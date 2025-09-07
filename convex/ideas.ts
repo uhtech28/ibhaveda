@@ -628,7 +628,7 @@ export const getUserIdeas = query({
       .unique();
 
     if (!user) {
-      throw new Error("User not found");
+      return []; // User profile not created yet
     }
 
     // Get user's ideas, excluding deleted ones
@@ -677,7 +677,7 @@ export const getUserRootIdeas = query({
       .unique();
 
     if (!user) {
-      throw new Error("User not found");
+      return []; // User profile not created yet
     }
 
     // Get user's root ideas (no parent)
@@ -1020,7 +1020,7 @@ export const getUserSparkedIdeas = query({
       .unique();
 
     if (!user) {
-      throw new Error("User not found");
+      return []; // User profile not created yet
     }
 
     // Get ideas the user has sparked
@@ -1092,7 +1092,7 @@ export const getUserContributedIdeas = query({
       .unique();
 
     if (!user) {
-      throw new Error("User not found");
+      return []; // User profile not created yet
     }
 
     // Get accepted contribution requests for this user
