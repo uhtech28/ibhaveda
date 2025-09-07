@@ -74,14 +74,24 @@ export const createUserProfile = mutation({
   // Verify authentication
   const identity = await auth.getUserIdentity()
   if (!identity) {
+    console.log("createUserProfile: No authentication identity found")
     throw new Error("Authentication required: Please sign in to create your profile")
   }
+
+  console.log("createUserProfile: Authentication identity subject:", identity.subject)
 
   // Check if user already has a profile
   const existing = await db
     .query("users")
     .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
     .first()
+
+  console.log("createUserProfile: Existing profile lookup result:", existing ? "found" : "not found")
+
+  if (existing) {
+    console.log("User profile creation attempted for existing profile:", identity.subject)
+    throw new Error("Profile already exists: You've already created your profile")
+  }
 
   if (existing) {
     console.log("User profile creation attempted for existing profile:", identity.subject)
@@ -231,12 +241,19 @@ export const updateUserProfile = mutation({
 export const userExists = query({
   handler: async ({ db, auth }): Promise<boolean> => {
     const identity = await auth.getUserIdentity()
-    if (!identity) return false
+    if (!identity) {
+      console.log("userExists: No authentication identity found")
+      return false
+    }
+
+    console.log("userExists: Authentication identity subject:", identity.subject)
 
     const profile = await db
       .query("users")
       .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
       .first()
+
+    console.log("userExists: Profile lookup result:", profile ? "found" : "not found")
 
     return !!profile
   },

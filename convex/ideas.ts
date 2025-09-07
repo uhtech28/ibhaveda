@@ -618,8 +618,11 @@ export const getUserIdeas = query({
     // Get authenticated user
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
+      console.log("getUserIdeas: No authentication identity");
       throw new Error("Not authenticated");
     }
+
+    console.log("getUserIdeas: Auth identity subject:", identity.subject);
 
     // Find user by Clerk ID
     const user = await ctx.db
@@ -627,8 +630,12 @@ export const getUserIdeas = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
-    if (!user) {
-      return []; // User profile not created yet
+    console.log("getUserIdeas: User lookup result:", user ? "found" : "not found");
+    if (user) {
+      console.log("getUserIdeas: User ID:", user._id);
+    } else {
+      console.log("getUserIdeas: User not found for Clerk ID:", identity.subject);
+      throw new Error("User not found"); // Throw error when user not found
     }
 
     // Get user's ideas, excluding deleted ones
