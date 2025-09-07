@@ -625,18 +625,18 @@ export const getUserIdeas = query({
     console.log("getUserIdeas: Auth identity subject:", identity.subject);
 
     // Find user by Clerk ID
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    console.log("getUserIdeas: User lookup result:", user ? "found" : "not found");
-    if (user) {
-      console.log("getUserIdeas: User ID:", user._id);
-    } else {
-      console.log("getUserIdeas: User not found for Clerk ID:", identity.subject);
-      throw new Error("User not found");
-    }
+        const user = await ctx.db
+          .query("users")
+          .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+          .unique();
+    
+        console.log("getUserIdeas: User lookup result:", user ? "found" : "not found");
+        if (user) {
+          console.log("getUserIdeas: User ID:", user._id);
+        } else {
+          console.log("getUserIdeas: User not found for Clerk ID:", identity.subject);
+          return []; // Return empty array instead of throwing
+        }
 
     // Get user's ideas, excluding deleted ones
     const userIdeas = await ctx.db
