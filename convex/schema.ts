@@ -17,12 +17,19 @@ export default defineSchema({
     skills: v.optional(v.array(v.string())), // Array of user skills (handled via userSkills table)
     industry: v.optional(v.string()), // Primary industry
     completedOnboarding: v.boolean(), // Onboarding status
+    isActive: v.optional(v.boolean()), // Account status for user management
+    role: v.optional(v.string()), // User role (user, moderator, admin)
+    followersCount: v.optional(v.number()), // Number of followers
+    followingCount: v.optional(v.number()), // Number of users followed
+    lastLoginAt: v.optional(v.number()), // Last login timestamp
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
   })
     .index("by_clerk_id", ["clerkId"])
       .index("by_username", ["username"])
       .index("by_completed_onboarding", ["completedOnboarding"])
+      .index("by_role", ["role"])
+      .index("by_is_active", ["isActive"])
     .index("by_created_at", ["createdAt"]),
 
   // User skills table for many-to-many relationship
@@ -119,6 +126,17 @@ export default defineSchema({
   .index("by_idea_contributor", ["ideaId", "contributorId"])
   .index("by_contributor_status", ["contributorId", "status"])
   .index("by_author_created", ["authorId", "createdAt"]),
+
+ // User follows table - tracks follower relationships between users
+ userFollows: defineTable({
+   followerId: v.id("users"), // User who is following
+   followeeId: v.id("users"), // User who is being followed
+   createdAt: v.number(), // Unix timestamp
+ })
+ .index("by_follower", ["followerId"])
+ .index("by_followee", ["followeeId"])
+ .index("by_follower_followee", ["followerId", "followeeId"])
+ .index("by_created_at", ["createdAt"]),
 
  // Todos table - tracks todo items for ideas
  todos: defineTable({

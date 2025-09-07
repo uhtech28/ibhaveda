@@ -214,6 +214,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
               userRequests={userRequestsQuery || []}
               addSubIdeaMutation={addSubIdeaMutation}
             />
+            <ContributionRequestSection idea={ideaQuery as ConvexIdea} />
             <TodoSection
               idea={ideaQuery as ConvexIdea}
               todos={todosQuery || []}
@@ -223,7 +224,6 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
               deleteTodoMutation={deleteTodoMutation}
             />
             <CalendarSection idea={ideaQuery as ConvexIdea} />
-            <ContributionRequestSection idea={ideaQuery as ConvexIdea} />
             <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
           </>
         )}

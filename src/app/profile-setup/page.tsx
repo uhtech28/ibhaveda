@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,11 +26,142 @@ import { industryCardOptions, skillCardOptions } from "@/lib/options";
 
 export default function ProfileSetupPage() {
   const { isLoaded, userId } = useAuth();
+
+  // Simple idea card component - Show only title
+  type IdeaType = {
+    _id: string;
+    title: string;
+  };
+
+  const IdeaCard = ({ idea }: { idea: IdeaType }) => (
+    <Card className="flex-shrink-0 w-80 hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="space-y-2">
+          <h4 className="font-semibold text-sm line-clamp-2 leading-tight min-h-[2.5rem]">
+            {idea.title}
+          </h4>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Metrics section component
+  const MetricsSection = () => (
+    <Card className="shadow-lg mt-8">
+      <CardHeader>
+        <CardTitle>Your Metrics</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-8">
+          {/* Created Ideas */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Ideas Created</h3>
+              {createdIdeasData && createdIdeasData.length > 3 && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => toggleExpanded('created')}
+                  className="h-auto p-0 text-primary hover:text-primary/80"
+                >
+                  {expandedSections.created ? 'Show less' : `View all (${createdIdeasData.length})`}
+                </Button>
+              )}
+            </div>
+           {createdIdeasData ? (
+             createdIdeas.length > 0 ? (
+               <div className="flex gap-3 overflow-x-auto pb-2">
+                 {createdIdeas.map((idea) => (
+                   <IdeaCard key={idea._id} idea={idea} />
+                 ))}
+               </div>
+             ) : (
+               <p className="text-muted-foreground text-center py-4">No ideas created yet</p>
+             )
+           ) : (
+             <div className="flex justify-center py-4">
+               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+             </div>
+           )}
+          </div>
+
+          {/* Sparked Ideas */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Ideas Sparked</h3>
+              {sparkedIdeasData && sparkedIdeasData.length > 3 && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => toggleExpanded('sparked')}
+                  className="h-auto p-0 text-primary hover:text-primary/80"
+                >
+                  {expandedSections.sparked ? 'Show less' : `View all (${sparkedIdeasData.length})`}
+                </Button>
+              )}
+            </div>
+            {sparkedIdeasData ? (
+              sparkedIdeas.length > 0 ? (
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {sparkedIdeas.map((idea) => (
+                    <IdeaCard key={idea._id} idea={idea} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">No ideas sparked yet</p>
+              )
+            ) : (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            )}
+          </div>
+
+          {/* Contributed Ideas */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Ideas Contributed To</h3>
+              {contributedIdeasData && contributedIdeasData.length > 3 && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => toggleExpanded('contributed')}
+                  className="h-auto p-0 text-primary hover:text-primary/80"
+                >
+                  {expandedSections.contributed ? 'Show less' : `View all (${contributedIdeasData.length})`}
+                </Button>
+              )}
+            </div>
+            {contributedIdeasData ? (
+              contributedIdeas.length > 0 ? (
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {contributedIdeas.map((idea) => (
+                    <IdeaCard key={idea._id} idea={idea} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">No contributions yet</p>
+              )
+            ) : (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
   const { user } = useUser();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [newSkill, setNewSkill] = useState("");
+  const [expandedSections, setExpandedSections] = useState({
+    created: false,
+    sparked: false,
+    contributed: false,
+  });
 
   // Comprehensive profile form data
   const [formData, setFormData] = useState({
@@ -43,6 +174,17 @@ export default function ProfileSetupPage() {
   });
 
   const createUserProfile = useMutation(api.users.createUserProfile);
+
+  // Query user's ideas data - refresh when expanded sections change
+  const createdIdeasData = useQuery(api.ideas.getUserIdeas);
+  const sparkedIdeasData = useQuery(api.ideas.getUserSparkedIdeas, { limit: expandedSections.sparked ? 20 : 20 });
+  const contributedIdeasData = useQuery(api.ideas.getUserContributedIdeas, { limit: expandedSections.contributed ? 20 : 20 });
+
+  // Apply limit to created ideas for display
+  const createdIdeas = createdIdeasData ? (expandedSections.created ? createdIdeasData : createdIdeasData.slice(0, 3)) : [];
+  // sparked and contributed ideas are already limited in query, but we'll show all returned items
+  const sparkedIdeas = sparkedIdeasData || [];
+  const contributedIdeas = contributedIdeasData || [];
 
   // Pre-populate with Clerk data
   useEffect(() => {
@@ -156,6 +298,14 @@ export default function ProfileSetupPage() {
     }));
   };
 
+  const toggleExpanded = (section: 'created' | 'sparked' | 'contributed') => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+
   if (!isLoaded || !userId) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -181,7 +331,7 @@ export default function ProfileSetupPage() {
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 mt-12">
             <h1 className="text-4xl font-bold text-foreground mb-4">Complete Your Profile</h1>
             <p className="text-lg text-muted-foreground">
               Tell us about yourself to personalize your experience
@@ -368,6 +518,8 @@ export default function ProfileSetupPage() {
               </form>
             </CardContent>
           </Card>
+
+          <MetricsSection />
         </div>
       </main>
 

@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as contributionRequests from "../contributionRequests.js";
+import type * as follows from "../follows.js";
 import type * as ideas from "../ideas.js";
 import type * as todos from "../todos.js";
 import type * as users from "../users.js";
@@ -28,6 +29,7 @@ import type * as users from "../users.js";
  */
 declare const fullApi: ApiFromModules<{
   contributionRequests: typeof contributionRequests;
+  follows: typeof follows;
   ideas: typeof ideas;
   todos: typeof todos;
   users: typeof users;

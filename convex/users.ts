@@ -18,6 +18,11 @@ export interface UserProfile {
   skills: string[]
   industry?: string
   completedOnboarding: boolean
+  isActive: boolean
+  role: string
+  followersCount: number
+  followingCount: number
+  lastLoginAt?: number
   createdAt: number
   updatedAt: number
 }
@@ -120,6 +125,10 @@ export const createUserProfile = mutation({
       linkedin: args.linkedin,
       twitter: args.twitter,
       completedOnboarding: true,
+      isActive: true,
+      role: "user",
+      followersCount: 0,
+      followingCount: 0,
       createdAt: now,
       updatedAt: now,
     });
@@ -307,5 +316,36 @@ export const getUserProfile = query({
       ...profile,
       skills: skills.map((s) => s.skillName),
     } as UserProfile
+  },
+})
+
+// Get all users for community page
+export const getAllUsers = query({
+  handler: async ({ db }): Promise<UserProfile[]> => {
+    const users = await db
+      .query("users")
+      .withIndex("by_is_active")
+      .filter((q) => q.neq(q.field("isActive"), false))
+      .collect()
+
+    // Sort by createdAt descending
+    users.sort((a, b) => b.createdAt - a.createdAt)
+
+    // Fetch skills for each user efficiently
+    const usersWithSkills = await Promise.all(
+      users.map(async (user) => {
+        const skills = await db
+          .query("userSkills")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect()
+
+        return {
+          ...user,
+          skills: skills.map((s) => s.skillName),
+        } as UserProfile
+      })
+    )
+
+    return usersWithSkills
   },
 })

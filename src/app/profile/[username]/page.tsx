@@ -39,6 +39,9 @@ interface UserProfile {
   completedOnboarding: boolean;
   createdAt: number;
   updatedAt: number;
+  ideasCreated?: number;
+  ideasSparked?: number;
+  ideasContributed?: number;
 }
 
 // Mock profile data for demonstration
@@ -53,7 +56,10 @@ const mockProfile: UserProfile = {
   skills: ["React", "TypeScript", "Node.js", "Python", "AWS"],
   completedOnboarding: true,
   createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000, // 7 days ago
-  updatedAt: Date.now()
+  updatedAt: Date.now(),
+  ideasCreated: 15,
+  ideasSparked: 8,
+  ideasContributed: 12
 }
 
 export default function ProfilePage() {
@@ -200,7 +206,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Profile Header */}
-        <Card className="mb-6">
+        <Card className="mt-12 mb-6">
           <CardHeader className="pb-4">
             <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
               {/* Avatar Upload Component */}
@@ -296,6 +302,28 @@ export default function ProfilePage() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* User Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="hover:shadow-lg transition-shadow duration-200">
+            <CardContent className="text-center py-6">
+              <div className="text-2xl font-bold text-primary">{profile.ideasCreated || 0}</div>
+              <div className="text-sm text-muted-foreground">Ideas Created</div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-lg transition-shadow duration-200">
+            <CardContent className="text-center py-6">
+              <div className="text-2xl font-bold text-primary">{profile.ideasSparked || 0}</div>
+              <div className="text-sm text-muted-foreground">Ideas Sparked</div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-lg transition-shadow duration-200">
+            <CardContent className="text-center py-6">
+              <div className="text-2xl font-bold text-primary">{profile.ideasContributed || 0}</div>
+              <div className="text-sm text-muted-foreground">Ideas Contributed</div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Skills Section */}
         <Card className="mb-6">

@@ -999,4 +999,152 @@ export const rejectContribution = mutation({
 export const getContributionRequests = getRequestsByIdea;
 
 // Get incoming requests for current user
+// Get ideas sparked by the current user (excluding their own ideas)
+export const getUserSparkedIdeas = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 10;
+
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Find user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get ideas the user has sparked
+    const userSparks = await ctx.db
+      .query("userIdeaSparks")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Extract idea IDs
+    const ideaIds = userSparks.map(spark => spark.ideaId);
+
+    if (ideaIds.length === 0) {
+      return [];
+    }
+
+    // Get the ideas, excluding user's own ideas
+    const ideas = await Promise.all(
+      ideaIds
+        .slice(0, limit) // Limit the number of ideas to fetch
+        .map(async (ideaId) => {
+          const idea = await ctx.db.get(ideaId);
+
+          // Skip if idea doesn't exist, is deleted, or is the user's own idea
+          if (!idea || idea.isDeleted || idea.authorId === user._id) {
+            return null;
+          }
+
+          // Get author information
+          const author = await ctx.db.get(idea.authorId);
+
+          return {
+            ...idea,
+            author: author ? {
+              ...author,
+              name: author.displayName,
+              username: author.username,
+            } : null,
+            // Include spark timestamp
+            sparkedAt: userSparks.find(s => s.ideaId === ideaId)?.createdAt,
+          };
+        })
+    );
+
+    // Filter out nulls and sort by spark timestamp (most recent first)
+    return ideas
+      .filter(idea => idea !== null)
+      .sort((a, b) => (b.sparkedAt || 0) - (a.sparkedAt || 0));
+  },
+});
+
+// Get ideas the user has contributed to (with accepted requests)
+export const getUserContributedIdeas = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 10;
+
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Find user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get accepted contribution requests for this user
+    const acceptedRequests = await ctx.db
+      .query("contributionRequests")
+      .withIndex("by_contributor_status", (q) =>
+        q.eq("contributorId", user._id).eq("status", "accepted")
+      )
+      .collect();
+
+    // Extract unique idea IDs
+    const ideaIds = [...new Set(acceptedRequests.map(req => req.ideaId))];
+
+    if (ideaIds.length === 0) {
+      return [];
+    }
+
+    // Get the ideas, excluding user's own ideas (shouldn't happen but safety check)
+    const ideas = await Promise.all(
+      ideaIds
+        .slice(0, limit) // Limit the number of ideas to fetch
+        .map(async (ideaId) => {
+          const idea = await ctx.db.get(ideaId);
+
+          // Skip if idea doesn't exist or is deleted
+          if (!idea || idea.isDeleted) {
+            return null;
+          }
+
+          // Get author information
+          const author = await ctx.db.get(idea.authorId);
+
+          // Find the contribution request to get the accepted timestamp
+          const request = acceptedRequests.find(req => req.ideaId === ideaId);
+
+          return {
+            ...idea,
+            author: author ? {
+              ...author,
+              name: author.displayName,
+              username: author.username,
+            } : null,
+            // Include contribution accepted timestamp
+            contributedAt: request?.updatedAt || request?.createdAt,
+          };
+        })
+    );
+
+    // Filter out nulls and sort by contribution timestamp (most recent first)
+    return ideas
+      .filter(idea => idea !== null)
+      .sort((a, b) => (b.contributedAt || 0) - (a.contributedAt || 0));
+  },
+});
 export const getIncomingContributionRequests = getIncomingRequests;
