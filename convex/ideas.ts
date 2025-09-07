@@ -635,7 +635,7 @@ export const getUserIdeas = query({
       console.log("getUserIdeas: User ID:", user._id);
     } else {
       console.log("getUserIdeas: User not found for Clerk ID:", identity.subject);
-      throw new Error("User not found"); // Throw error when user not found
+      throw new Error("User not found");
     }
 
     // Get user's ideas, excluding deleted ones
