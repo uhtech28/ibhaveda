@@ -1,12 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { HeroHeader } from "@/components/header";
 import FooterSection from "@/components/footer";
 import { Button } from "@/components/ui/button";
-import { Plus, MessageCircle, Users } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CategoryMultiSelect } from "@/components/CategoryMultiSelect";
+import { Plus, MessageCircle, Users, Filter } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery, useMutation } from "convex/react";
@@ -31,6 +33,7 @@ type ConvexIdea = {
     username?: string;
     avatar?: string;
   } | null;
+  contributionCount?: number;
 }
 
 // Grid Card Component for the grid layout
@@ -134,7 +137,7 @@ const IdeaGridCard: React.FC<{
             </div>
           </div>
 
-          {contributorsCount > 0 && (
+          {contributorsCount >= 0 && (
             <div className="flex items-center space-x-1 text-muted-foreground">
               <Users className="w-4 h-4" />
               <span className="text-sm font-medium">{contributorsCount}</span>
@@ -149,6 +152,10 @@ const IdeaGridCard: React.FC<{
 export default function FeedPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+
+  // Filter states
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   // Fetch ideas from Convex
   const ideasQuery = useQuery(api.ideas.getPublicIdeas);
@@ -187,6 +194,14 @@ export default function FeedPage() {
     router.push(`/idea/${ideaId}`);
   };
 
+  // Filter ideas based on selected categories
+  const filteredIdeas = ideas.filter((idea) => {
+    if (selectedCategories.length === 0) return true;
+    // Assuming category is comma-separated string
+    const ideaCategories = idea.category ? idea.category.split(',').map(c => c.trim()) : [];
+    return selectedCategories.some(selected => ideaCategories.includes(selected));
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <HeroHeader />
@@ -196,9 +211,31 @@ export default function FeedPage() {
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-12 gap-4">
             <div className="flex flex-col gap-2">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                Discover Ideas
-              </h1>
+              <div className="flex items-center gap-4">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                  Discover Ideas
+                </h1>
+                <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <Filter className="w-4 h-4" />
+                      Filter
+                      {selectedCategories.length > 0 && (
+                        <span className="bg-primary text-primary-foreground text-xs rounded-full px-2 py-0.5">
+                          {selectedCategories.length}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" align="start">
+                    <CategoryMultiSelect
+                      selectedCategories={selectedCategories}
+                      onChange={setSelectedCategories}
+                      placeholder="Select categories to filter..."
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               <p className="text-muted-foreground">Explore innovative concepts from our creative community</p>
             </div>
             <div className="flex items-center gap-4">
@@ -213,21 +250,29 @@ export default function FeedPage() {
 
           {/* Ideas Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {ideas && ideas.length > 0 ? (
-              ideas.map((idea) => (
+            {ideasQuery === undefined ? (
+              // Loading state
+              <div className="col-span-full text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading ideas...</p>
+              </div>
+            ) : filteredIdeas.length > 0 ? (
+              filteredIdeas.map((idea) => (
                 <IdeaGridCard
                   key={idea._id}
                   idea={idea}
                   onClick={() => handleIdeaClick(idea._id)}
                   onSpark={handleSpark}
-                  contributorsCount={Math.floor(Math.random() * 10) + 1}
+                  contributorsCount={idea.contributionCount || 0}
                 />
               ))
-            ) : ideasQuery === undefined ? (
-              // Loading state
+            ) : selectedCategories.length > 0 ? (
+              // No ideas matching filter
               <div className="col-span-full text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading ideas...</p>
+                <p className="text-muted-foreground mb-4">No ideas found for selected categories. Try different filters.</p>
+                <Button variant="outline" onClick={() => setSelectedCategories([])}>
+                  Clear Filters
+                </Button>
               </div>
             ) : (
               // No ideas state

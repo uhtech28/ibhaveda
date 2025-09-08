@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { CategoryMultiSelect } from "@/components/CategoryMultiSelect";
 
 export default function CreateIdeaPage() {
   const { isLoaded, userId } = useAuth();
@@ -23,8 +24,7 @@ export default function CreateIdeaPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: '',
-    customCategory: '',
+    categories: [] as string[],
     visibility: 'public' as 'public' | 'private'
   });
 
@@ -35,16 +35,6 @@ export default function CreateIdeaPage() {
   const titleCount = formData.title.length;
   const descriptionCount = formData.description.length;
 
-  // Available categories
-  const categories = [
-    { value: 'technology', label: 'Technology' },
-    { value: 'art', label: 'Art' },
-    { value: 'business', label: 'Business' },
-    { value: 'education', label: 'Education' },
-    { value: 'health', label: 'Health' },
-    { value: 'entertainment', label: 'Entertainment' },
-    { value: 'other', label: 'Other' }
-  ];
 
   // Initialize Convex mutation
   const createIdea = useMutation(api.ideas.createIdea);
@@ -65,10 +55,8 @@ export default function CreateIdeaPage() {
       newErrors.description = 'Description must be 1200 characters or less';
     }
 
-    if (!formData.category) {
-      newErrors.category = 'Please select a category';
-    } else if (formData.category === 'other' && !formData.customCategory.trim()) {
-      newErrors.customCategory = 'Please specify a custom category';
+    if (formData.categories.length === 0) {
+      newErrors.categories = 'Please select at least one category';
     }
 
     setErrors(newErrors);
@@ -76,7 +64,7 @@ export default function CreateIdeaPage() {
   };
 
   // Form handlers
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
+  const handleInputChange = (field: keyof typeof formData, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
@@ -94,16 +82,11 @@ export default function CreateIdeaPage() {
     setIsSubmitting(true);
 
     try {
-      // Handle category
-      const finalCategory = formData.category === 'other'
-        ? formData.customCategory.trim()
-        : formData.category;
-
       // Create idea via Convex mutation
       await createIdea({
         title: formData.title.trim(),
         description: formData.description.trim(),
-        category: finalCategory,
+        category: formData.categories.join(', '), // Send as comma-separated string
         visibility: formData.visibility,
       });
 
@@ -143,7 +126,7 @@ export default function CreateIdeaPage() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header with Back Button */}
-          <div className="flex items-center gap-4 mb-8">
+          <div className="flex items-center gap-4 mb-8 mt-6 md:mt-8">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/feed">
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -201,48 +184,23 @@ export default function CreateIdeaPage() {
                   </p>
                 </div>
 
-                {/* Category */}
+                {/* Categories */}
                 <div className="space-y-2">
-                  <Label htmlFor="category" className="text-sm font-medium">
-                    Category <span className="text-destructive">*</span>
+                  <Label className="text-sm font-medium">
+                    Categories <span className="text-destructive">*</span>
                   </Label>
-                  <select
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => handleInputChange('category', e.target.value)}
-                    className={`w-full h-9 px-3 py-1 text-base rounded-md border bg-transparent outline-none focus:border-ring focus-visible:ring-ring/50 shadow-xs transition-[color,box-shadow] md:text-sm ${errors.category ? 'border-destructive' : 'border-border'}`}
-                  >
-                    <option value="" disabled>Select a category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.category && (
-                    <p className="text-sm text-destructive">{errors.category}</p>
+                  <CategoryMultiSelect
+                    selectedCategories={formData.categories}
+                    onChange={(categories) => handleInputChange('categories', categories)}
+                  />
+                  {errors.categories && (
+                    <p className="text-sm text-destructive">{errors.categories}</p>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    Select one or more categories that best describe your idea
+                  </p>
                 </div>
 
-                {/* Custom Category Input */}
-                {formData.category === 'other' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="customCategory" className="text-sm font-medium">
-                      Custom Category <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="customCategory"
-                      type="text"
-                      value={formData.customCategory}
-                      onChange={(e) => handleInputChange('customCategory', e.target.value)}
-                      placeholder="Enter your custom category"
-                      className={errors.customCategory ? 'border-destructive' : ''}
-                    />
-                    {errors.customCategory && (
-                      <p className="text-sm text-destructive">{errors.customCategory}</p>
-                    )}
-                  </div>
-                )}
 
                 {/* Visibility */}
                 <div className="space-y-2">

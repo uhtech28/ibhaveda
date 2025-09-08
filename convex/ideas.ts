@@ -120,10 +120,30 @@ export const getPublicIdeas = query({
       .order("desc")
       .take(20);
 
-    // Get author information for each idea
+    // Get author information and contribution count for each idea
     const ideasWithAuthors = await Promise.all(
       ideas.map(async (idea) => {
-        const author = await ctx.db.get(idea.authorId);
+        let author = null;
+        try {
+          author = await ctx.db.get(idea.authorId);
+        } catch (e) {
+          console.error("Error fetching author for idea:", idea._id, e);
+        }
+
+        // Count accepted contribution requests
+        let contributionCount = 0;
+        try {
+          const acceptedContributions = await ctx.db
+            .query("contributionRequests")
+            .withIndex("by_idea_status_created", (q) =>
+              q.eq("ideaId", idea._id).eq("status", "accepted")
+            )
+            .collect();
+          contributionCount = acceptedContributions.length;
+        } catch (e) {
+          console.error("Error fetching contribution count for idea:", idea._id, e);
+        }
+
         return {
           ...idea,
           author: author ? {
@@ -132,6 +152,7 @@ export const getPublicIdeas = query({
             name: author.displayName,
             username: author.username,
           } : null,
+          contributionCount: contributionCount,
         };
       })
     );
