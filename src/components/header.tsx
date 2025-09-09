@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
 import React from 'react'
 import { cn } from '@/lib/utils'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 
 const menuItems = [
     { name: 'Feed', href: '/feed' },
@@ -105,6 +106,7 @@ export const HeroHeader = () => {
                                     </Button>
                                 </SignedOut>
                                 <SignedIn>
+                                    <NotificationBell />
                                     <UserButton />
                                 </SignedIn>
                                 <ThemeToggle />

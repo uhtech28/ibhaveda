@@ -1327,7 +1327,7 @@ const CalendarSection: React.FC<{ idea: ConvexIdea }> = ({ idea: _idea }: { idea
           </CalendarDate>
           <CalendarHeader />
           <CalendarBody features={sampleFeatures}>
-            {({ feature }) => <CalendarItem feature={feature} />}
+            {({ feature }) => <CalendarItem key={feature.id} feature={feature} />}
           </CalendarBody>
         </CalendarProvider>
       </div>

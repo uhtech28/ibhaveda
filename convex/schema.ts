@@ -151,5 +151,52 @@ export default defineSchema({
  .index("by_idea", ["ideaId"])
  .index("by_author", ["authorId"])
  .index("by_idea_status", ["ideaId", "status"])
- .index("by_created_at", ["createdAt"])
+ .index("by_created_at", ["createdAt"]),
+
+ // Messages table - stores chat messages
+ messages: defineTable({
+   senderId: v.id("users"), // Reference to users table
+   receiverId: v.id("users"), // Reference to users table
+   content: v.string(), // Message content
+   createdAt: v.number(), // Unix timestamp
+   read: v.boolean(), // Read status
+   conversationId: v.id("conversations"), // Reference to conversations table
+   messageType: v.optional(v.string()), // Message type (e.g., 'text', 'image')
+ })
+   .index("by_sender", ["senderId"])
+   .index("by_receiver", ["receiverId"])
+   .index("by_conversation", ["conversationId"])
+   .index("by_conversation_created", ["conversationId", "createdAt"])
+   .index("by_created_at", ["createdAt"]),
+
+ // Conversations table - stores conversation metadata
+ conversations: defineTable({
+   participant1: v.id("users"), // First participant user ID
+   participant2: v.id("users"), // Second participant user ID
+   createdAt: v.number(), // Unix timestamp
+   updatedAt: v.number(), // Unix timestamp
+   lastMessageId: v.optional(v.id("messages")), // Reference to latest message
+   unreadCount: v.optional(v.number()), // Unread message count for current user
+ })
+   .index("by_participant1", ["participant1"])
+   .index("by_participant2", ["participant2"])
+   .index("by_created_at", ["createdAt"])
+   .index("by_participants", ["participant1", "participant2"]),
+
+ // Notifications table - tracks user notifications for ideas and system events
+ notifications: defineTable({
+   recipientId: v.id("users"), // User receiving the notification
+   senderId: v.id("users"), // User who triggered the notification
+   type: v.string(), // Notification type (new_idea, comment, spark, etc.)
+   message: v.string(), // Notification message text
+   relatedId: v.optional(v.union(v.id("ideas"), v.id("comments"), v.id("contributionRequests"))), // ID of related item
+   isRead: v.boolean(), // Read status
+   createdAt: v.number(), // Unix timestamp
+ })
+   .index("by_recipient", ["recipientId"])
+   .index("by_recipient_read", ["recipientId", "isRead"])
+   .index("by_recipient_created", ["recipientId", "createdAt"])
+   .index("by_sender", ["senderId"])
+   .index("by_related", ["relatedId"])
+   .index("by_type", ["type"])
 })
