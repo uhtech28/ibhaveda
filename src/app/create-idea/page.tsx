@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { CategoryMultiSelect } from "@/components/CategoryMultiSelect";
+import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 
 export default function CreateIdeaPage() {
   const { isLoaded, userId } = useAuth();
@@ -24,7 +24,7 @@ export default function CreateIdeaPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    categories: [] as string[],
+    skills: [] as string[],
     visibility: 'public' as 'public' | 'private'
   });
 
@@ -55,8 +55,8 @@ export default function CreateIdeaPage() {
       newErrors.description = 'Description must be 1200 characters or less';
     }
 
-    if (formData.categories.length === 0) {
-      newErrors.categories = 'Please select at least one category';
+    if (formData.skills.length === 0) {
+      newErrors.skills = 'Please select at least one skill';
     }
 
     setErrors(newErrors);
@@ -86,7 +86,7 @@ export default function CreateIdeaPage() {
       await createIdea({
         title: formData.title.trim(),
         description: formData.description.trim(),
-        category: formData.categories.join(', '), // Send as comma-separated string
+        category: formData.skills.join(', '), // Send as comma-separated string
         visibility: formData.visibility,
       });
 
@@ -184,20 +184,20 @@ export default function CreateIdeaPage() {
                   </p>
                 </div>
 
-                {/* Categories */}
+                {/* Skills */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">
-                    Categories <span className="text-destructive">*</span>
+                    Skills <span className="text-destructive">*</span>
                   </Label>
-                  <CategoryMultiSelect
-                    selectedCategories={formData.categories}
-                    onChange={(categories) => handleInputChange('categories', categories)}
+                  <SkillsMultiSelect
+                    selectedSkills={formData.skills}
+                    onChange={(skills) => handleInputChange('skills', skills)}
                   />
-                  {errors.categories && (
-                    <p className="text-sm text-destructive">{errors.categories}</p>
+                  {errors.skills && (
+                    <p className="text-sm text-destructive">{errors.skills}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Select one or more categories that best describe your idea
+                    Select one or more skills that best describe your idea
                   </p>
                 </div>
 
