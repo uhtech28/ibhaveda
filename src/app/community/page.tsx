@@ -1,15 +1,14 @@
 "use client"
 
 import React from "react"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery } from "convex/react"
 import Link from "next/link"
-import { Id } from "../../../convex/_generated/dataModel"
 import { api } from "../../../convex/_generated/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserCheck, UserPlus, Users, MapPin, Globe } from "lucide-react"
+import { Users, MapPin, Globe, AlertCircle } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 
 // User profile interface
@@ -35,39 +34,44 @@ interface UserProfile {
 }
 
 export default function CommunityPage() {
-  const { user: currentUser, isLoaded: isClerkUserLoaded } = useUser()
+   const { isLoaded: isClerkUserLoaded } = useUser()
 
-  // Convex data
-  const users = useQuery(api.users.getAllUsers)
-  const followMutation = useMutation(api.follows.followUser)
-  const unfollowMutation = useMutation(api.follows.unfollowUser)
+   // Convex data
+   const users = useQuery(api.users.getAllUsers)
 
-  const handleFollow = async (followeeId: string) => {
-    try {
-      await followMutation({ followeeId: followeeId as Id<"users"> })
-    } catch (error) {
-      console.error("Failed to follow user:", error)
-    }
-  }
+   // Loading state
+   if (!isClerkUserLoaded || users === undefined) {
+     return (
+       <div className="min-h-screen bg-background flex items-center justify-center">
+         <div className="text-center">
+           <Users className="w-8 h-8 animate-spin mx-auto mb-2" />
+           <p>Loading community...</p>
+         </div>
+       </div>
+     )
+   }
 
-  const handleUnfollow = async (followeeId: string) => {
-    try {
-      await unfollowMutation({ followeeId: followeeId as Id<"users"> })
-    } catch (error) {
-      console.error("Failed to unfollow user:", error)
-    }
-  }
-
-  if (!isClerkUserLoaded || !users) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Users className="w-8 h-8 animate-spin mx-auto mb-2" />
-          <p>Loading community...</p>
-        </div>
-      </div>
-    )
-  }
+   // Error state
+   if (users === null) {
+     return (
+       <div className="min-h-screen bg-background flex items-center justify-center">
+         <Card className="max-w-md w-full">
+           <CardContent className="pt-6">
+             <div className="text-center">
+               <AlertCircle className="w-8 h-8 text-destructive mx-auto mb-2" />
+               <h3 className="text-lg font-semibold mb-2">Failed to Load Community</h3>
+               <p className="text-muted-foreground mb-4">
+                 Unable to fetch community data. Please try refreshing the page.
+               </p>
+               <Button onClick={() => window.location.reload()}>
+                 Try Again
+               </Button>
+             </div>
+           </CardContent>
+         </Card>
+       </div>
+     )
+   }
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,9 +94,6 @@ export default function CommunityPage() {
             <UserCard
               key={user._id}
               user={user}
-              currentUserId={currentUser?.id}
-              onFollow={handleFollow}
-              onUnfollow={handleUnfollow}
             />
           ))}
         </div>
@@ -113,38 +114,15 @@ export default function CommunityPage() {
 
 // User Card Component
 interface UserCardProps {
-  user: UserProfile
-  currentUserId?: string
-  onFollow: (followeeId: string) => void
-  onUnfollow: (followeeId: string) => void
+   user: UserProfile
 }
 
-const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onFollow, onUnfollow }) => {
-  const isCurrentUser = currentUserId ? (user.clerkId === currentUserId) : false
-  const [isFollowingThisUser, setIsFollowingThisUser] = React.useState(false)
-
-  const isFollowing = useQuery(api.follows.isFollowing, {
-    followeeId: user._id as Id<"users">
-  })
-
-  React.useEffect(() => {
-    setIsFollowingThisUser(isFollowing || false)
-  }, [isFollowing])
-
-  const handleFollowToggle = () => {
-    if (isFollowingThisUser) {
-      onUnfollow(user._id)
-      setIsFollowingThisUser(false)
-    } else {
-      onFollow(user._id)
-      setIsFollowingThisUser(true)
-    }
-  }
+const UserCard: React.FC<UserCardProps> = ({ user }) => {
 
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
+    <Link href={`/profile/${encodeURIComponent(user.username)}`}>
+      <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <CardHeader className="pb-3">
           <div className="flex items-center gap-3">
             <Avatar className="w-12 h-12">
               <AvatarImage src={user.avatar} alt={user.displayName} />
@@ -157,29 +135,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onFollow, onUn
               <p className="text-sm text-muted-foreground">@{user.username}</p>
             </div>
           </div>
-
-          {!isCurrentUser && (
-            <Button
-              size="sm"
-              variant={isFollowingThisUser ? "outline" : "default"}
-              onClick={handleFollowToggle}
-              className="shrink-0"
-            >
-              {isFollowingThisUser ? (
-                <>
-                  <UserCheck className="w-3 h-3 mr-1" />
-                  Following
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-3 h-3 mr-1" />
-                  Follow
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </CardHeader>
+        </CardHeader>
 
       <CardContent className="pt-0">
         {/* Bio */}
@@ -239,15 +195,8 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onFollow, onUn
           </div>
         )}
 
-        {/* Profile Link */}
-        <div className="mt-3 pt-3 border-t">
-          <Link href={`/profile/${encodeURIComponent(user.username)}`}>
-            <Button variant="ghost" size="sm" className="w-full">
-              View Profile
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

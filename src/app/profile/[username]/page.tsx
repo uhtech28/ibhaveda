@@ -44,23 +44,7 @@ interface UserProfile {
   ideasContributed?: number;
 }
 
-// Mock profile data for demonstration
-const mockProfile: UserProfile = {
-  _id: "1",
-  clerkId: "clerk_123",
-  username: "john-doe",
-  displayName: "John Doe",
-  bio: "Full-stack developer passionate about building innovative solutions and mentoring the next generation of developers.",
-  avatar: "",
-  industry: "Technology",
-  skills: ["React", "TypeScript", "Node.js", "Python", "AWS"],
-  completedOnboarding: true,
-  createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000, // 7 days ago
-  updatedAt: Date.now(),
-  ideasCreated: 15,
-  ideasSparked: 8,
-  ideasContributed: 12
-}
+// Mock profile removed - using only real data from Convex
 
 export default function ProfilePage() {
   const params = useParams()
@@ -79,10 +63,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(() => {
-    // Use real Convex data if available, otherwise mock for john-doe
-    if (realProfile) return realProfile as UserProfile
-    if (username === "john-doe") return mockProfile
-    return null
+    // Use only real Convex data
+    return realProfile as UserProfile || null
   })
 
   const [formData, setFormData] = useState({
@@ -476,20 +458,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Demo Notes */}
-        <div className="mt-8 p-4 bg-muted/50 rounded-lg">
-          <h3 className="font-semibold mb-2">Demo Features:</h3>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            <li>✅ Profile picture upload with avatar component</li>
-            <li>✅ Inline editing with form validation</li>
-            <li>✅ Industry dropdown selection from 30+ options</li>
-            <li>✅ Skills dropdown selection from 50+ predefined options</li>
-            <li>✅ Skills management with add/remove functionality</li>
-            <li>✅ Duplicate prevention and validation</li>
-            <li>✅ Responsive design with mobile-first approach</li>
-            <li>✅ Ready for Convex backend integration</li>
-          </ul>
-        </div>
       </div>
     </div>
   )

@@ -344,6 +344,19 @@ export const toggleSpark = mutation({
         updatedAt: now,
       });
 
+      // Create notification for idea author (if not the same user)
+      if (idea.authorId !== user._id) {
+        await ctx.db.insert("notifications", {
+          recipientId: idea.authorId,
+          senderId: user._id,
+          type: "spark_received",
+          message: `${user.displayName} sparked your idea "${idea.title}"`,
+          relatedId: args.ideaId,
+          isRead: false,
+          createdAt: now,
+        });
+      }
+
       return { action: "added", sparkCount: idea.sparkCount + 1 };
     }
   },
@@ -527,6 +540,19 @@ export const addComment = mutation({
       commentCount: idea.commentCount + 1,
       updatedAt: now,
     });
+
+    // Create notification for idea author (if not the same user)
+    if (idea.authorId !== user._id) {
+      await ctx.db.insert("notifications", {
+        recipientId: idea.authorId,
+        senderId: user._id,
+        type: "comment_received",
+        message: `${user.displayName} commented on your idea "${idea.title}"`,
+        relatedId: args.ideaId,
+        isRead: false,
+        createdAt: now,
+      });
+    }
 
     return { commentId, message: "Comment added successfully" };
   },

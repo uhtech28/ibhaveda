@@ -88,6 +88,19 @@ export const createContributionRequest = mutation({
         updatedAt: now,
       });
 
+      // Create notification for idea author (if not the same user)
+      if (idea.authorId !== user._id) {
+        await ctx.db.insert("notifications", {
+          recipientId: idea.authorId,
+          senderId: user._id,
+          type: "contribution_request_received",
+          message: `${user.displayName} requested to contribute to your idea "${idea.title}"`,
+          relatedId: requestId, // Note: relatedId should be the request ID, not idea ID for proper categorization
+          isRead: false,
+          createdAt: now,
+        });
+      }
+
       return { requestId, message: "Contribution request created successfully" };
     } catch (error) {
       console.error("Error in createContributionRequest:", error);
@@ -184,8 +197,14 @@ export const getMyRequests = query({
   handler: async (ctx) => {
     try {
       const identity = await ctx.auth.getUserIdentity();
+      console.log("[DEBUG getMyRequests] Identity check:", {
+        hasIdentity: !!identity,
+        subject: identity?.subject,
+        timestamp: new Date().toISOString()
+      });
       if (!identity) {
-        throw new Error("Authentication required: Please sign in to access your requests");
+        console.log("[DEBUG getMyRequests] No identity found, returning empty array");
+        return []; // Return empty array for unauthenticated users
       }
 
       const user = await ctx.db
@@ -388,7 +407,20 @@ export const getMyRequests = query({
         }
   
         console.log("Successfully updated request:", args.requestId, "to status:", args.status);
-  
+
+        // Create notification for the contributor about the status update
+        await ctx.db.insert("notifications", {
+          recipientId: request.contributorId,
+          senderId: user._id,
+          type: args.status === "accepted" ? "contribution_request_accepted" : "contribution_request_rejected",
+          message: args.status === "accepted"
+            ? `${user.displayName} accepted your contribution request`
+            : `${user.displayName} declined your contribution request`,
+          relatedId: request.ideaId,
+          isRead: false,
+          createdAt: Date.now(),
+        });
+
         return { message: "Request status updated successfully" };
       } catch (error) {
         console.error("Error in updateRequestStatus:", error);

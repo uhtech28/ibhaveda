@@ -216,8 +216,8 @@ type OutOfBoundsDayProps = {
 };
 
 const OutOfBoundsDay = ({ day }: OutOfBoundsDayProps) => (
-  <div className="relative h-full w-full bg-secondary p-1 text-muted-foreground text-xs">
-    {day}
+  <div className="relative h-full w-full bg-secondary p-1 text-muted-foreground text-sm min-h-[40px] sm:min-h-[50px] md:min-h-[60px]">
+    <span className="font-medium">{day}</span>
   </div>
 );
 
@@ -408,13 +408,13 @@ export const CalendarBody = ({ features: legacyFeatures, tasks, children }: Cale
     days.push(
       <div
         className={cn(
-          "relative flex h-full w-full flex-col gap-1 p-1 text-muted-foreground text-xs cursor-pointer hover:bg-accent/50",
+          "relative flex h-full w-full flex-col gap-1 p-1 text-muted-foreground text-sm cursor-pointer hover:bg-accent/50",
           ideaId && "hover:bg-blue-50"
         )}
         key={day}
         onClick={() => handleDayClick(day, true)}
       >
-        {day}
+        <span className="font-medium text-sm">{day}</span>
         <div>
           {featuresForDay.slice(0, 3).map((feature) => {
             const correspondingTask = allTasks.find(t => t._id === feature.id);
@@ -443,12 +443,12 @@ export const CalendarBody = ({ features: legacyFeatures, tasks, children }: Cale
 
   return (
     <>
-      <div className="grid flex-grow grid-cols-7">
+      <div className="grid flex-grow grid-cols-7 gap-px bg-border">
         {days.map((day, index) => (
           <div
             className={cn(
-              "relative aspect-square overflow-hidden border-t border-r",
-              index % 7 === 6 && "border-r-0"
+              "relative aspect-square overflow-hidden bg-background",
+              "min-h-[40px] sm:min-h-[50px] md:min-h-[60px]"
             )}
             key={index}
           >
@@ -825,7 +825,7 @@ export const CalendarHeader = ({ className }: CalendarHeaderProps) => {
   return (
     <div className={cn("grid flex-grow grid-cols-7", className)}>
       {daysData.map((day) => (
-        <div className="p-3 text-right text-muted-foreground text-xs" key={day}>
+        <div className="p-3 text-right text-muted-foreground text-sm font-medium" key={day}>
           {day}
         </div>
       ))}

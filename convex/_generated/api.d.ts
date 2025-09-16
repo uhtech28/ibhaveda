@@ -15,9 +15,10 @@ import type {
 } from "convex/server";
 import type * as chat from "../chat.js";
 import type * as contributionRequests from "../contributionRequests.js";
-import type * as follows from "../follows.js";
 import type * as ideas from "../ideas.js";
+import type * as invitations from "../invitations.js";
 import type * as notifications from "../notifications.js";
+import type * as search from "../search.js";
 import type * as todos from "../todos.js";
 import type * as users from "../users.js";
 
@@ -32,9 +33,10 @@ import type * as users from "../users.js";
 declare const fullApi: ApiFromModules<{
   chat: typeof chat;
   contributionRequests: typeof contributionRequests;
-  follows: typeof follows;
   ideas: typeof ideas;
+  invitations: typeof invitations;
   notifications: typeof notifications;
+  search: typeof search;
   todos: typeof todos;
   users: typeof users;
 }>;

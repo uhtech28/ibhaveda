@@ -338,17 +338,17 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
           <div className="flex items-center gap-2">
             {assignedTo ? (
               <div className="flex items-center gap-2">
-                <Avatar className="h-5 w-5">
+                <Avatar className="h-6 w-6">
                   <AvatarImage src={assignedTo.avatar} alt={assignedTo.name} />
                   <AvatarFallback className="text-xs">
                     {assignedTo.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-xs text-muted-foreground">{assignedTo.name}</span>
+                <span className="text-xs text-muted-foreground truncate">{assignedTo.name}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <User className="h-3 w-3 text-muted-foreground" />
+                <User className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">Unassigned</span>
               </div>
             )}
@@ -425,7 +425,7 @@ export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
   const items = filteredData.map((item) => item.id);
 
   return (
-    <ScrollArea className="overflow-hidden max-h-24">
+    <ScrollArea className="overflow-hidden max-h-32 sm:max-h-40">
       <SortableContext items={items}>
         <div
           className={cn(
@@ -616,10 +616,10 @@ export const KanbanProvider = <
       >
         <div
           className={cn(
-              "grid size-full gap-1",
-              "grid-cols-3",
-              className
-            )}
+               "grid size-full gap-1",
+               "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+               className
+             )}
         >
           {columns.map((column) => <Fragment key={column.id}>{children(column)}</Fragment>)}
         </div>

@@ -19,6 +19,7 @@ import { Doc, Id } from "@convex/_generated/dataModel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ParticleButton from "@/components/kokonutui/particle-button";
 import { notifyRequestSent } from "@/components/requests/notification-toast";
+import { InvitationSection } from "@/components/requests/invitation-section";
 import {
   Dialog,
   DialogClose,
@@ -215,6 +216,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
               addSubIdeaMutation={addSubIdeaMutation}
             />
             <ContributionRequestSection idea={ideaQuery as ConvexIdea} />
+            <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: (ideaQuery as ConvexIdea).isAuthor || false }} />
             <TodoSection
               idea={ideaQuery as ConvexIdea}
               todos={todosQuery || []}

@@ -2,10 +2,20 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
-// Get notifications for the current user
+// Get notifications for the current user with filtering and sorting
 export const getNotifications = query({
   args: {
     limit: v.optional(v.number()),
+    filterType: v.optional(v.union(
+      v.literal("all"),
+      v.literal("interactions"),
+      v.literal("requests")
+    )),
+    filterReadStatus: v.optional(v.union(
+      v.literal("all"),
+      v.literal("unread"),
+      v.literal("read")
+    )),
   },
   handler: async (ctx, args) => {
     // Get authenticated user
@@ -25,11 +35,33 @@ export const getNotifications = query({
     }
 
     const limit = args.limit || 50;
+    const filterType = args.filterType || "all";
+    const filterReadStatus = args.filterReadStatus || "all";
 
-    // Get user's notifications with sender information
-    const notifications = await ctx.db
+    // Define notification types for filtering
+    const interactionTypes = ["spark_received", "comment_received"];
+    const requestTypes = ["contribution_request_received", "invitation_received", "invitation_accepted", "invitation_rejected"];
+
+    let query = ctx.db
       .query("notifications")
-      .withIndex("by_recipient_created", (q) => q.eq("recipientId", user._id))
+      .withIndex("by_recipient_created", (q) => q.eq("recipientId", user._id));
+
+    // Apply type filter
+    if (filterType === "interactions") {
+      query = query.filter((q) => q.or(...interactionTypes.map(type => q.eq(q.field("type"), type))));
+    } else if (filterType === "requests") {
+      query = query.filter((q) => q.or(...requestTypes.map(type => q.eq(q.field("type"), type))));
+    }
+
+    // Apply read status filter
+    if (filterReadStatus === "unread") {
+      query = query.filter((q) => q.eq(q.field("isRead"), false));
+    } else if (filterReadStatus === "read") {
+      query = query.filter((q) => q.eq(q.field("isRead"), true));
+    }
+
+    // Get notifications with pagination and sorting (newest first)
+    const notifications = await query
       .order("desc")
       .take(limit);
 
@@ -221,5 +253,118 @@ export const createDeadlineNotification = mutation({
     });
 
     return { notificationId, message: "Deadline notification created successfully" };
+  },
+});
+
+// Dismiss a notification (delete it)
+export const dismissNotification = mutation({
+  args: {
+    notificationId: v.id("notifications"),
+  },
+  handler: async (ctx, args) => {
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Find user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get the notification
+    const notification = await ctx.db.get(args.notificationId);
+    if (!notification) {
+      throw new Error("Notification not found");
+    }
+
+    // Check if user owns this notification
+    if (notification.recipientId !== user._id) {
+      throw new Error("Not authorized to dismiss this notification");
+    }
+
+    // Delete the notification
+    await ctx.db.delete(args.notificationId);
+
+    return { message: "Notification dismissed successfully" };
+  },
+});
+
+// Bulk dismiss notifications
+export const dismissAllNotifications = mutation({
+  args: {
+    filterType: v.optional(v.union(
+      v.literal("all"),
+      v.literal("interactions"),
+      v.literal("requests")
+    )),
+    filterReadStatus: v.optional(v.union(
+      v.literal("all"),
+      v.literal("unread"),
+      v.literal("read")
+    )),
+  },
+  handler: async (ctx, args) => {
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Find user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      return { message: "User not found", count: 0 };
+    }
+
+    const filterType = args.filterType || "all";
+    const filterReadStatus = args.filterReadStatus || "all";
+
+    // Define notification types for filtering
+    const interactionTypes = ["spark_received", "comment_received"];
+    const requestTypes = ["contribution_request_received", "invitation_received", "invitation_accepted", "invitation_rejected"];
+
+    let query = ctx.db
+      .query("notifications")
+      .withIndex("by_recipient_created", (q) => q.eq("recipientId", user._id));
+
+    // Apply type filter
+    if (filterType === "interactions") {
+      query = query.filter((q) => q.or(...interactionTypes.map(type => q.eq(q.field("type"), type))));
+    } else if (filterType === "requests") {
+      query = query.filter((q) => q.or(...requestTypes.map(type => q.eq(q.field("type"), type))));
+    }
+
+    // Apply read status filter
+    if (filterReadStatus === "unread") {
+      query = query.filter((q) => q.eq(q.field("isRead"), false));
+    } else if (filterReadStatus === "read") {
+      query = query.filter((q) => q.eq(q.field("isRead"), true));
+    }
+
+    // Get notifications to delete
+    const notificationsToDelete = await query.collect();
+
+    // Delete all matching notifications
+    const deletePromises = notificationsToDelete.map(notification =>
+      ctx.db.delete(notification._id)
+    );
+
+    await Promise.all(deletePromises);
+
+    return {
+      message: "Notifications dismissed successfully",
+      count: notificationsToDelete.length
+    };
   },
 });

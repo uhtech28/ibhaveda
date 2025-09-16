@@ -127,16 +127,6 @@ export default defineSchema({
   .index("by_contributor_status", ["contributorId", "status"])
   .index("by_author_created", ["authorId", "createdAt"]),
 
- // User follows table - tracks follower relationships between users
- userFollows: defineTable({
-   followerId: v.id("users"), // User who is following
-   followeeId: v.id("users"), // User who is being followed
-   createdAt: v.number(), // Unix timestamp
- })
- .index("by_follower", ["followerId"])
- .index("by_followee", ["followeeId"])
- .index("by_follower_followee", ["followerId", "followeeId"])
- .index("by_created_at", ["createdAt"]),
 
  // Todos table - tracks todo items for ideas
  todos: defineTable({
@@ -194,7 +184,7 @@ export default defineSchema({
    senderId: v.id("users"), // User who triggered the notification
    type: v.string(), // Notification type (new_idea, comment, spark, etc.)
    message: v.string(), // Notification message text
-   relatedId: v.optional(v.union(v.id("ideas"), v.id("comments"), v.id("contributionRequests"), v.id("todos"))), // ID of related item
+   relatedId: v.optional(v.union(v.id("ideas"), v.id("comments"), v.id("contributionRequests"), v.id("todos"), v.id("invitations"))), // ID of related item
    isRead: v.boolean(), // Read status
    createdAt: v.number(), // Unix timestamp
  })
@@ -203,5 +193,22 @@ export default defineSchema({
    .index("by_recipient_created", ["recipientId", "createdAt"])
    .index("by_sender", ["senderId"])
    .index("by_related", ["relatedId"])
-   .index("by_type", ["type"])
+   .index("by_type", ["type"]),
+
+ // Invitations table - tracks user invitations for idea contributions
+ invitations: defineTable({
+   ideaId: v.id("ideas"), // Reference to ideas table
+   inviterId: v.id("users"), // User sending invitation
+   inviteeId: v.id("users"), // User receiving invitation
+   status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected"), v.literal("cancelled")), // Invitation status
+   message: v.optional(v.string()), // Optional invitation message
+   createdAt: v.number(), // Unix timestamp
+   updatedAt: v.number(), // Unix timestamp
+ })
+   .index("by_idea", ["ideaId"])
+   .index("by_inviter", ["inviterId"])
+   .index("by_invitee", ["inviteeId"])
+   .index("by_idea_status", ["ideaId", "status"])
+   .index("by_invitee_status", ["inviteeId", "status"])
+   .index("by_created_at", ["createdAt"])
 })

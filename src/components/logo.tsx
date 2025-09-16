@@ -2,12 +2,12 @@ import { cn } from '@/lib/utils'
 
 export const Logo = ({ className, uniColor }: { className?: string; uniColor?: boolean }) => {
     return (
-        <div className={cn('flex items-center h-5', className)}>
+        <div className={cn('flex items-center h-4 md:h-5', className)}>
             <svg
                 viewBox="0 0 18 18"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="text-foreground w-5 h-5 mr-1">
+                className="text-foreground w-4 h-4 md:w-5 md:h-5 mr-1">
                 <path
                     d="M3 0H5V18H3V0ZM13 0H15V18H13V0ZM18 3V5H0V3H18ZM0 15V13H18V15H0Z"
                     fill={uniColor ? 'currentColor' : 'url(#icon-gradient)'}
@@ -27,7 +27,7 @@ export const Logo = ({ className, uniColor }: { className?: string; uniColor?: b
             </svg>
             <span
                 className={cn(
-                    'text-base font-bold tracking-tight',
+                    'text-sm md:text-base font-bold tracking-tight',
                     uniColor ? 'text-current' : 'bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent'
                 )}>
                 Interactive Ideas

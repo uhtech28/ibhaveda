@@ -259,7 +259,7 @@ export const userExists = query({
   },
 })
 
-// Search users by username - optimized with pagination (case-insensitive)
+// Search users by username - supports partial matching with pagination (case-insensitive)
 export const searchUsers = query({
   args: { query: v.string(), limit: v.optional(v.number()) },
   handler: async ({ db }, { query, limit = 20 }): Promise<
@@ -268,12 +268,21 @@ export const searchUsers = query({
     const normalizedQuery = query.toLowerCase().trim()
     if (!normalizedQuery) return []
 
-    const results = await db
+    // For partial matching, we'll fetch more users and filter client-side
+    // This is a workaround since Convex doesn't support prefix search directly
+    const allUsers = await db
       .query("users")
-      .withIndex("by_username", (q) => q.eq("username", normalizedQuery))
-      .take(limit)
+      .withIndex("by_is_active", (q) => q.eq("isActive", true))
+      .take(1000) // Fetch a reasonable number of active users
 
-    return results.map((user) => ({
+    // Filter users whose username starts with the query
+    const filteredUsers = allUsers
+      .filter((user) =>
+        user.username.toLowerCase().startsWith(normalizedQuery)
+      )
+      .slice(0, limit)
+
+    return filteredUsers.map((user) => ({
       id: user._id,
       username: user.username,
       displayName: user.displayName,

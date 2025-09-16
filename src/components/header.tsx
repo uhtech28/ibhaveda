@@ -8,6 +8,7 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@cl
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
+import { SearchBar } from '@/components/search/search-bar'
 
 const menuItems = [
     { name: 'Feed', href: '/feed' },
@@ -22,94 +23,204 @@ export const HeroHeader = () => {
 
     React.useEffect(() => {
         const handleScroll = () => {
-            setIsScrolled(window.scrollY > 50)
+            setIsScrolled(window.scrollY > 20)
         }
         window.addEventListener('scroll', handleScroll)
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
+
+    const handleMenuToggle = () => {
+        setMenuState(!menuState)
+    }
+
+    const closeMenu = () => {
+        setMenuState(false)
+    }
+
     return (
-        <header>
-            <nav
-                data-state={menuState && 'active'}
-                className="fixed z-20 w-full px-2">
-                <div className={cn('mx-auto mt-2 max-w-6xl px-6 transition-all duration-300 lg:px-12', isScrolled && 'bg-background/50 max-w-4xl rounded-2xl border backdrop-blur-lg lg:px-5')}>
-                    <div className="relative flex flex-wrap items-center justify-between gap-6 py-3 lg:gap-0 lg:py-4">
-                        <div className="flex w-full justify-between lg:w-auto">
+        <header className="relative">
+            <nav className="fixed top-0 left-0 right-0 z-50 w-full">
+                <div className={cn(
+                    'mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ease-in-out',
+                    isScrolled 
+                        ? 'mt-2 max-w-5xl bg-background/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-lg shadow-black/5' 
+                        : 'mt-0 max-w-7xl bg-transparent'
+                )}>
+                    <div className="flex items-center justify-between h-16 lg:h-18">
+                        {/* Logo */}
+                        <div className="flex-shrink-0 z-20">
                             <Link
                                 href="/"
-                                aria-label="home"
-                                className="flex items-center space-x-2">
+                                aria-label="Interactive Ideas Home"
+                                className="flex items-center focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
+                                onClick={closeMenu}>
                                 <Logo />
                             </Link>
-
-                            <button
-                                onClick={() => setMenuState(!menuState)}
-                                aria-label={menuState == true ? 'Close Menu' : 'Open Menu'}
-                                className="relative z-20 -m-2.5 -mr-4 block cursor-pointer p-2.5 lg:hidden">
-                                <Menu className="in-data-[state=active]:rotate-180 in-data-[state=active]:scale-0 in-data-[state=active]:opacity-0 m-auto size-6 duration-200" />
-                                <X className="in-data-[state=active]:rotate-0 in-data-[state=active]:scale-100 in-data-[state=active]:opacity-100 absolute inset-0 m-auto size-6 -rotate-180 scale-0 opacity-0 duration-200" />
-                            </button>
                         </div>
 
-                        <div className="absolute inset-0 m-auto hidden size-fit lg:block">
-                            <ul className="flex gap-8 text-sm">
-                                {menuItems.map((item, index) => (
-                                    <li key={index}>
-                                        <Link
-                                            href={item.href}
-                                            className="text-muted-foreground hover:text-accent-foreground block duration-150">
-                                            <span>{item.name}</span>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <div className="bg-background in-data-[state=active]:block lg:in-data-[state=active]:flex mb-6 hidden w-full flex-wrap items-center justify-end space-y-8 rounded-3xl border p-6 shadow-2xl shadow-zinc-300/20 md:flex-nowrap lg:m-0 lg:flex lg:w-fit lg:gap-6 lg:space-y-0 lg:border-transparent lg:bg-transparent lg:p-0 lg:shadow-none dark:shadow-none dark:lg:bg-transparent">
-                            <div className="lg:hidden">
-                                <ul className="space-y-6 text-base">
-                                    {menuItems.map((item, index) => (
-                                        <li key={index}>
-                                            <Link
-                                                href={item.href}
-                                                className="text-muted-foreground hover:text-accent-foreground block duration-150">
-                                                <span>{item.name}</span>
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
+                        {/* Desktop Navigation */}
+                        <div className="hidden lg:flex lg:items-center lg:justify-center lg:flex-1 lg:px-8">
+                            {/* Search Bar */}
+                            <div className="max-w-md w-full mr-8">
+                                <SearchBar
+                                    onSearch={(query) => {
+                                        console.log('Search query:', query)
+                                    }}
+                                    placeholder="Search ideas..."
+                                    className="w-full"
+                                />
                             </div>
-                            <div className="flex w-full flex-col space-y-3 sm:flex-row sm:gap-3 sm:space-y-0 md:w-fit">
-                                <SignedOut>
-                                    <SignInButton>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className={cn(isScrolled && 'lg:hidden')}>
-                                            <span>Login</span>
-                                        </Button>
-                                    </SignInButton>
-                                    <SignUpButton>
-                                        <Button
-                                            size="sm"
-                                            className={cn(isScrolled && 'lg:hidden')}>
-                                            <span>Sign Up</span>
-                                        </Button>
-                                    </SignUpButton>
+
+                            {/* Navigation Menu */}
+                            <nav className="flex items-center space-x-8">
+                                {menuItems.map((item) => (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md px-2 py-1">
+                                        {item.name}
+                                    </Link>
+                                ))}
+                            </nav>
+                        </div>
+
+                        {/* Desktop Actions */}
+                        <div className="hidden lg:flex lg:items-center lg:space-x-3">
+                            <SignedOut>
+                                <SignInButton>
                                     <Button
-                                        asChild
+                                        variant="ghost"
                                         size="sm"
-                                        className={cn(isScrolled ? 'lg:inline-flex' : 'hidden')}>
-                                        <Link href="#link">
-                                            <span>Get Started</span>
-                                        </Link>
+                                        className="text-muted-foreground hover:text-foreground">
+                                        Login
                                     </Button>
-                                </SignedOut>
-                                <SignedIn>
-                                    <NotificationBell />
-                                    <UserButton />
-                                </SignedIn>
-                                <ThemeToggle />
+                                </SignInButton>
+                                <SignUpButton>
+                                    <Button
+                                        size="sm"
+                                        className="shadow-sm">
+                                        Sign Up
+                                    </Button>
+                                </SignUpButton>
+                            </SignedOut>
+                            <SignedIn>
+                                <NotificationBell />
+                                <UserButton 
+                                    afterSignOutUrl="/"
+                                    appearance={{
+                                        elements: {
+                                            avatarBox: "w-8 h-8"
+                                        }
+                                    }}
+                                />
+                            </SignedIn>
+                            <ThemeToggle />
+                        </div>
+
+                        {/* Mobile Menu Button */}
+                        <button
+                            onClick={handleMenuToggle}
+                            aria-label={menuState ? 'Close menu' : 'Open menu'}
+                            aria-expanded={menuState}
+                            className="lg:hidden relative z-20 p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md">
+                            <span className="sr-only">
+                                {menuState ? 'Close menu' : 'Open menu'}
+                            </span>
+                            <Menu 
+                                className={cn(
+                                    "w-6 h-6 transition-all duration-200",
+                                    menuState && "rotate-180 scale-0 opacity-0"
+                                )} 
+                            />
+                            <X 
+                                className={cn(
+                                    "w-6 h-6 absolute inset-0 m-auto transition-all duration-200",
+                                    menuState ? "rotate-0 scale-100 opacity-100" : "-rotate-180 scale-0 opacity-0"
+                                )} 
+                            />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile Menu Overlay */}
+                <div className={cn(
+                    "lg:hidden fixed inset-0 z-10 transition-all duration-300 ease-in-out",
+                    menuState ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
+                )}>
+                    {/* Backdrop */}
+                    <div 
+                        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+                        onClick={closeMenu}
+                    />
+                    
+                    {/* Mobile Menu Content */}
+                    <div className={cn(
+                        "absolute top-20 left-4 right-4 bg-background border border-border rounded-2xl shadow-xl transition-all duration-300 ease-in-out",
+                        menuState ? "translate-y-0 scale-100" : "-translate-y-4 scale-95"
+                    )}>
+                        <div className="p-6 space-y-6">
+                            {/* Mobile Search */}
+                            <div className="space-y-2">
+                                <SearchBar
+                                    onSearch={(query) => {
+                                        console.log('Mobile search query:', query)
+                                        closeMenu()
+                                    }}
+                                    placeholder="Search ideas..."
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* Mobile Navigation */}
+                            <nav className="space-y-1">
+                                {menuItems.map((item) => (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={closeMenu}
+                                        className="flex items-center px-3 py-3 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-all duration-200">
+                                        {item.name}
+                                    </Link>
+                                ))}
+                            </nav>
+
+                            {/* Mobile Actions */}
+                            <div className="pt-4 border-t border-border space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <SignedOut>
+                                        <div className="flex gap-3 flex-1">
+                                            <SignInButton>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="flex-1">
+                                                    Login
+                                                </Button>
+                                            </SignInButton>
+                                            <SignUpButton>
+                                                <Button
+                                                    size="sm"
+                                                    className="flex-1">
+                                                    Sign Up
+                                                </Button>
+                                            </SignUpButton>
+                                        </div>
+                                    </SignedOut>
+                                    <SignedIn>
+                                        <div className="flex items-center gap-3">
+                                            <NotificationBell />
+                                            <UserButton 
+                                                afterSignOutUrl="/"
+                                                appearance={{
+                                                    elements: {
+                                                        avatarBox: "w-8 h-8"
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </SignedIn>
+                                    <ThemeToggle />
+                                </div>
                             </div>
                         </div>
                     </div>
