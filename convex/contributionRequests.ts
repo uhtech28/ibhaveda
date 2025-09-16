@@ -114,8 +114,8 @@ export const getRequestsByIdea = query({
         .unique();
 
       if (!user) {
-        console.error("User lookup failed for Clerk ID:", identity.subject);
-        throw new Error("User profile not found: Please complete your profile setup");
+        console.log("User profile not found for Clerk ID:", identity.subject, "- returning empty array");
+        return []; // Return empty array for users without profile
       }
 
       // Check if idea exists and is not deleted
@@ -194,8 +194,8 @@ export const getMyRequests = query({
         .unique();
 
       if (!user) {
-        console.error("User lookup failed for Clerk ID:", identity.subject);
-        throw new Error("User profile not found: Please complete your profile setup");
+        console.log("User profile not found for Clerk ID:", identity.subject, "- returning empty array");
+        return []; // Return empty array for users without profile
       }
 
       const requests = await ctx.db
@@ -267,8 +267,8 @@ export const getMyRequests = query({
           .unique();
 
         if (!user) {
-          console.error("User lookup failed for Clerk ID:", identity.subject);
-          throw new Error("User profile not found: Please complete your profile setup");
+          console.log("User profile not found for Clerk ID:", identity.subject, "- returning empty array");
+          return []; // Return empty array for users without profile
         }
 
         const requests = await ctx.db
@@ -285,7 +285,7 @@ export const getMyRequests = query({
             try {
               const idea = await ctx.db.get(request.ideaId);
               const contributor = await ctx.db.get(request.contributorId);
-  
+
               // Only return idea info if it's not deleted or user is the author
               let ideaInfo = null;
               if (idea) {
@@ -298,7 +298,7 @@ export const getMyRequests = query({
                   };
                 }
               }
-  
+
               return {
                 ...request,
                 idea: ideaInfo,

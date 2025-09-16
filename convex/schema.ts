@@ -142,14 +142,19 @@ export default defineSchema({
  todos: defineTable({
    ideaId: v.id("ideas"), // Reference to the idea
    authorId: v.id("users"), // User who created the todo
+   assignedTo: v.optional(v.id("users")), // User assigned to the todo (reference to users table)
    title: v.string(), // Todo title/description
    status: v.union(v.literal("todo"), v.literal("in_progress"), v.literal("done")), // Status of the todo
    order: v.optional(v.number()), // Order for sorting/display
+   deadline: v.optional(v.number()), // Deadline as Unix timestamp
+   completionTarget: v.optional(v.string()), // Target description for completion
    createdAt: v.number(), // Unix timestamp
    updatedAt: v.number(), // Unix timestamp
  })
  .index("by_idea", ["ideaId"])
  .index("by_author", ["authorId"])
+ .index("by_assigned_to", ["assignedTo"])
+ .index("by_deadline", ["deadline"])
  .index("by_idea_status", ["ideaId", "status"])
  .index("by_created_at", ["createdAt"]),
 
@@ -189,7 +194,7 @@ export default defineSchema({
    senderId: v.id("users"), // User who triggered the notification
    type: v.string(), // Notification type (new_idea, comment, spark, etc.)
    message: v.string(), // Notification message text
-   relatedId: v.optional(v.union(v.id("ideas"), v.id("comments"), v.id("contributionRequests"))), // ID of related item
+   relatedId: v.optional(v.union(v.id("ideas"), v.id("comments"), v.id("contributionRequests"), v.id("todos"))), // ID of related item
    isRead: v.boolean(), // Read status
    createdAt: v.number(), // Unix timestamp
  })

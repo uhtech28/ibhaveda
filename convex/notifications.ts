@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 // Get notifications for the current user
 export const getNotifications = query({
@@ -160,5 +161,65 @@ export const getUnreadCount = query({
       .collect();
 
     return unreadCount.length;
+  },
+});
+
+// Create a deadline notification
+export const createDeadlineNotification = mutation({
+  args: {
+    recipientId: v.id("users"),
+    senderId: v.id("users"),
+    todoId: v.id("todos"),
+    type: v.union(v.literal("deadline_approaching"), v.literal("deadline_overdue")),
+    message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Verify sender is authenticated user
+    const sender = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!sender || sender._id !== args.senderId) {
+      throw new Error("Not authorized to send this notification");
+    }
+
+    // Check if notification already exists for this todo and type
+    const existingNotification = await ctx.db
+      .query("notifications")
+      .withIndex("by_type", (q) => q.eq("type", args.type))
+      .collect()
+      .then(notifications =>
+        notifications.find(n =>
+          n.recipientId === args.recipientId &&
+          n.relatedId === args.todoId &&
+          // Check if it's recent (within last 24 hours for approaching, within last week for overdue)
+          n.createdAt > Date.now() - (args.type === "deadline_approaching" ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000)
+        )
+      );
+
+    if (existingNotification) {
+      // Return existing notification ID
+      return { notificationId: existingNotification._id, message: "Notification already exists" };
+    }
+
+    // Create the notification
+    const notificationId = await ctx.db.insert("notifications", {
+      recipientId: args.recipientId,
+      senderId: args.senderId,
+      type: args.type,
+      message: args.message,
+      relatedId: args.todoId,
+      isRead: false,
+      createdAt: Date.now(),
+    });
+
+    return { notificationId, message: "Deadline notification created successfully" };
   },
 });

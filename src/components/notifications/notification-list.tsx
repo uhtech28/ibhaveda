@@ -3,6 +3,7 @@
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@convex/_generated/api'
 import { Id } from '@convex/_generated/dataModel'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -91,6 +92,14 @@ const NotificationItem = ({ notification }: NotificationItemProps) => {
 export const NotificationList = () => {
   const notifications = useQuery(api.notifications.getNotifications, { limit: 20 })
   const markAllAsRead = useMutation(api.notifications.markAllAsRead)
+  const checkDeadlinesAndNotify = useMutation(api.todos.checkDeadlinesAndNotify)
+
+  // Check for deadline notifications when notifications are viewed
+  useEffect(() => {
+    if (notifications) {
+      checkDeadlinesAndNotify()
+    }
+  }, [notifications, checkDeadlinesAndNotify])
 
   if (!notifications || notifications.length === 0) {
     return (

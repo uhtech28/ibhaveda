@@ -8,6 +8,17 @@ import {
   ChevronRightIcon,
   ChevronsUpDown,
 } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
+import { useEffect } from "react";
+import { useToast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { format } from "date-fns";
 import {
   createContext,
   memo,
@@ -49,11 +60,13 @@ export const useCalendarYear = () => useAtom(yearAtom);
 type CalendarContextProps = {
   locale: Intl.LocalesArgument;
   startDay: number;
+  ideaId?: string;
 };
 
 const CalendarContext = createContext<CalendarContextProps>({
   locale: "en-US",
   startDay: 0,
+  ideaId: undefined,
 });
 
 export type Status = {
@@ -68,6 +81,28 @@ export type Feature = {
   startAt: Date;
   endAt: Date;
   status: Status;
+};
+
+export type Task = {
+  _id: string;
+  title: string;
+  status: "todo" | "in_progress" | "done";
+  assignedTo?: {
+    _id: string;
+    name: string;
+    username: string;
+    avatar?: string;
+  };
+  deadline?: number;
+  completionTarget?: string;
+  author: {
+    _id: string;
+    name: string;
+    username: string;
+    avatar?: string;
+  };
+  canEdit: boolean;
+  canDelete: boolean;
 };
 
 type ComboboxProps = {
@@ -187,14 +222,52 @@ const OutOfBoundsDay = ({ day }: OutOfBoundsDayProps) => (
 );
 
 export type CalendarBodyProps = {
-  features: Feature[];
-  children: (props: { feature: Feature }) => ReactNode;
+  features?: Feature[];
+  tasks?: Task[];
+  children: (props: { feature: Feature; task?: Task; onEdit?: (task: Task) => void }) => ReactNode;
 };
 
-export const CalendarBody = ({ features, children }: CalendarBodyProps) => {
+export const CalendarBody = ({ features: legacyFeatures, tasks, children }: CalendarBodyProps) => {
   const [month] = useCalendarMonth();
   const [year] = useCalendarYear();
-  const { startDay } = useContext(CalendarContext);
+  const { startDay, ideaId } = useContext(CalendarContext);
+
+  // Check for deadline notifications when calendar loads
+  const checkDeadlinesAndNotify = useMutation(api.todos.checkDeadlinesAndNotify);
+
+  useEffect(() => {
+    checkDeadlinesAndNotify();
+  }, [checkDeadlinesAndNotify]);
+
+  // Fetch tasks if ideaId is provided
+  const fetchedTasks = useQuery(api.todos.getTodosForIdea, ideaId ? { ideaId: ideaId as Id<"ideas"> } : 'skip') as Task[] || [];
+
+  const allTasks = (tasks || fetchedTasks) as Task[];
+
+  // Map tasks to features
+  const mappedFeatures = useMemo(() => {
+    return allTasks.map((task: Task): Feature => {
+      let color = 'gray';
+      if (task.status === 'done') color = 'green';
+      else if (task.status === 'in_progress') color = 'blue';
+      else if (task.deadline && task.deadline < Date.now()) color = 'red';
+      else color = 'yellow';
+
+      return {
+        id: task._id,
+        name: task.title,
+        startAt: new Date(), // Not used for tasks
+        endAt: task.deadline ? new Date(task.deadline) : new Date(),
+        status: {
+          id: task.status,
+          name: task.status.replace('_', ' '),
+          color,
+        },
+      };
+    });
+  }, [allTasks]);
+
+  const effectiveFeatures = legacyFeatures || mappedFeatures;
 
   // Memoize expensive date calculations
   const currentMonthDate = useMemo(
@@ -238,14 +311,85 @@ export const CalendarBody = ({ features, children }: CalendarBodyProps) => {
   const featuresByDay = useMemo(() => {
     const result: { [day: number]: Feature[] } = {};
     for (let day = 1; day <= daysInMonth; day++) {
-      result[day] = features.filter((feature) => {
+      result[day] = effectiveFeatures.filter((feature) => {
         return isSameDay(new Date(feature.endAt), new Date(year, month, day));
       });
     }
     return result;
-  }, [features, daysInMonth, year, month]);
+  }, [effectiveFeatures, daysInMonth, year, month]);
+
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [editingTask, setEditingTask] = useState<Task | undefined>();
 
   const days: ReactNode[] = [];
+
+  const createTodo = useMutation(api.todos.createTodo);
+  const updateTodo = useMutation(api.todos.updateTodo);
+
+  const handleDayClick = (day: number, isCurrentMonth: boolean) => {
+    if (!isCurrentMonth || !ideaId) return;
+    const clickedDate = new Date(year, month, day);
+    setSelectedDate(clickedDate);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleCreateTask = async (data: { title: string; assignedTo?: string; deadline?: number; completionTarget?: string }) => {
+    if (!ideaId) return;
+    try {
+      await createTodo({
+        ideaId: ideaId as Id<"ideas">,
+        title: data.title,
+        assignedTo: data.assignedTo as Id<"users"> | undefined,
+        deadline: data.deadline,
+        completionTarget: data.completionTarget,
+      });
+      toast({
+        title: "Task created",
+        description: "Task has been successfully created.",
+      });
+      setIsCreateDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to create task:", error);
+      toast({
+        title: "Creation failed",
+        description: "Failed to create task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateTask = async (updates: { assignedTo?: string; deadline?: number; completionTarget?: string }) => {
+    if (!editingTask) return;
+    try {
+      await updateTodo({
+        todoId: editingTask._id as Id<"todos">,
+        assignedTo: updates.assignedTo as Id<"users"> | undefined,
+        deadline: updates.deadline,
+        completionTarget: updates.completionTarget,
+      });
+      toast({
+        title: "Task updated",
+        description: "Task details have been successfully updated.",
+      });
+      setIsEditDialogOpen(false);
+      setEditingTask(undefined);
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      toast({
+        title: "Update failed",
+        description: "Failed to update task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   for (let i = 0; i < firstDay; i++) {
     const day =
@@ -263,12 +407,19 @@ export const CalendarBody = ({ features, children }: CalendarBodyProps) => {
 
     days.push(
       <div
-        className="relative flex h-full w-full flex-col gap-1 p-1 text-muted-foreground text-xs"
+        className={cn(
+          "relative flex h-full w-full flex-col gap-1 p-1 text-muted-foreground text-xs cursor-pointer hover:bg-accent/50",
+          ideaId && "hover:bg-blue-50"
+        )}
         key={day}
+        onClick={() => handleDayClick(day, true)}
       >
         {day}
         <div>
-          {featuresForDay.slice(0, 3).map((feature) => children({ feature }))}
+          {featuresForDay.slice(0, 3).map((feature) => {
+            const correspondingTask = allTasks.find(t => t._id === feature.id);
+            return children({ feature, task: correspondingTask, onEdit: handleEditTask });
+          })}
         </div>
         {featuresForDay.length > 3 && (
           <span className="block text-muted-foreground text-xs">
@@ -291,21 +442,247 @@ export const CalendarBody = ({ features, children }: CalendarBodyProps) => {
   }
 
   return (
-    <div className="grid flex-grow grid-cols-7">
-      {days.map((day, index) => (
-        <div
-          className={cn(
-            "relative aspect-square overflow-hidden border-t border-r",
-            index % 7 === 6 && "border-r-0"
-          )}
-          key={index}
-        >
-          {day}
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="grid flex-grow grid-cols-7">
+        {days.map((day, index) => (
+          <div
+            className={cn(
+              "relative aspect-square overflow-hidden border-t border-r",
+              index % 7 === 6 && "border-r-0"
+            )}
+            key={index}
+          >
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Task Create Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <TaskCreateDialog
+          selectedDate={selectedDate}
+          onClose={() => setIsCreateDialogOpen(false)}
+          onSave={handleCreateTask}
+        />
+      </Dialog>
+
+      {/* Task Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <TaskEditDialog
+          task={editingTask}
+          onClose={() => {
+            setIsEditDialogOpen(false);
+            setEditingTask(undefined);
+          }}
+          onSave={handleUpdateTask}
+        />
+      </Dialog>
+    </>
   );
 };
+
+// Task Create Dialog Component
+type TaskCreateDialogProps = {
+  selectedDate?: Date;
+  onClose: () => void;
+  onSave: (data: { title: string; assignedTo?: string; deadline?: number; completionTarget?: string }) => void;
+};
+
+function TaskCreateDialog({ selectedDate, onClose, onSave }: TaskCreateDialogProps) {
+  const [title, setTitle] = useState("");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [deadline, setDeadline] = useState<Date | undefined>(selectedDate);
+  const [completionTarget, setCompletionTarget] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch users for assignee dropdown
+  const users: { _id: string; displayName: string }[] = useQuery(api.users.getAllUsers) || [];
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setIsLoading(true);
+    try {
+      await onSave({
+        title: title.trim(),
+        assignedTo: assignedTo || undefined,
+        deadline: deadline?.getTime(),
+        completionTarget: completionTarget.trim() || undefined,
+      });
+      onClose();
+    } catch (error) {
+      console.error("Failed to save task:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Create New Task</DialogTitle>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="title" className="text-right">
+            Title
+          </Label>
+          <Input
+            id="title"
+            placeholder="Task title..."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="assignee" className="text-right">
+            Assignee
+          </Label>
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="col-span-3">
+              <SelectValue placeholder="Select assignee..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Unassigned</SelectItem>
+              {users.map((user) => (
+                <SelectItem key={user._id} value={user._id}>
+                  {user.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="deadline" className="text-right">
+            Deadline
+          </Label>
+          <Input
+            id="deadline"
+            type="datetime-local"
+            value={deadline ? format(deadline, "yyyy-MM-dd'T'HH:mm") : ""}
+            onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value) : undefined)}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="completionTarget" className="text-right">
+            Target
+          </Label>
+          <Textarea
+            id="completionTarget"
+            placeholder="What needs to be completed..."
+            value={completionTarget}
+            onChange={(e) => setCompletionTarget(e.target.value)}
+            className="col-span-3"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={isLoading || !title.trim()}>
+          {isLoading ? "Creating..." : "Create"}
+        </Button>
+      </div>
+    </DialogContent>
+  );
+}
+
+// Task Edit Dialog Component (adapted from kanban)
+type TaskEditDialogProps = {
+  task?: Task;
+  onClose: () => void;
+  onSave: (updates: { assignedTo?: string; deadline?: number; completionTarget?: string }) => void;
+};
+
+function TaskEditDialog({ task, onClose, onSave }: TaskEditDialogProps) {
+  const [assignedTo, setAssignedTo] = useState(task?.assignedTo?._id || "");
+  const [deadline, setDeadline] = useState<Date | undefined>(task?.deadline ? new Date(task.deadline) : undefined);
+  const [completionTarget, setCompletionTarget] = useState(task?.completionTarget || "");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch users for assignee dropdown
+  const users: { _id: string; displayName: string }[] = useQuery(api.users.getAllUsers) || [];
+
+  const handleSave = async () => {
+    setIsLoading(true);
+    try {
+      await onSave({
+        assignedTo: assignedTo || undefined,
+        deadline: deadline?.getTime(),
+        completionTarget: completionTarget || undefined,
+      });
+      onClose();
+    } catch (error) {
+      console.error("Failed to save task updates:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!task) return null;
+
+  return (
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Edit Task: {task.title}</DialogTitle>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="assignee" className="text-right">
+            Assignee
+          </Label>
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="col-span-3">
+              <SelectValue placeholder="Select assignee..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Unassigned</SelectItem>
+              {users.map((user) => (
+                <SelectItem key={user._id} value={user._id}>
+                  {user.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="deadline" className="text-right">
+            Deadline
+          </Label>
+          <Input
+            id="deadline"
+            type="datetime-local"
+            value={deadline ? format(deadline, "yyyy-MM-dd'T'HH:mm") : ""}
+            onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value) : undefined)}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="completionTarget" className="text-right">
+            Target
+          </Label>
+          <Textarea
+            id="completionTarget"
+            placeholder="What needs to be completed..."
+            value={completionTarget}
+            onChange={(e) => setCompletionTarget(e.target.value)}
+            className="col-span-3"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={isLoading}>
+          {isLoading ? "Saving..." : "Save"}
+        </Button>
+      </div>
+    </DialogContent>
+  );
+}
 
 export type CalendarDatePickerProps = {
   className?: string;
@@ -458,19 +835,39 @@ export const CalendarHeader = ({ className }: CalendarHeaderProps) => {
 
 export type CalendarItemProps = {
   feature: Feature;
+  task?: Task;
   className?: string;
+  onEdit?: (task: Task) => void;
 };
 
 export const CalendarItem = memo(
-  ({ feature, className }: CalendarItemProps) => (
-    <div className={cn("flex items-center gap-2", className)}>
+  ({ feature, task, className, onEdit }: CalendarItemProps) => (
+    <div
+      className={cn("flex items-center gap-2 cursor-pointer hover:bg-accent/50 p-1 rounded", className)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (task && onEdit) onEdit(task);
+      }}
+    >
       <div
         className="h-2 w-2 shrink-0 rounded-full"
         style={{
           backgroundColor: feature.status.color,
         }}
       />
-      <span className="truncate">{feature.name}</span>
+      <span className="truncate text-xs">
+        {feature.name}
+        {task?.assignedTo && (
+          <span className="ml-1 text-muted-foreground">
+            ({task.assignedTo.name})
+          </span>
+        )}
+      </span>
+      {task?.completionTarget && (
+        <span className="truncate text-xs text-muted-foreground ml-1">
+          - {task.completionTarget}
+        </span>
+      )}
     </div>
   )
 );
@@ -480,6 +877,7 @@ CalendarItem.displayName = "CalendarItem";
 export type CalendarProviderProps = {
   locale?: Intl.LocalesArgument;
   startDay?: number;
+  ideaId?: string;
   children: ReactNode;
   className?: string;
 };
@@ -487,10 +885,11 @@ export type CalendarProviderProps = {
 export const CalendarProvider = ({
   locale = "en-US",
   startDay = 0,
+  ideaId,
   children,
   className,
 }: CalendarProviderProps) => (
-  <CalendarContext.Provider value={{ locale, startDay }}>
+  <CalendarContext.Provider value={{ locale, startDay, ideaId }}>
     <div className={cn("relative flex flex-col", className)}>{children}</div>
   </CalendarContext.Provider>
 );

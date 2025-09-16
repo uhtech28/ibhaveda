@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
+
+export const dynamic = 'force-dynamic';
 import { ThemeProvider } from '@/components/theme-provider';
 import { ConvexClientProvider } from '@/lib/convex/providers';
 import { Toaster } from '@/components/ui/toaster';

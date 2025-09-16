@@ -1,6 +1,8 @@
 "use client"
 
 import { useAuth, RedirectToSignIn } from "@clerk/nextjs";
+
+export const dynamic = 'force-dynamic';
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
