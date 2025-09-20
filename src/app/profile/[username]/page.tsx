@@ -226,9 +226,14 @@ export default function ProfilePage() {
                       <Input
                         id="username"
                         value={`@${username}`}
-                        disabled
-                        className="mt-1 bg-muted"
+                        disabled={profile.completedOnboarding}
+                        className={`mt-1 ${profile.completedOnboarding ? 'bg-muted' : ''}`}
                       />
+                      {profile.completedOnboarding && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Username cannot be changed after profile completion
+                        </p>
+                      )}
                     </div>
 
                     <div>
