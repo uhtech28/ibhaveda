@@ -62,7 +62,8 @@ export default defineSchema({
          authorId: v.id("users"), // Reference to users table (author)
          title: v.string(), // Idea title (required)
          description: v.string(), // Idea description (required)
-         category: v.string(), // Category selector (Technology, Art, Business, etc.)
+         category: v.string(), // Skills as comma-separated string
+         industries: v.optional(v.string()), // Industries as comma-separated string
       visibility: v.string(), // 'public' or 'private'
       // File attachment URLs (stored in Convex storage)
       attachments: v.optional(v.array(v.object({
@@ -81,13 +82,15 @@ export default defineSchema({
       parentId: v.optional(v.id("ideas")), // Optional parent idea for hierarchical relationships
     })
       .index("by_author", ["authorId"])
-      .index("by_visibility", ["visibility"])
-      .index("by_category", ["category"])
-      .index("by_created_at", ["createdAt"])
-      .index("by_author_visibility", ["authorId", "visibility"])
-      .index("by_category_created", ["category", "createdAt"])
-      .index("by_is_deleted", ["isDeleted"])
-      .index("by_parent", ["parentId"]),
+        .index("by_visibility", ["visibility"])
+        .index("by_category", ["category"])
+        .index("by_industries", ["industries"])
+        .index("by_created_at", ["createdAt"])
+        .index("by_author_visibility", ["authorId", "visibility"])
+        .index("by_category_created", ["category", "createdAt"])
+        .index("by_industries_created", ["industries", "createdAt"])
+        .index("by_is_deleted", ["isDeleted"])
+        .index("by_parent", ["parentId"]),
 
   // Comments table - stores comments on ideas
   comments: defineTable({

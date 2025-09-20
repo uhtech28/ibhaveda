@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@convex/_generated/api";
 import { Doc, Id } from "@convex/_generated/dataModel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
+import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 import ParticleButton from "@/components/kokonutui/particle-button";
 import { notifyRequestSent } from "@/components/requests/notification-toast";
 import { InvitationSection } from "@/components/requests/invitation-section";
@@ -1359,21 +1361,12 @@ const HierarchicalIdeasSection: React.FC<{
  const [isModalOpen, setIsModalOpen] = useState(false);
  const [subIdeaTitle, setSubIdeaTitle] = useState("");
  const [subIdeaDescription, setSubIdeaDescription] = useState("");
- const [subIdeaCategory, setSubIdeaCategory] = useState("other");
+ const [subIdeaSkills, setSubIdeaSkills] = useState<string[]>([]);
+ const [subIdeaIndustries, setSubIdeaIndustries] = useState<string[]>([]);
  const [subIdeaVisibility, setSubIdeaVisibility] = useState("public");
  const [isSubmitting, setIsSubmitting] = useState(false);
  const [error, setError] = useState("");
 
- // Categories
- const categories = [
-   { value: 'technology', label: 'Technology' },
-   { value: 'art', label: 'Art' },
-   { value: 'business', label: 'Business' },
-   { value: 'education', label: 'Education' },
-   { value: 'health', label: 'Health' },
-   { value: 'entertainment', label: 'Entertainment' },
-   { value: 'other', label: 'Other' }
- ];
 
  // Check if user is accepted contributor or author
  const isAuthor = idea.isAuthor || false;
@@ -1385,7 +1378,7 @@ const HierarchicalIdeasSection: React.FC<{
 
  const handleSubmitSubIdea = async (e: React.FormEvent) => {
    e.preventDefault();
-   if (!subIdeaTitle.trim() || !subIdeaDescription.trim() || isSubmitting) return;
+   if (!subIdeaTitle.trim() || !subIdeaDescription.trim() || subIdeaSkills.length === 0 || subIdeaIndustries.length === 0 || isSubmitting) return;
 
    setIsSubmitting(true);
    setError("");
@@ -1395,14 +1388,16 @@ const HierarchicalIdeasSection: React.FC<{
        parentId: idea._id as Id<"ideas">,
        title: subIdeaTitle.trim(),
        description: subIdeaDescription.trim(),
-       category: subIdeaCategory,
+       category: subIdeaSkills.join(', '),
+       // industries: subIdeaIndustries.join(', '), // Temporarily commented out due to type generation issue
        visibility: subIdeaVisibility,
      });
 
      // Reset form and close modal
      setSubIdeaTitle("");
      setSubIdeaDescription("");
-     setSubIdeaCategory("other");
+     setSubIdeaSkills([]);
+     setSubIdeaIndustries([]);
      setSubIdeaVisibility("public");
      setIsModalOpen(false);
    } catch (err: unknown) {
@@ -1537,21 +1532,25 @@ const HierarchicalIdeasSection: React.FC<{
                    </div>
 
                    <div>
-                     <label htmlFor="sub-category" className="text-sm font-medium">
-                       Category
+                     <label className="text-sm font-medium">
+                       Skills <span className="text-destructive">*</span>
                      </label>
-                     <Select value={subIdeaCategory} onValueChange={setSubIdeaCategory}>
-                       <SelectTrigger id="sub-category" className="mt-1">
-                         <SelectValue placeholder="Select category" />
-                       </SelectTrigger>
-                       <SelectContent>
-                         {categories.map((cat) => (
-                           <SelectItem key={cat.value} value={cat.value}>
-                             {cat.label}
-                           </SelectItem>
-                         ))}
-                       </SelectContent>
-                     </Select>
+                     <SkillsMultiSelect
+                       selectedSkills={subIdeaSkills}
+                       onChange={setSubIdeaSkills}
+                       placeholder="Select skills for your sub-idea"
+                     />
+                   </div>
+
+                   <div>
+                     <label className="text-sm font-medium">
+                       Industries <span className="text-destructive">*</span>
+                     </label>
+                     <IndustriesMultiSelect
+                       selectedIndustries={subIdeaIndustries}
+                       onChange={setSubIdeaIndustries}
+                       placeholder="Select industries for your sub-idea"
+                     />
                    </div>
 
                    <div className="space-y-3">
@@ -1609,7 +1608,7 @@ const HierarchicalIdeasSection: React.FC<{
                    </DialogClose>
                    <Button
                      type="submit"
-                     disabled={!subIdeaTitle.trim() || !subIdeaDescription.trim() || isSubmitting}
+                     disabled={!subIdeaTitle.trim() || !subIdeaDescription.trim() || subIdeaSkills.length === 0 || subIdeaIndustries.length === 0 || isSubmitting}
                    >
                      {isSubmitting ? <Spinner size={16} /> : "Create Sub-Idea"}
                    </Button>

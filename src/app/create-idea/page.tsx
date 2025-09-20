@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
+import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 
 export default function CreateIdeaPage() {
   const { isLoaded, userId } = useAuth();
@@ -25,6 +26,7 @@ export default function CreateIdeaPage() {
     title: '',
     description: '',
     skills: [] as string[],
+    industries: [] as string[],
     visibility: 'public' as 'public' | 'private'
   });
 
@@ -59,6 +61,10 @@ export default function CreateIdeaPage() {
       newErrors.skills = 'Please select at least one skill';
     }
 
+    if (formData.industries.length === 0) {
+      newErrors.industries = 'Please select at least one industry';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -86,7 +92,8 @@ export default function CreateIdeaPage() {
       await createIdea({
         title: formData.title.trim(),
         description: formData.description.trim(),
-        category: formData.skills.join(', '), // Send as comma-separated string
+        category: formData.skills.join(', '), // Send skills as comma-separated string
+        industries: formData.industries.join(', '), // Send industries as comma-separated string
         visibility: formData.visibility,
       });
 
@@ -198,6 +205,23 @@ export default function CreateIdeaPage() {
                   )}
                   <p className="text-xs text-muted-foreground">
                     Select one or more skills that best describe your idea
+                  </p>
+                </div>
+
+                {/* Industries */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Industries <span className="text-destructive">*</span>
+                  </Label>
+                  <IndustriesMultiSelect
+                    selectedIndustries={formData.industries}
+                    onChange={(industries) => handleInputChange('industries', industries)}
+                  />
+                  {errors.industries && (
+                    <p className="text-sm text-destructive">{errors.industries}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Select one or more industries that your idea targets
                   </p>
                 </div>
 
