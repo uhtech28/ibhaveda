@@ -61,13 +61,61 @@ export const getNotifications = query({
     }
 
     // Get notifications with pagination and sorting (newest first)
-    const notifications = await query
+    let notifications = await query
       .order("desc")
       .take(limit);
 
+    // Filter out notifications for private ideas that the user cannot access
+    const filteredNotifications = [];
+    for (const notification of notifications) {
+      let shouldInclude = true;
+
+      // Check if notification is related to an idea and if that idea is private
+      if (notification.relatedId && notification.type !== 'deadline_approaching' && notification.type !== 'deadline_overdue') {
+        try {
+          // Try to get the related idea if this is an idea-related notification
+          let relatedIdea = null;
+          if (notification.type === 'new_idea' || notification.type === 'spark_received' || notification.type === 'comment_received') {
+            relatedIdea = await ctx.db.get(notification.relatedId as Id<"ideas">);
+          }
+
+          if (relatedIdea && relatedIdea.visibility === 'private') {
+            // Check if user is authorized to see this private idea
+            const isAuthor = relatedIdea.authorId === user._id;
+            let hasAcceptedContribution = false;
+
+            if (!isAuthor) {
+              // Check for accepted contribution requests
+              const acceptedRequests = await ctx.db
+                .query("contributionRequests")
+                .withIndex("by_contributor_status", (q) =>
+                  q.eq("contributorId", user._id).eq("status", "accepted")
+                )
+                .collect();
+
+              hasAcceptedContribution = acceptedRequests.some(req => req.ideaId === relatedIdea._id);
+            }
+
+            // Only include if user is authorized
+            shouldInclude = isAuthor || hasAcceptedContribution;
+          }
+        } catch (error) {
+          // If related item doesn't exist or other error, exclude the notification
+          shouldInclude = false;
+        }
+      }
+
+      if (shouldInclude) {
+        filteredNotifications.push(notification);
+      }
+    }
+
+    // Limit the filtered results to the requested limit
+    const limitedNotifications = filteredNotifications.slice(0, limit);
+
     // Get sender information for each notification
     const notificationsWithSenders = await Promise.all(
-      notifications.map(async (notification) => {
+      limitedNotifications.map(async (notification) => {
         const sender = await ctx.db.get(notification.senderId);
         return {
           ...notification,

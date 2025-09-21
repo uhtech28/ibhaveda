@@ -107,26 +107,32 @@ export const createIdea = mutation({
 
     const ideaId = await ctx.db.insert("ideas", ideaData);
 
-    // Create notifications for all users except the creator
-    const allUsers = await ctx.db.query("users").collect();
+    // Create notifications based on idea visibility
+    if (args.visibility === 'public') {
+      // For public ideas, notify all users except the creator
+      const allUsers = await ctx.db.query("users").collect();
 
-    // Filter out the creator and create notifications
-    const notificationPromises = allUsers
-      .filter(u => u._id !== user._id) // Exclude the creator
-      .map(recipient =>
-        ctx.db.insert("notifications", {
-          recipientId: recipient._id,
-          senderId: user._id,
-          type: "new_idea",
-          message: `${user.displayName} shared a new idea: "${args.title.trim()}"`,
-          relatedId: ideaId,
-          isRead: false,
-          createdAt: now,
-        })
-      );
+      // Filter out the creator and create notifications
+      const notificationPromises = allUsers
+        .filter(u => u._id !== user._id) // Exclude the creator
+        .map(recipient =>
+          ctx.db.insert("notifications", {
+            recipientId: recipient._id,
+            senderId: user._id,
+            type: "new_idea",
+            message: `${user.displayName} shared a new idea: "${args.title.trim()}"`,
+            relatedId: ideaId,
+            isRead: false,
+            createdAt: now,
+          })
+        );
 
-    // Wait for all notifications to be created
-    await Promise.all(notificationPromises);
+      // Wait for all notifications to be created
+      await Promise.all(notificationPromises);
+    } else {
+      // For private ideas, only notify the author (which is already excluded above)
+      // Private ideas don't generate public notifications to maintain privacy
+    }
 
     return { ideaId, message: "Idea created successfully" };
   },
