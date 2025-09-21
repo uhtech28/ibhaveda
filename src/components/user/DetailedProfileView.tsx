@@ -85,6 +85,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
   myRequests,
   incomingRequests,
 }) => {
+  console.log('DetailedProfileView: completedOnboarding =', profile.completedOnboarding)
   const [loading, setLoading] = useState(false)
   const [newSkill, setNewSkill] = useState("")
 
@@ -177,9 +178,10 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                     <Input
                       id="username"
                       value={formData.username}
-                      onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                      onChange={(e) => !profile.completedOnboarding && setFormData(prev => ({ ...prev, username: e.target.value }))}
                       disabled={profile.completedOnboarding}
-                      className={`mt-1 ${profile.completedOnboarding ? 'bg-muted' : ''}`}
+                      readOnly={profile.completedOnboarding}
+                      className={`mt-1 ${profile.completedOnboarding ? 'bg-muted cursor-not-allowed' : ''}`}
                       placeholder="Enter your username"
                     />
                     {profile.completedOnboarding && (
