@@ -61,6 +61,7 @@ export default function ProfilePage() {
     avatar: "",
     industry: "",
     skills: [] as string[],
+    username: "",
   })
 
   // Update profile when Convex data loads
@@ -82,6 +83,7 @@ export default function ProfilePage() {
         avatar: profile.avatar || "",
         industry: profile.industry || "",
         skills: profile.skills || [],
+        username: profile.username,
       })
     }
   }, [profile])
