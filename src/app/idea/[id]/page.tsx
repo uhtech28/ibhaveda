@@ -116,6 +116,14 @@ type Todo = {
   order?: number;
   authorId: string;
   ideaId: string;
+  assignedTo?: {
+    _id: string;
+    name: string;
+    username: string;
+    avatar?: string;
+  } | null;
+  deadline?: number;
+  completionTarget?: string;
   author?: {
     _id: string;
     name?: string;
@@ -1105,6 +1113,9 @@ const TodoSection: React.FC<{
     id: todo._id as string,
     name: todo.title,
     column: todo.status,
+    assignedTo: todo.assignedTo || undefined,
+    deadline: todo.deadline,
+    completionTarget: todo.completionTarget,
     canDelete: todo.canDelete || false,
   })) || [];
 
@@ -1204,6 +1215,10 @@ const TodoSection: React.FC<{
                           id={item.id}
                           name={item.name}
                           column={item.column}
+                          assignedTo={item.assignedTo}
+                          deadline={item.deadline}
+                          completionTarget={item.completionTarget}
+                          status={item.status}
                           canDelete={item.canDelete}
                           className="w-full"
                         >
@@ -1293,29 +1308,7 @@ const TodoSection: React.FC<{
 };
 
 const CalendarSection: React.FC<{ idea: ConvexIdea }> = ({ idea: _idea }: { idea: ConvexIdea }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
-  const sampleFeatures = [
-    {
-      id: '1',
-      name: 'Feature Meeting',
-      startAt: new Date(2025, 8, 6),
-      endAt: new Date(2025, 8, 6),
-      status: { id: '1', name: 'Scheduled', color: '#007bff' }
-    },
-    {
-      id: '2',
-      name: 'Code Review',
-      startAt: new Date(2025, 8, 10),
-      endAt: new Date(2025, 8, 10),
-      status: { id: '2', name: 'Completed', color: '#28a745' }
-    },
-    {
-      id: '3',
-      name: 'User Testing',
-      startAt: new Date(2025, 8, 15),
-      endAt: new Date(2025, 8, 17),
-      status: { id: '3', name: 'In Progress', color: '#ffc107' }
-    }
-  ];
+  const todos = useQuery(api.todos.getTodosForCalendar) || [];
 
   return (
     <div className="max-w-4xl mx-auto mt-8 px-4">
@@ -1330,7 +1323,7 @@ const CalendarSection: React.FC<{ idea: ConvexIdea }> = ({ idea: _idea }: { idea
             <CalendarDatePagination />
           </CalendarDate>
           <CalendarHeader />
-          <CalendarBody features={sampleFeatures}>
+          <CalendarBody features={todos}>
             {({ feature }) => <CalendarItem key={feature.id} feature={feature} />}
           </CalendarBody>
         </CalendarProvider>

@@ -41,7 +41,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit, User } from "lucide-react";
+import { Edit, Grip, User, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -62,23 +62,18 @@ const t = tunnel();
 export type { DragEndEvent } from "@dnd-kit/core";
 
 // Utility functions for task enhancements
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = timestamp - now;
-  const absDiff = Math.abs(diff);
-  const minutes = Math.floor(absDiff / (1000 * 60));
-  const hours = Math.floor(absDiff / (1000 * 60 * 60));
-  const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+function formatDeadlineDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const isTomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString() === date.toDateString();
+  const isYesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toDateString() === date.toDateString();
 
-  if (diff < 0) {
-    if (minutes < 60) return `${minutes}min overdue`;
-    if (hours < 24) return `${hours}h overdue`;
-    return `${days}d overdue`;
-  }
+  if (isToday) return "Today";
+  if (isTomorrow) return "Tomorrow";
+  if (isYesterday) return "Yesterday";
 
-  if (minutes < 60) return `Due in ${minutes}min`;
-  if (hours < 24) return `Due in ${hours}h`;
-  return `Due in ${days}d`;
+  return format(date, "MMM dd");
 }
 
 function getDeadlineIndicator(deadline?: number, status?: string): { color: string; label: string } {
@@ -89,9 +84,9 @@ function getDeadlineIndicator(deadline?: number, status?: string): { color: stri
   const hours = diff / (1000 * 60 * 60);
 
   if (status === "done") return { color: "green", label: "✓ Done" };
-  if (diff < 0) return { color: "destructive", label: formatRelativeTime(deadline) };
-  if (hours < 24) return { color: "yellow", label: formatRelativeTime(deadline) };
-  return { color: "secondary", label: formatRelativeTime(deadline) };
+  if (diff < 0) return { color: "destructive", label: formatDeadlineDate(deadline) };
+  if (hours < 24) return { color: "yellow", label: formatDeadlineDate(deadline) };
+  return { color: "secondary", label: formatDeadlineDate(deadline) };
 }
 
 // Task Edit Dialog Component
@@ -102,7 +97,7 @@ type TaskEditDialogProps = {
 };
 
 function TaskEditDialog({ todo, onClose, onSave }: TaskEditDialogProps) {
-  const [assignedTo, setAssignedTo] = useState(todo.assignedTo?._id || "");
+  const [assignedTo, setAssignedTo] = useState(todo.assignedTo?._id || "unassigned");
   const [deadline, setDeadline] = useState<Date | undefined>(todo.deadline ? new Date(todo.deadline) : undefined);
   const [completionTarget, setCompletionTarget] = useState(todo.completionTarget || "");
   const [isLoading, setIsLoading] = useState(false);
@@ -114,7 +109,7 @@ function TaskEditDialog({ todo, onClose, onSave }: TaskEditDialogProps) {
     setIsLoading(true);
     try {
       await onSave({
-        assignedTo: assignedTo || undefined,
+        assignedTo: assignedTo === "unassigned" ? undefined : assignedTo,
         deadline: deadline?.getTime(),
         completionTarget: completionTarget || undefined,
       });
@@ -141,7 +136,7 @@ function TaskEditDialog({ todo, onClose, onSave }: TaskEditDialogProps) {
               <SelectValue placeholder="Select assignee..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Unassigned</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
               {users.map((user) => (
                 <SelectItem key={user._id} value={user._id}>
                   {user.displayName}
@@ -156,10 +151,11 @@ function TaskEditDialog({ todo, onClose, onSave }: TaskEditDialogProps) {
           </Label>
           <Input
             id="deadline"
-            type="datetime-local"
-            value={deadline ? format(deadline, "yyyy-MM-dd'T'HH:mm") : ""}
+            type="date"
+            value={deadline ? format(deadline, "yyyy-MM-dd") : ""}
             onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value) : undefined)}
             className="col-span-3"
+            min={new Date().toISOString().slice(0, 10)}
           />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
@@ -190,11 +186,12 @@ function TaskEditDialog({ todo, onClose, onSave }: TaskEditDialogProps) {
 type KanbanItemProps = {
   id: string;
   name: string;
-  column?: string;
+  column: string;
   status?: "todo" | "in_progress" | "done";
   assignedTo?: { _id: string; name: string; username: string; avatar?: string };
   deadline?: number;
   completionTarget?: string;
+  canDelete?: boolean;
 } & Record<string, unknown>;
 
 type KanbanColumnProps = {
@@ -255,6 +252,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   deadline,
   completionTarget,
   status,
+  canDelete,
   children,
   className,
 }: KanbanCardProps<T>) => {
@@ -275,6 +273,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const updateTodo = useMutation(api.todos.updateTodo);
+  const deleteTodo = useMutation(api.todos.deleteTodo);
 
   const handleEditSave = async (updates: { assignedTo?: string; deadline?: number; completionTarget?: string }) => {
     try {
@@ -298,6 +297,24 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this todo?")) return;
+    try {
+      await deleteTodo({ todoId: id as Id<"todos"> });
+      toast({
+        title: "Task deleted",
+        description: "Task has been successfully deleted.",
+      });
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const style = {
     transition,
     transform: CSS.Transform.toString(transform),
@@ -306,7 +323,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   const cardContent = (
     <Card
       className={cn(
-        "cursor-grab gap-2 rounded-md p-3 shadow-sm transition-all",
+        "cursor-default gap-2 rounded-md p-3 shadow-sm transition-all",
         isDragging && "pointer-events-none cursor-grabbing opacity-30",
         deadlineIndicator.color === "destructive" && "border-red-500",
         deadlineIndicator.color === "yellow" && "border-yellow-500",
@@ -314,20 +331,38 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
         className
       )}
     >
+      <div {...listeners} className="flex items-center justify-end mb-2 cursor-grab hover:bg-muted/50 rounded p-1 -m-1">
+        <Grip className="h-4 w-4 text-muted-foreground" />
+      </div>
       <div className="space-y-2">
         <div className="flex items-start justify-between">
           <p className="m-0 font-medium text-sm flex-1">{name}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditDialogOpen(true);
-            }}
-          >
-            <Edit className="h-3 w-3" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/80"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete();
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {completionTarget && (
@@ -374,7 +409,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
 
   return (
     <>
-      <div style={style} {...listeners} {...attributes} ref={setNodeRef} className="group">
+      <div style={style} {...attributes} ref={setNodeRef} className="group">
         {cardContent}
       </div>
       {activeCardId === id && (
@@ -396,6 +431,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
           todo={{
             id,
             name,
+            column: "todo", // Default value since we're not using it in dialog
             assignedTo,
             deadline,
             completionTarget,

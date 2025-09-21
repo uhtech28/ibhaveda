@@ -78,8 +78,8 @@ export type Status = {
 export type Feature = {
   id: string;
   name: string;
-  startAt: Date;
-  endAt: Date;
+  startAt: number;
+  endAt: number;
   status: Status;
 };
 
@@ -256,8 +256,8 @@ export const CalendarBody = ({ features: legacyFeatures, tasks, children }: Cale
       return {
         id: task._id,
         name: task.title,
-        startAt: new Date(), // Not used for tasks
-        endAt: task.deadline ? new Date(task.deadline) : new Date(),
+        startAt: Date.now(), // Not used for tasks
+        endAt: task.deadline || Date.now(),
         status: {
           id: task.status,
           name: task.status.replace('_', ' '),
@@ -838,36 +838,40 @@ export type CalendarItemProps = {
   task?: Task;
   className?: string;
   onEdit?: (task: Task) => void;
+  children?: ReactNode;
 };
 
 export const CalendarItem = memo(
-  ({ feature, task, className, onEdit }: CalendarItemProps) => (
+  ({ feature, task, className, onEdit, children }: CalendarItemProps) => (
     <div
-      className={cn("flex items-center gap-2 cursor-pointer hover:bg-accent/50 p-1 rounded", className)}
+      className={cn("flex flex-col gap-1 cursor-pointer hover:bg-accent/50 p-1 rounded", className)}
       onClick={(e) => {
         e.stopPropagation();
         if (task && onEdit) onEdit(task);
       }}
     >
-      <div
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{
-          backgroundColor: feature.status.color,
-        }}
-      />
-      <span className="truncate text-xs">
-        {feature.name}
-        {task?.assignedTo && (
-          <span className="ml-1 text-muted-foreground">
-            ({task.assignedTo.name})
+      <div className="flex items-center gap-2">
+        <div
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{
+            backgroundColor: feature.status.color,
+          }}
+        />
+        <span className="truncate text-xs">
+          {feature.name}
+          {task?.assignedTo && (
+            <span className="ml-1 text-muted-foreground">
+              ({task.assignedTo.name})
+            </span>
+          )}
+        </span>
+        {task?.completionTarget && (
+          <span className="truncate text-xs text-muted-foreground ml-1">
+            - {task.completionTarget}
           </span>
         )}
-      </span>
-      {task?.completionTarget && (
-        <span className="truncate text-xs text-muted-foreground ml-1">
-          - {task.completionTarget}
-        </span>
-      )}
+      </div>
+      {children}
     </div>
   )
 );

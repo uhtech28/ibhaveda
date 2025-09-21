@@ -36,10 +36,12 @@ export const createTodo = mutation({
       }
     }
 
-    // Validate deadline if provided (must be future date)
+    // Validate deadline if provided (must be today or future)
     if (args.deadline !== undefined) {
-      if (args.deadline <= Date.now()) {
-        throw new Error("Deadline must be a future date");
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (args.deadline < startOfToday.getTime()) {
+        throw new Error("Deadline must be today or in the future");
       }
     }
 
@@ -208,10 +210,14 @@ export const updateTodo = mutation({
       }
     }
 
-    // Validate deadline if provided (must be future date)
+    // Validate deadline if provided (must be today or future)
     if (args.deadline !== undefined) {
-      if (args.deadline && args.deadline <= Date.now()) {
-        throw new Error("Deadline must be a future date");
+      if (args.deadline) {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (args.deadline < startOfToday.getTime()) {
+          throw new Error("Deadline must be today or in the future");
+        }
       }
     }
 
@@ -503,6 +509,7 @@ export const getTodosForIdea = query({
     const todosWithAuthors = await Promise.all(
       todos.map(async (todo) => {
         const author = await ctx.db.get(todo.authorId);
+        const assignedUser = todo.assignedTo ? await ctx.db.get(todo.assignedTo) : null;
         return {
           ...todo,
           author: author ? {
@@ -510,6 +517,12 @@ export const getTodosForIdea = query({
             name: author.displayName,
             username: author.username,
             avatar: author.avatar,
+          } : null,
+          assignedTo: assignedUser ? {
+            _id: assignedUser._id,
+            name: assignedUser.displayName,
+            username: assignedUser.username,
+            avatar: assignedUser.avatar,
           } : null,
           canEdit: currentUser
             ? currentUser._id === todo.authorId
@@ -851,6 +864,70 @@ export const getTodosByAssignee = query({
       if (b.deadline) return 1;
       return b.createdAt - a.createdAt; // Newest first if no deadline
     });
+  },
+});
+
+// Get todos with deadlines for calendar (assigned to user)
+export const getTodosForCalendar = query({
+  handler: async (ctx) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    // Find user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      return [];
+    }
+
+    // Get todos with deadlines assigned to current user
+    const assignedTodos = await ctx.db
+      .query("todos")
+      .withIndex("by_assigned_to", (q) => q.eq("assignedTo", user._id))
+      .collect();
+
+    // Filter to only include todos with deadlines and not completed
+    const todosWithDeadlines = assignedTodos.filter(todo =>
+      todo.deadline && todo.status !== "done"
+    );
+
+    // Get unique idea IDs
+    const ideaIds = [...new Set(todosWithDeadlines.map(todo => todo.ideaId))];
+    const ideas = await Promise.all(ideaIds.map(id => ctx.db.get(id)));
+
+    // Create idea map
+    const ideaMap = new Map(ideas.filter(Boolean).map(idea => [idea!._id, idea]));
+
+    // Enrich todos with idea info, filter out deleted ideas
+    const enrichedTodos = todosWithDeadlines
+      .filter(todo => {
+        const idea = ideaMap.get(todo.ideaId);
+        return idea && !idea.isDeleted;
+      })
+      .map(todo => {
+        const idea = ideaMap.get(todo.ideaId)!;
+        return {
+          id: todo._id,
+          name: todo.title,
+          startAt: todo.deadline!,
+          endAt: todo.deadline!,
+          status: {
+            id: todo.status,
+            name: todo.status === "todo" ? "Todo" : todo.status === "in_progress" ? "In Progress" : "Done",
+            color: todo.status === "done" ? "#28a745" : todo.status === "in_progress" ? "#ffc107" : "#007bff"
+          },
+          ideaTitle: idea.title
+        };
+      });
+
+    // Sort by deadline
+    return enrichedTodos.sort((a, b) => a.startAt - b.startAt);
   },
 });
 
