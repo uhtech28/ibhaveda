@@ -27,141 +27,163 @@ import { industryCardOptions, skillCardOptions } from "@/lib/options";
 export default function ProfileSetupPage() {
   const { isLoaded, userId } = useAuth();
 
-  // Simple idea card component - Show only title
-  type IdeaType = {
-    _id: string;
-    title: string;
-  };
-
-  const IdeaCard = ({ idea }: { idea: IdeaType }) => (
-    <Card className="flex-shrink-0 w-80 hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm line-clamp-2 leading-tight min-h-[2.5rem]">
-            {idea.title}
-          </h4>
-        </div>
-      </CardContent>
-    </Card>
-  );
 
   // Metrics section component
-  const MetricsSection = () => (
-    <Card className="shadow-lg mt-8">
-      <CardHeader>
-        <CardTitle>Your Metrics</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-8">
-          {/* Created Ideas */}
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Ideas Created</h3>
-              {createdIdeasData && createdIdeasData.length > 3 && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={() => toggleExpanded('created')}
-                  className="h-auto p-0 text-primary hover:text-primary/80"
-                >
-                  {expandedSections.created ? 'Show less' : `View all (${createdIdeasData.length})`}
-                </Button>
-              )}
-            </div>
-           {createdIdeasData ? (
-             createdIdeas.length > 0 ? (
-               <div className="flex gap-3 overflow-x-auto pb-2">
-                 {createdIdeas.map((idea) => (
-                   <IdeaCard key={idea._id} idea={idea} />
-                 ))}
-               </div>
-             ) : (
-               <p className="text-muted-foreground text-center py-4">No ideas created yet</p>
-             )
-           ) : (
-             <div className="flex justify-center py-4">
-               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-             </div>
-           )}
-          </div>
+  const MetricsSection = () => {
+    const router = useRouter();
+    const [expandedCards, setExpandedCards] = useState({
+      created: false,
+      sparked: false,
+      contributed: false,
+    });
 
-          {/* Sparked Ideas */}
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Ideas Sparked</h3>
-              {sparkedIdeasData && sparkedIdeasData.length > 3 && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={() => toggleExpanded('sparked')}
-                  className="h-auto p-0 text-primary hover:text-primary/80"
-                >
-                  {expandedSections.sparked ? 'Show less' : `View all (${sparkedIdeasData.length})`}
-                </Button>
-              )}
-            </div>
-            {sparkedIdeasData ? (
-              sparkedIdeas.length > 0 ? (
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {sparkedIdeas.map((idea) => (
-                    <IdeaCard key={idea._id} idea={idea} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-4">No ideas sparked yet</p>
-              )
-            ) : (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              </div>
-            )}
-          </div>
+    const toggleCard = (cardType: 'created' | 'sparked' | 'contributed') => {
+      setExpandedCards(prev => ({
+        ...prev,
+        [cardType]: !prev[cardType]
+      }));
+    };
 
-          {/* Contributed Ideas */}
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Ideas Contributed To</h3>
-              {contributedIdeasData && contributedIdeasData.length > 3 && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={() => toggleExpanded('contributed')}
-                  className="h-auto p-0 text-primary hover:text-primary/80"
-                >
-                  {expandedSections.contributed ? 'Show less' : `View all (${contributedIdeasData.length})`}
-                </Button>
+    const navigateToIdea = (ideaId: string) => {
+      router.push(`/idea/${ideaId}`);
+    };
+
+    return (
+      <Card className="shadow-lg mt-8">
+        <CardHeader>
+          <CardTitle>Your Metrics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Created Ideas */}
+            <div>
+              <div
+                className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+                onClick={() => toggleCard('created')}
+              >
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">Ideas Created</h3>
+                <p className="text-2xl font-bold text-primary">{createdIdeasData?.length || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {expandedCards.created ? 'Click to collapse' : 'Click to expand'}
+                </p>
+              </div>
+
+              {expandedCards.created && (
+                <div className="mt-4">
+                  {createdIdeasData ? (
+                    createdIdeasData.length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {createdIdeasData.map((idea) => (
+                          <div
+                            key={idea._id}
+                            className="p-3 bg-background border rounded-md cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => navigateToIdea(idea._id)}
+                          >
+                            <h4 className="font-medium text-sm text-primary hover:underline">{idea.title}</h4>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">No ideas created yet</p>
+                    )
+                  ) : (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-            {contributedIdeasData ? (
-              contributedIdeas.length > 0 ? (
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {contributedIdeas.map((idea) => (
-                    <IdeaCard key={idea._id} idea={idea} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-4">No contributions yet</p>
-              )
-            ) : (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+
+            {/* Sparked Ideas */}
+            <div>
+              <div
+                className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+                onClick={() => toggleCard('sparked')}
+              >
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">Ideas Sparked</h3>
+                <p className="text-2xl font-bold text-primary">{sparkedIdeasData?.length || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {expandedCards.sparked ? 'Click to collapse' : 'Click to expand'}
+                </p>
               </div>
-            )}
+
+              {expandedCards.sparked && (
+                <div className="mt-4">
+                  {sparkedIdeasData ? (
+                    sparkedIdeas.length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {sparkedIdeas.map((idea) => (
+                          <div
+                            key={idea._id}
+                            className="p-3 bg-background border rounded-md cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => navigateToIdea(idea._id)}
+                          >
+                            <h4 className="font-medium text-sm text-primary hover:underline">{idea.title}</h4>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">No ideas sparked yet</p>
+                    )
+                  ) : (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Contributed Ideas */}
+            <div>
+              <div
+                className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+                onClick={() => toggleCard('contributed')}
+              >
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">Ideas Contributed To</h3>
+                <p className="text-2xl font-bold text-primary">{contributedIdeasData?.length || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {expandedCards.contributed ? 'Click to collapse' : 'Click to expand'}
+                </p>
+              </div>
+
+              {expandedCards.contributed && (
+                <div className="mt-4">
+                  {contributedIdeasData ? (
+                    contributedIdeas.length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {contributedIdeas.map((idea) => (
+                          <div
+                            key={idea._id}
+                            className="p-3 bg-background border rounded-md cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => navigateToIdea(idea._id)}
+                          >
+                            <h4 className="font-medium text-sm text-primary hover:underline">{idea.title}</h4>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">No contributions yet</p>
+                    )
+                  ) : (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
   const { user } = useUser();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [newSkill, setNewSkill] = useState("");
-  const [expandedSections, setExpandedSections] = useState({
-    created: false,
-    sparked: false,
-    contributed: false,
-  });
   const [profilePopulated, setProfilePopulated] = useState(false);
 
   // Comprehensive profile form data
@@ -180,13 +202,11 @@ export default function ProfileSetupPage() {
   // Query existing user profile to check if onboarding is completed
   const existingProfile = useQuery(api.users.getCurrentUser);
 
-  // Query user's ideas data - refresh when expanded sections change
+  // Query user's ideas data
   const createdIdeasData = useQuery(api.ideas.getUserIdeas);
-  const sparkedIdeasData = useQuery(api.ideas.getUserSparkedIdeas, { limit: expandedSections.sparked ? 20 : 20 });
-  const contributedIdeasData = useQuery(api.ideas.getUserContributedIdeas, { limit: expandedSections.contributed ? 20 : 20 });
+  const sparkedIdeasData = useQuery(api.ideas.getUserSparkedIdeas, { limit: 20 });
+  const contributedIdeasData = useQuery(api.ideas.getUserContributedIdeas, { limit: 20 });
 
-  // Apply limit to created ideas for display
-  const createdIdeas = createdIdeasData ? (expandedSections.created ? createdIdeasData : createdIdeasData.slice(0, 3)) : [];
   // sparked and contributed ideas are already limited in query, but we'll show all returned items
   const sparkedIdeas = sparkedIdeasData || [];
   const contributedIdeas = contributedIdeasData || [];
@@ -329,12 +349,6 @@ export default function ProfileSetupPage() {
     }));
   };
 
-  const toggleExpanded = (section: 'created' | 'sparked' | 'contributed') => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
 
 
   if (!isLoaded || !userId) {

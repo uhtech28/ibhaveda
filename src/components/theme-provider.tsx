@@ -9,7 +9,7 @@ export function ThemeProvider({ children, ...props }: React.PropsWithChildren) {
       attribute="class"
       defaultTheme="light"
       enableSystem={false}
-      disableTransitionOnChange={false}
+      disableTransitionOnChange={true}
       {...props}
     >
       {children}

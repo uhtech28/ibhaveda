@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AvatarUpload } from "@/components/user/avatar-upload"
 import { RequestStatusCard } from "@/components/requests/request-status-card"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Plus, X, User } from "lucide-react"
 import {
   Select,
@@ -138,9 +139,10 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Profile Header */}
-      <Card className="mt-12 mb-6">
+    <TooltipProvider>
+      <div className="max-w-4xl mx-auto">
+        {/* Profile Header */}
+        <Card className="mt-12 mb-6">
         <CardHeader className="pb-4">
           <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
             {/* Avatar Upload Component */}
@@ -247,22 +249,85 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
 
       {/* User Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="hover:shadow-lg transition-shadow duration-200">
-          <CardContent className="text-center py-6">
-            <div className="text-2xl font-bold text-primary">{profile.ideasCreated || 0}</div>
+        <Card className="hover:shadow-lg transition-all duration-200 group">
+          <CardContent className="text-center py-6 relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="text-2xl font-bold text-primary cursor-help group-hover:scale-105 transition-transform duration-200"
+                  aria-describedby="ideas-created-tooltip"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ideas created: ${profile.ideasCreated || 0}`}
+                >
+                  {profile.ideasCreated || 0}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="max-w-xs text-center"
+                id="ideas-created-tooltip"
+                role="tooltip"
+                aria-live="polite"
+              >
+                <p>The total number of ideas you've created and published on the platform.</p>
+              </TooltipContent>
+            </Tooltip>
             <div className="text-sm text-muted-foreground">Ideas Created</div>
           </CardContent>
         </Card>
-        <Card className="hover:shadow-lg transition-shadow duration-200">
-          <CardContent className="text-center py-6">
-            <div className="text-2xl font-bold text-primary">{profile.ideasSparked || 0}</div>
+        <Card className="hover:shadow-lg transition-all duration-200 group">
+          <CardContent className="text-center py-6 relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="text-2xl font-bold text-primary cursor-help group-hover:scale-105 transition-transform duration-200"
+                  aria-describedby="ideas-sparked-tooltip"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ideas sparked: ${profile.ideasSparked || 0}`}
+                >
+                  {profile.ideasSparked || 0}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="max-w-xs text-center"
+                id="ideas-sparked-tooltip"
+                role="tooltip"
+                aria-live="polite"
+              >
+                <p>The number of ideas you've sparked through your contributions that led to new ideas being created.</p>
+              </TooltipContent>
+            </Tooltip>
             <div className="text-sm text-muted-foreground">Ideas Sparked</div>
           </CardContent>
         </Card>
-        <Card className="hover:shadow-lg transition-shadow duration-200">
-          <CardContent className="text-center py-6">
-            <div className="text-2xl font-bold text-primary">{profile.ideasContributed || 0}</div>
-            <div className="text-sm text-muted-foreground">Ideas Contributed</div>
+        <Card className="hover:shadow-lg transition-all duration-200 group">
+          <CardContent className="text-center py-6 relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="text-2xl font-bold text-primary cursor-help group-hover:scale-105 transition-transform duration-200"
+                  aria-describedby="ideas-contributed-tooltip"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ideas contributed to: ${profile.ideasContributed || 0}`}
+                >
+                  {profile.ideasContributed || 0}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="max-w-xs text-center"
+                id="ideas-contributed-tooltip"
+                role="tooltip"
+                aria-live="polite"
+              >
+                <p>The total number of contributions you've made to other users' ideas.</p>
+              </TooltipContent>
+            </Tooltip>
+            <div className="text-sm text-muted-foreground">Ideas Contributed To</div>
           </CardContent>
         </Card>
       </div>
@@ -415,5 +480,6 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
         </div>
       </div>
     </div>
+    </TooltipProvider>
   )
 }
