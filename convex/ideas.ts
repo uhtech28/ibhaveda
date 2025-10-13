@@ -763,7 +763,7 @@ export const getUserIdeas = query({
           .query("users")
           .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
           .unique();
-    
+
         console.log("getUserIdeas: User lookup result:", user ? "found" : "not found");
         if (user) {
           console.log("getUserIdeas: User ID:", user._id);
@@ -772,7 +772,7 @@ export const getUserIdeas = query({
           return []; // Return empty array instead of throwing
         }
 
-    // Get user's ideas, excluding deleted ones
+    // Get user's ideas, excluding deleted ones - include both public and private
     const userIdeas = await ctx.db
       .query("ideas")
       .withIndex("by_author", (q) => q.eq("authorId", user._id))
@@ -799,6 +799,61 @@ export const getUserIdeas = query({
     );
 
     return ideasWithDetails;
+  },
+});
+
+// Get public ideas for a specific user (for community profile views)
+export const getUserPublicIdeas = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const userIdeas = await ctx.db
+      .query("ideas")
+      .withIndex("by_author_visibility", (q) =>
+        q.eq("authorId", args.userId).eq("visibility", "public")
+      )
+      .filter((q) => q.neq(q.field("isDeleted"), true))
+      .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
+      .order("desc")
+      .take(20);
+
+    // Get author information and contribution count for each idea
+    const ideasWithAuthors = await Promise.all(
+      userIdeas.map(async (idea) => {
+        let author = null;
+        try {
+          author = await ctx.db.get(idea.authorId);
+        } catch (e) {
+          console.error("Error fetching author for idea:", idea._id, e);
+        }
+
+        // Count accepted contribution requests
+        let contributionCount = 0;
+        try {
+          const acceptedContributions = await ctx.db
+            .query("contributionRequests")
+            .withIndex("by_idea_status_created", (q) =>
+              q.eq("ideaId", idea._id).eq("status", "accepted")
+            )
+            .collect();
+          contributionCount = acceptedContributions.length;
+        } catch (e) {
+          console.error("Error fetching contribution count for idea:", idea._id, e);
+        }
+
+        return {
+          ...idea,
+          author: author ? {
+            ...author,
+            // These fields should match the schema naming
+            name: author.displayName,
+            username: author.username,
+          } : null,
+          contributionCount: contributionCount,
+        };
+      })
+    );
+
+    return ideasWithAuthors;
   },
 });
 
