@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
 import { Id } from "./_generated/dataModel"
+import type { Doc } from "./_generated/dataModel"
 
 // TypeScript interfaces for user data
 export interface UserProfile {
@@ -71,6 +72,7 @@ export const createUserProfile = mutation({
   },
   handler: async ({ db, auth }, args): Promise<string> => {
     try {
+      console.log('👤 Creating user profile:', { username: args.username, skills: args.skills.length, industry: args.industry })
   // Verify authentication
   const identity = await auth.getUserIdentity()
   if (!identity) {
@@ -144,6 +146,7 @@ export const createUserProfile = mutation({
 
   // Add skills efficiently with batch operations
   if (args.skills.length > 0) {
+    console.log('💡 Adding skills:', args.skills)
     await Promise.all(
       args.skills.map((skill) =>
         db.insert("userSkills", {
@@ -152,6 +155,15 @@ export const createUserProfile = mutation({
         })
       )
     )
+  }
+
+  // Add industry if provided
+  if (args.industry) {
+    console.log('🏭 Adding industry:', args.industry)
+    await db.insert("userIndustries", {
+      userId,
+      industryName: args.industry,
+    })
   }
 
   console.log("Successfully created user profile:", userId, "username:", normalizedUsername)
@@ -178,6 +190,12 @@ export const updateUserProfile = mutation({
     industry: v.optional(v.string()),
   }),
   handler: async ({ db, auth }, args): Promise<string> => {
+    console.log('🔄 Updating user profile:', {
+      displayName: args.displayName,
+      skills: args.skills?.length,
+      industry: args.industry
+    })
+
     // Verify authentication
     const identity = await auth.getUserIdentity()
     if (!identity) throw new Error("Unauthorized")
@@ -197,7 +215,7 @@ export const updateUserProfile = mutation({
 
     // Only update fields that are provided
     Object.entries(args).forEach(([key, value]) => {
-      if (value !== undefined && key !== "skills") {
+      if (value !== undefined && key !== "skills" && key !== "industry") {
         updateData[key] = value
       }
     })
@@ -206,6 +224,7 @@ export const updateUserProfile = mutation({
 
     // Handle skills updates with transaction safety
     if (args.skills !== undefined) {
+      console.log('💡 Updating skills:', args.skills)
       // Remove existing skills
       const existingSkills = await db
         .query("userSkills")
@@ -225,6 +244,27 @@ export const updateUserProfile = mutation({
             })
           )
         )
+      }
+    }
+
+    // Handle industry updates
+    if (args.industry !== undefined) {
+      console.log('🏭 Updating industry:', args.industry)
+      // Remove existing industry
+      const existingIndustries = await db
+        .query("userIndustries")
+        .withIndex("by_user", (q) => q.eq("userId", profile._id))
+        .collect()
+      await Promise.all(
+        existingIndustries.map((industry) => db.delete(industry._id))
+      )
+
+      // Add new industry
+      if (args.industry) {
+        await db.insert("userIndustries", {
+          userId: profile._id,
+          industryName: args.industry,
+        })
       }
     }
 
@@ -368,5 +408,126 @@ export const getAllUsers = query({
     )
 
     return usersWithSkills
+  },
+})
+
+// Get suggested collaborators based on skills and industries matching
+export const getSuggestedCollaborators = query({
+  args: {
+    skills: v.array(v.string()),
+    industries: v.array(v.string()),
+    limit: v.optional(v.number()),
+    excludeUserId: v.optional(v.string())
+  },
+  handler: async ({ db }, { skills, industries, limit = 10, excludeUserId }): Promise<UserProfile[]> => {
+    console.log('🔍 getSuggestedCollaborators called with:', {
+      skills: skills.length,
+      industries: industries.length,
+      limit,
+      excludeUserId: excludeUserId ? 'present' : 'null',
+      skillsList: skills,
+      industriesList: industries
+    })
+
+    // Get user skill matches
+    const skillMatches = new Set<Id<"users">>()
+    if (skills.length > 0) {
+      console.log('📊 Searching for skill matches...')
+      const matchingUserSkills = await db
+        .query("userSkills")
+        .collect()
+
+      console.log(`📊 Found ${matchingUserSkills.length} userSkills records`)
+
+      matchingUserSkills.forEach(userSkill => {
+        if (skills.some(skill => userSkill.skillName.toLowerCase() === skill.toLowerCase())) {
+          skillMatches.add(userSkill.userId)
+        }
+      })
+      console.log(`📊 Skill matches found: ${skillMatches.size} users`)
+    }
+
+    // Get user industry matches
+    const industryMatches = new Set<Id<"users">>()
+    if (industries.length > 0) {
+      console.log('🏭 Searching for industry matches...')
+      const matchingUserIndustries = await db
+        .query("userIndustries")
+        .collect()
+
+      console.log(`🏭 Found ${matchingUserIndustries.length} userIndustries records`)
+
+      matchingUserIndustries.forEach(userIndustry => {
+        if (industries.some(industry => userIndustry.industryName.toLowerCase() === industry.toLowerCase())) {
+          industryMatches.add(userIndustry.userId)
+        }
+      })
+      console.log(`🏭 Industry matches found: ${industryMatches.size} users`)
+    }
+
+    // Combine matches (union of skill and industry matches)
+    const allMatches = new Set([...skillMatches, ...industryMatches])
+
+    // Remove current user if specified
+    if (excludeUserId) {
+      // Find the user ID from Clerk ID
+      const currentUser = await db
+        .query("users")
+        .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", excludeUserId))
+        .first()
+
+      if (currentUser) {
+        allMatches.delete(currentUser._id)
+      }
+    }
+
+    console.log(`🎯 Total unique matches (excluding current user): ${allMatches.size}`)
+
+    // Fetch user profiles for matches
+    const matchedUsers = []
+    for (const userId of allMatches) {
+      try {
+        const user = await db.get(userId)
+        if (user && user.isActive !== false) {
+          // Fetch skills for this user
+          const userSkills = await db
+            .query("userSkills")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .collect()
+
+          matchedUsers.push({
+            ...user,
+            skills: userSkills.map((s) => s.skillName),
+          } as UserProfile)
+        } else {
+          console.log(`⚠️ User ${userId} is inactive or not found`)
+        }
+      } catch (error) {
+        console.error(`❌ Error fetching user ${userId}:`, error)
+      }
+    }
+
+    console.log(`✅ Successfully fetched ${matchedUsers.length} user profiles`)
+
+    // Sort by relevance (users with both skill and industry matches first)
+    const skillMatchSet = new Set(skillMatches)
+    const industryMatchSet = new Set(industryMatches)
+
+    matchedUsers.sort((a, b) => {
+      const aSkillMatch = skillMatchSet.has(a._id as Id<"users">)
+      const bSkillMatch = skillMatchSet.has(b._id as Id<"users">)
+      const aIndustryMatch = industryMatchSet.has(a._id as Id<"users">)
+      const bIndustryMatch = industryMatchSet.has(b._id as Id<"users">)
+
+      const aRelevance = (aSkillMatch ? 2 : 0) + (aIndustryMatch ? 1 : 0)
+      const bRelevance = (bSkillMatch ? 2 : 0) + (bIndustryMatch ? 1 : 0)
+
+      return bRelevance - aRelevance
+    })
+
+    // Return limited results
+    const result = matchedUsers.slice(0, limit)
+    console.log(`📤 Returning ${result.length} suggested collaborators`)
+    return result
   },
 })

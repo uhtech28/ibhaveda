@@ -97,8 +97,16 @@ export default function CreateIdeaPage() {
         visibility: formData.visibility,
       });
 
-      // Success - redirect to feed
-      router.push('/feed');
+      // Success - redirect to suggestions page with skills and industries
+      const params = new URLSearchParams();
+      if (formData.skills.length > 0) {
+        params.set('skills', formData.skills.join(','));
+      }
+      if (formData.industries.length > 0) {
+        params.set('industries', formData.industries.join(','));
+      }
+
+      router.push(`/create-idea/suggestions?${params.toString()}`);
     } catch (error) {
       console.error('Failed to create idea:', error);
       setErrors({ submit: error instanceof Error ? error.message : 'Failed to create idea. Please try again.' });
