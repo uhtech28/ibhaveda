@@ -753,7 +753,7 @@ export const getUserIdeas = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       console.log("getUserIdeas: No authentication identity");
-      throw new Error("Not authenticated");
+      return []; // Return empty array instead of throwing for profile-setup page
     }
 
     console.log("getUserIdeas: Auth identity subject:", identity.subject);

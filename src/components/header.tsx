@@ -63,10 +63,11 @@ export const HeroHeader = () => {
                             {/* Search Bar */}
                             <div className="max-w-md w-full mr-8">
                                 <SearchBar
-                                    onSearch={(query) => {
-                                        console.log('Search query:', query)
+                                    onSearch={(query, type) => {
+                                        console.log('Search query:', query, 'type:', type)
+                                        // TODO: Navigate to search results page
                                     }}
-                                    placeholder="Search ideas..."
+                                    placeholder="Search for ideas, people, and more..."
                                     className="w-full"
                                 />
                             </div>
@@ -162,11 +163,11 @@ export const HeroHeader = () => {
                             {/* Mobile Search */}
                             <div className="space-y-2">
                                 <SearchBar
-                                    onSearch={(query) => {
-                                        console.log('Mobile search query:', query)
+                                    onSearch={(query, type) => {
+                                        console.log('Mobile search query:', query, 'type:', type)
                                         closeMenu()
                                     }}
-                                    placeholder="Search ideas..."
+                                    placeholder="Search for ideas, people, and more..."
                                     className="w-full"
                                 />
                             </div>
