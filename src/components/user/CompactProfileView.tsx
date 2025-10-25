@@ -33,39 +33,15 @@ interface CompactProfileViewProps {
 }
 
 export const CompactProfileView: React.FC<CompactProfileViewProps> = ({ profile }) => {
-  // Fetch real-time metrics
-  const userIdeas = useQuery(api.ideas.getUserIdeas);
-  const sparkedIdeas = useQuery(api.ideas.getUserSparkedIdeas, { limit: 100 });
-  const contributedIdeas = useQuery(api.ideas.getUserContributedIdeas, { limit: 100 });
-
   // Fetch public ideas for this user (for community profile views)
   const publicIdeas = useQuery(api.ideas.getUserPublicIdeas, { userId: profile._id as any }); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  // State for real-time metrics
-  const [metrics, setMetrics] = useState({
+  // Use the dynamic metrics directly from profile data (now calculated in getUserProfile query)
+  const metrics = {
     ideasCreated: profile.ideasCreated || 0,
     ideasSparked: profile.ideasSparked || 0,
     ideasContributed: profile.ideasContributed || 0,
-  });
-
-  // Update metrics when data loads
-  useEffect(() => {
-    if (userIdeas !== undefined) {
-      setMetrics(prev => ({ ...prev, ideasCreated: userIdeas.length }));
-    }
-  }, [userIdeas]);
-
-  useEffect(() => {
-    if (sparkedIdeas !== undefined) {
-      setMetrics(prev => ({ ...prev, ideasSparked: sparkedIdeas.length }));
-    }
-  }, [sparkedIdeas]);
-
-  useEffect(() => {
-    if (contributedIdeas !== undefined) {
-      setMetrics(prev => ({ ...prev, ideasContributed: contributedIdeas.length }));
-    }
-  }, [contributedIdeas]);
+  };
 
   return (
     <div className="max-w-4xl mx-auto">

@@ -8,12 +8,14 @@ import FooterSection from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CategoryMultiSelect } from "@/components/CategoryMultiSelect";
-import { Plus, MessageCircle, Users, Filter } from "lucide-react";
+import { Plus, MessageCircle, Users, Filter, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
+import { useToast } from "@/components/ui/use-toast";
 
 
 type ConvexIdea = {
@@ -152,6 +154,10 @@ const IdeaGridCard: React.FC<{
 export default function FeedPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
+  // Profile completion check
+  const { isComplete: isProfileComplete, isLoading: isProfileLoading } = useProfileCompletion();
 
   // Filter states
   const [filterOpen, setFilterOpen] = useState(false);
@@ -169,6 +175,18 @@ export default function FeedPage() {
       router.push('/');
     }
   }, [isLoaded, userId, router]);
+
+  // Show toast if profile is incomplete
+  React.useEffect(() => {
+    if (isLoaded && userId && !isProfileLoading && !isProfileComplete) {
+      toast({
+        title: "Complete Your Profile",
+        description: "Please complete your profile setup to fully participate in the community. Missing: display name, avatar, bio (50+ chars), industry, and at least 3 skills.",
+        action: <Button size="sm" onClick={() => router.push('/profile-setup')}>Complete Profile</Button>,
+        duration: 8000,
+      });
+    }
+  }, [isLoaded, userId, isProfileComplete, isProfileLoading, toast, router]);
 
   if (!isLoaded || !userId) {
     return (
@@ -247,6 +265,24 @@ export default function FeedPage() {
               </Button>
             </div>
           </div>
+
+          {/* Profile Incomplete Banner */}
+          {(!isProfileLoading && !isProfileComplete) && (
+            <div className="mb-8 p-6 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 text-amber-600" />
+                <div>
+                  <h3 className="font-semibold text-amber-800">Complete Your Profile</h3>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Your profile needs more details to fully participate. Add your display name, avatar, bio (50+ characters), industry, and at least 3 skills.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => router.push('/profile-setup')} className="bg-amber-600 hover:bg-amber-700">
+                Complete Profile
+              </Button>
+            </div>
+          )}
 
           {/* Ideas Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

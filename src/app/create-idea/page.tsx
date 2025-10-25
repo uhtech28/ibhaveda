@@ -16,10 +16,16 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
+import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function CreateIdeaPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
+  // Profile completion check
+  const { isComplete: isProfileComplete, isLoading: isProfileLoading } = useProfileCompletion();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -121,6 +127,19 @@ export default function CreateIdeaPage() {
       router.push('/');
     }
   }, [isLoaded, userId, router]);
+
+  // Show toast if profile is incomplete
+  React.useEffect(() => {
+    if (isLoaded && userId && !isProfileLoading && !isProfileComplete) {
+      toast({
+        title: "Complete Your Profile",
+        description: "You need a complete profile to create ideas. Missing: display name, avatar, bio (50+ chars), industry, and at least 3 skills.",
+        action: <Button size="sm" onClick={() => router.push('/profile-setup')}>Complete Profile</Button>,
+        duration: 8000,
+      });
+      router.push('/profile-setup');
+    }
+  }, [isLoaded, userId, isProfileComplete, isProfileLoading, toast, router]);
 
   if (!isLoaded || !userId) {
     return (

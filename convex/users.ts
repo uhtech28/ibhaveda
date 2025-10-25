@@ -215,7 +215,7 @@ export const updateUserProfile = mutation({
 
     // Only update fields that are provided
     Object.entries(args).forEach(([key, value]) => {
-      if (value !== undefined && key !== "skills" && key !== "industry") {
+      if (value !== undefined && key !== "skills") {
         updateData[key] = value
       }
     })
@@ -373,14 +373,52 @@ export const getUserProfile = query({
       .withIndex("by_user", (q) => q.eq("userId", profile._id))
       .collect()
 
+    // Fetch industry efficiently
+    const industries = await db
+      .query("userIndustries")
+      .withIndex("by_user", (q) => q.eq("userId", profile._id))
+      .collect()
+
+    // Calculate dynamic metrics
+    const createdIdeas = await db
+      .query("ideas")
+      .withIndex("by_author", (q) => q.eq("authorId", profile._id))
+      .filter((q) => q.neq(q.field("isDeleted"), true))
+      .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
+      .collect()
+
+    const sparkedRecords = await db
+      .query("userIdeaSparks")
+      .withIndex("by_user", (q) => q.eq("userId", profile._id))
+      .collect()
+
+    let sparkedCount = 0
+    for (const spark of sparkedRecords) {
+      const idea = await db.get(spark.ideaId)
+      if (idea && !idea.isDeleted && idea.authorId !== profile._id) {
+        sparkedCount++
+      }
+    }
+
+    const acceptedRequests = await db
+      .query("contributionRequests")
+      .withIndex("by_contributor_status", (q) =>
+        q.eq("contributorId", profile._id).eq("status", "accepted")
+      )
+      .collect()
+
     return {
       ...profile,
       skills: skills.map((s) => s.skillName),
+      industry: industries.length > 0 ? industries[0].industryName : undefined,
+      ideasCreated: createdIdeas.length,
+      ideasSparked: sparkedCount,
+      ideasContributed: acceptedRequests.length,
     } as UserProfile
   },
 })
 
-// Get all users for community page
+// Get all users for community page with real-time metrics
 export const getAllUsers = query({
   handler: async ({ db }): Promise<UserProfile[]> => {
     const users = await db
@@ -392,24 +430,87 @@ export const getAllUsers = query({
     // Sort by createdAt descending
     users.sort((a, b) => b.createdAt - a.createdAt)
 
-    // Fetch skills for each user efficiently
-    const usersWithSkills = await Promise.all(
+    // Fetch skills and dynamic metrics for each user efficiently
+    const usersWithMetrics = await Promise.all(
       users.map(async (user) => {
+        // Fetch skills
         const skills = await db
           .query("userSkills")
           .withIndex("by_user", (q) => q.eq("userId", user._id))
           .collect()
 
+        // Fetch created ideas count
+        const createdIdeas = await db
+          .query("ideas")
+          .withIndex("by_author", (q) => q.eq("authorId", user._id))
+          .filter((q) => q.neq(q.field("isDeleted"), true))
+          .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
+          .collect()
+
+        // Fetch sparked ideas count (ideas user has sparked, excluding their own)
+        const sparkedRecords = await db
+          .query("userIdeaSparks")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect()
+
+        // Filter out user's own ideas from sparked count
+        let sparkedCount = 0
+        for (const spark of sparkedRecords) {
+          const idea = await db.get(spark.ideaId)
+          if (idea && !idea.isDeleted && idea.authorId !== user._id) {
+            sparkedCount++
+          }
+        }
+
+        // Fetch contributed ideas count (ideas user contributed to with accepted requests)
+        const acceptedRequests = await db
+          .query("contributionRequests")
+          .withIndex("by_contributor_status", (q) =>
+            q.eq("contributorId", user._id).eq("status", "accepted")
+          )
+          .collect()
+
         return {
           ...user,
           skills: skills.map((s) => s.skillName),
+          ideasCreated: createdIdeas.length,
+          ideasSparked: sparkedCount,
+          ideasContributed: acceptedRequests.length,
         } as UserProfile
       })
     )
 
-    return usersWithSkills
+    return usersWithMetrics
   },
 })
+
+// Check if user profile is complete
+export const isProfileComplete = query({
+  args: { clerkId: v.string() },
+  handler: async ({ db }, { clerkId }): Promise<boolean> => {
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
+      .first();
+
+    if (!profile) return false;
+
+    // Check required fields
+    if (!profile.username || !profile.displayName || !profile.avatar || !profile.industry || !profile.bio || (profile.bio && profile.bio.length < 50)) {
+      return false;
+    }
+
+    // Check at least 3 skills
+    const skills = await db
+      .query("userSkills")
+      .withIndex("by_user", (q) => q.eq("userId", profile._id))
+      .collect();
+
+    if (skills.length < 3) return false;
+
+    return true;
+  },
+});
 
 // Get suggested collaborators based on skills and industries matching
 export const getSuggestedCollaborators = query({
@@ -529,5 +630,112 @@ export const getSuggestedCollaborators = query({
     const result = matchedUsers.slice(0, limit)
     console.log(`📤 Returning ${result.length} suggested collaborators`)
     return result
-  },
-})
+    },
+  })
+  
+  // Check username availability - case-insensitive uniqueness check
+  export const checkUsernameAvailability = query({
+    args: { username: v.string() },
+    handler: async ({ db }, { username }): Promise<{ available: boolean; error?: string }> => {
+      console.log('🔍 DEBUG: checkUsernameAvailability called with:', username);
+
+      const normalizedUsername = username.toLowerCase().trim()
+      console.log('🔍 DEBUG: normalizedUsername:', normalizedUsername);
+
+      // Validate format
+      if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
+        console.log('🔍 DEBUG: Username length validation failed:', normalizedUsername.length);
+        return { available: false, error: "Username must be between 3 and 20 characters long" }
+      }
+      const regexTest = /^[a-zA-Z0-9_]+$/.test(normalizedUsername);
+      console.log('🔍 DEBUG: Regex test result:', regexTest, 'for:', normalizedUsername);
+      if (!regexTest) {
+        console.log('🔍 DEBUG: Username regex validation failed');
+        return { available: false, error: "Username can only contain letters, numbers, and underscores" }
+      }
+
+      // Check for existing username (case-insensitive)
+      console.log('🔍 DEBUG: Checking database for existing username...');
+      const existing = await db
+        .query("users")
+        .withIndex("by_username", (q) => q.eq("username", normalizedUsername))
+        .first()
+
+      console.log('🔍 DEBUG: Existing username check result:', existing ? 'TAKEN' : 'AVAILABLE');
+
+      return { available: !existing }
+    },
+  })
+  
+  // Generate username suggestions when conflicts are detected
+  export const generateUsernameSuggestions = query({
+    args: { baseUsername: v.string(), count: v.optional(v.number()) },
+    handler: async ({ db }, { baseUsername, count = 5 }): Promise<string[]> => {
+      console.log('🔍 DEBUG: generateUsernameSuggestions called with:', baseUsername, 'count:', count);
+
+      const normalizedBase = baseUsername.toLowerCase().trim()
+      console.log('🔍 DEBUG: normalizedBase:', normalizedBase);
+
+      // Validate base username format
+      if (!normalizedBase || normalizedBase.length < 3 || normalizedBase.length > 20 || !/^[a-zA-Z0-9_]+$/.test(normalizedBase)) {
+        console.log('🔍 DEBUG: Base username validation failed, returning empty suggestions');
+        return []
+      }
+
+      const suggestions: string[] = []
+      const variations: string[] = []
+
+      // Generate systematic variations
+      // 1. Append numbers
+      for (let i = 1; i <= 10; i++) {
+        variations.push(`${normalizedBase}${i}`)
+      }
+
+      // 2. Add common suffixes
+      const suffixes = ['_dev', '_official', '_pro', '_x', '_hub']
+      for (const suffix of suffixes) {
+        variations.push(`${normalizedBase}${suffix}`)
+      }
+
+      // 3. Try with numbers in different positions
+      if (normalizedBase.length >= 4) {
+        variations.push(`${normalizedBase.slice(0, -1)}1${normalizedBase.slice(-1)}`)
+        variations.push(`${normalizedBase.slice(0, 2)}1${normalizedBase.slice(2)}`)
+      }
+
+      // 4. Handle case variations (but keep normalized for checking)
+      variations.push(normalizedBase.charAt(0).toUpperCase() + normalizedBase.slice(1))
+
+      console.log('🔍 DEBUG: Generated', variations.length, 'variations:', variations);
+
+      // Check each variation for availability
+      for (const suggestion of variations) {
+        if (suggestions.length >= count) break
+
+        const normalizedSuggestion = suggestion.toLowerCase()
+        if (normalizedSuggestion === normalizedBase) continue // Skip the original
+
+        // Validate suggestion format
+        if (normalizedSuggestion.length < 3 || normalizedSuggestion.length > 20 || !/^[a-zA-Z0-9_]+$/.test(normalizedSuggestion)) {
+          console.log('🔍 DEBUG: Skipping invalid suggestion:', suggestion);
+          continue
+        }
+
+        console.log('🔍 DEBUG: Checking availability of suggestion:', suggestion);
+        const existing = await db
+          .query("users")
+          .withIndex("by_username", (q) => q.eq("username", normalizedSuggestion))
+          .first()
+
+        if (!existing) {
+          console.log('🔍 DEBUG: Suggestion available:', suggestion);
+          suggestions.push(suggestion)
+        } else {
+          console.log('🔍 DEBUG: Suggestion taken:', suggestion);
+        }
+      }
+
+      console.log('🔍 DEBUG: Final suggestions:', suggestions.slice(0, count));
+      return suggestions.slice(0, count)
+    },
+  })

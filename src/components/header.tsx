@@ -1,4 +1,6 @@
 'use client'
+
+import { Plus } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
 import { Menu, X } from 'lucide-react'
@@ -42,8 +44,8 @@ export const HeroHeader = () => {
             <nav className="fixed top-0 left-0 right-0 z-50 w-full">
                 <div className={cn(
                     'mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ease-in-out',
-                    isScrolled 
-                        ? 'mt-2 max-w-5xl bg-background/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-lg shadow-black/5' 
+                    isScrolled
+                        ? 'mt-2 max-w-5xl bg-background/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-lg shadow-black/5'
                         : 'mt-0 max-w-7xl bg-transparent'
                 )}>
                     <div className="flex items-center justify-between h-16 lg:h-18">
@@ -106,7 +108,7 @@ export const HeroHeader = () => {
                             </SignedOut>
                             <SignedIn>
                                 <NotificationBell />
-                                <UserButton 
+                                <UserButton
                                     afterSignOutUrl="/"
                                     appearance={{
                                         elements: {
@@ -114,6 +116,17 @@ export const HeroHeader = () => {
                                         }
                                     }}
                                 />
+                                <Button
+                                    asChild
+                                    variant="ghost"
+                                    size="sm"
+                                    className="p-2 h-8 w-8"
+                                    title="Create new idea"
+                                >
+                                    <Link href="/create-idea">
+                                        <Plus className="w-4 h-4" />
+                                    </Link>
+                                </Button>
                             </SignedIn>
                             <ThemeToggle />
                         </div>
@@ -127,17 +140,17 @@ export const HeroHeader = () => {
                             <span className="sr-only">
                                 {menuState ? 'Close menu' : 'Open menu'}
                             </span>
-                            <Menu 
+                            <Menu
                                 className={cn(
                                     "w-6 h-6 transition-all duration-200",
                                     menuState && "rotate-180 scale-0 opacity-0"
-                                )} 
+                                )}
                             />
-                            <X 
+                            <X
                                 className={cn(
                                     "w-6 h-6 absolute inset-0 m-auto transition-all duration-200",
                                     menuState ? "rotate-0 scale-100 opacity-100" : "-rotate-180 scale-0 opacity-0"
-                                )} 
+                                )}
                             />
                         </button>
                     </div>
@@ -149,11 +162,11 @@ export const HeroHeader = () => {
                     menuState ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
                 )}>
                     {/* Backdrop */}
-                    <div 
+                    <div
                         className="absolute inset-0 bg-black/20 backdrop-blur-sm"
                         onClick={closeMenu}
                     />
-                    
+
                     {/* Mobile Menu Content */}
                     <div className={cn(
                         "absolute top-20 left-4 right-4 bg-background border border-border rounded-2xl shadow-xl transition-all duration-300 ease-in-out",
@@ -210,7 +223,7 @@ export const HeroHeader = () => {
                                     <SignedIn>
                                         <div className="flex items-center gap-3">
                                             <NotificationBell />
-                                            <UserButton 
+                                            <UserButton
                                                 afterSignOutUrl="/"
                                                 appearance={{
                                                     elements: {
@@ -218,6 +231,17 @@ export const HeroHeader = () => {
                                                     }
                                                 }}
                                             />
+                                            <Button
+                                                asChild
+                                                variant="ghost"
+                                                size="sm"
+                                                className="p-2 h-8 w-8"
+                                                title="Create new idea"
+                                            >
+                                                <Link href="/create-idea">
+                                                    <Plus className="w-4 h-4" />
+                                                </Link>
+                                            </Button>
                                         </div>
                                     </SignedIn>
                                     <ThemeToggle />

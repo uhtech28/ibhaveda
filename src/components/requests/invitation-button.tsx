@@ -28,6 +28,20 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser }
   // Get current user's ideas
   const myIdeas = useQuery(api.ideas.getUserIdeas);
 
+  // Get current user to check for existing invitations
+  const currentUser = useQuery(api.users.getCurrentUser);
+
+  // Check for existing invitations to this user
+  const existingInvitations = useQuery(
+    api.invitations.getInvitationsByInviterAndInvitee,
+    currentUser ? { inviterId: currentUser._id as Id<"users">, inviteeId: targetUser._id as Id<"users"> } : "skip"
+  );
+
+  // Check if there's already a pending/accepted/rejected invitation
+  const hasActiveInvitation = existingInvitations && existingInvitations.length > 0 && existingInvitations.some(inv =>
+    inv.status === "pending" || inv.status === "accepted" || inv.status === "rejected"
+  );
+
   // Send invitation mutation
   const sendInvitationMutation = useMutation(api.invitations.sendInvitation);
 
@@ -57,7 +71,6 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser }
     }
   };
 
-
   if (!myIdeas) {
     return (
       <Button variant="outline" size="sm" disabled className="w-full">
@@ -65,6 +78,11 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser }
         Loading...
       </Button>
     );
+  }
+
+  // If there's already an active invitation, hide the button
+  if (hasActiveInvitation) {
+    return null; // Hide the button completely when there's an active invitation
   }
 
   if (myIdeas.length === 0) {

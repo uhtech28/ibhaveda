@@ -35,6 +35,9 @@ interface UserProfile {
   lastLoginAt?: number;
   createdAt: number;
   updatedAt: number;
+  ideasCreated?: number;
+  ideasSparked?: number;
+  ideasContributed?: number;
 }
 
 export default function CommunityPage() {
@@ -105,7 +108,7 @@ export default function CommunityPage() {
             <div className="inline-flex items-center gap-2 px-6 py-3 bg-muted/50 rounded-full">
               <Users className="w-5 h-5" />
               <span className="text-sm font-medium">
-                {users?.length || 0} Members
+                {users?.filter(user => user.clerkId !== clerkUser?.id).length || 0} Members
               </span>
             </div>
           </div>
@@ -197,6 +200,30 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId }) => {
                 <Badge variant="outline" className="text-xs">
                   +{user.skills.length - 3}
                 </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Dynamic Metrics */}
+          {(user.ideasCreated || user.ideasSparked || user.ideasContributed) && (
+            <div className="flex gap-4 text-xs text-muted-foreground mb-3">
+              {user.ideasCreated !== undefined && user.ideasCreated > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium text-primary">{user.ideasCreated}</span>
+                  <span>ideas</span>
+                </div>
+              )}
+              {user.ideasSparked !== undefined && user.ideasSparked > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium text-primary">{user.ideasSparked}</span>
+                  <span>sparked</span>
+                </div>
+              )}
+              {user.ideasContributed !== undefined && user.ideasContributed > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium text-primary">{user.ideasContributed}</span>
+                  <span>contributed</span>
+                </div>
               )}
             </div>
           )}

@@ -501,7 +501,47 @@ export const getMyInvitations = query({
   },
 });
 
-// Temporary query to get invitation by ID (for debugging)
+// Get invitations by inviter and invitee (for checking existing invitations)
+export const getInvitationsByInviterAndInvitee = query({
+  args: {
+    inviterId: v.id("users"),
+    inviteeId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        throw new Error("Authentication required: Please sign in to continue");
+      }
+
+      const currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
+
+      if (!currentUser) {
+        console.log("User profile not found for Clerk ID:", identity.subject, "- returning empty array");
+        return [];
+      }
+
+      // Only allow users to see their own invitations
+      if (currentUser._id !== args.inviterId) {
+        return [];
+      }
+
+      const invitations = await ctx.db
+        .query("invitations")
+        .withIndex("by_inviter", (q) => q.eq("inviterId", args.inviterId))
+        .filter((q) => q.eq(q.field("inviteeId"), args.inviteeId))
+        .collect();
+
+      return invitations;
+    } catch (error) {
+      console.error("Error in getInvitationsByInviterAndInvitee:", error);
+      throw error;
+    }
+  },
+});
 export const getInvitationById = query({
   args: { invitationId: v.id("invitations") },
   handler: async (ctx, args) => {

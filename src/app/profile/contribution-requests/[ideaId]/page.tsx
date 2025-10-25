@@ -87,6 +87,11 @@ export default function ContributionRequestsByIdeaPage({
       )
     : [];
 
+  console.log("DEBUG: isAuthor check", {
+    userId: userId,
+    ideaAuthorId: ideaQuery?.authorId,
+    ideaId: ideaId
+  });
   const isAuthor = ideaQuery && ideaQuery.authorId === userId;
 
   // Redirect if not authenticated
