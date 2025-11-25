@@ -19,11 +19,6 @@ export const searchEverything = query({
     }
 
     const searchTerm = query.toLowerCase().trim();
-    const results = {
-      ideas: [],
-      users: [],
-      totalCount: 0
-    };
 
     // Get authenticated user for visibility checks
     const identity = await ctx.auth.getUserIdentity();
@@ -90,7 +85,8 @@ export const searchEverything = query({
       const displayNameMatch = user.displayName.toLowerCase().includes(searchTerm);
       const usernameMatch = user.username.toLowerCase().includes(searchTerm);
       const bioMatch = user.bio && user.bio.toLowerCase().includes(searchTerm);
-      const industryMatch = user.industry && user.industry.toLowerCase().includes(searchTerm);
+      const industryMatch = (user.industry && user.industry.toLowerCase().includes(searchTerm)) ||
+        (user.industries && user.industries.some((ind: string) => ind.toLowerCase().includes(searchTerm)));
 
       // Check skills
       const skillsMatch = user.skills && user.skills.some((skill: string) =>

@@ -138,16 +138,18 @@ export const createIdea = mutation({
   },
 });
 
-// Get all root public ideas (for feed) - excludes sub-ideas
+// Get all root public ideas (for feed) - excludes sub-ideas with limit-based pagination
 export const getPublicIdeas = query({
-  handler: async (ctx) => {
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 20;
     const ideas = await ctx.db
       .query("ideas")
       .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
       .filter((q) => q.neq(q.field("isDeleted"), true))
       .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
       .order("desc")
-      .take(20);
+      .take(limit);
 
     // Get author information and contribution count for each idea
     const ideasWithAuthors = await Promise.all(
@@ -759,18 +761,18 @@ export const getUserIdeas = query({
     console.log("getUserIdeas: Auth identity subject:", identity.subject);
 
     // Find user by Clerk ID
-        const user = await ctx.db
-          .query("users")
-          .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-          .unique();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
 
-        console.log("getUserIdeas: User lookup result:", user ? "found" : "not found");
-        if (user) {
-          console.log("getUserIdeas: User ID:", user._id);
-        } else {
-          console.log("getUserIdeas: User not found for Clerk ID:", identity.subject);
-          return []; // Return empty array instead of throwing
-        }
+    console.log("getUserIdeas: User lookup result:", user ? "found" : "not found");
+    if (user) {
+      console.log("getUserIdeas: User ID:", user._id);
+    } else {
+      console.log("getUserIdeas: User not found for Clerk ID:", identity.subject);
+      return []; // Return empty array instead of throwing
+    }
 
     // Get user's root ideas (originally created by user), excluding deleted ones and contributed ideas - include both public and private
     const userIdeas = await ctx.db
@@ -803,132 +805,18 @@ export const getUserIdeas = query({
   },
 });
 
-// Get public ideas for a specific user (for community profile views)
-export const getUserPublicIdeas = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const userIdeas = await ctx.db
-      .query("ideas")
-      .withIndex("by_author_visibility", (q) =>
-        q.eq("authorId", args.userId).eq("visibility", "public")
-      )
-      .filter((q) => q.neq(q.field("isDeleted"), true))
-      .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
-      .order("desc")
-      .take(20);
-
-    // Get author information and contribution count for each idea
-    const ideasWithAuthors = await Promise.all(
-      userIdeas.map(async (idea) => {
-        let author = null;
-        try {
-          author = await ctx.db.get(idea.authorId);
-        } catch (e) {
-          console.error("Error fetching author for idea:", idea._id, e);
-        }
-
-        // Count accepted contribution requests
-        let contributionCount = 0;
-        try {
-          const acceptedContributions = await ctx.db
-            .query("contributionRequests")
-            .withIndex("by_idea_status_created", (q) =>
-              q.eq("ideaId", idea._id).eq("status", "accepted")
-            )
-            .collect();
-          contributionCount = acceptedContributions.length;
-        } catch (e) {
-          console.error("Error fetching contribution count for idea:", idea._id, e);
-        }
-
-        return {
-          ...idea,
-          author: author ? {
-            ...author,
-            // These fields should match the schema naming
-            name: author.displayName,
-            username: author.username,
-          } : null,
-          contributionCount: contributionCount,
-        };
-      })
-    );
-
-    return ideasWithAuthors;
-  },
-});
-
-// Get root ideas (no parent) for the current user
-export const getUserRootIdeas = query({
-  handler: async (ctx) => {
-    // Get authenticated user
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    // Find user by Clerk ID
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) {
-      return []; // User profile not created yet
-    }
-
-    // Get user's root ideas (no parent)
-    const rootIdeas = await ctx.db
-      .query("ideas")
-      .withIndex("by_author", (q) => q.eq("authorId", user._id))
-      .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
-      .filter((q) => q.neq(q.field("isDeleted"), true))
-      .order("desc")
-      .take(50);
-
-    // Get author information is included but should be consistent
-    const ideasWithDetails = await Promise.all(
-      rootIdeas.map(async (idea) => {
-        // Count active contribution requests (not including rejected/deleted related)
-        const activeRequestsCount = await ctx.db
-          .query("contributionRequests")
-          .withIndex("by_idea_status_created", (q) =>
-            q.eq("ideaId", idea._id).eq("status", "pending")
-          )
-          .collect();
-
-        // Get children count
-        const childrenCount = await ctx.db
-          .query("ideas")
-          .withIndex("by_parent", (q) => q.eq("parentId", idea._id))
-          .filter((q) => q.neq(q.field("isDeleted"), true))
-          .collect();
-
-        return {
-          ...idea,
-          activeContributions: activeRequestsCount.length,
-          childrenCount: childrenCount.length,
-        };
-      })
-    );
-
-    return ideasWithDetails;
-  },
-});
-
 // Delete an idea (soft delete)
 export const deleteIdea = mutation({
   args: {
     ideaId: v.id("ideas"),
   },
   handler: async (ctx, args) => {
-    // Check authentication
+    // Get authenticated user
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
     }
 
-    // Find user by Clerk ID
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
@@ -938,7 +826,6 @@ export const deleteIdea = mutation({
       throw new Error("User not found");
     }
 
-    // Get the idea
     const idea = await ctx.db.get(args.ideaId);
     if (!idea) {
       throw new Error("Idea not found");
@@ -1370,3 +1257,31 @@ export const getUserContributedIdeas = query({
   },
 });
 export const getIncomingContributionRequests = getIncomingRequests;
+
+// Get public ideas for a specific user (for profile views)
+export const getPublicIdeasForUser = query({
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 20;
+
+    // Find user to verify existence
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      return [];
+    }
+
+    // Get user's public ideas
+    const userIdeas = await ctx.db
+      .query("ideas")
+      .withIndex("by_author", (q) => q.eq("authorId", args.userId))
+      .filter((q) => q.neq(q.field("isDeleted"), true))
+      .filter((q) => q.eq(q.field("visibility"), "public"))
+      .order("desc")
+      .take(limit);
+
+    return userIdeas;
+  },
+});

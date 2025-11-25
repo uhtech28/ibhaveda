@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react"
+import React from "react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -34,7 +34,7 @@ interface CompactProfileViewProps {
 
 export const CompactProfileView: React.FC<CompactProfileViewProps> = ({ profile }) => {
   // Fetch public ideas for this user (for community profile views)
-  const publicIdeas = useQuery(api.ideas.getUserPublicIdeas, { userId: profile._id as any }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const publicIdeas = useQuery(api.ideas.getPublicIdeasForUser, { userId: profile._id as any }); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // Use the dynamic metrics directly from profile data (now calculated in getUserProfile query)
   const metrics = {

@@ -11,12 +11,18 @@ export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
     await auth.protect()
 
-    // Check profile completion for feed routes
-    const isFeedRoute = createRouteMatcher(['/feed(.*)', '/my-feed(.*)'])
-    if (isFeedRoute(req)) {
-      const { userId } = await auth()
-      if (userId) {
+    // Check profile completion for ALL authenticated routes
+    const { userId } = await auth()
+    
+    if (userId) {
+      // Check if user is already on the profile setup page to avoid infinite redirect
+      // We also check for api/trpc routes to avoid breaking backend calls
+      const isProfileSetupPage = req.nextUrl.pathname === '/profile-setup';
+      const isApiRoute = req.nextUrl.pathname.startsWith('/api') || req.nextUrl.pathname.startsWith('/trpc');
+      
+      if (!isProfileSetupPage && !isApiRoute) {
         const isProfileComplete = await convex.query(api.users.isProfileComplete, { clerkId: userId })
+        
         if (!isProfileComplete) {
           return NextResponse.redirect(new URL('/profile-setup', req.url))
         }

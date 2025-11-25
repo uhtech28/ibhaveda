@@ -16,10 +16,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@convex/_generated/api";
 import { Doc, Id } from "@convex/_generated/dataModel";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
-import ParticleButton from "@/components/kokonutui/particle-button";
+
 import { notifyRequestSent } from "@/components/requests/notification-toast";
 import { InvitationSection } from "@/components/requests/invitation-section";
 import {
@@ -50,6 +50,8 @@ import {
   KanbanCard,
 } from "@/components/ui/kibo-ui/kanban";
 import { CalendarProvider, CalendarDate, CalendarMonthPicker, CalendarYearPicker, CalendarDatePagination, CalendarHeader, CalendarBody, CalendarItem } from '@/components/ui/kibo-ui/calendar';
+import { IdeaSideNav } from "@/components/IdeaSideNav";
+import { IdeaBottomBar } from "@/components/IdeaBottomBar";
 
 type ConvexIdea = {
   _id: string;
@@ -151,6 +153,13 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
   const updateTodoStatusMutation = useMutation(api.todos.updateTodoStatus);
   const deleteTodoMutation = useMutation(api.todos.deleteTodo);
 
+  // Modal states
+  const [showHierarchy, setShowHierarchy] = useState(false);
+  const [showRequests, setShowRequests] = useState(false);
+  const [showTodos, setShowTodos] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+
   // Redirect if not authenticated
   React.useEffect(() => {
     if (isLoaded && !userId) {
@@ -219,26 +228,88 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         ) : (
           <>
-            <IdeaContent idea={ideaQuery as ConvexIdea} />
-            <HierarchicalIdeasSection
-              idea={ideaQuery as ConvexIdea}
-              ideaTree={ideaTreeQuery}
-              userRequests={userRequestsQuery || []}
-              addSubIdeaMutation={addSubIdeaMutation}
+            <div className="pb-24"> {/* Add padding bottom for fixed bottom bar */}
+              <IdeaContent idea={ideaQuery as ConvexIdea} />
+            </div>
+
+            <IdeaSideNav
+              onOpenHierarchy={() => setShowHierarchy(true)}
+              onOpenTodos={() => setShowTodos(true)}
+              onOpenCalendar={() => setShowCalendar(true)}
+              todoCount={todosQuery?.filter(t => t.status !== 'done').length || 0}
             />
-            <ContributionRequestSection idea={ideaQuery as ConvexIdea} />
-            <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: (ideaQuery as ConvexIdea).isAuthor || false }} />
-            <TodoSection
-              idea={ideaQuery as ConvexIdea}
-              todos={todosQuery || []}
-              createTodoMutation={createTodoMutation}
-              updateTodoMutation={updateTodoMutation}
-              updateTodoStatusMutation={updateTodoStatusMutation}
-              deleteTodoMutation={deleteTodoMutation}
+
+            <IdeaBottomBar
+              ideaId={ideaQuery._id}
+              initialSparkCount={(ideaQuery as ConvexIdea).sparkCount}
+              initialHasSparked={(ideaQuery as ConvexIdea).hasSparked || false}
+              commentCount={(ideaQuery as ConvexIdea).commentCount}
+              onOpenComments={() => setShowComments(true)}
+              onOpenRequests={() => setShowRequests(true)}
+              isAuthor={(ideaQuery as ConvexIdea).isAuthor || false}
+              requestCount={userRequestsQuery?.filter(r => r.ideaId === ideaQuery._id && r.status === 'pending').length || 0}
             />
-            <CalendarSection idea={ideaQuery as ConvexIdea} />
-            <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
+
+            {/* Modals for Sections */}
+            <Dialog open={showHierarchy} onOpenChange={setShowHierarchy}>
+              <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto w-full">
+                <DialogHeader>
+                  <DialogTitle>Idea Hierarchy</DialogTitle>
+                </DialogHeader>
+                <HierarchicalIdeasSection
+                  idea={ideaQuery as ConvexIdea}
+                  ideaTree={ideaTreeQuery}
+                  userRequests={userRequestsQuery || []}
+                  addSubIdeaMutation={addSubIdeaMutation}
+                />
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showRequests} onOpenChange={setShowRequests}>
+              <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
+                <DialogHeader>
+                  <DialogTitle>Contribution Requests</DialogTitle>
+                </DialogHeader>
+                <ContributionRequestSection idea={ideaQuery as ConvexIdea} />
+                <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: (ideaQuery as ConvexIdea).isAuthor || false }} />
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showTodos} onOpenChange={setShowTodos}>
+              <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto w-full">
+                <DialogHeader>
+                  <DialogTitle>Project Management</DialogTitle>
+                </DialogHeader>
+                <TodoSection
+                  idea={ideaQuery as ConvexIdea}
+                  todos={todosQuery || []}
+                  createTodoMutation={createTodoMutation}
+                  updateTodoMutation={updateTodoMutation}
+                  updateTodoStatusMutation={updateTodoStatusMutation}
+                  deleteTodoMutation={deleteTodoMutation}
+                />
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showCalendar} onOpenChange={setShowCalendar}>
+              <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto w-full">
+                <DialogHeader>
+                  <DialogTitle>Calendar</DialogTitle>
+                </DialogHeader>
+                <CalendarSection idea={ideaQuery as ConvexIdea} />
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showComments} onOpenChange={setShowComments}>
+              <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
+                <DialogHeader>
+                  <DialogTitle>Comments</DialogTitle>
+                </DialogHeader>
+                <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
+              </DialogContent>
+            </Dialog>
           </>
+
         )}
       </main>
 
@@ -747,14 +818,9 @@ const CommentsSection: React.FC<{ ideaId: Id<"ideas">; commentCount: number }> =
 };
 
 const IdeaContent: React.FC<{ idea: ConvexIdea }> = ({ idea }) => {
-    const { userId } = useAuth();
     const router = useRouter();
-    const toggleSparkMutation = useMutation(api.ideas.toggleSpark);
     const updateIdeaMutation = useMutation(api.ideas.updateIdea);
     const deleteIdeaMutation = useMutation(api.ideas.deleteIdea);
-    const [isSparking, setIsSparking] = useState(false);
-    const [currentSparkCount, setCurrentSparkCount] = useState(idea.sparkCount);
-    const [currentHasSparked, setCurrentHasSparked] = useState(idea.hasSparked || false);
     const [isEditing, setIsEditing] = useState(false);
     const [editedTitle, setEditedTitle] = useState(idea.title);
     const [editedDescription, setEditedDescription] = useState(idea.description);
@@ -765,15 +831,7 @@ const IdeaContent: React.FC<{ idea: ConvexIdea }> = ({ idea }) => {
     const [errorMsg, setErrorMsg] = useState("");
 
     // Available categories
-   const categories = [
-     { value: 'technology', label: 'Technology' },
-     { value: 'art', label: 'Art' },
-     { value: 'business', label: 'Business' },
-     { value: 'education', label: 'Education' },
-     { value: 'health', label: 'Health' },
-     { value: 'entertainment', label: 'Entertainment' },
-     { value: 'other', label: 'Other' }
-   ];
+
 
 
   const handleEdit = () => {
@@ -827,21 +885,6 @@ const IdeaContent: React.FC<{ idea: ConvexIdea }> = ({ idea }) => {
     setErrorMsg("");
   };
 
-  const handleSpark = async () => {
-    if (!userId || isSparking) return;
-
-    setIsSparking(true);
-
-    try {
-      const result = await toggleSparkMutation({ ideaId: idea._id as Id<"ideas"> });
-      setCurrentSparkCount(result.sparkCount);
-      setCurrentHasSparked(result.action === 'added');
-    } catch (error) {
-      console.error('Error toggling spark:', error);
-    } finally {
-      setIsSparking(false);
-    }
-  };
 
 
   return (
@@ -858,120 +901,58 @@ const IdeaContent: React.FC<{ idea: ConvexIdea }> = ({ idea }) => {
             placeholder="Idea title"
           />
         ) : (
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent leading-tight">
-              {idea.title}
-            </h1>
-            {(idea.isAuthor || false) && !isEditing && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleEdit}
-                  className="ml-2"
-                  title="Edit idea"
-                  disabled={isDeleting}
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleDelete}
-                  className="ml-2"
-                  title="Delete idea"
-                  disabled={isDeleting || updating}
-                >
-                  {isDeleting ? <Spinner size={16} /> : <Trash2 className="w-4 h-4" />}
-                </Button>
-              </>
-            )}
+          <div className="flex items-start justify-between mb-8">
+            <div className="space-y-2 max-w-[70%]">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent leading-tight">
+                {idea.title}
+              </h1>
+              <span className="inline-block bg-gradient-to-r from-primary/10 to-purple-600/10 border border-primary/20 text-primary font-medium px-3 py-1 rounded-full text-sm">
+                {idea.category || 'General'}
+              </span>
+            </div>
+            
+            <div className="flex flex-col items-end gap-4">
+              <div className="flex items-center gap-3 bg-card/50 px-4 py-2 rounded-full border border-border/50">
+                <div className="text-right">
+                  <p className="font-medium text-sm">{idea.author?.name || idea.author?.username || "Unknown Author"}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString()}</p>
+                </div>
+                <Avatar className="w-10 h-10 border-2 border-background">
+                  <AvatarImage src={idea.author?.avatar} />
+                  <AvatarFallback>{idea.author?.name?.charAt(0) || "U"}</AvatarFallback>
+                </Avatar>
+              </div>
+
+              {(idea.isAuthor || false) && !isEditing && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEdit}
+                    className="h-8 w-8 p-0"
+                    title="Edit idea"
+                    disabled={isDeleting}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDelete}
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    title="Delete idea"
+                    disabled={isDeleting || updating}
+                  >
+                    {isDeleting ? <Spinner size={14} /> : <Trash2 className="w-4 h-4" />}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
-
-        {/* Category Badge */}
-        <div className="mb-4">
-          {isEditing ? (
-            <div className="space-y-4">
-              <Select value={editedCategory} onValueChange={setEditedCategory}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Visibility</label>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      name="visibility"
-                      value="public"
-                      checked={editedVisibility === 'public'}
-                      onChange={() => setEditedVisibility('public')}
-                      className="w-4 h-4 text-primary border-border focus:ring-ring focus:ring-2"
-                    />
-                    <div>
-                      <div className="font-medium text-sm">Public</div>
-                      <div className="text-xs text-muted-foreground">Visible to all users</div>
-                    </div>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      name="visibility"
-                      value="private"
-                      checked={editedVisibility === 'private'}
-                      onChange={() => setEditedVisibility('private')}
-                      className="w-4 h-4 text-primary border-border focus:ring-ring focus:ring-2"
-                    />
-                    <div>
-                      <div className="font-medium text-sm">Private</div>
-                      <div className="text-xs text-muted-foreground">Visible only to your connections</div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <span className="inline-block bg-gradient-to-r from-primary/10 to-purple-600/10 border border-primary/20 text-primary font-medium px-3 py-1 rounded-full text-sm">
-              {idea.category || 'General'}
-            </span>
-          )}
-        </div>
-
-        {/* Spark Button */}
-        <div className="flex items-center justify-content-start mb-6">
-          <ParticleButton
-            variant={currentHasSparked ? "default" : "outline"}
-            size="default"
-            onSuccess={handleSpark}
-            disabled={!userId || isSparking}
-            className={`
-              transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95
-              ${currentHasSparked
-                ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-lg hover:shadow-xl'
-                : 'hover:bg-accent/5 hover:border-destructive/50 hover:text-destructive'
-              }
-              ${isSparking ? 'opacity-70 cursor-not-allowed' : ''}
-            `}
-          >
-            {isSparking ? (
-              <Spinner size={18} />
-            ) : (
-              <span className="text-sm font-medium">
-                {currentHasSparked ? `Sparks ✨ ${currentSparkCount}` : 'Spark ✨'}
-              </span>
-            )}
-          </ParticleButton>
-        </div>
       </div>
+
+
 
       {/* Description */}
       <div className="prose prose-lg max-w-none mb-8 p-6 bg-gradient-to-br from-card/50 to-card/30 rounded-xl border border-border transition-colors">

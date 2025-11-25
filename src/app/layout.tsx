@@ -31,26 +31,31 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <ThemeProvider>
-      <ClerkProvider>
-        <ConvexClientProvider>
-          <html lang="en" suppressHydrationWarning>
-            <body
-              className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-            >
+    <ClerkProvider>
+      <ConvexClientProvider>
+        <html lang="en" suppressHydrationWarning>
+          <body
+            className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          >
+            <ThemeProvider>
               {children}
               <Toaster />
               <ChatWidget />
-            </body>
-          </html>
-        </ConvexClientProvider>
-      </ClerkProvider>
-    </ThemeProvider>
+            </ThemeProvider>
+          </body>
+        </html>
+      </ConvexClientProvider>
+    </ClerkProvider>
   );
 }

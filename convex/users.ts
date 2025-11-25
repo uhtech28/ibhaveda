@@ -18,6 +18,7 @@ export interface UserProfile {
   twitter?: string
   skills: string[]
   industry?: string
+  industries?: string[]
   completedOnboarding: boolean
   isActive: boolean
   role: string
@@ -48,9 +49,17 @@ export const getCurrentUser = query({
       .withIndex("by_user", (q) => q.eq("userId", profile._id))
       .collect()
 
+    // Efficiently fetch industries
+    const industries = await db
+      .query("userIndustries")
+      .withIndex("by_user", (q) => q.eq("userId", profile._id))
+      .collect()
+
     return {
       ...profile,
       skills: skills.map((s) => s.skillName),
+      industries: industries.map(i => i.industryName),
+      industry: industries.length > 0 ? industries[0].industryName : undefined,
     } as UserProfile
   },
 })
@@ -69,105 +78,115 @@ export const createUserProfile = mutation({
     twitter: v.optional(v.string()),
     skills: v.array(v.string()),
     industry: v.optional(v.string()),
+    industries: v.optional(v.array(v.string())),
   },
   handler: async ({ db, auth }, args): Promise<string> => {
     try {
       console.log('👤 Creating user profile:', { username: args.username, skills: args.skills.length, industry: args.industry })
-  // Verify authentication
-  const identity = await auth.getUserIdentity()
-  if (!identity) {
-    console.log("createUserProfile: No authentication identity found")
-    throw new Error("Authentication required: Please sign in to create your profile")
-  }
+      // Verify authentication
+      const identity = await auth.getUserIdentity()
+      if (!identity) {
+        console.log("createUserProfile: No authentication identity found")
+        throw new Error("Authentication required: Please sign in to create your profile")
+      }
 
-  console.log("createUserProfile: Authentication identity subject:", identity.subject)
+      console.log("createUserProfile: Authentication identity subject:", identity.subject)
 
-  // Check if user already has a profile
-  const existing = await db
-    .query("users")
-    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-    .first()
+      // Check if user already has a profile
+      const existing = await db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .first()
 
-  console.log("createUserProfile: Existing profile lookup result:", existing ? "found" : "not found")
+      console.log("createUserProfile: Existing profile lookup result:", existing ? "found" : "not found")
 
-  if (existing) {
-    console.log("User profile creation attempted for existing profile:", identity.subject)
-    throw new Error("You already have a profile set up!")
-  }
+      if (existing) {
+        console.log("User profile creation attempted for existing profile:", identity.subject)
+        throw new Error("You already have a profile set up!")
+      }
 
-  // Validate and normalize username (case-insensitive uniqueness)
-  const normalizedUsername = args.username.toLowerCase().trim()
-  if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
-    throw new Error("Invalid username: Username must be between 3 and 20 characters long")
-  }
-  if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
-    throw new Error("Invalid username: Username can only contain letters, numbers, and underscores")
-  }
+      // Validate and normalize username (case-insensitive uniqueness)
+      const normalizedUsername = args.username.toLowerCase().trim()
+      if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
+        throw new Error("Invalid username: Username must be between 3 and 20 characters long")
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
+        throw new Error("Invalid username: Username can only contain letters, numbers, and underscores")
+      }
 
-  // Check for existing username (case-insensitive)
-  const existingUsername = await db
-    .query("users")
-    .withIndex("by_username", (q) => q.eq("username", normalizedUsername))
-    .first()
+      // Check for existing username (case-insensitive)
+      const existingUsername = await db
+        .query("users")
+        .withIndex("by_username", (q) => q.eq("username", normalizedUsername))
+        .first()
 
-  if (existingUsername) {
-    console.log("Duplicate username attempted:", normalizedUsername, "by user:", identity.subject)
-    throw new Error(`Username "${normalizedUsername}" is already taken. Please try a different username.`)
-  }
+      if (existingUsername) {
+        console.log("Duplicate username attempted:", normalizedUsername, "by user:", identity.subject)
+        throw new Error(`Username "${normalizedUsername}" is already taken. Please try a different username.`)
+      }
 
-  const now = Date.now()
+      const now = Date.now()
 
-  // Create user profile with normalized username
-  let userId: Id<"users">;
-  try {
-    userId = await db.insert("users", {
-      clerkId: identity.subject,
-      username: normalizedUsername,
-      displayName: args.displayName,
-      bio: args.bio,
-      avatar: args.avatar,
-      location: args.location,
-      website: args.website,
-      github: args.github,
-      linkedin: args.linkedin,
-      twitter: args.twitter,
-      completedOnboarding: true,
-      isActive: true,
-      role: "user",
-      followersCount: 0,
-      followingCount: 0,
-      createdAt: now,
-      updatedAt: now,
-    });
-  } catch (insertError) {
-    console.error("Failed to insert user profile:", insertError)
-    throw new Error("Profile creation failed: Unable to save your profile. Please try again.")
-  }
+      // Create user profile with normalized username
+      let userId: Id<"users">;
+      try {
+        userId = await db.insert("users", {
+          clerkId: identity.subject,
+          username: normalizedUsername,
+          displayName: args.displayName,
+          bio: args.bio,
+          avatar: args.avatar,
+          location: args.location,
+          website: args.website,
+          github: args.github,
+          linkedin: args.linkedin,
+          twitter: args.twitter,
+          completedOnboarding: true,
+          isActive: true,
+          role: "user",
+          followersCount: 0,
+          followingCount: 0,
+          createdAt: now,
+          updatedAt: now,
+          industries: args.industries || (args.industry ? [args.industry] : []),
+          industry: args.industry, // Keep for backward compatibility
+        });
+      } catch (insertError) {
+        console.error("Failed to insert user profile:", insertError)
+        throw new Error("Profile creation failed: Unable to save your profile. Please try again.")
+      }
 
-  // Add skills efficiently with batch operations
-  if (args.skills.length > 0) {
-    console.log('💡 Adding skills:', args.skills)
-    await Promise.all(
-      args.skills.map((skill) =>
-        db.insert("userSkills", {
-          userId,
-          skillName: skill,
-        })
-      )
-    )
-  }
+      // Add skills efficiently with batch operations
+      if (args.skills.length > 0) {
+        console.log('💡 Adding skills:', args.skills)
+        await Promise.all(
+          args.skills.map((skill) =>
+            db.insert("userSkills", {
+              userId,
+              skillName: skill,
+            })
+          )
+        )
+      }
 
-  // Add industry if provided
-  if (args.industry) {
-    console.log('🏭 Adding industry:', args.industry)
-    await db.insert("userIndustries", {
-      userId,
-      industryName: args.industry,
-    })
-  }
+      // Add industry if provided (legacy support + new array)
+      if (args.industry || (args.industries && args.industries.length > 0)) {
+        const industriesToAdd = args.industries || (args.industry ? [args.industry] : []);
+        console.log('🏭 Adding industries:', industriesToAdd)
 
-  console.log("Successfully created user profile:", userId, "username:", normalizedUsername)
-  return userId
+        // Add to userIndustries table for relational queries
+        await Promise.all(
+          industriesToAdd.map(ind =>
+            db.insert("userIndustries", {
+              userId,
+              industryName: ind,
+            })
+          )
+        );
+      }
+
+      console.log("Successfully created user profile:", userId, "username:", normalizedUsername)
+      return userId
     } catch (error) {
       console.error("Error in createUserProfile:", error)
       throw error // Re-throw to maintain original error messages
@@ -188,6 +207,7 @@ export const updateUserProfile = mutation({
     twitter: v.optional(v.string()),
     skills: v.optional(v.array(v.string())),
     industry: v.optional(v.string()),
+    industries: v.optional(v.array(v.string())),
   }),
   handler: async ({ db, auth }, args): Promise<string> => {
     console.log('🔄 Updating user profile:', {
@@ -215,7 +235,7 @@ export const updateUserProfile = mutation({
 
     // Only update fields that are provided
     Object.entries(args).forEach(([key, value]) => {
-      if (value !== undefined && key !== "skills") {
+      if (value !== undefined && key !== "skills" && key !== "industry" && key !== "industries") {
         updateData[key] = value
       }
     })
@@ -248,9 +268,11 @@ export const updateUserProfile = mutation({
     }
 
     // Handle industry updates
-    if (args.industry !== undefined) {
-      console.log('🏭 Updating industry:', args.industry)
-      // Remove existing industry
+    if (args.industry !== undefined || args.industries !== undefined) {
+      const newIndustries = args.industries || (args.industry ? [args.industry] : []);
+      console.log('🏭 Updating industries:', newIndustries)
+
+      // Remove existing industries from relational table
       const existingIndustries = await db
         .query("userIndustries")
         .withIndex("by_user", (q) => q.eq("userId", profile._id))
@@ -259,13 +281,23 @@ export const updateUserProfile = mutation({
         existingIndustries.map((industry) => db.delete(industry._id))
       )
 
-      // Add new industry
-      if (args.industry) {
-        await db.insert("userIndustries", {
-          userId: profile._id,
-          industryName: args.industry,
-        })
+      // Add new industries to relational table
+      if (newIndustries.length > 0) {
+        await Promise.all(
+          newIndustries.map(ind =>
+            db.insert("userIndustries", {
+              userId: profile._id,
+              industryName: ind,
+            })
+          )
+        );
       }
+
+      // Update the user record with the industries array
+      await db.patch(profile._id, {
+        industries: newIndustries,
+        industry: newIndustries.length > 0 ? newIndustries[0] : undefined // Keep primary for legacy
+      });
     }
 
     return profile._id
@@ -411,6 +443,7 @@ export const getUserProfile = query({
       ...profile,
       skills: skills.map((s) => s.skillName),
       industry: industries.length > 0 ? industries[0].industryName : undefined,
+      industries: industries.map(i => i.industryName),
       ideasCreated: createdIdeas.length,
       ideasSparked: sparkedCount,
       ideasContributed: acceptedRequests.length,
@@ -495,18 +528,12 @@ export const isProfileComplete = query({
 
     if (!profile) return false;
 
-    // Check required fields
-    if (!profile.username || !profile.displayName || !profile.avatar || !profile.industry || !profile.bio || (profile.bio && profile.bio.length < 50)) {
+    // Check required fields - Relaxed validation: only username is strictly required for "complete" status in middleware
+    // But for "isProfileComplete" check used in UI, we might want to keep some standards or align with new requirements
+    // User requested: "No need for any compulsory points other than Username"
+    if (!profile.username) {
       return false;
     }
-
-    // Check at least 3 skills
-    const skills = await db
-      .query("userSkills")
-      .withIndex("by_user", (q) => q.eq("userId", profile._id))
-      .collect();
-
-    if (skills.length < 3) return false;
 
     return true;
   },
@@ -630,112 +657,112 @@ export const getSuggestedCollaborators = query({
     const result = matchedUsers.slice(0, limit)
     console.log(`📤 Returning ${result.length} suggested collaborators`)
     return result
-    },
-  })
-  
-  // Check username availability - case-insensitive uniqueness check
-  export const checkUsernameAvailability = query({
-    args: { username: v.string() },
-    handler: async ({ db }, { username }): Promise<{ available: boolean; error?: string }> => {
-      console.log('🔍 DEBUG: checkUsernameAvailability called with:', username);
+  },
+})
 
-      const normalizedUsername = username.toLowerCase().trim()
-      console.log('🔍 DEBUG: normalizedUsername:', normalizedUsername);
+// Check username availability - case-insensitive uniqueness check
+export const checkUsernameAvailability = query({
+  args: { username: v.string() },
+  handler: async ({ db }, { username }): Promise<{ available: boolean; error?: string }> => {
+    console.log('🔍 DEBUG: checkUsernameAvailability called with:', username);
 
-      // Validate format
-      if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
-        console.log('🔍 DEBUG: Username length validation failed:', normalizedUsername.length);
-        return { available: false, error: "Username must be between 3 and 20 characters long" }
+    const normalizedUsername = username.toLowerCase().trim()
+    console.log('🔍 DEBUG: normalizedUsername:', normalizedUsername);
+
+    // Validate format
+    if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
+      console.log('🔍 DEBUG: Username length validation failed:', normalizedUsername.length);
+      return { available: false, error: "Username must be between 3 and 20 characters long" }
+    }
+    const regexTest = /^[a-zA-Z0-9_]+$/.test(normalizedUsername);
+    console.log('🔍 DEBUG: Regex test result:', regexTest, 'for:', normalizedUsername);
+    if (!regexTest) {
+      console.log('🔍 DEBUG: Username regex validation failed');
+      return { available: false, error: "Username can only contain letters, numbers, and underscores" }
+    }
+
+    // Check for existing username (case-insensitive)
+    console.log('🔍 DEBUG: Checking database for existing username...');
+    const existing = await db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", normalizedUsername))
+      .first()
+
+    console.log('🔍 DEBUG: Existing username check result:', existing ? 'TAKEN' : 'AVAILABLE');
+
+    return { available: !existing }
+  },
+})
+
+// Generate username suggestions when conflicts are detected
+export const generateUsernameSuggestions = query({
+  args: { baseUsername: v.string(), count: v.optional(v.number()) },
+  handler: async ({ db }, { baseUsername, count = 5 }): Promise<string[]> => {
+    console.log('🔍 DEBUG: generateUsernameSuggestions called with:', baseUsername, 'count:', count);
+
+    const normalizedBase = baseUsername.toLowerCase().trim()
+    console.log('🔍 DEBUG: normalizedBase:', normalizedBase);
+
+    // Validate base username format
+    if (!normalizedBase || normalizedBase.length < 3 || normalizedBase.length > 20 || !/^[a-zA-Z0-9_]+$/.test(normalizedBase)) {
+      console.log('🔍 DEBUG: Base username validation failed, returning empty suggestions');
+      return []
+    }
+
+    const suggestions: string[] = []
+    const variations: string[] = []
+
+    // Generate systematic variations
+    // 1. Append numbers
+    for (let i = 1; i <= 10; i++) {
+      variations.push(`${normalizedBase}${i}`)
+    }
+
+    // 2. Add common suffixes
+    const suffixes = ['_dev', '_official', '_pro', '_x', '_hub']
+    for (const suffix of suffixes) {
+      variations.push(`${normalizedBase}${suffix}`)
+    }
+
+    // 3. Try with numbers in different positions
+    if (normalizedBase.length >= 4) {
+      variations.push(`${normalizedBase.slice(0, -1)}1${normalizedBase.slice(-1)}`)
+      variations.push(`${normalizedBase.slice(0, 2)}1${normalizedBase.slice(2)}`)
+    }
+
+    // 4. Handle case variations (but keep normalized for checking)
+    variations.push(normalizedBase.charAt(0).toUpperCase() + normalizedBase.slice(1))
+
+    console.log('🔍 DEBUG: Generated', variations.length, 'variations:', variations);
+
+    // Check each variation for availability
+    for (const suggestion of variations) {
+      if (suggestions.length >= count) break
+
+      const normalizedSuggestion = suggestion.toLowerCase()
+      if (normalizedSuggestion === normalizedBase) continue // Skip the original
+
+      // Validate suggestion format
+      if (normalizedSuggestion.length < 3 || normalizedSuggestion.length > 20 || !/^[a-zA-Z0-9_]+$/.test(normalizedSuggestion)) {
+        console.log('🔍 DEBUG: Skipping invalid suggestion:', suggestion);
+        continue
       }
-      const regexTest = /^[a-zA-Z0-9_]+$/.test(normalizedUsername);
-      console.log('🔍 DEBUG: Regex test result:', regexTest, 'for:', normalizedUsername);
-      if (!regexTest) {
-        console.log('🔍 DEBUG: Username regex validation failed');
-        return { available: false, error: "Username can only contain letters, numbers, and underscores" }
-      }
 
-      // Check for existing username (case-insensitive)
-      console.log('🔍 DEBUG: Checking database for existing username...');
+      console.log('🔍 DEBUG: Checking availability of suggestion:', suggestion);
       const existing = await db
         .query("users")
-        .withIndex("by_username", (q) => q.eq("username", normalizedUsername))
+        .withIndex("by_username", (q) => q.eq("username", normalizedSuggestion))
         .first()
 
-      console.log('🔍 DEBUG: Existing username check result:', existing ? 'TAKEN' : 'AVAILABLE');
-
-      return { available: !existing }
-    },
-  })
-  
-  // Generate username suggestions when conflicts are detected
-  export const generateUsernameSuggestions = query({
-    args: { baseUsername: v.string(), count: v.optional(v.number()) },
-    handler: async ({ db }, { baseUsername, count = 5 }): Promise<string[]> => {
-      console.log('🔍 DEBUG: generateUsernameSuggestions called with:', baseUsername, 'count:', count);
-
-      const normalizedBase = baseUsername.toLowerCase().trim()
-      console.log('🔍 DEBUG: normalizedBase:', normalizedBase);
-
-      // Validate base username format
-      if (!normalizedBase || normalizedBase.length < 3 || normalizedBase.length > 20 || !/^[a-zA-Z0-9_]+$/.test(normalizedBase)) {
-        console.log('🔍 DEBUG: Base username validation failed, returning empty suggestions');
-        return []
+      if (!existing) {
+        console.log('🔍 DEBUG: Suggestion available:', suggestion);
+        suggestions.push(suggestion)
+      } else {
+        console.log('🔍 DEBUG: Suggestion taken:', suggestion);
       }
+    }
 
-      const suggestions: string[] = []
-      const variations: string[] = []
-
-      // Generate systematic variations
-      // 1. Append numbers
-      for (let i = 1; i <= 10; i++) {
-        variations.push(`${normalizedBase}${i}`)
-      }
-
-      // 2. Add common suffixes
-      const suffixes = ['_dev', '_official', '_pro', '_x', '_hub']
-      for (const suffix of suffixes) {
-        variations.push(`${normalizedBase}${suffix}`)
-      }
-
-      // 3. Try with numbers in different positions
-      if (normalizedBase.length >= 4) {
-        variations.push(`${normalizedBase.slice(0, -1)}1${normalizedBase.slice(-1)}`)
-        variations.push(`${normalizedBase.slice(0, 2)}1${normalizedBase.slice(2)}`)
-      }
-
-      // 4. Handle case variations (but keep normalized for checking)
-      variations.push(normalizedBase.charAt(0).toUpperCase() + normalizedBase.slice(1))
-
-      console.log('🔍 DEBUG: Generated', variations.length, 'variations:', variations);
-
-      // Check each variation for availability
-      for (const suggestion of variations) {
-        if (suggestions.length >= count) break
-
-        const normalizedSuggestion = suggestion.toLowerCase()
-        if (normalizedSuggestion === normalizedBase) continue // Skip the original
-
-        // Validate suggestion format
-        if (normalizedSuggestion.length < 3 || normalizedSuggestion.length > 20 || !/^[a-zA-Z0-9_]+$/.test(normalizedSuggestion)) {
-          console.log('🔍 DEBUG: Skipping invalid suggestion:', suggestion);
-          continue
-        }
-
-        console.log('🔍 DEBUG: Checking availability of suggestion:', suggestion);
-        const existing = await db
-          .query("users")
-          .withIndex("by_username", (q) => q.eq("username", normalizedSuggestion))
-          .first()
-
-        if (!existing) {
-          console.log('🔍 DEBUG: Suggestion available:', suggestion);
-          suggestions.push(suggestion)
-        } else {
-          console.log('🔍 DEBUG: Suggestion taken:', suggestion);
-        }
-      }
-
-      console.log('🔍 DEBUG: Final suggestions:', suggestions.slice(0, count));
-      return suggestions.slice(0, count)
-    },
-  })
+    console.log('🔍 DEBUG: Final suggestions:', suggestions.slice(0, count));
+    return suggestions.slice(0, count)
+  },
+})

@@ -45,14 +45,14 @@ interface SearchBarProps {
   onSearch: (query: string, type?: 'idea' | 'user') => void
   placeholder?: string
   className?: string
-  isLoading?: boolean
+
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   placeholder = "Search for ideas, people, and more...",
   className,
-  isLoading = false
+
 }) => {
   const [query, setQuery] = useState('')
   const [isFocused, setIsFocused] = useState(false)
@@ -267,19 +267,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </Button>
           )}
         </div>
-        <Button
-          type="submit"
-          size="sm"
-          disabled={!query.trim() || isLoading}
-          className="ml-2"
-          aria-label="Submit search"
-        >
-          {isLoading ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            <Search className="h-4 w-4" />
-          )}
-        </Button>
       </form>
 
       {/* Suggestions Dropdown */}
