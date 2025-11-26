@@ -15,30 +15,32 @@ import { Spinner } from "@/components/ui/spinner";
 import FooterSection from "@/components/footer";
 import { InvitationButton } from "@/components/requests/invitation-button";
 
+import { UserProfile } from "../../../convex/users";
+
 // User profile interface
-interface UserProfile {
-  _id: string;
-  clerkId: string;
-  username: string;
-  displayName: string;
-  bio?: string;
-  avatar?: string;
-  location?: string;
-  website?: string;
-  skills: string[];
-  industry?: string;
-  completedOnboarding: boolean;
-  isActive: boolean;
-  role: string;
-  followersCount: number;
-  followingCount: number;
-  lastLoginAt?: number;
-  createdAt: number;
-  updatedAt: number;
-  ideasCreated?: number;
-  ideasSparked?: number;
-  ideasContributed?: number;
-}
+// interface UserProfile {
+//   _id: string;
+//   clerkId: string;
+//   username: string;
+//   displayName: string;
+//   bio?: string;
+//   avatar?: string;
+//   location?: string;
+//   website?: string;
+//   skills: string[];
+//   industry?: string;
+//   completedOnboarding: boolean;
+//   isActive: boolean;
+//   role: string;
+//   followersCount: number;
+//   followingCount: number;
+//   lastLoginAt?: number;
+//   createdAt: number;
+//   updatedAt: number;
+//   ideasCreated?: number;
+//   ideasSparked?: number;
+//   ideasContributed?: number;
+// }
 
 export default function CommunityPage() {
   const { isLoaded: isClerkUserLoaded, user: clerkUser } = useUser();

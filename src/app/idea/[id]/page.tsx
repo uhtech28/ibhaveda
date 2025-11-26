@@ -1326,10 +1326,8 @@ const HierarchicalIdeasSection: React.FC<{
     industries?: string;
     visibility: string;
   }) => Promise<{
-    ideaId: string;
+    subIdeaId: Id<"ideas">;
     message: string;
-    parentId: string;
-    authorId: string;
   }>;
 }> = ({ idea, ideaTree, userRequests, addSubIdeaMutation }) => {
   const router = useRouter();

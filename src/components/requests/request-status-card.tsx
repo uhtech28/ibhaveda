@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 // Type for the request data from our query
-interface ContributionRequest {
+export interface ContributionRequest {
   _id: string;
   message: string;
   status: string;
@@ -22,17 +22,23 @@ interface ContributionRequest {
     title: string;
     _id: string;
   } | null;
-  author: {
+  author?: {
     displayName: string;
     username: string;
+  } | null;
+  contributor?: {
+    displayName: string;
+    username: string;
+    avatar?: string;
   } | null;
 }
 
 interface RequestStatusCardProps {
   request: ContributionRequest;
+  type?: "outgoing" | "incoming";
 }
 
-export function RequestStatusCard({ request }: RequestStatusCardProps) {
+export function RequestStatusCard({ request, type = "outgoing" }: RequestStatusCardProps) {
   const prevStatus = useRef<string | null>(null);
 
   useEffect(() => {
@@ -89,6 +95,10 @@ export function RequestStatusCard({ request }: RequestStatusCardProps) {
     });
   };
 
+  const displayUser = type === "outgoing" ? request.author : request.contributor;
+  const userLabel = type === "outgoing" ? "by" : "from";
+  const messageLabel = type === "outgoing" ? "Your message:" : "Message:";
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -96,13 +106,13 @@ export function RequestStatusCard({ request }: RequestStatusCardProps) {
           <div className="flex items-center gap-3">
             <Avatar className="w-8 h-8">
               <AvatarFallback>
-                {request.author?.displayName?.charAt(0).toUpperCase() || "?"}
+                {displayUser?.displayName?.charAt(0).toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
             <div>
               <CardTitle className="text-lg">{request.idea?.title || "Idea"}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                by @{request.author?.username || "unknown"}
+                {userLabel} @{displayUser?.username || "unknown"}
               </p>
             </div>
           </div>
@@ -116,7 +126,7 @@ export function RequestStatusCard({ request }: RequestStatusCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <p className="text-sm font-medium">Your message:</p>
+          <p className="text-sm font-medium">{messageLabel}</p>
           <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
             {request.message.length > 100
               ? `${request.message.substring(0, 100)}...`

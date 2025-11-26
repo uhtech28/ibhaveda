@@ -12,24 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { HeroHeader } from "@/components/header"
 import { Spinner } from "@/components/ui/spinner"
 import FooterSection from "@/components/footer"
-
-// Local UserProfile interface for demonstration
-interface UserProfile {
-  _id: string;
-  clerkId: string;
-  username: string;
-  displayName: string;
-  bio?: string;
-  avatar?: string;
-  industry?: string;
-  skills: string[];
-  completedOnboarding: boolean;
-  createdAt: number;
-  updatedAt: number;
-  ideasCreated?: number;
-  ideasSparked?: number;
-  ideasContributed?: number;
-}
+import type { UserProfile } from "../../../../convex/users"
 
 // Mock profile removed - using only real data from Convex
 
@@ -42,6 +25,9 @@ export default function ProfilePage() {
     const realProfile = useQuery(api.users.getUserProfile, { username })
     const myRequests = useQuery(api.contributionRequests.getMyRequests)
     const incomingRequests = useQuery(api.contributionRequests.getIncomingRequests)
+    const publicIdeas = useQuery(api.ideas.getPublicIdeasForUser, realProfile ? { userId: realProfile._id } : "skip")
+
+  // At this point, realProfile is loaded and not null, so profileData is safe to use
 
   // Check if this is current user's profile
   const isCurrentUser = user?.username === username
@@ -55,11 +41,19 @@ export default function ProfilePage() {
 
   // At this point, realProfile is loaded and not null, so profileData is safe to use
 
+  // Remove the old profileData declaration since it's now declared earlier
+
   const [formData, setFormData] = useState({
     displayName: "",
     bio: "",
     avatar: "",
+    location: "",
+    website: "",
+    github: "",
+    linkedin: "",
+    twitter: "",
     industry: "",
+    industries: [] as string[],
     skills: [] as string[],
     username: "",
   })
@@ -81,7 +75,13 @@ export default function ProfilePage() {
         displayName: profile.displayName,
         bio: profile.bio || "",
         avatar: profile.avatar || "",
+        location: profile.location || "",
+        website: profile.website || "",
+        github: profile.github || "",
+        linkedin: profile.linkedin || "",
+        twitter: profile.twitter || "",
         industry: profile.industry || "",
+        industries: profile.industries || [],
         skills: profile.skills || [],
         username: profile.username,
       })
@@ -129,7 +129,7 @@ if (realProfile === null) {
 }
 
 // At this point, realProfile is loaded and not null
-const profileData = realProfile as UserProfile
+const profileData = { ...realProfile, skills: realProfile.skills || [], industries: realProfile.industries || [] } as UserProfile
 
 return (
   <div className="min-h-screen flex flex-col bg-background">
@@ -139,7 +139,6 @@ return (
       {isCurrentUser ? (
         <DetailedProfileView
           profile={profileData}
-          username={username}
           isEditing={isEditing}
           setIsEditing={setIsEditing}
           formData={formData}
@@ -148,7 +147,7 @@ return (
           incomingRequests={incomingRequests}
         />
       ) : (
-        <CompactProfileView profile={profileData} />
+        <CompactProfileView profile={profileData} publicIdeas={publicIdeas || []} />
       )}
 
     </main>

@@ -2,11 +2,14 @@
 
 import React from "react"
 import { DetailedProfileView } from "@/components/user/DetailedProfileView"
+import type { UserProfile } from "../../../convex/users"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Id } from "../../../convex/_generated/dataModel"
 
 // Mock profile data for testing
-const mockProfile = {
-  _id: "test-id",
+const mockProfile: UserProfile = {
+  _id: "test-id" as Id<"users">,
+  _creationTime: Date.now(),
   clerkId: "test-clerk-id",
   username: "testuser",
   displayName: "Test User",
@@ -20,6 +23,12 @@ const mockProfile = {
   ideasCreated: 5,
   ideasSparked: 3,
   ideasContributed: 7,
+  location: "San Francisco, CA",
+  website: "https://example.com",
+  github: "https://github.com/testuser",
+  linkedin: "https://linkedin.com/in/testuser",
+  twitter: "https://twitter.com/testuser",
+  industries: ["Technology", "Design"],
 }
 
 const mockFormData = {
@@ -29,6 +38,12 @@ const mockFormData = {
   industry: "Technology",
   skills: ["JavaScript", "React", "TypeScript"],
   username: "testuser",
+  location: "San Francisco, CA",
+  website: "https://example.com",
+  github: "https://github.com/testuser",
+  linkedin: "https://linkedin.com/in/testuser",
+  twitter: "https://twitter.com/testuser",
+  industries: ["Technology", "Design"],
 }
 
 export default function TestProfileTooltip() {
@@ -43,7 +58,6 @@ export default function TestProfileTooltip() {
 
           <DetailedProfileView
             profile={mockProfile}
-            username="testuser"
             isEditing={false}
             setIsEditing={() => {}}
             formData={mockFormData}

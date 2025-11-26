@@ -1000,160 +1000,46 @@ export const addSubIdea = mutation({
       await Promise.all(notificationPromises);
     }
 
-    return {
-      ideaId: subIdeaId,
-      message: "Sub-idea created successfully",
-      parentId: args.parentId,
-      authorId: user._id
-    };
+    return { subIdeaId, message: "Sub-idea added successfully" };
   },
 });
 
-// Request contribution (alias for frontend usage)
-export const requestContribution = createContributionRequest;
-
-// Accept contribution request
-export const acceptContribution = mutation({
+// Get public ideas sparked by a specific user (for profile views)
+export const getPublicSparkedIdeasForUser = query({
   args: {
-    requestId: v.id("contributionRequests"),
-  },
-  handler: async (ctx, args) => {
-    // Get authenticated user
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Authentication required: Please sign in to continue");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const request = await ctx.db.get(args.requestId);
-    if (!request) {
-      throw new Error("Request not found");
-    }
-
-    // Only author can update status
-    if (request.authorId !== user._id) {
-      throw new Error("Not authorized to update this request");
-    }
-
-    // Validate status transition
-    if (request.status !== "pending") {
-      throw new Error(`Cannot accept a request that is already ${request.status}`);
-    }
-
-    // Update status
-    await ctx.db.patch(args.requestId, {
-      status: "accepted",
-      updatedAt: Date.now(),
-    });
-
-    return { message: "Request accepted successfully" };
-  },
-});
-
-// Reject contribution request
-export const rejectContribution = mutation({
-  args: {
-    requestId: v.id("contributionRequests"),
-  },
-  handler: async (ctx, args) => {
-    // Get authenticated user
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Authentication required: Please sign in to continue");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const request = await ctx.db.get(args.requestId);
-    if (!request) {
-      throw new Error("Request not found");
-    }
-
-    // Only author can update status
-    if (request.authorId !== user._id) {
-      throw new Error("Not authorized to update this request");
-    }
-
-    // Validate status transition
-    if (request.status !== "pending") {
-      throw new Error(`Cannot reject a request that is already ${request.status}`);
-    }
-
-    // Update status
-    await ctx.db.patch(args.requestId, {
-      status: "rejected",
-      updatedAt: Date.now(),
-    });
-
-    return { message: "Request rejected successfully" };
-  },
-});
-
-// Get requests for an idea (for author)
-export const getContributionRequests = getRequestsByIdea;
-
-// Get incoming requests for current user
-// Get ideas sparked by the current user (excluding their own ideas)
-export const getUserSparkedIdeas = query({
-  args: {
+    userId: v.id("users"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 10;
+    const limit = args.limit || 20;
 
-    // Get authenticated user
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    // Find user by Clerk ID
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
+    // Find user to verify existence
+    const user = await ctx.db.get(args.userId);
     if (!user) {
-      return []; // User profile not created yet
+      return [];
     }
 
     // Get ideas the user has sparked
     const userSparks = await ctx.db
       .query("userIdeaSparks")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    // Extract idea IDs
     const ideaIds = userSparks.map(spark => spark.ideaId);
 
     if (ideaIds.length === 0) {
       return [];
     }
 
-    // Get the ideas, excluding user's own ideas
+    // Get the ideas, checking visibility
     const ideas = await Promise.all(
       ideaIds
-        .slice(0, limit) // Limit the number of ideas to fetch
+        .slice(0, limit)
         .map(async (ideaId) => {
           const idea = await ctx.db.get(ideaId);
 
-          // Skip if idea doesn't exist, is deleted, or is the user's own idea
-          if (!idea || idea.isDeleted || idea.authorId === user._id) {
+          // Skip if idea doesn't exist, is deleted, is user's own, or is NOT public
+          if (!idea || idea.isDeleted || idea.authorId === args.userId || idea.visibility !== "public") {
             return null;
           }
 
@@ -1167,48 +1053,38 @@ export const getUserSparkedIdeas = query({
               name: author.displayName,
               username: author.username,
             } : null,
-            // Include spark timestamp
             sparkedAt: userSparks.find(s => s.ideaId === ideaId)?.createdAt,
           };
         })
     );
 
-    // Filter out nulls and sort by spark timestamp (most recent first)
+    // Filter out nulls and sort by spark timestamp
     return ideas
       .filter(idea => idea !== null)
       .sort((a, b) => (b.sparkedAt || 0) - (a.sparkedAt || 0));
   },
 });
 
-// Get ideas the user has contributed to (with accepted requests)
-export const getUserContributedIdeas = query({
+// Get public ideas contributed to by a specific user (for profile views)
+export const getPublicContributedIdeasForUser = query({
   args: {
+    userId: v.id("users"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 10;
+    const limit = args.limit || 20;
 
-    // Get authenticated user
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    // Find user by Clerk ID
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
+    // Find user to verify existence
+    const user = await ctx.db.get(args.userId);
     if (!user) {
-      return []; // User profile not created yet
+      return [];
     }
 
     // Get accepted contribution requests for this user
     const acceptedRequests = await ctx.db
       .query("contributionRequests")
       .withIndex("by_contributor_status", (q) =>
-        q.eq("contributorId", user._id).eq("status", "accepted")
+        q.eq("contributorId", args.userId).eq("status", "accepted")
       )
       .collect();
 
@@ -1219,15 +1095,15 @@ export const getUserContributedIdeas = query({
       return [];
     }
 
-    // Get the ideas, excluding user's own ideas (shouldn't happen but safety check)
+    // Get the ideas, checking visibility
     const ideas = await Promise.all(
       ideaIds
-        .slice(0, limit) // Limit the number of ideas to fetch
+        .slice(0, limit)
         .map(async (ideaId) => {
           const idea = await ctx.db.get(ideaId);
 
-          // Skip if idea doesn't exist or is deleted
-          if (!idea || idea.isDeleted) {
+          // Skip if idea doesn't exist, is deleted, or is NOT public
+          if (!idea || idea.isDeleted || idea.visibility !== "public") {
             return null;
           }
 
@@ -1244,19 +1120,17 @@ export const getUserContributedIdeas = query({
               name: author.displayName,
               username: author.username,
             } : null,
-            // Include contribution accepted timestamp
             contributedAt: request?.updatedAt || request?.createdAt,
           };
         })
     );
 
-    // Filter out nulls and sort by contribution timestamp (most recent first)
+    // Filter out nulls and sort by contribution timestamp
     return ideas
       .filter(idea => idea !== null)
       .sort((a, b) => (b.contributedAt || 0) - (a.contributedAt || 0));
   },
 });
-export const getIncomingContributionRequests = getIncomingRequests;
 
 // Get public ideas for a specific user (for profile views)
 export const getPublicIdeasForUser = query({
@@ -1273,7 +1147,6 @@ export const getPublicIdeasForUser = query({
       return [];
     }
 
-    // Get user's public ideas
     const userIdeas = await ctx.db
       .query("ideas")
       .withIndex("by_author", (q) => q.eq("authorId", args.userId))
@@ -1283,5 +1156,44 @@ export const getPublicIdeasForUser = query({
       .take(limit);
 
     return userIdeas;
+  },
+});
+
+// Get ideas for a specific user profile (handles visibility for owner vs visitor)
+export const getProfileIdeas = query({
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+    const identity = await ctx.auth.getUserIdentity();
+
+    // Check if viewer is the profile owner
+    let isOwner = false;
+    if (identity) {
+      const viewer = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
+      if (viewer && viewer._id === args.userId) {
+        isOwner = true;
+      }
+    }
+
+    let ideasQuery = ctx.db
+      .query("ideas")
+      .withIndex("by_author", (q) => q.eq("authorId", args.userId))
+      .filter((q) => q.neq(q.field("isDeleted"), true))
+      .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)));
+
+    // If not owner, filter by public visibility
+    if (!isOwner) {
+      ideasQuery = ideasQuery.filter((q) => q.eq(q.field("visibility"), "public"));
+    }
+
+    const ideas = await ideasQuery.order("desc").take(limit);
+
+    return ideas;
   },
 });

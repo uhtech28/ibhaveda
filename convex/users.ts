@@ -1,37 +1,18 @@
-import { query, mutation } from "./_generated/server"
-import { v } from "convex/values"
-import { Id } from "./_generated/dataModel"
-import type { Doc } from "./_generated/dataModel"
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { Id, Doc } from "./_generated/dataModel";
 
-// TypeScript interfaces for user data
-export interface UserProfile {
-  _id: string
-  clerkId: string
-  username: string
-  displayName: string
-  bio?: string
-  avatar?: string
-  location?: string
-  website?: string
-  github?: string
-  linkedin?: string
-  twitter?: string
-  skills: string[]
-  industry?: string
-  industries?: string[]
-  completedOnboarding: boolean
-  isActive: boolean
-  role: string
-  followersCount: number
-  followingCount: number
-  lastLoginAt?: number
-  createdAt: number
-  updatedAt: number
-}
+export type UserProfile = Doc<"users"> & {
+  skills: string[];
+  industry?: string;
+  industries?: string[];
+  ideasCreated?: number;
+  ideasSparked?: number;
+  ideasContributed?: number;
+};
 
-// Get current user's profile by Clerk ID - FAST lookup with optimized queries
 export const getCurrentUser = query({
-  handler: async ({ db, auth }): Promise<UserProfile | null> => {
+  handler: async ({ db, auth }) => {
     const identity = await auth.getUserIdentity()
 
     if (!identity) return null
@@ -364,6 +345,8 @@ export const getUserStats = query({
     | { skillsCount: number; createdAt: number; completedOnboarding: boolean }
     | null
   > => {
+
+
     const identity = await auth.getUserIdentity()
     if (!identity) return null
 

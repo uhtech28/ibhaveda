@@ -9,9 +9,10 @@ interface AvatarUploadProps {
   currentAvatar?: string
   onAvatarChange: (avatarUrl: string) => void
   displayName: string
+  className?: string
 }
 
-export function AvatarUpload({ currentAvatar, onAvatarChange, displayName }: AvatarUploadProps) {
+export function AvatarUpload({ currentAvatar, onAvatarChange, displayName, className }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -68,7 +69,7 @@ export function AvatarUpload({ currentAvatar, onAvatarChange, displayName }: Ava
   }
 
   return (
-    <div className="flex flex-col items-center space-y-4">
+    <div className={`flex flex-col items-center space-y-4 ${className || ''}`}>
       <div className="relative group">
         <Avatar className="w-32 h-32 border-4 border-background shadow-lg">
           <AvatarImage src={currentAvatar} alt={displayName} />
