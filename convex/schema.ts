@@ -155,7 +155,7 @@ export default defineSchema({
   // Messages table - stores chat messages
   messages: defineTable({
     senderId: v.id("users"), // Reference to users table
-    receiverId: v.id("users"), // Reference to users table
+    receiverId: v.optional(v.id("users")), // Reference to users table (optional for group chats)
     content: v.string(), // Message content
     createdAt: v.number(), // Unix timestamp
     read: v.boolean(), // Read status
@@ -170,8 +170,10 @@ export default defineSchema({
 
   // Conversations table - stores conversation metadata
   conversations: defineTable({
-    participant1: v.id("users"), // First participant user ID
-    participant2: v.id("users"), // Second participant user ID
+    participant1: v.optional(v.id("users")), // First participant user ID (optional for groups)
+    participant2: v.optional(v.id("users")), // Second participant user ID (optional for groups)
+    type: v.optional(v.string()), // 'direct' or 'group'
+    ideaId: v.optional(v.id("ideas")), // Reference to idea for group chats
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
     lastMessageId: v.optional(v.id("messages")), // Reference to latest message
@@ -180,7 +182,8 @@ export default defineSchema({
     .index("by_participant1", ["participant1"])
     .index("by_participant2", ["participant2"])
     .index("by_created_at", ["createdAt"])
-    .index("by_participants", ["participant1", "participant2"]),
+    .index("by_participants", ["participant1", "participant2"])
+    .index("by_idea", ["ideaId"]),
 
   // Notifications table - tracks user notifications for ideas and system events
   notifications: defineTable({

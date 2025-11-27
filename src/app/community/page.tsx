@@ -6,41 +6,17 @@ import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, MapPin, Globe, AlertCircle } from "lucide-react";
+import { Users, AlertCircle, Lightbulb, Sparkles, Send } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { HeroHeader } from "@/components/header";
 import { Spinner } from "@/components/ui/spinner";
 import FooterSection from "@/components/footer";
 import { InvitationButton } from "@/components/requests/invitation-button";
+import { useChat } from "@/components/chat/ChatContext";
 
 import { UserProfile } from "../../../convex/users";
-
-// User profile interface
-// interface UserProfile {
-//   _id: string;
-//   clerkId: string;
-//   username: string;
-//   displayName: string;
-//   bio?: string;
-//   avatar?: string;
-//   location?: string;
-//   website?: string;
-//   skills: string[];
-//   industry?: string;
-//   completedOnboarding: boolean;
-//   isActive: boolean;
-//   role: string;
-//   followersCount: number;
-//   followingCount: number;
-//   lastLoginAt?: number;
-//   createdAt: number;
-//   updatedAt: number;
-//   ideasCreated?: number;
-//   ideasSparked?: number;
-//   ideasContributed?: number;
-// }
 
 export default function CommunityPage() {
   const { isLoaded: isClerkUserLoaded, user: clerkUser } = useUser();
@@ -97,7 +73,7 @@ export default function CommunityPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <HeroHeader />
 
-      <main className="flex-1 container mx-auto px-4 py-12 pt-20">
+      <main className="flex-1 container mx-auto px-4 py-12 pt-24">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
@@ -107,16 +83,16 @@ export default function CommunityPage() {
             <p className="text-lg text-muted-foreground mb-6 max-w-2xl mx-auto">
               Discover amazing creators and innovators in our community
             </p>
-            <div className="inline-flex items-center gap-2 px-6 py-3 bg-muted/50 rounded-full">
-              <Users className="w-5 h-5" />
-              <span className="text-sm font-medium">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-full border border-border/50">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">
                 {users?.filter(user => user.clerkId !== clerkUser?.id).length || 0} Members
               </span>
             </div>
           </div>
 
           {/* Users Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {users?.filter(user => user.clerkId !== clerkUser?.id).map((user: UserProfile) => (
               <UserCard
                 key={user._id}
@@ -151,115 +127,117 @@ interface UserCardProps {
 
 const UserCard: React.FC<UserCardProps> = ({ user, currentUserId }) => {
   const isCurrentUser = currentUserId === user.clerkId;
+  const { toggleChat } = useChat();
+
+  const handleMessageClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleChat();
+    // TODO: Implement direct messaging logic to open chat with specific user
+  };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow flex flex-col h-full">
+    <Card className="group hover:shadow-lg transition-all duration-300 flex flex-col h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
       <Link
         href={`/profile/${encodeURIComponent(user.username)}`}
-        className="flex-1"
+        className="flex-1 flex flex-col"
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-start gap-3">
-            <Avatar className="w-12 h-12 flex-shrink-0">
-              <AvatarImage src={user.avatar} alt={user.displayName} />
-              <AvatarFallback>
+        <div className="p-4 flex-1 flex flex-col">
+          {/* Header: Avatar & Name */}
+          <div className="flex items-start gap-3 mb-3">
+            <Avatar className="w-10 h-10 border-2 border-background shadow-sm shrink-0">
+              <AvatarImage src={user.avatar} alt={user.displayName} className="object-cover" />
+              <AvatarFallback className="text-sm bg-primary/10 text-primary font-semibold">
                 {user.displayName.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold truncate">{user.displayName}</h3>
-              <p className="text-sm text-muted-foreground truncate">
+            <div className="min-w-0 pt-0.5">
+              <h3 className="font-bold text-base leading-tight truncate group-hover:text-primary transition-colors">
+                {user.displayName}
+              </h3>
+              <p className="text-xs text-muted-foreground truncate">
                 @{user.username}
               </p>
             </div>
           </div>
-        </CardHeader>
 
-        <CardContent className="pt-0 pb-3">
           {/* Bio */}
           {user.bio && (
-            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+            <p className="text-xs text-muted-foreground mb-3 line-clamp-2 leading-relaxed h-8">
               {user.bio}
             </p>
           )}
 
-          {/* Industry */}
-          {user.industry && (
-            <Badge variant="secondary" className="text-xs mb-3">
-              {user.industry}
-            </Badge>
-          )}
+          {/* Industry Badge */}
+          <div className="mb-2">
+             {user.industry ? (
+               <Badge variant="secondary" className="rounded-md px-2 py-0 text-[10px] font-medium bg-muted text-muted-foreground hover:bg-muted/80 h-5">
+                 {user.industry}
+               </Badge>
+             ) : (
+               <div className="h-5"></div> // Spacer if no industry
+             )}
+          </div>
 
           {/* Skills */}
-          {user.skills.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {user.skills.slice(0, 3).map((skill) => (
-                <Badge key={skill} variant="outline" className="text-xs">
-                  {skill}
-                </Badge>
-              ))}
-              {user.skills.length > 3 && (
-                <Badge variant="outline" className="text-xs">
-                  +{user.skills.length - 3}
-                </Badge>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-1 mb-4 h-10 content-start overflow-hidden">
+            {user.skills.length > 0 ? (
+              <>
+                {user.skills.slice(0, 3).map((skill) => (
+                  <Badge key={skill} variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-background/50">
+                    {skill}
+                  </Badge>
+                ))}
+                {user.skills.length > 3 && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-background/50">
+                    +{user.skills.length - 3}
+                  </Badge>
+                )}
+              </>
+            ) : (
+               <p className="text-[10px] text-muted-foreground italic">No skills listed</p>
+            )}
+          </div>
 
-          {/* Dynamic Metrics */}
-          {(user.ideasCreated || user.ideasSparked || user.ideasContributed) && (
-            <div className="flex gap-4 text-xs text-muted-foreground mb-3">
-              {user.ideasCreated !== undefined && user.ideasCreated > 0 && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium text-primary">{user.ideasCreated}</span>
-                  <span>ideas</span>
-                </div>
-              )}
-              {user.ideasSparked !== undefined && user.ideasSparked > 0 && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium text-primary">{user.ideasSparked}</span>
-                  <span>sparked</span>
-                </div>
-              )}
-              {user.ideasContributed !== undefined && user.ideasContributed > 0 && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium text-primary">{user.ideasContributed}</span>
-                  <span>contributed</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Location & Website */}
-          {(user.location || user.website) && (
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {user.location && (
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  <span className="truncate">{user.location}</span>
-                </div>
-              )}
-              {user.website && (
-                <div className="flex items-center gap-1">
-                  <Globe className="w-3 h-3" />
-                  <span>Website</span>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
+          {/* Stats Row */}
+          <div className="grid grid-cols-3 gap-1 py-2 border-t border-b border-border/40 mb-1">
+             <div className="flex flex-col items-center justify-center text-center">
+                <Lightbulb className="w-3.5 h-3.5 text-primary mb-0.5" />
+                <span className="text-[10px] font-bold">{user.ideasCreated || 0}</span>
+             </div>
+             <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
+                <Sparkles className="w-3.5 h-3.5 text-orange-500 mb-0.5" />
+                <span className="text-[10px] font-bold">{user.ideasSparked || 0}</span>
+             </div>
+             <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
+                <Users className="w-3.5 h-3.5 text-green-500 mb-0.5" />
+                <span className="text-[10px] font-bold">{user.ideasContributed || 0}</span>
+             </div>
+          </div>
+        </div>
       </Link>
 
-      {/* Action buttons - outside the Link */}
+      {/* Footer Actions */}
       {!isCurrentUser && (
-        <div className="px-6 pb-4" onClick={(e) => e.stopPropagation()}>
-          <InvitationButton
-            targetUser={{
-              _id: user._id,
-              username: user.username,
-              displayName: user.displayName,
-            }}
-          />
+        <div className="px-4 pb-4 pt-0 flex items-center gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1">
+            <InvitationButton
+              targetUser={{
+                _id: user._id,
+                username: user.username,
+                displayName: user.displayName,
+              }}
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="h-8 w-8 shrink-0 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
+            onClick={handleMessageClick}
+            title="Message"
+          >
+            <Send className="w-3.5 h-3.5" />
+          </Button>
         </div>
       )}
     </Card>

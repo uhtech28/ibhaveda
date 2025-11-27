@@ -11,18 +11,19 @@ import ChatInput from "./ChatInput";
 
 
 interface ChatThreadProps {
-  conversationId: Id<"conversations">;
+  conversationId: Id<"conversations"> | null;
   onBack: () => void;
   onClose: () => void;
   receiverId?: Id<"users"> | null;
+  ideaId?: Id<"ideas"> | null;
 }
 
-const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, onClose, receiverId }) => {
+const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, onClose, receiverId, ideaId }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const { isAuthenticated } = useConvexAuth();
 
-  const messages = useQuery(api.chat.getConversationMessages, isAuthenticated ? { conversationId } : "skip");
+  const messages = useQuery(api.chat.getConversationMessages, isAuthenticated && conversationId ? { conversationId } : "skip");
   const sendMessage = useMutation(api.chat.sendMessage);
   const users = useQuery(api.chat.getAllUsers, isAuthenticated ? {} : "skip");
   const currentUserDoc = useQuery(api.chat.getUserByClerkId, isAuthenticated ? {} : "skip");
@@ -43,36 +44,51 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
   const handleSendMessage = useCallback(async (content: string) => {
     if (!content.trim() || !currentUserId) return;
 
-    let recId = receiverId;
-    if (!recId && (!messages || messages.length === 0)) {
-      setSendError("No active conversation found");
-      return;
-    } else if (!recId && messages && messages.length > 0) {
-      const firstMessage = messages[0];
-      recId = firstMessage.senderId === currentUserId
-        ? firstMessage.receiverId
-        : firstMessage.senderId;
-    }
-
-    if (!recId) {
-      setSendError("Cannot determine receiver");
-      return;
-    }
-
     setSendError(null);
 
     try {
-      await sendMessage({
-        receiverId: recId,
-        content,
-      });
-      // Message sent successfully - no need to clear anything as Convex will update
+      if (ideaId) {
+        // Group chat
+        await sendMessage({
+          content,
+          conversationId: conversationId || undefined,
+          ideaId: ideaId,
+        });
+      } else if (receiverId) {
+        // Direct chat
+        await sendMessage({
+          receiverId,
+          content,
+          conversationId: conversationId || undefined,
+        });
+      } else {
+        // Try to infer context from existing messages if no explicit context
+        let recId = receiverId;
+        if (!recId && messages && messages.length > 0) {
+            const firstMessage = messages[0];
+            recId = firstMessage.senderId === currentUserId
+            ? firstMessage.receiverId
+            : firstMessage.senderId;
+        }
+        
+        if (recId) {
+             await sendMessage({
+                receiverId: recId,
+                content,
+                conversationId: conversationId || undefined,
+            });
+        } else {
+            setSendError("Cannot determine chat context");
+            return;
+        }
+      }
+      // Message sent successfully
     } catch (error) {
       console.error("Failed to send message:", error);
       setSendError("Failed to send message. Please try again.");
     } finally {
     }
-  }, [sendMessage, messages, currentUserId, receiverId]);
+  }, [sendMessage, messages, currentUserId, receiverId, conversationId, ideaId]);
 
   return (
     <div className="flex flex-col h-full bg-background max-w-full">

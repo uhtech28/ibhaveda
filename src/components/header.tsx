@@ -1,27 +1,32 @@
 'use client'
 
-import { Plus } from 'lucide-react'
+import { Plus, User, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
 import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useClerk } from '@clerk/nextjs'
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { SearchBar } from '@/components/search/search-bar'
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useQuery } from "convex/react"
+import { api } from "../../convex/_generated/api"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 const menuItems = [
     { name: 'Feed', href: '/feed' },
     { name: 'My Feed', href: '/my-feed' },
     { name: 'Community', href: '/community' },
-    { name: 'Profile', href: '/profile-setup' },
 ]
 
 export const HeroHeader = () => {
     const [menuState, setMenuState] = React.useState(false)
     const [isScrolled, setIsScrolled] = React.useState(false)
+    const { signOut } = useClerk()
+    const currentUser = useQuery(api.users.getCurrentUser)
 
     React.useEffect(() => {
         const handleScroll = () => {
@@ -86,6 +91,80 @@ export const HeroHeader = () => {
                                 ))}
                             </nav>
                         </div>
+
+                        {/* Desktop Actions */}
+                        <div className="hidden lg:flex items-center gap-4">
+                            <SignedOut>
+                                <div className="flex gap-3">
+                                    <SignInButton>
+                                        <Button variant="ghost" size="sm">
+                                            Login
+                                        </Button>
+                                    </SignInButton>
+                                    <SignUpButton>
+                                        <Button size="sm">
+                                            Sign Up
+                                        </Button>
+                                    </SignUpButton>
+                                </div>
+                            </SignedOut>
+                            <SignedIn>
+                                <div className="flex items-center gap-3">
+                                    <NotificationBell />
+                                    
+                                    <Button
+                                        asChild
+                                        variant="ghost"
+                                        size="sm"
+                                        className="p-2 h-8 w-8"
+                                        title="Create new idea"
+                                    >
+                                        <Link href="/create-idea">
+                                            <Plus className="w-4 h-4" />
+                                        </Link>
+                                    </Button>
+
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                                                    <AvatarFallback>{currentUser?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                                                </Avatar>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56" align="end" forceMount>
+                                            <div className="grid gap-4">
+                                                <div className="font-medium truncate">
+                                                    {currentUser?.displayName}
+                                                    <p className="text-xs text-muted-foreground font-normal truncate">
+                                                        @{currentUser?.username}
+                                                    </p>
+                                                </div>
+                                                <div className="grid gap-2">
+                                                    <Button asChild variant="ghost" className="justify-start gap-2 px-2 w-full">
+                                                        <Link href={`/profile/${currentUser?.username}`}>
+                                                            <User className="h-4 w-4" />
+                                                            <span>Profile Page</span>
+                                                        </Link>
+                                                    </Button>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                        onClick={() => signOut()}
+                                                    >
+                                                        <LogOut className="h-4 w-4" />
+                                                        <span>Sign Out</span>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            </SignedIn>
+                            <ThemeToggle />
+                        </div>
+
                         <button
                             onClick={handleMenuToggle}
                             aria-label={menuState ? 'Close menu' : 'Open menu'}

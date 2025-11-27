@@ -1,60 +1,44 @@
 "use client";
 
 import React, { useState, memo, lazy, Suspense, useCallback } from "react";
-import { useQuery, useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { api } from "../../../convex/_generated/api";
+
 import { Id } from "../../../convex/_generated/dataModel";
 import { useChat } from "./ChatContext";
 
 const ChatThread = lazy(() => import("./ChatThread"));
-const UserList = lazy(() => import("./UserList"));
+const GroupList = lazy(() => import("./GroupList"));
 
 const ChatWidget: React.FC = () => {
   const { isOpen, setIsOpen } = useChat();
   const [selectedConversationId, setSelectedConversationId] = useState<Id<"conversations"> | null>(null);
-  const [selectedReceiverId, setSelectedReceiverId] = useState<Id<"users"> | null>(null);
+  const [selectedIdeaId, setSelectedIdeaId] = useState<Id<"ideas"> | null>(null);
 
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { user } = useUser();
   const pathname = usePathname();
 
-  const conversations = useQuery(api.chat.getUserConversations, isAuthenticated ? {} : "skip");
-  const createConversation = useMutation(api.chat.createConversation);
-
-  const handleSelectUser = useCallback((userId: string) => {
-    const actualUserId = userId as Id<"users">;
-    setSelectedReceiverId(actualUserId);
-    const existingConvo = conversations?.find(convo => convo.otherUser?.id === actualUserId);
-    if (existingConvo) {
-      setSelectedConversationId(existingConvo._id);
+  const handleSelectGroup = useCallback((conversationId: Id<"conversations"> | undefined, ideaId: Id<"ideas">) => {
+    setSelectedIdeaId(ideaId);
+    if (conversationId) {
+      setSelectedConversationId(conversationId);
     } else {
-      (async () => {
-        try {
-          const convoId = await createConversation({ receiverId: actualUserId });
-          setSelectedConversationId(convoId);
-        } catch (error) {
-          console.error("Failed to create conversation:", error);
-          setSelectedReceiverId(null);
-        }
-      })();
+      setSelectedConversationId(null);
     }
-  }, [conversations, createConversation]);
-
-  const handleBackToUsers = useCallback(() => {
-    setSelectedConversationId(null);
   }, []);
 
-  const handleSelectConversation = useCallback((conversationId: Id<"conversations">) => {
-    setSelectedConversationId(conversationId);
+  const handleBackToGroups = useCallback(() => {
+    setSelectedConversationId(null);
+    setSelectedIdeaId(null);
   }, []);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
     setSelectedConversationId(null);
-    setSelectedReceiverId(null);
+    setSelectedIdeaId(null);
   }, [setIsOpen]);
 
   // Determine positioning class based on page
@@ -76,20 +60,17 @@ const ChatWidget: React.FC = () => {
     <div className={positionClass}>
       <Card className="w-80 h-96 shadow-lg bg-card border transition-all duration-300 ease-in-out overflow-hidden">
         <Suspense fallback={<div className="p-4 text-center">Loading...</div>}>
-          {selectedConversationId ? (
+          {selectedIdeaId || selectedConversationId ? (
               <ChatThread
                 conversationId={selectedConversationId}
-                onBack={handleBackToUsers}
+                onBack={handleBackToGroups}
                 onClose={handleClose}
-                receiverId={selectedReceiverId}
+                ideaId={selectedIdeaId}
               />
             ) : (
-            <UserList
-              onSelectUser={handleSelectUser}
-              onSelectConversation={handleSelectConversation}
-              conversations={conversations || []}
+            <GroupList
+              onSelectGroup={handleSelectGroup}
               onClose={handleClose}
-              currentUserId={user?.id as Id<"users"> || null}
             />
           )}
         </Suspense>
