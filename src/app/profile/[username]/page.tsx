@@ -2,7 +2,6 @@
 
 import React from "react"
 import { useParams } from "next/navigation"
-import { useUser } from "@clerk/nextjs"
 import { useQuery } from "convex/react"
 import { api } from "../../../../convex/_generated/api"
 import { CompactProfileView } from "@/components/user/CompactProfileView"
@@ -16,16 +15,15 @@ import type { UserProfile } from "../../../../convex/users"
 export default function ProfilePage() {
   const params = useParams()
   const username = params.username as string
-  const { user } = useUser()
-
   // Convex data
+  const currentUser = useQuery(api.users.getCurrentUser)
   const realProfile = useQuery(api.users.getUserProfile, { username })
   const myRequests = useQuery(api.contributionRequests.getMyRequests)
   const incomingRequests = useQuery(api.contributionRequests.getIncomingRequests)
   const publicIdeas = useQuery(api.ideas.getPublicIdeasForUser, realProfile ? { userId: realProfile._id } : "skip")
 
   // Check if this is current user's profile
-  const isCurrentUser = user?.username?.toLowerCase() === username?.toLowerCase()
+  const isCurrentUser = !!(currentUser && realProfile && currentUser._id === realProfile._id)
 
 
 
@@ -69,24 +67,23 @@ if (realProfile === null) {
   )
 }
 
-// At this point, realProfile is loaded and not null
-const profileData = { ...realProfile, skills: realProfile.skills || [], industries: realProfile.industries || [] } as UserProfile
+  // At this point, realProfile is loaded and not null
+  const profileData = { ...realProfile, skills: realProfile.skills || [], industries: realProfile.industries || [] } as UserProfile
 
-return (
-  <div className="min-h-screen flex flex-col bg-background">
-    <HeroHeader />
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <HeroHeader />
 
-    <main className="flex-1 container mx-auto px-4 py-12 pt-20">
-      <CompactProfileView 
-        profile={profileData} 
-        publicIdeas={publicIdeas || []} 
-        isOwner={isCurrentUser}
-        myRequests={myRequests}
-        incomingRequests={incomingRequests}
-      />
-    </main>
+      <main className="flex-1 container mx-auto px-4 py-12 pt-20">
+        <CompactProfileView 
+          profile={profileData} 
+          isOwner={isCurrentUser}
+          myRequests={myRequests}
+          incomingRequests={incomingRequests}
+        />
+      </main>
 
-    <FooterSection />
-  </div>
+      <FooterSection />
+    </div>
   )
 }

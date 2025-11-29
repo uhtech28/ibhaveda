@@ -1,65 +1,56 @@
 "use client";
 
-import React from "react"
+import React, { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Lightbulb, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle } from "lucide-react"
-import { useRouter } from "next/navigation";
 import { ProfileStatsDialog } from "./ProfileStatsDialog";
 import { Id } from "@convex/_generated/dataModel";
 import { RequestStatusCard, ContributionRequest } from "@/components/requests/request-status-card"
 import { useChat } from "@/components/chat/ChatContext";
 
 export interface UserProfile {
-  _id: string;
-  username: string;
+  _id: Id<"users">;
   displayName: string;
+  username: string;
   bio?: string;
   avatar?: string;
-  industry?: string;
-  skills?: string[];
+  coverImage?: string;
   location?: string;
   website?: string;
+  twitter?: string;
+  linkedin?: string;
+  github?: string;
+  skills?: string[];
+  industry?: string;
   ideasCreated?: number;
   ideasSparked?: number;
   ideasContributed?: number;
 }
 
-interface Idea {
-  _id: string;
-  title: string;
-  description: string;
-  visibility: string;
-  category?: string;
-  createdAt: number;
-  sparkCount?: number;
-  contributionCount?: number;
-}
-
 interface CompactProfileViewProps {
   profile: UserProfile;
-  publicIdeas?: Idea[];
+  isOwner: boolean;
   onInvite?: () => void;
-  isOwner?: boolean;
   myRequests?: ContributionRequest[];
   incomingRequests?: ContributionRequest[];
 }
 
-export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
-  profile,
-  publicIdeas: _publicIdeas,
+export const CompactProfileView: React.FC<CompactProfileViewProps> = ({ 
+  profile, 
+  isOwner, 
   onInvite,
-  isOwner,
   myRequests,
-  incomingRequests
+  incomingRequests 
 }) => {
   const router = useRouter();
   const { openChatWithUser } = useChat();
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [dialogType, setDialogType] = React.useState<"created" | "sparked" | "contributed">("created");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogType, setDialogType] = useState<"created" | "sparked" | "contributed">("created");
 
   const handleEditProfile = () => {
     router.push("/profile-setup");
@@ -70,8 +61,10 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
     setDialogOpen(true);
   };
 
-  const handleSendMessage = () => {
-    openChatWithUser(profile._id as Id<"users">);
+  const handleSendMessage = async () => {
+    if (profile._id) {
+      openChatWithUser(profile._id);
+    }
   };
 
   const metrics = {

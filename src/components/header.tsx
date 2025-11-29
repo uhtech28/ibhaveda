@@ -3,10 +3,9 @@
 import { User, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
-import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useClerk } from '@clerk/nextjs'
+import { SignedIn, SignedOut, SignInButton, SignUpButton, useClerk } from '@clerk/nextjs'
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -15,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useQuery } from "convex/react"
 import { api } from "../../convex/_generated/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { MobileBottomNav } from '@/components/mobile-bottom-nav'
 
 const menuItems = [
     { name: 'Feed', href: '/feed' },
@@ -29,7 +29,6 @@ export const HeroHeader = ({
     searchQuery?: string;
     onSearchChange?: (query: string) => void;
 }) => {
-    const [menuState, setMenuState] = React.useState(false)
     const [isScrolled, setIsScrolled] = React.useState(false)
     const { signOut } = useClerk()
     const currentUser = useQuery(api.users.getCurrentUser)
@@ -42,22 +41,14 @@ export const HeroHeader = ({
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
 
-    const handleMenuToggle = () => {
-        setMenuState(!menuState)
-    }
-
-    const closeMenu = () => {
-        setMenuState(false)
-    }
-
     return (
         <header className="relative">
             <nav className="fixed top-0 left-0 right-0 z-50 w-full">
                 <div className={cn(
                     'mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ease-in-out',
                     isScrolled
-                        ? 'mt-2 max-w-5xl bg-background/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-lg shadow-black/5'
-                        : 'mt-0 max-w-5xl bg-transparent'
+                        ? 'mt-0 lg:mt-2 max-w-5xl bg-background/80 backdrop-blur-xl border-b lg:border border-border/50 lg:rounded-2xl shadow-lg shadow-black/5'
+                        : 'mt-0 max-w-5xl bg-background/80 backdrop-blur-xl lg:bg-transparent border-b lg:border-none border-border/50'
                 )}>
                     <div className="flex items-center justify-between h-16 lg:h-18">
                         {/* Logo */}
@@ -65,8 +56,7 @@ export const HeroHeader = ({
                             <Link
                                 href="/"
                                 aria-label="Interactive Ideas Home"
-                                className="flex items-center focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
-                                onClick={closeMenu}>
+                                className="flex items-center focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg">
                                 <Logo />
                             </Link>
                         </div>
@@ -77,12 +67,10 @@ export const HeroHeader = ({
                             <div className="max-w-md w-full mr-8">
                                 <SearchBar
                                     value={searchQuery}
-                                    onSearch={(query, type) => {
-                                        console.log('Search query:', query, 'type:', type)
+                                    onSearch={(query) => {
                                         onSearchChange?.(query)
-                                        // TODO: Navigate to search results page
                                     }}
-                                    placeholder="Search for ideas, people, and more..."
+                                    placeholder="Search for ideas..."
                                     className="w-full"
                                 />
                             </div>
@@ -160,116 +148,38 @@ export const HeroHeader = ({
                             </SignedIn>
                         </div>
 
-                        <button
-                            onClick={handleMenuToggle}
-                            aria-label={menuState ? 'Close menu' : 'Open menu'}
-                            aria-expanded={menuState}
-                            className="lg:hidden relative z-20 p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md">
-                            <span className="sr-only">
-                                {menuState ? 'Close menu' : 'Open menu'}
-                            </span>
-                            <Menu
-                                className={cn(
-                                    "w-6 h-6 transition-all duration-200",
-                                    menuState && "rotate-180 scale-0 opacity-0"
-                                )}
-                            />
-                            <X
-                                className={cn(
-                                    "w-6 h-6 absolute inset-0 m-auto transition-all duration-200",
-                                    menuState ? "rotate-0 scale-100 opacity-100" : "-rotate-180 scale-0 opacity-0"
-                                )}
-                            />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Mobile Menu Overlay */}
-                <div className={cn(
-                    "lg:hidden fixed inset-0 z-10 transition-all duration-300 ease-in-out",
-                    menuState ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
-                )}>
-                    {/* Backdrop */}
-                    <div
-                        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-                        onClick={closeMenu}
-                    />
-
-                    {/* Mobile Menu Content */}
-                    <div className={cn(
-                        "absolute top-20 left-4 right-4 bg-background border border-border rounded-2xl shadow-xl transition-all duration-300 ease-in-out",
-                        menuState ? "translate-y-0 scale-100" : "-translate-y-4 scale-95"
-                    )}>
-                        <div className="p-6 space-y-6">
-                            {/* Mobile Search */}
-                            <div className="space-y-2">
+                        {/* Mobile Actions (Top Bar) */}
+                        <div className="flex lg:hidden items-center gap-2">
+                             {/* Mobile Search - Compact */}
+                             <div className="w-32 sm:w-48">
                                 <SearchBar
                                     value={searchQuery}
                                     onSearch={(query, type) => {
-                                        console.log('Mobile search query:', query, 'type:', type)
                                         onSearchChange?.(query)
-                                        closeMenu()
                                     }}
-                                    placeholder="Search for ideas, people, and more..."
-                                    className="w-full"
+                                    placeholder="Search..."
+                                    className="w-full h-9 text-xs"
                                 />
                             </div>
-
-                            {/* Mobile Navigation */}
-                            <nav className="space-y-1">
-                                {menuItems.map((item) => (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        onClick={closeMenu}
-                                        className="flex items-center px-3 py-3 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-all duration-200">
-                                        {item.name}
-                                    </Link>
-                                ))}
-                            </nav>
-
-                            {/* Mobile Actions */}
-                            <div className="pt-4 border-t border-border space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <SignedOut>
-                                        <div className="flex gap-3 flex-1">
-                                            <SignInButton>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="flex-1">
-                                                    Login
-                                                </Button>
-                                            </SignInButton>
-                                            <SignUpButton>
-                                                <Button
-                                                    size="sm"
-                                                    className="flex-1">
-                                                    Sign Up
-                                                </Button>
-                                            </SignUpButton>
-                                        </div>
-                                    </SignedOut>
-                                    <SignedIn>
-                                        <div className="flex items-center gap-3">
-                                            <NotificationBell />
-                                            <UserButton
-                                                afterSignOutUrl="/"
-                                                appearance={{
-                                                    elements: {
-                                                        avatarBox: "w-8 h-8"
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                    </SignedIn>
-                                    <ThemeToggle />
-                                </div>
-                            </div>
+                            
+                            <SignedIn>
+                                <NotificationBell />
+                            </SignedIn>
+                            <ThemeToggle />
+                            <SignedOut>
+                                <SignInButton>
+                                    <Button size="sm" variant="ghost" className="px-2">
+                                        Login
+                                    </Button>
+                                </SignInButton>
+                            </SignedOut>
                         </div>
                     </div>
                 </div>
             </nav>
+            
+            {/* Mobile Bottom Navigation */}
+            <MobileBottomNav />
         </header>
     )
 }

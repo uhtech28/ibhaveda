@@ -2,15 +2,15 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { UserProfile } from "./CompactProfileView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Edit2, MapPin, Link2, Lightbulb, Sparkles, Users, ChevronRight } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ContributionRequest, RequestStatusCard } from "@/components/requests/request-status-card";
-import { useRouter } from "next/navigation";
+import { Edit2, MapPin, Link2, Lightbulb, Sparkles, Users, ChevronRight } from "lucide-react";
+import { RequestStatusCard, ContributionRequest } from "@/components/requests/request-status-card";
 
 interface DetailedProfileViewProps {
   profile: UserProfile;
@@ -50,10 +50,10 @@ interface DetailedProfileViewProps {
 
 export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
   profile,
-  isEditing: _isEditing,
-  setIsEditing: _setIsEditing,
-  formData: _formData,
-  setFormData: _setFormData,
+  isEditing,
+  setIsEditing,
+  formData,
+  setFormData,
   myRequests,
   incomingRequests
 }) => {
