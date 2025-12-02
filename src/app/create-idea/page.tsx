@@ -17,6 +17,7 @@ import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
 import { useToast } from "@/components/ui/use-toast";
+import CardUpload from "@/components/card-upload";
 
 export default function CreateIdeaPage() {
   const { isLoaded, userId } = useAuth();
@@ -37,6 +38,8 @@ export default function CreateIdeaPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadError, setUploadError] = useState("");
 
   // Character counts
   const titleCount = formData.title.length;
@@ -45,6 +48,8 @@ export default function CreateIdeaPage() {
 
   // Initialize Convex mutation
   const createIdea = useMutation(api.ideas.createIdea);
+  const generateUploadUrl = useMutation(api.ideas.generateUploadUrl);
+  const attachFileToIdea = useMutation(api.ideas.attachFileToIdea);
 
   // Validation function
   const validate = () => {
@@ -93,14 +98,90 @@ export default function CreateIdeaPage() {
     setIsSubmitting(true);
 
     try {
-      // Create idea via Convex mutation
-      await createIdea({
+      const fileCount = selectedFiles.length;
+      if (fileCount > 1) {
+        setErrors({ attachments: "Maximum 1 file allowed" });
+        setIsSubmitting(false);
+        return;
+      }
+      if (fileCount === 1) {
+        const f = selectedFiles[0];
+        const type = (f.type || "").toLowerCase();
+        const allowed = [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/gif",
+          "video/mp4",
+        ];
+        if (!allowed.includes(type)) {
+          setErrors({ attachments: "Unsupported file type" });
+          setIsSubmitting(false);
+          return;
+        }
+        if (f.size > 50 * 1024 * 1024) {
+          setErrors({ attachments: "Total size limit exceeded (50MB)" });
+          setIsSubmitting(false);
+          return;
+        }
+        if (type === "video/mp4" && f.size > 25 * 1024 * 1024) {
+          setErrors({ attachments: "MP4 files must be 25MB or less" });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      const res = await createIdea({
         title: formData.title.trim(),
         description: formData.description.trim(),
-        category: formData.skills.join(', '), // Send skills as comma-separated string
-        industries: formData.industries.join(', '), // Send industries as comma-separated string
+        category: formData.skills.join(', '),
+        industries: formData.industries.join(', '),
         visibility: formData.visibility,
       });
+      const createdIdeaId = res.ideaId;
+
+      if (selectedFiles.length === 1) {
+        setUploadError("");
+        const file = selectedFiles[0];
+        const withRetry = async <T,>(fn: () => Promise<T>, retries = 2, delayMs = 600): Promise<T> => {
+          try {
+            return await fn();
+          } catch (err) {
+            if (retries <= 0) throw err;
+            await new Promise((r) => setTimeout(r, delayMs));
+            return withRetry(fn, retries - 1, delayMs * 1.5);
+          }
+        };
+
+        try {
+          const { uploadUrl } = await withRetry(() => generateUploadUrl({}));
+          const uploadResp = await withRetry(() => fetch(uploadUrl, { method: "POST", body: file }));
+          if (!uploadResp.ok) {
+            throw new Error("Network upload failed");
+          }
+          const json = await uploadResp.json().catch(() => ({ storageId: undefined }));
+          const storageId = json?.storageId as string | undefined;
+          if (!storageId) {
+            throw new Error("Upload did not return storageId");
+          }
+
+          await withRetry(() => attachFileToIdea({
+            ideaId: createdIdeaId,
+            storageId,
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            uploadedAt: Date.now(),
+          }));
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Upload failed";
+          setUploadError(msg);
+        }
+      }
 
       // Success - redirect to suggestions page with skills and industries
       const params = new URLSearchParams();
@@ -210,6 +291,27 @@ export default function CreateIdeaPage() {
                     )}
                     <span className="text-muted-foreground">{descriptionCount}/1200</span>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Attachment</Label>
+                  <CardUpload
+                    maxFiles={1}
+                    maxSize={50 * 1024 * 1024}
+                    accept={"application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"}
+                    multiple={false}
+                    onChange={(files) => setSelectedFiles(files)}
+                  />
+                  {errors.attachments && (
+                    <p className="text-xs text-destructive">{errors.attachments}</p>
+                  )}
+                  {uploadError && (
+                    <div className="flex items-center space-x-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+                      <AlertCircle className="w-3 h-3 text-destructive" />
+                      <p className="text-xs text-destructive">{uploadError}</p>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">Supported: PDF, DOCX, PPTX, XLSX, JPG, PNG, GIF, MP4 (≤25MB)</p>
                 </div>
 
                 {/* Skills & Industries Grid */}

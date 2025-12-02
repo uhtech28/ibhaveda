@@ -138,6 +138,104 @@ export const createIdea = mutation({
   },
 });
 
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    const uploadUrl = await ctx.storage.generateUploadUrl();
+    return { uploadUrl };
+  },
+});
+
+export const attachFileToIdea = mutation({
+  args: {
+    ideaId: v.id("ideas"),
+    storageId: v.string(),
+    name: v.string(),
+    type: v.string(),
+    size: v.number(),
+    uploadedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const idea = await ctx.db.get(args.ideaId);
+    if (!idea) {
+      throw new Error("Idea not found");
+    }
+
+    if (idea.authorId !== user._id) {
+      throw new Error("Not authorized to attach files to this idea");
+    }
+
+    const existing = Array.isArray(idea.attachments) ? idea.attachments : [];
+    if (existing.length >= 1) {
+      throw new Error("Maximum 1 file per idea");
+    }
+
+    if (args.size > 50 * 1024 * 1024) {
+      throw new Error("Total size limit exceeded (50MB)");
+    }
+
+    const lowerType = (args.type || "").toLowerCase();
+    const allowed = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "video/mp4",
+    ];
+
+    const isAllowed = allowed.some((t) => lowerType === t);
+    if (!isAllowed) {
+      throw new Error("Unsupported file type");
+    }
+
+    if (lowerType === "video/mp4" && args.size > 25 * 1024 * 1024) {
+      throw new Error("MP4 files must be 25MB or less");
+    }
+
+    const url = await ctx.storage.getUrl(args.storageId);
+    if (!url) {
+      throw new Error("Convex storage error");
+    }
+
+    const attachment = {
+      name: args.name,
+      type: lowerType,
+      size: args.size,
+      url,
+      fileId: args.storageId,
+    };
+
+    await ctx.db.patch(idea._id, {
+      attachments: [...existing, attachment],
+      updatedAt: Date.now(),
+    });
+
+    return { attachment };
+  },
+});
+
 // Get all root public ideas (for feed) - excludes sub-ideas with limit-based pagination
 export const getPublicIdeas = query({
   args: { limit: v.optional(v.number()) },

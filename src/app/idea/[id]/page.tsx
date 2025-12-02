@@ -53,6 +53,11 @@ import {
   KanbanCard,
 } from "@/components/ui/kibo-ui/kanban";
 import { CalendarProvider, CalendarDate, CalendarMonthPicker, CalendarYearPicker, CalendarDatePagination, CalendarHeader, CalendarBody, CalendarItem } from '@/components/ui/kibo-ui/calendar';
+import CardUpload from "@/components/card-upload";
+import PdfViewer from "@/components/PdfViewer";
+import ExcelViewer from "@/components/ExcelViewer";
+import WordViewer from "@/components/WordViewer";
+import PowerPointViewer from "@/components/PowerPointViewer";
 import { IdeaSideNav } from "@/components/IdeaSideNav";
 import { IdeaBottomBar } from "@/components/IdeaBottomBar";
 import { CreateSubIdeaDialog } from "@/components/ideas/CreateSubIdeaDialog";
@@ -77,6 +82,7 @@ type ConvexIdea = {
   } | null;
   hasSparked?: boolean;
   isAuthor?: boolean;
+  attachments?: { name: string; type: string; size: number; url: string; fileId: string }[];
 };
 
 
@@ -188,7 +194,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
 
       <main className="flex-1 w-full py-12 pt-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          
+
           {/* Right Sidebar - Desktop (xl+) */}
           <div className="absolute top-0 -right-24 h-full hidden xl:block z-50">
             <div className="sticky top-32">
@@ -236,93 +242,93 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           ) : (
             <>
-            <div className="pb-8">
-              <IdeaContent 
-                idea={ideaQuery as ConvexIdea} 
-                onTagClick={setSearchQuery}
-                onOpenComments={() => setShowComments(true)}
-                onOpenRequests={() => setShowRequests(true)}
-                requestCount={userRequestsQuery?.filter(r => r.ideaId === ideaQuery._id && r.status === 'pending').length || 0}
+              <div className="pb-8">
+                <IdeaContent
+                  idea={ideaQuery as ConvexIdea}
+                  onTagClick={setSearchQuery}
+                  onOpenComments={() => setShowComments(true)}
+                  onOpenRequests={() => setShowRequests(true)}
+                  requestCount={userRequestsQuery?.filter(r => r.ideaId === ideaQuery._id && r.status === 'pending').length || 0}
+                />
+              </div>
+
+              {/* Modals for Sections */}
+              <Dialog open={showHierarchy} onOpenChange={setShowHierarchy}>
+                <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto w-full">
+                  <DialogHeader>
+                    <DialogTitle>Idea Hierarchy</DialogTitle>
+                  </DialogHeader>
+                  <HierarchicalIdeasSection
+                    idea={ideaQuery as ConvexIdea}
+                    ideaTree={ideaTreeQuery}
+                    userRequests={userRequestsQuery || []}
+                    addSubIdeaMutation={addSubIdeaMutation}
+                  />
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showRequests} onOpenChange={setShowRequests}>
+                <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
+                  <DialogHeader>
+                    <DialogTitle>Contribution Requests</DialogTitle>
+                  </DialogHeader>
+                  <ContributionDashboard
+                    ideaId={ideaQuery._id as Id<"ideas">}
+                    ideaTitle={(ideaQuery as ConvexIdea).title}
+                    authorId={(ideaQuery as ConvexIdea).authorId}
+                    authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
+                    isAuthor={(ideaQuery as ConvexIdea).isAuthor || false}
+                    onClose={() => setShowRequests(false)}
+                  />
+                  <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: (ideaQuery as ConvexIdea).isAuthor || false }} />
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showTodos} onOpenChange={setShowTodos}>
+                <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden flex flex-col bg-background/95 backdrop-blur-xl">
+                  <DialogHeader className="p-6 pb-2 shrink-0 border-b">
+                    <DialogTitle className="text-xl">Project Management</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <TodoSection
+                      idea={ideaQuery as ConvexIdea}
+                      todos={todosQuery || []}
+                      createTodoMutation={createTodoMutation}
+                      updateTodoMutation={updateTodoMutation}
+                      updateTodoStatusMutation={updateTodoStatusMutation}
+                      deleteTodoMutation={deleteTodoMutation}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showCalendar} onOpenChange={setShowCalendar}>
+                <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto w-full">
+                  <DialogHeader>
+                    <DialogTitle>Calendar</DialogTitle>
+                  </DialogHeader>
+                  <CalendarSection idea={ideaQuery as ConvexIdea} />
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showComments} onOpenChange={setShowComments}>
+                <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
+                  <DialogHeader>
+                    <DialogTitle>Comments</DialogTitle>
+                  </DialogHeader>
+                  <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
+                </DialogContent>
+              </Dialog>
+
+              <CreateSubIdeaDialog
+                isOpen={showCreateSubIdea}
+                onOpenChange={setShowCreateSubIdea}
+                parentId={ideaQuery._id as Id<"ideas">}
+                addSubIdeaMutation={addSubIdeaMutation}
               />
-            </div>
+            </>
 
-            {/* Modals for Sections */}
-            <Dialog open={showHierarchy} onOpenChange={setShowHierarchy}>
-              <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto w-full">
-                <DialogHeader>
-                  <DialogTitle>Idea Hierarchy</DialogTitle>
-                </DialogHeader>
-                <HierarchicalIdeasSection
-                  idea={ideaQuery as ConvexIdea}
-                  ideaTree={ideaTreeQuery}
-                  userRequests={userRequestsQuery || []}
-                  addSubIdeaMutation={addSubIdeaMutation}
-                />
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showRequests} onOpenChange={setShowRequests}>
-              <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
-                <DialogHeader>
-                  <DialogTitle>Contribution Requests</DialogTitle>
-                </DialogHeader>
-                <ContributionDashboard 
-                  ideaId={ideaQuery._id as Id<"ideas">}
-                  ideaTitle={(ideaQuery as ConvexIdea).title}
-                  authorId={(ideaQuery as ConvexIdea).authorId}
-                  authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
-                  isAuthor={(ideaQuery as ConvexIdea).isAuthor || false}
-                  onClose={() => setShowRequests(false)}
-                />
-                <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: (ideaQuery as ConvexIdea).isAuthor || false }} />
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showTodos} onOpenChange={setShowTodos}>
-              <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden flex flex-col bg-background/95 backdrop-blur-xl">
-                <DialogHeader className="p-6 pb-2 shrink-0 border-b">
-                  <DialogTitle className="text-xl">Project Management</DialogTitle>
-                </DialogHeader>
-                <div className="flex-1 min-h-0 overflow-hidden">
-                <TodoSection
-                  idea={ideaQuery as ConvexIdea}
-                  todos={todosQuery || []}
-                  createTodoMutation={createTodoMutation}
-                  updateTodoMutation={updateTodoMutation}
-                  updateTodoStatusMutation={updateTodoStatusMutation}
-                  deleteTodoMutation={deleteTodoMutation}
-                />
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showCalendar} onOpenChange={setShowCalendar}>
-              <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto w-full">
-                <DialogHeader>
-                  <DialogTitle>Calendar</DialogTitle>
-                </DialogHeader>
-                <CalendarSection idea={ideaQuery as ConvexIdea} />
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showComments} onOpenChange={setShowComments}>
-              <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
-                <DialogHeader>
-                  <DialogTitle>Comments</DialogTitle>
-                </DialogHeader>
-                <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
-              </DialogContent>
-            </Dialog>
-
-            <CreateSubIdeaDialog 
-              isOpen={showCreateSubIdea}
-              onOpenChange={setShowCreateSubIdea}
-              parentId={ideaQuery._id as Id<"ideas">}
-              addSubIdeaMutation={addSubIdeaMutation}
-            />
-          </>
-
-        )}
+          )}
         </div>
       </main>
 
@@ -336,235 +342,324 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
 
 
 
-const IdeaContent: React.FC<{ 
-  idea: ConvexIdea; 
+const IdeaContent: React.FC<{
+  idea: ConvexIdea;
   onTagClick?: (tag: string) => void;
   onOpenComments: () => void;
   onOpenRequests: () => void;
   requestCount: number;
 }> = ({ idea, onTagClick, onOpenComments, onOpenRequests, requestCount }) => {
-    const router = useRouter();
-    const updateIdeaMutation = useMutation(api.ideas.updateIdea);
-    const deleteIdeaMutation = useMutation(api.ideas.deleteIdea);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editedTitle, setEditedTitle] = useState(idea.title);
-    const [editedDescription, setEditedDescription] = useState(idea.description);
-    const [editedCategory, setEditedCategory] = useState(idea.category);
-    const [editedVisibility, setEditedVisibility] = useState(idea.visibility);
-    const [updating, setUpdating] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
+  const updateIdeaMutation = useMutation(api.ideas.updateIdea);
+  const deleteIdeaMutation = useMutation(api.ideas.deleteIdea);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(idea.title);
+  const [editedDescription, setEditedDescription] = useState(idea.description);
+  const [editedCategory, setEditedCategory] = useState(idea.category);
+  const [editedVisibility, setEditedVisibility] = useState(idea.visibility);
+  const [updating, setUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
-    const getInitials = (name: string) => {
-      return name.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2);
-    };
-  
-    // Parse categories (skills) and industries
-    const skills = idea.category ? idea.category.split(',').map(s => s.trim()) : [];
-    const industries = idea.industries ? idea.industries.split(',').map(i => i.trim()) : [];
+  const getInitials = (name: string) => {
+    return name.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2);
+  };
 
-    const handleEdit = () => {
-      setEditedTitle(idea.title);
-      setEditedDescription(idea.description);
-      setEditedCategory(idea.category);
-      setEditedVisibility(idea.visibility);
-      setIsEditing(true);
-      setErrorMsg("");
-    };
+  // Parse categories (skills) and industries
+  const skills = idea.category ? idea.category.split(',').map(s => s.trim()) : [];
+  const industries = idea.industries ? idea.industries.split(',').map(i => i.trim()) : [];
 
-    const handleSave = async () => {
-      if (!editedTitle.trim() || !editedDescription.trim()) return;
-      setUpdating(true);
-      setErrorMsg("");
-      try {
-        await updateIdeaMutation({
-          ideaId: idea._id as Id<"ideas">,
-          title: editedTitle.trim(),
-          description: editedDescription.trim(),
-          category: editedCategory,
-          visibility: editedVisibility
-        });
-        setIsEditing(false);
-      } catch (err) {
-        setErrorMsg("Failed to update idea. Please try again.");
-        console.error(err);
-      } finally {
-        setUpdating(false);
-      }
-    };
+  const handleEdit = () => {
+    setEditedTitle(idea.title);
+    setEditedDescription(idea.description);
+    setEditedCategory(idea.category);
+    setEditedVisibility(idea.visibility);
+    setIsEditing(true);
+    setErrorMsg("");
+  };
 
-    const handleDelete = async () => {
-      if (!window.confirm("Are you sure you want to delete this idea? This action cannot be undone.")) return;
-      setIsDeleting(true);
-      setErrorMsg("");
-      try {
-        await deleteIdeaMutation({ ideaId: idea._id as Id<"ideas"> });
-        // Redirect after successful deletion
-        router.push('/feed');
-      } catch (err) {
-        setErrorMsg("Failed to delete idea. Please try again.");
-        console.error(err);
-      } finally {
-        setIsDeleting(false);
-      }
-    };
-
-    const handleCancel = () => {
+  const handleSave = async () => {
+    if (!editedTitle.trim() || !editedDescription.trim()) return;
+    setUpdating(true);
+    setErrorMsg("");
+    try {
+      await updateIdeaMutation({
+        ideaId: idea._id as Id<"ideas">,
+        title: editedTitle.trim(),
+        description: editedDescription.trim(),
+        category: editedCategory,
+        visibility: editedVisibility
+      });
       setIsEditing(false);
-      setErrorMsg("");
-    };
+    } catch (err) {
+      setErrorMsg("Failed to update idea. Please try again.");
+      console.error(err);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
-    return (
-      <div className="group relative overflow-hidden rounded-3xl border border-border/50 bg-card text-card-foreground transition-all duration-300 flex flex-col shadow-xl">
-        {/* Header Section */}
-        <div className="relative h-64 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5 overflow-hidden shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 flex items-center justify-center">
-            <div className="w-32 h-32 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-6xl font-bold text-foreground/80 shadow-2xl ring-1 ring-white/30">
-              {idea.title.charAt(0).toUpperCase()}
-            </div>
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this idea? This action cannot be undone.")) return;
+    setIsDeleting(true);
+    setErrorMsg("");
+    try {
+      await deleteIdeaMutation({ ideaId: idea._id as Id<"ideas"> });
+      // Redirect after successful deletion
+      router.push('/feed');
+    } catch (err) {
+      setErrorMsg("Failed to delete idea. Please try again.");
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setErrorMsg("");
+  };
+
+  return (
+    <div className="group relative overflow-hidden rounded-3xl border border-border/50 bg-card text-card-foreground transition-all duration-300 flex flex-col shadow-xl">
+      {/* Header Section */}
+      <div className="relative h-64 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5 overflow-hidden shrink-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 flex items-center justify-center">
+          <div className="w-32 h-32 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-6xl font-bold text-foreground/80 shadow-2xl ring-1 ring-white/30">
+            {idea.title.charAt(0).toUpperCase()}
           </div>
+        </div>
 
-          {/* Title (Top Left) */}
-          <div className="absolute top-6 left-6 max-w-[60%] z-10">
-             {isEditing ? (
-                <Input
-                    value={editedTitle}
-                    onChange={(e) => setEditedTitle(e.target.value)}
-                    className="text-2xl font-bold bg-background/80 backdrop-blur-md border-white/20 h-auto py-2"
-                    placeholder="Idea Title"
-                />
-             ) : (
-                <h1 className="text-2xl font-bold leading-tight text-foreground/90 bg-background/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-sm text-left">
-                    {idea.title}
-                </h1>
-             )}
-          </div>
-
-          {/* Author (Top Right) */}
-          <div className="absolute top-6 right-6 flex items-center gap-3 bg-background/30 backdrop-blur-md px-3 py-2 rounded-full border border-white/10 shadow-sm z-10">
-             {idea.author?.avatar ? (
-                <Image
-                  src={idea.author.avatar}
-                  alt={idea.author?.name || idea.author?.username || 'User'}
-                  className="w-8 h-8 rounded-full object-cover border border-white/20 shrink-0"
-                  width={32}
-                  height={32}
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary border border-white/20 shrink-0">
-                  {getInitials(idea.author?.name || idea.author?.username || 'U')}
-                </div>
-              )}
-             <div className="flex flex-col min-w-0 pr-2">
-                <span className="text-xs font-semibold text-foreground/90 leading-none truncate">
-                  {idea.author?.name || idea.author?.username || 'Unknown'}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  {formatDistanceToNow(idea.createdAt, { addSuffix: true })}
-                </span>
-             </div>
-          </div>
-
-          {/* Edit Actions (Bottom Right of Header) */}
-          {(idea.isAuthor || false) && !isEditing && (
-            <div className="absolute bottom-4 right-4 flex gap-2 z-10">
-               <Button
-                 variant="secondary"
-                 size="sm"
-                 onClick={handleEdit}
-                 className="bg-background/50 backdrop-blur-md hover:bg-background/80 border border-white/10"
-               >
-                 <Pencil className="w-4 h-4 mr-2" />
-                 Edit
-               </Button>
-               <Button
-                 variant="destructive"
-                 size="sm"
-                 onClick={handleDelete}
-                 disabled={isDeleting}
-                 className="bg-red-500/80 backdrop-blur-md hover:bg-red-600/90 border border-white/10"
-               >
-                 {isDeleting ? <Spinner size={16} className="mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                 Delete
-               </Button>
-            </div>
+        {/* Title (Top Left) */}
+        <div className="absolute top-6 left-6 max-w-[60%] z-10">
+          {isEditing ? (
+            <Input
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              className="text-2xl font-bold bg-background/80 backdrop-blur-md border-white/20 h-auto py-2"
+              placeholder="Idea Title"
+            />
+          ) : (
+            <h1 className="text-2xl font-bold leading-tight text-foreground/90 bg-background/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-sm text-left">
+              {idea.title}
+            </h1>
           )}
         </div>
 
-        {/* Body */}
-        <div className="p-8 flex flex-col gap-8">
-            {/* Description */}
-            <div className="prose prose-lg max-w-none text-muted-foreground leading-relaxed">
-                {isEditing ? (
-                    <Textarea
-                        value={editedDescription}
-                        onChange={(e) => setEditedDescription(e.target.value)}
-                        className="min-h-[200px] resize-y"
-                        placeholder="Describe your idea..."
-                    />
-                ) : (
-                    <p className="whitespace-pre-wrap">{idea.description}</p>
-                )}
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-col gap-4 pt-6 border-t border-border/50">
-                <div className="flex flex-wrap gap-2">
-                   {/* Industries */}
-                   {industries.map((tag, i) => (
-                    <button 
-                      key={`ind-${i}`} 
-                      onClick={() => onTagClick?.(tag)}
-                      className="text-xs font-medium px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                  
-                  {/* Skills */}
-                  {skills.map((tag, i) => (
-                    <button 
-                      key={`skill-${i}`} 
-                      onClick={() => onTagClick?.(tag)}
-                      className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-            </div>
-
-            {/* Edit Mode Actions */}
-            {isEditing && (
-                <div className="flex items-center gap-4 pt-4 border-t border-border/50">
-                    <Button onClick={handleSave} disabled={updating}>
-                        {updating ? <div className="mr-2"><Spinner size={16} /></div> : <Check className="w-4 h-4 mr-2" />}
-                        Save Changes
-                    </Button>
-                    <Button variant="outline" onClick={handleCancel} disabled={updating}>
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                    </Button>
-                    {errorMsg && <p className="text-destructive text-sm">{errorMsg}</p>}
-                </div>
-            )}
-            {/* Action Bar (Attached Footer) */}
-            <IdeaBottomBar
-              ideaId={idea._id}
-              initialSparkCount={idea.sparkCount}
-              initialHasSparked={idea.hasSparked || false}
-              commentCount={idea.commentCount}
-              onOpenComments={onOpenComments}
-              onOpenRequests={onOpenRequests}
-              isAuthor={idea.isAuthor || false}
-              requestCount={requestCount}
-              variant="inline"
+        {/* Author (Top Right) */}
+        <div className="absolute top-6 right-6 flex items-center gap-3 bg-background/30 backdrop-blur-md px-3 py-2 rounded-full border border-white/10 shadow-sm z-10">
+          {idea.author?.avatar ? (
+            <Image
+              src={idea.author.avatar}
+              alt={idea.author?.name || idea.author?.username || 'User'}
+              className="w-8 h-8 rounded-full object-cover border border-white/20 shrink-0"
+              width={32}
+              height={32}
             />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary border border-white/20 shrink-0">
+              {getInitials(idea.author?.name || idea.author?.username || 'U')}
+            </div>
+          )}
+          <div className="flex flex-col min-w-0 pr-2">
+            <span className="text-xs font-semibold text-foreground/90 leading-none truncate">
+              {idea.author?.name || idea.author?.username || 'Unknown'}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              {formatDistanceToNow(idea.createdAt, { addSuffix: true })}
+            </span>
+          </div>
         </div>
+
+        {/* Edit Actions (Bottom Right of Header) */}
+        {(idea.isAuthor || false) && !isEditing && (
+          <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleEdit}
+              className="bg-background/50 backdrop-blur-md hover:bg-background/80 border border-white/10"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-500/80 backdrop-blur-md hover:bg-red-600/90 border border-white/10"
+            >
+              {isDeleting ? <Spinner size={16} className="mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
-    ); 
+
+      {/* Body */}
+      <div className="p-8 flex flex-col gap-8">
+        {/* Description */}
+        <div className="prose prose-lg max-w-none text-muted-foreground leading-relaxed">
+          {isEditing ? (
+            <Textarea
+              value={editedDescription}
+              onChange={(e) => setEditedDescription(e.target.value)}
+              className="min-h-[200px] resize-y"
+              placeholder="Describe your idea..."
+            />
+          ) : (
+            <p className="whitespace-pre-wrap">{idea.description}</p>
+          )}
+        </div>
+
+
+
+        {/* Tags */}
+        <div className="flex flex-col gap-4 pt-6 border-t border-border/50">
+          <div className="flex flex-wrap gap-2">
+            {/* Industries */}
+            {industries.map((tag, i) => (
+              <button
+                key={`ind-${i}`}
+                onClick={() => onTagClick?.(tag)}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
+              >
+                {tag}
+              </button>
+            ))}
+
+            {/* Skills */}
+            {skills.map((tag, i) => (
+              <button
+                key={`skill-${i}`}
+                onClick={() => onTagClick?.(tag)}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Attachments Preview */}
+        {Array.isArray(idea.attachments) && idea.attachments.length > 0 && (
+          <div className="flex flex-col gap-4 pt-6 border-t border-border/50">
+            <h3 className="text-lg font-semibold">Preview</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-1 gap-6">
+              {idea.attachments.map((att, idx) => {
+                const mime = (att.type || "").toLowerCase();
+                const key = att.fileId || `${att.name}-${idx}`;
+                if (mime.startsWith("image/")) {
+                  return (
+                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
+                      <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+                        <span>{att.name}</span>
+                        <a href={att.url} target="_blank" rel="noreferrer" className="underline">Open</a>
+                      </div>
+                      <div className="w-full h-[70vh] rounded-md border overflow-hidden relative">
+                        <Image src={att.url} alt={att.name} fill className="object-contain" />
+                      </div>
+                    </div>
+                  );
+                }
+                if (mime.startsWith("video/") || mime.includes("mp4")) {
+                  return (
+                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
+                      <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+                        <span>{att.name}</span>
+                        <a href={att.url} target="_blank" rel="noreferrer" className="underline">Open</a>
+                      </div>
+                      <div className="w-full h-[70vh] rounded-md border overflow-hidden">
+                        <video
+                          src={att.url}
+                          className="w-full h-full"
+                          controls
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                if (mime.includes("pdf")) {
+                  return (
+                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
+                      <PdfViewer url={att.url} fileName={att.name} />
+                    </div>
+                  );
+                }
+                if (mime.includes("word") || mime.includes("msword") || mime.includes("officedocument.wordprocessingml.document")) {
+                  return (
+                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
+                      <WordViewer url={att.url} fileName={att.name} />
+                    </div>
+                  );
+                }
+                if (mime.includes("excel") || mime.includes("spreadsheetml") || mime.includes("ms-excel") || mime.includes("officedocument.spreadsheetml.sheet")) {
+                  return (
+                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
+                      <ExcelViewer url={att.url} fileName={att.name} />
+                    </div>
+                  );
+                }
+                if (mime.includes("powerpoint") || mime.includes("presentationml") || mime.includes("ms-powerpoint") || mime.includes("officedocument.presentationml.presentation")) {
+                  return (
+                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
+                      <PowerPointViewer url={att.url} fileName={att.name} />
+                    </div>
+                  );
+                }
+                return (
+                  <div key={key} className="rounded-xl border bg-muted/30 p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+                      <span>{att.name}</span>
+                      <a href={att.url} target="_blank" rel="noreferrer" className="underline">Open</a>
+                    </div>
+                    <div className="text-sm text-muted-foreground">Preview not available for this file type.</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Edit Mode Actions */}
+        {isEditing && (
+          <div className="flex items-center gap-4 pt-4 border-t border-border/50">
+            <Button onClick={handleSave} disabled={updating}>
+              {updating ? <div className="mr-2"><Spinner size={16} /></div> : <Check className="w-4 h-4 mr-2" />}
+              Save Changes
+            </Button>
+            <Button variant="outline" onClick={handleCancel} disabled={updating}>
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            {errorMsg && <p className="text-destructive text-sm">{errorMsg}</p>}
+          </div>
+        )}
+        {/* Action Bar (Attached Footer) */}
+        <IdeaBottomBar
+          ideaId={idea._id}
+          initialSparkCount={idea.sparkCount}
+          initialHasSparked={idea.hasSparked || false}
+          commentCount={idea.commentCount}
+          onOpenComments={onOpenComments}
+          onOpenRequests={onOpenRequests}
+          isAuthor={idea.isAuthor || false}
+          requestCount={requestCount}
+          variant="inline"
+        />
+      </div>
+    </div>
+  );
 };
+
+
 
 const TodoSection: React.FC<{
   idea: ConvexIdea;
@@ -612,7 +707,7 @@ const TodoSection: React.FC<{
   // Get all contributors (author + accepted contributors)
   const allUsers = useQuery(api.users.getAllUsers) || [];
   const acceptedRequests = useQuery(api.contributionRequests.getAcceptedContributors, { ideaId: idea._id as Id<"ideas"> }) || [];
-  
+
   const contributors = allUsers.filter(u => {
     // Include author
     if (u._id === idea.authorId) return true;
@@ -781,14 +876,14 @@ const TodoSection: React.FC<{
             >
               {(column) => (
                 <KanbanBoard id={column.id} className="h-full bg-transparent border-none shadow-none">
-                  <KanbanHeader 
+                  <KanbanHeader
                     color={column.id === 'todo' ? 'blue' : column.id === 'in_progress' ? 'orange' : 'green'}
                     count={groupedTodos[column.id as keyof typeof groupedTodos]?.length || 0}
                   >
                     {column.name}
                   </KanbanHeader>
-                  <KanbanCards 
-                    id={column.id} 
+                  <KanbanCards
+                    id={column.id}
                     className="bg-secondary/5 h-full"
                     onAdd={() => document.getElementById('new-todo-input')?.focus()}
                   >
@@ -841,9 +936,8 @@ const TodoSection: React.FC<{
                             </div>
                           ) : (
                             <div className="flex items-center justify-between gap-2">
-                              <span className={`flex-1 text-sm ${
-                                column.id === "done" ? "line-through text-muted-foreground" : ""
-                              }`}>
+                              <span className={`flex-1 text-sm ${column.id === "done" ? "line-through text-muted-foreground" : ""
+                                }`}>
                                 {item.name}
                               </span>
                               <div className="flex items-center gap-1">
@@ -938,332 +1032,332 @@ const HierarchicalIdeasSection: React.FC<{
   }>;
 }> = ({ idea, ideaTree, userRequests, addSubIdeaMutation }) => {
   const router = useRouter();
- const { userId } = useAuth();
- const [isModalOpen, setIsModalOpen] = useState(false);
- const [subIdeaTitle, setSubIdeaTitle] = useState("");
- const [subIdeaDescription, setSubIdeaDescription] = useState("");
- const [subIdeaSkills, setSubIdeaSkills] = useState<string[]>([]);
- const [subIdeaIndustries, setSubIdeaIndustries] = useState<string[]>([]);
- const [mandatorySkills, setMandatorySkills] = useState<string[]>([]);
- const [mandatoryIndustries, setMandatoryIndustries] = useState<string[]>([]);
- const [subIdeaVisibility, setSubIdeaVisibility] = useState("public");
- const [isSubmitting, setIsSubmitting] = useState(false);
- const [error, setError] = useState("");
+  const { userId } = useAuth();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [subIdeaTitle, setSubIdeaTitle] = useState("");
+  const [subIdeaDescription, setSubIdeaDescription] = useState("");
+  const [subIdeaSkills, setSubIdeaSkills] = useState<string[]>([]);
+  const [subIdeaIndustries, setSubIdeaIndustries] = useState<string[]>([]);
+  const [mandatorySkills, setMandatorySkills] = useState<string[]>([]);
+  const [mandatoryIndustries, setMandatoryIndustries] = useState<string[]>([]);
+  const [subIdeaVisibility, setSubIdeaVisibility] = useState("public");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
 
- // Check if user is accepted contributor or author
- const isAuthor = idea.isAuthor || false;
- const acceptedRequests = userRequests?.filter(req =>
-   req.status === "accepted" && req.ideaId === idea._id
- ) || [];
- const isAcceptedContributor = acceptedRequests.length > 0;
- const canAddSubIdea = userId && (isAuthor || isAcceptedContributor);
+  // Check if user is accepted contributor or author
+  const isAuthor = idea.isAuthor || false;
+  const acceptedRequests = userRequests?.filter(req =>
+    req.status === "accepted" && req.ideaId === idea._id
+  ) || [];
+  const isAcceptedContributor = acceptedRequests.length > 0;
+  const canAddSubIdea = userId && (isAuthor || isAcceptedContributor);
 
- const handleSubmitSubIdea = async (e: React.FormEvent) => {
-   e.preventDefault();
-   if (!subIdeaTitle.trim() || !subIdeaDescription.trim() || subIdeaSkills.length === 0 || subIdeaIndustries.length === 0 || isSubmitting) return;
+  const handleSubmitSubIdea = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subIdeaTitle.trim() || !subIdeaDescription.trim() || subIdeaSkills.length === 0 || subIdeaIndustries.length === 0 || isSubmitting) return;
 
-   setIsSubmitting(true);
-   setError("");
+    setIsSubmitting(true);
+    setError("");
 
-   try {
-     await addSubIdeaMutation({
-       parentId: idea._id as Id<"ideas">,
-       title: subIdeaTitle.trim(),
-       description: subIdeaDescription.trim(),
-       category: subIdeaSkills.join(', '),
-       industries: subIdeaIndustries.length > 0 ? subIdeaIndustries.join(', ') : undefined,
-       visibility: subIdeaVisibility,
-     });
+    try {
+      await addSubIdeaMutation({
+        parentId: idea._id as Id<"ideas">,
+        title: subIdeaTitle.trim(),
+        description: subIdeaDescription.trim(),
+        category: subIdeaSkills.join(', '),
+        industries: subIdeaIndustries.length > 0 ? subIdeaIndustries.join(', ') : undefined,
+        visibility: subIdeaVisibility,
+      });
 
-     // Reset form and close modal
-     setSubIdeaTitle("");
-     setSubIdeaDescription("");
-     setSubIdeaSkills([]);
-     setSubIdeaIndustries([]);
-     setMandatorySkills([]);
-     setMandatoryIndustries([]);
-     setSubIdeaVisibility("public");
-     setIsModalOpen(false);
-   } catch (err: unknown) {
-     setError(err instanceof Error ? err.message : "Failed to create sub-idea");
-   } finally {
-     setIsSubmitting(false);
-   }
- };
+      // Reset form and close modal
+      setSubIdeaTitle("");
+      setSubIdeaDescription("");
+      setSubIdeaSkills([]);
+      setSubIdeaIndustries([]);
+      setMandatorySkills([]);
+      setMandatoryIndustries([]);
+      setSubIdeaVisibility("public");
+      setIsModalOpen(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create sub-idea");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
- const renderIdeaTree = (treeNode: TreeNode, level = 0, parentPath: boolean[] = [], isLast = false): React.ReactNode => {
-   if (!treeNode) return null;
+  const renderIdeaTree = (treeNode: TreeNode, level = 0, parentPath: boolean[] = [], isLast = false): React.ReactNode => {
+    if (!treeNode) return null;
 
-   const currentPath = level === 0 ? [] : [...parentPath];
-   if (level > 0) {
-     for (let i = 0; i < level; i++) {
-       if (currentPath.length <= i) currentPath.push(false);
-     }
-     currentPath[level - 1] = isLast;
-   }
+    const currentPath = level === 0 ? [] : [...parentPath];
+    if (level > 0) {
+      for (let i = 0; i < level; i++) {
+        if (currentPath.length <= i) currentPath.push(false);
+      }
+      currentPath[level - 1] = isLast;
+    }
 
-   return (
-     <TreeNode
-       key={treeNode._id}
-       nodeId={treeNode._id}
-       level={level}
-       isLast={isLast}
-       parentPath={currentPath}
-     >
-       <TreeNodeTrigger
-         className="flex items-center justify-between"
-         aria-label={`Idea: ${treeNode.title} by ${treeNode.author?.name || treeNode.author?.username}`}
-         onClick={() => router.push(`/idea/${treeNode._id}`)}
-       >
-         <div className="flex items-center space-x-3">
-           <TreeExpander hasChildren={treeNode.children && treeNode.children.length > 0} />
-           <TreeIcon hasChildren={treeNode.children && treeNode.children.length > 0} icon={<Lightbulb className="w-4 h-4" />} />
-           <div className="flex-1">
-             <TreeLabel className="font-medium">{treeNode.title}</TreeLabel>
-             <div className="text-xs text-muted-foreground mt-1">
-               {treeNode.category || 'General'} • by {treeNode.author?.name || treeNode.author?.username}
-               {treeNode.childrenCount > 0 && ` • ${treeNode.childrenCount} sub-idea${treeNode.childrenCount !== 1 ? 's' : ''}`}
-             </div>
-           </div>
-         </div>
-       </TreeNodeTrigger>
+    return (
+      <TreeNode
+        key={treeNode._id}
+        nodeId={treeNode._id}
+        level={level}
+        isLast={isLast}
+        parentPath={currentPath}
+      >
+        <TreeNodeTrigger
+          className="flex items-center justify-between"
+          aria-label={`Idea: ${treeNode.title} by ${treeNode.author?.name || treeNode.author?.username}`}
+          onClick={() => router.push(`/idea/${treeNode._id}`)}
+        >
+          <div className="flex items-center space-x-3">
+            <TreeExpander hasChildren={treeNode.children && treeNode.children.length > 0} />
+            <TreeIcon hasChildren={treeNode.children && treeNode.children.length > 0} icon={<Lightbulb className="w-4 h-4" />} />
+            <div className="flex-1">
+              <TreeLabel className="font-medium">{treeNode.title}</TreeLabel>
+              <div className="text-xs text-muted-foreground mt-1">
+                {treeNode.category || 'General'} • by {treeNode.author?.name || treeNode.author?.username}
+                {treeNode.childrenCount > 0 && ` • ${treeNode.childrenCount} sub-idea${treeNode.childrenCount !== 1 ? 's' : ''}`}
+              </div>
+            </div>
+          </div>
+        </TreeNodeTrigger>
 
-       <TreeNodeContent hasChildren={treeNode.children && treeNode.children.length > 0}>
-         <div className="border-l border-border ml-4 pl-4 py-4">
-           <div className="bg-card/50 rounded-lg p-4 space-y-3">
-             <p className="text-sm text-muted-foreground leading-relaxed">
-               {treeNode.description.length > 200
-                 ? `${treeNode.description.substring(0, 200)}...`
-                 : treeNode.description
-               }
-             </p>
-             <div className="flex items-center justify-between text-xs text-muted-foreground">
-               <span>{new Date(treeNode.createdAt).toLocaleDateString()}</span>
-               {treeNode.children && treeNode.children.length > 0 && (
-                 <span>{treeNode.childrenCount} sub-ideas</span>
-               )}
-             </div>
-           </div>
-         </div>
-         {treeNode.children && treeNode.children.length > 0 &&
-           treeNode.children.map((child: TreeNode, index: number) =>
-             renderIdeaTree(
-               child,
-               level + 1,
-               currentPath,
-               index === treeNode.children!.length - 1
-             )
-           )
-         }
-       </TreeNodeContent>
-     </TreeNode>
-   );
- };
+        <TreeNodeContent hasChildren={treeNode.children && treeNode.children.length > 0}>
+          <div className="border-l border-border ml-4 pl-4 py-4">
+            <div className="bg-card/50 rounded-lg p-4 space-y-3">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {treeNode.description.length > 200
+                  ? `${treeNode.description.substring(0, 200)}...`
+                  : treeNode.description
+                }
+              </p>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{new Date(treeNode.createdAt).toLocaleDateString()}</span>
+                {treeNode.children && treeNode.children.length > 0 && (
+                  <span>{treeNode.childrenCount} sub-ideas</span>
+                )}
+              </div>
+            </div>
+          </div>
+          {treeNode.children && treeNode.children.length > 0 &&
+            treeNode.children.map((child: TreeNode, index: number) =>
+              renderIdeaTree(
+                child,
+                level + 1,
+                currentPath,
+                index === treeNode.children!.length - 1
+              )
+            )
+          }
+        </TreeNodeContent>
+      </TreeNode>
+    );
+  };
 
- return (
-   <div className="max-w-4xl mx-auto mt-8">
-     <div className="bg-card border border-border rounded-xl p-6 transition-colors">
-       <div className="flex items-center justify-between mb-4">
-         <h3 className="text-lg font-semibold">Idea Hierarchy</h3>
-         {canAddSubIdea && (
-           <Dialog open={isModalOpen} onOpenChange={(open) => {
-             setIsModalOpen(open);
-             if (open) {
-               // Pre-populate with parent idea's skills and industries
-               const parentSkills = idea.category ? idea.category.split(',').map(s => s.trim()).filter(s => s) : [];
-               const parentIndustries = idea.industries ? idea.industries.split(',').map((s: string) => s.trim()).filter((s: string) => s) : [];
+  return (
+    <div className="max-w-4xl mx-auto mt-8">
+      <div className="bg-card border border-border rounded-xl p-6 transition-colors">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Idea Hierarchy</h3>
+          {canAddSubIdea && (
+            <Dialog open={isModalOpen} onOpenChange={(open) => {
+              setIsModalOpen(open);
+              if (open) {
+                // Pre-populate with parent idea's skills and industries
+                const parentSkills = idea.category ? idea.category.split(',').map(s => s.trim()).filter(s => s) : [];
+                const parentIndustries = idea.industries ? idea.industries.split(',').map((s: string) => s.trim()).filter((s: string) => s) : [];
 
-               // Debug logging
-               console.log('Parent idea industries:', idea.industries);
-               console.log('Parsed parent industries:', parentIndustries);
+                // Debug logging
+                console.log('Parent idea industries:', idea.industries);
+                console.log('Parsed parent industries:', parentIndustries);
 
-               setMandatorySkills(parentSkills);
-               setMandatoryIndustries(parentIndustries);
-               setSubIdeaSkills(parentSkills);
-               setSubIdeaIndustries(parentIndustries);
-               // Clear other fields
-               setSubIdeaTitle("");
-               setSubIdeaDescription("");
-               setSubIdeaVisibility("public");
-               setError("");
-             }
-           }}>
-             <DialogTrigger asChild>
-               <Button className="flex items-center gap-2" aria-label="Add sub-idea">
-                 <Plus className="w-4 h-4" />
-                 Add Sub-Idea
-               </Button>
-             </DialogTrigger>
-             <DialogContent className="sm:max-w-[500px]" aria-describedby="sub-idea-description">
-               <DialogHeader>
-                 <DialogTitle>Create Sub-Idea</DialogTitle>
-                 <DialogDescription id="sub-idea-description">
-                   Add a new idea that expands on this concept. Your sub-idea will be publicly visible under the parent idea.
-                 </DialogDescription>
-               </DialogHeader>
+                setMandatorySkills(parentSkills);
+                setMandatoryIndustries(parentIndustries);
+                setSubIdeaSkills(parentSkills);
+                setSubIdeaIndustries(parentIndustries);
+                // Clear other fields
+                setSubIdeaTitle("");
+                setSubIdeaDescription("");
+                setSubIdeaVisibility("public");
+                setError("");
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2" aria-label="Add sub-idea">
+                  <Plus className="w-4 h-4" />
+                  Add Sub-Idea
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]" aria-describedby="sub-idea-description">
+                <DialogHeader>
+                  <DialogTitle>Create Sub-Idea</DialogTitle>
+                  <DialogDescription id="sub-idea-description">
+                    Add a new idea that expands on this concept. Your sub-idea will be publicly visible under the parent idea.
+                  </DialogDescription>
+                </DialogHeader>
 
-               <form onSubmit={handleSubmitSubIdea} className="space-y-4">
-                 <div className="space-y-4">
-                   <div>
-                     <label htmlFor="sub-title" className="text-sm font-medium">
-                       Title *
-                     </label>
-                     <Input
-                       id="sub-title"
-                       placeholder="Enter sub-idea title..."
-                       value={subIdeaTitle}
-                       onChange={(e) => setSubIdeaTitle(e.target.value)}
-                       className="mt-1"
-                       maxLength={100}
-                       autoFocus
-                       required
-                     />
-                   </div>
+                <form onSubmit={handleSubmitSubIdea} className="space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="sub-title" className="text-sm font-medium">
+                        Title *
+                      </label>
+                      <Input
+                        id="sub-title"
+                        placeholder="Enter sub-idea title..."
+                        value={subIdeaTitle}
+                        onChange={(e) => setSubIdeaTitle(e.target.value)}
+                        className="mt-1"
+                        maxLength={100}
+                        autoFocus
+                        required
+                      />
+                    </div>
 
-                   <div>
-                     <label htmlFor="sub-description" className="text-sm font-medium">
-                       Description *
-                     </label>
-                     <Textarea
-                       id="sub-description"
-                       placeholder="Describe your sub-idea..."
-                       value={subIdeaDescription}
-                       onChange={(e) => setSubIdeaDescription(e.target.value)}
-                       className="mt-1 resize-none"
-                       rows={4}
-                       maxLength={1200}
-                       required
-                     />
-                   </div>
+                    <div>
+                      <label htmlFor="sub-description" className="text-sm font-medium">
+                        Description *
+                      </label>
+                      <Textarea
+                        id="sub-description"
+                        placeholder="Describe your sub-idea..."
+                        value={subIdeaDescription}
+                        onChange={(e) => setSubIdeaDescription(e.target.value)}
+                        className="mt-1 resize-none"
+                        rows={4}
+                        maxLength={1200}
+                        required
+                      />
+                    </div>
 
-                   <div>
-                     <label className="text-sm font-medium">
-                       Skills <span className="text-destructive">*</span>
-                     </label>
-                     <SkillsMultiSelect
-                       selectedSkills={subIdeaSkills}
-                       onChange={setSubIdeaSkills}
-                       placeholder="Select skills for your sub-idea"
-                       mandatorySkills={mandatorySkills}
-                     />
-                   </div>
+                    <div>
+                      <label className="text-sm font-medium">
+                        Skills <span className="text-destructive">*</span>
+                      </label>
+                      <SkillsMultiSelect
+                        selectedSkills={subIdeaSkills}
+                        onChange={setSubIdeaSkills}
+                        placeholder="Select skills for your sub-idea"
+                        mandatorySkills={mandatorySkills}
+                      />
+                    </div>
 
-                   <div>
-                     <label className="text-sm font-medium">
-                       Industries <span className="text-destructive">*</span>
-                     </label>
-                     <IndustriesMultiSelect
-                       selectedIndustries={subIdeaIndustries}
-                       onChange={setSubIdeaIndustries}
-                       placeholder="Select industries for your sub-idea"
-                       mandatoryIndustries={mandatoryIndustries}
-                     />
-                   </div>
+                    <div>
+                      <label className="text-sm font-medium">
+                        Industries <span className="text-destructive">*</span>
+                      </label>
+                      <IndustriesMultiSelect
+                        selectedIndustries={subIdeaIndustries}
+                        onChange={setSubIdeaIndustries}
+                        placeholder="Select industries for your sub-idea"
+                        mandatoryIndustries={mandatoryIndustries}
+                      />
+                    </div>
 
-                   <div className="space-y-3">
-                     <label className="text-sm font-medium">Visibility</label>
-                     <div className="space-y-2">
-                       <label className="flex items-center space-x-3">
-                         <input
-                           type="radio"
-                           name="sub-visibility"
-                           value="public"
-                           checked={subIdeaVisibility === 'public'}
-                           onChange={() => setSubIdeaVisibility('public')}
-                           className="w-4 h-4 text-primary border-border focus:ring-ring focus:ring-2"
-                           required
-                         />
-                         <div>
-                           <div className="font-medium text-sm">Public</div>
-                           <div className="text-xs text-muted-foreground">Visible to all users</div>
-                         </div>
-                       </label>
-                       <label className="flex items-center space-x-3">
-                         <input
-                           type="radio"
-                           name="sub-visibility"
-                           value="private"
-                           checked={subIdeaVisibility === 'private'}
-                           onChange={() => setSubIdeaVisibility('private')}
-                           className="w-4 h-4 text-primary border-border focus:ring-ring focus:ring-2"
-                         />
-                         <div>
-                           <div className="font-medium text-sm">Private</div>
-                           <div className="text-xs text-muted-foreground">Visible only to your connections</div>
-                         </div>
-                       </label>
-                     </div>
-                   </div>
-                 </div>
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium">Visibility</label>
+                      <div className="space-y-2">
+                        <label className="flex items-center space-x-3">
+                          <input
+                            type="radio"
+                            name="sub-visibility"
+                            value="public"
+                            checked={subIdeaVisibility === 'public'}
+                            onChange={() => setSubIdeaVisibility('public')}
+                            className="w-4 h-4 text-primary border-border focus:ring-ring focus:ring-2"
+                            required
+                          />
+                          <div>
+                            <div className="font-medium text-sm">Public</div>
+                            <div className="text-xs text-muted-foreground">Visible to all users</div>
+                          </div>
+                        </label>
+                        <label className="flex items-center space-x-3">
+                          <input
+                            type="radio"
+                            name="sub-visibility"
+                            value="private"
+                            checked={subIdeaVisibility === 'private'}
+                            onChange={() => setSubIdeaVisibility('private')}
+                            className="w-4 h-4 text-primary border-border focus:ring-ring focus:ring-2"
+                          />
+                          <div>
+                            <div className="font-medium text-sm">Private</div>
+                            <div className="text-xs text-muted-foreground">Visible only to your connections</div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
 
-                 {error && (
-                   <div className="text-destructive text-sm bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
-                     {error}
-                   </div>
-                 )}
+                  {error && (
+                    <div className="text-destructive text-sm bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
+                      {error}
+                    </div>
+                  )}
 
-                 <DialogFooter>
-                   <DialogClose asChild>
-                     <Button
-                       type="button"
-                       variant="outline"
-                       disabled={isSubmitting}
-                       onClick={() => setIsModalOpen(false)}
-                     >
-                       Cancel
-                     </Button>
-                   </DialogClose>
-                   <Button
-                     type="submit"
-                     disabled={!subIdeaTitle.trim() || !subIdeaDescription.trim() || subIdeaSkills.length === 0 || subIdeaIndustries.length === 0 || isSubmitting}
-                   >
-                     {isSubmitting ? <Spinner size={16} /> : "Create Sub-Idea"}
-                   </Button>
-                 </DialogFooter>
-               </form>
-             </DialogContent>
-           </Dialog>
-         )}
-       </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isSubmitting}
+                        onClick={() => setIsModalOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      type="submit"
+                      disabled={!subIdeaTitle.trim() || !subIdeaDescription.trim() || subIdeaSkills.length === 0 || subIdeaIndustries.length === 0 || isSubmitting}
+                    >
+                      {isSubmitting ? <Spinner size={16} /> : "Create Sub-Idea"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
 
-       {ideaTree === undefined ? (
-         <div className="flex items-center justify-center py-8">
-           <Spinner size={32} />
-           <p className="ml-3 text-muted-foreground">Loading hierarchy...</p>
-         </div>
-       ) : ideaTree === null ? (
-         <div className="text-center py-8">
-           <p className="text-muted-foreground">No hierarchy data available.</p>
-         </div>
-       ) : (
-         <div className="flex-1 overflow-hidden">
-           <TreeProvider
-             showLines={true}
-             showIcons={true}
-             selectable={false}
-             multiSelect={false}
-             animateExpand={true}
-             className="idea-hierarchy-tree h-full"
-           >
-             <TreeView aria-label="Idea hierarchy tree" className="h-full overflow-auto">
-               {renderIdeaTree(ideaTree)}
-             </TreeView>
-           </TreeProvider>
-         </div>
-       )}
+        {ideaTree === undefined ? (
+          <div className="flex items-center justify-center py-8">
+            <Spinner size={32} />
+            <p className="ml-3 text-muted-foreground">Loading hierarchy...</p>
+          </div>
+        ) : ideaTree === null ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No hierarchy data available.</p>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-hidden">
+            <TreeProvider
+              showLines={true}
+              showIcons={true}
+              selectable={false}
+              multiSelect={false}
+              animateExpand={true}
+              className="idea-hierarchy-tree h-full"
+            >
+              <TreeView aria-label="Idea hierarchy tree" className="h-full overflow-auto">
+                {renderIdeaTree(ideaTree)}
+              </TreeView>
+            </TreeProvider>
+          </div>
+        )}
 
-       {!canAddSubIdea && userId && (
-         <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
-           <div className="flex items-center space-x-2">
-             <Lightbulb className="w-4 h-4 text-muted-foreground" />
-             <p className="text-sm text-muted-foreground">
-               Only the idea creator or accepted contributors can add sub-ideas.
-             </p>
-           </div>
-         </div>
-       )}
-     </div>
-   </div>
- );
+        {!canAddSubIdea && userId && (
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+            <div className="flex items-center space-x-2">
+              <Lightbulb className="w-4 h-4 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Only the idea creator or accepted contributors can add sub-ideas.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
