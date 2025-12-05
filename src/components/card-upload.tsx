@@ -395,9 +395,9 @@ export default function CardUpload({
     return (
         <div className={cn('w-full space-y-4', className)}>
             {/* Upload Area */}
-            <div
+            <div onClick={openFileDialog} 
                 className={cn(
-                    'relative rounded-lg border border-dashed p-6 text-center transition-colors',
+                    'relative rounded-lg border border-dashed p-6 text-center transition-colors cursor-pointer',
                     isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50',
                 )}
                 onDragEnter={handleDragEnter}
