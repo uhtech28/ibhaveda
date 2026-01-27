@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { createContributionRequest, updateRequestStatus, getRequestsByIdea, getIncomingRequests } from "./contributionRequests";
 
@@ -1293,5 +1293,16 @@ export const getProfileIdeas = query({
     const ideas = await ideasQuery.order("desc").take(limit);
 
     return ideas;
+  },
+});
+// Internal query for the AI agent to fetch recent ideas
+export const getRecentIdeasInternal = internalQuery({
+  args: { limit: v.number() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("ideas")
+      .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
+      .order("desc")
+      .take(args.limit);
   },
 });
