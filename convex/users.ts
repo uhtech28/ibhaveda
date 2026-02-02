@@ -205,98 +205,104 @@ export const updateUserProfile = mutation({
       industry: args.industry
     })
 
-    // Verify authentication
-    const identity = await auth.getUserIdentity()
-    if (!identity) throw new Error("Unauthorized")
-
-    // ✅ TEMP SAFETY CHECK: prevent Convex document overflow
-    if (args.avatar && args.avatar.length > 999_999) {
-      throw new ConvexError(
-        "Avatar image is too large. Please upload an image under 1MB."
-      )
-    }
-
-    // Get user profile
-    const profile = await db
-      .query("users")
-      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
-      .first()
-
-    if (!profile) throw new Error("User profile not found")
-
-    // Update profile with optimistic results
-    const updateData: any = {
-      updatedAt: Date.now(),
-    }
-
-    // Only update fields that are provided
-    Object.entries(args).forEach(([key, value]) => {
-      if (value !== undefined && key !== "skills" && key !== "industry" && key !== "industries") {
-        updateData[key] = value
-      }
-    })
-
-    await db.patch(profile._id, updateData)
-
-    // Handle skills updates with transaction safety
-    if (args.skills !== undefined) {
-      console.log('💡 Updating skills:', args.skills)
-      // Remove existing skills
-      const existingSkills = await db
-        .query("userSkills")
-        .withIndex("by_user", (q) => q.eq("userId", profile._id))
-        .collect()
-      await Promise.all(
-        existingSkills.map((skill) => db.delete(skill._id))
-      )
-
-      // Add new skills
-      if (args.skills.length > 0) {
-        await Promise.all(
-          args.skills.map((skill) =>
-            db.insert("userSkills", {
-              userId: profile._id,
-              skillName: skill,
-            })
-          )
+    try {
+      // Verify authentication
+      const identity = await auth.getUserIdentity()
+      if (!identity) throw new Error("Unauthorized")
+      
+      // ✅ TEMP SAFETY CHECK: prevent Convex document overflow
+      if (args.avatar && args.avatar.length > 999_999) {
+        throw new ConvexError(
+          "Avatar image is too large. Please upload an image under 1MB."
         )
       }
-    }
 
-    // Handle industry updates
-    if (args.industry !== undefined || args.industries !== undefined) {
-      const newIndustries = args.industries || (args.industry ? [args.industry] : []);
-      console.log('🏭 Updating industries:', newIndustries)
+      // Get user profile
+      const profile = await db
+        .query("users")
+        .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+        .first()
 
-      // Remove existing industries from relational table
-      const existingIndustries = await db
-        .query("userIndustries")
-        .withIndex("by_user", (q) => q.eq("userId", profile._id))
-        .collect()
-      await Promise.all(
-        existingIndustries.map((industry) => db.delete(industry._id))
-      )
+      if (!profile) throw new Error("User profile not found")
 
-      // Add new industries to relational table
-      if (newIndustries.length > 0) {
-        await Promise.all(
-          newIndustries.map(ind =>
-            db.insert("userIndustries", {
-              userId: profile._id,
-              industryName: ind,
-            })
-          )
-        );
+      // Update profile with optimistic results
+      const updateData: any = {
+        updatedAt: Date.now(),
       }
 
-      // Update the user record with the industries array
-      await db.patch(profile._id, {
-        industries: newIndustries,
-        industry: newIndustries.length > 0 ? newIndustries[0] : undefined // Keep primary for legacy
-      });
-    }
+      // Only update fields that are provided
+      Object.entries(args).forEach(([key, value]) => {
+        if (value !== undefined && key !== "skills" && key !== "industry" && key !== "industries") {
+          updateData[key] = value
+        }
+      })
 
-    return profile._id
+      await db.patch(profile._id, updateData)
+
+      // Handle skills updates with transaction safety
+      if (args.skills !== undefined) {
+        console.log('💡 Updating skills:', args.skills)
+        // Remove existing skills
+        const existingSkills = await db
+          .query("userSkills")
+          .withIndex("by_user", (q) => q.eq("userId", profile._id))
+          .collect()
+        await Promise.all(
+          existingSkills.map((skill) => db.delete(skill._id))
+        )
+
+        // Add new skills
+        if (args.skills.length > 0) {
+          await Promise.all(
+            args.skills.map((skill) =>
+              db.insert("userSkills", {
+                userId: profile._id,
+                skillName: skill,
+              })
+            )
+          )
+        }
+      }
+
+      // Handle industry updates
+      if (args.industry !== undefined || args.industries !== undefined) {
+        const newIndustries = args.industries || (args.industry ? [args.industry] : []);
+        console.log('🏭 Updating industries:', newIndustries)
+
+        // Remove existing industries from relational table
+        const existingIndustries = await db
+          .query("userIndustries")
+          .withIndex("by_user", (q) => q.eq("userId", profile._id))
+          .collect()
+        await Promise.all(
+          existingIndustries.map((industry) => db.delete(industry._id))
+        )
+
+        // Add new industries to relational table
+        if (newIndustries.length > 0) {
+          await Promise.all(
+            newIndustries.map(ind =>
+              db.insert("userIndustries", {
+                userId: profile._id,
+                industryName: ind,
+              })
+            )
+          );
+        }
+
+        // Update the user record with the industries array
+        await db.patch(profile._id, {
+          industries: newIndustries,
+          industry: newIndustries.length > 0 ? newIndustries[0] : undefined // Keep primary for legacy
+        });
+      }
+
+      return profile._id
+    } catch (error) {
+      console.error("❌ Error updating user profile:", error)
+      const message = error instanceof Error ? error.message : "Failed to update profile due to a server error."
+      throw new Error(message)
+    }
   },
 })
 

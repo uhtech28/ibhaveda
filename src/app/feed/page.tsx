@@ -16,7 +16,11 @@ import { RightSidebar } from "@/components/RightSidebar";
 
 
 import { IdeaGridCard, ConvexIdea } from "@/components/IdeaGridCard";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 
@@ -37,10 +41,10 @@ export default function FeedPage() {
 
   // Pagination state
   const [limit, setLimit] = useState(20);
-  
+
   // Fetch ideas from Convex with manual pagination (limit)
   const ideasResult = useQuery(api.ideas.getPublicIdeas, { limit });
-  
+
   // State to hold displayed ideas to prevent blinking when limit changes (and query becomes undefined)
   const [displayedIdeas, setDisplayedIdeas] = useState<ConvexIdea[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -65,7 +69,7 @@ export default function FeedPage() {
   const ideas = displayedIdeas;
   const isLoadingMore = ideasResult === undefined && displayedIdeas.length > 0;
   const isInitialLoading = ideasResult === undefined && displayedIdeas.length === 0;
-  
+
   const toggleSparkMutation = useMutation(api.ideas.toggleSpark);
 
   // Infinite Scroll Observer
@@ -74,7 +78,7 @@ export default function FeedPage() {
     if (isInitialLoading || isLoadingMore) return; // Don't trigger while loading
     if (ideas.length === 0) return; // Don't trigger if no ideas
     if (!hasMore) return; // Don't trigger if no more items
-    
+
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
@@ -149,14 +153,14 @@ export default function FeedPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <HeroHeader searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-      
+
       <main className="flex-1 w-full py-12 pt-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          
+
           {/* Right Sidebar - Positioned relative to content */}
           <div className="absolute top-0 -right-24 h-full hidden xl:block z-50">
             <div className="sticky top-32">
-              <RightSidebar 
+              <RightSidebar
                 filterOpen={filterOpen}
                 setFilterOpen={setFilterOpen}
                 selectedCategories={selectedCategories}
@@ -251,38 +255,38 @@ export default function FeedPage() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
             </div>
           )}
-       
+
         </div>
 
         {/* Comments Dialog */}
         <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
           <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
-             <div className="mb-4">
-                <h2 className="text-xl font-bold">Comments</h2>
-                <p className="text-sm text-muted-foreground">
-                  {activeCommentIdea?.title}
-                </p>
-             </div>
-             {activeCommentIdea && (
-                <CommentsSection 
-                  ideaId={activeCommentIdea._id as Id<"ideas">} 
-                  commentCount={activeCommentIdea.commentCount || 0} 
-                />
-             )}
+            <div className="mb-4">
+              <DialogTitle className="text-xl font-bold">Comments</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {activeCommentIdea?.title}
+              </p>
+            </div>
+            {activeCommentIdea && (
+              <CommentsSection
+                ideaId={activeCommentIdea._id as Id<"ideas">}
+                commentCount={activeCommentIdea.commentCount || 0}
+              />
+            )}
           </DialogContent>
         </Dialog>
 
         {/* Contribution Request Dialog */}
         <Dialog open={!!activeContributeIdea} onOpenChange={(open) => !open && setActiveContributeIdea(null)}>
           <DialogContent className="sm:max-w-[500px]">
-             {activeContributeIdea && (
-                <ContributionRequestModal
-                  ideaId={activeContributeIdea._id as Id<"ideas">}
-                  ideaTitle={activeContributeIdea.title}
-                  authorName={activeContributeIdea.author?.name || activeContributeIdea.author?.username}
-                  onClose={() => setActiveContributeIdea(null)}
-                />
-             )}
+            {activeContributeIdea && (
+              <ContributionRequestModal
+                ideaId={activeContributeIdea._id as Id<"ideas">}
+                ideaTitle={activeContributeIdea.title}
+                authorName={activeContributeIdea.author?.name || activeContributeIdea.author?.username}
+                onClose={() => setActiveContributeIdea(null)}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </main>
