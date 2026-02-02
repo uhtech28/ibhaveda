@@ -21,8 +21,8 @@ export function AvatarUpload({ currentAvatar, onAvatarChange, displayName, class
     if (!file) return
 
     // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File too large. Please choose an image under 5MB")
+    if (file.size > 1024 * 1024) {
+      alert("Image must be under 700KB. Larger images will be supported soon.")
       return
     }
 

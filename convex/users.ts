@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id, Doc } from "./_generated/dataModel";
+import { ConvexError } from "convex/values";
 
 export type UserProfile = Doc<"users"> & {
   skills: string[];
@@ -71,6 +72,13 @@ export const createUserProfile = mutation({
         throw new Error("Authentication required: Please sign in to create your profile")
       }
 
+        // ✅ TEMP SAFETY CHECK: prevent Convex document overflow
+      if (args.avatar && args.avatar.length > 999_999) {
+        throw new Error(
+          "Avatar image is too large. Please upload an image under 1MB."
+        )
+      }
+
       console.log("createUserProfile: Authentication identity subject:", identity.subject)
 
       // Check if user already has a profile
@@ -103,7 +111,7 @@ export const createUserProfile = mutation({
 
       if (existingUsername) {
         console.log("Duplicate username attempted:", normalizedUsername, "by user:", identity.subject)
-        throw new Error(`Username "${normalizedUsername}" is already taken. Please try a different username.`)
+        throw new ConvexError(`Username "${normalizedUsername}" is already taken. Please try a different username.`)
       }
 
       const now = Date.now()
@@ -200,6 +208,13 @@ export const updateUserProfile = mutation({
     // Verify authentication
     const identity = await auth.getUserIdentity()
     if (!identity) throw new Error("Unauthorized")
+
+    // ✅ TEMP SAFETY CHECK: prevent Convex document overflow
+    if (args.avatar && args.avatar.length > 999_999) {
+      throw new ConvexError(
+        "Avatar image is too large. Please upload an image under 1MB."
+      )
+    }
 
     // Get user profile
     const profile = await db
