@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useToast } from "@/components/ui/use-toast"
 import { Camera } from "lucide-react"
 
 interface AvatarUploadProps {
@@ -15,20 +16,31 @@ interface AvatarUploadProps {
 export function AvatarUpload({ currentAvatar, onAvatarChange, displayName, className }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    // Validate file size (max 5MB)
+    // Validate file size (max 1MB)
     if (file.size > 1024 * 1024) {
-      alert("Image must be under 700KB. Larger images will be supported soon.")
+      toast({
+        title: "Image too large",
+        description: "Image must be under 1MB. Please compress or choose a smaller image.",
+        variant: "destructive",
+        duration: 5000,
+      })
       return
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert("Please choose an image file")
+      toast({
+        title: "Invalid file type",
+        description: "Please choose an image file (JPG, PNG, or GIF).",
+        variant: "destructive",
+        duration: 4000,
+      })
       return
     }
 
@@ -42,6 +54,11 @@ export function AvatarUpload({ currentAvatar, onAvatarChange, displayName, class
         reader.onload = () => {
           if (typeof reader.result === 'string') {
             onAvatarChange(reader.result)
+            toast({
+              title: "Avatar updated",
+              description: "Your profile picture has been updated successfully.",
+              duration: 3000,
+            })
           }
         }
         reader.readAsDataURL(file)
@@ -50,7 +67,12 @@ export function AvatarUpload({ currentAvatar, onAvatarChange, displayName, class
 
     } catch (error) {
       console.error('Error uploading avatar:', error)
-      alert('Upload failed. Please try again.')
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload avatar. Please try again.",
+        variant: "destructive",
+        duration: 4000,
+      })
       setUploading(false)
     }
   }
@@ -109,7 +131,7 @@ export function AvatarUpload({ currentAvatar, onAvatarChange, displayName, class
       />
 
       <p className="text-sm text-muted-foreground text-center max-w-xs">
-        JPG, PNG or GIF. Max size 5MB.<br />
+        JPG, PNG or GIF. Max size 1MB.<br />
         Click the avatar or use the button to upload.
       </p>
     </div>
