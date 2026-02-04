@@ -182,6 +182,11 @@ export default function ProfileSetupPage() {
         displayName: prev.displayName || suggestedName,
         username: prev.username || suggestedUsername,
       }));
+
+      // Trigger initial username validation if we have a suggested username
+      if (suggestedUsername && suggestedUsername.length >= 3) {
+        setValidationUsername(suggestedUsername);
+      }
     }
   }, [user, userId]);
 
