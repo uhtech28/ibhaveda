@@ -174,6 +174,8 @@ export default defineSchema({
     participant2: v.optional(v.id("users")), // Second participant user ID (optional for groups)
     type: v.optional(v.string()), // 'direct' or 'group'
     ideaId: v.optional(v.id("ideas")), // Reference to idea for group chats
+    creatorId: v.optional(v.string()), // Creator of group chat (stored as string ID)
+    name: v.optional(v.string()), // Group chat name
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
     lastMessageId: v.optional(v.id("messages")), // Reference to latest message
