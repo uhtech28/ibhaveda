@@ -110,15 +110,7 @@ export const createUserProfile = mutation({
         .first()
 
       if (existingUsername) {
-        // ✨ TEMP FIX: Allow "saunak" to reclaim their profile (Dev env mismatch fix)
-        if (normalizedUsername === "saunak") {
-          console.log("🔓 Reclaiming 'saunak' profile for new identity:", identity.subject);
-          await db.patch(existingUsername._id, {
-            clerkId: identity.subject,
-            isActive: true
-          });
-          return existingUsername._id;
-        }
+
 
         console.log("Duplicate username attempted:", normalizedUsername, "by user:", identity.subject)
         throw new ConvexError(`Username "${normalizedUsername}" is already taken. Please try a different username.`)
