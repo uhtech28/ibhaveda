@@ -320,7 +320,22 @@ export default function ProfileSetupPage() {
         description: "Welcome to the community! Your profile has been successfully set up.",
         duration: 4000,
       });
-      router.push('/feed');
+
+      // Use router.push first, then fallback to window.location for production compatibility
+      try {
+        router.push('/feed');
+        // Fallback: if still on same page after 500ms, force redirect
+        setTimeout(() => {
+          if (typeof window !== 'undefined' && window.location.pathname.includes('profile-setup')) {
+            window.location.href = '/feed';
+          }
+        }, 500);
+      } catch {
+        // Hard fallback for production environments
+        if (typeof window !== 'undefined') {
+          window.location.href = '/feed';
+        }
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : `Failed to ${existingProfile ? 'update' : 'create'} profile`;
       setError(errorMessage);
