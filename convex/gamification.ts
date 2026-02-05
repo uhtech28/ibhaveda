@@ -99,3 +99,143 @@ export const updateStreak = mutation({
         }
     },
 });
+
+// Gamification: Wallet & Points System
+
+// Get user's wallet balance
+export const getWallet = query({
+    handler: async ({ db, auth }) => {
+        const identity = await auth.getUserIdentity();
+        if (!identity) return null;
+
+        const user = await db
+            .query("users")
+            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) return null;
+
+        const wallet = await db
+            .query("wallets")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .first();
+
+        return wallet || { balance: 0 };
+    },
+});
+
+// Award points to a user (Internal or admin use primarily)
+// Usage: await awardPoints({ db, userId: ..., amount: 10, type: 'daily_login', description: 'Daily Login Reward' })
+export const awardPoints = mutation({
+    args: {
+        userId: v.optional(v.id("users")), // Optional if calling as user
+        amount: v.number(),
+        type: v.string(),
+        description: v.string(),
+        relatedId: v.optional(v.string()),
+    },
+    handler: async ({ db, auth }, args) => {
+        let userId = args.userId;
+
+        // If no userId provided, try to get from auth
+        if (!userId) {
+            const identity = await auth.getUserIdentity();
+            if (!identity) throw new Error("Unauthorized");
+            const user = await db
+                .query("users")
+                .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+                .first();
+            if (!user) throw new Error("User not found");
+            userId = user._id;
+        }
+
+        // Get or create wallet
+        let wallet = await db
+            .query("wallets")
+            .withIndex("by_user", (q) => q.eq("userId", userId!))
+            .first();
+
+        if (!wallet) {
+            const walletId = await db.insert("wallets", {
+                userId: userId!,
+                balance: 0,
+                updatedAt: Date.now(),
+            });
+            wallet = await db.get(walletId);
+        }
+
+        if (!wallet) throw new Error("Failed to initialize wallet");
+
+        // Calculate new balance
+        const newBalance = wallet.balance + args.amount;
+
+        // Update wallet
+        await db.patch(wallet._id, {
+            balance: newBalance,
+            updatedAt: Date.now(),
+        });
+
+        // Record transaction
+        await db.insert("transactions", {
+            walletId: wallet._id,
+            amount: args.amount,
+            type: args.type,
+            description: args.description,
+            relatedId: args.relatedId,
+            createdAt: Date.now(),
+        });
+
+        return { success: true, newBalance };
+    },
+});
+
+// Award XP to a user and handle level ups
+// Usage: await awardXP({ db, userId: ..., amount: 50, action: 'create_idea' })
+export const awardXP = mutation({
+    args: {
+        userId: v.optional(v.id("users")),
+        amount: v.number(),
+        action: v.string(), // For logging/history if we add it later
+    },
+    handler: async ({ db, auth }, args) => {
+        let userId = args.userId;
+
+        // If no userId provided, try to get from auth
+        if (!userId) {
+            const identity = await auth.getUserIdentity();
+            if (!identity) throw new Error("Unauthorized");
+            const user = await db
+                .query("users")
+                .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+                .first();
+            if (!user) throw new Error("User not found");
+            userId = user._id;
+        }
+
+        const user = await db.get(userId);
+        if (!user) throw new Error("User not found");
+
+        const currentXP = user.xp || 0;
+        const currentLevel = user.level || 1;
+        const newXP = currentXP + args.amount;
+
+        // Level calculation: Level = floor(sqrt(XP / 100)) + 1
+        const newLevel = Math.floor(Math.sqrt(newXP / 100)) + 1;
+
+        await db.patch(userId, {
+            xp: newXP,
+            level: newLevel,
+        });
+
+        return {
+            xpAdded: args.amount,
+            newTotalXP: newXP,
+            levelUp: newLevel > currentLevel,
+            newLevel,
+        };
+    },
+});
+
+// Update streak logic - usually called on session start
+
+
