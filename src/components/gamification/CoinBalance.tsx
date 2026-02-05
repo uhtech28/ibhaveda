@@ -24,7 +24,7 @@ export const CoinBalance = () => {
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-full border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors cursor-help">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-full border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors cursor-default">
                         <Coins className="w-4 h-4 fill-current" />
                         <span className="text-sm font-bold font-mono">{wallet.balance}</span>
                     </div>
