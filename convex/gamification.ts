@@ -9,6 +9,31 @@ function getTodayString(): string {
 }
 
 // Get user's current streak
+export const getStreak = query({
+    handler: async ({ db, auth }) => {
+        const identity = await auth.getUserIdentity();
+        if (!identity) return null;
+
+        const user = await db
+            .query("users")
+            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) return null;
+
+        const streak = await db
+            .query("userStreaks")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .first();
+
+        return streak || {
+            currentStreak: 0,
+            longestStreak: 0,
+            lastLoginDate: "",
+            recoveryAvailable: false
+        };
+    },
+});
 
 // Update streak logic - usually called on session start
 export const updateStreak = mutation({
