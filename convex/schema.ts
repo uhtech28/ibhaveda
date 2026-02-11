@@ -242,7 +242,8 @@ export default defineSchema({
     balance: v.number(), // Current balance of IdeaCoins
     updatedAt: v.number(), // Last transaction timestamp
   })
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_balance", ["balance"]),
 
   // Gamification: Point Transactions Ledger
   transactions: defineTable({

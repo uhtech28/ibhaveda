@@ -257,7 +257,18 @@ export const getPublicIdeas = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
-    const ideas = await ctx.db
+
+    // 1. Get Top 5 Leaderboard Users
+    const topWallets = await ctx.db
+      .query("wallets")
+      .withIndex("by_balance")
+      .order("desc")
+      .take(5);
+
+    const topUserIds = new Set(topWallets.map(w => w.userId));
+
+    // 2. Get recent public ideas (General Feed)
+    const generalIdeas = await ctx.db
       .query("ideas")
       .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
       .filter((q) => q.neq(q.field("isDeleted"), true))
@@ -265,10 +276,46 @@ export const getPublicIdeas = query({
       .order("desc")
       .take(limit);
 
+    // 3. Get recent ideas from Top Users (Leader Boost)
+    // We explicitly fetch their recent posts to ensure they appear
+    const leaderIdeasPromises = Array.from(topUserIds).map(userId =>
+      ctx.db.query("ideas")
+        .withIndex("by_author_visibility", (q) => q.eq("authorId", userId).eq("visibility", "public"))
+        .filter((q) => q.neq(q.field("isDeleted"), true))
+        .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
+        .order("desc")
+        .take(3) // Take top 3 from each leader
+    );
+
+    const leaderIdeasArrays = await Promise.all(leaderIdeasPromises);
+    const leaderIdeas = leaderIdeasArrays.flat();
+
+    // 4. Merge and Deduplicate
+    const allIdeas = [...leaderIdeas, ...generalIdeas];
+    const uniqueIdeasMap = new Map();
+    allIdeas.forEach(idea => {
+      uniqueIdeasMap.set(idea._id, idea);
+    });
+
+    const uniqueIdeas = Array.from(uniqueIdeasMap.values());
+
+    // 5. Sort with Boost
+    // Boost score: +1 day equivalent (86400000 ms) if author is top leader, effectively pinning them higher vs same-day posts
+    const BOOST_AMOUNT = 86400000;
+
+    uniqueIdeas.sort((a, b) => {
+      const scoreA = topUserIds.has(a.authorId) ? a.createdAt + BOOST_AMOUNT : a.createdAt;
+      const scoreB = topUserIds.has(b.authorId) ? b.createdAt + BOOST_AMOUNT : b.createdAt;
+      return scoreB - scoreA;
+    });
+
+    // 6. Limit
+    const finalIdeas = uniqueIdeas.slice(0, limit);
+
     // Get author information and contribution count for each idea
     const ideasWithAuthors = await Promise.all(
-      ideas.map(async (idea) => {
-        let author = null;
+      finalIdeas.map(async (idea) => {
+        let author: any = null;
         try {
           author = await ctx.db.get(idea.authorId);
         } catch (e) {
@@ -482,19 +529,37 @@ export const toggleSpark = mutation({
       }
 
 
-      // Gamification: Award XP and Coins for sparking
+      // Gamification: Award XP and Points for sparking
+
+      // 1. Award Sparker (Actor) - 1 Point
       await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
         userId: user._id,
         amount: 1,
         action: "spark_idea",
       });
-
       await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
         userId: user._id,
         amount: 1,
         type: "spark_idea",
         description: "Sparked an idea"
       });
+
+      // 2. Award Author - 3 Points (Public) or 1 Point (Private)
+      if (idea.authorId !== user._id) {
+        const pointsForAuthor = idea.visibility === 'public' ? 3 : 1;
+
+        await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+          userId: idea.authorId,
+          amount: pointsForAuthor,
+          action: "spark_received",
+        });
+        await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
+          userId: idea.authorId,
+          amount: pointsForAuthor,
+          type: "spark_received",
+          description: `Received spark on ${idea.visibility} idea`
+        });
+      }
 
       return { action: "added", sparkCount: idea.sparkCount + 1 };
     }
@@ -752,19 +817,37 @@ export const addComment = mutation({
     }
 
 
-    // Gamification: Award XP and Coins for commenting
+    // Gamification: Award XP and Points for commenting
+
+    // 1. Award Commenter (Actor) - 1 Point
     await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
       userId: user._id,
-      amount: 5,
+      amount: 1,
       action: "comment",
     });
-
     await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
       userId: user._id,
-      amount: 5,
+      amount: 1,
       type: "comment",
       description: "Commented on an idea"
     });
+
+    // 2. Award Author - 3 Points (Public) or 1 Point (Private)
+    if (idea.authorId !== user._id) {
+      const pointsForAuthor = idea.visibility === 'public' ? 3 : 1;
+
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: idea.authorId,
+        amount: pointsForAuthor,
+        action: "comment_received",
+      });
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
+        userId: idea.authorId,
+        amount: pointsForAuthor,
+        type: "comment_received",
+        description: `Received comment on ${idea.visibility} idea`
+      });
+    }
 
     return { commentId, message: "Comment added successfully" };
   },

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 // Create a new contribution request
 export const createContributionRequest = mutation({
@@ -116,6 +117,38 @@ export const createContributionRequest = mutation({
           createdAt: now,
         });
       }
+
+
+
+      // Gamification: Award XP and Points for contribution request
+
+      // 1. Award Sender (Contributor) - 1 Point
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: user._id,
+        amount: 1,
+        action: "contribution_request_sent",
+      });
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
+        userId: user._id,
+        amount: 1,
+        type: "contribution_request_sent",
+        description: "Sent contribution request"
+      });
+
+      // 2. Award Author - 3 Points (Public) or 1 Point (Private)
+      const pointsForAuthor = idea.visibility === 'public' ? 3 : 1;
+
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: idea.authorId,
+        amount: pointsForAuthor,
+        action: "contribution_request_received",
+      });
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
+        userId: idea.authorId,
+        amount: pointsForAuthor,
+        type: "contribution_request_received",
+        description: `Received contribution request on ${idea.visibility} idea`
+      });
 
       return { requestId, message: "Contribution request created successfully" };
     } catch (error) {
@@ -437,6 +470,32 @@ export const updateRequestStatus = mutation({
         isRead: false,
         createdAt: Date.now(),
       });
+
+      // Gamification: Award XP/Points for status update
+      const idea = await ctx.db.get(request.ideaId);
+      if (idea) {
+        const isPublic = idea.visibility === 'public';
+
+        if (args.status === 'accepted') {
+          // Accepted: Author +4 (Public) / +2 (Private)
+          const authorPoints = isPublic ? 4 : 2;
+          await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, { userId: user._id, amount: authorPoints, action: "request_accepted_author" });
+          await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, { userId: user._id, amount: authorPoints, type: "request_accepted", description: "Accepted contribution request" });
+
+          // Accepted: Contributor +10 (Public) / +5 (Private)
+          const contributorPoints = isPublic ? 10 : 5;
+          await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, { userId: request.contributorId, amount: contributorPoints, action: "request_accepted_contributor" });
+          await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, { userId: request.contributorId, amount: contributorPoints, type: "contribution_accepted", description: "Contribution request accepted" });
+
+        } else if (args.status === 'rejected') {
+          // Rejected: Author +1 (Public) / +0 (Private)
+          const authorPoints = isPublic ? 1 : 0;
+          if (authorPoints > 0) {
+            await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, { userId: user._id, amount: authorPoints, action: "request_rejected_author" });
+            await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, { userId: user._id, amount: authorPoints, type: "request_rejected", description: "Rejected contribution request" });
+          }
+        }
+      }
 
       return { message: "Request status updated successfully" };
     } catch (error) {

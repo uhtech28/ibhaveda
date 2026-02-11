@@ -14,6 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import FooterSection from "@/components/footer";
 import { InvitationButton } from "@/components/requests/invitation-button";
 import { useChat } from "@/components/chat/ChatContext";
+import { Leaderboard } from "@/components/gamification/Leaderboard";
 
 import { UserProfile } from "../../../convex/users";
 
@@ -108,6 +109,11 @@ export default function CommunityPage() {
             </div>
           </div>
 
+          {/* Leaderboard Section */}
+          <div className="mb-12">
+            <Leaderboard />
+          </div>
+
           {/* Users Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredUsers.filter(user => user.clerkId !== clerkUser?.id).map((user: UserProfile) => (
@@ -192,7 +198,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
             {user.industry && (
               <div className="flex flex-wrap gap-1.5 items-center">
                 {user.industry.split(',').map(s => s.trim()).slice(0, 2).map((ind, i) => (
-                  <button 
+                  <button
                     key={`ind-${i}`}
                     onClick={(e) => {
                       e.preventDefault();
@@ -216,7 +222,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
             {user.skills.length > 0 ? (
               <div className="flex flex-wrap gap-1.5 items-center">
                 {user.skills.slice(0, 2).map((skill, i) => (
-                  <button 
+                  <button
                     key={`skill-${i}`}
                     onClick={(e) => {
                       e.preventDefault();
@@ -241,18 +247,18 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
           {/* Stats Row */}
           <div className="grid grid-cols-3 gap-1 py-2 border-t border-b border-border/40 mb-1">
-             <div className="flex flex-col items-center justify-center text-center">
-                <Lightbulb className="w-3.5 h-3.5 text-primary mb-0.5" />
-                <span className="text-[10px] font-bold">{user.ideasCreated || 0}</span>
-             </div>
-             <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
-                <Sparkles className="w-3.5 h-3.5 text-orange-500 mb-0.5" />
-                <span className="text-[10px] font-bold">{user.ideasSparked || 0}</span>
-             </div>
-             <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
-                <Users className="w-3.5 h-3.5 text-green-500 mb-0.5" />
-                <span className="text-[10px] font-bold">{user.ideasContributed || 0}</span>
-             </div>
+            <div className="flex flex-col items-center justify-center text-center">
+              <Lightbulb className="w-3.5 h-3.5 text-primary mb-0.5" />
+              <span className="text-[10px] font-bold">{user.ideasCreated || 0}</span>
+            </div>
+            <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
+              <Sparkles className="w-3.5 h-3.5 text-orange-500 mb-0.5" />
+              <span className="text-[10px] font-bold">{user.ideasSparked || 0}</span>
+            </div>
+            <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
+              <Users className="w-3.5 h-3.5 text-green-500 mb-0.5" />
+              <span className="text-[10px] font-bold">{user.ideasContributed || 0}</span>
+            </div>
           </div>
         </div>
       </Link>
@@ -269,9 +275,9 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               }}
             />
           </div>
-          <Button 
-            variant="outline" 
-            size="icon" 
+          <Button
+            variant="outline"
+            size="icon"
             className="h-8 w-8 shrink-0 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
             onClick={handleMessageClick}
             title="Message"
