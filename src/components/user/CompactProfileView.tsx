@@ -13,6 +13,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { RequestStatusCard, ContributionRequest } from "@/components/requests/request-status-card"
 import { useChat } from "@/components/chat/ChatContext";
 import { InvitationButton } from "@/components/requests/invitation-button";
+import { LevelProgress } from "@/components/gamification/LevelProgress";
 
 export interface UserProfile {
   _id: Id<"users">;
@@ -31,7 +32,10 @@ export interface UserProfile {
   ideasCreated?: number;
   ideasSparked?: number;
   ideasContributed?: number;
+  xp?: number;
+  level?: number;
 }
+
 
 interface CompactProfileViewProps {
   profile: UserProfile;
@@ -41,12 +45,12 @@ interface CompactProfileViewProps {
   incomingRequests?: ContributionRequest[];
 }
 
-export const CompactProfileView: React.FC<CompactProfileViewProps> = ({ 
-  profile, 
-  isOwner, 
+export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
+  profile,
+  isOwner,
   onInvite,
   myRequests,
-  incomingRequests 
+  incomingRequests
 }) => {
   const router = useRouter();
   const { openChatWithUser } = useChat();
@@ -77,7 +81,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   return (
     <div className="max-w-6xl mx-auto px-4 pb-12">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
+
         {/* 1. Identity Card (Span 2) */}
         <Card className="md:col-span-2 shadow-sm border-border/40 bg-card/50 backdrop-blur-sm overflow-hidden relative flex flex-col">
           <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent"></div>
@@ -92,17 +96,25 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                 </Avatar>
                 <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background"></div>
               </div>
-              
+
               <div className="flex-1 space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
                     <h1 className="text-xl font-bold text-foreground leading-tight">{profile.displayName}</h1>
                     <p className="text-muted-foreground font-medium text-sm">@{profile.username}</p>
+
+                    <div className="pt-2 w-full max-w-[200px]">
+                      <LevelProgress currentXP={profile.xp || 0} showLabel={false} />
+                      <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                        <span className="font-semibold text-primary">Lvl {profile.level || 1}</span>
+                        <span>{profile.xp || 0} XP</span>
+                      </div>
+                    </div>
                   </div>
                   {isOwner ? (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleEditProfile}
                       className="gap-2 h-8"
                     >
@@ -111,9 +123,9 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                     </Button>
                   ) : (
                     <div className="flex gap-2">
-                      <Button 
-                        variant="default" 
-                        size="sm" 
+                      <Button
+                        variant="default"
+                        size="sm"
                         onClick={handleSendMessage}
                         className="gap-2 h-8"
                       >
@@ -121,7 +133,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                         Message
                       </Button>
                       <div className="w-32">
-                        <InvitationButton 
+                        <InvitationButton
                           targetUser={{
                             _id: profile._id,
                             username: profile.username,
@@ -156,29 +168,29 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
 
                 {/* Skills & Industries moved here */}
                 <div className="pt-1.5 space-y-2">
-                   {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
-                     <div className="flex flex-wrap gap-1.5">
-                        {profile.industry && (
-                          <Badge variant="secondary" className="rounded-md px-2 py-0 text-[10px] font-medium h-5">
-                            {profile.industry}
-                          </Badge>
-                        )}
-                        {profile.skills && profile.skills.slice(0, 5).map((skill, index) => (
-                          <Badge 
-                            key={index} 
-                            variant="outline" 
-                            className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5"
-                          >
-                            {skill}
-                          </Badge>
-                        ))}
-                        {profile.skills && profile.skills.length > 5 && (
-                          <Badge variant="outline" className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5">
-                            +{profile.skills.length - 5}
-                          </Badge>
-                        )}
-                     </div>
-                   )}
+                  {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {profile.industry && (
+                        <Badge variant="secondary" className="rounded-md px-2 py-0 text-[10px] font-medium h-5">
+                          {profile.industry}
+                        </Badge>
+                      )}
+                      {profile.skills && profile.skills.slice(0, 5).map((skill, index) => (
+                        <Badge
+                          key={index}
+                          variant="outline"
+                          className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5"
+                        >
+                          {skill}
+                        </Badge>
+                      ))}
+                      {profile.skills && profile.skills.length > 5 && (
+                        <Badge variant="outline" className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5">
+                          +{profile.skills.length - 5}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -187,7 +199,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
 
         {/* 2. Stats Column (Span 1) */}
         <div className="md:col-span-1 grid grid-rows-3 gap-3">
-          <Card 
+          <Card
             className="shadow-sm border-border/40 hover:bg-muted/30 transition-all cursor-pointer group active:scale-[0.98]"
             onClick={() => openDialog("created")}
           >
@@ -204,8 +216,8 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
               </div>
             </CardContent>
           </Card>
-          
-          <Card 
+
+          <Card
             className="shadow-sm border-border/40 hover:bg-muted/30 transition-all cursor-pointer group active:scale-[0.98]"
             onClick={() => openDialog("sparked")}
           >
@@ -223,7 +235,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
             </CardContent>
           </Card>
 
-          <Card 
+          <Card
             className="shadow-sm border-border/40 hover:bg-muted/30 transition-all cursor-pointer group active:scale-[0.98]"
             onClick={() => openDialog("contributed")}
           >
@@ -247,68 +259,68 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
       {/* Contribution Requests (Only visible to owner) */}
       {isOwner && (
         <div className="mt-16 pt-8 border-t">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Contribution Requests</h2>
-              <Link href="/profile/contribution-requests">
-                <Button variant="outline" size="sm" className="gap-2">
-                  Manage Requests
-                </Button>
-              </Link>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Outgoing Requests */}
-              {myRequests && myRequests.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">My Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {myRequests.slice(0, 3).map((request) => (
-                        <RequestStatusCard key={request._id} request={request} />
-                      ))}
-                      {myRequests.length > 3 && (
-                        <Button variant="link" className="w-full text-xs">View all {myRequests.length} requests</Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">Contribution Requests</h2>
+            <Link href="/profile/contribution-requests">
+              <Button variant="outline" size="sm" className="gap-2">
+                Manage Requests
+              </Button>
+            </Link>
+          </div>
 
-              {/* Incoming Requests */}
-              {incomingRequests && incomingRequests.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Incoming Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {incomingRequests.slice(0, 3).map((request) => (
-                        <div key={request._id} className="border rounded-lg p-3 bg-muted/20 text-sm">
-                          <p className="font-medium truncate">{request.idea?.title || "Idea"}</p>
-                          <p className="text-muted-foreground truncate">{request.message}</p>
-                        </div>
-                      ))}
-                        {incomingRequests.length > 3 && (
-                        <Button variant="link" className="w-full text-xs">View all {incomingRequests.length} incoming</Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {(!myRequests?.length && !incomingRequests?.length) && (
-                <div className="col-span-full text-center py-8 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
-                  No active contribution requests.
-                </div>
-              )}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Outgoing Requests */}
+            {myRequests && myRequests.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">My Requests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {myRequests.slice(0, 3).map((request) => (
+                      <RequestStatusCard key={request._id} request={request} />
+                    ))}
+                    {myRequests.length > 3 && (
+                      <Button variant="link" className="w-full text-xs">View all {myRequests.length} requests</Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Incoming Requests */}
+            {incomingRequests && incomingRequests.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Incoming Requests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {incomingRequests.slice(0, 3).map((request) => (
+                      <div key={request._id} className="border rounded-lg p-3 bg-muted/20 text-sm">
+                        <p className="font-medium truncate">{request.idea?.title || "Idea"}</p>
+                        <p className="text-muted-foreground truncate">{request.message}</p>
+                      </div>
+                    ))}
+                    {incomingRequests.length > 3 && (
+                      <Button variant="link" className="w-full text-xs">View all {incomingRequests.length} incoming</Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {(!myRequests?.length && !incomingRequests?.length) && (
+              <div className="col-span-full text-center py-8 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                No active contribution requests.
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      <ProfileStatsDialog 
-        userId={profile._id as Id<"users">} 
+      <ProfileStatsDialog
+        userId={profile._id as Id<"users">}
         type={dialogType}
         isOpen={dialogOpen}
         onOpenChange={setDialogOpen}

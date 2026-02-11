@@ -10,6 +10,8 @@ export type UserProfile = Doc<"users"> & {
   ideasCreated?: number;
   ideasSparked?: number;
   ideasContributed?: number;
+  xp?: number;
+  level?: number;
 };
 
 export const getCurrentUser = query({
