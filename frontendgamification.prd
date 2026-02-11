@@ -1,0 +1,77 @@
+Product Requirements Document: Frontend Gamification UI
+1. Overview
+This document outlines the frontend user interface requirements for the Interactive Ideas Gamification System. The goal is to ensure all gamification elements (Points, Streaks, Levels, Leaderboards) are correctly rendered and interactive on the client side.
+
+2. Key UI Components
+2.1 Global Header (Navigation Bar)
+The header must persistently display the user's gamification status when logged in.
+
+Point Balance:
+Component: 
+PointBalance.tsx
+Visuals: Star icon (Lucide Star) + Numeric Balance.
+Behavior: Hovering displays a tooltip "Points Balance".
+Data Source: api.gamification.getWallet.
+States:
+Loading: Skeleton loader.
+Error/Null: Returns null (hidden).
+Streak Indicator:
+Component: 
+StreakIndicator.tsx
+Visuals: Fire icon (Lucide Flame) + Day Count.
+Behavior: Hovering displays a tooltip "Current Streak".
+Data Source: api.gamification.getStreak.
+2.2 User Profile Page (/profile/[username])
+The profile view must showcase the user's progression level.
+
+Level Progress:
+Component: 
+LevelProgress.tsx
+ in 
+CompactProfileView
+.
+Visuals:
+"Lvl {x}" text badge.
+Linear Progress Bar indicating XP progress to next level.
+"XP: {current}/{next}" label.
+Logic: Level = floor(sqrt(XP / 100)) + 1.
+2.3 Community Page (/community)
+The community hub must highlight top performers.
+
+Leaderboard Widget:
+Component: 
+Leaderboard.tsx
+.
+Location: Top of the Community page (above the user grid).
+Visuals:
+Card titled "Community Leaders".
+Horizontal list of Top 5 Users.
+Rank Badges:
+Rank #1: Gold style (bg-yellow-400).
+Rank #2: Silver style (bg-slate-300).
+Rank #3: Bronze style (bg-amber-600).
+User Avatar, Name, and Total Points.
+Interactions: Clicking a user card navigates to their profile.
+2.4 Main Feed (/feed)
+The feed must display ideas sorted by the new boosted algorithm.
+
+Feed List:
+Visuals: Standard Idea Cards.
+Requirement: The feed must render without errors using the new getPublicIdeas query which merges Leaderboard User posts with the general feed.
+3. User Flows for Testing
+Flow A: Verification of Status (Login)
+Action: User logs in.
+Expected Outcome: Header immediately loads and displays the correct Point Balance and Streak Count.
+Flow B: Profile Inspection
+Action: Navigate to My Profile.
+Expected Outcome: "Level" badge and XP Progress bar are visible within the profile card.
+Flow C: Leaderboard Check
+Action: Navigate to 
+Community
+ page.
+Expected Outcome: Leaderboard component is present. Top 5 users are displayed. Top 3 have distinct colored badges.
+Flow D: Responsiveness
+Action: Resize window to Mobile (<640px).
+Expected Outcome:
+Header elements might collapse or move to a menu (verify implementation in MobileBottomNav or Header).
+Leaderboard grid should stack appropriately.
