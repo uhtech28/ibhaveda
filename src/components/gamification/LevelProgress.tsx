@@ -1,6 +1,8 @@
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { Trophy } from "lucide-react"
+import { useQuery } from "convex/react"
+import { api } from "../../../convex/_generated/api"
 
 interface LevelProgressProps {
     currentXP: number;
@@ -13,24 +15,11 @@ export const LevelProgress = ({
     className,
     showLabel = true
 }: LevelProgressProps) => {
-    // Level calculation: Level = floor(sqrt(XP / 100)) + 1
-    const level = Math.floor(Math.sqrt(currentXP / 100)) + 1;
+    const levelInfo = useQuery(api.gamification.getLevelProgress, { xp: currentXP });
 
-    // Calculate XP thresholds
-    // XP needed for current level start = 100 * (level - 1)^2
-    const currentLevelStartXP = 100 * Math.pow(level - 1, 2);
-
-    // XP needed for next level = 100 * level^2
-    const nextLevelXP = 100 * Math.pow(level, 2);
-
-    // XP earned in this level
-    const xpInLevel = currentXP - currentLevelStartXP;
-
-    // Total XP needed for this level
-    const xpForLevel = nextLevelXP - currentLevelStartXP;
-
-    // Percentage progress
-    const progress = Math.min(100, Math.max(0, (xpInLevel / xpForLevel) * 100));
+    const level = levelInfo?.level || 1;
+    const nextLevelXP = levelInfo?.nextLevelXP || 100;
+    const progress = levelInfo?.progress || 0;
 
     return (
         <div className={cn("w-full space-y-1.5", className)}>

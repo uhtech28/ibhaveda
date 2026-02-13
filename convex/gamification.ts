@@ -234,6 +234,47 @@ export const awardPoints = mutation({
 
 // Award XP to a user and handle level ups
 // Usage: await awardXP({ db, userId: ..., amount: 50, action: 'create_idea' })
+// Helper: Level Calculation Strategy
+// Levels 1-10: Linear (100 XP per level)
+// Levels 11+: Exponential (Base 1000 XP, 1.5x multiplier per level relative to base)
+function calculateLevelFromXP(xp: number): number {
+    if (xp < 1000) {
+        return Math.floor(xp / 100) + 1;
+    }
+    // xp = 1000 * (1.5 ^ (level - 10))
+    // level - 10 = log(xp / 1000) / log(1.5)
+    // level = 10 + ...
+    const power = Math.log(xp / 1000) / Math.log(1.5);
+    return Math.floor(10 + power);
+}
+
+// Helper: Calculate XP required for a specific level
+function calculateXPForLevel(level: number): number {
+    if (level <= 10) {
+        return (level - 1) * 100;
+    }
+    return Math.floor(1000 * Math.pow(1.5, level - 10));
+}
+
+export const getLevelProgress = query({
+    args: { xp: v.number() },
+    handler: async (ctx, args) => {
+        const level = calculateLevelFromXP(args.xp);
+        const currentLevelStart = calculateXPForLevel(level);
+        const nextLevelStart = calculateXPForLevel(level + 1);
+
+        return {
+            level,
+            currentXP: args.xp,
+            levelStartXP: currentLevelStart,
+            nextLevelXP: nextLevelStart,
+            progress: ((args.xp - currentLevelStart) / (nextLevelStart - currentLevelStart)) * 100
+        };
+    }
+});
+
+// Award XP to a user and handle level ups
+// Usage: await awardXP({ db, userId: ..., amount: 50, action: 'create_idea' })
 export const awardXP = mutation({
     args: {
         userId: v.optional(v.id("users")),
@@ -262,8 +303,7 @@ export const awardXP = mutation({
         const currentLevel = user.level || 1;
         const newXP = currentXP + args.amount;
 
-        // Level calculation: Level = floor(sqrt(XP / 100)) + 1
-        const newLevel = Math.floor(Math.sqrt(newXP / 100)) + 1;
+        const newLevel = calculateLevelFromXP(newXP);
 
         await db.patch(userId, {
             xp: newXP,
@@ -293,8 +333,7 @@ export const internalAwardXP = internalMutation({
         const currentXP = user.xp || 0;
         const newXP = currentXP + args.amount;
 
-        // Level calculation: Level = floor(sqrt(XP / 100)) + 1
-        const newLevel = Math.floor(Math.sqrt(newXP / 100)) + 1;
+        const newLevel = calculateLevelFromXP(newXP);
 
         await db.patch(args.userId, {
             xp: newXP,

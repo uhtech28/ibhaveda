@@ -20,4 +20,11 @@ crons.interval(
     api.agent_actions.generateEngagement
 );
 
+// Schedule: Daily Leaderboard Reset (00:00 IST -> 18:30 UTC previous day)
+crons.daily(
+    "Finalize Daily Leaderboard",
+    { hourUTC: 18, minuteUTC: 30 },
+    api.leaderboard.finalizeDailyLeaderboard
+);
+
 export default crons;

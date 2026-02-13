@@ -493,6 +493,20 @@ export const updateRequestStatus = mutation({
             trigger: "accept_contribution",
           });
 
+          // Gamification V2: Skill Badge Progress
+          // Parse skills from idea.category (comma-separated)
+          if (idea.category) {
+            const skills = idea.category.split(',').map(s => s.trim()).filter(s => s);
+            for (const skill of skills) {
+              await ctx.scheduler.runAfter(0, internal.skillBadges.incrementSkillProgress, {
+                userId: request.contributorId,
+                ideaId: idea._id,
+                skill: skill,
+                type: "contribution",
+              });
+            }
+          }
+
         } else if (args.status === 'rejected') {
           // Rejected: Author +1 (Public) / +0 (Private)
           const authorPoints = isPublic ? 1 : 0;

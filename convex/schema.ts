@@ -286,4 +286,67 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_badge", ["badgeId"])
     .index("by_user_badge", ["userId", "badgeId"]),
+
+  // Gamification V2: Meetings
+  meetings: defineTable({
+    ideaId: v.id("ideas"),
+    organizerId: v.id("users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    scheduledAt: v.number(), // Unix timestamp
+    status: v.union(v.literal("scheduled"), v.literal("completed"), v.literal("cancelled")),
+    attendees: v.array(v.id("users")), // List of user IDs
+    meetingLink: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_idea", ["ideaId"])
+    .index("by_organizer", ["organizerId"])
+    .index("by_status", ["status"])
+    .index("by_idea_status", ["ideaId", "status"]),
+
+  // Gamification V2: Daily Leaderboard Winners
+  dailyLeaderboardWinners: defineTable({
+    date: v.string(), // YYYY-MM-DD (IST)
+    userId: v.id("users"),
+    rank: v.number(), // 1, 2, 3
+    points: v.number(), // Points scored that day
+    awardedAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_user", ["userId"])
+    .index("by_date_rank", ["date", "rank"]),
+
+  // Gamification V2: Skill Badges (Strict Per-Idea)
+  userSkillBadges: defineTable({
+    userId: v.id("users"),
+    ideaId: v.id("ideas"),
+    skill: v.string(), // The specific skill tag
+    badgeLeveL: v.optional(v.number()), // Visual tier (optional)
+    awardedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_idea", ["ideaId"])
+    .index("by_user_skill", ["userId", "skill"])
+    .index("by_user_idea_skill", ["userId", "ideaId", "skill"]),
+
+  // Gamification V2: Skill Levels (Meta-Game)
+  userSkillLevels: defineTable({
+    userId: v.id("users"),
+    skill: v.string(),
+    level: v.number(), // 1, 2, 3...
+    badgeCount: v.number(), // Number of skill badges collected for this skill
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+  // Gamification V2: Skill Progress (Tracking toward badges)
+  userSkillProgress: defineTable({
+    userId: v.id("users"),
+    ideaId: v.id("ideas"),
+    skill: v.string(),
+    contributionsCount: v.number(),
+    tasksCompletedCount: v.number(),
+    meetingsHostedCount: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_idea_skill", ["userId", "ideaId", "skill"]),
 })

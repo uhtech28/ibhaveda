@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 // Create a new todo for an idea
 export const createTodo = mutation({
@@ -340,6 +340,30 @@ export const toggleTodoComplete = mutation({
       updatedAt: Date.now(),
     });
 
+    // Gamification V2: Skill Badge Progress
+    if (newStatus === "done" && todo.status !== "done") {
+      if (idea.category) {
+        const skills = idea.category.split(',').map(s => s.trim()).filter(s => s);
+        const assigneeId = todo.assignedTo || todo.authorId; // Award to assignee if exists, else author? 
+        // Actually, if assignedTo exists, THEY did it. If not, the author did it? 
+        // PRD says "Contributor completes task".
+
+        // Logic: If assignedTo is set, they get credit.
+        // If not, maybe it's a self-task by author.
+
+        const creditUserId = todo.assignedTo || todo.authorId;
+
+        for (const skill of skills) {
+          await ctx.scheduler.runAfter(0, internal.skillBadges.incrementSkillProgress, {
+            userId: creditUserId,
+            ideaId: idea._id,
+            skill: skill,
+            type: "task",
+          });
+        }
+      }
+    }
+
     return { status: newStatus, message: "Todo status updated successfully" };
   },
 });
@@ -408,6 +432,23 @@ export const updateTodoStatus = mutation({
       status: args.status,
       updatedAt: Date.now(),
     });
+
+    // Gamification V2: Skill Badge Progress
+    if (args.status === "done" && todo.status !== "done") {
+      if (idea.category) {
+        const skills = idea.category.split(',').map(s => s.trim()).filter(s => s);
+        const creditUserId = todo.assignedTo || todo.authorId;
+
+        for (const skill of skills) {
+          await ctx.scheduler.runAfter(0, internal.skillBadges.incrementSkillProgress, {
+            userId: creditUserId,
+            ideaId: idea._id,
+            skill: skill,
+            type: "task",
+          });
+        }
+      }
+    }
 
     return { status: args.status, message: "Todo status updated successfully" };
   },

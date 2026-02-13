@@ -15,6 +15,9 @@ import { useChat } from "@/components/chat/ChatContext";
 import { InvitationButton } from "@/components/requests/invitation-button";
 import { LevelProgress } from "@/components/gamification/LevelProgress";
 import { BadgeList } from "@/components/gamification/BadgeList";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { Medal } from "lucide-react";
 
 export interface UserProfile {
   _id: Id<"users">;
@@ -37,6 +40,35 @@ export interface UserProfile {
   level?: number;
 }
 
+interface SkillProfileItem {
+  _id: Id<"userSkillLevels">;
+  skill: string;
+  level: number;
+  badgeCount: number;
+}
+
+const SkillMasteryList = ({ userId }: { userId: Id<"users"> }) => {
+  const skillProfile = useQuery(api.skillBadges.getSkillProfile, { userId });
+
+  if (!skillProfile || skillProfile.length === 0) return null;
+
+  return (
+    <div className="mt-2 text-xs">
+      <div className="text-[10px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Top Masteries</div>
+      <div className="flex flex-wrap gap-2">
+        {skillProfile.slice(0, 3).map((sp: SkillProfileItem) => (
+          <div key={sp._id} className="flex items-center gap-1.5 bg-primary/5 border border-primary/10 rounded-full pl-2 pr-3 py-0.5" title={`${sp.badgeCount} badges earned`}>
+            <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-bold text-primary">
+              {sp.level}
+            </div>
+            <span className="font-medium text-foreground/80">{sp.skill}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 
 interface CompactProfileViewProps {
   profile: UserProfile;
@@ -57,6 +89,12 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   const { openChatWithUser } = useChat();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"created" | "sparked" | "contributed">("created");
+
+  const dailyWins = useQuery(api.leaderboard.getDailyWins, { userId: profile._id as Id<"users"> });
+
+  const golds = dailyWins?.filter(w => w.rank === 1).length || 0;
+  const silvers = dailyWins?.filter(w => w.rank === 2).length || 0;
+  const bronzes = dailyWins?.filter(w => w.rank === 3).length || 0;
 
   const handleEditProfile = () => {
     router.push("/profile-setup");
@@ -110,6 +148,30 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                         <span className="font-semibold text-primary">Lvl {profile.level || 1}</span>
                         <span>{profile.xp || 0} XP</span>
                       </div>
+
+                      {/* Daily Medals */}
+                      {(golds > 0 || silvers > 0 || bronzes > 0) && (
+                        <div className="flex gap-2 mt-2 pt-2 border-t border-border/40">
+                          {golds > 0 && (
+                            <div className="flex items-center gap-1 text-[10px] text-yellow-600 bg-yellow-100/50 px-1.5 py-0.5 rounded-full border border-yellow-200">
+                              <Medal className="w-3 h-3 fill-yellow-500 text-yellow-600" />
+                              <span className="font-bold">{golds}</span>
+                            </div>
+                          )}
+                          {silvers > 0 && (
+                            <div className="flex items-center gap-1 text-[10px] text-slate-600 bg-slate-100/50 px-1.5 py-0.5 rounded-full border border-slate-200">
+                              <Medal className="w-3 h-3 fill-slate-400 text-slate-600" />
+                              <span className="font-bold">{silvers}</span>
+                            </div>
+                          )}
+                          {bronzes > 0 && (
+                            <div className="flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100/50 px-1.5 py-0.5 rounded-full border border-amber-200">
+                              <Medal className="w-3 h-3 fill-amber-600 text-amber-700" />
+                              <span className="font-bold">{bronzes}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   {isOwner ? (
@@ -167,7 +229,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                   )}
                 </div>
 
-                {/* Skills & Industries moved here */}
+                {/* Skills & Industries */}
                 <div className="pt-1.5 space-y-2">
                   {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
                     <div className="flex flex-wrap gap-1.5">
@@ -185,13 +247,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                           {skill}
                         </Badge>
                       ))}
-                      {profile.skills && profile.skills.length > 5 && (
-                        <Badge variant="outline" className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5">
-                          +{profile.skills.length - 5}
-                        </Badge>
-                      )}
                     </div>
                   )}
+
+                  {/* V2 Skill Mastery */}
+                  <SkillMasteryList userId={profile._id} />
                 </div>
               </div>
             </div>
@@ -334,3 +394,4 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
     </div>
   )
 }
+
