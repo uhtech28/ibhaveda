@@ -7,6 +7,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // Added import
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -236,7 +237,7 @@ export function ChatInterface() {
     // 3. Chat View
     const renderChat = () => (
         <div className="flex flex-col h-full bg-background absolute inset-0 z-20"> {/* Absolute to overlay fully */}
-            <div className="px-4 py-3 flex items-center gap-2 border-b bg-card/80 backdrop-blur-md sticky top-0 z-10 w-full">
+            <div className="px-4 py-2 flex items-center gap-2 border-b bg-card/80 backdrop-blur-md sticky top-0 z-10 w-full">
                 <Button variant="ghost" size="icon" onClick={handleBack} className="-ml-2 h-8 w-8">
                     <ChevronLeft className="w-6 h-6" />
                 </Button>
@@ -289,24 +290,33 @@ export function ChatInterface() {
                 </div>
             </div>
 
-            <div className="p-3 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="p-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-                    <Button type="button" size="icon" variant="ghost" className="h-10 w-10 rounded-full shrink-0">
+                    <Button type="button" size="icon" variant="ghost" className="h-9 w-9 rounded-full shrink-0 mb-0.5">
                         <Plus className="w-5 h-5 text-muted-foreground" />
                     </Button>
-                    <Input
-                        value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        placeholder="Message..."
-                        className="flex-1 rounded-full bg-muted border-0 focus-visible:ring-1 focus-visible:ring-offset-0 min-h-[40px] py-2"
-                    />
+                    <div className="flex-1 relative">
+                        <Textarea
+                            value={inputMessage}
+                            onChange={(e) => setInputMessage(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendMessage();
+                                }
+                            }}
+                            placeholder="Message..."
+                            className="w-full rounded-3xl bg-muted border-0 focus-visible:ring-1 focus-visible:ring-offset-0 min-h-[38px] max-h-[120px] py-2.5 px-4 resize-none scrollbar-hide text-sm"
+                            rows={1}
+                        />
+                    </div>
                     {inputMessage.trim() ? (
-                        <Button type="submit" size="icon" className="h-10 w-10 rounded-full shrink-0 transition-all">
+                        <Button type="submit" size="icon" className="h-9 w-9 rounded-full shrink-0 transition-all mb-0.5">
                             <Send className="w-4 h-4 ml-0.5" />
                         </Button>
                     ) : (
-                        <div className="flex gap-1 shrink-0">
-                            <Button type="button" size="icon" variant="ghost" className="h-10 w-10 rounded-full"><ImageIcon className="w-5 h-5 text-muted-foreground" /></Button>
+                        <div className="flex gap-1 shrink-0 mb-0.5">
+                            <Button type="button" size="icon" variant="ghost" className="h-9 w-9 rounded-full"><ImageIcon className="w-5 h-5 text-muted-foreground" /></Button>
                         </div>
                     )}
                 </form>
@@ -334,6 +344,7 @@ export function GlobalChatSheet() {
                 </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-full sm:w-[400px] p-0 gap-0 border-l border-border/40 shadow-2xl overflow-hidden sm:max-w-md">
+                <SheetTitle className="sr-only">Global Chat</SheetTitle>
                 <ChatInterface />
             </SheetContent>
         </Sheet>

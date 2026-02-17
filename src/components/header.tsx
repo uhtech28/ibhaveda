@@ -1,6 +1,7 @@
 'use client'
 
-import { User, LogOut } from 'lucide-react'
+import { User, LogOut, GitBranch, ListTodo, Calendar, MessageCircle, Plus } from 'lucide-react'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { LogoIcon } from '@/components/logo'
 import { Button } from '@/components/ui/button'
@@ -25,10 +26,16 @@ const menuItems = [
 
 export const HeroHeader = ({
     searchQuery,
-    onSearchChange
+    onSearchChange,
+    onOpenHierarchy,
+    onOpenTodos,
+    onOpenCalendar
 }: {
     searchQuery?: string;
     onSearchChange?: (query: string) => void;
+    onOpenHierarchy?: () => void;
+    onOpenTodos?: () => void;
+    onOpenCalendar?: () => void;
 }) => {
     const [isScrolled, setIsScrolled] = React.useState(false)
 
@@ -42,6 +49,9 @@ export const HeroHeader = ({
         window.addEventListener('scroll', handleScroll)
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
+
+    const pathname = usePathname()
+    const isIdeaPage = pathname?.startsWith('/idea/') && pathname !== '/create-idea'
 
     return (
         <header className="relative">
@@ -166,9 +176,31 @@ export const HeroHeader = ({
 
                             {/* Mobile Actions */}
                             <div className="flex-shrink-0 flex items-center gap-1">
-                                <ThemeToggle />
+                                {isIdeaPage ? (
+                                    /* Idea Page Actions */
+                                    <>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onOpenHierarchy}>
+                                            <Plus className="h-5 w-5" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onOpenTodos}>
+                                            <ListTodo className="h-5 w-5" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onOpenCalendar}>
+                                            <Calendar className="h-5 w-5" />
+                                        </Button>
+                                        <GlobalChatSheet />
+                                    </>
+                                ) : (
+                                    /* Global Feed Actions */
+                                    <>
+                                        <ThemeToggle />
+                                        <SignedIn>
+                                            <NotificationBell />
+                                        </SignedIn>
+                                    </>
+                                )}
+
                                 <SignedIn>
-                                    <NotificationBell />
                                     {/* Mobile User Menu */}
                                     <Popover>
                                         <PopoverTrigger asChild>

@@ -188,7 +188,13 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <HeroHeader searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      <HeroHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onOpenHierarchy={() => setShowHierarchy(true)}
+        onOpenTodos={() => setShowTodos(true)}
+        onOpenCalendar={() => setShowCalendar(true)}
+      />
 
 
 
@@ -448,7 +454,7 @@ const IdeaContent: React.FC<{
         </div>
 
         {/* Author (Top Right) */}
-        <div className="absolute top-6 right-6 flex items-center gap-3 bg-background/30 backdrop-blur-md px-3 py-2 rounded-full border border-white/10 shadow-sm z-10">
+        <div className="absolute top-4 right-4 flex items-center gap-3 bg-background/30 backdrop-blur-md p-1.5 sm:px-3 sm:py-2 rounded-full border border-white/10 shadow-sm z-10 transition-all hover:bg-background/40">
           {idea.author?.avatar ? (
             <Image
               src={idea.author.avatar}
@@ -462,8 +468,8 @@ const IdeaContent: React.FC<{
               {getInitials(idea.author?.name || idea.author?.username || 'U')}
             </div>
           )}
-          <div className="flex flex-col min-w-0 pr-2">
-            <span className="text-xs font-semibold text-foreground/90 leading-none truncate">
+          <div className="flex flex-col min-w-0 pr-2 hidden sm:flex">
+            <span className="text-xs font-semibold text-foreground/90 leading-none truncate max-w-[100px]">
               {idea.author?.name || idea.author?.username || 'Unknown'}
             </span>
             <span className="text-[10px] text-muted-foreground">
@@ -906,64 +912,24 @@ const TodoSection: React.FC<{
                           contributors={contributors}
                           className="w-full"
                         >
-                          {editingTodoId === todo?._id ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                value={editingTitle}
-                                onChange={(e) => setEditingTitle(e.target.value)}
-                                className="flex-1 h-8 text-sm"
-                                maxLength={200}
-                                autoFocus
-                              />
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleSaveEdit}
-                                disabled={!editingTitle.trim() || isUpdating}
-                                className="text-green-600 hover:text-green-700 h-6 w-6 p-0"
-                              >
-                                <Check className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleCancelEdit}
-                                disabled={isUpdating}
-                                className="text-muted-foreground hover:text-foreground h-6 w-6 p-0"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`flex-1 text-sm ${column.id === "done" ? "line-through text-muted-foreground" : ""
+                              }`}>
+                              {item.name}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {todo?.canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteTodo(todo._id as Id<"todos">)}
+                                  className="text-destructive hover:text-destructive/80 h-6 w-6 p-0 opacity-70 hover:opacity-100 flex-shrink-0"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-between gap-2">
-                              <span className={`flex-1 text-sm ${column.id === "done" ? "line-through text-muted-foreground" : ""
-                                }`}>
-                                {item.name}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                {todo?.canEdit && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditTodo(todo._id as Id<"todos">, todo.title)}
-                                    className="text-muted-foreground hover:text-foreground h-6 w-6 p-0 opacity-60 hover:opacity-100 flex-shrink-0"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </Button>
-                                )}
-                                {todo?.canDelete && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteTodo(todo._id as Id<"todos">)}
-                                    className="text-destructive hover:text-destructive/80 h-6 w-6 p-0 opacity-70 hover:opacity-100 flex-shrink-0"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                          </div>
                         </KanbanCard>
                       );
                     }}

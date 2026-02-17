@@ -28,7 +28,7 @@ export const NotificationBell = () => {
           <span className="sr-only">Notifications</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full sm:w-96 md:w-[28rem] lg:w-[32rem] p-0" align="end">
+      <PopoverContent className="w-[90vw] sm:w-96 md:w-[28rem] lg:w-[32rem] p-0 mr-2 sm:mr-0" align="end">
         <ScrollArea className="h-[60vh] sm:h-[500px] lg:h-[700px]">
           <NotificationList />
         </ScrollArea>

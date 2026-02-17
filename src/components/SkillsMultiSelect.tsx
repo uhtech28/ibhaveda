@@ -103,7 +103,7 @@ export function SkillsMultiSelect({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
+        <PopoverContent className="w-[90vw] sm:w-[400px] p-0" align="start">
           <Command>
             <CommandInput
               placeholder="Search skills..."
@@ -172,7 +172,7 @@ export function SkillsMultiSelect({
       {selectedSkills.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selectedSkills.map((skill) => {
-             return (
+            return (
               <Badge key={skill} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
                 {skill}
                 <button
@@ -186,7 +186,7 @@ export function SkillsMultiSelect({
                   <span className="sr-only">Remove {skill}</span>
                 </button>
               </Badge>
-             );
+            );
           })}
         </div>
       )}

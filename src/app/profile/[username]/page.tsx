@@ -18,8 +18,9 @@ export default function ProfilePage() {
   // Convex data
   const currentUser = useQuery(api.users.getCurrentUser)
   const realProfile = useQuery(api.users.getUserProfile, { username })
-  const myRequests = useQuery(api.contributionRequests.getMyRequests)
-  const incomingRequests = useQuery(api.contributionRequests.getIncomingRequests)
+  const myRequests = useQuery(api.contributionRequests.getMyRequests, currentUser ? {} : "skip")
+  const incomingRequests = useQuery(api.contributionRequests.getIncomingRequests, currentUser ? {} : "skip")
+  // Fetch public ideas for the profile being viewed (skip if profile not yet loaded)
   const publicIdeas = useQuery(api.ideas.getPublicIdeasForUser, realProfile ? { userId: realProfile._id } : "skip")
 
   // Check if this is current user's profile

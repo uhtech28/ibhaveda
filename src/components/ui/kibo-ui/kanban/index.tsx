@@ -40,7 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Plus } from "lucide-react";
+import { User, Plus, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -327,7 +327,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
       <div className="space-y-2">
         {/* Header: Drag Handle & Metadata (Deadline + Assignee) */}
         <div
-          className="flex items-start justify-between mb-1.5 cursor-grab active:cursor-grabbing"
+          className="flex items-start justify-between mb-1.5 cursor-grab active:cursor-grabbing touch-action-none"
           {...listeners}
           {...attributes}
         >
@@ -342,21 +342,39 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
             {deadline ? format(new Date(deadline), "MMM dd") : "No deadline"}
           </div>
 
-          {/* Assignee (Moved here) */}
-          <div className="flex items-center gap-2 ml-2">
-            {assignedTo ? (
-              <Avatar className="h-5 w-5 shrink-0 ring-1 ring-background">
-                <AvatarImage src={assignedTo.avatar} alt={assignedTo.name} />
-                <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
-                  {assignedTo.name
-                    ? assignedTo.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                    : assignedTo.username.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            ) : (
-              <div className="flex items-center text-muted-foreground/40">
-                <User className="h-4 w-4" />
-              </div>
+          <div className="flex items-center gap-1">
+            {/* Assignee */}
+            <div className="flex items-center gap-2 ml-2">
+              {assignedTo ? (
+                <Avatar className="h-5 w-5 shrink-0 ring-1 ring-background">
+                  <AvatarImage src={assignedTo.avatar} alt={assignedTo.name} />
+                  <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                    {assignedTo.name
+                      ? assignedTo.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                      : assignedTo.username.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <div className="flex items-center text-muted-foreground/40">
+                  <User className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+
+            {/* Edit Button */}
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 ml-1 text-muted-foreground/50 hover:text-foreground"
+                onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditDialogOpen(true);
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
             )}
           </div>
         </div>
