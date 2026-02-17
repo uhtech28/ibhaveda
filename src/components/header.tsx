@@ -31,7 +31,7 @@ export const HeroHeader = ({
     onSearchChange?: (query: string) => void;
 }) => {
     const [isScrolled, setIsScrolled] = React.useState(false)
-    const [isMobileSearchOpen, setIsMobileSearchOpen] = React.useState(false)
+
     const { signOut } = useClerk()
     const currentUser = useQuery(api.users.getCurrentUser)
 
@@ -147,101 +147,65 @@ export const HeroHeader = ({
                             </SignedIn>
                         </div>
 
-                        {/* Mobile Actions (Top Bar) */}
-                        <div className="flex lg:hidden items-center justify-between w-full h-16">
-                            {isMobileSearchOpen ? (
-                                <div className="flex items-center w-full gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    <div className="flex-1">
-                                        <SearchBar
-                                            value={searchQuery}
-                                            onSearch={(query) => onSearchChange?.(query)}
-                                            placeholder="Search ideas..."
-                                            className="w-full h-10"
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => setIsMobileSearchOpen(false)}
-                                        className="shrink-0"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                                    </Button>
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Mobile Logo */}
-                                    <Link href="/" className="flex items-center text-primary mr-2">
-                                        <LogoIcon className="h-8 w-auto" />
-                                    </Link>
+                        {/* Mobile Actions (Top Bar) - Persistent Layout */}
+                        <div className="flex lg:hidden items-center justify-between w-full h-16 gap-2">
+                            {/* Mobile Logo */}
+                            <Link href="/" className="flex-shrink-0 flex items-center text-primary">
+                                <LogoIcon className="h-8 w-8" uniColor />
+                            </Link>
 
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-9 w-9"
-                                            onClick={() => setIsMobileSearchOpen(true)}
-                                        >
-                                            <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                className="lucide lucide-search"
-                                            >
-                                                <circle cx="11" cy="11" r="8" />
-                                                <path d="m21 21-4.3-4.3" />
-                                            </svg>
-                                        </Button>
+                            {/* Persistent Mobile Search */}
+                            <div className="flex-1 min-w-0">
+                                <SearchBar
+                                    value={searchQuery}
+                                    onSearch={(query) => onSearchChange?.(query)}
+                                    placeholder="Search..."
+                                    className="w-full h-9 text-xs"
+                                />
+                            </div>
 
-                                        <SignedIn>
-                                            <NotificationBell />
-                                            {/* Mobile User Menu */}
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full ml-1">
-                                                        <Avatar className="h-7 w-7">
-                                                            <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
-                                                            <AvatarFallback>{currentUser?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
-                                                        </Avatar>
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-56" align="end">
-                                                    <div className="grid gap-2">
-                                                        <Link
-                                                            href={`/profile/${currentUser?.username}`}
-                                                            className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors"
-                                                        >
-                                                            {currentUser?.displayName}
-                                                        </Link>
-                                                        <Button
-                                                            variant="ghost"
-                                                            className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50"
-                                                            onClick={() => signOut()}
-                                                        >
-                                                            <LogOut className="h-4 w-4" />
-                                                            <span>Sign Out</span>
-                                                        </Button>
-                                                    </div>
-                                                </PopoverContent>
-                                            </Popover>
-                                        </SignedIn>
-                                        <SignedOut>
-                                            <SignInButton>
-                                                <Button size="sm" variant="ghost" className="px-2">
-                                                    Login
+                            {/* Mobile Actions */}
+                            <div className="flex-shrink-0 flex items-center gap-1">
+                                <SignedIn>
+                                    <NotificationBell />
+                                    {/* Mobile User Menu */}
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full ml-1">
+                                                <Avatar className="h-7 w-7">
+                                                    <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                                                    <AvatarFallback>{currentUser?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                                                </Avatar>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56" align="end">
+                                            <div className="grid gap-2">
+                                                <Link
+                                                    href={`/profile/${currentUser?.username}`}
+                                                    className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors"
+                                                >
+                                                    {currentUser?.displayName}
+                                                </Link>
+                                                <Button
+                                                    variant="ghost"
+                                                    className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={() => signOut()}
+                                                >
+                                                    <LogOut className="h-4 w-4" />
+                                                    <span>Sign Out</span>
                                                 </Button>
-                                            </SignInButton>
-                                        </SignedOut>
-                                    </div>
-                                </>
-                            )}
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                </SignedIn>
+                                <SignedOut>
+                                    <SignInButton>
+                                        <Button size="sm" variant="ghost" className="px-1 text-xs">
+                                            Login
+                                        </Button>
+                                    </SignInButton>
+                                </SignedOut>
+                            </div>
                         </div>
                     </div>
                 </div>
