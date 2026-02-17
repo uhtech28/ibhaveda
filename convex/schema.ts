@@ -239,4 +239,121 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_conversation", ["userId", "conversationId"]),
+
+  // --- Gamification Tables ---
+
+  // User Wallets (Points/Coins)
+  wallets: defineTable({
+    userId: v.id("users"),
+    balance: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_balance", ["balance"]),
+
+  // Transactions History
+  transactions: defineTable({
+    walletId: v.id("wallets"),
+    amount: v.number(),
+    type: v.string(), // 'daily_login', 'create_idea', 'spark_idea', etc.
+    description: v.string(),
+    relatedId: v.optional(v.string()), // ID of related entity (idea, etc.)
+    createdAt: v.number(),
+  })
+    .index("by_wallet", ["walletId"])
+    .index("by_type", ["type"]),
+
+  // User Streaks
+  userStreaks: defineTable({
+    userId: v.id("users"),
+    currentStreak: v.number(),
+    longestStreak: v.number(),
+    lastLoginDate: v.string(), // ISO date string "YYYY-MM-DD"
+    lastStreakUpdate: v.number(),
+    recoveryAvailable: v.optional(v.boolean()),
+  })
+    .index("by_user", ["userId"]),
+
+  // Badges Definitions
+  badges: defineTable({
+    slug: v.string(), // Unique identifier e.g. "first-idea"
+    name: v.string(),
+    description: v.string(),
+    icon: v.string(), // Icon name
+    category: v.string(), // 'creation', 'social', etc.
+    criteria: v.any(), // Flexible criteria object
+  })
+    .index("by_slug", ["slug"]),
+
+  // User Badges (Earned)
+  userBadges: defineTable({
+    userId: v.id("users"),
+    badgeId: v.id("badges"),
+    awardedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_badge", ["userId", "badgeId"]),
+
+  // User Skill Progress (per Idea/Skill)
+  userSkillProgress: defineTable({
+    userId: v.id("users"),
+    ideaId: v.id("ideas"),
+    skill: v.string(),
+    contributionsCount: v.number(),
+    tasksCompletedCount: v.number(),
+    meetingsHostedCount: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_idea_skill", ["userId", "ideaId", "skill"]),
+
+  // User Skill Badges (Earned per Idea/Skill)
+  userSkillBadges: defineTable({
+    userId: v.id("users"),
+    ideaId: v.id("ideas"),
+    skill: v.string(),
+    badgeLeveL: v.number(), // 1=Bronze, 2=Silver, 3=Gold, 4=Platinum
+    awardedAt: v.number(),
+  })
+    .index("by_user_idea_skill", ["userId", "ideaId", "skill"])
+    .index("by_user_skill", ["userId", "skill"]),
+
+  // User Skill Levels (Aggregate)
+  userSkillLevels: defineTable({
+    userId: v.id("users"),
+    skill: v.string(),
+    level: v.number(),
+    badgeCount: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_skill", ["userId", "skill"]),
+
+  // Meetings Table
+  meetings: defineTable({
+    ideaId: v.id("ideas"),
+    organizerId: v.optional(v.id("users")), // Made optional for legacy data
+    title: v.string(),
+    description: v.optional(v.string()),
+    scheduledAt: v.optional(v.number()), // Made optional
+    status: v.optional(v.string()), // Made optional
+    attendees: v.array(v.id("users")),
+    meetingLink: v.optional(v.string()),
+    createdAt: v.number(),
+
+    // Legacy fields found in existing data
+    createdBy: v.optional(v.string()),
+    date: v.optional(v.number()),
+  })
+    .index("by_organizer", ["organizerId"])
+    .index("by_idea", ["ideaId"]),
+
+  // Daily Leaderboard Winners
+  dailyLeaderboardWinners: defineTable({
+    date: v.string(), // YYYY-MM-DD
+    userId: v.id("users"),
+    rank: v.number(),
+    points: v.number(),
+    awardedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
 })

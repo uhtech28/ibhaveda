@@ -12,6 +12,7 @@ import type * as agent from "../agent.js";
 import type * as agent_actions from "../agent_actions.js";
 import type * as badges from "../badges.js";
 import type * as chat from "../chat.js";
+import type * as communities from "../communities.js";
 import type * as contributionRequests from "../contributionRequests.js";
 import type * as crons from "../crons.js";
 import type * as debug from "../debug.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   agent_actions: typeof agent_actions;
   badges: typeof badges;
   chat: typeof chat;
+  communities: typeof communities;
   contributionRequests: typeof contributionRequests;
   crons: typeof crons;
   debug: typeof debug;
