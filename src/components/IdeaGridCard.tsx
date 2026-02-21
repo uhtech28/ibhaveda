@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { MessageCircle, Users, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -55,9 +55,28 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
       .slice(0, 2);
   };
 
-  // Parse categories (skills) and industries
-  const skills = idea.category ? idea.category.split(',').map(s => s.trim()) : [];
-  const industries = idea.industries ? idea.industries.split(',').map(i => i.trim()) : [];
+  const [showAllIndustries, setShowAllIndustries] = useState(false);
+  const [showAllSkills, setShowAllSkills] = useState(false);
+
+  // Robust parsing of categories (skills) and industries
+  const parseTags = (tagStr?: string): string[] => {
+    if (!tagStr) return [];
+    try {
+      const parsed = JSON.parse(tagStr);
+      if (Array.isArray(parsed)) {
+        return parsed.map(s => String(s).trim()).filter(s => s);
+      }
+    } catch {
+      // Not JSON
+    }
+    return tagStr.split(',').map(s => s.trim()).filter(s => s);
+  };
+
+  const skills = parseTags(idea.category);
+  const industries = parseTags(idea.industries);
+
+  const displayedIndustries = showAllIndustries ? industries : industries.slice(0, 1);
+  const displayedSkills = showAllSkills ? skills : skills.slice(0, 1);
 
   const firstImageAttachment = Array.isArray(idea.attachments)
     ? idea.attachments.find(att => (att.type || "").toLowerCase().startsWith("image/"))
@@ -128,12 +147,11 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
         </p>
 
         {/* Tags Section - Below Content */}
-        {/* Tags Section - Below Content */}
         <div className="flex flex-col gap-2 mt-auto">
           {/* Industries - Purple/Pink Theme */}
           {industries.length > 0 && (
             <div className="flex flex-wrap gap-2 items-center">
-              {industries.slice(0, 2).map((tag, i) => (
+              {displayedIndustries.map((tag, i) => (
                 <button
                   key={`ind-${i}`}
                   onClick={(e) => {
@@ -145,10 +163,17 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
                   {tag}
                 </button>
               ))}
-              {industries.length > 2 && (
-                <span className="text-[10px] font-medium px-2 py-1 rounded-lg bg-purple-500/5 text-purple-600/70 border border-purple-500/10">
-                  +{industries.length - 2}
-                </span>
+              {!showAllIndustries && industries.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAllIndustries(true);
+                  }}
+                  className="text-[10px] font-bold px-2 py-1 rounded-lg bg-purple-500/5 text-purple-600 border border-purple-500/10 hover:bg-purple-500/10 border-transparent transition-colors"
+                  title={`Show ${industries.length - 1} more industries`}
+                >
+                  •••
+                </button>
               )}
             </div>
           )}
@@ -156,7 +181,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
           {/* Skills - Blue/Indigo Theme */}
           {skills.length > 0 && (
             <div className="flex flex-wrap gap-2 items-center">
-              {skills.slice(0, 2).map((tag, i) => (
+              {displayedSkills.map((tag, i) => (
                 <button
                   key={`skill-${i}`}
                   onClick={(e) => {
@@ -168,11 +193,32 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
                   {tag}
                 </button>
               ))}
-              {skills.length > 2 && (
-                <span className="text-[10px] font-medium px-2 py-1 rounded-lg bg-blue-500/5 text-blue-600/70 border border-blue-500/10">
-                  +{skills.length - 2}
-                </span>
+              {!showAllSkills && skills.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAllSkills(true);
+                  }}
+                  className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-500/5 text-blue-600 border border-blue-500/10 hover:bg-blue-500/10 transition-colors"
+                  title={`Show ${skills.length - 1} more skills`}
+                >
+                  •••
+                </button>
               )}
+
+              {/* Collapse Button (Only show if at least one is expanded and has more than 1 item) */}
+              {(showAllIndustries && industries.length > 1) || (showAllSkills && skills.length > 1) ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAllIndustries(false);
+                    setShowAllSkills(false);
+                  }}
+                  className="text-[10px] font-medium px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors ml-auto"
+                >
+                  Show less
+                </button>
+              ) : null}
             </div>
           )}
         </div>

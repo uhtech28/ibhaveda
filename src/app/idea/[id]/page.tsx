@@ -372,9 +372,29 @@ const IdeaContent: React.FC<{
     return name.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // Parse categories (skills) and industries
-  const skills = idea.category ? idea.category.split(',').map(s => s.trim()) : [];
-  const industries = idea.industries ? idea.industries.split(',').map(i => i.trim()) : [];
+  const [showAllIndustries, setShowAllIndustries] = useState(false);
+  const [showAllSkills, setShowAllSkills] = useState(false);
+
+  // Robust parsing of categories (skills) and industries that might be JSON arrays or CSV strings
+  const parseTags = (tagStr?: string): string[] => {
+    if (!tagStr) return [];
+    try {
+      // Try parsing as JSON first (if stored as an array string)
+      const parsed = JSON.parse(tagStr);
+      if (Array.isArray(parsed)) {
+        return parsed.map(s => String(s).trim()).filter(s => s);
+      }
+    } catch {
+      // If not JSON, split by comma
+    }
+    return tagStr.split(',').map(s => s.trim()).filter(s => s);
+  };
+
+  const skills = parseTags(idea.category);
+  const industries = parseTags(idea.industries);
+
+  const displayedIndustries = showAllIndustries ? industries : industries.slice(0, 1);
+  const displayedSkills = showAllSkills ? skills : skills.slice(0, 1);
 
   const firstImageAttachment = Array.isArray(idea.attachments)
     ? idea.attachments.find(att => (att.type || "").toLowerCase().startsWith("image/"))
@@ -538,28 +558,60 @@ const IdeaContent: React.FC<{
 
         {/* Tags */}
         <div className="flex flex-col gap-4 pt-6 border-t border-border/50">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Industries */}
-            {industries.map((tag, i) => (
+            {displayedIndustries.map((tag, i) => (
               <button
                 key={`ind-${i}`}
                 onClick={() => onTagClick?.(tag)}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 transition-colors cursor-pointer"
               >
                 {tag}
               </button>
             ))}
+            {!showAllIndustries && industries.length > 1 && (
+              <button
+                onClick={() => setShowAllIndustries(true)}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-purple-500/5 text-purple-600 border border-purple-500/10 hover:bg-purple-500/10 transition-colors"
+                title={`Show ${industries.length - 1} more industries`}
+              >
+                •••
+              </button>
+            )}
 
             {/* Skills */}
-            {skills.map((tag, i) => (
+            {displayedSkills.map((tag, i) => (
               <button
                 key={`skill-${i}`}
                 onClick={() => onTagClick?.(tag)}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 transition-colors cursor-pointer"
               >
                 {tag}
               </button>
             ))}
+            {!showAllSkills && skills.length > 1 && (
+              <button
+                onClick={() => setShowAllSkills(true)}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-500/5 text-blue-600 border border-blue-500/10 hover:bg-blue-500/10 transition-colors"
+                title={`Show ${skills.length - 1} more skills`}
+              >
+                •••
+              </button>
+            )}
+
+            {/* Collapse Button */}
+            {(showAllIndustries && industries.length > 1) || (showAllSkills && skills.length > 1) ? (
+              <button
+                onClick={() => {
+                  setShowAllIndustries(false);
+                  setShowAllSkills(false);
+                }}
+                className="text-xs font-medium px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-colors ml-1"
+                title="Show less"
+              >
+                Show less
+              </button>
+            ) : null}
           </div>
         </div>
 
