@@ -12,7 +12,7 @@ export const MobileBottomNav = () => {
   const pathname = usePathname();
   const currentUser = useQuery(api.users.getCurrentUser);
 
-  if (pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')) {
+  if (pathname === '/' || pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')) {
     return null;
   }
 
