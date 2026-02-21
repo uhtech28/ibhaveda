@@ -17,9 +17,10 @@ interface InvitationButtonProps {
     username: string;
     displayName: string;
   };
+  iconOnly?: boolean;
 }
 
-export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser }) => {
+export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, iconOnly }) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [invitationMessage, setInvitationMessage] = useState("");
 
@@ -73,9 +74,9 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser }
 
   if (!myIdeas) {
     return (
-      <Button variant="outline" size="sm" disabled className="w-full">
-        <Spinner size={14} />
-        Loading...
+      <Button variant="outline" size={iconOnly ? "icon" : "sm"} disabled className={iconOnly ? "h-8 w-8 rounded-full flex-shrink-0" : "w-full"}>
+        <Spinner size={14} className={iconOnly ? "" : "mr-2"} />
+        {!iconOnly && "Loading..."}
       </Button>
     );
   }
@@ -89,13 +90,13 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser }
     return (
       <Button
         variant="outline"
-        size="sm"
+        size={iconOnly ? "icon" : "sm"}
         disabled
         title="Create an idea first to send invitations"
-        className="w-full"
+        className={iconOnly ? "h-8 w-8 rounded-full flex-shrink-0" : "w-full"}
       >
-        <UserPlus className="w-4 h-4 mr-2" />
-        Send Invitation
+        <UserPlus className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
+        {!iconOnly && "Send Invitation"}
       </Button>
     );
   }
@@ -106,11 +107,12 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser }
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            size="sm"
-            className="w-full"
+            size={iconOnly ? "icon" : "sm"}
+            className={iconOnly ? "h-8 w-8 rounded-full flex-shrink-0" : "w-full"}
+            title="Send Invitation"
           >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Send Invitation
+            <UserPlus className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
+            {!iconOnly && "Send Invitation"}
           </Button>
         </PopoverTrigger>
 

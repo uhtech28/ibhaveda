@@ -144,25 +144,25 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                       Edit Profile
                     </Button>
                   ) : (
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <Button
                         variant="default"
-                        size="sm"
+                        size="icon"
                         onClick={handleSendMessage}
-                        className="gap-2 h-8"
+                        className="h-8 w-8 rounded-full flex-shrink-0"
+                        title="Message"
                       >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        Message
+                        <MessageCircle className="w-4 h-4 text-white" />
+                        <span className="sr-only">Message</span>
                       </Button>
-                      <div className="w-32">
-                        <InvitationButton
-                          targetUser={{
-                            _id: profile._id,
-                            username: profile.username,
-                            displayName: profile.displayName,
-                          }}
-                        />
-                      </div>
+                      <InvitationButton
+                        targetUser={{
+                          _id: profile._id,
+                          username: profile.username,
+                          displayName: profile.displayName,
+                        }}
+                        iconOnly
+                      />
                     </div>
                   )}
                 </div>
@@ -193,7 +193,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                   {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
                     <div className="flex flex-wrap gap-1.5">
                       {profile.industry && (
-                        <Badge variant="secondary" className="rounded-md px-2 py-0 text-[10px] font-medium h-5">
+                        <Badge variant="outline" className="rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20">
                           {profile.industry}
                         </Badge>
                       )}
@@ -201,7 +201,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                         <Badge
                           key={index}
                           variant="outline"
-                          className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5"
+                          className="rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20"
                         >
                           {skill}
                         </Badge>
