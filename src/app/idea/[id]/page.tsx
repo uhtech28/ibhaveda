@@ -376,6 +376,10 @@ const IdeaContent: React.FC<{
   const skills = idea.category ? idea.category.split(',').map(s => s.trim()) : [];
   const industries = idea.industries ? idea.industries.split(',').map(i => i.trim()) : [];
 
+  const firstImageAttachment = Array.isArray(idea.attachments)
+    ? idea.attachments.find(att => (att.type || "").toLowerCase().startsWith("image/"))
+    : undefined;
+
   const handleEdit = () => {
     setEditedTitle(idea.title);
     setEditedDescription(idea.description);
@@ -431,11 +435,21 @@ const IdeaContent: React.FC<{
     <div className="group relative overflow-hidden rounded-3xl border border-border/50 bg-card text-card-foreground transition-all duration-300 flex flex-col shadow-xl">
       {/* Header Section */}
       <div className="relative h-64 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5 overflow-hidden shrink-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 flex items-center justify-center">
-          <div className="w-32 h-32 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-6xl font-bold text-foreground/80 shadow-2xl ring-1 ring-white/30">
-            {idea.title.charAt(0).toUpperCase()}
+        {firstImageAttachment ? (
+          <Image
+            src={firstImageAttachment.url}
+            alt={idea.title}
+            fill
+            className="object-cover"
+            priority
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 flex items-center justify-center">
+            <div className="w-32 h-32 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-6xl font-bold text-foreground/80 shadow-2xl ring-1 ring-white/30">
+              {idea.title.charAt(0).toUpperCase()}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Title (Top Left) */}
         <div className="absolute top-6 left-6 max-w-[60%] z-10">

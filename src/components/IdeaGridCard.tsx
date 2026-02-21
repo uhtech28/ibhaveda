@@ -22,6 +22,7 @@ export type ConvexIdea = {
   } | null;
   contributionCount?: number;
   industries?: string;
+  attachments?: { name: string; type: string; size: number; url: string; fileId: string }[];
 }
 
 interface IdeaGridCardProps {
@@ -35,11 +36,11 @@ interface IdeaGridCardProps {
   onContributeClick?: (ideaId: string) => void;
 }
 
-export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({ 
-  idea, 
-  onClick, 
-  onSpark, 
-  contributorsCount = 0, 
+export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
+  idea,
+  onClick,
+  onSpark,
+  contributorsCount = 0,
   innerRef,
   onTagClick,
   onCommentClick,
@@ -58,6 +59,10 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
   const skills = idea.category ? idea.category.split(',').map(s => s.trim()) : [];
   const industries = idea.industries ? idea.industries.split(',').map(i => i.trim()) : [];
 
+  const firstImageAttachment = Array.isArray(idea.attachments)
+    ? idea.attachments.find(att => (att.type || "").toLowerCase().startsWith("image/"))
+    : undefined;
+
   return (
     <div
       ref={innerRef}
@@ -67,44 +72,54 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
       {/* Image or Gradient Background - Top Section */}
       <div className="relative h-48 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5 overflow-hidden shrink-0">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 flex items-center justify-center group-hover:scale-105 transition-transform duration-700 ease-out">
-          <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-4xl font-bold text-foreground/80 shadow-2xl ring-1 ring-white/30">
-            {idea.title.charAt(0).toUpperCase()}
-          </div>
+          {firstImageAttachment ? (
+            <Image
+              src={firstImageAttachment.url}
+              alt={idea.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-4xl font-bold text-foreground/80 shadow-2xl ring-1 ring-white/30">
+              {idea.title.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
 
         {/* Top Left: Title */}
         <div className="absolute top-4 left-4 max-w-[50%] z-10">
           <h3 className="text-xs font-bold leading-tight text-foreground/90 bg-background/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-sm truncate text-left">
-             {idea.title}
+            {idea.title}
           </h3>
         </div>
 
         {/* Top Right: Author */}
         <div className="absolute top-4 right-4 flex items-center gap-2 bg-background/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 shadow-sm z-10 max-w-[45%]">
-           {idea.author?.avatar ? (
-              <Image
-                src={idea.author.avatar}
-                alt={idea.author?.name || idea.author?.username || 'User'}
-                className="w-6 h-6 rounded-full object-cover border border-white/20 shrink-0"
-                width={24}
-                height={24}
-              />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border border-white/20 shrink-0">
-                {getInitials(idea.author?.name || idea.author?.username || 'U')}
-              </div>
-            )}
-           <div className="flex flex-col min-w-0">
-              <span className="text-[10px] font-semibold text-foreground/90 leading-none truncate">
-                {idea.author?.name || idea.author?.username || 'Unknown'}
-              </span>
-           </div>
+          {idea.author?.avatar ? (
+            <Image
+              src={idea.author.avatar}
+              alt={idea.author?.name || idea.author?.username || 'User'}
+              className="w-6 h-6 rounded-full object-cover border border-white/20 shrink-0"
+              width={24}
+              height={24}
+            />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border border-white/20 shrink-0">
+              {getInitials(idea.author?.name || idea.author?.username || 'U')}
+            </div>
+          )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px] font-semibold text-foreground/90 leading-none truncate">
+              {idea.author?.name || idea.author?.username || 'Unknown'}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Content Body */}
       <div className="p-5 flex flex-col flex-1 gap-3">
-        
+
         {/* Description */}
 
         {/* Description */}
@@ -115,12 +130,12 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
         {/* Tags Section - Below Content */}
         {/* Tags Section - Below Content */}
         <div className="flex flex-col gap-2 mt-auto">
-           {/* Industries - Purple/Pink Theme */}
-           {industries.length > 0 && (
-             <div className="flex flex-wrap gap-2 items-center">
-               {industries.slice(0, 2).map((tag, i) => (
-                <button 
-                  key={`ind-${i}`} 
+          {/* Industries - Purple/Pink Theme */}
+          {industries.length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              {industries.slice(0, 2).map((tag, i) => (
+                <button
+                  key={`ind-${i}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onTagClick?.(tag);
@@ -135,15 +150,15 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
                   +{industries.length - 2}
                 </span>
               )}
-             </div>
-           )}
-          
+            </div>
+          )}
+
           {/* Skills - Blue/Indigo Theme */}
           {skills.length > 0 && (
             <div className="flex flex-wrap gap-2 items-center">
               {skills.slice(0, 2).map((tag, i) => (
-                <button 
-                  key={`skill-${i}`} 
+                <button
+                  key={`skill-${i}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onTagClick?.(tag);
@@ -164,7 +179,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
 
         {/* Footer: Date (Left) and Actions (Right) */}
         <div className="flex items-center justify-between pt-4 border-t border-border/50 mt-2">
-          
+
           {/* Bottom Left: Date */}
           <span className="text-[10px] font-medium text-muted-foreground">
             {formatDistanceToNow(idea.createdAt, { addSuffix: true })}
@@ -172,7 +187,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
 
           {/* Bottom Right: Actions (Icons & Numbers separated) */}
           <div className="flex items-center gap-4">
-            
+
             {/* Sparks */}
             <div className="flex items-center gap-1">
               <button
@@ -185,7 +200,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
               >
                 <Sparkles className="w-4 h-4 group-hover/spark:fill-orange-500 transition-all" />
               </button>
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   // TODO: Show list of sparkers
@@ -208,7 +223,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
               >
                 <MessageCircle className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onCommentClick?.(idea._id);
@@ -231,7 +246,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
               >
                 <Users className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   // TODO: Show list of contributors
