@@ -17,7 +17,11 @@ import { Input } from "@/components/ui/input";
 import { api } from "@convex/_generated/api";
 import { Doc, Id } from "@convex/_generated/dataModel";
 import Image from "next/image";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
@@ -741,15 +745,22 @@ const IdeaContent: React.FC<{
 const TodoSection: React.FC<{
   idea: ConvexIdea;
   todos: Todo[];
-  createTodoMutation: (args: { ideaId: Id<"ideas">; title: string }) => Promise<{ todoId: string; message: string }>;
+  createTodoMutation: (args: { ideaId: Id<"ideas">; title: string; assignedTo?: Id<"users">; deadline?: number; completionTarget?: string }) => Promise<{ todoId: string; message: string }>;
   updateTodoMutation: (args: { todoId: Id<"todos">; title: string }) => Promise<{ message: string }>;
   updateTodoStatusMutation: (args: { todoId: Id<"todos">; status: "todo" | "in_progress" | "done" }) => Promise<{ status: "todo" | "in_progress" | "done"; message: string }>;
   deleteTodoMutation: (args: { todoId: Id<"todos"> }) => Promise<{ message: string }>;
 }> = ({ idea, todos, createTodoMutation, updateTodoMutation, updateTodoStatusMutation, deleteTodoMutation }) => {
   const { userId } = useAuth();
+  const [isCreateTodoDialogOpen, setIsCreateTodoDialogOpen] = useState(false);
   const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [newTodoAssignee, setNewTodoAssignee] = useState<string>("unassigned");
+  const [newTodoDeadline, setNewTodoDeadline] = useState<Date | undefined>();
+  const [newTodoCompletionTarget, setNewTodoCompletionTarget] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
+
+  const [todoToDelete, setTodoToDelete] = useState<Id<"todos"> | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editingTodoId, setEditingTodoId] = useState<Id<"todos"> | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -771,10 +782,17 @@ const TodoSection: React.FC<{
       await createTodoMutation({
         ideaId: idea._id as Id<"ideas">,
         title: newTodoTitle.trim(),
+        assignedTo: newTodoAssignee !== "unassigned" ? newTodoAssignee as Id<"users"> : undefined,
+        deadline: newTodoDeadline ? newTodoDeadline.getTime() : undefined,
+        completionTarget: newTodoCompletionTarget.trim() || undefined,
       });
       setNewTodoTitle("");
-    } catch (err) {
-      setError("Failed to create todo");
+      setNewTodoAssignee("unassigned");
+      setNewTodoDeadline(undefined);
+      setNewTodoCompletionTarget("");
+      setIsCreateTodoDialogOpen(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create todo");
       console.error(err);
     } finally {
       setIsCreating(false);
@@ -799,13 +817,21 @@ const TodoSection: React.FC<{
   }));
 
 
-  const handleDeleteTodo = async (todoId: Id<"todos">) => {
-    if (!confirm("Are you sure you want to delete this todo?")) return;
+  const confirmDeleteTodo = async () => {
+    if (!todoToDelete || isDeleting) return;
+    setIsDeleting(true);
     try {
-      await deleteTodoMutation({ todoId });
+      await deleteTodoMutation({ todoId: todoToDelete });
+      setTodoToDelete(null);
     } catch (err) {
       console.error("Failed to delete todo:", err);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleDeleteTodo = (todoId: Id<"todos">) => {
+    setTodoToDelete(todoId);
   };
 
   const handleEditTodo = (todoId: Id<"todos">, currentTitle: string) => {
@@ -899,40 +925,23 @@ const TodoSection: React.FC<{
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-6 shrink-0">
           <h3 className="text-lg font-semibold">Kanban Board</h3>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-1 rounded-full border border-border/50">
-            <Check className="w-4 h-4" />
-            <span>{groupedTodos.done.length} done</span>
-            <span className="mx-1 opacity-30">•</span>
-            <span>{groupedTodos.in_progress.length} in progress</span>
-            <span className="mx-1 opacity-30">•</span>
-            <span>{groupedTodos.todo.length} todo</span>
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-1 rounded-full border border-border/50">
+              <Check className="w-4 h-4" />
+              <span>{groupedTodos.done.length} done</span>
+              <span className="mx-1 opacity-30">•</span>
+              <span>{groupedTodos.in_progress.length} in progress</span>
+              <span className="mx-1 opacity-30">•</span>
+              <span>{groupedTodos.todo.length} todo</span>
+            </div>
+            {canManageTodos && (
+              <Button onClick={() => setIsCreateTodoDialogOpen(true)} size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Todo
+              </Button>
+            )}
           </div>
         </div>
-
-        {/* Create new todo form */}
-        {canManageTodos && (
-          <form onSubmit={handleCreateTodo} className="mb-6">
-            <div className="flex gap-2 flex-col sm:flex-row">
-              <Input
-                id="new-todo-input"
-                placeholder="Add a new todo..."
-                value={newTodoTitle}
-                onChange={(e) => setNewTodoTitle(e.target.value)}
-                className="flex-1"
-                maxLength={200}
-                disabled={isCreating}
-              />
-              <Button
-                type="submit"
-                disabled={!newTodoTitle.trim() || isCreating}
-                className="self-start sm:self-auto"
-              >
-                {isCreating ? <Spinner size={16} /> : <Plus className="w-4 h-4" />}
-              </Button>
-            </div>
-            {error && <p className="text-destructive text-sm mt-2">{error}</p>}
-          </form>
-        )}
 
         {/* Kanban Board */}
         {kanbanData.length === 0 ? (
@@ -1022,6 +1031,123 @@ const TodoSection: React.FC<{
             </div>
           </div>
         )}
+
+        {/* Kanban Create Todo Dialog */}
+        <Dialog open={isCreateTodoDialogOpen} onOpenChange={setIsCreateTodoDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add New Todo</DialogTitle>
+              <DialogDescription>
+                Create a new task on the Kanban board.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateTodo}>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="title" className="text-right">
+                    Title
+                  </Label>
+                  <Input
+                    id="title"
+                    placeholder="Task title..."
+                    value={newTodoTitle}
+                    onChange={(e) => setNewTodoTitle(e.target.value)}
+                    className="col-span-3"
+                    maxLength={200}
+                    required
+                  />
+                </div>
+                <div className="grid gap-4 grid-cols-4 items-center">
+                  <Label htmlFor="assignee" className="text-right">
+                    Assign To
+                  </Label>
+                  <div className="col-span-3">
+                    <Select value={newTodoAssignee} onValueChange={setNewTodoAssignee}>
+                      <SelectTrigger id="assignee" className="w-full">
+                        <SelectValue placeholder="Assign to..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">
+                          <div className="flex items-center">
+                            <span className="ml-2">Unassigned</span>
+                          </div>
+                        </SelectItem>
+                        {contributors.map((user) => (
+                          <SelectItem key={user._id} value={user._id}>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-5 w-5">
+                                <AvatarImage src={user.avatar} />
+                                <AvatarFallback className="text-[10px]">
+                                  {user.displayName?.charAt(0) || user.username?.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span>{user.displayName || user.username}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="deadline" className="text-right">
+                    Deadline
+                  </Label>
+                  <Input
+                    id="deadline"
+                    type="date"
+                    value={newTodoDeadline ? format(newTodoDeadline, "yyyy-MM-dd") : ""}
+                    onChange={(e) => setNewTodoDeadline(e.target.value ? new Date(e.target.value) : undefined)}
+                    className="col-span-3"
+                    min={new Date().toISOString().slice(0, 10)}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="target" className="text-right">
+                    Target <span className="text-xs text-muted-foreground">(Optional)</span>
+                  </Label>
+                  <Textarea
+                    id="target"
+                    placeholder="What needs to be completed..."
+                    value={newTodoCompletionTarget}
+                    onChange={(e) => setNewTodoCompletionTarget(e.target.value)}
+                    className="col-span-3"
+                  />
+                </div>
+                {error && <p className="text-destructive text-sm col-span-4 text-center mt-2">{error}</p>}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsCreateTodoDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!newTodoTitle.trim() || isCreating}>
+                  {isCreating ? <Spinner size={16} className="mr-2" /> : null}
+                  Create Task
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Kanban Delete Todo Confirmation Dialog */}
+        <Dialog open={!!todoToDelete} onOpenChange={(open) => !open && setTodoToDelete(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Delete Task</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete this todo? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0 mt-4">
+              <Button type="button" variant="outline" onClick={() => setTodoToDelete(null)} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button type="button" variant="destructive" onClick={confirmDeleteTodo} disabled={isDeleting}>
+                {isDeleting ? <Spinner size={16} className="mr-2" /> : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
