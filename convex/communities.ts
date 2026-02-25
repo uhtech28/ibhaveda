@@ -30,26 +30,31 @@ export const getUserCommunities = query({
             )
             .collect();
 
-        const contributedIdeaIds = acceptedRequests.map(r => r.ideaId);
+        const uniqueContributedIdeaIds = Array.from(new Set(acceptedRequests.map(r => r.ideaId)));
 
         // Fetch unique contributed ideas (that are not already in authored)
         const contributedIdeas = [];
-        for (const ideaId of contributedIdeaIds) {
+        for (const ideaId of uniqueContributedIdeaIds) {
             if (authoredIdeas.some(i => i._id === ideaId)) continue;
             const idea = await ctx.db.get(ideaId);
-            if (idea) contributedIdeas.push(idea);
+            if (idea && !idea.isDeleted) contributedIdeas.push(idea);
         }
 
-        const allIdeas = [...authoredIdeas, ...contributedIdeas];
+        const allIdeasRaw = [...authoredIdeas, ...contributedIdeas];
 
-        // Map to community metadata
-        return allIdeas.map(idea => ({
-            _id: idea._id,
-            name: idea.title,
-            description: idea.description,
-            // For now, no specific icon field, could use author avatar or a placeholder?
-            // user wants "Group privacy settings" or similar info?
-        }));
+        // Map to community metadata, deduplicating by _id as a final safety measure
+        const allIdeasMap = new Map();
+        allIdeasRaw.forEach(idea => {
+            if (!idea.isDeleted) {
+                allIdeasMap.set(idea._id, {
+                    _id: idea._id,
+                    name: idea.title,
+                    description: idea.description,
+                });
+            }
+        });
+
+        return Array.from(allIdeasMap.values());
     },
 });
 

@@ -118,10 +118,10 @@ export function ChatInterface() {
 
     // 1. Communities View
     const renderCommunities = () => (
-        <div className="flex flex-col h-full bg-background">
-            <div className="px-4 py-3 flex items-center justify-between border-b bg-card/50 backdrop-blur-md sticky top-0 z-10">
-                <h2 className="text-xl font-bold">Communities</h2>
-                <Button size="icon" variant="ghost"><Plus className="w-5 h-5" /></Button>
+        <div className="flex flex-col h-full bg-background w-full max-w-full overflow-hidden">
+            <div className="px-4 py-3 flex items-center justify-between border-b bg-card/50 backdrop-blur-md sticky top-0 z-10 w-full">
+                <h2 className="text-xl font-bold truncate">Communities</h2>
+                <Button size="icon" variant="ghost" className="shrink-0"><Plus className="w-5 h-5" /></Button>
             </div>
 
             <ScrollArea className="flex-1">
@@ -146,9 +146,9 @@ export function ChatInterface() {
                                 <div
                                     key={comm._id}
                                     onClick={() => handleCommunityClick(comm)}
-                                    className="flex items-center gap-4 p-3 bg-card hover:bg-accent/50 rounded-xl cursor-pointer transition-colors border border-border/40 shadow-sm"
+                                    className="flex items-center gap-4 p-3 bg-card hover:bg-accent/50 rounded-xl cursor-pointer transition-colors border border-border/40 shadow-sm w-full max-w-full overflow-hidden"
                                 >
-                                    <Avatar className="w-12 h-12 border-2 border-background">
+                                    <Avatar className="w-12 h-12 border-2 border-background shrink-0">
                                         <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${comm.name}`} />
                                         <AvatarFallback>{comm.name[0]}</AvatarFallback>
                                     </Avatar>
@@ -170,12 +170,12 @@ export function ChatInterface() {
 
     // 2. Channels View (Community Details)
     const renderChannels = () => (
-        <div className="flex flex-col h-full bg-background">
-            <div className="px-4 py-3 flex items-center gap-2 border-b bg-card/50 backdrop-blur-md sticky top-0 z-10">
-                <Button variant="ghost" size="icon" onClick={handleBack} className="-ml-2 h-8 w-8">
+        <div className="flex flex-col h-full bg-background w-full max-w-full overflow-hidden">
+            <div className="px-4 py-3 flex items-center gap-2 border-b bg-card/50 backdrop-blur-md sticky top-0 z-10 w-full">
+                <Button variant="ghost" size="icon" onClick={handleBack} className="-ml-2 h-8 w-8 shrink-0">
                     <ChevronLeft className="w-5 h-5" />
                 </Button>
-                <div className="flex-1 flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-2 min-w-0">
                     <Avatar className="w-8 h-8">
                         <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${selectedCommunity?.name}`} />
                         <AvatarFallback>{selectedCommunity?.name[0]}</AvatarFallback>
@@ -239,14 +239,14 @@ export function ChatInterface() {
 
     // 3. Chat View
     const renderChat = () => (
-        <div className="flex flex-col h-full bg-background absolute inset-0 z-20"> {/* Absolute to overlay fully */}
+        <div className="flex flex-col h-full bg-background absolute inset-0 z-20 w-full max-w-full overflow-hidden">
             <div className="px-4 py-2 flex items-center gap-2 border-b bg-card/80 backdrop-blur-md sticky top-0 z-10 w-full">
-                <Button variant="ghost" size="icon" onClick={handleBack} className="-ml-2 h-8 w-8">
+                <Button variant="ghost" size="icon" onClick={handleBack} className="-ml-2 h-8 w-8 shrink-0">
                     <ChevronLeft className="w-6 h-6" />
                 </Button>
-                <div className="flex-1 flex flex-col">
-                    <h2 className="text-base font-bold leading-none">{selectedChannel?.name}</h2>
-                    <span className="text-xs text-muted-foreground">{selectedCommunity?.name}</span>
+                <div className="flex-1 flex flex-col min-w-0">
+                    <h2 className="text-base font-bold leading-none truncate">{selectedChannel?.name}</h2>
+                    <span className="text-xs text-muted-foreground truncate">{selectedCommunity?.name}</span>
                 </div>
                 <div className="flex gap-1">
                     {selectedCommunity && selectedChannel && (
