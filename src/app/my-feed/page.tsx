@@ -218,7 +218,7 @@ export default function MyFeedPage() {
 
         {/* Comments Dialog */}
         <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
-          <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
+          <DialogContent className="sm:max-w-[600px] h-[85vh] flex flex-col p-4 sm:p-6">
             <div className="mb-4">
               <h2 className="text-xl font-bold">Comments</h2>
               <p className="text-sm text-muted-foreground">

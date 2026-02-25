@@ -318,7 +318,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
               </Dialog>
 
               <Dialog open={showComments} onOpenChange={setShowComments}>
-                <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
+                <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-4 sm:p-6 w-full">
                   <DialogHeader>
                     <DialogTitle>Comments</DialogTitle>
                   </DialogHeader>
