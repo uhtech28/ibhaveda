@@ -36,7 +36,7 @@ export const ContributionDashboard: React.FC<ContributionDashboardProps> = ({
       <div className="max-w-4xl mx-auto mt-8">
         <div className="bg-card border border-border rounded-xl p-6 transition-colors">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Incoming Contribution Requests</h3>
+            <h3 className="text-lg font-semibold">Incoming Requests</h3>
             <Link href={`/profile/contribution-requests/${ideaId}`}>
               <Button variant="outline" size="sm" className="flex items-center gap-2">
                 View All

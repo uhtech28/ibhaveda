@@ -23,25 +23,25 @@ type InvitationSectionProps = {
 };
 
 export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) => {
-   const sendInvitationMutation = useMutation(api.invitations.sendInvitation);
-   const cancelInvitationMutation = useMutation(api.invitations.cancelInvitation);
-   const myInvitationsQuery = useQuery(api.invitations.getMyInvitations);
-   const acceptInvitationMutation = useMutation(api.invitations.acceptInvitation);
-   const rejectInvitationMutation = useMutation(api.invitations.rejectInvitation);
-   const invitationsQuery = useQuery(api.invitations.getInvitationsForIdea, { ideaId: idea._id });
-   const { toast } = useToast();
+  const sendInvitationMutation = useMutation(api.invitations.sendInvitation);
+  const cancelInvitationMutation = useMutation(api.invitations.cancelInvitation);
+  const myInvitationsQuery = useQuery(api.invitations.getMyInvitations);
+  const acceptInvitationMutation = useMutation(api.invitations.acceptInvitation);
+  const rejectInvitationMutation = useMutation(api.invitations.rejectInvitation);
+  const invitationsQuery = useQuery(api.invitations.getInvitationsForIdea, { ideaId: idea._id });
+  const { toast } = useToast();
 
-   // Only show invitation section for root ideas (ideas without parentId)
-   const isRootIdea = !idea.parentId;
+  // Only show invitation section for root ideas (ideas without parentId)
+  const isRootIdea = !idea.parentId;
 
-   // Always render to show invitations to recipients and sending UI to authors
+  // Always render to show invitations to recipients and sending UI to authors
 
-   const [username, setUsername] = useState("");
-   const [message, setMessage] = useState("");
-   const [isSending, setIsSending] = useState(false);
-   const [error, setError] = useState("");
-   const [isAccepting, setIsAccepting] = useState<Id<"invitations"> | null>(null);
-   const [isRejecting, setIsRejecting] = useState<Id<"invitations"> | null>(null);
+  const [username, setUsername] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState("");
+  const [isAccepting, setIsAccepting] = useState<Id<"invitations"> | null>(null);
+  const [isRejecting, setIsRejecting] = useState<Id<"invitations"> | null>(null);
 
   const handleSendInvitation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,91 +167,91 @@ export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) =>
         <div className="bg-card border border-border rounded-xl p-6 transition-colors">
           <h3 className="text-lg font-semibold mb-4">Invite Contributors</h3>
 
-        {/* Send invitation form */}
-        <form onSubmit={handleSendInvitation} className="space-y-4 mb-6">
-          <div className="flex gap-2 flex-col sm:flex-row">
-            <div className="flex-1">
-              <SearchableUserDropdown
-                value={username}
-                onChange={setUsername}
-                placeholder="Select contributor by username"
+          {/* Send invitation form */}
+          <form onSubmit={handleSendInvitation} className="space-y-4 mb-6">
+            <div className="flex gap-2 flex-row items-start">
+              <div className="flex-1">
+                <SearchableUserDropdown
+                  value={username}
+                  onChange={setUsername}
+                  placeholder="Select contributor by username"
+                  disabled={isSending}
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={!username.trim() || isSending}
+                className="px-3 shrink-0"
+                title="Send Invitation"
+              >
+                {isSending ? <Spinner size={16} /> : <UserPlus className="w-4 h-4" />}
+              </Button>
+            </div>
+            <div>
+              <textarea
+                className="w-full p-3 border border-border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                rows={3}
+                placeholder={`Hi there, I'd love for you to contribute to this idea...`}
+                value={message}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value)}
+                maxLength={500}
                 disabled={isSending}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {message.length}/500 characters
+              </p>
             </div>
-            <Button
-              type="submit"
-              disabled={!username.trim() || isSending}
-              className="self-start sm:self-auto"
-            >
-              {isSending ? <Spinner size={16} /> : <UserPlus className="w-4 h-4 mr-2" />}
-              Send Invitation
-            </Button>
-          </div>
-          <div>
-            <textarea
-              className="w-full p-3 border border-border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-              rows={3}
-              placeholder={`Hi there, I'd love for you to contribute to this idea...`}
-              value={message}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value)}
-              maxLength={500}
-              disabled={isSending}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              {message.length}/500 characters
-            </p>
-          </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-        </form>
+            {error && <p className="text-destructive text-sm">{error}</p>}
+          </form>
 
-        {/* Pending invitations */}
-        {invitationsQuery === undefined ? (
-          <div className="text-center py-4">
-            <Spinner size={24} />
-            <p className="text-muted-foreground mt-2">Loading invitations...</p>
-          </div>
-        ) : pendingInvitations.length > 0 ? (
-          <>
-            <h4 className="text-md font-medium mb-3">Pending Invitations</h4>
-            <div className="space-y-4">
-              {pendingInvitations.map((invitation) => (
-                <div key={invitation._id} className="border border-border rounded-lg p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback>
-                          {invitation.invitee?.name?.charAt(0).toUpperCase() || "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{invitation.invitee?.name || "Unknown"}</p>
-                        <p className="text-sm text-muted-foreground">@{invitation.invitee?.username || "unknown"}</p>
+          {/* Pending invitations */}
+          {invitationsQuery === undefined ? (
+            <div className="text-center py-4">
+              <Spinner size={24} />
+              <p className="text-muted-foreground mt-2">Loading invitations...</p>
+            </div>
+          ) : pendingInvitations.length > 0 ? (
+            <>
+              <h4 className="text-md font-medium mb-3">Pending Invitations</h4>
+              <div className="space-y-4">
+                {pendingInvitations.map((invitation) => (
+                  <div key={invitation._id} className="border border-border rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback>
+                            {invitation.invitee?.name?.charAt(0).toUpperCase() || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{invitation.invitee?.name || "Unknown"}</p>
+                          <p className="text-sm text-muted-foreground">@{invitation.invitee?.username || "unknown"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Pending</Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCancelInvitation(invitation._id)}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Pending</Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCancelInvitation(invitation._id)}
-                        className="text-destructive hover:text-destructive/80"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    {invitation.message && (
+                      <p className="text-sm mt-2 text-muted-foreground">{invitation.message}</p>
+                    )}
                   </div>
-                  {invitation.message && (
-                    <p className="text-sm mt-2 text-muted-foreground">{invitation.message}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="text-muted-foreground py-4">
-            No pending invitations.
-          </p>
-        )}
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-muted-foreground py-4">
+              No pending invitations.
+            </p>
+          )}
         </div>
       )}
     </div>
