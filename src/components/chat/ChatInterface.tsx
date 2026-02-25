@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import { ChannelSettingsDialog } from "./ChannelSettingsDialog";
 
 const View = {
     COMMUNITIES: "communities",
@@ -60,6 +62,8 @@ export function ChatInterface() {
     const [selectedCommunity, setSelectedCommunity] = useState<{ _id: Id<"ideas">, name: string } | null>(null);
     const [selectedChannel, setSelectedChannel] = useState<{ _id: Id<"conversations">, name: string } | null>(null);
     const [inputMessage, setInputMessage] = useState("");
+    const [showSettings, setShowSettings] = useState(false);
+    const { toast } = useToast();
 
     const communities = useQuery(api.communities.getUserCommunities);
     const channels = useQuery(api.communities.getChannels, selectedCommunity ? { ideaId: selectedCommunity._id } : "skip");
@@ -245,8 +249,11 @@ export function ChatInterface() {
                     <span className="text-xs text-muted-foreground">{selectedCommunity?.name}</span>
                 </div>
                 <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8"><Phone className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"><Video className="w-4 h-4" /></Button>
+                    {selectedCommunity && selectedChannel && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSettings(true)}>
+                            <Settings className="w-4 h-4" />
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -291,7 +298,7 @@ export function ChatInterface() {
 
             <div className="p-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-                    <Button type="button" size="icon" variant="ghost" className="h-9 w-9 rounded-full shrink-0 mb-0.5">
+                    <Button type="button" size="icon" variant="ghost" onClick={() => toast({ description: "Attachments coming soon!" })} className="h-9 w-9 rounded-full shrink-0 mb-0.5">
                         <Plus className="w-5 h-5 text-muted-foreground" />
                     </Button>
                     <div className="flex-1 relative">
@@ -315,11 +322,21 @@ export function ChatInterface() {
                         </Button>
                     ) : (
                         <div className="flex gap-1 shrink-0 mb-0.5">
-                            <Button type="button" size="icon" variant="ghost" className="h-9 w-9 rounded-full"><ImageIcon className="w-5 h-5 text-muted-foreground" /></Button>
+                            <Button type="button" size="icon" variant="ghost" onClick={() => toast({ description: "Image upload coming soon!" })} className="h-9 w-9 rounded-full"><ImageIcon className="w-5 h-5 text-muted-foreground" /></Button>
                         </div>
                     )}
                 </form>
             </div>
+
+            {showSettings && selectedChannel && selectedCommunity && (
+                <ChannelSettingsDialog
+                    isOpen={showSettings}
+                    onClose={() => setShowSettings(false)}
+                    conversationId={selectedChannel._id}
+                    ideaId={selectedCommunity._id}
+                    onChannelDeleted={handleBack}
+                />
+            )}
         </div>
     );
 
