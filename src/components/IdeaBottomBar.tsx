@@ -34,7 +34,7 @@ export function IdeaBottomBar({
 }: IdeaBottomBarProps) {
   const { userId } = useAuth();
   const toggleSparkMutation = useMutation(api.ideas.toggleSpark);
-  
+
   const [isSparking, setIsSparking] = useState(false);
   const [currentSparkCount, setCurrentSparkCount] = useState(initialSparkCount);
   const [currentHasSparked, setCurrentHasSparked] = useState(initialHasSparked);
@@ -88,9 +88,9 @@ export function IdeaBottomBar({
       <div className="w-px h-6 bg-border/50 mx-1" />
 
       {/* Comment Button */}
-      <Button 
-        variant="ghost" 
-        size="sm" 
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onOpenComments}
         className="rounded-full px-4 h-10 gap-2 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 transition-colors"
       >
@@ -101,9 +101,9 @@ export function IdeaBottomBar({
       <div className="w-px h-6 bg-border/50 mx-1" />
 
       {/* Contribute/Requests Button */}
-      <Button 
-        variant="ghost" 
-        size="sm" 
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onOpenRequests}
         className="rounded-full px-4 h-10 gap-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 transition-colors relative"
       >
@@ -120,7 +120,6 @@ export function IdeaBottomBar({
         ) : (
           <>
             <Handshake className="w-4 h-4" />
-            <span className="font-semibold text-sm">Contribute</span>
           </>
         )}
       </Button>

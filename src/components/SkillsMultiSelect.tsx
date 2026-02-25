@@ -103,7 +103,7 @@ export function SkillsMultiSelect({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[90vw] sm:w-[400px] p-0" align="start">
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
           <Command>
             <CommandInput
               placeholder="Search skills..."
@@ -153,7 +153,6 @@ export function SkillsMultiSelect({
                           className="mr-2"
                           readOnly
                         />
-                        <span className="text-xs text-muted-foreground mr-2">[{group.group}]</span>
                         {item.label}
                         {selectedSkills.includes(item.value) && (
                           <Check className="ml-auto h-4 w-4 opacity-50" />

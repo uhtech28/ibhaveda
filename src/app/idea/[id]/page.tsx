@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React, { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
@@ -472,7 +474,7 @@ const IdeaContent: React.FC<{
         )}
 
         {/* Title (Top Left) */}
-        <div className="absolute top-6 left-6 max-w-[60%] z-10">
+        <div className="absolute top-6 left-6 max-w-[80%] z-10">
           {isEditing ? (
             <Input
               value={editedTitle}
@@ -481,14 +483,17 @@ const IdeaContent: React.FC<{
               placeholder="Idea Title"
             />
           ) : (
-            <h1 className="text-2xl font-bold leading-tight text-foreground/90 bg-background/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-sm text-left">
+            <h1 className="text-2xl font-bold leading-tight text-foreground/90 bg-background/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-sm text-left line-clamp-3 break-words">
               {idea.title}
             </h1>
           )}
         </div>
 
         {/* Author (Top Right) */}
-        <div className="absolute top-4 right-4 flex items-center gap-3 bg-background/30 backdrop-blur-md p-1.5 sm:px-3 sm:py-2 rounded-full border border-white/10 shadow-sm z-10 transition-all hover:bg-background/40">
+        <Link
+          href={`/profile/${idea.author?.username || idea.authorId}`}
+          className="absolute top-4 right-4 flex items-center gap-3 bg-background/30 backdrop-blur-md p-1.5 sm:px-3 sm:py-2 rounded-full border border-white/10 shadow-sm z-10 transition-all hover:bg-background/40 hover:scale-105 cursor-pointer"
+        >
           {idea.author?.avatar ? (
             <Image
               src={idea.author.avatar}
@@ -510,7 +515,7 @@ const IdeaContent: React.FC<{
               {formatDistanceToNow(idea.createdAt, { addSuffix: true })}
             </span>
           </div>
-        </div>
+        </Link>
 
         {/* Edit Actions (Bottom Right of Header) */}
         {(idea.isAuthor || false) && !isEditing && (

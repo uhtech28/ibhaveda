@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Image from "next/image";
-import { MessageCircle, Users, Sparkles } from "lucide-react";
+import { MessageCircle, Users, Sparkles, Handshake } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export type ConvexIdea = {
@@ -107,14 +107,22 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
         </div>
 
         {/* Top Left: Title */}
-        <div className="absolute top-4 left-4 max-w-[50%] z-10">
-          <h3 className="text-xs font-bold leading-tight text-foreground/90 bg-background/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-sm truncate text-left">
+        <div className="absolute top-4 left-4 max-w-[80%] z-10">
+          <h3 className="text-xs font-bold leading-tight text-foreground/90 bg-background/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-sm line-clamp-2 break-words text-left">
             {idea.title}
           </h3>
         </div>
 
         {/* Top Right: Author */}
-        <div className="absolute top-4 right-4 flex items-center gap-2 bg-background/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 shadow-sm z-10 max-w-[45%]">
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            if (idea.author?.username || idea.authorId) {
+              window.location.href = `/profile/${idea.author?.username || idea.authorId}`;
+            }
+          }}
+          className="absolute top-4 right-4 flex items-center gap-2 bg-background/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 shadow-sm z-10 max-w-[45%] hover:bg-background/50 hover:scale-105 transition-all cursor-pointer"
+        >
           {idea.author?.avatar ? (
             <Image
               src={idea.author.avatar}
@@ -290,7 +298,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
                 className="p-1.5 rounded-full hover:bg-green-50 text-muted-foreground hover:text-green-500 transition-colors"
                 title="Contribute"
               >
-                <Users className="w-4 h-4" />
+                <Handshake className="w-4 h-4" />
               </button>
               <button
                 onClick={(e) => {
