@@ -134,3 +134,14 @@
     }
   }
 }
+
+/* Centre the notification popover on mobile */
+@media (max-width: 640px) {
+  [data-notification][data-radix-popper-content-wrapper],
+  [data-notification] ~ [data-radix-popper-content-wrapper],
+  div:has(> [data-notification]) {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    right: auto !important;
+  }
+}
