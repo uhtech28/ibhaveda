@@ -16,6 +16,8 @@ import { useQuery } from "convex/react"
 import { api } from "../../convex/_generated/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { GlobalChatSheet } from '@/components/chat/ChatInterface'
+import { StreakIndicator } from '@/components/gamification/StreakIndicator'
+import { PointBalance } from '@/components/gamification/PointBalance'
 
 
 const menuItems = [
@@ -118,6 +120,8 @@ export const HeroHeader = ({
                             </SignedOut>
                             <SignedIn>
                                 <div className="flex items-center gap-3">
+                                    <StreakIndicator />
+                                    <PointBalance />
                                     <NotificationBell />
 
                                     <Popover>
