@@ -1,72 +1,34 @@
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
-export const Logo = ({ className, uniColor, idSuffix = "" }: { className?: string; uniColor?: boolean; idSuffix?: string }) => {
-    const gradientId = `icon-gradient${idSuffix ? `-${idSuffix}` : ""}`;
+export const Logo = ({ className }: { className?: string; uniColor?: boolean; idSuffix?: string }) => {
     return (
-        <div className={cn('flex items-center h-4 md:h-5', className)}>
-            <svg
-                viewBox="0 0 18 18"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="text-foreground w-4 h-4 md:w-5 md:h-5 mr-1">
-                <path
-                    d="M3 0H5V18H3V0ZM13 0H15V18H13V0ZM18 3V5H0V3H18ZM0 15V13H18V15H0Z"
-                    fill={uniColor ? 'currentColor' : `url(#${gradientId})`}
-                />
-                <defs>
-                    <linearGradient
-                        id={gradientId}
-                        x1="10"
-                        y1="0"
-                        x2="10"
-                        y2="20"
-                        gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#9B99FE" />
-                        <stop offset="1" stopColor="#2BC8B7" />
-                    </linearGradient>
-                </defs>
-            </svg>
-            <span
-                className={cn(
-                    'hidden md:block text-sm md:text-base font-bold tracking-tight ml-2',
-                    uniColor ? 'text-current' : 'bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent'
-                )}>
+        <div className={cn('flex items-center gap-2', className)}>
+            <Image
+                src="/logo.png"
+                alt="Interactive Ideas Logo"
+                width={28}
+                height={28}
+                className="rounded-lg"
+                priority
+            />
+            <span className="hidden md:block text-sm md:text-base font-bold tracking-tight bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
                 Interactive Ideas
             </span>
         </div>
     )
 }
 
-export const LogoIcon = ({ className, uniColor, idSuffix = "" }: { className?: string; uniColor?: boolean; idSuffix?: string }) => {
-    const gradientId = `icon-gradient-icon${idSuffix ? `-${idSuffix}` : ""}`;
+export const LogoIcon = ({ className }: { className?: string; uniColor?: boolean; idSuffix?: string }) => {
     return (
-        <svg
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className={cn('size-5', className)}>
-            <path
-                d="M3 0H5V18H3V0ZM13 0H15V18H13V0ZM18 3V5H0V3H18ZM0 15V13H18V15H0Z"
-                fill={uniColor ? 'currentColor' : `url(#${gradientId})`}
-            />
-            <defs>
-                <linearGradient
-                    id={gradientId}
-                    x1="10"
-                    y1="0"
-                    x2="10"
-                    y2="20"
-                    gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#9B99FE" />
-                    <stop
-                        offset="1"
-                        stopColor="#2BC8B7"
-                    />
-                </linearGradient>
-            </defs>
-        </svg>
+        <Image
+            src="/logo.png"
+            alt="Interactive Ideas"
+            width={28}
+            height={28}
+            className={cn('rounded-lg', className)}
+            priority
+        />
     )
 }
 
