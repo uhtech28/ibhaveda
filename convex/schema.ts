@@ -262,7 +262,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_wallet", ["walletId"])
-    .index("by_type", ["type"]),
+    .index("by_type", ["type"])
+    .index("by_created_at", ["createdAt"]),
 
   // User Streaks
   userStreaks: defineTable({

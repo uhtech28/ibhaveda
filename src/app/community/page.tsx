@@ -17,6 +17,25 @@ import { useChat } from "@/components/chat/ChatContext";
 
 import { UserProfile } from "../../../convex/users";
 
+// Error Boundary to prevent leaderboard failures from crashing the page
+class LeaderboardErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return null; // Silently hide if leaderboard fails
+    return this.props.children;
+  }
+}
+
+
 export default function CommunityPage() {
   const { isLoaded: isClerkUserLoaded, user: clerkUser } = useUser();
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -108,7 +127,9 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          <WeeklyLeaderboard />
+          <LeaderboardErrorBoundary>
+            <WeeklyLeaderboard />
+          </LeaderboardErrorBoundary>
 
           {/* Users Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -163,7 +184,7 @@ const WeeklyLeaderboard = () => {
             
             <Link href={`/profile/${encodeURIComponent(user.username)}`} className="w-full flex flex-col items-center">
               <Avatar className={`w-20 h-20 mb-4 border-4 ${index === 0 ? 'border-yellow-500/20' : index === 1 ? 'border-gray-400/20' : 'border-orange-700/20'} shadow-md`}>
-                <AvatarImage src={user.avatar} alt={user.displayName} />
+                <AvatarImage src={user.avatar ?? undefined} alt={user.displayName} />
                 <AvatarFallback className="text-2xl font-semibold bg-background">{user.displayName.charAt(0).toUpperCase()}</AvatarFallback>
               </Avatar>
               

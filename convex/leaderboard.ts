@@ -44,37 +44,36 @@ export const getWeeklyLeaderboard = query({
         limit: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const limit = args.limit || 3;
+        const limit = args.limit ?? 3;
 
         // 1. Calculate start of the week (7 days ago)
-        const now = new Date();
-        const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const startOfWeekTimestamp = startOfWeek.getTime();
+        const startOfWeekTimestamp = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-        // 2. Fetch all transactions since start of week
+        // 2. Fetch all transactions since start of week using the index (efficient!)
         const transactions = await ctx.db
             .query("transactions")
-            .filter((q) => q.gte(q.field("createdAt"), startOfWeekTimestamp))
+            .withIndex("by_created_at", (q) => q.gte("createdAt", startOfWeekTimestamp))
             .collect();
 
-        // 3. Aggregate points per user
-        const userPoints = new Map<string, number>();
+        if (transactions.length === 0) return [];
 
+        // 3. Aggregate points per walletId
+        const walletPoints = new Map<string, number>();
         for (const tx of transactions) {
-            if (tx.amount > 0) { // Only count positive points
-                const current = userPoints.get(tx.walletId) || 0;
-                userPoints.set(tx.walletId, current + tx.amount);
+            if (tx.amount > 0) {
+                const current = walletPoints.get(tx.walletId) || 0;
+                walletPoints.set(tx.walletId, current + tx.amount);
             }
         }
 
         // 4. Sort and take top N
-        const sortedWallets = Array.from(userPoints.entries())
+        const sortedEntries = Array.from(walletPoints.entries())
             .sort((a, b) => b[1] - a[1])
             .slice(0, limit);
 
-        // 5. Fetch User Details
+        // 5. Fetch User Details for each matched wallet
         const results = await Promise.all(
-            sortedWallets.map(async ([walletId, points]) => {
+            sortedEntries.map(async ([walletId, points], index) => {
                 const wallet = await ctx.db.get(walletId as Id<"wallets">);
                 if (!wallet) return null;
 
@@ -85,15 +84,15 @@ export const getWeeklyLeaderboard = query({
                     _id: user._id,
                     displayName: user.displayName,
                     username: user.username,
-                    avatar: user.avatar,
-                    points: points, // Weekly Score
-                    level: user.level || 1,
-                    rank: 0 // to be filled
+                    avatar: user.avatar ?? null,
+                    points,
+                    level: user.level ?? 1,
+                    rank: index + 1,
                 };
             })
         );
 
-        return results.filter(u => u !== null).map((u, index) => ({ ...u, rank: index + 1 }));
+        return results.filter((u): u is NonNullable<typeof u> => u !== null);
     }
 });
 
