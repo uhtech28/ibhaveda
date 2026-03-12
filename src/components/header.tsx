@@ -193,6 +193,11 @@ export const HeroHeader = ({
                                 ) : (
                                     /* Global Feed Actions */
                                     <>
+                                        <Link href="/create-idea">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                                                <Plus className="h-5 w-5" />
+                                            </Button>
+                                        </Link>
                                         <ThemeToggle />
                                         <SignedIn>
                                             <NotificationBell />
