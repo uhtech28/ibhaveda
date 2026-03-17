@@ -1,11 +1,10 @@
-'use client'
+﻿'use client'
 
 import { User, LogOut, GitBranch, ListTodo, Calendar, MessageCircle, Plus } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { LogoIcon } from '@/components/logo'
 import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { SignedIn, SignedOut, SignInButton, SignUpButton, useClerk } from '@clerk/nextjs'
 import React from 'react'
 import { cn } from '@/lib/utils'
@@ -198,7 +197,6 @@ export const HeroHeader = ({
                                                 <Plus className="h-5 w-5" />
                                             </Button>
                                         </Link>
-                                        <ThemeToggle />
                                         <SignedIn>
                                             <NotificationBell />
                                         </SignedIn>
