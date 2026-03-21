@@ -1,6 +1,6 @@
-import MyFeedPage, { dynamic } from "../my-feed/page";
+import MyFeedPage from "../my-feed/page";
 
-export { dynamic };
+export const dynamic = "force-dynamic";
 export default function MyIdeasPage() {
   return <MyFeedPage />;
 }
