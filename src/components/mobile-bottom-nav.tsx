@@ -24,7 +24,7 @@ export const MobileBottomNav = () => {
     },
     {
       name: "My Ideas",
-      href: "/my-feed",
+      href: "/my-ideas",
       icon: Star,
     },
     {
@@ -66,3 +66,4 @@ export const MobileBottomNav = () => {
     </div>
   );
 };
+

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { User, LogOut, GitBranch, ListTodo, Calendar, MessageCircle, Plus } from 'lucide-react'
 import { usePathname } from 'next/navigation'
@@ -19,7 +19,7 @@ import { GlobalChatSheet } from '@/components/chat/ChatInterface'
 
 const menuItems = [
     { name: 'Feed', href: '/feed' },
-    { name: 'My Ideas', href: '/my-feed' },
+    { name: 'My Ideas', href: '/my-ideas' },
     { name: 'Community', href: '/community' },
 ]
 
@@ -66,7 +66,7 @@ export const HeroHeader = ({
                         <div className="flex-shrink-0 z-20 hidden lg:block">
                             <Link
                                 href="/"
-                                aria-label="Interactive Ideas Home"
+                                aria-label="InteractiveIdeas Home"
                                 className="flex items-center focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg">
                                 <LogoIcon />
                             </Link>
@@ -251,3 +251,5 @@ export const HeroHeader = ({
         </header>
     )
 }
+
+

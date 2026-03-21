@@ -1,5 +1,5 @@
-﻿import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata } from "next";
+import { DM_Sans, JetBrains_Mono, Sora } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 
 export const dynamic = 'force-dynamic';
@@ -11,18 +11,26 @@ import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const displayFont = Sora({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const bodyFont = DM_Sans({
+  variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
+});
+
+const monoFont = JetBrains_Mono({
+  variable: "--font-code",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Interactive Ideas - Share & Cultivate Brilliant Ideas",
+  title: "InteractiveIdeas - Share & Cultivate Brilliant Ideas",
   description: "Connect with like-minded creators, share your brilliant ideas, get valuable feedback, and collaborate on groundbreaking projects in our innovative community.",
   keywords: "ideas, innovation, collaboration, creativity, community, startup, prototyping",
   icons: {
@@ -32,7 +40,7 @@ export const metadata: Metadata = {
     apple: '/logo.png',
   },
   openGraph: {
-    title: "Interactive Ideas - Where Brilliant Ideas Come to Life",
+    title: "InteractiveIdeas - Where Brilliant Ideas Come to Life",
     description: "Join thousands of creators sharing ideas, finding collaborators, and building the future together.",
     type: "website",
     url: "/",
@@ -55,7 +63,7 @@ export default function RootLayout({
       <ConvexClientProvider>
         <html lang="en" className="dark" suppressHydrationWarning>
           <body
-            className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+            className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} font-sans antialiased`}
           >
             <ThemeProvider>
               <ChatProvider>

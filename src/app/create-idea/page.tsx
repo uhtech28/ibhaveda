@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { CheckCircle, AlertCircle } from "lucide-react";
@@ -51,6 +51,24 @@ export default function CreateIdeaPage() {
   const generateUploadUrl = useMutation(api.ideas.generateUploadUrl);
   const attachFileToIdea = useMutation(api.ideas.attachFileToIdea);
 
+  useEffect(() => {
+    try {
+      const rawDraft = window.sessionStorage.getItem("ideaforge-composer-publish") || window.localStorage.getItem("ideaforge-composer-draft");
+      if (!rawDraft) return;
+
+      const parsed = JSON.parse(rawDraft);
+      setFormData((prev) => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        description: parsed.description || prev.description,
+        skills: Array.isArray(parsed.tags) && prev.skills.length === 0 ? parsed.tags.slice(0, 5) : prev.skills,
+      }));
+
+      window.sessionStorage.removeItem("ideaforge-composer-publish");
+    } catch {
+      // Ignore invalid local draft payloads.
+    }
+  }, []);
   // Validation function
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -430,3 +448,5 @@ export default function CreateIdeaPage() {
     </div>
   );
 }
+
+
