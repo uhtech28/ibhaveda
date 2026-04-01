@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +15,9 @@ import { InvitationButton } from "@/components/requests/invitation-button";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Flame, Star, Trophy } from "lucide-react";
+import { LevelBadge } from "@/components/levels/level-badge";
+import { BadgeGrid } from "@/components/badges/badge-grid";
+import Link from "next/link";
 
 export interface UserProfile {
   _id: Id<"users">;
@@ -312,6 +314,12 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
 
         {/* 1.5 Badges (Span 2) */}
         {/* Removed Gamification BadgeList */}
+
+        {/* Venture System Integration */}
+        <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <LevelBadge userId={profile._id} />
+          <BadgeGrid userId={profile._id} />
+        </div>
 
       </div>
 
