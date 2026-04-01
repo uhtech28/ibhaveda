@@ -13,6 +13,16 @@ import { Id } from "./_generated/dataModel"
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Generate a URL for uploading files to Convex storage.
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl()
+  },
+})
+
+/**
  * Create a new venture from an existing idea.
  * Initializes all checkpoints and tasks for all 8 stages.
  * Randomly assigns 1-2 bosses from the pool.
