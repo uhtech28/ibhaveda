@@ -1,6 +1,6 @@
 # Venture Progression System — Implementation Tracker
 
-## Status: Phase 1-2 Complete ✅
+## Status: Phase 1-5 Complete ✅
 
 ### Completed (Phase 1: Backend Foundation)
 - [x] `convex/ventureConstants.ts` — All static definitions:
@@ -36,40 +36,51 @@
   - `applyForMentorship`, `acceptMentee`, `trackMenteeCheckpoint`, `endMentorship` — Mutations
   - `getMentorDashboard`, `getMentorshipStatus` — Queries
 
-### Completed (Phase 2: UI Components)
-- [x] `src/app/venture/[id]/page.tsx` — Venture detail page with progress, bosses, stages
-- [x] `src/app/venture/[id]/stage/[stage]/checkpoint/[checkpoint]/page.tsx` — Checkpoint view with T1/T2/T3 tasks
+### Completed (Phase 2: UI Pages + Core Tools)
+- [x] `src/app/venture/[id]/page.tsx` — Venture detail with progress, bosses, stages
+- [x] `src/app/venture/[id]/stage/[stage]/checkpoint/[checkpoint]/page.tsx` — Checkpoint with T1/T2/T3 tasks + tool integration
 - [x] `src/app/venture/create/page.tsx` — Create venture from idea with boss preview
 - [x] `src/components/tools/write-tool.tsx` — Rich text response tool
 - [x] `src/components/tools/table-tool.tsx` — Dynamic table builder
 - [x] `src/components/tools/link-tool.tsx` — URL submission tool
-- [x] `src/components/tools/upload-tool.tsx` — File upload tool
+- [x] `src/components/tools/upload-tool.tsx` — File upload tool with Convex storage
 - [x] `src/components/tools/self-report-tool.tsx` — Structured form tool
-- [x] `src/components/levels/level-badge.tsx` — Level display with progress bar
-- [x] `src/components/badges/badge-grid.tsx` — Badge collection grid with rarity colors
+
+### Completed (Phase 3: Boss System)
+- [x] `src/components/venture/boss-encounter.tsx` — Boss display with corruption levels, status badges, defeat methods
+- [x] `src/components/venture/monument-display.tsx` — Slain boss monuments with gradient styling
+- [x] Boss corruption CSS animations in `globals.css` — 12 unique per-boss effects + slay/monument animations
+
+### Completed (Phase 4: Profile Integration)
+- [x] `src/components/levels/level-badge.tsx` — Level display with phase colors, progress bar, requirements
+- [x] `src/components/badges/badge-grid.tsx` — Badge collection grid with rarity colors, hidden badge support
 - [x] `src/components/flares/flare-button.tsx` — Fire flare + flare feed components
+- [x] Profile page integration — CompactProfileView now shows LevelBadge + BadgeGrid
 
-### Pending (Phase 3: Boss System)
-- [ ] Boss corruption visual effects (CSS animations)
-- [ ] Boss encounter UI component
-- [ ] Monument display for slain bosses
-- [ ] Boss defeat condition evaluation (slay vs retreat)
+### Completed (Phase 5: Remaining Tools + Integration)
+- [x] `src/components/tools/map-tool.tsx` — Canvas with draggable nodes and connections
+- [x] `src/components/tools/survey-tool.tsx` — Survey builder with text/multiple choice
+- [x] `src/components/tools/poll-tool.tsx` — Poll creator with dynamic options
+- [x] `src/components/tools/oauth-tool.tsx` — External tool linking (Figma, Notion, etc.)
+- [x] `src/components/ui/radio-group.tsx` — Radio group UI component (shadcn)
+- [x] Checkpoint page wired up with all 9 tool components
+- [x] `src/components/IdeaToolbar.tsx` — Added "Convert to Venture" rocket button
 
-### Pending (Phase 4: Polish & Integration)
-- [ ] Mobile responsive design
-- [ ] Notifications for completions/level ups/badges
-- [ ] Profile page integration (level, badges, ventures)
+### Pending (Phase 6: Polish & Production)
+- [ ] Mobile responsive polish for all venture pages
+- [ ] Notification system for completions/level ups/badges
 - [ ] Feed integration (venture progress badges)
 - [ ] Error handling & edge cases
-- [ ] Testing
+- [ ] Testing (unit + integration)
+- [ ] Performance optimization
 
 ## System Architecture
 
 ```
 Ideas → Ventures → Checkpoints → Tasks → Evidence
   │         │           │          │        │
-  │         │           │          │        └─ Tool-specific UI
-  │         │           │          └─ T1/T2/T3 (write/table/map/etc)
+  │         │           │          │        └─ 9 Tool Types (Write/Table/Link/Upload/Map/Survey/Poll/OAuth/SelfReport)
+  │         │           │          └─ T1/T2/T3 (Easy/Medium/Stretch)
   │         │           └─ 2/3 tasks to advance, all 3 = gold bonus
   │         └─ 8 stages, 34 total checkpoints
   └─ Wrap existing idea with progression
@@ -87,9 +98,14 @@ Mentorship → Level 40+ → Mentees → Tracking
 3. **Boss corruption numeric (0-100)** — Easy to scale visual effects
 4. **Mentor track separate module** — Only relevant at Lv 40+
 5. **Points feed existing gamification** — No separate wallet system needed
+6. **Tool components are isolated** — Each tool is self-contained, testable
+7. **Boss CSS animations are per-boss** — 12 unique animation classes
 
 ## Commits
 1. `1ece4c7` — Backend foundation (8 Convex modules, 10 tables)
 2. `740df45` — Venture UI pages (detail + checkpoint)
 3. `3cb22c6` — Tool components + create page
 4. `2e95d0f` — Level, badge, flare UI components
+5. `4193272` — Boss encounter and monument display
+6. `bd80e4a` — Profile page integration
+7. `59789bf` — Remaining tools, boss CSS, checkpoint integration
