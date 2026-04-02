@@ -44,6 +44,9 @@ export default function CheckpointPage() {
 
   const venture = useQuery(api.ventures.getVenture, { ventureId: ventureId as any })
   const submitEvidence = useMutation(api.ventures.submitEvidence)
+  const advanceCheckpoint = useMutation(api.ventures.advanceCheckpoint)
+  const startCheckpoint = useMutation(api.ventures.startCheckpoint)
+  const [advancing, setAdvancing] = useState(false)
 
   const checkpoint = venture?.checkpoints?.find(
     (cp: any) => cp.stage === stageNum && cp.checkpoint === checkpointNum
@@ -74,6 +77,43 @@ export default function CheckpointPage() {
       console.error("Failed to submit evidence:", error)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleAdvance = async () => {
+    if (!checkpoint) return
+    setAdvancing(true)
+    try {
+      await advanceCheckpoint({ checkpointId: checkpoint._id })
+      // Navigate to next checkpoint after advancing
+      const nextCp = venture.checkpoints?.find(
+        (cp: any) => cp.stage === stageNum && cp.checkpoint === checkpointNum + 1
+      )
+      if (nextCp) {
+        router.push(`/venture/${ventureId}/stage/${stageNum}/checkpoint/${checkpointNum + 1}`)
+      } else {
+        const nextStage = venture.checkpoints?.find(
+          (cp: any) => cp.stage === stageNum + 1 && cp.checkpoint === 1
+        )
+        if (nextStage) {
+          router.push(`/venture/${ventureId}/stage/${stageNum + 1}/checkpoint/1`)
+        } else {
+          router.push(`/venture/${ventureId}`)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to advance checkpoint:", error)
+    } finally {
+      setAdvancing(false)
+    }
+  }
+
+  const handleStart = async () => {
+    if (!checkpoint) return
+    try {
+      await startCheckpoint({ checkpointId: checkpoint._id })
+    } catch (error) {
+      console.error("Failed to start checkpoint:", error)
     }
   }
 
@@ -154,6 +194,8 @@ export default function CheckpointPage() {
               onActivate={() => task && setActiveTask(task._id)}
               onClose={() => setActiveTask(null)}
               renderTool={() => task ? renderTool(task, def) : null}
+              checkpointStatus={checkpoint.status}
+              onStartCheckpoint={handleStart}
             />
           ))}
         </div>
@@ -161,9 +203,18 @@ export default function CheckpointPage() {
         {/* Advance Button */}
         {canAdvance && checkpoint.status !== "completed" && (
           <div className="mt-8 flex justify-center">
-            <Button size="lg" className="gap-2">
-              <Check className="h-5 w-5" />
-              Advance to Next Checkpoint
+            <Button size="lg" className="gap-2" onClick={handleAdvance} disabled={advancing}>
+              {advancing ? (
+                <>
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Advancing...
+                </>
+              ) : (
+                <>
+                  <Check className="h-5 w-5" />
+                  Advance to Next Checkpoint
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -211,6 +262,8 @@ function TaskCard({
   onActivate,
   onClose,
   renderTool,
+  checkpointStatus,
+  onStartCheckpoint,
 }: {
   task: any
   def: { prompt: string; tool: string }
@@ -221,6 +274,8 @@ function TaskCard({
   onActivate: () => void
   onClose: () => void
   renderTool: () => React.ReactNode
+  checkpointStatus: string
+  onStartCheckpoint: () => void
 }) {
   const isComplete = task?.status === "completed"
   const Icon = TOOL_ICONS[def.tool] || FileText
@@ -258,6 +313,11 @@ function TaskCard({
         {!isComplete && !isActive && (
           <Button className="mt-4" size="sm" onClick={onActivate}>
             Start Task
+          </Button>
+        )}
+        {checkpointStatus === "not_started" && (
+          <Button className="mt-2" variant="outline" size="sm" onClick={onStartCheckpoint}>
+            Start This Checkpoint
           </Button>
         )}
         {!isComplete && isActive && (
