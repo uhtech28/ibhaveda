@@ -239,6 +239,14 @@ export const submitEvidence = mutation({
 
       // Award gold bonus points
       await awardPoints(ctx, user._id, POINT_VALUES.gold_checkpoint_bonus, "gold_checkpoint", venture._id)
+      await createNotification(
+        ctx,
+        user._id,
+        user._id,
+        "gold_checkpoint",
+        `You earned a Gold Checkpoint! All 3 tasks completed. +${POINT_VALUES.gold_checkpoint_bonus} points`,
+        venture._id
+      )
     }
 
     // Award task completion points
@@ -533,6 +541,14 @@ async function tryAdvanceStage(
   const user = await ctx.db.get(venture.userId)
   if (user) {
     await awardPoints(ctx, user._id, POINT_VALUES.stage_complete_bonus, `stage_${currentStage}_complete`, venture._id)
+    await createNotification(
+      ctx,
+      user._id,
+      user._id,
+      "venture_stage_complete",
+      `You completed Stage ${currentStage} of your venture!`,
+      venture._id
+    )
   }
 
   if (currentStage < 8) {
@@ -563,6 +579,14 @@ async function tryAdvanceStage(
     // Award venture completion bonus
     if (user) {
       await awardPoints(ctx, user._id, POINT_VALUES.venture_complete_bonus, "venture_complete", venture._id)
+      await createNotification(
+        ctx,
+        user._id,
+        user._id,
+        "venture_complete",
+        `Congratulations! You've completed your venture! +${POINT_VALUES.venture_complete_bonus} points`,
+        venture._id
+      )
 
       // Update user level tracking for full lifecycles
       const userLevel = await ctx.db
@@ -641,6 +665,28 @@ async function awardPoints(
       updatedAt: now,
     })
   }
+}
+
+/**
+ * Create a notification for a user.
+ */
+async function createNotification(
+  ctx: { db: MutationDbCtx },
+  recipientId: Id<"users">,
+  senderId: Id<"users">,
+  type: string,
+  message: string,
+  relatedId: string
+) {
+  await ctx.db.insert("notifications", {
+    recipientId,
+    senderId,
+    type,
+    message,
+    relatedId: relatedId as any,
+    isRead: false,
+    createdAt: Date.now(),
+  })
 }
 
 /**
