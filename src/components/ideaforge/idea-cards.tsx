@@ -6,6 +6,7 @@ import { Bookmark, Lightbulb, MessageCircle, MoreHorizontal, PencilLine, Repeat2
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { IdeaVentureBadge } from "@/components/venture/idea-venture-badge";
 import {
   cardSurface,
   codeFontClass,
@@ -280,6 +281,7 @@ export function IdeaStoryCard({
         <span>{getReadTime(description)}</span>
         <span className="h-1 w-1 rounded-full bg-[#4B5563]" />
         <span>{getIdeaStage(idea)}</span>
+        <IdeaVentureBadge ideaId={idea._id} />
       </div>
 
       {onContribute && (
@@ -368,6 +370,7 @@ export function CompactIdeaCard({
           {tags.map((tag) => (
             <span key={tag} className={cn(codeFontClass, "rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[#CBD5E1]")}>{tag}</span>
           ))}
+          <IdeaVentureBadge ideaId={idea._id} />
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-[#9CA3AF]">
           <span>{idea.sparkCount || 0} sparks</span>

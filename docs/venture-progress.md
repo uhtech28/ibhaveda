@@ -49,13 +49,18 @@
   - Weekly badge evaluation (auto-awards earned badges)
   - Daily streak update (consecutive day tracking)
 
-### Pending (Phase 8: Future Enhancements)
-- [ ] Notification system for completions/level ups/badges
-- [ ] Feed integration (venture progress badges on idea cards)
-- [ ] 'My Ventures' listing page
-- [ ] Error boundaries and better loading/empty states
+## Status: Phase 1-8 Complete ✅
+
+### Completed (Phase 8: My Ventures + Notifications)
+- [x] `src/app/my-ventures/page.tsx` — My Ventures listing with stats, progress, boss indicators
+- [x] Notification triggers for stage completions, venture completions, gold checkpoints
+- [x] `createNotification` helper in ventures.ts
+
+### Pending (Phase 9: Polish & Production)
+- [ ] Feed integration — show venture badges on idea cards in feed
+- [ ] Error boundaries and comprehensive error handling across venture pages
 - [ ] Testing (unit + integration)
-- [ ] Performance optimization
+- [ ] Performance optimization (query batching, caching)
 
 ## System Architecture
 
