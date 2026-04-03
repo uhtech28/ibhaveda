@@ -23,7 +23,7 @@ import {
 import { VENTURE_STAGES, BOSS_DEFINITIONS } from "@convex/ventureConstants"
 
 export default function MyVenturesPage() {
-  const ventures = useQuery(api.ventures.getUserVentures, {})
+  const ventures = useQuery(api.ventures.getUserVentureSummaries, {})
   const currentUser = useQuery(api.users.getCurrentUser)
 
   return (

@@ -347,6 +347,7 @@ export const advanceStage = mutation({
 
 /**
  * Get a venture with all its checkpoints, tasks, and evidence.
+ * Optimized: batches task and evidence queries to avoid N+1.
  */
 export const getVenture = query({
   args: {
@@ -366,28 +367,46 @@ export const getVenture = query({
       .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
       .collect()
 
+    // Batch fetch all tasks for all checkpoints
+    const allTasks = await ctx.db
+      .query("ventureTasks")
+      .collect()
+
+    // Group tasks by checkpointId
+    const tasksByCheckpoint = new Map()
+    for (const task of allTasks) {
+      if (task.checkpointId) {
+        const existing = tasksByCheckpoint.get(task.checkpointId) || []
+        existing.push(task)
+        tasksByCheckpoint.set(task.checkpointId, existing)
+      }
+    }
+
+    // Batch fetch all evidence for tasks that have evidenceId
+    const evidenceIds = new Set<string>()
+    for (const task of allTasks) {
+      if (task.evidenceId) {
+        evidenceIds.add(task.evidenceId)
+      }
+    }
+
+    const evidenceMap = new Map()
+    for (const evidenceId of evidenceIds) {
+      const evidence = await ctx.db.get(evidenceId as any)
+      if (evidence) {
+        evidenceMap.set(evidenceId, evidence)
+      }
+    }
+
     // Enrich checkpoints with tasks
-    const enrichedCheckpoints = await Promise.all(
-      checkpoints.map(async (cp) => {
-        const tasks = await ctx.db
-          .query("ventureTasks")
-          .withIndex("by_checkpoint", (q) => q.eq("checkpointId", cp._id))
-          .collect()
-
-        // Enrich tasks with evidence
-        const enrichedTasks = await Promise.all(
-          tasks.map(async (task) => {
-            let evidence = null
-            if (task.evidenceId) {
-              evidence = await ctx.db.get(task.evidenceId)
-            }
-            return { ...task, evidence }
-          })
-        )
-
-        return { ...cp, tasks: enrichedTasks }
-      })
-    )
+    const enrichedCheckpoints = checkpoints.map((cp) => {
+      const tasks = tasksByCheckpoint.get(cp._id) || []
+      const enrichedTasks = tasks.map((task: any) => ({
+        ...task,
+        evidence: task.evidenceId ? evidenceMap.get(task.evidenceId) || null : null,
+      }))
+      return { ...cp, tasks: enrichedTasks }
+    })
 
     // Enrich bosses with definitions
     const enrichedBosses = bosses.map((boss) => {
@@ -400,6 +419,111 @@ export const getVenture = query({
       checkpoints: enrichedCheckpoints,
       bosses: enrichedBosses,
     }
+  },
+})
+
+/**
+ * Lightweight venture summary for list views.
+ * Does NOT fetch tasks or evidence — only venture + checkpoints + bosses.
+ */
+export const getVentureSummary = query({
+  args: {
+    ventureId: v.id("ventures"),
+  },
+  handler: async (ctx, args) => {
+    const venture = await ctx.db.get(args.ventureId)
+    if (!venture) return null
+
+    const checkpoints = await ctx.db
+      .query("ventureCheckpoints")
+      .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
+      .collect()
+
+    const bosses = await ctx.db
+      .query("ventureBosses")
+      .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
+      .collect()
+
+    const enrichedBosses = bosses.map((boss) => {
+      const def = BOSS_DEFINITIONS.find((b) => b.id === boss.bossId)
+      return { ...boss, definition: def }
+    })
+
+    // Calculate summary stats
+    const completedCheckpoints = checkpoints.filter((cp) => cp.status === "completed").length
+    const goldCheckpoints = checkpoints.filter((cp) => cp.goldBonusEarned).length
+
+    return {
+      ...venture,
+      completedCheckpoints,
+      goldCheckpoints,
+      totalCheckpoints: checkpoints.length,
+      bosses: enrichedBosses,
+    }
+  },
+})
+
+/**
+ * Get venture summaries for all user ventures (for My Ventures page).
+ * Lightweight — no tasks or evidence.
+ */
+export const getUserVentureSummaries = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return []
+
+    const user = await getUserByClerkId(ctx, identity.subject)
+
+    const ventures = await ctx.db
+      .query("ventures")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect()
+
+    // Batch fetch checkpoints for all ventures
+    const allCheckpoints = await ctx.db
+      .query("ventureCheckpoints")
+      .collect()
+
+    const checkpointsByVenture = new Map()
+    for (const cp of allCheckpoints) {
+      const existing = checkpointsByVenture.get(cp.ventureId) || []
+      existing.push(cp)
+      checkpointsByVenture.set(cp.ventureId, existing)
+    }
+
+    // Batch fetch bosses for all ventures
+    const allBosses = await ctx.db
+      .query("ventureBosses")
+      .collect()
+
+    const bossesByVenture = new Map()
+    for (const boss of allBosses) {
+      const existing = bossesByVenture.get(boss.ventureId) || []
+      existing.push(boss)
+      bossesByVenture.set(boss.ventureId, existing)
+    }
+
+    return ventures.map((venture) => {
+      const checkpoints = checkpointsByVenture.get(venture._id) || []
+      const bosses = bossesByVenture.get(venture._id) || []
+
+      const completedCheckpoints = checkpoints.filter((cp: any) => cp.status === "completed").length
+      const goldCheckpoints = checkpoints.filter((cp: any) => cp.goldBonusEarned).length
+
+      const enrichedBosses = bosses.map((boss: any) => {
+        const def = BOSS_DEFINITIONS.find((b) => b.id === boss.bossId)
+        return { ...boss, definition: def }
+      })
+
+      return {
+        ...venture,
+        completedCheckpoints,
+        goldCheckpoints,
+        totalCheckpoints: checkpoints.length,
+        bosses: enrichedBosses,
+      }
+    })
   },
 })
 

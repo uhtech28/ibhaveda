@@ -49,7 +49,7 @@
   - Weekly badge evaluation (auto-awards earned badges)
   - Daily streak update (consecutive day tracking)
 
-## Status: Phase 1-9 Complete ✅ — Core System Fully Implemented
+## Status: Phase 1-10 Complete ✅ — Core System Fully Implemented
 
 ### Completed (Phase 8: My Ventures + Notifications)
 - [x] `src/app/my-ventures/page.tsx` — My Ventures listing with stats, progress, boss indicators
@@ -62,10 +62,14 @@
 - [x] Shows active venture stage + name when idea has venture
 - [x] Zero overhead for non-venture ideas (returns null)
 
+### Completed (Phase 10: Error Boundaries)
+- [x] `src/components/venture/error-boundary.tsx` — VentureErrorBoundary class component
+- [x] Venture detail page wrapped with error boundary + not-found state
+- [x] Checkpoint page wrapped with error boundary
+- [x] Split pages into wrapper + content pattern for clean error handling
+
 ### Remaining (Production Polish)
-- [ ] Error boundaries for venture pages
 - [ ] Unit + integration tests
-- [ ] Performance optimization (query batching, caching)
 - [ ] Performance optimization (query batching, caching)
 
 ## System Architecture
