@@ -1,9 +1,9 @@
 # Venture Progression System — Implementation Tracker
 
-## Status: Phase 1-7 Complete ✅
+## Status: Phase 1-11 Complete ✅ — System Fully Implemented
 
 ### Completed (Phase 1: Backend Foundation)
-- [x] `convex/ventureConstants.ts` — All static definitions (34 checkpoints, 12 bosses, 50 levels, 62 badges, point values)
+- [x] `convex/ventureConstants.ts` — All static definitions (36 checkpoints, 12 bosses, 50 levels, 62 badges, point values)
 - [x] `convex/schema.ts` — Extended with 10 new tables
 - [x] `convex/ventures.ts` — Core venture CRUD, checkpoint/task logic, boss assignment, evidence submission
 - [x] `convex/levels.ts` — Level progression, point tracking, level-up detection
@@ -49,8 +49,6 @@
   - Weekly badge evaluation (auto-awards earned badges)
   - Daily streak update (consecutive day tracking)
 
-## Status: Phase 1-10 Complete ✅ — Core System Fully Implemented
-
 ### Completed (Phase 8: My Ventures + Notifications)
 - [x] `src/app/my-ventures/page.tsx` — My Ventures listing with stats, progress, boss indicators
 - [x] Notification triggers for stage completions, venture completions, gold checkpoints
@@ -68,9 +66,12 @@
 - [x] Checkpoint page wrapped with error boundary
 - [x] Split pages into wrapper + content pattern for clean error handling
 
-### Remaining (Production Polish)
-- [ ] Unit + integration tests
-- [ ] Performance optimization (query batching, caching)
+### Completed (Phase 11: Performance + Testing)
+- [x] Batched queries in `getVenture` (eliminates N+1 problem)
+- [x] `getVentureSummary` — lightweight query for detail views
+- [x] `getUserVentureSummaries` — lightweight query for list views
+- [x] Vitest test suite with 60 passing tests
+- [x] Tests for constants, logic, boss assignment, checkpoint advancement, corruption, points, levels
 
 ## System Architecture
 
@@ -80,7 +81,7 @@ Ideas → Ventures → Checkpoints → Tasks → Evidence
   │         │           │          │        └─ 9 Tool Types (Write/Table/Link/Upload/Map/Survey/Poll/OAuth/SelfReport)
   │         │           │          └─ T1/T2/T3 (Easy/Medium/Stretch)
   │         │           └─ 2/3 tasks to advance, all 3 = gold bonus
-  │         └─ 8 stages, 34 total checkpoints
+  │         └─ 8 stages, 36 total checkpoints
   └─ Wrap existing idea with progression
 
 Bosses (1-2 per venture) → Corruption → Defeat → Monument
@@ -101,3 +102,17 @@ Cron Jobs → Daily Boss Corruption, Weekly Badge Eval, Daily Streak Update
 7. `59789bf` — Remaining tools, boss CSS, checkpoint integration
 8. `a7ffb27` — Mobile responsive polish and venture badge for idea cards
 9. `449cc9a` — Wire up advance checkpoint, add cron jobs
+10. `dc3541a` — My Ventures page + notification triggers
+11. `6226f43` — Feed integration (venture badges on idea cards)
+12. `a011814` — Error boundaries for venture pages
+13. `cedf03e` — Performance optimization (batched queries, lightweight summaries)
+14. `01cf0dc` — Comprehensive test suite (60 tests)
+
+## Stats
+- **Files created/modified:** 40+
+- **Lines of code:** 5,000+
+- **Database tables:** 10 new
+- **Convex mutations/queries:** 50+
+- **UI components:** 20+
+- **Tests:** 60 passing
+- **Commits:** 14
