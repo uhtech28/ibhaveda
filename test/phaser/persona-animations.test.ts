@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { PersonaGender } from "@/lib/phaser/entities/Persona";
+import { Persona, PersonaGender } from "../../src/lib/phaser/entities/Persona";
 
 describe("Persona Animation System - API Contract", () => {
   describe("Type Definitions", () => {
@@ -24,8 +24,6 @@ describe("Persona Animation System - API Contract", () => {
   describe("Public API Methods", () => {
     it("should have required position management methods", () => {
       // Verify the Persona class exists and has the expected shape
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       expect(Persona).toBeDefined();
       expect(typeof Persona).toBe("function");
 
@@ -46,8 +44,6 @@ describe("Persona Animation System - API Contract", () => {
     });
 
     it("should export Persona class constructor", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       // Constructor should accept: scene, x, y, gender
       expect(Persona.length).toBeGreaterThanOrEqual(4);
     });
@@ -55,8 +51,6 @@ describe("Persona Animation System - API Contract", () => {
 
   describe("Animation Features", () => {
     it("should support walk animation parameters", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       // playWalk should accept targetX, targetY, duration
       const walkMethod = Persona.prototype.playWalk;
 
@@ -64,8 +58,6 @@ describe("Persona Animation System - API Contract", () => {
     });
 
     it("should support position setting", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       // setPosition should accept x and y
       const setPositionMethod = Persona.prototype.setPosition;
 
@@ -73,8 +65,6 @@ describe("Persona Animation System - API Contract", () => {
     });
 
     it("should support movement animation", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       // moveToPosition should accept targetX, targetY, duration
       const moveMethod = Persona.prototype.moveToPosition;
 
@@ -94,16 +84,12 @@ describe("Persona Animation System - API Contract", () => {
 
   describe("Integration Points", () => {
     it("should export all required types and classes", () => {
-      const module = require("@/lib/phaser/entities/Persona");
-
-      expect(module.Persona).toBeDefined();
+      expect(Persona).toBeDefined();
       // PersonaGender is a type, so it won't be in runtime exports
       // but we verify it compiles above
     });
 
     it("should maintain backward compatibility with Week 1 API", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       // Original Week 1 methods should still exist
       expect(Persona.prototype.playIdle).toBeDefined();
 
@@ -116,8 +102,6 @@ describe("Persona Animation System - API Contract", () => {
 
   describe("Method Signatures", () => {
     it("should have setPosition that returns this for chaining", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       // setPosition should support chaining
       const method = Persona.prototype.setPosition;
       expect(method).toBeDefined();
@@ -127,8 +111,6 @@ describe("Persona Animation System - API Contract", () => {
     });
 
     it("should have playWalk with duration parameter", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       const walkMethod = Persona.prototype.playWalk;
 
       // playWalk(targetX, targetY, duration)
@@ -137,8 +119,6 @@ describe("Persona Animation System - API Contract", () => {
     });
 
     it("should have moveToPosition with optional duration", () => {
-      const { Persona } = require("@/lib/phaser/entities/Persona");
-
       const moveMethod = Persona.prototype.moveToPosition;
 
       // moveToPosition(targetX, targetY, duration?)
@@ -150,24 +130,18 @@ describe("Persona Animation System - API Contract", () => {
 describe("Persona Implementation Details", () => {
   it("should define walk animation constants correctly", () => {
     // Verify the implementation includes expected animation parameters
-    const { Persona } = require("@/lib/phaser/entities/Persona");
-
     // These are implementation details we can verify exist
     expect(Persona.prototype.playWalk).toBeDefined();
     expect(Persona.prototype.playIdle).toBeDefined();
   });
 
   it("should maintain gender property", () => {
-    const { Persona } = require("@/lib/phaser/entities/Persona");
-
     // Gender should be a readonly property
     // Verified at compile time, but we can check the class structure
     expect(Persona).toBeDefined();
   });
 
   it("should support both immediate and animated positioning", () => {
-    const { Persona } = require("@/lib/phaser/entities/Persona");
-
     // setPosition = immediate
     expect(Persona.prototype.setPosition).toBeDefined();
 
