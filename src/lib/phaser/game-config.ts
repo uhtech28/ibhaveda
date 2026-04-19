@@ -31,7 +31,7 @@ export function createGameConfig(
     parent,
     width: 1280,
     height: 720,
-    backgroundColor: "#0A0A14",
+    backgroundColor: "#0A0D12", // Match feed page background
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,

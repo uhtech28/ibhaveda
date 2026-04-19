@@ -83,14 +83,26 @@ export class Persona extends Phaser.GameObjects.Container {
     );
 
     // ── Sprite ──────────────────────────────────────────────────────────────
-    // The persona texture is 32×48 pixels at 1× scale.
-    // We scale it 3× to get 96×144 display pixels.
-    // Origin is set to (0.5, 1.0) — bottom-center, so the sprite's feet
-    // are at y=0 relative to the container.
-    const textureKey = gender === "male" ? "persona_male" : "persona_female";
-    this.sprite = new Phaser.GameObjects.Image(scene, 0, 0, textureKey);
-    this.sprite.setOrigin(0.5, 1.0);
-    this.sprite.setScale(3);
+    // The high-resolution guide textures are large PNGs (e.g. 1024x1024).
+    // We scale them down to roughly 120-150px height for the map view.
+    // Origin is set to (0.5, 0.9) to allow for the character's feet to be at y=0
+    // while leaving room for the backpack/head.
+    const textureKey = gender === "male" ? "guide_male" : "guide_female";
+    const fallbackKey = gender === "male" ? "persona_male_pixel" : "persona_female_pixel";
+
+    // Try to use the high-fidelity guide texture first, fallback to pixel art
+    const activeKey = scene.textures.exists(textureKey) ? textureKey : fallbackKey;
+
+    this.sprite = new Phaser.GameObjects.Image(scene, 0, 0, activeKey);
+    this.sprite.setOrigin(0.5, 0.95);
+
+    if (activeKey === textureKey) {
+      // Scale for high-res images (aim for ~140px height)
+      this.sprite.setScale(0.14);
+    } else {
+      // Legacy scale for pixel art
+      this.sprite.setScale(3);
+    }
 
     // ── Assemble container ──────────────────────────────────────────────────
     // Shadow is added first so it renders behind the sprite

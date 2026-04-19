@@ -200,15 +200,6 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   // ── Public API ────────────────────────────────────────────────────────────
 
   /**
-   * Gets the current status of this checkpoint node.
-   *
-   * @returns The current checkpoint status.
-   */
-  get status(): CheckpointStatus {
-    return this._status;
-  }
-
-  /**
    * Transitions the node to a new status, updating all visuals and animations.
    *
    * @param status The new checkpoint status.

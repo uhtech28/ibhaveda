@@ -6,6 +6,9 @@
  * - Position setting and movement
  * - Idle/walk state transitions
  * - Public API contract verification
+ * 
+ * Note: These tests verify the API contract and type definitions.
+ * Full integration tests require a browser environment with canvas support.
  */
 
 import { describe, it, expect } from "vitest";
@@ -154,3 +157,4 @@ describe("Persona Implementation Details", () => {
     );
   });
 });
+

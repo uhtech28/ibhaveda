@@ -19,12 +19,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import * as Phaser from "phaser";
-import { createGameConfig } from "@/lib/phaser/game-config";
-import {
-  eventBridge,
-  type CheckpointState,
-} from "@/lib/phaser/utils/event-bridge";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { IntroScreen } from "@/components/map/IntroScreen";
+import { MapHUD } from "@/components/map/MapHUD";
+import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 
 /**
  * Maps numeric boss IDs (1-12) to string slugs for Phaser
@@ -78,7 +77,7 @@ function mapCheckpointStatus(
  */
 export default function MapPage() {
   /** Reference to the Phaser game instance */
-  const gameRef = useRef<Phaser.Game | null>(null);
+  const gameRef = useRef<any | null>(null);
 
   /** Reference to the DOM container for the Phaser canvas */
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +87,15 @@ export default function MapPage() {
 
   /** Current frames per second for performance monitoring */
   const [fps, setFps] = useState(60);
+
+  /** Router for navigation */
+  const router = useRouter();
+
+  /** Show intro screen for character selection */
+  const [showIntro, setShowIntro] = useState(true);
+
+  /** Selected persona gender */
+  const [selectedGender, setSelectedGender] = useState<"male" | "female">("male");
 
   // Get user's ventures from Convex
   const ventures = useQuery(api.worldMap.getVenturesByUser);
@@ -99,6 +107,12 @@ export default function MapPage() {
     activeVenture ? { ventureId: activeVenture._id } : "skip",
   );
 
+  /** Handle character selection and start journey */
+  const handleStartJourney = (gender: "male" | "female") => {
+    setSelectedGender(gender);
+    setShowIntro(false);
+  };
+
   /**
    * Mount and unmount Phaser game
    *
@@ -108,28 +122,53 @@ export default function MapPage() {
    * 3. Clean up on unmount
    */
   useEffect(() => {
-    if (!containerRef.current || gameRef.current) return;
+    if (!containerRef.current || gameRef.current || showIntro) return;
 
-    // Create Phaser game
-    const game = new Phaser.Game(createGameConfig(containerRef.current));
-    gameRef.current = game;
+    // Dynamically import Phaser and game config only on client side
+    let game: any = null;
+    let eventBridge: any = null;
 
-    // Listen for Phaser ready signal
-    const handleReady = () => setPhaserReady(true);
-    const handleFPS = (event: { fps: number }) => setFps(event.fps);
+    const initPhaser = async () => {
+      const Phaser = await import("phaser");
+      const { createGameConfig } = await import("@/lib/phaser/game-config");
+      const { eventBridge: bridge } = await import("@/lib/phaser/utils/event-bridge");
 
-    eventBridge.onReact("PHASER_READY", handleReady);
-    eventBridge.onReact("FPS_UPDATE", handleFPS);
+      eventBridge = bridge;
+
+      // Create Phaser game
+      game = new Phaser.Game(createGameConfig(containerRef.current!));
+      gameRef.current = game;
+
+      // Listen for Phaser ready signal
+      const handleReady = () => setPhaserReady(true);
+      const handleFPS = (event: { fps: number }) => setFps(event.fps);
+
+      eventBridge.onReact("PHASER_READY", handleReady);
+      eventBridge.onReact("FPS_UPDATE", handleFPS);
+
+      // Store cleanup handlers
+      return () => {
+        eventBridge.off("PHASER_READY", handleReady);
+        eventBridge.off("FPS_UPDATE", handleFPS);
+        if (game) {
+          game.destroy(true);
+        }
+      };
+    };
+
+    let cleanup: (() => void) | undefined;
+
+    initPhaser().then((cleanupFn) => {
+      cleanup = cleanupFn;
+    });
 
     // Cleanup on unmount
     return () => {
-      eventBridge.off("PHASER_READY", handleReady);
-      eventBridge.off("FPS_UPDATE", handleFPS);
-      game.destroy(true);
+      if (cleanup) cleanup();
       gameRef.current = null;
       setPhaserReady(false);
     };
-  }, []);
+  }, [showIntro]);
 
   /**
    * Send venture data to Phaser when ready
@@ -142,44 +181,50 @@ export default function MapPage() {
   useEffect(() => {
     if (!phaserReady || !worldMapData) return;
 
-    const { venture, checkpoints, brightness } = worldMapData;
+    const syncData = async () => {
+      const { eventBridge } = await import("@/lib/phaser/utils/event-bridge");
 
-    // Send active venture to Phaser
-    eventBridge.dispatchToPhaser({
-      type: "SET_ACTIVE_VENTURE",
-      ventureId: venture._id,
-      personaGender: "male", // TODO: Get from venture.personaId lookup
-      assignedBosses: venture.assignedBosses.map(mapBossIdToSlug),
-      currentStage: venture.currentStage,
-    });
+      const { venture, checkpoints, brightness } = worldMapData;
 
-    // Send checkpoint states to Phaser
-    const checkpointStates: CheckpointState[] = checkpoints.map((cp) => ({
-      id: cp._id,
-      stage: cp.stage,
-      checkpoint: cp.checkpoint,
-      status: mapCheckpointStatus(
-        cp.status,
-        cp.t1Completed,
-        cp.t2Completed,
-        cp.t3Completed,
-      ),
-      t1: cp.t1Completed,
-      t2: cp.t2Completed,
-      t3: cp.t3Completed,
-    }));
+      // Send active venture to Phaser
+      eventBridge.dispatchToPhaser({
+        type: "SET_ACTIVE_VENTURE",
+        ventureId: venture._id,
+        personaGender: selectedGender, // Use selected gender from intro
+        assignedBosses: venture.assignedBosses.map(mapBossIdToSlug),
+        currentStage: venture.currentStage,
+      });
 
-    eventBridge.dispatchToPhaser({
-      type: "UPDATE_CHECKPOINTS",
-      checkpoints: checkpointStates,
-    });
+      // Send checkpoint states to Phaser
+      const checkpointStates: CheckpointState[] = checkpoints.map((cp) => ({
+        id: cp._id,
+        stage: cp.stage,
+        checkpoint: cp.checkpoint,
+        status: mapCheckpointStatus(
+          cp.status,
+          cp.t1Completed,
+          cp.t2Completed,
+          cp.t3Completed,
+        ),
+        t1: cp.t1Completed,
+        t2: cp.t2Completed,
+        t3: cp.t3Completed,
+      }));
 
-    // Send brightness level to Phaser
-    eventBridge.dispatchToPhaser({
-      type: "UPDATE_BRIGHTNESS",
-      brightness: brightness.worldBrightness,
-    });
-  }, [phaserReady, worldMapData]);
+      eventBridge.dispatchToPhaser({
+        type: "UPDATE_CHECKPOINTS",
+        checkpoints: checkpointStates,
+      });
+
+      // Send brightness level to Phaser
+      eventBridge.dispatchToPhaser({
+        type: "UPDATE_BRIGHTNESS",
+        brightness: brightness.worldBrightness,
+      });
+    };
+
+    syncData();
+  }, [phaserReady, worldMapData, selectedGender]);
 
   /**
    * Listen for checkpoint clicks from Phaser
@@ -189,64 +234,143 @@ export default function MapPage() {
    * - Future: Boss interactions, persona clicks, etc.
    */
   useEffect(() => {
-    const handleCheckpointClick = (event: {
-      checkpointId: string;
-      stage: number;
-      checkpoint: number;
-    }) => {
-      console.log("Checkpoint clicked:", event);
-      // TODO: Navigate to checkpoint detail page
-      // router.push(`/checkpoint/${event.checkpointId}`)
+    if (!phaserReady) return;
+
+    const setupListeners = async () => {
+      const { eventBridge } = await import("@/lib/phaser/utils/event-bridge");
+
+      const handleCheckpointClick = (event: {
+        checkpointId: string;
+        stage: number;
+        checkpoint: number;
+      }) => {
+        console.log("Checkpoint clicked:", event);
+        // TODO: Navigate to checkpoint detail page
+        // router.push(`/checkpoint/${event.checkpointId}`)
+      };
+
+      eventBridge.onReact("CHECKPOINT_CLICKED", handleCheckpointClick);
+
+      return () => {
+        eventBridge.off("CHECKPOINT_CLICKED", handleCheckpointClick);
+      };
     };
 
-    eventBridge.onReact("CHECKPOINT_CLICKED", handleCheckpointClick);
+    let cleanup: (() => void) | undefined;
+    setupListeners().then((cleanupFn) => {
+      cleanup = cleanupFn;
+    });
 
     return () => {
-      eventBridge.off("CHECKPOINT_CLICKED", handleCheckpointClick);
+      if (cleanup) cleanup();
     };
-  }, []);
+  }, [phaserReady]);
 
   return (
-    <div className="relative w-full h-screen bg-slate-950">
-      {/* Phaser canvas container */}
-      <div
-        ref={containerRef}
-        className="w-full h-full"
-        style={{ touchAction: "none" }} // Prevent mobile scroll interference
-      />
-
-      {/* Debug HUD - shows performance and connection status */}
-      <div className="absolute top-4 left-4 text-white/70 text-sm font-mono bg-black/50 px-3 py-2 rounded">
-        <div>FPS: {fps}</div>
-        <div>Phaser: {phaserReady ? "✓" : "..."}</div>
-        <div>
-          Venture: {activeVenture ? activeVenture._id.slice(0, 8) : "None"}
-        </div>
-        <div>
-          Brightness:{" "}
-          {worldMapData?.brightness.worldBrightness.toFixed(1) ?? "—"}%
-        </div>
-        <div>Checkpoints: {worldMapData?.checkpoints.length ?? 0}</div>
-      </div>
-
-      {/* Loading overlay while Phaser initializes */}
-      {!phaserReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80">
-          <div className="text-white text-lg">Loading world map...</div>
-        </div>
+    <>
+      {/* Intro Screen - Show before map */}
+      {showIntro && activeVenture && (
+        <IntroScreen
+          ventureName={activeVenture.ideaId || "Your Venture"}
+          onStart={handleStartJourney}
+        />
       )}
 
-      {/* Error state if no venture found */}
-      {phaserReady && !activeVenture && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80">
-          <div className="text-white text-center">
-            <p className="text-xl mb-2">No active venture</p>
-            <p className="text-sm text-white/60">
-              Create a venture to see your world map
-            </p>
-          </div>
+      {/* Main Map View */}
+      {!showIntro && (
+        <div className="relative w-full h-screen bg-[#0A0D12]">
+          {/* Phaser canvas container */}
+          <div
+            ref={containerRef}
+            className="w-full h-full"
+            style={{ touchAction: "none" }} // Prevent mobile scroll interference
+          />
+
+          {/* MapHUD - Shows all progress and stats */}
+          {phaserReady && worldMapData && (
+            <MapHUD
+              currentStage={worldMapData.venture.currentStage}
+              stageName={getStageNameFromNumber(worldMapData.venture.currentStage)}
+              biomeName={getBiomeNameFromStage(worldMapData.venture.currentStage)}
+              checkpointsCompleted={worldMapData.checkpoints.filter(cp => 
+                cp.status === "completed" || (cp.t1Completed && cp.t2Completed && cp.t3Completed)
+              ).length}
+              checkpointsTotal={worldMapData.checkpoints.length}
+              goldCheckpoints={worldMapData.checkpoints.filter(cp => 
+                cp.t1Completed && cp.t2Completed && cp.t3Completed
+              ).length}
+              level={activeVenture?.level || 1}
+              xp={activeVenture?.xp || 0}
+              xpToNext={activeVenture?.xpToNextLevel || 100}
+              personaGender={selectedGender}
+              brightness={worldMapData.brightness.worldBrightness}
+              fps={fps}
+            />
+          )}
+
+          {/* Loading overlay while Phaser initializes */}
+          {!phaserReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#0A0D12]/80 backdrop-blur-sm">
+              <div className="text-center">
+                <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#6366F1] mx-auto mb-4" />
+                <div className="text-white text-lg">Loading world map...</div>
+              </div>
+            </div>
+          )}
+
+          {/* Error state if no venture found */}
+          {phaserReady && !activeVenture && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#0A0D12]/80 backdrop-blur-sm">
+              <div className="text-white text-center bg-[#111827] p-8 rounded-lg border border-white/10">
+                <p className="text-xl mb-2">No active venture</p>
+                <p className="text-sm text-gray-400 mb-6">
+                  Create a venture to see your world map
+                </p>
+                <Button
+                  onClick={() => router.push('/venture/create')}
+                  className="bg-[#6366F1] hover:bg-[#5558E3]"
+                >
+                  Create Venture
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </>
   );
+}
+
+/**
+ * Get stage name from stage number
+ */
+function getStageNameFromNumber(stage: number): string {
+  const names = [
+    "Ideation",
+    "Research",
+    "Validation",
+    "Design",
+    "Development",
+    "Launch",
+    "Iteration",
+    "Scale",
+  ];
+  return names[stage - 1] || `Stage ${stage}`;
+}
+
+/**
+ * Get biome name from stage number
+ */
+function getBiomeNameFromStage(stage: number): string {
+  const biomes = [
+    "The Village",
+    "The Forest",
+    "The Arena",
+    "Artisan's Quarter",
+    "The Mine",
+    "The Harbour",
+    "The Crossroads",
+    "The Capital",
+  ];
+  return biomes[stage - 1] || "Unknown Biome";
 }

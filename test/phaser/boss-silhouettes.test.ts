@@ -6,10 +6,13 @@
  * - Public API contract
  * - Configuration interface
  * - Method signatures
+ * 
+ * Note: These tests verify the API contract and type definitions.
+ * Full integration tests require a browser environment with canvas support.
  */
 
 import { describe, it, expect } from "vitest";
-import type { BossStatus, BossConfig } from "@/lib/phaser/entities/Boss";
+import { BossSilhouette, type BossStatus, type BossConfig } from "../../src/lib/phaser/entities/Boss";
 
 describe("Boss Silhouette System - API Contract", () => {
   describe("Type Definitions", () => {
@@ -60,8 +63,6 @@ describe("Boss Silhouette System - API Contract", () => {
 
   describe("Public API Methods", () => {
     it("should have BossSilhouette class with required methods", () => {
-      const { BossSilhouette } = require("@/lib/phaser/entities/Boss");
-
       expect(BossSilhouette).toBeDefined();
       expect(typeof BossSilhouette).toBe("function");
 
@@ -72,8 +73,6 @@ describe("Boss Silhouette System - API Contract", () => {
     });
 
     it("should export BossSilhouette constructor", () => {
-      const { BossSilhouette } = require("@/lib/phaser/entities/Boss");
-
       // Constructor should accept: scene, config
       expect(BossSilhouette.length).toBeGreaterThanOrEqual(2);
     });
@@ -81,8 +80,6 @@ describe("Boss Silhouette System - API Contract", () => {
 
   describe("Status Update Method", () => {
     it("should have updateStatus method with status parameter", () => {
-      const { BossSilhouette } = require("@/lib/phaser/entities/Boss");
-
       const updateMethod = BossSilhouette.prototype.updateStatus;
 
       // updateStatus should accept at least status parameter
@@ -91,8 +88,6 @@ describe("Boss Silhouette System - API Contract", () => {
     });
 
     it("should support smooth transition parameter", () => {
-      const { BossSilhouette } = require("@/lib/phaser/entities/Boss");
-
       // updateStatus(status, smooth?)
       const updateMethod = BossSilhouette.prototype.updateStatus;
       expect(updateMethod).toBeDefined();
@@ -179,9 +174,7 @@ describe("Boss Silhouette System - API Contract", () => {
 
   describe("Integration Points", () => {
     it("should export all required types and classes", () => {
-      const module = require("@/lib/phaser/entities/Boss");
-
-      expect(module.BossSilhouette).toBeDefined();
+      expect(BossSilhouette).toBeDefined();
       // BossStatus and BossConfig are types, verified at compile time
     });
 
@@ -243,15 +236,11 @@ describe("Boss Implementation Details", () => {
   });
 
   it("should support smooth transitions", () => {
-    const { BossSilhouette } = require("@/lib/phaser/entities/Boss");
-
     // updateStatus method should exist
     expect(BossSilhouette.prototype.updateStatus).toBeDefined();
   });
 
   it("should maintain boss configuration internally", () => {
-    const { BossSilhouette } = require("@/lib/phaser/entities/Boss");
-
     // BossSilhouette should be a class/constructor
     expect(typeof BossSilhouette).toBe("function");
   });

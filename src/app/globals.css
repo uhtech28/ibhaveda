@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -134,18 +134,26 @@
     0% {
       background-position: 200% 0;
     }
+
     100% {
       background-position: -200% 0;
     }
   }
 
   @keyframes bounce {
-    0%, 20%, 50%, 80%, 100% {
+
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
       transform: translateY(0);
     }
+
     40% {
       transform: translateY(-10px);
     }
+
     60% {
       transform: translateY(-5px);
     }
@@ -153,19 +161,18 @@
 
   .animate-shimmer {
     animation: shimmer 1.8s linear infinite;
-    background-image: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.03) 0%,
-      rgba(255, 255, 255, 0.08) 20%,
-      rgba(255, 255, 255, 0.03) 40%
-    );
+    background-image: linear-gradient(90deg,
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.08) 20%,
+        rgba(255, 255, 255, 0.03) 40%);
     background-size: 200% 100%;
   }
 }
 
 @media (max-width: 640px) {
+
   [data-notification][data-radix-popper-content-wrapper],
-  [data-notification] ~ [data-radix-popper-content-wrapper],
+  [data-notification]~[data-radix-popper-content-wrapper],
   div:has(> [data-notification]) {
     left: 50% !important;
     transform: translateX(-50%) !important;
@@ -178,86 +185,228 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 @keyframes boss-crack {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.02); }
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.02);
+  }
 }
 
 @keyframes boss-amber-freeze {
-  0% { filter: saturate(0.3) brightness(0.8); }
-  50% { filter: saturate(0.5) brightness(0.9); }
-  100% { filter: saturate(0.3) brightness(0.8); }
+  0% {
+    filter: saturate(0.3) brightness(0.8);
+  }
+
+  50% {
+    filter: saturate(0.5) brightness(0.9);
+  }
+
+  100% {
+    filter: saturate(0.3) brightness(0.8);
+  }
 }
 
 @keyframes boss-greyscale {
-  0%, 100% { filter: grayscale(0.4); }
-  50% { filter: grayscale(0.7); }
+
+  0%,
+  100% {
+    filter: grayscale(0.4);
+  }
+
+  50% {
+    filter: grayscale(0.7);
+  }
 }
 
 @keyframes boss-thorns {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  75% { transform: translateX(2px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-2px);
+  }
+
+  75% {
+    transform: translateX(2px);
+  }
 }
 
 @keyframes boss-mirror {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.8; }
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
 }
 
 @keyframes boss-ash {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
-  100% { transform: translateY(-20px) rotate(180deg); opacity: 0; }
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 0;
+  }
 }
 
 @keyframes boss-flood {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(1.05); }
+
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  50% {
+    transform: scaleY(1.05);
+  }
 }
 
 @keyframes boss-grave {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 @keyframes boss-rust {
-  0%, 100% { filter: sepia(0.3); }
-  50% { filter: sepia(0.6); }
+
+  0%,
+  100% {
+    filter: sepia(0.3);
+  }
+
+  50% {
+    filter: sepia(0.6);
+  }
 }
 
 @keyframes boss-wraith {
-  0%, 100% { opacity: 0.4; transform: translateX(0); }
-  25% { opacity: 0.7; transform: translateX(-3px); }
-  75% { opacity: 0.7; transform: translateX(3px); }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translateX(0);
+  }
+
+  25% {
+    opacity: 0.7;
+    transform: translateX(-3px);
+  }
+
+  75% {
+    opacity: 0.7;
+    transform: translateX(3px);
+  }
 }
 
 @keyframes boss-stone {
-  0%, 100% { filter: brightness(0.7) contrast(1.2); }
-  50% { filter: brightness(0.5) contrast(1.4); }
+
+  0%,
+  100% {
+    filter: brightness(0.7) contrast(1.2);
+  }
+
+  50% {
+    filter: brightness(0.5) contrast(1.4);
+  }
 }
 
 @keyframes boss-veil {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 0.3; }
+
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
 }
 
-.boss-corruption-unraveller { animation: boss-crack 4s ease-in-out infinite; }
-.boss-corruption-architect { animation: boss-amber-freeze 6s ease-in-out infinite; }
-.boss-corruption-hollow { animation: boss-greyscale 5s ease-in-out infinite; }
-.boss-corruption-thornwarden { animation: boss-thorns 3s ease-in-out infinite; }
-.boss-corruption-mirror { animation: boss-mirror 3.5s ease-in-out infinite; }
-.boss-corruption-drake { animation: boss-ash 2s ease-out infinite; }
-.boss-corruption-tide { animation: boss-flood 4.5s ease-in-out infinite; }
-.boss-corruption-gravemind { animation: boss-grave 5s ease-in-out infinite; }
-.boss-corruption-oracle { animation: boss-rust 4s ease-in-out infinite; }
-.boss-corruption-wraith { animation: boss-wraith 3s ease-in-out infinite; }
-.boss-corruption-stonecaller { animation: boss-stone 5s ease-in-out infinite; }
-.boss-corruption-veilwalker { animation: boss-veil 4s ease-in-out infinite; }
+.boss-corruption-unraveller {
+  animation: boss-crack 4s ease-in-out infinite;
+}
+
+.boss-corruption-architect {
+  animation: boss-amber-freeze 6s ease-in-out infinite;
+}
+
+.boss-corruption-hollow {
+  animation: boss-greyscale 5s ease-in-out infinite;
+}
+
+.boss-corruption-thornwarden {
+  animation: boss-thorns 3s ease-in-out infinite;
+}
+
+.boss-corruption-mirror {
+  animation: boss-mirror 3.5s ease-in-out infinite;
+}
+
+.boss-corruption-drake {
+  animation: boss-ash 2s ease-out infinite;
+}
+
+.boss-corruption-tide {
+  animation: boss-flood 4.5s ease-in-out infinite;
+}
+
+.boss-corruption-gravemind {
+  animation: boss-grave 5s ease-in-out infinite;
+}
+
+.boss-corruption-oracle {
+  animation: boss-rust 4s ease-in-out infinite;
+}
+
+.boss-corruption-wraith {
+  animation: boss-wraith 3s ease-in-out infinite;
+}
+
+.boss-corruption-stonecaller {
+  animation: boss-stone 5s ease-in-out infinite;
+}
+
+.boss-corruption-veilwalker {
+  animation: boss-veil 4s ease-in-out infinite;
+}
 
 /* Boss defeat celebration */
 @keyframes boss-slay {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.2); opacity: 0.5; }
-  100% { transform: scale(0); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
 }
 
 .boss-slay-animation {
@@ -266,8 +415,15 @@
 
 /* Monument glow */
 @keyframes monument-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.2); }
-  50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.4); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
+  }
 }
 
 .monument-glow {
