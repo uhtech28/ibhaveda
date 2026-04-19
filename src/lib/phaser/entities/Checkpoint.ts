@@ -241,6 +241,15 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Get the absolute world position of this checkpoint node.
+   *
+   * @returns Object with x and y world coordinates.
+   */
+  getWorldPosition(): { x: number; y: number } {
+    return { x: this.x, y: this.y };
+  }
+
+  /**
    * Activates pointer input on this node and wires up event listeners.
    *
    * Emits `'checkpoint_clicked'` on the scene's event bus with a payload of

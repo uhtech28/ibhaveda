@@ -1,6 +1,11 @@
-import { v } from "convex/values"
-import { query } from "./_generated/server"
-import { VENTURE_STAGES } from "./ventureConstants"
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import {
+  VENTURE_STAGES,
+  POINT_VALUES,
+  CHECKPOINT_DEFINITIONS,
+} from "./ventureConstants";
+import { Id } from "./_generated/dataModel";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -12,11 +17,11 @@ import { VENTURE_STAGES } from "./ventureConstants"
  */
 export interface BrightnessResult {
   /** Contribution from fully-completed stages. Range: 0–60. */
-  accumulatedBase: number
+  accumulatedBase: number;
   /** Contribution from task progress within the current stage. Range: 0–40. */
-  stageLayer: number
+  stageLayer: number;
   /** Total world brightness percentage fed to Phaser. Range: 0–100. */
-  worldBrightness: number
+  worldBrightness: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,9 +39,9 @@ export interface BrightnessResult {
 //   All 8 stages complete  →  min(7×(60/7), 60) + 40     = 100%
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PER_STAGE_CONTRIBUTION = 60 / 7 // ≈ 8.5714…% per completed stage
-const MAX_ACCUMULATED        = 60
-const MAX_STAGE_LAYER        = 40
+const PER_STAGE_CONTRIBUTION = 60 / 7; // ≈ 8.5714…% per completed stage
+const MAX_ACCUMULATED = 60;
+const MAX_STAGE_LAYER = 40;
 
 /**
  * Derive brightness inputs from raw ventureCheckpoints rows and the venture's
@@ -50,62 +55,69 @@ const MAX_STAGE_LAYER        = 40
  */
 function computeBrightness(
   checkpoints: Array<{
-    stage: number
-    checkpoint: number
-    status: string
-    t1Completed: boolean
-    t2Completed: boolean
-    t3Completed: boolean
+    stage: number;
+    checkpoint: number;
+    status: string;
+    t1Completed: boolean;
+    t2Completed: boolean;
+    t3Completed: boolean;
   }>,
   currentStage: number,
 ): BrightnessResult {
   // ── 1. Count fully-completed prior stages ──────────────────────────────────
-  let completedStages = 0
+  let completedStages = 0;
 
   for (const stageDef of VENTURE_STAGES) {
-    if (stageDef.id >= currentStage) break // only look at stages before current
+    if (stageDef.id >= currentStage) break; // only look at stages before current
 
-    const stageCheckpoints = checkpoints.filter((cp) => cp.stage === stageDef.id)
+    const stageCheckpoints = checkpoints.filter(
+      (cp) => cp.stage === stageDef.id,
+    );
 
     // A stage is "complete" when every one of its checkpoints is done.
     // We guard against the edge-case where rows don't exist yet (e.g. fresh venture).
-    const allPresent   = stageCheckpoints.length >= stageDef.checkpoints
+    const allPresent = stageCheckpoints.length >= stageDef.checkpoints;
     const allCompleted = stageCheckpoints.every(
       (cp) => cp.status === "completed" || cp.status === "skipped",
-    )
+    );
 
     if (allPresent && allCompleted) {
-      completedStages++
+      completedStages++;
     }
   }
 
   // ── 2. Count tasks done/total in the current stage ────────────────────────
-  const currentStageDef = VENTURE_STAGES.find((s) => s.id === currentStage)
-  const totalTasksInCurrentStage = (currentStageDef?.checkpoints ?? 0) * 3 // 3 tasks per checkpoint
+  const currentStageDef = VENTURE_STAGES.find((s) => s.id === currentStage);
+  const totalTasksInCurrentStage = (currentStageDef?.checkpoints ?? 0) * 3; // 3 tasks per checkpoint
 
-  const currentStageCheckpoints = checkpoints.filter((cp) => cp.stage === currentStage)
-  let tasksDoneInCurrentStage = 0
+  const currentStageCheckpoints = checkpoints.filter(
+    (cp) => cp.stage === currentStage,
+  );
+  let tasksDoneInCurrentStage = 0;
   for (const cp of currentStageCheckpoints) {
-    if (cp.t1Completed) tasksDoneInCurrentStage++
-    if (cp.t2Completed) tasksDoneInCurrentStage++
-    if (cp.t3Completed) tasksDoneInCurrentStage++
+    if (cp.t1Completed) tasksDoneInCurrentStage++;
+    if (cp.t2Completed) tasksDoneInCurrentStage++;
+    if (cp.t3Completed) tasksDoneInCurrentStage++;
   }
 
   // ── 3. Apply formula ───────────────────────────────────────────────────────
-  const accumulatedBase = Math.min(completedStages * PER_STAGE_CONTRIBUTION, MAX_ACCUMULATED)
+  const accumulatedBase = Math.min(
+    completedStages * PER_STAGE_CONTRIBUTION,
+    MAX_ACCUMULATED,
+  );
 
   const stageLayer =
     totalTasksInCurrentStage > 0
       ? (tasksDoneInCurrentStage / totalTasksInCurrentStage) * MAX_STAGE_LAYER
-      : 0
+      : 0;
 
-  const worldBrightness = Math.min(accumulatedBase + stageLayer, 100)
+  const worldBrightness = Math.min(accumulatedBase + stageLayer, 100);
 
   return {
     accumulatedBase: Math.round(accumulatedBase * 100) / 100,
-    stageLayer:      Math.round(stageLayer      * 100) / 100,
-    worldBrightness: Math.round(worldBrightness  * 100) / 100,
-  }
+    stageLayer: Math.round(stageLayer * 100) / 100,
+    worldBrightness: Math.round(worldBrightness * 100) / 100,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -129,25 +141,70 @@ export const getWorldMapData = query({
   },
   handler: async (ctx, args) => {
     // ── Venture ───────────────────────────────────────────────────────────────
-    const venture = await ctx.db.get(args.ventureId)
-    if (!venture) return null
+    const venture = await ctx.db.get(args.ventureId);
+    if (!venture) return null;
+
+    // ── Idea title (venture name shown in HUD) ────────────────────────────────
+    const idea = await ctx.db.get(venture.ideaId);
+    const ideaTitle = idea?.title ?? "Unnamed Venture";
 
     // ── Checkpoints ───────────────────────────────────────────────────────────
     const checkpoints = await ctx.db
       .query("ventureCheckpoints")
       .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
-      .collect()
+      .collect();
+
+    // ── Tasks (one batch — keyed by checkpointId) ────────────────────────────
+    // We need task _ids so the map page can call markTaskComplete without
+    // a separate lookup.
+    const allTasks = await ctx.db.query("ventureTasks").collect();
+    const tasksByCheckpoint = new Map<string, typeof allTasks>();
+    for (const task of allTasks) {
+      const key = task.checkpointId as string;
+      const existing = tasksByCheckpoint.get(key) ?? [];
+      existing.push(task);
+      tasksByCheckpoint.set(key, existing);
+    }
+
+    // Attach task rows to each checkpoint, enriched with real prompt text
+    // from CHECKPOINT_DEFINITIONS so the map panel shows the actual task prompt.
+    const checkpointsWithTasks = checkpoints.map((cp) => {
+      const cpDef = CHECKPOINT_DEFINITIONS.find(
+        (d) => d.stage === cp.stage && d.checkpoint === cp.checkpoint,
+      );
+
+      const tasks = (tasksByCheckpoint.get(cp._id as string) ?? [])
+        .sort((a, b) => {
+          const order: Record<string, number> = { t1: 0, t2: 1, t3: 2 };
+          return (order[a.taskLevel] ?? 0) - (order[b.taskLevel] ?? 0);
+        })
+        .map((task) => {
+          // Pull the real prompt from the constant definitions
+          const promptKey = task.taskLevel as "t1" | "t2" | "t3";
+          const prompt = cpDef?.[promptKey]?.prompt ?? "";
+          return { ...task, prompt };
+        });
+
+      return {
+        ...cp,
+        // Expose checkpoint outcome so the panel can display it
+        outcome: cpDef?.outcome ?? "",
+        checkpointName: cpDef?.name ?? `Checkpoint ${cp.checkpoint}`,
+        tasks,
+      };
+    });
 
     // ── Brightness ────────────────────────────────────────────────────────────
-    const brightness = computeBrightness(checkpoints, venture.currentStage)
+    const brightness = computeBrightness(checkpoints, venture.currentStage);
 
     return {
       venture,
-      checkpoints,
+      ideaTitle,
+      checkpoints: checkpointsWithTasks,
       brightness,
-    }
+    };
   },
-})
+});
 
 /**
  * Return all ventures that belong to the currently authenticated user.
@@ -160,29 +217,199 @@ export const getWorldMapData = query({
  * Returns an empty array for unauthenticated requests or users who have
  * not yet completed onboarding (i.e. no matching user row).
  */
+// ─────────────────────────────────────────────────────────────────────────────
+// MUTATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lightweight task-completion mutation used by the world-map panel.
+ *
+ * Marks one task (t1 / t2 / t3) on a checkpoint as done, creates a minimal
+ * self-report evidence record, updates the checkpoint flags, and awards the
+ * appropriate points.  Does NOT gate on evidence content — the world-map UX
+ * treats task toggling as a quick acknowledgement rather than a full submission.
+ *
+ * Idempotent: calling it a second time for an already-completed task is a no-op.
+ */
+export const markTaskComplete = mutation({
+  args: {
+    checkpointId: v.id("ventureCheckpoints"),
+    taskLevel: v.union(v.literal("t1"), v.literal("t2"), v.literal("t3")),
+  },
+  handler: async (ctx, args) => {
+    // ── Auth ──────────────────────────────────────────────────────────────────
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const checkpoint = await ctx.db.get(args.checkpointId);
+    if (!checkpoint) throw new Error("Checkpoint not found");
+
+    // ── Idempotency guard ─────────────────────────────────────────────────────
+    const flagField =
+      args.taskLevel === "t1"
+        ? "t1Completed"
+        : args.taskLevel === "t2"
+          ? "t2Completed"
+          : "t3Completed";
+
+    if (checkpoint[flagField]) return { alreadyDone: true };
+
+    // ── Ownership ─────────────────────────────────────────────────────────────
+    const venture = await ctx.db.get(checkpoint.ventureId);
+    if (!venture) throw new Error("Venture not found");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) throw new Error("User not found");
+    if (venture.userId !== user._id) throw new Error("Not your venture");
+
+    // ── Find the task row ────────────────────────────────────────────────────
+    const task = await ctx.db
+      .query("ventureTasks")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("checkpointId"), args.checkpointId),
+          q.eq(q.field("taskLevel"), args.taskLevel),
+        ),
+      )
+      .first();
+
+    if (!task)
+      throw new Error(`Task ${args.taskLevel} not found for checkpoint`);
+
+    const now = Date.now();
+
+    // ── Create minimal evidence (self-report) ─────────────────────────────────
+    const evidenceId = await ctx.db.insert("ventureEvidence", {
+      taskId: task._id,
+      userId: user._id,
+      toolType: "self_report",
+      content: { note: "Marked complete from world map", completedAt: now },
+      createdAt: now,
+    });
+
+    // ── Mark task done ────────────────────────────────────────────────────────
+    await ctx.db.patch(task._id, {
+      status: "completed",
+      evidenceId,
+      completedAt: now,
+    });
+
+    // ── Update checkpoint flag (and check for gold) ───────────────────────────
+    const updatedFlags = {
+      t1Completed: checkpoint.t1Completed,
+      t2Completed: checkpoint.t2Completed,
+      t3Completed: checkpoint.t3Completed,
+      [flagField]: true,
+    };
+
+    const allThreeDone =
+      updatedFlags.t1Completed &&
+      updatedFlags.t2Completed &&
+      updatedFlags.t3Completed;
+
+    const cpPatch: Record<string, unknown> = {
+      [flagField]: true,
+      status: "in_progress",
+    };
+
+    if (allThreeDone && !checkpoint.goldBonusEarned) {
+      cpPatch.goldBonusEarned = true;
+      // Award gold bonus points via wallet/level pipeline
+      await ctx.db
+        .insert("transactions", {
+          walletId: (
+            await ctx.db
+              .query("wallets")
+              .withIndex("by_user", (q) => q.eq("userId", user._id))
+              .first()
+          )?._id as Id<"wallets">,
+          amount: POINT_VALUES.gold_checkpoint_bonus,
+          type: "gold_checkpoint",
+          description: "Gold checkpoint bonus — all 3 tasks complete",
+          relatedId: venture._id,
+          createdAt: now,
+        })
+        .catch(() => {
+          /* wallet may not exist yet — non-fatal */
+        });
+    }
+
+    await ctx.db.patch(args.checkpointId, cpPatch);
+
+    // ── Award task points ─────────────────────────────────────────────────────
+    const pointKey =
+      `task_${args.taskLevel}_complete` as keyof typeof POINT_VALUES;
+    const pts = POINT_VALUES[pointKey] as number | undefined;
+
+    if (pts) {
+      const wallet = await ctx.db
+        .query("wallets")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .first();
+
+      if (wallet) {
+        await ctx.db.insert("transactions", {
+          walletId: wallet._id,
+          amount: pts,
+          type: `${args.taskLevel}_task_complete`,
+          description: `Task ${args.taskLevel.toUpperCase()} completed`,
+          relatedId: venture._id,
+          createdAt: now,
+        });
+        await ctx.db.patch(wallet._id, {
+          balance: wallet.balance + pts,
+          updatedAt: now,
+        });
+
+        // Propagate to userLevels
+        const userLevel = await ctx.db
+          .query("userLevels")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .first();
+
+        if (userLevel) {
+          await ctx.db.patch(userLevel._id, {
+            totalPoints: userLevel.totalPoints + pts,
+            titlePoints: userLevel.titlePoints + pts,
+            updatedAt: now,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      goldEarned: allThreeDone && !checkpoint.goldBonusEarned,
+    };
+  },
+});
+
 export const getVenturesByUser = query({
   args: {},
   handler: async (ctx) => {
     // ── Auth ──────────────────────────────────────────────────────────────────
-    const identity = await ctx.auth.getUserIdentity()
-    if (!identity) return []
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
 
-    const clerkId = identity.subject
+    const clerkId = identity.subject;
 
     // ── User lookup ───────────────────────────────────────────────────────────
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
-      .first()
+      .first();
 
-    if (!user) return []
+    if (!user) return [];
 
     // ── Ventures ──────────────────────────────────────────────────────────────
     const ventures = await ctx.db
       .query("ventures")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect()
+      .collect();
 
-    return ventures
+    return ventures;
   },
-})
+});

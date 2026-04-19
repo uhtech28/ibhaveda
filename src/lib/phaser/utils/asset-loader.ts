@@ -18,6 +18,8 @@
  */
 
 import Phaser from "phaser";
+import { BiomeTextureCreator } from "./biome-textures";
+import { AdventureCheckpointCreator } from "./adventure-checkpoints";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Module-level draw helpers
@@ -113,9 +115,13 @@ export class AssetLoader {
   static createAllTextures(scene: Phaser.Scene): void {
     AssetLoader.createCheckpointTextures(scene);
     AssetLoader.createPersonaTextures(scene);
+    AssetLoader.createPersonaSpriteSheets(scene);
     AssetLoader.createPathTextures(scene);
     AssetLoader.createParticleTextures(scene);
     AssetLoader.createDecorationTextures(scene);
+    AssetLoader.createBiomeTiles(scene);
+    AssetLoader.createAdventureCheckpointTextures(scene);
+    AssetLoader.createEnemyTextures(scene);
   }
 
   /**
@@ -125,6 +131,195 @@ export class AssetLoader {
     scene.load.image("skeld_floor", "/assets/skeld/floor.png");
     scene.load.image("guide_male", "/assets/skeld/guide_male.png");
     scene.load.image("guide_female", "/assets/skeld/guide_female.png");
+
+    // Try to load persona sprite sheets (will use generated placeholders if not found)
+    scene.load.spritesheet(
+      "persona_male_idle_sheet",
+      "/assets/persona/male_idle.png",
+      {
+        frameWidth: 32,
+        frameHeight: 48,
+      },
+    );
+    scene.load.spritesheet(
+      "persona_male_walk_sheet",
+      "/assets/persona/male_walk.png",
+      {
+        frameWidth: 32,
+        frameHeight: 48,
+      },
+    );
+    scene.load.spritesheet(
+      "persona_female_idle_sheet",
+      "/assets/persona/female_idle.png",
+      {
+        frameWidth: 32,
+        frameHeight: 48,
+      },
+    );
+    scene.load.spritesheet(
+      "persona_female_walk_sheet",
+      "/assets/persona/female_walk.png",
+      {
+        frameWidth: 32,
+        frameHeight: 48,
+      },
+    );
+  }
+
+  // ── Persona sprite sheets ──────────────────────────────────────────────────
+
+  /**
+   * Creates placeholder persona sprite sheets for idle and walk animations.
+   * These are used when external sprite sheet assets are not available.
+   *
+   * Generates 4 sprite sheets:
+   * - persona_male_idle_sheet (4 frames, 128×48px)
+   * - persona_male_walk_sheet (6 frames, 192×48px)
+   * - persona_female_idle_sheet (4 frames, 128×48px)
+   * - persona_female_walk_sheet (6 frames, 192×48px)
+   */
+  static createPersonaSpriteSheets(scene: Phaser.Scene): void {
+    const FRAME_WIDTH = 32;
+    const FRAME_HEIGHT = 48;
+
+    // Only create if external assets failed to load
+    const sheetsToCreate = [
+      { key: "persona_male_idle_sheet", frames: 4, color: 0x4a90e2 },
+      { key: "persona_male_walk_sheet", frames: 6, color: 0x4a90e2 },
+      { key: "persona_female_idle_sheet", frames: 4, color: 0xe94b9c },
+      { key: "persona_female_walk_sheet", frames: 6, color: 0xe94b9c },
+    ];
+
+    for (const sheet of sheetsToCreate) {
+      // Skip if already loaded from file
+      if (scene.textures.exists(sheet.key)) {
+        continue;
+      }
+
+      const width = FRAME_WIDTH * sheet.frames;
+      const height = FRAME_HEIGHT;
+      const gfx = scene.add.graphics();
+
+      // Draw each frame
+      for (let i = 0; i < sheet.frames; i++) {
+        const x = i * FRAME_WIDTH;
+
+        // Frame background
+        gfx.fillStyle(sheet.color, 1);
+        gfx.fillRoundedRect(x + 2, 2, FRAME_WIDTH - 4, FRAME_HEIGHT - 4, 4);
+
+        // Frame border
+        gfx.lineStyle(1, 0xffffff, 0.5);
+        gfx.strokeRoundedRect(x + 2, 2, FRAME_WIDTH - 4, FRAME_HEIGHT - 4, 4);
+
+        // Head (circle at top)
+        const headX = x + FRAME_WIDTH / 2;
+        const headY = 12;
+        const headRadius = 6;
+        gfx.fillStyle(0xffd4a3, 1);
+        gfx.fillCircle(headX, headY, headRadius);
+        gfx.lineStyle(1, 0x000000, 0.3);
+        gfx.strokeCircle(headX, headY, headRadius);
+
+        // Body (rectangle)
+        const bodyX = x + FRAME_WIDTH / 2 - 4;
+        const bodyY = 18;
+        const bodyWidth = 8;
+        const bodyHeight = 14;
+        gfx.fillStyle(sheet.color, 1);
+        gfx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
+
+        // Legs (position varies slightly per frame for walk animation)
+        const legOffset =
+          sheet.frames === 6
+            ? Math.sin((i / sheet.frames) * Math.PI * 2) * 2
+            : 0;
+        gfx.fillStyle(0x333333, 1);
+        gfx.fillRect(bodyX + 1, bodyY + bodyHeight, 2, 8 + legOffset);
+        gfx.fillRect(bodyX + 5, bodyY + bodyHeight, 2, 8 - legOffset);
+
+        // Frame number label (for debugging)
+        const text = scene.add.text(
+          x + FRAME_WIDTH / 2,
+          FRAME_HEIGHT - 6,
+          `${i + 1}`,
+          {
+            fontSize: "8px",
+            color: "#ffffff",
+            backgroundColor: "#000000",
+          },
+        );
+        text.setOrigin(0.5, 0.5);
+        text.setAlpha(0.7);
+      }
+
+      // Generate texture
+      gfx.generateTexture(sheet.key, width, height);
+      gfx.destroy();
+    }
+
+    // Create animations if they don't exist
+    AssetLoader.createPersonaAnimations(scene);
+  }
+
+  /**
+   * Creates Phaser animations for persona sprite sheets.
+   * Should be called after sprite sheets are loaded/generated.
+   */
+  static createPersonaAnimations(scene: Phaser.Scene): void {
+    const anims = [
+      {
+        key: "persona_male_idle",
+        sheet: "persona_male_idle_sheet",
+        frames: 4,
+        frameRate: 4,
+        repeat: -1,
+      },
+      {
+        key: "persona_male_walk",
+        sheet: "persona_male_walk_sheet",
+        frames: 6,
+        frameRate: 8,
+        repeat: -1,
+      },
+      {
+        key: "persona_female_idle",
+        sheet: "persona_female_idle_sheet",
+        frames: 4,
+        frameRate: 4,
+        repeat: -1,
+      },
+      {
+        key: "persona_female_walk",
+        sheet: "persona_female_walk_sheet",
+        frames: 6,
+        frameRate: 8,
+        repeat: -1,
+      },
+    ];
+
+    for (const anim of anims) {
+      // Skip if animation already exists
+      if (scene.anims.exists(anim.key)) {
+        continue;
+      }
+
+      // Skip if sprite sheet doesn't exist
+      if (!scene.textures.exists(anim.sheet)) {
+        continue;
+      }
+
+      scene.anims.create({
+        key: anim.key,
+        frames: scene.anims.generateFrameNumbers(anim.sheet, {
+          start: 0,
+          end: anim.frames - 1,
+        }),
+        frameRate: anim.frameRate,
+        repeat: anim.repeat,
+      });
+    }
   }
 
   // ── Checkpoint textures ────────────────────────────────────────────────────
@@ -675,6 +870,272 @@ export class AssetLoader {
   static createDecorationTextures(scene: Phaser.Scene): void {
     AssetLoader.createVentTexture(scene);
     AssetLoader.createTableTexture(scene);
+  }
+
+  /**
+   * Create all biome tile textures for adventure theme
+   */
+  static createBiomeTiles(scene: Phaser.Scene): void {
+    BiomeTextureCreator.createAllBiomeTiles(scene);
+    BiomeTextureCreator.createOrganicPathTextures(scene);
+  }
+
+  /**
+   * Create adventure-themed checkpoint markers
+   */
+  static createAdventureCheckpointTextures(scene: Phaser.Scene): void {
+    AdventureCheckpointCreator.createAllAdventureCheckpoints(scene);
+  }
+
+  /**
+   * Create enemy silhouette textures
+   */
+  static createEnemyTextures(scene: Phaser.Scene): void {
+    AssetLoader.createSlimeTexture(scene);
+    AssetLoader.createVultureTexture(scene);
+    AssetLoader.createUndeadTexture(scene);
+    AssetLoader.createFrostWraithTexture(scene);
+    AssetLoader.createGolemTexture(scene);
+    AssetLoader.createSeaSerpentTexture(scene);
+    AssetLoader.createHarpyTexture(scene);
+    AssetLoader.createBureaucratTexture(scene);
+  }
+
+  // ── Enemy Textures ─────────────────────────────────────────────────────────
+
+  /**
+   * Stage 1: Slime enemy
+   */
+  private static createSlimeTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Slime body (green blob)
+    gfx.fillStyle(0x4caf50, 0.8);
+    gfx.fillEllipse(SIZE / 2, SIZE / 2 + 8, 20, 16);
+    
+    // Eyes
+    gfx.fillStyle(0x000000, 1);
+    gfx.fillCircle(SIZE / 2 - 6, SIZE / 2, 3);
+    gfx.fillCircle(SIZE / 2 + 6, SIZE / 2, 3);
+    
+    // Shine
+    gfx.fillStyle(0xffffff, 0.6);
+    gfx.fillCircle(SIZE / 2 - 4, SIZE / 2 - 2, 2);
+    
+    gfx.generateTexture("enemy_slime", SIZE, SIZE);
+    gfx.destroy();
+  }
+
+  /**
+   * Stage 2: Vulture enemy
+   */
+  private static createVultureTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Body
+    gfx.fillStyle(0x5d4037, 1);
+    gfx.fillEllipse(SIZE / 2, SIZE / 2 + 4, 12, 16);
+    
+    // Head
+    gfx.fillCircle(SIZE / 2, SIZE / 2 - 8, 8);
+    
+    // Beak
+    gfx.fillStyle(0xffa726, 1);
+    gfx.fillTriangle(
+      SIZE / 2 + 8, SIZE / 2 - 8,
+      SIZE / 2 + 4, SIZE / 2 - 10,
+      SIZE / 2 + 4, SIZE / 2 - 6
+    );
+    
+    // Wings
+    gfx.fillStyle(0x3e2723, 0.8);
+    gfx.fillEllipse(SIZE / 2 - 12, SIZE / 2, 8, 12);
+    gfx.fillEllipse(SIZE / 2 + 12, SIZE / 2, 8, 12);
+    
+    gfx.generateTexture("enemy_vulture", SIZE, SIZE);
+    gfx.destroy();
+  }
+
+  /**
+   * Stage 3: Undead enemy
+   */
+  private static createUndeadTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Skull
+    gfx.fillStyle(0xeeeeee, 1);
+    gfx.fillCircle(SIZE / 2, SIZE / 2 - 4, 12);
+    
+    // Eye sockets
+    gfx.fillStyle(0x000000, 1);
+    gfx.fillCircle(SIZE / 2 - 4, SIZE / 2 - 6, 3);
+    gfx.fillCircle(SIZE / 2 + 4, SIZE / 2 - 6, 3);
+    
+    // Glowing eyes
+    gfx.fillStyle(0x5555ff, 0.8);
+    gfx.fillCircle(SIZE / 2 - 4, SIZE / 2 - 6, 2);
+    gfx.fillCircle(SIZE / 2 + 4, SIZE / 2 - 6, 2);
+    
+    // Body (tattered robe)
+    gfx.fillStyle(0x424242, 0.8);
+    gfx.fillRect(SIZE / 2 - 8, SIZE / 2 + 8, 16, 12);
+    
+    gfx.generateTexture("enemy_undead", SIZE, SIZE);
+    gfx.destroy();
+  }
+
+  /**
+   * Stage 4: Frost Wraith enemy
+   */
+  private static createFrostWraithTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Ghostly body
+    gfx.fillStyle(0xb8d4e8, 0.7);
+    gfx.fillEllipse(SIZE / 2, SIZE / 2, 14, 20);
+    
+    // Ice crystals
+    gfx.fillStyle(0x7fb3d5, 1);
+    gfx.fillRect(SIZE / 2 - 2, SIZE / 2 - 12, 4, 8);
+    gfx.fillRect(SIZE / 2 - 6, SIZE / 2 - 8, 4, 6);
+    gfx.fillRect(SIZE / 2 + 2, SIZE / 2 - 8, 4, 6);
+    
+    // Eyes
+    gfx.fillStyle(0x00ffff, 0.9);
+    gfx.fillCircle(SIZE / 2 - 4, SIZE / 2 - 4, 2);
+    gfx.fillCircle(SIZE / 2 + 4, SIZE / 2 - 4, 2);
+    
+    gfx.generateTexture("enemy_frost_wraith", SIZE, SIZE);
+    gfx.destroy();
+  }
+
+  /**
+   * Stage 5: Golem enemy
+   */
+  private static createGolemTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Body (rocky)
+    gfx.fillStyle(0x5d4037, 1);
+    gfx.fillRect(SIZE / 2 - 10, SIZE / 2 - 8, 20, 24);
+    
+    // Head
+    gfx.fillRect(SIZE / 2 - 8, SIZE / 2 - 16, 16, 8);
+    
+    // Gem core
+    gfx.fillStyle(0xffa726, 0.8);
+    gfx.fillCircle(SIZE / 2, SIZE / 2, 6);
+    
+    // Eyes
+    gfx.fillStyle(0xff6f00, 1);
+    gfx.fillCircle(SIZE / 2 - 4, SIZE / 2 - 12, 2);
+    gfx.fillCircle(SIZE / 2 + 4, SIZE / 2 - 12, 2);
+    
+    gfx.generateTexture("enemy_golem", SIZE, SIZE);
+    gfx.destroy();
+  }
+
+  /**
+   * Stage 6: Sea Serpent enemy
+   */
+  private static createSeaSerpentTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Serpent body (wavy)
+    gfx.fillStyle(0x1565c0, 1);
+    for (let i = 0; i < 3; i++) {
+      const y = SIZE / 2 + i * 6;
+      gfx.fillEllipse(SIZE / 2, y, 12, 8);
+    }
+    
+    // Head
+    gfx.fillEllipse(SIZE / 2, SIZE / 2 - 8, 10, 12);
+    
+    // Eyes
+    gfx.fillStyle(0xffeb3b, 1);
+    gfx.fillCircle(SIZE / 2 - 3, SIZE / 2 - 10, 2);
+    gfx.fillCircle(SIZE / 2 + 3, SIZE / 2 - 10, 2);
+    
+    // Fins
+    gfx.fillStyle(0x64b5f6, 0.8);
+    gfx.fillTriangle(
+      SIZE / 2 - 12, SIZE / 2,
+      SIZE / 2 - 8, SIZE / 2 - 4,
+      SIZE / 2 - 8, SIZE / 2 + 4
+    );
+    gfx.fillTriangle(
+      SIZE / 2 + 12, SIZE / 2,
+      SIZE / 2 + 8, SIZE / 2 - 4,
+      SIZE / 2 + 8, SIZE / 2 + 4
+    );
+    
+    gfx.generateTexture("enemy_sea_serpent", SIZE, SIZE);
+    gfx.destroy();
+  }
+
+  /**
+   * Stage 7: Harpy enemy
+   */
+  private static createHarpyTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Body
+    gfx.fillStyle(0x9c27b0, 1);
+    gfx.fillEllipse(SIZE / 2, SIZE / 2, 10, 14);
+    
+    // Head
+    gfx.fillCircle(SIZE / 2, SIZE / 2 - 10, 6);
+    
+    // Wings
+    gfx.fillStyle(0xb39ddb, 0.8);
+    gfx.fillEllipse(SIZE / 2 - 14, SIZE / 2 - 4, 10, 16);
+    gfx.fillEllipse(SIZE / 2 + 14, SIZE / 2 - 4, 10, 16);
+    
+    // Eyes
+    gfx.fillStyle(0xff0000, 1);
+    gfx.fillCircle(SIZE / 2 - 2, SIZE / 2 - 10, 2);
+    gfx.fillCircle(SIZE / 2 + 2, SIZE / 2 - 10, 2);
+    
+    gfx.generateTexture("enemy_harpy", SIZE, SIZE);
+    gfx.destroy();
+  }
+
+  /**
+   * Stage 8: Iron Bureaucrat enemy
+   */
+  private static createBureaucratTexture(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics();
+    const SIZE = 48;
+    
+    // Body (armored)
+    gfx.fillStyle(0x757575, 1);
+    gfx.fillRect(SIZE / 2 - 8, SIZE / 2 - 4, 16, 20);
+    
+    // Head (helmet)
+    gfx.fillRect(SIZE / 2 - 6, SIZE / 2 - 14, 12, 10);
+    
+    // Visor
+    gfx.fillStyle(0xff0000, 0.8);
+    gfx.fillRect(SIZE / 2 - 4, SIZE / 2 - 10, 8, 2);
+    
+    // Shoulders
+    gfx.fillStyle(0xffd54f, 1);
+    gfx.fillRect(SIZE / 2 - 12, SIZE / 2 - 4, 4, 6);
+    gfx.fillRect(SIZE / 2 + 8, SIZE / 2 - 4, 4, 6);
+    
+    // Scroll (bureaucracy symbol)
+    gfx.fillStyle(0xffffff, 0.9);
+    gfx.fillRect(SIZE / 2 - 3, SIZE / 2 + 2, 6, 8);
+    
+    gfx.generateTexture("enemy_bureaucrat", SIZE, SIZE);
+    gfx.destroy();
   }
 
   /**

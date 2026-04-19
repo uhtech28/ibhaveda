@@ -1,0 +1,591 @@
+import { v } from "convex/values";
+import { action, mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The four scoring dimensions (each 0–3).
+ * Total score = sum of all four dimensions → range 0–12.
+ *
+ * Quality tiers (per PRD):
+ *   Low      0–4
+ *   Standard 5–8
+ *   High     9–12
+ */
+export interface ScoringDimensions {
+  completeness: number;  // Does the submission fully address the task prompt?
+  specificity:  number;  // Are claims specific, named, and concrete?
+  evidence:     number;  // Is real-world evidence attached or referenced?
+  originality:  number;  // Is the thinking genuinely the user's own?
+}
+
+export interface EvaluationResult extends ScoringDimensions {
+  totalScore:   number;          // 0–12
+  qualityTier:  "low" | "standard" | "high";
+  feedback:     string;          // One-sentence guidance for the user
+  modelUsed:    string;
+  valuationScore: number;        // Mapped ₹ valuation (see VALUATION_MAP)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Maps a quality tier to an integer valuation multiplier (arbitrary unit).
+ * The UI can format this as ₹ or any currency later.
+ */
+const VALUATION_MAP: Record<"low" | "standard" | "high", number> = {
+  low:      100_000,   // ₹1 Lakh
+  standard: 500_000,   // ₹5 Lakh
+  high:     2_000_000, // ₹20 Lakh
+};
+
+function getQualityTier(total: number): "low" | "standard" | "high" {
+  if (total >= 9) return "high";
+  if (total >= 5) return "standard";
+  return "low";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCORING PROMPT BUILDER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildScoringPrompt(content: string, checkpointOutcome: string): string {
+  return `You are a rigorous academic evaluator assessing a startup founder's checkpoint submission.
+
+CHECKPOINT OUTCOME BEING EVALUATED:
+"${checkpointOutcome}"
+
+SUBMISSION:
+"${content}"
+
+Score the submission on EXACTLY these four dimensions. Each dimension is scored 0, 1, 2, or 3.
+Return ONLY a valid JSON object with no extra text.
+
+SCORING RUBRIC:
+- completeness: Does the submission fully address every part of the checkpoint outcome? (0=missing, 1=partial, 2=mostly, 3=complete)
+- specificity: Are claims concrete and named (real people, places, numbers, companies)? (0=vague, 1=some specifics, 2=mostly specific, 3=fully specific)
+- evidence: Is real-world evidence referenced (links, data, quotes, uploads)? (0=none, 1=anecdotal, 2=some evidence, 3=strong evidence)
+- originality: Is the thinking genuinely the user's own vs. generic/copied? (0=generic, 1=some original thought, 2=mostly original, 3=clearly original)
+
+Also write a single sentence of actionable feedback.
+
+RESPOND WITH ONLY THIS JSON (no markdown, no extra text):
+{
+  "completeness": <0-3>,
+  "specificity": <0-3>,
+  "evidence": <0-3>,
+  "originality": <0-3>,
+  "feedback": "<one sentence of actionable feedback>"
+}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOCK SCORER (fallback when API keys are absent)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mockScore(content: string): ScoringDimensions & { feedback: string; modelUsed: string } {
+  const words = content.trim().split(/\s+/).length;
+
+  // Deterministic scoring based on submission length and keyword presence
+  const hasNumbers   = /\d+/.test(content);
+  const hasLinks     = /https?:\/\//.test(content);
+  const hasQuotes    = /"[^"]+"/.test(content);
+  const hasNames     = /[A-Z][a-z]+ [A-Z][a-z]+/.test(content);
+
+  const completeness = words > 100 ? 3 : words > 50 ? 2 : words > 20 ? 1 : 0;
+  const specificity  = (hasNumbers ? 1 : 0) + (hasNames ? 1 : 0) + (words > 80 ? 1 : 0);
+  const evidence     = (hasLinks ? 2 : 0) + (hasQuotes ? 1 : 0);
+  const originality  = words > 60 ? 2 : words > 30 ? 1 : 0;
+
+  const total = completeness + specificity + Math.min(evidence, 3) + originality;
+  const tier  = getQualityTier(total);
+
+  const feedbackMap = {
+    low:      "Add specific names, numbers, and at least one external link to strengthen your submission.",
+    standard: "Good start — include more concrete evidence like quotes, data sources, or user feedback.",
+    high:     "Strong submission. Consider adding direct quotes from users or competitors to reach gold standard.",
+  };
+
+  return {
+    completeness,
+    specificity,
+    evidence:   Math.min(evidence, 3),
+    originality,
+    feedback:   feedbackMap[tier],
+    modelUsed:  "mock",
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FREE TIER SCORER — Replicate (open-weight models)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function scoreWithReplicate(
+  content: string,
+  checkpointOutcome: string,
+  replicateApiKey: string,
+): Promise<ScoringDimensions & { feedback: string; modelUsed: string }> {
+  const prompt = buildScoringPrompt(content, checkpointOutcome);
+
+  // Using Llama 3 8B Instruct via Replicate
+  const response = await fetch("https://api.replicate.com/v1/models/meta/meta-llama-3-8b-instruct/predictions", {
+    method:  "POST",
+    headers: {
+      "Authorization": `Bearer ${replicateApiKey}`,
+      "Content-Type":  "application/json",
+    },
+    body: JSON.stringify({
+      input: {
+        prompt,
+        max_tokens:  300,
+        temperature: 0.1,
+        system_prompt: "You are a strict JSON-only evaluator. Respond only with valid JSON.",
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Replicate API error: ${response.status}`);
+  }
+
+  const prediction = await response.json() as { urls?: { get?: string }; id?: string };
+
+  // Poll for completion (Replicate is async)
+  const getUrl = prediction?.urls?.get;
+  if (!getUrl) throw new Error("No polling URL from Replicate");
+
+  let attempts = 0;
+  while (attempts < 30) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const poll = await fetch(getUrl, {
+      headers: { "Authorization": `Bearer ${replicateApiKey}` },
+    });
+    const result = await poll.json() as { status?: string; output?: string[] };
+
+    if (result.status === "succeeded" && result.output) {
+      const raw = Array.isArray(result.output)
+        ? result.output.join("")
+        : String(result.output);
+      return parseAIResponse(raw, "llama-3-8b");
+    }
+
+    if (result.status === "failed") {
+      throw new Error("Replicate prediction failed");
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Replicate prediction timed out");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRO TIER SCORER — OpenAI GPT-4o
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function scoreWithOpenAI(
+  content: string,
+  checkpointOutcome: string,
+  openAIApiKey: string,
+): Promise<ScoringDimensions & { feedback: string; modelUsed: string }> {
+  const prompt = buildScoringPrompt(content, checkpointOutcome);
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method:  "POST",
+    headers: {
+      "Authorization": `Bearer ${openAIApiKey}`,
+      "Content-Type":  "application/json",
+    },
+    body: JSON.stringify({
+      model:       "gpt-4o",
+      temperature: 0.1,
+      max_tokens:  300,
+      messages: [
+        {
+          role:    "system",
+          content: "You are a strict JSON-only evaluator. Respond only with valid JSON, no markdown fences.",
+        },
+        {
+          role:    "user",
+          content: prompt,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`OpenAI API error ${response.status}: ${body}`);
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const raw = data?.choices?.[0]?.message?.content ?? "";
+  return parseAIResponse(raw, "gpt-4o");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESPONSE PARSER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function parseAIResponse(
+  raw: string,
+  modelUsed: string,
+): ScoringDimensions & { feedback: string; modelUsed: string } {
+  // Strip markdown fences if present
+  const cleaned = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+
+  // Find the first JSON object in the response
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error(`Could not parse JSON from AI response: ${raw.slice(0, 200)}`);
+  }
+
+  const parsed = JSON.parse(jsonMatch[0]) as {
+    completeness?: unknown;
+    specificity?:  unknown;
+    evidence?:     unknown;
+    originality?:  unknown;
+    feedback?:     unknown;
+  };
+
+  const clamp = (v: unknown): number =>
+    Math.max(0, Math.min(3, Math.round(Number(v ?? 0))));
+
+  return {
+    completeness: clamp(parsed.completeness),
+    specificity:  clamp(parsed.specificity),
+    evidence:     clamp(parsed.evidence),
+    originality:  clamp(parsed.originality),
+    feedback:     String(parsed.feedback ?? "Continue refining your submission."),
+    modelUsed,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNAL MUTATION — save evaluation result to DB
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const saveEvaluationResult = internalMutation({
+  args: {
+    taskId:       v.id("ventureTasks"),
+    checkpointId: v.id("ventureCheckpoints"),
+    ventureId:    v.id("ventures"),
+    stageNumber:  v.number(),
+    content:      v.string(),
+    completeness: v.number(),
+    specificity:  v.number(),
+    evidence:     v.number(),
+    originality:  v.number(),
+    totalScore:   v.number(),
+    qualityTier:  v.string(),
+    valuationScore: v.number(),
+    feedback:     v.optional(v.string()),
+    modelUsed:    v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Save per-task AI evaluation
+    await ctx.db.insert("aiEvaluations", {
+      taskId:       args.taskId,
+      checkpointId: args.checkpointId,
+      content:      args.content,
+      completeness: args.completeness,
+      specificity:  args.specificity,
+      evidence:     args.evidence,
+      originality:  args.originality,
+      totalScore:   args.totalScore,
+      feedback:     args.feedback,
+      modelUsed:    args.modelUsed,
+      evaluatedAt:  now,
+    });
+
+    // Upsert aggregate quality score for the stage
+    const existing = await ctx.db
+      .query("qualityScores")
+      .withIndex("by_venture_stage", (q) =>
+        q.eq("ventureId", args.ventureId).eq("stageNumber", args.stageNumber),
+      )
+      .first();
+
+    if (existing) {
+      // Average new score with existing (rolling update)
+      const avgScore = (existing.totalScore + args.totalScore) / 2;
+      const newTier  = getQualityTier(Math.round(avgScore));
+      await ctx.db.patch(existing._id, {
+        completeness:   (existing.completeness + args.completeness) / 2,
+        specificity:    (existing.specificity  + args.specificity)  / 2,
+        evidence:       (existing.evidence     + args.evidence)     / 2,
+        originality:    (existing.originality  + args.originality)  / 2,
+        totalScore:     avgScore,
+        qualityTier:    newTier,
+        valuationScore: VALUATION_MAP[newTier],
+        evaluatedAt:    now,
+      });
+    } else {
+      await ctx.db.insert("qualityScores", {
+        ventureId:      args.ventureId,
+        stageNumber:    args.stageNumber,
+        completeness:   args.completeness,
+        specificity:    args.specificity,
+        evidence:       args.evidence,
+        originality:    args.originality,
+        totalScore:     args.totalScore,
+        qualityTier:    args.qualityTier,
+        valuationScore: args.valuationScore,
+        evaluatedAt:    now,
+      });
+    }
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC ACTION — evaluateTaskSubmission
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Evaluate the quality of a task submission using AI.
+ *
+ * Free tier:    Llama 3 via Replicate (REPLICATE_API_KEY)
+ * Pro tier:     GPT-4o via OpenAI    (OPENAI_API_KEY)
+ * No keys set:  Mock scorer (deterministic, length-based)
+ *
+ * Called after evidence is submitted — does NOT block checkpoint advancement.
+ * The score updates the `qualityScores` and `aiEvaluations` tables and feeds
+ * the Valuation Score shown in the HUD.
+ */
+export const evaluateTaskSubmission = action({
+  args: {
+    taskId:            v.id("ventureTasks"),
+    checkpointId:      v.id("ventureCheckpoints"),
+    ventureId:         v.id("ventures"),
+    stageNumber:       v.number(),
+    content:           v.string(),
+    checkpointOutcome: v.string(),
+    userTier:          v.union(v.literal("free"), v.literal("pro")),
+  },
+  handler: async (ctx, args): Promise<EvaluationResult> => {
+    const { content, checkpointOutcome, userTier } = args;
+
+    let scored: ScoringDimensions & { feedback: string; modelUsed: string };
+
+    // ── Choose scorer based on tier + available API keys ─────────────────────
+    const openAIKey  = process.env.OPENAI_API_KEY;
+    const replicateKey = process.env.REPLICATE_API_KEY;
+
+    try {
+      if (userTier === "pro" && openAIKey) {
+        scored = await scoreWithOpenAI(content, checkpointOutcome, openAIKey);
+      } else if (userTier === "free" && replicateKey) {
+        scored = await scoreWithReplicate(content, checkpointOutcome, replicateKey);
+      } else {
+        // No API keys configured — use deterministic mock scorer
+        scored = mockScore(content);
+      }
+    } catch (err) {
+      console.error("[aiScoring] Scoring failed, falling back to mock:", err);
+      scored = mockScore(content);
+    }
+
+    // ── Build result ──────────────────────────────────────────────────────────
+    const totalScore    = scored.completeness + scored.specificity + scored.evidence + scored.originality;
+    const qualityTier   = getQualityTier(totalScore);
+    const valuationScore = VALUATION_MAP[qualityTier];
+
+    const result: EvaluationResult = {
+      completeness:  scored.completeness,
+      specificity:   scored.specificity,
+      evidence:      scored.evidence,
+      originality:   scored.originality,
+      totalScore,
+      qualityTier,
+      feedback:      scored.feedback,
+      modelUsed:     scored.modelUsed,
+      valuationScore,
+    };
+
+    // ── Persist to database ───────────────────────────────────────────────────
+    await ctx.runMutation(internal.aiScoring.saveEvaluationResult, {
+      taskId:        args.taskId,
+      checkpointId:  args.checkpointId,
+      ventureId:     args.ventureId,
+      stageNumber:   args.stageNumber,
+      content,
+      completeness:  scored.completeness,
+      specificity:   scored.specificity,
+      evidence:      scored.evidence,
+      originality:   scored.originality,
+      totalScore,
+      qualityTier,
+      valuationScore,
+      feedback:      scored.feedback,
+      modelUsed:     scored.modelUsed,
+    });
+
+    return result;
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERIES — read scoring data back into the UI
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Get the aggregate quality score for a stage within a venture.
+ * Used by the HUD's QualityScore component.
+ */
+export const getStageQualityScore = query({
+  args: {
+    ventureId:   v.id("ventures"),
+    stageNumber: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("qualityScores")
+      .withIndex("by_venture_stage", (q) =>
+        q.eq("ventureId", args.ventureId).eq("stageNumber", args.stageNumber),
+      )
+      .first();
+  },
+});
+
+/**
+ * Get all quality scores for a venture across all stages.
+ * Used on the venture detail page to show overall quality.
+ */
+export const getVentureQualityScores = query({
+  args: {
+    ventureId: v.id("ventures"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("qualityScores")
+      .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
+      .collect();
+  },
+});
+
+/**
+ * Get the AI evaluation for a specific task.
+ * Used in the checkpoint detail panel to show per-task feedback.
+ */
+export const getTaskEvaluation = query({
+  args: {
+    taskId: v.id("ventureTasks"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("aiEvaluations")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .first();
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FEATURE FLAGS — read/write
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Seed the V1 feature flags into the database.
+ * Run once during deployment — idempotent.
+ */
+export const seedFeatureFlags = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const V1_FLAGS = [
+      { flag: "phaser_world_map",    enabled: true,  rolloutPercentage: 100, description: "Phaser 3 world map rendering" },
+      { flag: "ai_quality_scoring",  enabled: true,  rolloutPercentage: 100, description: "AI-powered task evaluation" },
+      { flag: "persona_system",      enabled: true,  rolloutPercentage: 100, description: "Character sprites on world map" },
+      { flag: "audio_system",        enabled: true,  rolloutPercentage: 100, description: "Howler.js ambient + SFX audio" },
+      // Post-V1 (disabled)
+      { flag: "academic_template",   enabled: false, rolloutPercentage: 0,   description: "Academic project template" },
+      { flag: "lab_template",        enabled: false, rolloutPercentage: 0,   description: "Lab/experimental template" },
+      { flag: "creative_template",   enabled: false, rolloutPercentage: 0,   description: "Creative project template" },
+      { flag: "ai_tag_suggestion",   enabled: false, rolloutPercentage: 0,   description: "AI-generated skill/industry tags" },
+      { flag: "ai_matching",         enabled: false, rolloutPercentage: 0,   description: "Collaborator matching algorithm" },
+      { flag: "corruption_mechanic", enabled: false, rolloutPercentage: 0,   description: "World corruption on inactivity" },
+    ] as const;
+
+    const now = Date.now();
+
+    for (const f of V1_FLAGS) {
+      const existing = await ctx.db
+        .query("featureFlags")
+        .withIndex("by_flag", (q) => q.eq("flag", f.flag))
+        .first();
+
+      if (!existing) {
+        await ctx.db.insert("featureFlags", {
+          flag:              f.flag,
+          enabled:           f.enabled,
+          rolloutPercentage: f.rolloutPercentage,
+          enabledForUsers:   [],
+          description:       f.description,
+          createdAt:         now,
+          updatedAt:         now,
+        });
+      }
+    }
+
+    return { seeded: V1_FLAGS.length };
+  },
+});
+
+/**
+ * Check if a feature flag is enabled for a given user.
+ * Checks global enabled + rollout percentage + per-user overrides.
+ */
+export const isFeatureEnabled = query({
+  args: {
+    flag:   v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const flagDoc = await ctx.db
+      .query("featureFlags")
+      .withIndex("by_flag", (q) => q.eq("flag", args.flag))
+      .first();
+
+    if (!flagDoc) return false;
+    if (!flagDoc.enabled) return false;
+
+    // Per-user override takes precedence
+    if (args.userId && flagDoc.enabledForUsers.includes(args.userId)) {
+      return true;
+    }
+
+    // Percentage rollout — use a deterministic check based on userId hash
+    if (flagDoc.rolloutPercentage >= 100) return true;
+    if (flagDoc.rolloutPercentage <= 0) return false;
+
+    if (args.userId) {
+      // Simple deterministic hash: sum char codes mod 100
+      const hash = [...args.userId].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 100;
+      return hash < flagDoc.rolloutPercentage;
+    }
+
+    return false;
+  },
+});
+
+/**
+ * Get all feature flags (admin view).
+ */
+export const getAllFeatureFlags = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("featureFlags").collect();
+  },
+});

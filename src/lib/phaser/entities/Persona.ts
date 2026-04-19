@@ -42,9 +42,8 @@ export class Persona extends Phaser.GameObjects.Container {
 
   // ── Private state ─────────────────────────────────────────────────────────
 
-  private sprite: Phaser.GameObjects.Image;
+  private sprite: Phaser.GameObjects.Sprite;
   private shadowEllipse: Phaser.GameObjects.Ellipse;
-  private floatTween: Phaser.Tweens.Tween | null = null;
   private shadowTween: Phaser.Tweens.Tween | null = null;
   private walkTween: Phaser.Tweens.Tween | null = null;
   private currentAnimation: "idle" | "walk" = "idle";
@@ -83,26 +82,17 @@ export class Persona extends Phaser.GameObjects.Container {
     );
 
     // ── Sprite ──────────────────────────────────────────────────────────────
-    // The high-resolution guide textures are large PNGs (e.g. 1024x1024).
-    // We scale them down to roughly 120-150px height for the map view.
-    // Origin is set to (0.5, 0.9) to allow for the character's feet to be at y=0
-    // while leaving room for the backpack/head.
-    const textureKey = gender === "male" ? "guide_male" : "guide_female";
-    const fallbackKey = gender === "male" ? "persona_male_pixel" : "persona_female_pixel";
+    // Use sprite sheets for frame-based animations
+    // The sprite sheets are 32×48px per frame, rendered at 3× scale (96×144px)
+    // Origin is set to (0.5, 1.0) to allow for the character's feet to be at y=0
+    const spriteSheetKey =
+      gender === "male"
+        ? "persona_male_idle_sheet"
+        : "persona_female_idle_sheet";
 
-    // Try to use the high-fidelity guide texture first, fallback to pixel art
-    const activeKey = scene.textures.exists(textureKey) ? textureKey : fallbackKey;
-
-    this.sprite = new Phaser.GameObjects.Image(scene, 0, 0, activeKey);
-    this.sprite.setOrigin(0.5, 0.95);
-
-    if (activeKey === textureKey) {
-      // Scale for high-res images (aim for ~140px height)
-      this.sprite.setScale(0.14);
-    } else {
-      // Legacy scale for pixel art
-      this.sprite.setScale(3);
-    }
+    this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, spriteSheetKey, 0);
+    this.sprite.setOrigin(0.5, 1.0);
+    this.sprite.setScale(3); // 32×48px → 96×144px with nearest-neighbor
 
     // ── Assemble container ──────────────────────────────────────────────────
     // Shadow is added first so it renders behind the sprite
@@ -112,7 +102,7 @@ export class Persona extends Phaser.GameObjects.Container {
     scene.add.existing(this);
 
     // Start idle animation
-    this.setupFloatAnimation();
+    this.playIdle();
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -142,7 +132,7 @@ export class Persona extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Resume idle animation (floating motion)
+   * Resume idle animation (sprite-based animation)
    */
   playIdle(): void {
     if (this.currentAnimation === "idle") return;
@@ -156,21 +146,17 @@ export class Persona extends Phaser.GameObjects.Container {
       this.walkTween = null;
     }
 
-    // Resume float animation
-    if (this.floatTween) {
-      this.floatTween.resume();
-    } else {
-      this.setupFloatAnimation();
-    }
+    // Play idle sprite animation
+    const idleAnimKey =
+      this.gender === "male" ? "persona_male_idle" : "persona_female_idle";
+    this.sprite.play(idleAnimKey, true);
 
-    // Resume shadow animation
-    if (this.shadowTween) {
-      this.shadowTween.resume();
-    }
+    // Start subtle shadow pulse for idle
+    this.startIdleShadowPulse();
   }
 
   /**
-   * Start walk animation
+   * Start walk animation (sprite-based animation)
    * Moves persona to target position with walking animation
    *
    * @param targetX Target world X coordinate.
@@ -183,26 +169,16 @@ export class Persona extends Phaser.GameObjects.Container {
     this.currentAnimation = "walk";
     this.isWalking = true;
 
-    // Stop idle animation
-    if (this.floatTween) {
-      this.floatTween.pause();
-    }
+    // Stop idle shadow animation
     if (this.shadowTween) {
-      this.shadowTween.pause();
+      this.shadowTween.stop();
+      this.shadowTween = null;
     }
 
-    // Reset sprite y to 0 (no float offset)
-    this.sprite.y = 0;
-
-    // Add slight bob during walk (smaller than idle float)
-    const bobTween = this.scene.tweens.add({
-      targets: this.sprite,
-      y: { from: 0, to: -4 },
-      duration: 200,
-      ease: "Sine.easeInOut",
-      yoyo: true,
-      repeat: Math.floor(duration / 400),
-    });
+    // Play walk sprite animation
+    const walkAnimKey =
+      this.gender === "male" ? "persona_male_walk" : "persona_female_walk";
+    this.sprite.play(walkAnimKey, true);
 
     // Move the container
     this.walkTween = this.scene.tweens.add({
@@ -212,7 +188,6 @@ export class Persona extends Phaser.GameObjects.Container {
       duration: duration,
       ease: "Linear",
       onComplete: () => {
-        bobTween.stop();
         this.currentAnimation = "idle";
         this.playIdle();
       },
@@ -222,29 +197,20 @@ export class Persona extends Phaser.GameObjects.Container {
   // ── Private: animations ───────────────────────────────────────────────────
 
   /**
-   * Sets up the idle floating animation.
-   *
-   * Creates two synchronized tweens:
-   * 1. Sprite y-position oscillates from 0 to -8 pixels (upward float)
-   * 2. Shadow scaleX shrinks from 1.0 to 0.7 (simulating distance from ground)
-   *
-   * Both tweens run continuously with yoyo enabled.
+   * Starts a subtle shadow pulse during idle animation.
+   * Shadow scales slightly to create a hovering effect.
    */
-  private setupFloatAnimation(): void {
-    // Float the sprite up and down
-    this.floatTween = this.scene.tweens.add({
-      targets: this.sprite,
-      y: -8,
-      duration: 1200,
-      ease: Phaser.Math.Easing.Sine.InOut,
-      yoyo: true,
-      repeat: -1,
-    });
+  private startIdleShadowPulse(): void {
+    // Stop any existing shadow animation
+    if (this.shadowTween) {
+      this.shadowTween.stop();
+    }
 
-    // Shrink shadow as sprite floats up (simulating height change)
+    // Subtle shadow pulse during idle
     this.shadowTween = this.scene.tweens.add({
       targets: this.shadowEllipse,
-      scaleX: 0.7,
+      scaleX: 0.85,
+      scaleY: 0.85,
       duration: 1200,
       ease: Phaser.Math.Easing.Sine.InOut,
       yoyo: true,

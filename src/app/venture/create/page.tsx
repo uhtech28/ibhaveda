@@ -1,56 +1,58 @@
-"use client"
+"use client";
 
-import { useQuery, useMutation } from "convex/react"
-import { api } from "@convex/_generated/api"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, Rocket, Skull, Shield, Loader2 } from "lucide-react"
-import { BOSS_DEFINITIONS } from "@convex/ventureConstants"
-import { useState } from "react"
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Rocket, Skull, Shield, Loader2 } from "lucide-react";
+import { BOSS_DEFINITIONS } from "@convex/ventureConstants";
+import { useState } from "react";
+import type { Id } from "@convex/_generated/dataModel";
 
 export default function VentureCreatePage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const ideaId = searchParams.get("ideaId")
-  const [creating, setCreating] = useState(false)
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const ideaId = searchParams.get("ideaId");
+  const [creating, setCreating] = useState(false);
 
-  const ideas = useQuery(api.ideas.getUserIdeas, {})
-  const createVenture = useMutation(api.ventures.createVenture)
+  const ideas = useQuery(api.ideas.getUserIdeas, {});
+  const createVenture = useMutation(api.ventures.createVenture);
 
-  const selectedIdea = ideas?.find((i: any) => i._id === ideaId)
+  const selectedIdea = ideas?.find((i: { _id: string }) => i._id === ideaId);
 
   const handleCreate = async () => {
-    if (!ideaId) return
-    setCreating(true)
+    if (!ideaId) return;
+    setCreating(true);
     try {
-      const ventureId = await createVenture({ ideaId: ideaId as any })
-      router.push(`/venture/${ventureId}`)
+      const ventureId = await createVenture({ ideaId: ideaId as Id<"ideas"> });
+      router.push(`/venture/${ventureId}`);
     } catch (error) {
-      console.error("Failed to create venture:", error)
-      setCreating(false)
+      console.error("Failed to create venture:", error);
+      setCreating(false);
     }
-  }
+  };
 
   if (!ideas) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-6">
         <div className="flex items-center gap-4 mb-8">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-          >
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -122,8 +124,8 @@ export default function VentureCreatePage() {
               <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    8 structured stages from ideation to scale
+                    <div className="w-2 h-2 rounded-full bg-green-500" />8
+                    structured stages from ideation to scale
                   </li>
                   <li className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500" />
@@ -198,7 +200,8 @@ export default function VentureCreatePage() {
           <Card>
             <CardContent className="pt-6 text-center">
               <p className="text-muted-foreground">
-                You don't have any ideas yet. Create an idea first, then convert it to a venture.
+                You don't have any ideas yet. Create an idea first, then convert
+                it to a venture.
               </p>
               <Button
                 className="mt-4"
@@ -211,5 +214,5 @@ export default function VentureCreatePage() {
         )}
       </div>
     </div>
-  )
+  );
 }

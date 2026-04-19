@@ -34,6 +34,10 @@
  * that imports from React, and only runs in a React context.
  */
 
+// React hooks used by useGameEvent — imported at module level so they are
+// always called unconditionally (satisfies rules-of-hooks).
+import { useEffect, useRef } from "react";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Checkpoint state (shared vocabulary between React and Phaser)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,7 +108,14 @@ export type ReactToPhaserEvent =
    * Notify the game that the canvas container has been resized so it can
    * call `game.scale.resize()`.
    */
-  | { type: "RESIZE"; width: number; height: number };
+  | { type: "RESIZE"; width: number; height: number }
+  /** Request to play a checkpoint completion animation. */
+  | {
+      type: "PLAY_CHECKPOINT_ANIMATION";
+      checkpointId: string;
+      stage: number;
+      variant: "standard" | "gold";
+    };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phaser → React events
@@ -135,7 +146,34 @@ export type PhaserToReactEvent =
   /** Periodic frame-rate report from the game loop (throttled to ~1 Hz). */
   | { type: "FPS_UPDATE"; fps: number }
   /** An unrecoverable error occurred inside the game; React may show a fallback UI. */
-  | { type: "ERROR"; message: string };
+  | { type: "ERROR"; message: string }
+  /**
+   * A badge has been awarded to the user.
+   * React should display the BadgeAwardSequence overlay.
+   */
+  | {
+      type: "BADGE_AWARDED";
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
+    }
+  /**
+   * A level-up has occurred.
+   * React should display the LevelUpSequence overlay.
+   */
+  | {
+      type: "LEVEL_UP";
+      oldLevel: number;
+      newLevel: number;
+    }
+  /** Checkpoint animation has completed playing. */
+  | {
+      type: "CHECKPOINT_ANIMATION_COMPLETE";
+      checkpointId: string;
+      stage: number;
+    };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal listener registry types
@@ -493,29 +531,12 @@ export const eventBridge = new EventBridge();
  * }
  */
 export function useGameEvent(eventType: string, handler: EventHandler): void {
-  // Note: This hook should only be called from React components.
-  // The event bridge itself can be used in Phaser contexts without React.
-  let useEffect: any;
-  let useRef: any;
-
-  try {
-    // Conditional import for React hooks - only available in React contexts
-    const React = typeof window !== "undefined" ? require("react") : null;
-    if (React) {
-      useEffect = React.useEffect;
-      useRef = React.useRef;
-    } else {
-      // Fallback for non-React contexts (should not be called)
-      console.warn("useGameEvent called outside of React context");
-      return;
-    }
-  } catch {
-    console.warn("React not available for useGameEvent");
-    return;
-  }
+  // useGameEvent is a React hook — must only be called from React components.
+  // React hooks are imported at the top of the file so they are never
+  // called conditionally (satisfies the rules-of-hooks lint rule).
 
   // Keep a stable ref to the latest handler so the effect does not need to
-  // re-subscribe every time an inline handler changes identity.
+  // re-subscribe every time an inline lambda changes identity.
   const handlerRef = useRef<EventHandler>(handler);
   useEffect(() => {
     handlerRef.current = handler;

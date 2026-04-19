@@ -23,6 +23,20 @@ export interface HUDVisibility {
   hudExpanded: boolean;
 }
 
+export interface QuestTask {
+  label: string;
+  description: string;
+  tool: string;
+  done: boolean;
+}
+
+export interface CurrentQuest {
+  checkpointName: string;
+  tasks: QuestTask[];
+  stage: number;
+  checkpoint: number;
+}
+
 export const hudVisibleAtom = atom<boolean>(true);
 export const hudExpandedAtom = atom<boolean>(true);
 export const activeVentureAtom = atom<VentureData | null>(null);
@@ -48,7 +62,8 @@ export const corruptionAtom = atom<number>(0);
 export const stageInfoAtom = atom({
   stageName: "Ideation",
   stageIcon: "💡",
-  biomeName: "Village",
+  biomeName: "The Forest",
+  stage: 1,
 });
 
 export const checkpointProgressAtom = atom({
@@ -59,3 +74,9 @@ export const checkpointProgressAtom = atom({
 
 export const isAnimatingAtom = atom<boolean>(false);
 export const animationTypeAtom = atom<string | null>(null);
+
+// Quest system atoms
+export const currentQuestAtom = atom<CurrentQuest | null>(null);
+
+// Gold counter atom
+export const goldCountAtom = atom<number>(0);

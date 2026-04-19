@@ -1,6 +1,8 @@
-import { v } from "convex/values"
-import { mutation, query } from "./_generated/server"
-import { LEVEL_DEFINITIONS, POINT_VALUES } from "./ventureConstants"
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { LEVEL_DEFINITIONS } from "./ventureConstants";
+import type { MutationCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 /**
  * Initialize user level tracking record.
@@ -12,11 +14,11 @@ export const initializeUserLevel = mutation({
     const existing = await ctx.db
       .query("userLevels")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first()
+      .first();
 
-    if (existing) return existing._id
+    if (existing) return existing._id;
 
-    const now = Date.now()
+    const now = Date.now();
     return await ctx.db.insert("userLevels", {
       userId: args.userId,
       currentLevel: 1,
@@ -40,9 +42,9 @@ export const initializeUserLevel = mutation({
       ideasWithStage8: 0,
       activeIdeaTypes: [],
       updatedAt: now,
-    })
+    });
   },
-})
+});
 
 /**
  * Award points and check for level up.
@@ -55,26 +57,26 @@ export const awardPoints = mutation({
     relatedId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (args.amount <= 0) return
+    if (args.amount <= 0) return;
 
-    const now = Date.now()
+    const now = Date.now();
 
     // Find or create wallet
     let wallet = await ctx.db
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first()
+      .first();
 
     if (!wallet) {
       const walletId = await ctx.db.insert("wallets", {
         userId: args.userId,
         balance: 0,
         updatedAt: now,
-      })
-      wallet = await ctx.db.get(walletId)
+      });
+      wallet = await ctx.db.get(walletId);
     }
 
-    if (!wallet) return
+    if (!wallet) return;
 
     // Create transaction
     await ctx.db.insert("transactions", {
@@ -84,67 +86,72 @@ export const awardPoints = mutation({
       description: args.type.replace(/_/g, " "),
       relatedId: args.relatedId,
       createdAt: now,
-    })
+    });
 
     // Update wallet
     await ctx.db.patch(wallet._id, {
       balance: wallet.balance + args.amount,
       updatedAt: now,
-    })
+    });
 
     // Update user level tracking
     const userLevel = await ctx.db
       .query("userLevels")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first()
+      .first();
 
     if (userLevel) {
       await ctx.db.patch(userLevel._id, {
         totalPoints: userLevel.totalPoints + args.amount,
         titlePoints: userLevel.titlePoints + args.amount,
         updatedAt: now,
-      })
+      });
 
       // Check for level up
-      await checkLevelUp(ctx, userLevel._id)
+      await checkLevelUp(ctx, userLevel._id);
     }
   },
-})
+});
 
 /**
  * Check if user qualifies for next level and advance if so.
  */
-async function checkLevelUp(ctx: any, userLevelId: any) {
-  const userLevel = await ctx.db.get(userLevelId)
-  if (!userLevel) return
+async function checkLevelUp(
+  ctx: { db: MutationCtx["db"] },
+  userLevelId: Id<"userLevels">,
+) {
+  const userLevel = await ctx.db.get(userLevelId);
+  if (!userLevel) return;
 
-  const currentLevel = userLevel.currentLevel
-  if (currentLevel >= 50) return
+  const currentLevel = userLevel.currentLevel;
+  if (currentLevel >= 50) return;
 
-  const nextLevelDef = LEVEL_DEFINITIONS.find((l) => l.level === currentLevel + 1)
-  if (!nextLevelDef) return
+  const nextLevelDef = LEVEL_DEFINITIONS.find(
+    (l) => l.level === currentLevel + 1,
+  );
+  if (!nextLevelDef) return;
 
   // Check if user meets the titlePoints threshold
   if (userLevel.titlePoints >= nextLevelDef.titlePoints) {
     // Level up
-    await ctx.db.patch(userLevelId, {
+    await ctx.db.patch(userLevelId as Id<"userLevels">, {
       currentLevel: currentLevel + 1,
       updatedAt: Date.now(),
-    })
+    });
 
     // Award level-up points
-    const levelUpPoints = (currentLevel + 1) * 5
+    const levelUpPoints = (currentLevel + 1) * 5;
     let wl = await ctx.db
       .query("wallets")
-      .withIndex("by_user", (q: any) => q.eq("userId", userLevel.userId))
-      .first()
+      .withIndex("by_user", (q) => q.eq("userId", userLevel.userId))
+      .first();
     if (!wl) {
       const wId = await ctx.db.insert("wallets", {
         userId: userLevel.userId,
         balance: 0,
         updatedAt: Date.now(),
-      })
-      wl = await ctx.db.get(wId)
+      });
+      wl = await ctx.db.get(wId);
     }
     if (wl) {
       await ctx.db.insert("transactions", {
@@ -153,7 +160,7 @@ async function checkLevelUp(ctx: any, userLevelId: any) {
         type: "level_up",
         description: `Reached level ${currentLevel + 1}: ${nextLevelDef.title}`,
         createdAt: Date.now(),
-      })
+      });
     }
   }
 }
@@ -167,12 +174,16 @@ export const getUserLevelProgress = query({
     const userLevel = await ctx.db
       .query("userLevels")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first()
+      .first();
 
-    if (!userLevel) return null
+    if (!userLevel) return null;
 
-    const currentDef = LEVEL_DEFINITIONS.find((l) => l.level === userLevel.currentLevel)
-    const nextDef = LEVEL_DEFINITIONS.find((l) => l.level === userLevel.currentLevel + 1)
+    const currentDef = LEVEL_DEFINITIONS.find(
+      (l) => l.level === userLevel.currentLevel,
+    );
+    const nextDef = LEVEL_DEFINITIONS.find(
+      (l) => l.level === userLevel.currentLevel + 1,
+    );
 
     return {
       level: userLevel.currentLevel,
@@ -184,12 +195,15 @@ export const getUserLevelProgress = query({
       nextLevelTitle: nextDef?.title ?? null,
       nextLevelPoints: nextDef?.titlePoints ?? null,
       progress: nextDef
-        ? Math.min(100, Math.round((userLevel.titlePoints / nextDef.titlePoints) * 100))
+        ? Math.min(
+            100,
+            Math.round((userLevel.titlePoints / nextDef.titlePoints) * 100),
+          )
         : 100,
       requirements: currentDef?.requirements ?? [],
-    }
+    };
   },
-})
+});
 
 /**
  * Get all level definitions.
@@ -197,6 +211,6 @@ export const getUserLevelProgress = query({
 export const getAllLevels = query({
   args: {},
   handler: async () => {
-    return LEVEL_DEFINITIONS
+    return LEVEL_DEFINITIONS;
   },
-})
+});

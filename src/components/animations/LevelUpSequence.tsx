@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+
 import { Sparkles, Zap, Shield, Crown } from "lucide-react";
 
 interface LevelUpSequenceProps {

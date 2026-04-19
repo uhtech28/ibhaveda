@@ -1,14 +1,20 @@
-"use client"
+"use client";
 
-import { useQuery } from "convex/react"
-import { api } from "@convex/_generated/api"
-import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { HeroHeader } from "@/components/header"
-import FooterSection from "@/components/footer"
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { HeroHeader } from "@/components/header";
+import FooterSection from "@/components/footer";
 import {
   Rocket,
   Skull,
@@ -19,12 +25,13 @@ import {
   Plus,
   Trophy,
   Flame,
-} from "lucide-react"
-import { VENTURE_STAGES, BOSS_DEFINITIONS } from "@convex/ventureConstants"
+  Map,
+} from "lucide-react";
+import { VENTURE_STAGES, BOSS_DEFINITIONS } from "@convex/ventureConstants";
 
 export default function MyVenturesPage() {
-  const ventures = useQuery(api.ventures.getUserVentureSummaries, {})
-  const currentUser = useQuery(api.users.getCurrentUser)
+  const ventures = useQuery(api.ventures.getUserVentureSummaries, {});
+  const currentUser = useQuery(api.users.getCurrentUser);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -43,12 +50,23 @@ export default function MyVenturesPage() {
                 Track your venture progression across all active ideas
               </p>
             </div>
-            <Link href="/my-ideas">
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                New Venture
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/map">
+                <Button
+                  variant="outline"
+                  className="gap-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                >
+                  <Map className="h-4 w-4" />
+                  Open World Map
+                </Button>
+              </Link>
+              <Link href="/my-ideas">
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  New Venture
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {/* Stats Overview */}
@@ -62,13 +80,20 @@ export default function MyVenturesPage() {
             <StatCard
               icon={<CheckCircle2 className="h-5 w-5" />}
               label="Completed"
-              value={ventures?.filter((v) => v.status === "completed").length || 0}
+              value={
+                ventures?.filter((v) => v.status === "completed").length || 0
+              }
               color="text-green-500"
             />
             <StatCard
               icon={<Skull className="h-5 w-5" />}
               label="Bosses Fought"
-              value={ventures?.reduce((sum, v) => sum + (v.assignedBosses?.length || 0), 0) || 0}
+              value={
+                ventures?.reduce(
+                  (sum, v) => sum + (v.assignedBosses?.length || 0),
+                  0,
+                ) || 0
+              }
               color="text-red-500"
             />
             <StatCard
@@ -82,7 +107,9 @@ export default function MyVenturesPage() {
           {/* Ventures List */}
           {!ventures ? (
             <div className="text-center py-12">
-              <div className="animate-pulse text-muted-foreground">Loading ventures...</div>
+              <div className="animate-pulse text-muted-foreground">
+                Loading ventures...
+              </div>
             </div>
           ) : ventures.length === 0 ? (
             <Card>
@@ -90,7 +117,8 @@ export default function MyVenturesPage() {
                 <Rocket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No Ventures Yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Turn any of your ideas into a guided 8-stage venture with checkpoints, tasks, and boss encounters.
+                  Turn any of your ideas into a guided 8-stage venture with
+                  checkpoints, tasks, and boss encounters.
                 </p>
                 <Link href="/my-ideas">
                   <Button className="gap-2">
@@ -112,7 +140,7 @@ export default function MyVenturesPage() {
 
       <FooterSection />
     </div>
-  )
+  );
 }
 
 function StatCard({
@@ -121,10 +149,10 @@ function StatCard({
   value,
   color,
 }: {
-  icon: React.ReactNode
-  label: string
-  value: number
-  color: string
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  color: string;
 }) {
   return (
     <Card>
@@ -138,34 +166,39 @@ function StatCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function VentureCard({
   venture,
 }: {
   venture: {
-    _id: string
-    ideaId: string
-    userId: string
-    currentStage: number
-    currentCheckpoint: number
-    status: string
-    assignedBosses: number[]
-    createdAt: number
-    updatedAt: number
-  }
+    _id: string;
+    ideaId: string;
+    userId: string;
+    currentStage: number;
+    currentCheckpoint: number;
+    status: string;
+    assignedBosses: number[];
+    createdAt: number;
+    updatedAt: number;
+  };
 }) {
-  const stageName = VENTURE_STAGES.find((s) => s.id === venture.currentStage)?.name || "Unknown"
+  const stageName =
+    VENTURE_STAGES.find((s) => s.id === venture.currentStage)?.name ||
+    "Unknown";
   const completionPct = Math.round(
     ((venture.currentStage - 1) * 100 +
-      ((venture.currentCheckpoint / (VENTURE_STAGES.find((s) => s.id === venture.currentStage)?.checkpoints || 1)) * 100)) /
-      8
-  )
+      (venture.currentCheckpoint /
+        (VENTURE_STAGES.find((s) => s.id === venture.currentStage)
+          ?.checkpoints || 1)) *
+        100) /
+      8,
+  );
 
   const activeBosses = venture.assignedBosses
     .map((id) => BOSS_DEFINITIONS.find((b) => b.id === id))
-    .filter(Boolean)
+    .filter(Boolean);
 
   return (
     <Card className="hover:border-primary/30 transition-colors">
@@ -176,9 +209,12 @@ function VentureCard({
               <Rocket className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg">Venture #{venture._id.slice(-6)}</CardTitle>
+              <CardTitle className="text-lg">
+                Venture #{venture._id.slice(-6)}
+              </CardTitle>
               <CardDescription>
-                Stage {venture.currentStage}: {stageName} · Checkpoint {venture.currentCheckpoint}
+                Stage {venture.currentStage}: {stageName} · Checkpoint{" "}
+                {venture.currentCheckpoint}
               </CardDescription>
             </div>
           </div>
@@ -188,12 +224,22 @@ function VentureCard({
                 venture.status === "completed"
                   ? "default"
                   : venture.status === "active"
-                  ? "secondary"
-                  : "outline"
+                    ? "secondary"
+                    : "outline"
               }
             >
               {venture.status}
             </Badge>
+            <Link href="/map">
+              <Button
+                size="sm"
+                className="gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 hover:text-amber-300"
+                variant="ghost"
+              >
+                <Map className="h-3.5 w-3.5" />
+                Play
+              </Button>
+            </Link>
             <Link href={`/venture/${venture._id}`}>
               <Button variant="ghost" size="icon">
                 <ArrowRight className="h-4 w-4" />
@@ -205,8 +251,13 @@ function VentureCard({
       <CardContent>
         {/* Progress */}
         <div className="flex items-center gap-4 mb-4">
-          <Progress value={Math.min(100, completionPct)} className="flex-1 h-2" />
-          <span className="text-sm font-medium">{Math.min(100, completionPct)}%</span>
+          <Progress
+            value={Math.min(100, completionPct)}
+            className="flex-1 h-2"
+          />
+          <span className="text-sm font-medium">
+            {Math.min(100, completionPct)}%
+          </span>
         </div>
 
         {/* Bosses */}
@@ -236,8 +287,8 @@ function VentureCard({
                 stage.id < venture.currentStage
                   ? "bg-green-500"
                   : stage.id === venture.currentStage
-                  ? "bg-primary"
-                  : "bg-muted"
+                    ? "bg-primary"
+                    : "bg-muted"
               }`}
               title={`Stage ${stage.id}: ${stage.name}`}
             />
@@ -245,5 +296,5 @@ function VentureCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
