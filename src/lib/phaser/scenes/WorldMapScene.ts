@@ -4,7 +4,7 @@ import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender } from "../entities/Persona";
 import { BossSilhouette } from "../entities/Boss";
 import { BIOME_PALETTES } from "../utils/biome-textures";
-import { audioManager } from "../../audio/audioManager";
+import { audioManager, type CheckpointSFXId } from "../../audio/audioManager";
 
 import { eventBridge, type CheckpointState } from "../utils/event-bridge";
 import { VENTURE_STAGES } from "@convex/ventureConstants";
@@ -855,25 +855,61 @@ export class WorldMapScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Creates the Ocean Biome background with realistic wave layers
+   *
+   * IMPROVEMENTS (Visual Quality Fix):
+   * - Replaced flat circles with smooth sine curve waves
+   * - Added 3 wave layers with different opacities for depth
+   * - Used continuous sine/cosine functions for natural wave shapes
+   * - Waves create proper depth perception from back to front
+   */
   private createOceanBiomeBackground(
     container: Phaser.GameObjects.Container,
     biome: VentureBiome,
   ): void {
     const graphics = this.add.graphics();
 
-    // Deep ocean waves
-    graphics.fillStyle(0x0277bd, 0.8);
-    for (let x = 0; x < biome.width; x += 100) {
-      const y = 400 + Math.sin(x * 0.01) * 40;
-      graphics.fillCircle(x, y, 80);
+    // Deep ocean wave layer (back) - smooth sine curves
+    graphics.fillStyle(0x0277bd, 0.5);
+    graphics.beginPath();
+    graphics.moveTo(0, 500);
+    for (let x = 0; x <= biome.width; x += 10) {
+      const y = 450 + Math.sin(x * 0.008) * 35 + Math.cos(x * 0.012) * 20;
+      graphics.lineTo(x, y);
     }
+    graphics.lineTo(biome.width, this.MAP_HEIGHT);
+    graphics.lineTo(0, this.MAP_HEIGHT);
+    graphics.closePath();
+    graphics.fillPath();
 
-    // Surface waves
-    graphics.fillStyle(0x4fc3f7, 0.9);
-    for (let x = 0; x < biome.width; x += 80) {
-      const y = 380 + Math.cos(x * 0.015) * 30;
-      graphics.fillCircle(x, y, 60);
+    // Mid ocean wave layer - lighter blue
+    graphics.fillStyle(0x0288d1, 0.6);
+    graphics.beginPath();
+    graphics.moveTo(0, 480);
+    for (let x = 0; x <= biome.width; x += 10) {
+      const y =
+        420 + Math.sin(x * 0.01 + 1.5) * 30 + Math.cos(x * 0.015 - 0.8) * 18;
+      graphics.lineTo(x, y);
     }
+    graphics.lineTo(biome.width, this.MAP_HEIGHT);
+    graphics.lineTo(0, this.MAP_HEIGHT);
+    graphics.closePath();
+    graphics.fillPath();
+
+    // Surface wave layer (front) - brightest blue
+    graphics.fillStyle(0x4fc3f7, 0.7);
+    graphics.beginPath();
+    graphics.moveTo(0, 450);
+    for (let x = 0; x <= biome.width; x += 10) {
+      const y =
+        390 + Math.sin(x * 0.012 + 3) * 25 + Math.cos(x * 0.018 + 2) * 15;
+      graphics.lineTo(x, y);
+    }
+    graphics.lineTo(biome.width, this.MAP_HEIGHT);
+    graphics.lineTo(0, this.MAP_HEIGHT);
+    graphics.closePath();
+    graphics.fillPath();
 
     // Islands with palm trees
     graphics.fillStyle(0x8d6e63, 1);
@@ -898,34 +934,71 @@ export class WorldMapScene extends Phaser.Scene {
     container.add(graphics);
   }
 
+  /**
+   * Creates the Mountain Biome background with realistic peaks
+   *
+   * IMPROVEMENTS (Visual Quality Fix):
+   * - Added jagged sub-peaks for more realistic mountain shapes
+   * - Implemented proper shading on mountain sides (darker on left)
+   * - Enhanced snow caps with larger, more prominent white triangles
+   * - Made foreground mountains darker than background for depth
+   * - Added snow highlights on right side of peaks
+   */
   private createMountainBiomeBackground(
     container: Phaser.GameObjects.Container,
     biome: VentureBiome,
   ): void {
     const graphics = this.add.graphics();
 
-    // Distant mountains
-    graphics.fillStyle(0x90a4ae, 0.7);
+    // Distant mountains (lighter, with jagged peaks)
+    graphics.fillStyle(0x90a4ae, 0.6);
     for (let i = 0; i < 4; i++) {
       const x = i * 450 + 200;
-      graphics.fillTriangle(x - 150, 500, x + 150, 500, x, 250);
+      const peak = 250;
+      const base = 500;
+      // Main peak
+      graphics.fillTriangle(x - 150, base, x + 150, base, x, peak);
+      // Add jagged sub-peaks for realism
+      graphics.fillTriangle(x - 80, base, x - 20, base, x - 50, peak + 40);
+      graphics.fillTriangle(x + 20, base, x + 80, base, x + 50, peak + 35);
     }
 
-    // Mid-range mountains
-    graphics.fillStyle(0x78909c, 0.85);
+    // Mid-range mountains (darker, sharper)
+    graphics.fillStyle(0x68818f, 0.8);
     for (let i = 0; i < 5; i++) {
       const x = i * 360 + 100;
-      graphics.fillTriangle(x - 120, 520, x + 120, 520, x, 300);
+      const peak = 280;
+      const base = 520;
+      // Main mountain with sharper peak
+      graphics.fillTriangle(x - 120, base, x + 120, base, x, peak);
+
+      // Add shading on left side
+      graphics.fillStyle(0x546e7a, 0.5);
+      graphics.fillTriangle(x - 120, base, x, peak, x, base);
+      graphics.fillStyle(0x68818f, 0.8);
     }
 
-    // Foreground mountains with snow
-    graphics.fillStyle(0x607d8b, 1);
+    // Foreground mountains (darkest, most detailed)
     for (let i = 0; i < 4; i++) {
       const x = i * 450 + 300;
-      graphics.fillTriangle(x - 150, 550, x + 150, 550, x, 320);
+      const peak = 300;
+      const base = 550;
+
+      // Main mountain body (darker)
+      graphics.fillStyle(0x546e7a, 1);
+      graphics.fillTriangle(x - 150, base, x + 150, base, x, peak);
+
+      // Left side shading (even darker)
+      graphics.fillStyle(0x455a64, 0.8);
+      graphics.fillTriangle(x - 150, base, x, peak, x, base);
+
+      // Snow cap (larger, more prominent)
+      graphics.fillStyle(0xffffff, 0.95);
+      graphics.fillTriangle(x - 60, peak + 40, x + 60, peak + 40, x, peak);
+
+      // Snow highlights (brighter white on right side)
       graphics.fillStyle(0xffffff, 1);
-      graphics.fillTriangle(x - 40, 360, x + 40, 360, x, 320);
-      graphics.fillStyle(0x607d8b, 1);
+      graphics.fillTriangle(x, peak, x + 60, peak + 40, x + 30, peak + 20);
     }
 
     // Cave entrances
@@ -939,7 +1012,7 @@ export class WorldMapScene extends Phaser.Scene {
     graphics.fillStyle(0x4caf50, 1);
     const flagPositions = [450, 1000, 1500];
     for (const x of flagPositions) {
-      graphics.lineBetween(x, 320, x, 270);
+      graphics.lineBetween(x, 300, x, 270);
       graphics.fillTriangle(x, 270, x, 290, x + 30, 280);
     }
 
@@ -1012,6 +1085,20 @@ export class WorldMapScene extends Phaser.Scene {
    * Create premium game-like background with stunning visuals
    * Theme: Deep space with nebula clouds, stars, and dynamic lighting
    */
+  /**
+   * Creates the main adventure background with biome fills and decorations
+   *
+   * IMPROVEMENTS (Visual Quality Fix):
+   * - Added 200px biome transition zone at x:1600 (ocean to mountain gradient)
+   * - Reduced fire animation opacity to 20% (was too bright/distracting)
+   * - Fire now subtle atmospheric element instead of focal point
+   *
+   * NOTE: If green debug square appears, check:
+   * - React overlays in parent components (not in this Phaser scene)
+   * - Phaser debug mode (currently disabled in game-config.ts)
+   * - Browser dev tools element inspector
+   * - Other Phaser scenes that might be active
+   */
   private createAdventureBackground(): void {
     // 1. Biome-specific ground fills
     const ground = this.add.graphics();
@@ -1019,9 +1106,21 @@ export class WorldMapScene extends Phaser.Scene {
     ground.fillStyle(0x81d4fa, 1);
     ground.fillRect(0, 0, 1600, this.MAP_HEIGHT);
 
-    // Mountain section (biome 2: 1600-3400px)
+    // Biome transition zone (beach/rocky shore: 1600-1800px)
+    const transitionWidth = 200;
+    for (let x = 0; x < transitionWidth; x += 10) {
+      const t = x / transitionWidth; // 0 to 1
+      const r = Math.floor(129 + (176 - 129) * t); // 0x81 to 0xb0
+      const g = Math.floor(212 + (190 - 212) * t); // 0xd4 to 0xbe
+      const b = Math.floor(250 + (197 - 250) * t); // 0xfa to 0xc5
+      const color = (r << 16) | (g << 8) | b;
+      ground.fillStyle(color, 1);
+      ground.fillRect(1600 + x, 0, 10, this.MAP_HEIGHT);
+    }
+
+    // Mountain section (biome 2: 1800-3400px)
     ground.fillStyle(0xb0bec5, 1);
-    ground.fillRect(1600, 0, 1800, this.MAP_HEIGHT);
+    ground.fillRect(1800, 0, 1600, this.MAP_HEIGHT);
 
     // Future biomes (3400+)
     ground.fillStyle(0xf59e0b, 1);
@@ -1036,22 +1135,22 @@ export class WorldMapScene extends Phaser.Scene {
     topBand.setDepth(-195);
     this.backgroundLayer.add(topBand);
 
-    // 3. Flame silhouettes - multiple layers of flames below the dark band
+    // 3. Flame silhouettes - multiple layers of flames below the dark band (dimmed to 20% opacity)
     const flames = this.add.graphics();
     // Back flame layer (darker orange-red)
-    flames.fillStyle(0xc2410c, 1);
+    flames.fillStyle(0xc2410c, 0.2);
     for (let x = -10; x < this.MAP_WIDTH + 20; x += 22) {
       const h = 60 + Math.sin(x * 0.12) * 30 + Math.cos(x * 0.07) * 20;
       flames.fillTriangle(x - 14, 180, x + 14, 180, x, 180 - h);
     }
     // Front flame layer (lighter orange)
-    flames.fillStyle(0xf97316, 1);
+    flames.fillStyle(0xf97316, 0.2);
     for (let x = 8; x < this.MAP_WIDTH + 10; x += 18) {
       const h = 40 + Math.sin(x * 0.15 + 1) * 20 + Math.cos(x * 0.09 + 2) * 15;
       flames.fillTriangle(x - 10, 180, x + 10, 180, x, 180 - h);
     }
     // Bright tips
-    flames.fillStyle(0xfbbf24, 1);
+    flames.fillStyle(0xfbbf24, 0.2);
     for (let x = 14; x < this.MAP_WIDTH; x += 30) {
       const h = 20 + Math.sin(x * 0.2) * 10;
       flames.fillTriangle(x - 5, 180, x + 5, 180, x, 180 - h);
@@ -1435,8 +1534,8 @@ export class WorldMapScene extends Phaser.Scene {
     const animationType = getAnimationTypeForStage(stage);
 
     // Play checkpoint SFX based on animation type and variant
-    const sfxId = `${animationType}_${variant}` as any;
-    audioManager.playCheckpointSFX(sfxId);
+    const sfxId = `${animationType}_${variant}`;
+    audioManager.playCheckpointSFX(sfxId as CheckpointSFXId);
     console.log(`[WorldMapScene] Playing checkpoint SFX: ${sfxId}`);
 
     // Create animation instance

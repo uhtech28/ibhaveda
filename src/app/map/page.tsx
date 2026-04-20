@@ -5,11 +5,16 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { IntroScreen } from "@/components/map/IntroScreen";
-import { motion } from "framer-motion";
+import { WelcomeOverlay } from "@/components/map/WelcomeOverlay";
+import { MapIntroOverlay } from "@/components/map/MapIntroOverlay";
+import { motion, AnimatePresence } from "framer-motion";
+
+type TutorialStep = "gender" | "welcome" | "map-intro" | "complete";
 
 export default function MapIntroPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState<TutorialStep>("gender");
 
   // Fetch venture name for the intro screen from Convex (real-time)
   const ventures = useQuery(api.worldMap.getVenturesByUser);
@@ -37,6 +42,28 @@ export default function MapIntroPage() {
     if (typeof window !== "undefined") {
       localStorage.setItem("selectedGender", gender);
     }
+
+    // Check if tutorial has been completed before
+    const tutorialCompleted =
+      typeof window !== "undefined"
+        ? localStorage.getItem("tutorial_completed") === "true"
+        : false;
+
+    if (tutorialCompleted) {
+      // Skip tutorial for returning users
+      router.push("/map/stages");
+    } else {
+      // Show tutorial for new users
+      setTutorialStep("welcome");
+    }
+  };
+
+  const handleWelcomeComplete = () => {
+    setTutorialStep("map-intro");
+  };
+
+  const handleMapIntroComplete = () => {
+    setTutorialStep("complete");
     router.push("/map/stages");
   };
 
@@ -54,5 +81,26 @@ export default function MapIntroPage() {
     );
   }
 
-  return <IntroScreen ventureName={ventureName} onStart={handleStart} />;
+  return (
+    <>
+      {tutorialStep === "gender" && (
+        <IntroScreen ventureName={ventureName} onStart={handleStart} />
+      )}
+
+      <AnimatePresence>
+        {tutorialStep === "welcome" && (
+          <WelcomeOverlay
+            ventureName={ventureName}
+            onComplete={handleWelcomeComplete}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {tutorialStep === "map-intro" && (
+          <MapIntroOverlay onComplete={handleMapIntroComplete} />
+        )}
+      </AnimatePresence>
+    </>
+  );
 }

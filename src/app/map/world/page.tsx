@@ -23,6 +23,7 @@ import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { HUD } from "@/components/hud/HUD";
 import { LevelUpSequence } from "@/components/animations/LevelUpSequence";
 import { BadgeAwardSequence } from "@/components/animations/BadgeAwardSequence";
+import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { useRouter } from "next/navigation";
 import {
   activeVentureAtom,
@@ -800,8 +801,31 @@ export default function MapPage() {
   const [badgeQueue, setBadgeQueue] = useState<BadgePayload[]>([]);
   const activeBadge = badgeQueue[0] ?? null;
 
+  // Tutorial: First checkpoint pulse
+  const [showFirstCheckpointPulse, setShowFirstCheckpointPulse] =
+    useState(false);
+
   // Track previous level to detect level-up events
   const prevLevelRef = useRef<number | null>(null);
+
+  // ── Derived values from Convex ─────────────────────────────────────────────
+  const venture = worldMapData?.venture ?? null;
+  // Stable reference — avoids re-renders on every Convex tick
+  const checkpoints = useMemo(
+    () => worldMapData?.checkpoints ?? [],
+    [worldMapData?.checkpoints],
+  );
+  const brightness = worldMapData?.brightness;
+  const ideaTitle = worldMapData?.ideaTitle ?? "Your Venture";
+
+  const activeStage = venture?.currentStage ?? 1;
+  const activeCP = venture?.currentCheckpoint ?? 1;
+
+  const completedCount = checkpoints.filter(
+    (cp) =>
+      cp.status === "completed" ||
+      (cp.t1Completed && cp.t2Completed && cp.t3Completed),
+  ).length;
 
   // ── Persist gender to DB whenever venture + gender are known ─────────────
   useEffect(() => {
@@ -824,24 +848,29 @@ export default function MapPage() {
     });
   }, [seedFlags]);
 
-  // ── Derived values from Convex ─────────────────────────────────────────────
-  const venture = worldMapData?.venture ?? null;
-  // Stable reference — avoids re-renders on every Convex tick
-  const checkpoints = useMemo(
-    () => worldMapData?.checkpoints ?? [],
-    [worldMapData?.checkpoints],
-  );
-  const brightness = worldMapData?.brightness;
-  const ideaTitle = worldMapData?.ideaTitle ?? "Your Venture";
+  // Tutorial: Show first checkpoint pulse after map intro tutorial
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const activeStage = venture?.currentStage ?? 1;
-  const activeCP = venture?.currentCheckpoint ?? 1;
+    const tutorialCompleted =
+      localStorage.getItem("tutorial_completed") === "true";
+    const pulseShown =
+      localStorage.getItem("first_checkpoint_pulse_shown") === "true";
 
-  const completedCount = checkpoints.filter(
-    (cp) =>
-      cp.status === "completed" ||
-      (cp.t1Completed && cp.t2Completed && cp.t3Completed),
-  ).length;
+    // Show pulse if tutorial just completed but pulse hasn't been shown yet
+    if (
+      tutorialCompleted &&
+      !pulseShown &&
+      phaserReady &&
+      checkpoints.length > 0
+    ) {
+      // Only show if user is on checkpoint 1
+      const firstCheckpoint = checkpoints[0];
+      if (firstCheckpoint && activeCP === 1) {
+        setShowFirstCheckpointPulse(true);
+      }
+    }
+  }, [phaserReady, checkpoints, activeCP]);
 
   // XP / Level from Convex
   const level = levelData?.level ?? 1;
@@ -1107,6 +1136,14 @@ export default function MapPage() {
       // e.checkpointId is the real Convex _id (string) — look it up
       const cp = checkpoints.find((c) => c._id === e.checkpointId);
       if (!cp) return;
+
+      // Hide first checkpoint pulse when any checkpoint is clicked
+      if (showFirstCheckpointPulse) {
+        setShowFirstCheckpointPulse(false);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("first_checkpoint_pulse_shown", "true");
+        }
+      }
 
       const stageIdx = cp.stage - 1;
       const cpIdx = cp.checkpoint - 1;
@@ -1478,6 +1515,18 @@ export default function MapPage() {
               className="absolute inset-0 z-[25]"
               style={{ right: "340px" }}
               onClick={() => setSelectedDetail(null)}
+            />
+          )}
+
+          {/* First checkpoint pulse tutorial */}
+          {showFirstCheckpointPulse && (
+            <FirstCheckpointPulse
+              onCheckpointClick={() => {
+                setShowFirstCheckpointPulse(false);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("first_checkpoint_pulse_shown", "true");
+                }
+              }}
             />
           )}
         </>
