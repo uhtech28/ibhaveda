@@ -335,6 +335,30 @@ export const markTaskComplete = mutation({
         .catch(() => {
           /* wallet may not exist yet — non-fatal */
         });
+
+      // Create social feed notification for gold checkpoint
+      const idea = await ctx.db.get(venture.ideaId);
+      const stageName =
+        VENTURE_STAGES[checkpoint.stage - 1]?.name ||
+        `Stage ${checkpoint.stage}`;
+      const checkpointDef = CHECKPOINT_DEFINITIONS.find(
+        (cp) =>
+          cp.stage === checkpoint.stage &&
+          cp.checkpoint === checkpoint.checkpoint,
+      );
+      const checkpointName =
+        checkpointDef?.name || `Checkpoint ${checkpoint.checkpoint}`;
+      const ventureName = idea?.title || "Your Venture";
+
+      await ctx.db.insert("notifications", {
+        recipientId: user._id,
+        senderId: user._id,
+        type: "gold_checkpoint",
+        message: `🏆 ${ventureName} - ${stageName}: ${checkpointName} - Gold Checkpoint! All 3 tasks completed. +${POINT_VALUES.gold_checkpoint_bonus} points`,
+        relatedId: venture.ideaId,
+        isRead: false,
+        createdAt: now,
+      });
     }
 
     await ctx.db.patch(args.checkpointId, cpPatch);
@@ -429,5 +453,216 @@ export const savePersonaGender = mutation({
       updatedAt: Date.now(),
     });
     return { success: true };
+  },
+});
+
+/**
+ * Submit actual content for a task (replaces simple checkbox toggle).
+ * 
+ * This mutation:
+ * 1. Validates content (minimum 50 words)
+ * 2. Creates evidence record with actual content
+ * 3. Marks task as complete
+ * 4. Updates checkpoint flags
+ * 5. Awards points
+ * 6. Checks for gold checkpoint completion
+ */
+export const submitTaskContent = mutation({
+  args: {
+    checkpointId: v.id("ventureCheckpoints"),
+    taskLevel: v.union(v.literal("t1"), v.literal("t2"), v.literal("t3")),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // ── Auth ──────────────────────────────────────────────────────────────────
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) throw new Error("User not found");
+
+    // ── Validate content ──────────────────────────────────────────────────────
+    const wordCount = args.content.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount < 50) {
+      throw new Error("Content must be at least 50 words");
+    }
+
+    // ── Get checkpoint ────────────────────────────────────────────────────────
+    const checkpoint = await ctx.db.get(args.checkpointId);
+    if (!checkpoint) throw new Error("Checkpoint not found");
+
+    // ── Verify ownership ──────────────────────────────────────────────────────
+    const venture = await ctx.db.get(checkpoint.ventureId);
+    if (!venture) throw new Error("Venture not found");
+    if (venture.userId !== user._id) throw new Error("Not your venture");
+
+    // ── Check if already completed ────────────────────────────────────────────
+    const flagField =
+      args.taskLevel === "t1"
+        ? "t1Completed"
+        : args.taskLevel === "t2"
+          ? "t2Completed"
+          : "t3Completed";
+
+    if (checkpoint[flagField]) {
+      throw new Error("Task already completed");
+    }
+
+    // ── Find task row ─────────────────────────────────────────────────────────
+    const task = await ctx.db
+      .query("ventureTasks")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("checkpointId"), args.checkpointId),
+          q.eq(q.field("taskLevel"), args.taskLevel),
+        ),
+      )
+      .first();
+
+    if (!task) throw new Error(`Task ${args.taskLevel} not found`);
+
+    const now = Date.now();
+
+    // ── Create evidence with actual content ───────────────────────────────────
+    const evidenceId = await ctx.db.insert("ventureEvidence", {
+      taskId: task._id,
+      userId: user._id,
+      toolType: task.toolType,
+      content: {
+        text: args.content,
+        wordCount,
+        submittedAt: now,
+      },
+      createdAt: now,
+    });
+
+    // ── Mark task complete ────────────────────────────────────────────────────
+    await ctx.db.patch(task._id, {
+      status: "completed",
+      evidenceId,
+      completedAt: now,
+    });
+
+    // ── Update checkpoint flags ───────────────────────────────────────────────
+    const updatedFlags = {
+      t1Completed: checkpoint.t1Completed,
+      t2Completed: checkpoint.t2Completed,
+      t3Completed: checkpoint.t3Completed,
+      [flagField]: true,
+    };
+
+    const allThreeDone =
+      updatedFlags.t1Completed &&
+      updatedFlags.t2Completed &&
+      updatedFlags.t3Completed;
+
+    const cpPatch: Record<string, unknown> = {
+      [flagField]: true,
+      status: "in_progress",
+    };
+
+    // ── Check for gold checkpoint ─────────────────────────────────────────────
+    if (allThreeDone && !checkpoint.goldBonusEarned) {
+      cpPatch.goldBonusEarned = true;
+
+      // Award gold bonus
+      const wallet = await ctx.db
+        .query("wallets")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .first();
+
+      if (wallet) {
+        await ctx.db.insert("transactions", {
+          walletId: wallet._id,
+          amount: POINT_VALUES.gold_checkpoint_bonus,
+          type: "gold_checkpoint",
+          description: "Gold checkpoint bonus — all 3 tasks complete",
+          relatedId: venture._id,
+          createdAt: now,
+        });
+
+        await ctx.db.patch(wallet._id, {
+          balance: wallet.balance + POINT_VALUES.gold_checkpoint_bonus,
+          updatedAt: now,
+        });
+      }
+
+      // Create notification
+      const idea = await ctx.db.get(venture.ideaId);
+      const stageName =
+        VENTURE_STAGES[checkpoint.stage - 1]?.name ||
+        `Stage ${checkpoint.stage}`;
+      const checkpointDef = CHECKPOINT_DEFINITIONS.find(
+        (cp) =>
+          cp.stage === checkpoint.stage &&
+          cp.checkpoint === checkpoint.checkpoint,
+      );
+      const checkpointName =
+        checkpointDef?.name || `Checkpoint ${checkpoint.checkpoint}`;
+      const ventureName = idea?.title || "Your Venture";
+
+      await ctx.db.insert("notifications", {
+        recipientId: user._id,
+        senderId: user._id,
+        type: "gold_checkpoint",
+        message: `🏆 ${ventureName} - ${stageName}: ${checkpointName} - Gold Checkpoint! All 3 tasks completed. +${POINT_VALUES.gold_checkpoint_bonus} points`,
+        relatedId: venture.ideaId,
+        isRead: false,
+        createdAt: now,
+      });
+    }
+
+    await ctx.db.patch(args.checkpointId, cpPatch);
+
+    // ── Award task points ─────────────────────────────────────────────────────
+    const pointKey =
+      `task_${args.taskLevel}_complete` as keyof typeof POINT_VALUES;
+    const pts = POINT_VALUES[pointKey] as number | undefined;
+
+    if (pts) {
+      const wallet = await ctx.db
+        .query("wallets")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .first();
+
+      if (wallet) {
+        await ctx.db.insert("transactions", {
+          walletId: wallet._id,
+          amount: pts,
+          type: `${args.taskLevel}_task_complete`,
+          description: `Task ${args.taskLevel.toUpperCase()} completed`,
+          relatedId: venture._id,
+          createdAt: now,
+        });
+
+        await ctx.db.patch(wallet._id, {
+          balance: wallet.balance + pts,
+          updatedAt: now,
+        });
+
+        // Update user level
+        const userLevel = await ctx.db
+          .query("userLevels")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .first();
+
+        if (userLevel) {
+          await ctx.db.patch(userLevel._id, {
+            totalPoints: userLevel.totalPoints + pts,
+            titlePoints: userLevel.titlePoints + pts,
+            updatedAt: now,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      goldEarned: allThreeDone && !checkpoint.goldBonusEarned,
+      pointsAwarded: pts || 0,
+    };
   },
 });

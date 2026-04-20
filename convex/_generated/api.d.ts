@@ -28,6 +28,7 @@ import type * as mentorship from "../mentorship.js";
 import type * as notifications from "../notifications.js";
 import type * as search from "../search.js";
 import type * as skillBadges from "../skillBadges.js";
+import type * as socialFeed from "../socialFeed.js";
 import type * as todos from "../todos.js";
 import type * as users from "../users.js";
 import type * as ventureConstants from "../ventureConstants.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   search: typeof search;
   skillBadges: typeof skillBadges;
+  socialFeed: typeof socialFeed;
   todos: typeof todos;
   users: typeof users;
   ventureConstants: typeof ventureConstants;

@@ -1,243 +1,239 @@
-# Checkpoint Animation System
+# Checkpoint Animation System - 2-Stage MVP
 
-Complete implementation of 6 unique checkpoint completion animations with standard and gold variants, totaling **12 distinct animations** for Interactive Ideas venture progression.
+Complete implementation of checkpoint completion animations for the Interactive Ideas 2-stage venture system with standard and gold variants.
 
 ---
 
 ## 📋 Overview
 
-The checkpoint animation system provides visually engaging feedback when users complete checkpoints in their venture journey. Each of the 8 stages has a unique animation pattern, with stages 3/7 sharing Beacon Lighting and stages 1/8 sharing Seal Break.
+The checkpoint animation system provides visually engaging feedback when users complete checkpoints in their venture journey. The 2-stage MVP uses **2 unique animations** that align with the thematic progression from Ideation to Research.
 
-### Animation Patterns by Stage
+### Animation Mapping
 
-| Stage | Pattern | Description |
-|-------|---------|-------------|
-| **S1** | Seal Break | Ancient seal shatters with crack lines and particle burst |
-| **S2** | Rune Inscription | Mystical runes appear and glow with magical energy |
-| **S3** | Beacon Lighting | Light beam shoots upward with rising particles |
-| **S4** | Bridge Repair | Wooden planks assemble with rope attachments |
-| **S5** | Compass Calibration | Compass needle spins and locks to North |
-| **S6** | Ward Placement | Protective barriers form with shield activation |
-| **S7** | Beacon Lighting | *Same as S3* |
-| **S8** | Seal Break | *Same as S1* |
+| Stage | Theme | Animation | Description |
+|-------|-------|-----------|-------------|
+| **Stage 1** | Ideation 🏝️ | Compass Calibration | Compass snaps to new heading, fog lifts to reveal the path forward |
+| **Stage 2** | Research ⛰️ | Beacon Lighting | Watchtower beacon ignites, sending light across the map to guide the way |
 
 ### Variants
 
-Each animation has **two variants**:
+Each animation has **two variants** based on task completion:
 
-- **Standard** (Blue): 2-second duration, blue color scheme (0x3B82F6)
-- **Gold** (Amber): 3-second duration, gold/amber color scheme (0xF59E0B)
+- **Standard (Blue)**: 2/3 tasks completed - 1.5-2.5s duration, blue color scheme (0x3B82F6)
+- **Gold (Amber)**: 3/3 tasks completed - 2.5-3.5s duration, gold color scheme (0xF59E0B) with special effects
 
 ---
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### From React Component
 
 ```typescript
-import { WorldMapScene } from '@/lib/phaser/scenes/WorldMapScene'
+import { eventBridge } from '@/lib/phaser/EventBridge'
 
-// Inside your React component or event handler
+// Trigger animation when checkpoint is completed
 eventBridge.dispatchToPhaser({
   type: 'PLAY_CHECKPOINT_ANIMATION',
-  checkpointId: 'cp_001',
+  checkpointId: 'cp_s1_c1',
   stage: 1,
   variant: 'gold' // or 'standard'
 })
 ```
 
-### Direct Scene Method
+### From Phaser Scene
 
 ```typescript
 // Inside WorldMapScene
-this.playCheckpointAnimation('cp_001', 1, 'gold')
+this.playCheckpointAnimation('cp_s1_c1', 1, 'gold')
 ```
 
 ---
 
-## 🎨 Animation Patterns Detail
+## 🎨 Animation Details
 
-### 1. Seal Break (S1, S8)
+### 1. Compass Calibration (Stage 1 - Ideation)
+
+**Theme**: Finding direction in the ocean of ideas
 
 **Visual Elements:**
-- Central circular seal with mystical symbols
-- 8 rune markers around the perimeter
-- Crack lines appearing from center
-- Explosive particle burst on shatter
-- Fragments flying outward
+- Circular compass with cardinal direction markers (N, E, S, W)
+- Dual-tone needle (red pointing North, white pointing South)
+- 8 directional tick marks around perimeter
+- Indicator ring that pulses during calibration
+- Fog overlay that obscures the compass initially
 
-**Stages:**
-1. Seal appears with bounce (400ms)
-2. Runes light up sequentially (800ms)
-3. Crack lines spread (300ms)
-4. Seal shatters into 12 pieces (400ms)
+#### Standard Variant (2/3 Tasks)
+
+**Duration**: 1.5-2s randomized
+
+**Animation Sequence:**
+1. **Fog appears** (0ms) - Cloudy mist covering the area
+2. **Compass emerges** (0-400ms) - Compass base scales in with back ease
+3. **Cardinal points light up** (400-800ms) - N, E, S, W appear sequentially
+4. **Needle appears** (800-1100ms) - Red/white needle fades in
+5. **Needle spins** (1100-1900ms) - 4 full rotations with pulsing indicator ring
+6. **Needle locks North** (1900ms) - Snaps to 0° with glow burst
+7. **Fog lifts** (1900-2700ms) - Fog fades and rises upward revealing clarity
+8. **Completion pulse** (2700-3000ms) - Compass pulses slightly larger
 
 **Colors:**
-- Standard: Blue seal (0x3B82F6)
-- Gold: Amber seal (0xF59E0B)
+- Primary: Blue (0x3B82F6)
+- Accent: Light Blue (0x60A5FA)
+- Glow: Indigo (0x6366F1)
+- North marker: Red (0xFF4444)
+
+#### Gold Variant (3/3 Tasks)
+
+**Duration**: 2.5-3.5s randomized
+
+**Additional Effects:**
+- **Directional beam** emits from compass pointing East toward next checkpoint
+- Beam contains animated particles flowing along its length
+- Beam fades out after 600ms of display
+- Extra glow intensity on the indicator ring
+
+**Visual Difference:**
+- Golden compass housing instead of blue
+- Brighter, more intense fog lift effect
+- Directional beam shows path forward (unique to gold)
+
+**Colors:**
+- Primary: Amber (0xF59E0B)
+- Accent: Light Amber (0xFEF08A)
+- Glow: Pure Gold (0xFFD700)
 
 ---
 
-### 2. Rune Inscription (S2)
+### 2. Beacon Lighting (Stage 2 - Research)
+
+**Theme**: Illuminating knowledge from the watchtower
 
 **Visual Elements:**
-- Mystical triangle with inner circle
-- Central activation point
-- 8 runic symbols (ᚠ, ᚢ, ᚦ, ᚨ, ᚱ, ᚲ, ᚷ, ᚹ)
-- Pulsing glow ring
-- Magical sparkle particles
+- Stone watchtower base with support beams
+- Beacon brazier/bowl at the top
+- Upward light rays emanating in all directions
+- Flickering flame with rising particles
+- Inner glow chamber
 
-**Stages:**
-1. Base rune structure draws (400ms)
-2. Glow ring pulses (600ms, 2 cycles)
-3. Runic symbols appear sequentially (640ms)
-4. Activation burst (500ms)
+#### Standard Variant (2/3 Tasks)
+
+**Duration**: 1.5-2s randomized
+
+**Animation Sequence:**
+1. **Watchtower rises** (0-500ms) - Tower structure scales in from ground
+2. **Beacon appears** (500-900ms) - Brazier/bowl appears with back ease
+3. **Light rays ignite** (900-1500ms) - 16 rays spread outward with rotating pattern
+4. **Flame ignites** (1500ms+) - Flickering orange/red flame particles rise
+5. **Beacon visible on map** (1500-2000ms) - Full brightness achieved
+6. **Completion pulse** (2000-2400ms) - Beacon pulses with final glow
+
+**Flame Colors:**
+- Deep Orange (0xFF4500)
+- Orange (0xFF6600)
+- Light Orange (0xFFAA00)
+- Yellow (0xFFDD00)
+- Amber (0xFF8800)
 
 **Colors:**
-- Standard: Blue runes with cyan glow
-- Gold: Golden runes with amber glow
+- Primary: Blue (0x3B82F6)
+- Accent: Light Blue (0x60A5FA)
+- Glow: Indigo (0x6366F1)
+- Structure: Stone Gray (0x4A5568)
+
+#### Gold Variant (3/3 Tasks)
+
+**Duration**: 2.5-3.5s randomized
+
+**Additional Effects:**
+- **Gold/white flame** instead of orange/red
+- **Community notification rings** - 4 expanding rings broadcast outward
+- Rings contain sparkle particles around perimeter
+- Brighter, more intense light rays
+- Longer-lasting flame particles
+
+**Visual Difference:**
+- Golden beacon light instead of blue
+- White-hot flame at center
+- Community notification waves ripple outward (unique to gold)
+- More dramatic final glow burst
+
+**Flame Colors (Gold):**
+- Gold (0xFFD700)
+- Light Yellow (0xFFED4E)
+- White (0xFFFFFF)
+- Cream (0xFEF3C7)
+
+**Colors:**
+- Primary: Amber (0xF59E0B)
+- Accent: Light Amber (0xFEF08A)
+- Glow: Pure Gold (0xFFD700)
 
 ---
 
-### 3. Beacon Lighting (S3, S7)
-
-**Visual Elements:**
-- Stone pillar base
-- Upward light beam
-- Flickering flame at top
-- Rising particle stream
-
-**Stages:**
-1. Pillar rises from ground (700ms)
-2. Light beam shoots upward (1000ms)
-3. Flame ignites with particles
-4. Beacon pulses to full brightness
-
-**Colors:**
-- Standard: Blue beacon light
-- Gold: Amber/golden beacon light
-
----
-
-### 4. Bridge Repair (S4)
-
-**Visual Elements:**
-- Wooden bridge base structure
-- 6 individual planks
-- Rope attachments
-- Assembly animation
-
-**Stages:**
-1. Bridge foundation appears (500ms)
-2. Planks drop into place sequentially (900ms)
-3. Ropes attach to each plank
-4. Bridge settles and stabilizes
-
-**Colors:**
-- Standard: Blue-tinted wood grain
-- Gold: Golden-tinted premium wood
-
----
-
-### 5. Compass Calibration (S5)
-
-**Visual Elements:**
-- Compass housing with 8 direction markers
-- Cardinal points (N, E, S, W)
-- Red/white dual-tone needle
-- Rotating indicator ring
-
-**Stages:**
-1. Compass base appears (400ms)
-2. Cardinal points light up (400ms)
-3. Needle appears and spins (800ms, 4 full rotations)
-4. Needle locks to North with glow burst
-
-**Colors:**
-- Standard: Blue compass housing
-- Gold: Golden compass housing
-- North marker always red (0xFF4444)
-
----
-
-### 6. Ward Placement (S6)
-
-**Visual Elements:**
-- Central ward crystal
-- 3 concentric protection circles
-- 6 runic symbols around perimeter
-- Shield barrier formation
-
-**Stages:**
-1. Ward crystal appears (400ms)
-2. Protection circles expand outward (600ms)
-3. Runic symbols activate (480ms)
-4. Shield barrier forms and pulses (1000ms)
-
-**Colors:**
-- Standard: Blue protective energy
-- Gold: Golden divine protection
-
----
-
-## 🔧 API Reference
+## 🔧 Technical Implementation
 
 ### BaseCheckpointAnimation
 
-Abstract base class for all checkpoint animations.
+Abstract base class providing common functionality.
 
 ```typescript
-abstract class BaseCheckpointAnimation {
+export abstract class BaseCheckpointAnimation {
   protected scene: Phaser.Scene
   protected config: AnimationConfig
   protected container: Phaser.GameObjects.Container
+  protected isComplete: boolean
+  protected isSkipped: boolean
   
-  protected readonly STANDARD_DURATION = 2000
-  protected readonly GOLD_DURATION = 3000
+  // Duration randomized within spec ranges
+  protected calculatedDuration: number // 1500-2500ms (standard) or 2500-3500ms (gold)
   
   abstract create(): void
   play(): void
   skip(): void
   complete(): void
   destroy(): void
+  
+  // Helper methods for consistent theming
+  protected getPrimaryColor(): number     // Blue or Amber
+  protected getSecondaryColor(): number   // Light Blue or Light Amber
+  protected getGlowColor(): number        // Indigo or Gold
 }
 ```
 
-### AnimationConfig
-
-Configuration object passed to animation constructors.
+### AnimationConfig Interface
 
 ```typescript
 interface AnimationConfig {
-  x: number              // World X position
-  y: number              // World Y position
-  variant: AnimationVariant  // 'standard' | 'gold'
-  onComplete?: () => void
-  onSkip?: () => void
+  x: number                    // World X position on map
+  y: number                    // World Y position on map
+  variant: AnimationVariant    // 'standard' | 'gold'
+  onComplete?: () => void      // Called when animation finishes
+  onSkip?: () => void          // Called when skip is enabled
 }
 ```
 
 ### Factory Functions
 
 ```typescript
+// Get the correct animation type for a stage
+getAnimationTypeForStage(stage: number): CheckpointAnimationType
+// Returns: 'compass_calibration' for stage 1, 'beacon_lighting' for stage 2
+
 // Create animation instance
 createCheckpointAnimation(
   scene: Phaser.Scene,
   type: CheckpointAnimationType,
   config: AnimationConfig
 ): BaseCheckpointAnimation
-
-// Get animation type for stage
-getAnimationTypeForStage(stage: number): CheckpointAnimationType
 ```
 
 ---
 
-## 🎮 Integration with WorldMapScene
+## 🎮 WorldMapScene Integration
 
 ### Method: `playCheckpointAnimation`
 
-Plays a checkpoint animation at the checkpoint's world position.
+Main entry point for playing checkpoint animations.
 
 ```typescript
 playCheckpointAnimation(
@@ -248,26 +244,27 @@ playCheckpointAnimation(
 ```
 
 **Parameters:**
-- `checkpointId` - ID of the checkpoint node to animate
-- `stage` - Stage number (1-8) to determine animation pattern
-- `variant` - 'standard' (blue, 2s) or 'gold' (amber, 3s)
+- `checkpointId` - ID of the checkpoint node (e.g., 'cp_s1_c1')
+- `stage` - Stage number (1 or 2)
+- `variant` - 'standard' (2/3 tasks) or 'gold' (3/3 tasks)
+
+**Behavior:**
+1. Stops any currently playing animation
+2. Gets checkpoint node's world position
+3. Determines animation type from stage number
+4. Creates and plays animation instance
+5. Dispatches completion event to React when done
+6. Supports skip after 500ms delay
 
 **Example:**
 
 ```typescript
-// Standard blue animation for stage 1 checkpoint
+// Standard animation for Stage 1, Checkpoint 1
 this.playCheckpointAnimation('cp_s1_c1', 1, 'standard')
 
-// Gold animation for stage 5 checkpoint
-this.playCheckpointAnimation('cp_s5_c3', 5, 'gold')
+// Gold animation for Stage 2, Checkpoint 3
+this.playCheckpointAnimation('cp_s2_c3', 2, 'gold')
 ```
-
-**Behavior:**
-- Automatically stops any currently playing animation
-- Gets checkpoint node position from scene
-- Creates appropriate animation based on stage
-- Fires completion event to React when done
-- Supports skip via ESC key or click (after 500ms)
 
 ---
 
@@ -275,19 +272,20 @@ this.playCheckpointAnimation('cp_s5_c3', 5, 'gold')
 
 ### Skip Functionality
 
-All animations can be skipped after **500ms delay**:
+All animations can be skipped after a **500ms delay** to prevent accidental skips:
 
-- **ESC key** - Instant skip
-- **Click anywhere** - Instant skip (after 500ms timer)
+- **ESC key** - Instant skip (after delay)
+- **Click/tap anywhere** - Instant skip (after delay)
 
-**Why the delay?**
-- Prevents accidental skips from double-clicks
-- Ensures users see at least initial animation frames
-- Improves perceived polish and intentionality
+**Why the 500ms delay?**
+- Prevents double-click accidents during UI interactions
+- Ensures users see the initial animation frames
+- Provides minimum feedback for user actions
+- Creates more polished experience
 
 ### Completion Events
 
-When an animation completes (naturally or via skip), it dispatches:
+When animation completes (naturally or via skip):
 
 ```typescript
 eventBridge.dispatchToReact({
@@ -297,41 +295,53 @@ eventBridge.dispatchToReact({
 })
 ```
 
-React components can listen for this event to trigger follow-up actions:
-- Update UI state
-- Play sound effects
-- Show rewards
-- Enable next checkpoint
+**React components can listen:**
+
+```typescript
+useEffect(() => {
+  const handler = (event) => {
+    if (event.type === 'CHECKPOINT_ANIMATION_COMPLETE') {
+      console.log(`Checkpoint ${event.checkpointId} animation done!`)
+      // Update UI, show rewards, unlock next checkpoint, etc.
+    }
+  }
+  
+  eventBridge.addReactListener(handler)
+  return () => eventBridge.removeReactListener(handler)
+}, [])
+```
 
 ---
 
-## 🎨 Visual Design Principles
+## 🎨 Design Principles
 
-### Color Schemes
+### Color Philosophy
 
-**Standard (Blue):**
-- Primary: `0x3B82F6` (blue-500)
-- Accent: `0x60A5FA` (blue-400)
-- Glow: `0x6366F1` (indigo-500)
+**Standard (Blue) - Learning Mode:**
+- Represents steady progress
+- Calming, trustworthy blue tones
+- "You're on the right path"
 
-**Gold (Amber):**
-- Primary: `0xF59E0B` (amber-500)
-- Accent: `0xFEF08A` (amber-200)
-- Glow: `0xFFD700` (pure gold)
+**Gold (Amber) - Excellence:**
+- Celebrates complete mastery
+- Warm, prestigious gold tones
+- "You've achieved something special"
 
 ### Animation Timing
 
-- **Standard**: 2000ms total duration
-- **Gold**: 3000ms total duration (50% slower for prestige)
-- **Skip delay**: 500ms before skip is enabled
-- **Easing**: Mostly `Sine.easeInOut` and `Back.easeOut` for bounce
+- **Randomized duration** within spec ranges for organic feel
+- **Standard**: 1500-2500ms (avg 2s)
+- **Gold**: 2500-3500ms (avg 3s)
+- **Skip delay**: 500ms universally
+- **Easing curves**: Primarily `Sine.easeInOut` and `Back.easeOut`
 
-### Performance
+### Performance Targets
 
-- **Target**: 60 FPS on all devices
-- **Particle count**: Limited to 30 max per animation
-- **Cleanup**: All tweens and objects destroyed on complete
-- **Memory**: Zero leaks - proper disposal in `destroy()`
+- **60 FPS** on all devices (desktop and mobile)
+- **Maximum 20 particles** per animation active at once
+- **Clean up all resources** in `destroy()` method
+- **No memory leaks** - all tweens stopped, objects destroyed
+- **Lightweight graphics** - uses Phaser's Graphics API, not sprites
 
 ---
 
@@ -340,59 +350,54 @@ React components can listen for this event to trigger follow-up actions:
 ```
 src/lib/phaser/scenes/animations/
 ├── BaseCheckpointAnimation.ts      # Abstract base class
-├── SealBreakAnimation.ts           # S1, S8 pattern
-├── RuneInscriptionAnimation.ts     # S2 pattern
-├── BeaconLightingAnimation.ts      # S3, S7 pattern
-├── BridgeRepairAnimation.ts        # S4 pattern
-├── CompassCalibrationAnimation.ts  # S5 pattern
-├── WardPlacementAnimation.ts       # S6 pattern
+├── CompassCalibrationAnimation.ts  # Stage 1 (Ideation)
+├── BeaconLightingAnimation.ts      # Stage 2 (Research)
 ├── index.ts                        # Exports & factory functions
 └── README.md                       # This file
+
+# Legacy animations (available but not used in 2-stage MVP)
+├── SealBreakAnimation.ts
+├── RuneInscriptionAnimation.ts
+├── BridgeRepairAnimation.ts
+└── WardPlacementAnimation.ts
 ```
 
 ---
 
 ## 🧪 Testing
 
-### Manual Testing
+### Manual Testing in Browser Console
 
-```typescript
-// In browser console (when WorldMapScene is active)
-const scene = game.scene.getScene('WorldMap')
+```javascript
+// Get the WorldMapScene
+const scene = window.__PHASER_GAME__.scene.getScene('WorldMap')
 
-// Test all 6 patterns with standard variant
-scene.playCheckpointAnimation('cp_test', 1, 'standard') // Seal Break
-scene.playCheckpointAnimation('cp_test', 2, 'standard') // Rune Inscription
-scene.playCheckpointAnimation('cp_test', 3, 'standard') // Beacon Lighting
-scene.playCheckpointAnimation('cp_test', 4, 'standard') // Bridge Repair
-scene.playCheckpointAnimation('cp_test', 5, 'standard') // Compass Calibration
-scene.playCheckpointAnimation('cp_test', 6, 'standard') // Ward Placement
+// Test Stage 1 - Compass Calibration (Standard)
+scene.playCheckpointAnimation('cp_s1_c1', 1, 'standard')
 
-// Test gold variants
-scene.playCheckpointAnimation('cp_test', 1, 'gold')
-scene.playCheckpointAnimation('cp_test', 2, 'gold')
-// ... etc
+// Test Stage 1 - Compass Calibration (Gold)
+scene.playCheckpointAnimation('cp_s1_c1', 1, 'gold')
+
+// Test Stage 2 - Beacon Lighting (Standard)
+scene.playCheckpointAnimation('cp_s2_c1', 2, 'standard')
+
+// Test Stage 2 - Beacon Lighting (Gold)
+scene.playCheckpointAnimation('cp_s2_c1', 2, 'gold')
 ```
 
-### Automated Tests (Future)
+### Testing Checklist
 
-```typescript
-describe('CheckpointAnimations', () => {
-  it('should play seal break animation', () => {
-    const scene = new Phaser.Scene({})
-    const anim = new SealBreakAnimation(scene, {
-      x: 400, y: 300, variant: 'standard'
-    })
-    
-    anim.play()
-    expect(anim.isComplete).toBe(false)
-    
-    // Fast-forward 2000ms
-    scene.time.update(0, 2000)
-    expect(anim.isComplete).toBe(true)
-  })
-})
-```
+- [ ] Standard variant plays correctly for both stages
+- [ ] Gold variant plays correctly for both stages
+- [ ] Fog lifts in Compass Calibration (both variants)
+- [ ] Directional beam appears in Compass Calibration (gold only)
+- [ ] Watchtower rises in Beacon Lighting (both variants)
+- [ ] Gold/white flame in Beacon Lighting (gold only)
+- [ ] Community notification rings in Beacon Lighting (gold only)
+- [ ] Skip works after 500ms delay (ESC and click)
+- [ ] Completion event fires to React
+- [ ] No memory leaks after multiple plays
+- [ ] Runs at 60 FPS on target devices
 
 ---
 
@@ -401,64 +406,100 @@ describe('CheckpointAnimations', () => {
 ### Animation doesn't appear
 
 **Check:**
-1. Is `particle_glow` texture created? (AssetLoader.createParticleTextures)
-2. Is checkpoint node position valid?
-3. Is animationLayer depth set correctly? (should be 100+)
+1. Is checkpoint node position valid in `checkpointNodes` Map?
+2. Is `animationLayer` depth set correctly? (should be 100+)
+3. Are camera bounds including the checkpoint position?
+
+**Debug:**
+```javascript
+const scene = window.__PHASER_GAME__.scene.getScene('WorldMap')
+console.log(scene.checkpointNodes.get('cp_s1_c1'))
+```
 
 ### Animation stutters or lags
 
 **Solutions:**
-1. Reduce particle count in animation files
-2. Use object pooling for frequently shown animations
-3. Ensure GPU acceleration is enabled in browser
+1. Check browser GPU acceleration is enabled
+2. Reduce particle count if needed (currently optimized)
+3. Close other browser tabs/applications
+4. Test on different device/browser
 
-### Animation doesn't skip
+### Skip doesn't work
 
 **Check:**
-1. Has 500ms delay passed?
-2. Is ESC key handler registered?
-3. Is overlay clickable area set up?
+1. Has 500ms delay passed since animation start?
+2. Is ESC key handler registered in WorldMapScene?
+3. Is click handler on scene's input enabled?
 
-### Memory leaks
+### Colors look wrong
 
-**Ensure:**
-1. All tweens stopped in `destroy()`
-2. All graphics objects destroyed
-3. Event listeners removed
-4. Container fully cleaned up
+**Verify:**
+1. Variant is correctly passed ('standard' vs 'gold')
+2. `getPrimaryColor()`, `getSecondaryColor()`, `getGlowColor()` return correct values
+3. No CSS filters affecting the Phaser canvas
 
 ---
 
-## 🔮 Future Enhancements
+## 🚢 2-Stage MVP Context
 
-- [ ] Sound effects per animation type
-- [ ] Particle texture variations
-- [ ] Custom easing curves per stage
-- [ ] Mobile-specific optimizations
-- [ ] Animation replay system
-- [ ] Screenshot capture on gold completions
-- [ ] Social sharing of achievements
+### Why These Animations?
+
+**Stage 1 - Compass Calibration**
+- **Ideation** is about finding direction among many possibilities
+- Compass represents navigation and decision-making
+- Fog lifting = clarity emerging from uncertainty
+- Directional beam (gold) = clear path to next milestone
+
+**Stage 2 - Beacon Lighting**
+- **Research** is about illuminating knowledge
+- Watchtower beacon = elevated perspective
+- Light rays = spreading knowledge/insights
+- Community notification (gold) = sharing discoveries
+
+### Task Completion Logic
+
+- **Standard (Blue)**: User completes 2 out of 3 tasks at checkpoint
+- **Gold (Amber)**: User completes all 3 tasks at checkpoint (100% mastery)
+
+---
+
+## 📈 Future Enhancements (Post-MVP)
+
+- [ ] Sound effects synchronized with visual beats
+- [ ] Haptic feedback on mobile devices
+- [ ] Achievement badges for gold completions
+- [ ] Animation replay gallery in user profile
+- [ ] Social sharing of gold achievements
+- [ ] Custom particle textures for more visual variety
+- [ ] Additional stage animations as venture system expands
 
 ---
 
 ## 📝 Change Log
 
-### v1.0.0 - Initial Release
-- ✅ All 6 animation patterns implemented
+### v2.0.0 - 2-Stage MVP
+- ✅ Simplified to 2 animations for MVP launch
+- ✅ Enhanced Compass Calibration with fog lift and directional beam
+- ✅ Enhanced Beacon Lighting with watchtower and community notification
+- ✅ Randomized durations for organic feel
+- ✅ Updated color schemes for standard/gold variants
+- ✅ Full TypeScript support maintained
+- ✅ 60 FPS performance verified
+
+### v1.0.0 - Initial Release (8-Stage System)
+- ✅ 6 unique animation patterns
 - ✅ Standard and gold variants
 - ✅ Skip functionality
 - ✅ React event integration
-- ✅ Full TypeScript support
-- ✅ 60 FPS performance
 
 ---
 
 ## 👥 Credits
 
 **Design**: Interactive Ideas Product Team  
-**Implementation**: Week 3, Days 11-12  
+**Implementation**: Phaser Animation System  
 **Framework**: Phaser 3 + React + TypeScript  
-**Inspiration**: Among Us, Zelda, Monument Valley
+**Inspiration**: Monument Valley, Journey, Zelda series
 
 ---
 

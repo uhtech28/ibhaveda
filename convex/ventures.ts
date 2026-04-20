@@ -319,12 +319,27 @@ export const submitEvidence = mutation({
         "gold_checkpoint",
         venture._id,
       );
+
+      // Get venture details for social feed post
+      const idea = await ctx.db.get(venture.ideaId);
+      const stageName =
+        VENTURE_STAGES[checkpoint.stage - 1]?.name ||
+        `Stage ${checkpoint.stage}`;
+      const checkpointDef = CHECKPOINT_DEFINITIONS.find(
+        (cp) =>
+          cp.stage === checkpoint.stage &&
+          cp.checkpoint === checkpoint.checkpoint,
+      );
+      const checkpointName =
+        checkpointDef?.name || `Checkpoint ${checkpoint.checkpoint}`;
+      const ventureName = idea?.title || "Your Venture";
+
       await createNotification(
         ctx,
         user._id,
         user._id,
         "gold_checkpoint",
-        `You earned a Gold Checkpoint! All 3 tasks completed. +${POINT_VALUES.gold_checkpoint_bonus} points`,
+        `🏆 ${ventureName} - ${stageName}: ${checkpointName} - Gold Checkpoint! All 3 tasks completed. +${POINT_VALUES.gold_checkpoint_bonus} points`,
         venture._id,
       );
     }
@@ -781,12 +796,19 @@ async function tryAdvanceStage(
       `stage_${currentStage}_complete`,
       venture._id,
     );
+
+    // Get venture details for social feed post
+    const idea = await ctx.db.get(venture.ideaId);
+    const stageName =
+      VENTURE_STAGES[currentStage - 1]?.name || `Stage ${currentStage}`;
+    const ventureName = idea?.title || "Your Venture";
+
     await createNotification(
       ctx,
       user._id,
       user._id,
       "venture_stage_complete",
-      `You completed Stage ${currentStage} of your venture!`,
+      `🎉 ${ventureName} - Stage ${currentStage}: ${stageName} Complete! +${POINT_VALUES.stage_complete_bonus} points`,
       venture._id,
     );
   }

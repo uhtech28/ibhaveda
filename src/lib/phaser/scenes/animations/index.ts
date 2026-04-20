@@ -1,4 +1,8 @@
-export { BaseCheckpointAnimation, type AnimationConfig, type AnimationVariant } from "./BaseCheckpointAnimation";
+export {
+  BaseCheckpointAnimation,
+  type AnimationConfig,
+  type AnimationVariant,
+} from "./BaseCheckpointAnimation";
 export { SealBreakAnimation } from "./SealBreakAnimation";
 export { RuneInscriptionAnimation } from "./RuneInscriptionAnimation";
 export { BeaconLightingAnimation } from "./BeaconLightingAnimation";
@@ -15,18 +19,18 @@ import { WardPlacementAnimation } from "./WardPlacementAnimation";
 import type { AnimationConfig } from "./BaseCheckpointAnimation";
 import * as Phaser from "phaser";
 
-export type CheckpointAnimationType = 
-  | "seal_break" 
-  | "rune_inscription" 
-  | "beacon_lighting" 
-  | "bridge_repair" 
-  | "compass_calibration" 
+export type CheckpointAnimationType =
+  | "seal_break"
+  | "rune_inscription"
+  | "beacon_lighting"
+  | "bridge_repair"
+  | "compass_calibration"
   | "ward_placement";
 
 export function createCheckpointAnimation(
   scene: Phaser.Scene,
   type: CheckpointAnimationType,
-  config: AnimationConfig
+  config: AnimationConfig,
 ) {
   switch (type) {
     case "seal_break":
@@ -47,16 +51,13 @@ export function createCheckpointAnimation(
   }
 }
 
-export function getAnimationTypeForStage(stage: number): CheckpointAnimationType {
+export function getAnimationTypeForStage(
+  stage: number,
+): CheckpointAnimationType {
+  // 2-Stage MVP System
   const stageToAnimation: Record<number, CheckpointAnimationType> = {
-    1: "seal_break",
-    2: "rune_inscription",
-    3: "beacon_lighting",
-    4: "bridge_repair",
-    5: "compass_calibration",
-    6: "ward_placement",
-    7: "beacon_lighting",
-    8: "seal_break",
+    1: "compass_calibration", // Stage 1: Ideation - Compass snaps to new heading
+    2: "beacon_lighting", // Stage 2: Research - Watchtower beacon ignites
   };
-  return stageToAnimation[stage] || "seal_break";
+  return stageToAnimation[stage] || "compass_calibration";
 }

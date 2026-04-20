@@ -3,6 +3,7 @@ import { AssetLoader } from "../utils/asset-loader";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender } from "../entities/Persona";
 import { BossSilhouette } from "../entities/Boss";
+import { MiniBoss } from "../entities/MiniBoss";
 import { BIOME_PALETTES } from "../utils/biome-textures";
 import { audioManager, type CheckpointSFXId } from "../../audio/audioManager";
 
@@ -54,6 +55,9 @@ export class WorldMapScene extends Phaser.Scene {
 
   /** Map of boss IDs to their silhouette instances */
   private bosses: Map<string, BossSilhouette>;
+
+  /** Map of stage numbers to their mini-boss instances */
+  private miniBosses: Map<number, MiniBoss>;
 
   /** Container for static background elements */
   private backgroundLayer!: Phaser.GameObjects.Container;
@@ -127,6 +131,7 @@ export class WorldMapScene extends Phaser.Scene {
     this.checkpointNodes = new Map();
     this.persona = null;
     this.bosses = new Map();
+    this.miniBosses = new Map();
     this.currentVentureId = null;
     this.boundHandlers = {};
   }
@@ -183,6 +188,9 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Draw modern connection paths between biomes
     this.createAdventurePath();
+
+    // Create mini-bosses for venture stages
+    this.createMiniBosses();
 
     // Bind event handlers
     this.boundHandlers.updateBrightness =
@@ -372,8 +380,58 @@ export class WorldMapScene extends Phaser.Scene {
         this.gameLayer.add(node);
         this.checkpointNodes.set(cp.id, node);
       });
+
+      // Update mini-boss weakness based on checkpoint completion
+      this.updateMiniBossProgress(event.checkpoints);
     } catch (error) {
       console.warn("[WorldMapScene] Failed to update checkpoints:", error);
+    }
+  }
+
+  /**
+   * Update mini-boss weakness based on checkpoint completion in each stage.
+   *
+   * @param checkpoints - Array of all checkpoint states
+   */
+  private updateMiniBossProgress(checkpoints: CheckpointState[]): void {
+    // Group checkpoints by stage and count completed ones
+    const stageProgress = new Map<
+      number,
+      { completed: number; total: number }
+    >();
+
+    checkpoints.forEach((cp) => {
+      const stage = cp.stage;
+      if (!stageProgress.has(stage)) {
+        stageProgress.set(stage, { completed: 0, total: 0 });
+      }
+
+      const progress = stageProgress.get(stage)!;
+      progress.total++;
+
+      // Count as completed if status is 'completed' or 'gold'
+      if (cp.status === "completed" || cp.status === "gold") {
+        progress.completed++;
+      }
+    });
+
+    // Update mini-bosses for stages 1 and 2
+    for (const [stage, miniBoss] of this.miniBosses.entries()) {
+      const progress = stageProgress.get(stage);
+      if (!progress) continue;
+
+      const { completed, total } = progress;
+
+      // Check if stage is fully complete
+      const stageComplete = completed === total && total > 0;
+
+      if (stageComplete) {
+        // Slay the boss when stage is complete
+        miniBoss.slay();
+      } else {
+        // Weaken the boss based on progress
+        miniBoss.weaken(completed, total);
+      }
     }
   }
 
@@ -638,6 +696,56 @@ export class WorldMapScene extends Phaser.Scene {
 
       this.gameLayer.add(miniBoss);
       this.bosses.set(`mini_boss_${stage}`, miniBoss);
+    }
+  }
+
+  /**
+   * Create mini-bosses for venture stages.
+   *
+   * Stage 1 (Ideation): Fog of Vagueness
+   * Stage 2 (Research): Pathwarden Wraith
+   */
+  private createMiniBosses(): void {
+    // Clear existing mini-bosses
+    this.miniBosses.forEach((boss) => boss.destroy());
+    this.miniBosses.clear();
+
+    // Mini-boss definitions
+    const miniBossConfigs = [
+      {
+        stage: 1,
+        type: "fog_of_vagueness" as const,
+        bossId: "fog_of_vagueness",
+      },
+      {
+        stage: 2,
+        type: "pathwarden_wraith" as const,
+        bossId: "pathwarden_wraith",
+      },
+    ];
+
+    for (const config of miniBossConfigs) {
+      // Position mini-boss near the last checkpoint of its stage
+      const lastCheckpoint = this.getCheckpointsForStage(config.stage);
+      const cpPos = this.calculateCheckpointPosition(
+        config.stage,
+        lastCheckpoint,
+        0,
+      );
+
+      const x = cpPos.x + 100; // Slightly past the last checkpoint
+      const y = cpPos.y - 50; // Slightly above
+
+      const miniBoss = new MiniBoss(this, {
+        bossId: config.bossId,
+        bossType: config.type,
+        x,
+        y,
+        stage: config.stage,
+      });
+
+      this.gameLayer.add(miniBoss);
+      this.miniBosses.set(config.stage, miniBoss);
     }
   }
 
@@ -1638,6 +1746,10 @@ export class WorldMapScene extends Phaser.Scene {
   shutdown(): void {
     // Stop any playing animation
     this.stopCurrentAnimation();
+
+    // Clean up mini-bosses
+    this.miniBosses.forEach((boss) => boss.destroy());
+    this.miniBosses.clear();
 
     // Clean up event listeners
     if (this.boundHandlers.updateBrightness) {

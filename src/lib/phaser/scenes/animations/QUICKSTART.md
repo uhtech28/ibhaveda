@@ -1,4 +1,4 @@
-# Checkpoint Animations - Quick Start Guide
+# Checkpoint Animations - Quick Start Guide (2-Stage MVP)
 
 Get started with the checkpoint animation system in 5 minutes.
 
@@ -41,30 +41,28 @@ function MyComponent() {
 
 ---
 
-## 🎬 Animation Patterns
+## 🎬 2-Stage Animation Mapping
 
-| Stage | Animation | Best For |
-|-------|-----------|----------|
-| 1, 8 | Seal Break | Breaking through barriers |
-| 2 | Rune Inscription | Knowledge/learning checkpoints |
-| 3, 7 | Beacon Lighting | Major milestones |
-| 4 | Bridge Repair | Connecting ideas |
-| 5 | Compass Calibration | Finding direction |
-| 6 | Ward Placement | Protection/completion |
+| Stage | Theme | Animation | Description |
+|-------|-------|-----------|-------------|
+| **1** | Ideation 🏝️ | Compass Calibration | Compass snaps to heading, fog lifts |
+| **2** | Research ⛰️ | Beacon Lighting | Watchtower beacon ignites, light spreads |
 
 ---
 
-## 💎 Standard vs Gold
+## 💎 Standard vs Gold Variants
 
-**Standard (Blue):**
-- Duration: 2 seconds
+### Standard (Blue) - 2/3 Tasks Complete
+- Duration: 1.5-2.5s (randomized)
 - Color: Blue (#3B82F6)
-- Use for: Regular completions
+- **Stage 1:** Compass calibrates, fog lifts
+- **Stage 2:** Beacon lights, visible on map
 
-**Gold (Amber):**
-- Duration: 3 seconds
+### Gold (Amber) - 3/3 Tasks Complete ✨
+- Duration: 2.5-3.5s (randomized)
 - Color: Gold (#F59E0B)
-- Use for: Perfect scores, achievements, special milestones
+- **Stage 1:** Compass emits directional beam to next checkpoint
+- **Stage 2:** Beacon burns gold/white flame, community notification rings
 
 ---
 
@@ -74,62 +72,46 @@ function MyComponent() {
 
 ```typescript
 function handleCheckpointComplete(checkpoint) {
-  // Determine variant based on score
-  const variant = checkpoint.score >= 90 ? 'gold' : 'standard'
+  // Determine variant based on tasks completed
+  const tasksCompleted = checkpoint.tasks.filter(t => t.completed).length
+  const variant = tasksCompleted === 3 ? 'gold' : 'standard'
   
   eventBridge.dispatchToPhaser({
     type: 'PLAY_CHECKPOINT_ANIMATION',
     checkpointId: checkpoint.id,
-    stage: checkpoint.stage,
+    stage: checkpoint.stage, // 1 or 2
     variant
   })
 }
 ```
 
-### Pattern 2: Achievement Unlock
+### Pattern 2: Perfect Completion (All Tasks)
 
 ```typescript
-function unlockAchievement(achievement) {
-  // Always use gold for achievements
-  eventBridge.dispatchToPhaser({
-    type: 'PLAY_CHECKPOINT_ANIMATION',
-    checkpointId: achievement.checkpointId,
-    stage: achievement.stage,
-    variant: 'gold'
-  })
-}
-```
-
-### Pattern 3: Sequential Animations
-
-```typescript
-function playSequence(checkpoints) {
-  checkpoints.forEach((cp, index) => {
-    setTimeout(() => {
-      eventBridge.dispatchToPhaser({
-        type: 'PLAY_CHECKPOINT_ANIMATION',
-        checkpointId: cp.id,
-        stage: cp.stage,
-        variant: 'standard'
-      })
-    }, index * 2500) // 2.5s between animations
-  })
-}
-```
-
-### Pattern 4: Completion with Callback
-
-```typescript
-function completeWithReward(checkpoint) {
-  // Play animation
+function celebratePerfectCompletion(checkpoint) {
+  // Always use gold for 3/3 tasks
   eventBridge.dispatchToPhaser({
     type: 'PLAY_CHECKPOINT_ANIMATION',
     checkpointId: checkpoint.id,
     stage: checkpoint.stage,
-    variant: 'gold'
+    variant: 'gold' // 🎉 Special effects!
+  })
+}
+```
+
+### Pattern 3: Completion with Reward
+
+```typescript
+function completeWithReward(checkpoint) {
+  // Play animation first
+  eventBridge.dispatchToPhaser({
+    type: 'PLAY_CHECKPOINT_ANIMATION',
+    checkpointId: checkpoint.id,
+    stage: checkpoint.stage,
+    variant: checkpoint.perfectScore ? 'gold' : 'standard'
   })
   
-  // Listen for completion
+  // Listen for completion to show reward
   const cleanup = eventBridge.on('CHECKPOINT_ANIMATION_COMPLETE', (event) => {
     if (event.checkpointId === checkpoint.id) {
       showRewardModal(checkpoint.reward)
@@ -139,27 +121,43 @@ function completeWithReward(checkpoint) {
 }
 ```
 
+### Pattern 4: Sequential Checkpoints
+
+```typescript
+function playCheckpointSequence(checkpoints) {
+  checkpoints.forEach((cp, index) => {
+    setTimeout(() => {
+      eventBridge.dispatchToPhaser({
+        type: 'PLAY_CHECKPOINT_ANIMATION',
+        checkpointId: cp.id,
+        stage: cp.stage,
+        variant: cp.variant
+      })
+    }, index * 3000) // 3s between animations
+  })
+}
+```
+
 ---
 
 ## 🎮 Testing
 
-### Option 1: Use the Demo Component
-
-```tsx
-import { AnimationDemo } from '@/lib/phaser/scenes/animations/AnimationDemo'
-
-// Add to your dev page
-<AnimationDemo />
-```
-
-### Option 2: Browser Console
+### Option 1: Browser Console
 
 ```javascript
-const scene = game.scene.getScene('WorldMap')
-scene.playCheckpointAnimation('test', 1, 'gold')
+// Get WorldMapScene
+const scene = window.__PHASER_GAME__.scene.getScene('WorldMap')
+
+// Test Stage 1 animations
+scene.playCheckpointAnimation('cp_s1_c1', 1, 'standard')
+scene.playCheckpointAnimation('cp_s1_c1', 1, 'gold')
+
+// Test Stage 2 animations
+scene.playCheckpointAnimation('cp_s2_c1', 2, 'standard')
+scene.playCheckpointAnimation('cp_s2_c1', 2, 'gold')
 ```
 
-### Option 3: React Dev Component
+### Option 2: React Dev Component
 
 ```tsx
 function AnimationTester() {
@@ -169,24 +167,43 @@ function AnimationTester() {
   const test = () => {
     eventBridge.dispatchToPhaser({
       type: 'PLAY_CHECKPOINT_ANIMATION',
-      checkpointId: 'test',
+      checkpointId: `cp_s${stage}_c1`,
       stage,
       variant
     })
   }
   
   return (
-    <div>
-      <input type="number" min="1" max="8" value={stage} 
-             onChange={e => setStage(Number(e.target.value))} />
-      <select value={variant} onChange={e => setVariant(e.target.value)}>
-        <option value="standard">Standard</option>
-        <option value="gold">Gold</option>
-      </select>
-      <button onClick={test}>Play</button>
+    <div className="p-4 space-y-2">
+      <div>
+        <label>Stage: </label>
+        <select value={stage} onChange={e => setStage(Number(e.target.value))}>
+          <option value={1}>Stage 1 - Ideation (Compass)</option>
+          <option value={2}>Stage 2 - Research (Beacon)</option>
+        </select>
+      </div>
+      <div>
+        <label>Variant: </label>
+        <select value={variant} onChange={e => setVariant(e.target.value)}>
+          <option value="standard">Standard (2/3 tasks)</option>
+          <option value="gold">Gold (3/3 tasks)</option>
+        </select>
+      </div>
+      <button onClick={test} className="px-4 py-2 bg-blue-500 text-white rounded">
+        Play Animation
+      </button>
     </div>
   )
 }
+```
+
+### Option 3: Use the Demo Component
+
+```tsx
+import { AnimationDemo } from '@/lib/phaser/scenes/animations/AnimationDemo'
+
+// Add to your dev page
+<AnimationDemo />
 ```
 
 ---
@@ -199,9 +216,52 @@ function AnimationTester() {
 - Not skippable in first 500ms (prevents accidental skips)
 
 **During Animation:**
-- User input is blocked (overlay captures clicks)
+- User input to map is blocked
 - Game continues in background
 - Camera doesn't move
+
+**After Animation:**
+- `CHECKPOINT_ANIMATION_COMPLETE` event fires
+- Animation container is destroyed
+- User can interact with map again
+
+---
+
+## 🎨 Visual Guide
+
+### Stage 1: Compass Calibration
+
+**Standard (Blue):**
+1. Fog appears covering compass
+2. Compass emerges and scales in
+3. Cardinal points (N, E, S, W) light up
+4. Needle spins 4 rotations
+5. Needle snaps to North
+6. **Fog lifts upward** revealing clarity
+7. Compass pulses complete
+
+**Gold (Amber):**
+- All of the above, PLUS:
+- **Directional beam** shoots East toward next checkpoint
+- Beam contains flowing particles
+- More intense glow effects
+
+### Stage 2: Beacon Lighting
+
+**Standard (Blue):**
+1. Watchtower rises from ground
+2. Beacon brazier appears at top
+3. Light rays ignite in all directions
+4. Orange/red flame particles rise
+5. Beacon reaches full brightness
+6. Final glow pulse
+
+**Gold (Amber):**
+- All of the above, PLUS:
+- **Gold/white flame** instead of orange/red
+- **Community notification rings** expand outward
+- Sparkle particles around rings
+- More dramatic light show
 
 ---
 
@@ -210,103 +270,144 @@ function AnimationTester() {
 ### Animation doesn't appear
 
 ```typescript
-// Check 1: Is WorldMapScene loaded?
-const scene = game.scene.getScene('WorldMap')
-if (!scene) console.error('WorldMapScene not loaded')
+// Debug checklist:
+const scene = window.__PHASER_GAME__.scene.getScene('WorldMap')
 
-// Check 2: Is checkpoint ID valid?
-const checkpoint = scene.checkpointNodes.get('your-checkpoint-id')
-if (!checkpoint) console.error('Checkpoint not found')
+// 1. Is scene loaded?
+console.log('Scene exists:', !!scene)
 
-// Check 3: Is particle texture created?
-const texture = game.textures.exists('particle_glow')
-if (!texture) console.error('Particle texture missing')
+// 2. Is checkpoint valid?
+console.log('Checkpoint exists:', scene.checkpointNodes.has('cp_s1_c1'))
+
+// 3. Check checkpoint position
+const node = scene.checkpointNodes.get('cp_s1_c1')
+console.log('Checkpoint position:', node?.getWorldPosition())
 ```
 
-### Animation plays but looks broken
+### Animation plays at wrong location
 
 ```typescript
-// Ensure AssetLoader created all textures
-import { AssetLoader } from '@/lib/phaser/utils/asset-loader'
-
-// In your preload or create phase
-AssetLoader.createParticleTextures(this)
-```
-
-### Multiple animations overlap
-
-```typescript
-// This is by design - only one animation plays at a time
-// The newest animation will stop the previous one
-// To queue animations, use setTimeout:
-
-function queueAnimations(checkpoints) {
-  let delay = 0
-  checkpoints.forEach(cp => {
-    setTimeout(() => playAnimation(cp), delay)
-    delay += 2500 // Wait for previous to finish
-  })
-}
+// Verify checkpoint node has correct position
+const node = scene.checkpointNodes.get(checkpointId)
+const worldPos = node.getWorldPosition()
+console.log('Animation will play at:', worldPos)
 ```
 
 ### Animation won't skip
 
 ```typescript
-// Check if 500ms has passed since animation started
-// Skip is intentionally delayed to prevent accidental skips
-// This is working as designed
+// Skip is intentionally delayed 500ms to prevent accidental skips
+// Wait for 500ms, then press ESC or click
+// This is working as designed ✅
+```
+
+### Colors look wrong
+
+```typescript
+// Verify variant is correct
+eventBridge.dispatchToPhaser({
+  type: 'PLAY_CHECKPOINT_ANIMATION',
+  checkpointId: 'cp_s1_c1',
+  stage: 1,
+  variant: 'gold' // Must be 'standard' or 'gold'
+})
+```
+
+### Multiple animations overlap
+
+```typescript
+// Only one animation plays at a time (by design)
+// New animation automatically stops the previous one
+// To queue animations, add delays:
+
+function queueAnimations(checkpoints) {
+  checkpoints.forEach((cp, index) => {
+    setTimeout(() => {
+      eventBridge.dispatchToPhaser({
+        type: 'PLAY_CHECKPOINT_ANIMATION',
+        checkpointId: cp.id,
+        stage: cp.stage,
+        variant: cp.variant
+      })
+    }, index * 3000) // 3s delay between each
+  })
+}
 ```
 
 ---
 
-## 📋 Checklist
+## 📋 Launch Checklist
 
-Before going live:
-- [ ] Test all 6 animation patterns
-- [ ] Test both standard and gold variants
-- [ ] Verify skip functionality (ESC and click)
-- [ ] Test on mobile devices (touch events)
-- [ ] Check performance (should maintain 60 FPS)
+Before deploying:
+- [ ] Test Stage 1 standard variant (2/3 tasks)
+- [ ] Test Stage 1 gold variant (3/3 tasks)
+- [ ] Test Stage 2 standard variant (2/3 tasks)
+- [ ] Test Stage 2 gold variant (3/3 tasks)
+- [ ] Verify fog lifts in Compass Calibration
+- [ ] Verify directional beam in Compass Calibration (gold)
+- [ ] Verify watchtower rises in Beacon Lighting
+- [ ] Verify gold/white flame in Beacon Lighting (gold)
+- [ ] Verify community notification rings (gold)
+- [ ] Test skip functionality (ESC and click)
+- [ ] Test on mobile devices (touch)
 - [ ] Verify completion events fire correctly
-- [ ] Test sequential animations
-- [ ] Test interrupting animations
-
----
-
-## 🔗 Links
-
-- **Full Documentation:** `./README.md`
-- **API Reference:** `./README.md#api-reference`
-- **Demo Component:** `./AnimationDemo.tsx`
-- **Event Bridge:** `../../utils/event-bridge.ts`
-- **WorldMapScene:** `../WorldMapScene.ts`
-
----
-
-## 💡 Pro Tips
-
-1. **Use gold sparingly** - Makes it feel more special
-2. **Match animation to context** - Seal Break for breakthroughs, Compass for navigation, etc.
-3. **Test skip timing** - 500ms is usually perfect, but validate with users
-4. **Chain animations carefully** - Don't overwhelm with too many in sequence
-5. **Monitor performance** - Max 30 particles per animation for 60 FPS
-6. **Provide feedback** - Always handle `CHECKPOINT_ANIMATION_COMPLETE` event
+- [ ] Check performance (60 FPS maintained)
+- [ ] Test with real checkpoint data from Convex
 
 ---
 
 ## ⚡ One-Liner Examples
 
 ```typescript
-// Standard blue animation
-eventBridge.dispatchToPhaser({ type: 'PLAY_CHECKPOINT_ANIMATION', checkpointId: 'cp1', stage: 1, variant: 'standard' })
+// Stage 1, Standard (2/3 tasks)
+eventBridge.dispatchToPhaser({ type: 'PLAY_CHECKPOINT_ANIMATION', checkpointId: 'cp_s1_c1', stage: 1, variant: 'standard' })
 
-// Gold achievement
-eventBridge.dispatchToPhaser({ type: 'PLAY_CHECKPOINT_ANIMATION', checkpointId: 'cp1', stage: 1, variant: 'gold' })
+// Stage 1, Gold (3/3 tasks) - with directional beam!
+eventBridge.dispatchToPhaser({ type: 'PLAY_CHECKPOINT_ANIMATION', checkpointId: 'cp_s1_c3', stage: 1, variant: 'gold' })
+
+// Stage 2, Standard (2/3 tasks)
+eventBridge.dispatchToPhaser({ type: 'PLAY_CHECKPOINT_ANIMATION', checkpointId: 'cp_s2_c2', stage: 2, variant: 'standard' })
+
+// Stage 2, Gold (3/3 tasks) - with community notification!
+eventBridge.dispatchToPhaser({ type: 'PLAY_CHECKPOINT_ANIMATION', checkpointId: 'cp_s2_c5', stage: 2, variant: 'gold' })
 
 // Listen for completion
-useGameEvent('CHECKPOINT_ANIMATION_COMPLETE', (e) => console.log('Done!', e))
+useGameEvent('CHECKPOINT_ANIMATION_COMPLETE', (e) => console.log('Done!', e.checkpointId))
 ```
 
 ---
 
-**Ready to go?** Start with a simple standard animation and build from there! 🚀
+## 💡 Pro Tips
+
+1. **Use gold for perfect scores** - Makes 3/3 task completion feel special
+2. **Match timing to UX** - 2-3s animations keep momentum while providing feedback
+3. **Test skip timing** - 500ms prevents accidents but allows quick progression
+4. **Leverage themed animations** - Compass for finding direction, Beacon for illuminating knowledge
+5. **Monitor performance** - Animations are optimized but test on target devices
+6. **Handle completion events** - Always respond to `CHECKPOINT_ANIMATION_COMPLETE`
+7. **Progressive disclosure** - Standard → Gold creates satisfying progression loop
+
+---
+
+## 🔗 Resources
+
+- **Full Documentation:** [README.md](./README.md)
+- **API Reference:** [README.md#technical-implementation](./README.md#technical-implementation)
+- **2-Stage MVP Overview:** [/2_STAGE_MVP_COMPLETE.md](../../../../2_STAGE_MVP_COMPLETE.md)
+- **Event Bridge:** `../../utils/event-bridge.ts`
+- **WorldMapScene:** `../WorldMapScene.ts`
+
+---
+
+## 🚀 Ready to Launch!
+
+The 2-stage MVP animation system is production-ready:
+- ✅ 2 unique animations (Compass + Beacon)
+- ✅ Standard and gold variants
+- ✅ Randomized durations for organic feel
+- ✅ Skip functionality
+- ✅ Event-driven architecture
+- ✅ 60 FPS performance
+- ✅ Mobile-friendly
+
+**Start simple:** Test with standard variants first, then add gold celebrations for perfect scores! 🎉

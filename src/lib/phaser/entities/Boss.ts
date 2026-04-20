@@ -247,4 +247,79 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
         return 0;
     }
   }
+
+  /**
+   * Play the entrance animation - boss materializes with dramatic effect.
+   * Called when the player reaches stage 7+ and encounters the super boss.
+   */
+  entrance(): void {
+    this.setAlpha(0);
+    this.setScale(0.8);
+
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 0.5,
+      scaleX: 1.1,
+      scaleY: 1.1,
+      duration: 800,
+      ease: "Cubic.easeOut",
+      onComplete: () => {
+        this.scene.tweens.add({
+          targets: this,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 400,
+          ease: "Back.easeOut",
+        });
+      },
+    });
+
+    this.scene.tweens.add({
+      targets: this,
+      y: this.y + 15,
+      duration: 600,
+      ease: "Sine.easeOut",
+      yoyo: true,
+      repeat: 2,
+    });
+  }
+
+  /**
+   * Play the slay animation and destroy the boss.
+   * Called when the player defeats the super boss.
+   */
+  slay(): void {
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.killTweensOf(this.silhouetteGraphics);
+    this.scene.tweens.killTweensOf(this.namePlate);
+
+    this.scene.tweens.add({
+      targets: this.namePlate,
+      alpha: 0,
+      duration: 300,
+      ease: "Sine.easeOut",
+    });
+
+    this.scene.tweens.add({
+      targets: this.silhouetteGraphics,
+      alpha: 0,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      duration: 1200,
+      ease: "Cubic.easeIn",
+    });
+
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 0,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      rotation: Math.PI * 0.5,
+      duration: 2000,
+      ease: "Cubic.easeOut",
+      onComplete: () => {
+        this.destroy();
+      },
+    });
+  }
 }

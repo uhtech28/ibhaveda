@@ -11,6 +11,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { X, Lock, CheckCircle, Circle, Star } from "lucide-react";
+import { TaskSubmissionModal } from "./TaskSubmissionModal";
+import type { Id } from "@convex/_generated/dataModel";
 
 interface CheckpointModalProps {
   isOpen: boolean;
@@ -56,6 +58,16 @@ const TASK_DESCRIPTIONS = {
 };
 
 export function CheckpointModal({ isOpen, onClose, checkpoint }: CheckpointModalProps) {
+  const [selectedTask, setSelectedTask] = useState<{
+    id: Id<"ventureTasks">;
+    checkpointId: Id<"ventureCheckpoints">;
+    taskLevel: "t1" | "t2" | "t3";
+    title: string;
+    description: string;
+    toolType: string;
+    points: number;
+  } | null>(null);
+
   if (!checkpoint) return null;
 
   const stageName = STAGE_NAMES[checkpoint.stage - 1] || "Unknown";
@@ -65,6 +77,24 @@ export function CheckpointModal({ isOpen, onClose, checkpoint }: CheckpointModal
 
   const completedTasks = [checkpoint.t1, checkpoint.t2, checkpoint.t3].filter(Boolean).length;
   const totalPoints = (checkpoint.t1 ? 10 : 0) + (checkpoint.t2 ? 20 : 0) + (checkpoint.t3 ? 30 : 0);
+
+  const handleTaskClick = (taskLevel: "t1" | "t2" | "t3") => {
+    const taskData = TASK_DESCRIPTIONS[taskLevel];
+    setSelectedTask({
+      id: `${checkpoint.id}_${taskLevel}` as Id<"ventureTasks">, // Temporary - will be replaced with real task ID
+      checkpointId: checkpoint.id as Id<"ventureCheckpoints">,
+      taskLevel,
+      title: taskData.title,
+      description: taskData.description,
+      toolType: "write", // Default tool - will be enhanced later
+      points: taskData.points,
+    });
+  };
+
+  const handleSubmissionSuccess = () => {
+    // Refresh checkpoint data
+    window.location.reload(); // Simple refresh for now - can be optimized with proper state management
+  };
 
   return (
     <AnimatePresence>
@@ -173,6 +203,7 @@ export function CheckpointModal({ isOpen, onClose, checkpoint }: CheckpointModal
                     <TaskCard
                       task="t1"
                       completed={checkpoint.t1}
+                      onTaskClick={() => handleTaskClick("t1")}
                       {...TASK_DESCRIPTIONS.t1}
                     />
 
@@ -180,6 +211,7 @@ export function CheckpointModal({ isOpen, onClose, checkpoint }: CheckpointModal
                     <TaskCard
                       task="t2"
                       completed={checkpoint.t2}
+                      onTaskClick={() => handleTaskClick("t2")}
                       {...TASK_DESCRIPTIONS.t2}
                     />
 
@@ -187,6 +219,7 @@ export function CheckpointModal({ isOpen, onClose, checkpoint }: CheckpointModal
                     <TaskCard
                       task="t3"
                       completed={checkpoint.t3}
+                      onTaskClick={() => handleTaskClick("t3")}
                       {...TASK_DESCRIPTIONS.t3}
                     />
 
@@ -240,6 +273,14 @@ export function CheckpointModal({ isOpen, onClose, checkpoint }: CheckpointModal
               </div>
             </div>
           </motion.div>
+
+          {/* Task Submission Modal */}
+          <TaskSubmissionModal
+            isOpen={!!selectedTask}
+            onClose={() => setSelectedTask(null)}
+            task={selectedTask}
+            onSuccess={handleSubmissionSuccess}
+          />
         </>
       )}
     </AnimatePresence>
@@ -251,22 +292,25 @@ function TaskCard({
   title, 
   description, 
   points, 
-  completed 
+  completed,
+  onTaskClick 
 }: { 
   task: string;
   title: string;
   description: string;
   points: number;
   completed: boolean;
+  onTaskClick: () => void;
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
+      onClick={completed ? undefined : onTaskClick}
       className={`p-4 rounded-xl border-2 transition-all ${
         completed
           ? 'bg-green-500/10 border-green-500/30'
-          : 'bg-white/5 border-white/10 hover:border-white/20'
+          : 'bg-white/5 border-white/10 hover:border-white/20 cursor-pointer'
       }`}
     >
       <div className="flex items-start gap-4">
@@ -292,6 +336,11 @@ function TaskCard({
           <p className="text-sm text-gray-400">
             {description}
           </p>
+          {!completed && (
+            <button className="text-xs text-indigo-400 hover:text-indigo-300 mt-2 transition-colors">
+              Click to work on this task →
+            </button>
+          )}
         </div>
       </div>
     </motion.div>

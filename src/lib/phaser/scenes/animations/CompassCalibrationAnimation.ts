@@ -9,17 +9,46 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
   private needleGraphics!: Phaser.GameObjects.Graphics;
   private cardinalPoints: Phaser.GameObjects.Text[] = [];
   private indicatorRing!: Phaser.GameObjects.Arc;
+  private fogGraphics!: Phaser.GameObjects.Graphics;
+  private beamGraphics!: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, config: AnimationConfig) {
     super(scene, config);
   }
 
   create(): void {
+    this.createFog();
     this.createCompassBase();
     this.createCardinalPoints();
     this.createNeedle();
     this.createIndicatorRing();
+    if (this.config.variant === "gold") {
+      this.createDirectionalBeam();
+    }
     this.playCompassCalibration();
+  }
+
+  private createFog(): void {
+    this.fogGraphics = this.scene.add.graphics();
+    this.container.add(this.fogGraphics);
+
+    // Create fog overlay - cloudy mist covering the area
+    for (let i = 0; i < 15; i++) {
+      const angle = (i / 15) * Math.PI * 2;
+      const radius = 80 + Math.random() * 20;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      const size = 25 + Math.random() * 15;
+
+      this.fogGraphics.fillStyle(0xffffff, 0.15 + Math.random() * 0.1);
+      this.fogGraphics.fillCircle(x, y, size);
+    }
+
+    // Center fog cloud
+    this.fogGraphics.fillStyle(0xffffff, 0.25);
+    this.fogGraphics.fillCircle(0, 0, 70);
+
+    this.container.add(this.fogGraphics);
   }
 
   private createCompassBase(): void {
@@ -27,7 +56,7 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
     this.container.add(this.compassGraphics);
 
     const color = this.getPrimaryColor();
-    
+
     this.compassGraphics.fillStyle(0x1a1a2e, 0.9);
     this.compassGraphics.fillCircle(0, 0, 50);
 
@@ -41,16 +70,16 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
       const angle = (i / 8) * Math.PI * 2;
       const innerRadius = 38;
       const outerRadius = 42;
-      
+
       this.compassGraphics.lineStyle(2, this.getSecondaryColor(), 0.5);
       this.compassGraphics.beginPath();
       this.compassGraphics.moveTo(
         Math.cos(angle) * innerRadius,
-        Math.sin(angle) * innerRadius
+        Math.sin(angle) * innerRadius,
       );
       this.compassGraphics.lineTo(
         Math.cos(angle) * outerRadius,
-        Math.sin(angle) * outerRadius
+        Math.sin(angle) * outerRadius,
       );
       this.compassGraphics.strokePath();
     }
@@ -90,7 +119,7 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
 
     this.needleGraphics.fillStyle(0xff4444, 0.9);
     this.needleGraphics.fillTriangle(0, -30, -6, 0, 6, 0);
-    
+
     this.needleGraphics.fillStyle(0xffffff, 0.9);
     this.needleGraphics.fillTriangle(0, 30, -6, 0, 6, 0);
 
@@ -99,10 +128,25 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
   }
 
   private createIndicatorRing(): void {
-    this.indicatorRing = this.scene.add.arc(0, 0, 55, 0, 360, false, this.getGlowColor(), 0);
+    this.indicatorRing = this.scene.add.arc(
+      0,
+      0,
+      55,
+      0,
+      360,
+      false,
+      this.getGlowColor(),
+      0,
+    );
     this.indicatorRing.setStrokeStyle(3, this.getGlowColor(), 0);
     this.indicatorRing.setAlpha(0);
     this.container.add(this.indicatorRing);
+  }
+
+  private createDirectionalBeam(): void {
+    this.beamGraphics = this.scene.add.graphics();
+    this.beamGraphics.setAlpha(0);
+    this.container.add(this.beamGraphics);
   }
 
   private playCompassCalibration(): void {
@@ -120,7 +164,7 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
   private animateCardinalPoints(): void {
     this.cardinalPoints.forEach((point, index) => {
       const delay = index * 100;
-      
+
       this.scene.time.delayedCall(delay, () => {
         this.scene.tweens.add({
           targets: point,
@@ -151,7 +195,7 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
   private animateNeedleSpin(): void {
     const targetRotation = Math.PI * 4;
     let rotation = 0;
-    
+
     this.mainTween = this.scene.tweens.addCounter({
       from: 0,
       to: targetRotation,
@@ -160,9 +204,13 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
       onUpdate: (tween) => {
         rotation = tween.getValue() as number;
         this.needleGraphics.setRotation(rotation);
-        
+
         const intensity = Math.sin(rotation * 2) * 0.5 + 0.5;
-        this.indicatorRing.setStrokeStyle(3, this.getGlowColor(), intensity * 0.8);
+        this.indicatorRing.setStrokeStyle(
+          3,
+          this.getGlowColor(),
+          intensity * 0.8,
+        );
         this.indicatorRing.setAlpha(intensity);
       },
       onComplete: () => {
@@ -173,6 +221,15 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
   }
 
   private animateCalibrationComplete(): void {
+    // Lift the fog
+    this.scene.tweens.add({
+      targets: this.fogGraphics,
+      alpha: { from: 1, to: 0 },
+      y: { from: 0, to: -60 },
+      duration: 800,
+      ease: "Sine.easeOut",
+    });
+
     this.scene.tweens.add({
       targets: this.indicatorRing,
       scaleX: { from: 1, to: 1.3 },
@@ -182,6 +239,64 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
       ease: "Power2",
     });
 
+    if (this.config.variant === "gold") {
+      // Emit directional beam to next checkpoint
+      this.scene.time.delayedCall(400, () => {
+        this.animateDirectionalBeam();
+      });
+    } else {
+      this.finishAnimation();
+    }
+  }
+
+  private animateDirectionalBeam(): void {
+    // Beam points to the right (toward next checkpoint)
+    const beamLength = 150;
+
+    let currentLength = 0;
+
+    this.scene.tweens.add({
+      targets: this,
+      duration: 600,
+      ease: "Sine.easeOut",
+      onUpdate: (tween) => {
+        const progress = tween.progress;
+        currentLength = progress * beamLength;
+
+        this.beamGraphics.clear();
+
+        // Draw main beam with gradient effect
+        this.beamGraphics.fillStyle(this.getGlowColor(), 0.6);
+        this.beamGraphics.beginPath();
+        this.beamGraphics.moveTo(0, 0);
+        this.beamGraphics.lineTo(currentLength, -8);
+        this.beamGraphics.lineTo(currentLength, 8);
+        this.beamGraphics.closePath();
+        this.beamGraphics.fillPath();
+
+        // Draw beam particles
+        for (let i = 0; i < 5; i++) {
+          const particlePos = (currentLength / 5) * (i + 1);
+          const offset = Math.sin(Date.now() * 0.01 + i) * 4;
+          this.beamGraphics.fillStyle(0xffffff, 0.8);
+          this.beamGraphics.fillCircle(particlePos, offset, 3);
+        }
+      },
+      onComplete: () => {
+        this.scene.tweens.add({
+          targets: this.beamGraphics,
+          alpha: 0,
+          duration: 400,
+          delay: 200,
+        });
+        this.finishAnimation();
+      },
+    });
+
+    this.beamGraphics.setAlpha(1);
+  }
+
+  private finishAnimation(): void {
     this.scene.tweens.add({
       targets: this.container,
       scale: { from: 1, to: 1.15 },
@@ -202,7 +317,13 @@ export class CompassCalibrationAnimation extends BaseCheckpointAnimation {
     this.scene.tweens.killTweensOf(this.compassGraphics);
     this.scene.tweens.killTweensOf(this.needleGraphics);
     this.scene.tweens.killTweensOf(this.indicatorRing);
-    this.cardinalPoints.forEach(point => this.scene.tweens.killTweensOf(point));
+    this.scene.tweens.killTweensOf(this.fogGraphics);
+    if (this.beamGraphics) {
+      this.scene.tweens.killTweensOf(this.beamGraphics);
+    }
+    this.cardinalPoints.forEach((point) =>
+      this.scene.tweens.killTweensOf(point),
+    );
 
     this.scene.tweens.add({
       targets: this.container,
