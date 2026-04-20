@@ -778,121 +778,162 @@ export class WorldMapScene extends Phaser.Scene {
     const biomeContainer = this.add.container(biome.x, biome.y);
     this.backgroundLayer.add(biomeContainer);
 
-    // ── Layer 1: Biome base texture (organic, nature-themed) ────────────────
-    const textureKey = `biome_${biome.biomeType}`;
-    if (this.textures.exists(textureKey)) {
-      const base = this.add.tileSprite(
-        0,
-        0,
-        biome.width,
-        biome.height,
-        textureKey,
-      );
-      base.setOrigin(0, 0);
-      biomeContainer.add(base);
-    } else {
-      // Fallback to solid color if texture not loaded
-      const base = this.add.graphics();
-      const palette = BIOME_PALETTES[biome.biomeType];
-      base.fillStyle(palette?.primary ?? 0x2d5016, 1);
-      base.fillRect(0, 0, biome.width, biome.height);
-      biomeContainer.add(base);
+    // ── Layer 1: Premium glassmorphism card with depth ──────────────────────
+    const glassCard = this.add.graphics();
+    
+    // Multi-layer shadow for depth
+    glassCard.fillStyle(0x000000, 0.3);
+    glassCard.fillRoundedRect(8, 8, biome.width, biome.height, 16);
+    
+    // Main card with gradient
+    glassCard.fillGradientStyle(
+      0x1a1f35, 0x1a1f35, // Top: Dark with purple tint
+      0x0f1420, 0x0f1420, // Bottom: Darker
+      0.95 // High opacity for solid feel
+    );
+    glassCard.fillRoundedRect(0, 0, biome.width, biome.height, 16);
+    
+    // Inner highlight (top edge)
+    glassCard.fillGradientStyle(
+      0xffffff, 0xffffff,
+      0xffffff, 0xffffff,
+      0.08, 0.08, 0.02, 0.02
+    );
+    glassCard.fillRoundedRect(2, 2, biome.width - 4, biome.height / 3, 14);
+    
+    // Glowing border with theme color
+    glassCard.lineStyle(2, biome.pathColor, 0.6);
+    glassCard.strokeRoundedRect(1, 1, biome.width - 2, biome.height - 2, 15);
+    
+    // Outer subtle border
+    glassCard.lineStyle(1, biome.pathColor, 0.2);
+    glassCard.strokeRoundedRect(0, 0, biome.width, biome.height, 16);
+    
+    biomeContainer.add(glassCard);
+
+    // ── Layer 2: Animated accent line with glow ─────────────────────────────
+    const accentGlow = this.add.graphics();
+    
+    // Glow effect
+    for (let i = 0; i < 5; i++) {
+      const alpha = (5 - i) * 0.08;
+      accentGlow.lineStyle(6 + i * 2, biome.pathColor, alpha);
+      accentGlow.lineBetween(20, 0, biome.width - 20, 0);
     }
+    
+    // Main accent line
+    accentGlow.lineStyle(4, biome.pathColor, 0.9);
+    accentGlow.lineBetween(20, 0, biome.width - 20, 0);
+    
+    biomeContainer.add(accentGlow);
 
-    // ── Layer 2: Organic border (grass/sand edges, not straight lines) ──────
-    const borderGfx = this.add.graphics();
-    borderGfx.lineStyle(6, biome.pathColor, 0.4);
+    // ── Layer 3: Premium header card with depth ─────────────────────────────
+    const headerCard = this.add.graphics();
+    
+    // Header shadow
+    headerCard.fillStyle(0x000000, 0.2);
+    headerCard.fillRoundedRect(22, 17, biome.width - 44, 85, 12);
+    
+    // Header card with gradient
+    headerCard.fillGradientStyle(
+      0x1f2540, 0x1f2540, // Top
+      0x151a2e, 0x151a2e, // Bottom
+      0.9
+    );
+    headerCard.fillRoundedRect(20, 15, biome.width - 40, 85, 12);
+    
+    // Inner glow
+    headerCard.lineStyle(1, biome.pathColor, 0.4);
+    headerCard.strokeRoundedRect(21, 16, biome.width - 42, 83, 11);
+    
+    // Outer border
+    headerCard.lineStyle(1, biome.pathColor, 0.2);
+    headerCard.strokeRoundedRect(20, 15, biome.width - 40, 85, 12);
+    
+    biomeContainer.add(headerCard);
 
-    // Draw wavy organic border
-    borderGfx.beginPath();
-    borderGfx.moveTo(0, 0);
-
-    // Top edge with waves
-    for (let x = 0; x < biome.width; x += 20) {
-      const wave = Math.sin(x * 0.05) * 8;
-      borderGfx.lineTo(x, wave);
-    }
-    borderGfx.lineTo(biome.width, 0);
-
-    // Right edge
-    for (let y = 0; y < biome.height; y += 20) {
-      const wave = Math.sin(y * 0.05) * 8;
-      borderGfx.lineTo(biome.width + wave, y);
-    }
-
-    // Bottom edge
-    for (let x = biome.width; x >= 0; x -= 20) {
-      const wave = Math.sin(x * 0.05) * 8;
-      borderGfx.lineTo(x, biome.height + wave);
-    }
-
-    // Left edge
-    for (let y = biome.height; y >= 0; y -= 20) {
-      const wave = Math.sin(y * 0.05) * 8;
-      borderGfx.lineTo(wave, y);
-    }
-
-    borderGfx.closePath();
-    borderGfx.strokePath();
-    biomeContainer.add(borderGfx);
-
-    // ── Layer 3: Header banner (wooden sign style) ──────────────────────────
-    const headerBg = this.add.graphics();
-    headerBg.fillStyle(0x3e2723, 0.85);
-    headerBg.fillRoundedRect(20, 10, biome.width - 40, 70, 8);
-
-    // Wood grain effect
-    headerBg.lineStyle(2, 0x4e342e, 0.6);
-    for (let i = 0; i < 3; i++) {
-      headerBg.lineBetween(30, 25 + i * 20, biome.width - 30, 25 + i * 20);
-    }
-    biomeContainer.add(headerBg);
-
-    // ── Layer 4: Biome name and subtitle ────────────────────────────────────
-    const label = this.add.text(biome.width / 2, 20, biome.name, {
-      fontSize: "22px",
-      fontFamily: '"Georgia", serif',
-      color: "#FFE082",
-      fontStyle: "bold",
-      stroke: "#1a1a1a",
-      strokeThickness: 3,
-      letterSpacing: 1,
+    // ── Layer 4: Stage name with glow effect ────────────────────────────────
+    const labelGlow = this.add.text(biome.width / 2, 28, biome.name, {
+      fontSize: "26px",
+      fontFamily: '"Inter", "SF Pro Display", system-ui, sans-serif',
+      color: "#ffffff",
+      fontStyle: "900",
+      stroke: `#${biome.pathColor.toString(16).padStart(6, '0')}`,
+      strokeThickness: 6,
+      letterSpacing: 3,
+    });
+    labelGlow.setOrigin(0.5, 0);
+    labelGlow.setAlpha(0.4);
+    biomeContainer.add(labelGlow);
+    
+    const label = this.add.text(biome.width / 2, 28, biome.name, {
+      fontSize: "26px",
+      fontFamily: '"Inter", "SF Pro Display", system-ui, sans-serif',
+      color: "#F9FAFB",
+      fontStyle: "900",
+      strokeThickness: 0,
+      letterSpacing: 3,
     });
     label.setOrigin(0.5, 0);
     biomeContainer.add(label);
 
-    const biomeName = this.add.text(biome.width / 2, 45, biome.biomeName, {
+    const biomeName = this.add.text(biome.width / 2, 58, biome.biomeName, {
       fontSize: "16px",
-      fontFamily: '"Georgia", serif',
-      color: "#BCAAA4",
-      fontStyle: "italic",
-      stroke: "#000000",
-      strokeThickness: 2,
+      fontFamily: '"Inter", system-ui, sans-serif',
+      color: "#A5B4FC",
+      fontStyle: "600",
+      strokeThickness: 0,
+      letterSpacing: 1,
     });
     biomeName.setOrigin(0.5, 0);
     biomeContainer.add(biomeName);
 
-    const subtitle = this.add.text(biome.width / 2, 65, biome.subtitle, {
-      fontSize: "11px",
-      fontFamily: "Arial, sans-serif",
-      color: "rgba(255,255,255,0.75)",
-      stroke: "#000000",
-      strokeThickness: 1,
+    const subtitle = this.add.text(biome.width / 2, 80, biome.subtitle, {
+      fontSize: "12px",
+      fontFamily: '"Inter", system-ui, sans-serif',
+      color: "rgba(156, 163, 175, 0.9)",
+      strokeThickness: 0,
+      letterSpacing: 0.5,
     });
     subtitle.setOrigin(0.5, 0);
     biomeContainer.add(subtitle);
 
-    // ── Layer 5: Large background icon (biome emoji) ────────────────────────
-    const icon = this.add.text(
-      biome.width / 2,
-      biome.height / 2 + 40,
-      biome.icon,
-      {
-        fontSize: "96px",
-      },
-    );
+    // ── Layer 5: Large background icon with premium glow ────────────────────
+    const iconGlow = this.add.graphics();
+    const iconX = biome.width / 2;
+    const iconY = biome.height / 2 + 60;
+    
+    // Multi-layer radial glow
+    for (let r = 180; r > 0; r -= 12) {
+      const alpha = (1 - r / 180) * 0.12;
+      iconGlow.fillStyle(biome.pathColor, alpha);
+      iconGlow.fillCircle(iconX, iconY, r);
+    }
+    
+    // Bright center glow
+    for (let r = 80; r > 0; r -= 8) {
+      const alpha = (1 - r / 80) * 0.2;
+      iconGlow.fillStyle(0xffffff, alpha);
+      iconGlow.fillCircle(iconX, iconY, r);
+    }
+    
+    biomeContainer.add(iconGlow);
+    
+    // Icon shadow
+    const iconShadow = this.add.text(iconX + 3, iconY + 3, biome.icon, {
+      fontSize: "110px",
+    });
+    iconShadow.setOrigin(0.5);
+    iconShadow.setAlpha(0.3);
+    iconShadow.setTint(0x000000);
+    biomeContainer.add(iconShadow);
+    
+    // Main icon
+    const icon = this.add.text(iconX, iconY, biome.icon, {
+      fontSize: "110px",
+    });
     icon.setOrigin(0.5);
-    icon.setAlpha(0.12);
+    icon.setAlpha(0.25);
     biomeContainer.add(icon);
 
     // ── Layer 6: Biome decorations (trees, rocks, etc.) ─────────────────────
@@ -907,7 +948,8 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   /**
-   * Add biome-specific decorations (trees, rocks, crystals, etc.)
+   * Add modern tech-themed decorations (data nodes, connection lines, etc.)
+   * Matches Interactive Ideas platform aesthetic
    */
   private addBiomeDecorations(
     container: Phaser.GameObjects.Container,
@@ -915,98 +957,138 @@ export class WorldMapScene extends Phaser.Scene {
   ): void {
     const gfx = this.add.graphics();
 
-    // Add decorations based on biome type
+    // Add modern decorations based on biome type
     switch (biome.biomeType) {
-      case "forest":
-        // Trees
-        for (let i = 0; i < 8; i++) {
-          const x = Math.random() * biome.width;
-          const y = Math.random() * biome.height;
-          gfx.fillStyle(0x4a7c2f, 0.6);
-          gfx.fillCircle(x, y, 15);
-          gfx.fillStyle(0x6b4423, 0.8);
-          gfx.fillRect(x - 3, y + 10, 6, 15);
-        }
-        break;
-
-      case "desert":
-        // Rocks
+      case "ideation":
+        // Floating idea nodes with connections
+        const nodes: { x: number; y: number }[] = [];
         for (let i = 0; i < 12; i++) {
           const x = Math.random() * biome.width;
-          const y = Math.random() * biome.height;
-          gfx.fillStyle(0x8b7355, 0.7);
-          gfx.fillRect(x, y, 8 + Math.random() * 8, 8 + Math.random() * 8);
+          const y = 120 + Math.random() * (biome.height - 140);
+          nodes.push({ x, y });
+          
+          // Node circle
+          gfx.fillStyle(0x6366f1, 0.3);
+          gfx.fillCircle(x, y, 8);
+          gfx.fillStyle(0x6366f1, 0.6);
+          gfx.fillCircle(x, y, 4);
+        }
+        
+        // Connection lines between nearby nodes
+        gfx.lineStyle(1, 0x6366f1, 0.15);
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const dist = Math.sqrt(
+              Math.pow(nodes[i].x - nodes[j].x, 2) +
+              Math.pow(nodes[i].y - nodes[j].y, 2)
+            );
+            if (dist < 150) {
+              gfx.lineBetween(nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y);
+            }
+          }
         }
         break;
 
-      case "dungeon":
-        // Torches
-        for (let i = 0; i < 6; i++) {
-          const x = 50 + i * (biome.width / 6);
-          const y = 100;
-          gfx.fillStyle(0x3a3a4a, 1);
-          gfx.fillRect(x - 2, y, 4, 25);
-          gfx.fillStyle(0xff6f00, 0.7);
-          gfx.fillCircle(x, y - 5, 6);
-        }
-        break;
-
-      case "tundra":
-        // Ice crystals
+      case "research":
+        // Data visualization bars
         for (let i = 0; i < 10; i++) {
-          const x = Math.random() * biome.width;
-          const y = Math.random() * biome.height;
-          gfx.fillStyle(0x7fb3d5, 0.6);
-          gfx.fillRect(x, y, 4, 8);
-          gfx.fillRect(x - 2, y + 4, 8, 4);
+          const x = 80 + i * (biome.width / 11);
+          const height = 40 + Math.random() * 80;
+          const y = biome.height - 100;
+          
+          gfx.fillStyle(0x10b981, 0.3);
+          gfx.fillRoundedRect(x - 15, y - height, 30, height, 4);
+          gfx.lineStyle(2, 0x10b981, 0.6);
+          gfx.strokeRoundedRect(x - 15, y - height, 30, height, 4);
         }
         break;
 
-      case "mine":
-        // Gem veins
+      case "validation":
+        // Checkmark patterns
+        for (let i = 0; i < 8; i++) {
+          const x = Math.random() * biome.width;
+          const y = 120 + Math.random() * (biome.height - 140);
+          
+          gfx.lineStyle(3, 0x8b5cf6, 0.4);
+          gfx.beginPath();
+          gfx.moveTo(x - 10, y);
+          gfx.lineTo(x - 3, y + 7);
+          gfx.lineTo(x + 10, y - 10);
+          gfx.strokePath();
+        }
+        break;
+
+      case "design":
+        // Design grid patterns
+        gfx.lineStyle(1, 0xf59e0b, 0.2);
+        for (let x = 50; x < biome.width - 50; x += 60) {
+          for (let y = 120; y < biome.height - 50; y += 60) {
+            gfx.strokeRect(x, y, 50, 50);
+          }
+        }
+        break;
+
+      case "development":
+        // Code brackets
         for (let i = 0; i < 15; i++) {
           const x = Math.random() * biome.width;
-          const y = Math.random() * biome.height;
-          gfx.fillStyle(0xffa726, 0.5);
-          gfx.fillCircle(x, y, 8);
-          gfx.fillStyle(0xff6f00, 1);
-          gfx.fillRect(x - 2, y - 2, 4, 4);
+          const y = 120 + Math.random() * (biome.height - 140);
+          
+          gfx.lineStyle(2, 0x3b82f6, 0.4);
+          // Left bracket
+          gfx.beginPath();
+          gfx.moveTo(x, y - 8);
+          gfx.lineTo(x - 5, y - 8);
+          gfx.lineTo(x - 5, y + 8);
+          gfx.lineTo(x, y + 8);
+          gfx.strokePath();
+          
+          // Right bracket
+          gfx.beginPath();
+          gfx.moveTo(x + 20, y - 8);
+          gfx.lineTo(x + 25, y - 8);
+          gfx.lineTo(x + 25, y + 8);
+          gfx.lineTo(x + 20, y + 8);
+          gfx.strokePath();
         }
         break;
 
-      case "harbour":
-        // Barrels and crates
-        for (let i = 0; i < 8; i++) {
-          const x = 50 + Math.random() * (biome.width - 100);
-          const y = 150 + Math.random() * (biome.height - 200);
-          gfx.fillStyle(0x795548, 0.8);
-          gfx.fillRect(x, y, 20, 25);
-          gfx.lineStyle(1, 0x3e2723, 1);
-          gfx.strokeRect(x, y, 20, 25);
-        }
-        break;
-
-      case "floatingIsle":
-        // Rune stones
+      case "launch":
+        // Rocket trails
         for (let i = 0; i < 6; i++) {
-          const x = Math.random() * biome.width;
-          const y = Math.random() * biome.height;
-          gfx.fillStyle(0x9e9e9e, 0.7);
-          gfx.fillRect(x, y, 12, 18);
-          gfx.fillStyle(0xb39ddb, 0.6);
-          gfx.fillCircle(x + 6, y + 9, 4);
+          const x = 100 + i * (biome.width / 7);
+          const y = biome.height - 80;
+          
+          gfx.lineStyle(3, 0xef4444, 0.5);
+          gfx.lineBetween(x, y, x - 10, y + 30);
+          gfx.lineStyle(2, 0xfbbf24, 0.6);
+          gfx.lineBetween(x + 5, y, x - 5, y + 25);
         }
         break;
 
-      case "capital":
-        // Golden pillars
-        for (let i = 0; i < 5; i++) {
-          const x = 100 + i * (biome.width / 5);
-          const y = biome.height - 80;
-          gfx.fillStyle(0xffd54f, 0.8);
-          gfx.fillRect(x - 8, y, 16, 60);
-          gfx.fillStyle(0xffb300, 1);
-          gfx.fillRect(x - 10, y - 5, 20, 5);
+      case "growth":
+        // Growth arrows
+        for (let i = 0; i < 10; i++) {
+          const x = Math.random() * biome.width;
+          const y = 150 + Math.random() * (biome.height - 180);
+          
+          gfx.lineStyle(2, 0x06b6d4, 0.5);
+          gfx.lineBetween(x, y + 20, x, y);
+          // Arrow head
+          gfx.lineBetween(x, y, x - 5, y + 8);
+          gfx.lineBetween(x, y, x + 5, y + 8);
+        }
+        break;
+
+      case "scale":
+        // Star patterns (success)
+        for (let i = 0; i < 12; i++) {
+          const x = Math.random() * biome.width;
+          const y = 120 + Math.random() * (biome.height - 140);
+          const size = 6 + Math.random() * 4;
+          
+          gfx.fillStyle(0xfbbf24, 0.5);
+          gfx.fillStar(x, y, 5, size, size * 0.5);
         }
         break;
     }
@@ -1064,119 +1146,276 @@ export class WorldMapScene extends Phaser.Scene {
    * - Foreground (1.0x, no parallax): Bright stars with sparkles
    */
   /**
-   * Create adventure-themed background with sky, clouds, and mountains
+   * Create premium game-like background with stunning visuals
+   * Theme: Deep space with nebula clouds, stars, and dynamic lighting
    */
   private createAdventureBackground(): void {
-    // === BACKGROUND LAYER (0.3x parallax - furthest) ===
-    // Sky gradient - changes from dawn to dusk based on progress
-    const bg = this.add.graphics();
+    // === LAYER 1: Deep Space Base (Darkest) ===
+    const deepSpace = this.add.graphics();
+    
+    // Rich gradient from deep purple to dark blue
+    deepSpace.fillGradientStyle(
+      0x0f0520, // Top: Very dark purple
+      0x0f0520,
+      0x0a0d1f, // Bottom: Dark blue-black
+      0x1a1535, // Bottom right: Purple tint
+      1
+    );
+    deepSpace.fillRect(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
+    deepSpace.setDepth(-200);
+    this.backgroundLayer.add(deepSpace);
 
-    // Sky gradient (blue to lighter blue)
-    bg.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xe0f6ff, 0xe0f6ff, 1);
-    bg.fillRect(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
+    // === LAYER 2: Nebula Clouds (Massive, Colorful) ===
+    const nebulaClouds = this.add.graphics();
+    
+    // Create 5 large nebula formations
+    const nebulaColors = [
+      { color: 0x6366f1, x: 0.15, y: 0.3 },      // Indigo
+      { color: 0x8b5cf6, x: 0.35, y: 0.6 },      // Purple
+      { color: 0xa855f7, x: 0.55, y: 0.4 },      // Bright purple
+      { color: 0x4f46e5, x: 0.75, y: 0.5 },      // Deep indigo
+      { color: 0x7c3aed, x: 0.90, y: 0.35 },     // Violet
+    ];
 
-    bg.setDepth(-200);
-    this.backgroundLayer.add(bg);
+    nebulaColors.forEach((nebula) => {
+      const centerX = this.MAP_WIDTH * nebula.x;
+      const centerY = this.MAP_HEIGHT * nebula.y;
+      
+      // Create massive nebula cloud with multiple layers
+      for (let layer = 0; layer < 5; layer++) {
+        const radius = 400 + layer * 120;
+        const segments = 32;
+        
+        for (let i = 0; i < segments; i++) {
+          const angle = (i / segments) * Math.PI * 2;
+          const nextAngle = ((i + 1) / segments) * Math.PI * 2;
+          
+          // Irregular cloud shape
+          const variation = Math.sin(angle * 3) * 80 + Math.cos(angle * 5) * 60;
+          const r = radius + variation;
+          
+          const x1 = centerX + Math.cos(angle) * r;
+          const y1 = centerY + Math.sin(angle) * r;
+          const x2 = centerX + Math.cos(nextAngle) * r;
+          const y2 = centerY + Math.sin(nextAngle) * r;
+          
+          const alpha = (0.12 - layer * 0.02) * (1 - i / segments * 0.3);
+          nebulaClouds.fillStyle(nebula.color, alpha);
+          nebulaClouds.fillTriangle(centerX, centerY, x1, y1, x2, y2);
+        }
+      }
+    });
+    
+    nebulaClouds.setDepth(-190);
+    this.backgroundLayer.add(nebulaClouds);
 
-    // Distant mountains (furthest layer - 0.3x parallax)
-    const distantMountains = this.add.graphics();
-    distantMountains.fillStyle(0x5a6d7e, 0.4);
-
-    for (let x = 0; x < this.MAP_WIDTH; x += 400) {
-      const height = 200 + Math.random() * 150;
-      distantMountains.beginPath();
-      distantMountains.moveTo(x, this.MAP_HEIGHT);
-      distantMountains.lineTo(x + 200, this.MAP_HEIGHT - height);
-      distantMountains.lineTo(x + 400, this.MAP_HEIGHT);
-      distantMountains.closePath();
-      distantMountains.fillPath();
+    // === LAYER 3: Star Field (Thousands of Stars) ===
+    const starField = this.add.graphics();
+    
+    // Small distant stars
+    for (let i = 0; i < 800; i++) {
+      const x = Math.random() * this.MAP_WIDTH;
+      const y = Math.random() * this.MAP_HEIGHT;
+      const size = Math.random() * 1.5 + 0.5;
+      const alpha = Math.random() * 0.6 + 0.2;
+      
+      starField.fillStyle(0xffffff, alpha);
+      starField.fillCircle(x, y, size);
     }
-
-    distantMountains.setDepth(-190);
-    this.backgroundLayer.add(distantMountains);
-
-    // High clouds (background layer)
-    const distantClouds = this.add.graphics();
-    distantClouds.fillStyle(0xffffff, 0.3);
+    
+    // Medium bright stars
+    for (let i = 0; i < 200; i++) {
+      const x = Math.random() * this.MAP_WIDTH;
+      const y = Math.random() * this.MAP_HEIGHT;
+      const size = Math.random() * 2 + 1;
+      const alpha = Math.random() * 0.8 + 0.3;
+      
+      starField.fillStyle(0xffffff, alpha);
+      starField.fillCircle(x, y, size);
+      
+      // Add glow to some stars
+      if (Math.random() > 0.7) {
+        starField.fillStyle(0x818cf8, alpha * 0.3);
+        starField.fillCircle(x, y, size * 3);
+      }
+    }
+    
+    // Large prominent stars with cross flare
     for (let i = 0; i < 50; i++) {
       const x = Math.random() * this.MAP_WIDTH;
-      const y = Math.random() * (this.MAP_HEIGHT * 0.4);
-      const size = Math.random() * 40 + 30;
-      distantClouds.fillEllipse(x, y, size * 2, size);
-      distantClouds.fillEllipse(x + size, y, size * 1.5, size * 0.8);
+      const y = Math.random() * this.MAP_HEIGHT;
+      const size = Math.random() * 3 + 2;
+      
+      // Star core
+      starField.fillStyle(0xffffff, 0.9);
+      starField.fillCircle(x, y, size);
+      
+      // Glow
+      starField.fillStyle(0xa5b4fc, 0.4);
+      starField.fillCircle(x, y, size * 2.5);
+      
+      // Cross flare
+      starField.fillStyle(0xffffff, 0.6);
+      starField.fillRect(x - size * 4, y - 0.5, size * 8, 1);
+      starField.fillRect(x - 0.5, y - size * 4, 1, size * 8);
     }
-    distantClouds.setDepth(-180);
-    this.backgroundLayer.add(distantClouds);
+    
+    starField.setDepth(-180);
+    this.backgroundLayer.add(starField);
+
+    // === LAYER 4: Cosmic Dust Particles ===
+    const cosmicDust = this.add.graphics();
+    
+    for (let i = 0; i < 300; i++) {
+      const x = Math.random() * this.MAP_WIDTH;
+      const y = Math.random() * this.MAP_HEIGHT;
+      const size = Math.random() * 2 + 0.5;
+      const alpha = Math.random() * 0.15 + 0.05;
+      
+      const colors = [0x6366f1, 0x8b5cf6, 0xa855f7, 0x818cf8];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      
+      cosmicDust.fillStyle(color, alpha);
+      cosmicDust.fillCircle(x, y, size);
+    }
+    
+    cosmicDust.setDepth(-170);
+    this.backgroundLayer.add(cosmicDust);
 
     // === MIDGROUND LAYER (0.6x parallax - medium distance) ===
-    // Mid-range mountains
-    const midMountains = this.add.graphics();
-    midMountains.fillStyle(0x6b8e9e, 0.6);
-
-    for (let x = 0; x < this.MAP_WIDTH; x += 350) {
-      const height = 250 + Math.random() * 200;
-      midMountains.beginPath();
-      midMountains.moveTo(x, this.MAP_HEIGHT);
-      midMountains.lineTo(x + 175, this.MAP_HEIGHT - height);
-      midMountains.lineTo(x + 350, this.MAP_HEIGHT);
-      midMountains.closePath();
-      midMountains.fillPath();
-    }
-
-    midMountains.setDepth(-100);
-    this.midgroundLayer.add(midMountains);
-
-    // Medium clouds
-    const midClouds = this.add.graphics();
-    midClouds.fillStyle(0xffffff, 0.5);
-    for (let i = 0; i < 40; i++) {
+    // Floating energy orbs with trails
+    const energyOrbs = this.add.graphics();
+    
+    for (let i = 0; i < 60; i++) {
       const x = Math.random() * this.MAP_WIDTH;
-      const y = Math.random() * (this.MAP_HEIGHT * 0.5);
-      const size = Math.random() * 50 + 40;
-      midClouds.fillEllipse(x, y, size * 2, size);
-      midClouds.fillEllipse(x + size * 0.7, y - 10, size * 1.8, size * 0.9);
-      midClouds.fillEllipse(x - size * 0.5, y + 5, size * 1.5, size * 0.7);
+      const y = Math.random() * this.MAP_HEIGHT;
+      const size = Math.random() * 8 + 4;
+      const alpha = Math.random() * 0.4 + 0.2;
+      
+      const colors = [0x6366f1, 0x8b5cf6, 0xa855f7, 0x818cf8];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      
+      // Outer glow
+      for (let r = size * 3; r > 0; r -= 2) {
+        const glowAlpha = alpha * (1 - r / (size * 3)) * 0.3;
+        energyOrbs.fillStyle(color, glowAlpha);
+        energyOrbs.fillCircle(x, y, r);
+      }
+      
+      // Core
+      energyOrbs.fillStyle(color, alpha);
+      energyOrbs.fillCircle(x, y, size);
+      
+      // Bright center
+      energyOrbs.fillStyle(0xffffff, alpha * 0.8);
+      energyOrbs.fillCircle(x, y, size * 0.4);
     }
-    midClouds.setDepth(-90);
-    this.midgroundLayer.add(midClouds);
+    
+    energyOrbs.setDepth(-100);
+    this.midgroundLayer.add(energyOrbs);
+
+    // Constellation lines (connecting bright points)
+    const constellations = this.add.graphics();
+    const constellationPoints: { x: number; y: number }[] = [];
+    
+    // Create constellation nodes
+    for (let i = 0; i < 25; i++) {
+      const x = Math.random() * this.MAP_WIDTH;
+      const y = Math.random() * this.MAP_HEIGHT;
+      constellationPoints.push({ x, y });
+      
+      // Draw node
+      constellations.fillStyle(0x818cf8, 0.6);
+      constellations.fillCircle(x, y, 3);
+      constellations.fillStyle(0xa5b4fc, 0.3);
+      constellations.fillCircle(x, y, 6);
+    }
+    
+    // Connect nearby points
+    constellations.lineStyle(1, 0x6366f1, 0.15);
+    for (let i = 0; i < constellationPoints.length; i++) {
+      for (let j = i + 1; j < constellationPoints.length; j++) {
+        const dist = Math.sqrt(
+          Math.pow(constellationPoints[i].x - constellationPoints[j].x, 2) +
+          Math.pow(constellationPoints[i].y - constellationPoints[j].y, 2)
+        );
+        
+        if (dist < 300) {
+          constellations.lineBetween(
+            constellationPoints[i].x,
+            constellationPoints[i].y,
+            constellationPoints[j].x,
+            constellationPoints[j].y
+          );
+        }
+      }
+    }
+    
+    constellations.setDepth(-90);
+    this.midgroundLayer.add(constellations);
 
     // === FOREGROUND LAYER (1.0x - closest elements, no parallax) ===
-    // Foreground hills (at ground level with biomes)
-    const foregroundHills = this.add.graphics();
-    foregroundHills.fillStyle(0x4a7c2f, 0.3);
-
-    for (let x = 0; x < this.MAP_WIDTH; x += 300) {
-      const height = 100 + Math.random() * 80;
-      foregroundHills.beginPath();
-      foregroundHills.moveTo(x, this.MAP_HEIGHT);
-      foregroundHills.lineTo(x + 150, this.MAP_HEIGHT - height);
-      foregroundHills.lineTo(x + 300, this.MAP_HEIGHT);
-      foregroundHills.closePath();
-      foregroundHills.fillPath();
+    // Atmospheric light rays (god rays effect)
+    const lightRays = this.add.graphics();
+    
+    for (let i = 0; i < 8; i++) {
+      const x = (i * this.MAP_WIDTH) / 7;
+      const y = -100;
+      const angle = (Math.random() - 0.5) * 0.3;
+      const width = 150 + Math.random() * 100;
+      const height = this.MAP_HEIGHT + 200;
+      
+      // Create light ray with gradient
+      for (let j = 0; j < 10; j++) {
+        const alpha = (0.08 - j * 0.008) * (1 - i / 8 * 0.3);
+        const offset = j * 15;
+        
+        lightRays.fillStyle(0x6366f1, alpha);
+        lightRays.save();
+        lightRays.translateCanvas(x, y);
+        lightRays.rotateCanvas(angle);
+        lightRays.fillRect(-width / 2 - offset, 0, width + offset * 2, height);
+        lightRays.restore();
+      }
     }
+    
+    lightRays.setDepth(-50);
+    this.gameLayer.add(lightRays);
 
-    foregroundHills.setDepth(-50);
-    this.gameLayer.add(foregroundHills);
-
-    // Birds in the sky
-    const birds = this.add.graphics();
-    birds.lineStyle(2, 0x000000, 0.6);
-    for (let i = 0; i < 15; i++) {
+    // Floating sparkles (closest layer)
+    const sparkles = this.add.graphics();
+    
+    for (let i = 0; i < 100; i++) {
       const x = Math.random() * this.MAP_WIDTH;
-      const y = Math.random() * (this.MAP_HEIGHT * 0.3);
-      // Simple 'V' shape for birds
-      birds.beginPath();
-      birds.moveTo(x - 5, y);
-      birds.lineTo(x, y - 3);
-      birds.lineTo(x + 5, y);
-      birds.strokePath();
+      const y = Math.random() * this.MAP_HEIGHT;
+      const size = Math.random() * 2 + 1;
+      const alpha = Math.random() * 0.6 + 0.3;
+      
+      // Diamond sparkle shape
+      sparkles.fillStyle(0xffffff, alpha);
+      sparkles.fillTriangle(
+        x, y - size * 2,
+        x - size, y,
+        x, y + size * 2
+      );
+      sparkles.fillTriangle(
+        x, y - size * 2,
+        x + size, y,
+        x, y + size * 2
+      );
+      
+      // Glow
+      sparkles.fillStyle(0xa5b4fc, alpha * 0.3);
+      sparkles.fillCircle(x, y, size * 2);
     }
-    birds.setDepth(-40);
-    this.gameLayer.add(birds);
+    
+    sparkles.setDepth(-40);
+    this.gameLayer.add(sparkles);
   }
 
   /**
-   * Create organic dirt/grass path connecting biomes (adventure style)
+   * Create modern connection path between biomes (tech aesthetic)
+   * Smooth gradient lines with glow effects
    */
   private createAdventurePath(): void {
     const pathGraphics = this.add.graphics();
@@ -1189,12 +1428,12 @@ export class WorldMapScene extends Phaser.Scene {
       pathColor: biome.pathColor,
     }));
 
-    // Draw organic path between consecutive biomes
+    // Draw modern connection lines between consecutive biomes
     for (let i = 0; i < biomeCenters.length - 1; i++) {
       const start = biomeCenters[i];
       const end = biomeCenters[i + 1];
 
-      this.drawOrganicPath(
+      this.drawModernPath(
         pathGraphics,
         start.x,
         start.y,
@@ -1209,9 +1448,9 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   /**
-   * Draw organic dirt path with natural edges (adventure style)
+   * Draw modern tech-style path with glow effect
    */
-  private drawOrganicPath(
+  private drawModernPath(
     graphics: Phaser.GameObjects.Graphics,
     x1: number,
     y1: number,
@@ -1220,76 +1459,81 @@ export class WorldMapScene extends Phaser.Scene {
     color: number,
   ): void {
     const distance = Phaser.Math.Distance.Between(x1, y1, x2, y2);
-    const segments = Math.floor(distance / 40);
+    const segments = Math.floor(distance / 30);
 
-    // Path base (dirt)
-    graphics.fillStyle(color, 0.8);
-
-    for (let i = 0; i <= segments; i++) {
+    // Outer glow
+    graphics.lineStyle(12, color, 0.08);
+    graphics.beginPath();
+    graphics.moveTo(x1, y1);
+    
+    for (let i = 1; i <= segments; i++) {
       const t = i / segments;
       const x = x1 + (x2 - x1) * t;
       const y = y1 + (y2 - y1) * t;
-
-      // Natural wave variation
-      const wave = Math.sin(t * Math.PI * 4) * 15;
+      
+      // Subtle curve for visual interest
+      const curve = Math.sin(t * Math.PI) * 20;
       const perpX = -(y2 - y1) / distance;
       const perpY = (x2 - x1) / distance;
-
-      // Draw path segment with organic width
-      const width = 25 + Math.sin(t * Math.PI * 8) * 5;
-      graphics.fillEllipse(
-        x + perpX * wave,
-        y + perpY * wave,
-        width,
-        width * 0.6,
-      );
+      
+      graphics.lineTo(x + perpX * curve, y + perpY * curve);
     }
+    
+    graphics.strokePath();
 
-    // Add edge grass tufts
-    graphics.fillStyle(0x4a7c2f, 0.5);
-    for (let i = 0; i <= segments; i++) {
+    // Middle glow
+    graphics.lineStyle(6, color, 0.15);
+    graphics.beginPath();
+    graphics.moveTo(x1, y1);
+    
+    for (let i = 1; i <= segments; i++) {
       const t = i / segments;
       const x = x1 + (x2 - x1) * t;
       const y = y1 + (y2 - y1) * t;
-
-      const wave = Math.sin(t * Math.PI * 4) * 15;
+      const curve = Math.sin(t * Math.PI) * 20;
       const perpX = -(y2 - y1) / distance;
       const perpY = (x2 - x1) / distance;
-
-      // Random grass on edges
-      if (Math.random() > 0.7) {
-        graphics.fillRect(
-          x + perpX * (wave + 20),
-          y + perpY * (wave + 20),
-          3,
-          6,
-        );
-      }
-      if (Math.random() > 0.7) {
-        graphics.fillRect(
-          x + perpX * (wave - 20),
-          y + perpY * (wave - 20),
-          3,
-          6,
-        );
-      }
+      graphics.lineTo(x + perpX * curve, y + perpY * curve);
     }
+    
+    graphics.strokePath();
 
-    // Add pebbles along path
-    graphics.fillStyle(0x5a3a1a, 0.7);
-    for (let i = 0; i < distance / 60; i++) {
+    // Core line
+    graphics.lineStyle(2, color, 0.5);
+    graphics.beginPath();
+    graphics.moveTo(x1, y1);
+    
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const x = x1 + (x2 - x1) * t;
+      const y = y1 + (y2 - y1) * t;
+      const curve = Math.sin(t * Math.PI) * 20;
+      const perpX = -(y2 - y1) / distance;
+      const perpY = (x2 - x1) / distance;
+      graphics.lineTo(x + perpX * curve, y + perpY * curve);
+    }
+    
+    graphics.strokePath();
+
+    // Add data nodes along the path
+    for (let i = 0; i < distance / 100; i++) {
       const t = Math.random();
       const x = x1 + (x2 - x1) * t;
       const y = y1 + (y2 - y1) * t;
-      const wave = Math.sin(t * Math.PI * 4) * 15;
+      const curve = Math.sin(t * Math.PI) * 20;
       const perpX = -(y2 - y1) / distance;
       const perpY = (x2 - x1) / distance;
-
-      graphics.fillCircle(
-        x + perpX * wave + (Math.random() - 0.5) * 20,
-        y + perpY * wave + (Math.random() - 0.5) * 20,
-        Math.random() * 3 + 1,
-      );
+      
+      const nodeX = x + perpX * curve;
+      const nodeY = y + perpY * curve;
+      
+      // Node glow
+      graphics.fillStyle(color, 0.2);
+      graphics.fillCircle(nodeX, nodeY, 8);
+      
+      // Node core
+      graphics.fillStyle(color, 0.6);
+      graphics.fillCircle(nodeX, nodeY, 4);
     }
   }
 

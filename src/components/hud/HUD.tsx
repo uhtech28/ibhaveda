@@ -130,9 +130,9 @@ export function HUD() {
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            className="absolute left-4 top-full mt-2 flex items-center gap-2 px-3 py-1.5 bg-[#1a1a2e] rounded-lg border border-white/10"
+            className="absolute left-4 top-full mt-2 flex items-center gap-2 px-3 py-1.5 bg-slate-900/60 backdrop-blur-md rounded-lg border border-white/10 shadow-[0_4px_15px_rgba(0,0,0,0.3)]"
           >
-            <Sparkles className="w-4 h-4 text-[#6366f1]" />
+            <Sparkles className="w-4 h-4 text-indigo-400 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]" />
             <span className="text-sm text-white font-medium truncate max-w-[150px]">
               {activeVenture.name}
             </span>
@@ -143,9 +143,9 @@ export function HUD() {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="absolute right-4 top-full mt-2 flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-[#f59e0b] to-[#d97706] rounded-lg"
+            className="absolute right-4 top-full mt-2 flex items-center gap-2 px-3 py-1.5 bg-indigo-500/20 backdrop-blur-md border border-indigo-400/30 rounded-lg shadow-[0_4px_15px_rgba(99,102,241,0.2)]"
           >
-            <Crown className="w-4 h-4 text-white" />
+            <Crown className="w-4 h-4 text-indigo-400 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]" />
             <span className="text-sm text-white font-semibold">Mentor</span>
           </motion.div>
         )}

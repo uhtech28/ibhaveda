@@ -80,7 +80,7 @@ const STAGES: Stage[] = [
     name: "Ideation",
     biome: "The Village",
     mini: "Fog of Vagueness",
-    glow: "#C9A84C",
+    glow: "#818cf8", // Indigo 400
     checkpoints: 4,
     icon: "💡",
   },
@@ -89,7 +89,7 @@ const STAGES: Stage[] = [
     name: "Research",
     biome: "The Forest",
     mini: "Pathwarden Wraith",
-    glow: "#4ADE80",
+    glow: "#a78bfa", // Violet 400
     checkpoints: 5,
     icon: "🔬",
   },
@@ -98,7 +98,7 @@ const STAGES: Stage[] = [
     name: "Validation",
     biome: "The Arena",
     mini: "Advocate of Comfortable Lies",
-    glow: "#F97316",
+    glow: "#6366f1", // Indigo 500
     checkpoints: 4,
     icon: "⚔️",
   },
@@ -107,7 +107,7 @@ const STAGES: Stage[] = [
     name: "Offer Design",
     biome: "Artisan's Quarter",
     mini: "Unfinished Golem",
-    glow: "#94A3B8",
+    glow: "#8b5cf6", // Violet 500
     checkpoints: 5,
     icon: "🎨",
   },
@@ -116,7 +116,7 @@ const STAGES: Stage[] = [
     name: "Build & Deliver",
     biome: "The Mine",
     mini: "Collapse Specter",
-    glow: "#FBBF24",
+    glow: "#a855f7", // Purple 500
     checkpoints: 6,
     icon: "⚙️",
   },
@@ -125,7 +125,7 @@ const STAGES: Stage[] = [
     name: "Launch",
     biome: "The Harbour",
     mini: "Harbourmaster of Hesitation",
-    glow: "#22D3EE",
+    glow: "#4f46e5", // Indigo 600
     checkpoints: 3,
     icon: "🚀",
   },
@@ -134,7 +134,7 @@ const STAGES: Stage[] = [
     name: "Iteration",
     biome: "Crossroads Town",
     mini: "Babel Merchant",
-    glow: "#FB923C",
+    glow: "#7c3aed", // Violet 600
     checkpoints: 4,
     icon: "🔄",
   },
@@ -143,7 +143,7 @@ const STAGES: Stage[] = [
     name: "Scale",
     biome: "The Capital",
     mini: "Iron Bureaucrat",
-    glow: "#A78BFA",
+    glow: "#9333ea", // Purple 600
     checkpoints: 5,
     icon: "👑",
   },
@@ -267,7 +267,7 @@ function StageStrip({
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.5, duration: 0.5 }}
-      className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-1.5"
+      className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2 backdrop-blur-md bg-[#0a0d14]/60 p-2 rounded-full border border-white/5 shadow-[0_0_20px_rgba(30,20,50,0.5)]"
     >
       {STAGES.map((st, i) => {
         const isDone = i + 1 < activeStage;
@@ -282,32 +282,32 @@ function StageStrip({
             title={st.name}
           >
             <motion.div
-              className="h-[6px] rounded-full"
+              className="h-[8px] rounded-full"
               style={{
-                width: isCurrent ? "36px" : "24px",
+                width: isCurrent ? "48px" : "28px",
                 background: isDone
-                  ? "#7A6128"
+                  ? "#4f46e5"
                   : isCurrent
                     ? st.glow
-                    : "rgba(20,34,51,0.9)",
+                    : "rgba(255,255,255,0.05)",
                 border: `1px solid ${
                   isDone
-                    ? "#C9A84C"
+                    ? "#6366f1"
                     : isCurrent
                       ? st.glow
-                      : "rgba(58,90,114,0.5)"
+                      : "rgba(255,255,255,0.1)"
                 }`,
-                boxShadow: isCurrent ? `0 0 10px ${st.glow}` : "none",
-                transition: "width 0.3s ease, box-shadow 0.3s ease",
+                boxShadow: isCurrent ? `0 0 15px ${st.glow}` : "none",
+                transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease",
               }}
             />
             <span
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap text-[9px] tracking-[2px] uppercase px-2 py-1 rounded pointer-events-none"
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap text-[10px] tracking-[0.15em] font-semibold uppercase px-3 py-1.5 rounded-lg pointer-events-none shadow-lg backdrop-blur-xl"
               style={{
-                fontFamily: "'Cinzel', serif",
-                color: st.glow,
-                background: "rgba(7,13,20,0.95)",
-                border: "1px solid rgba(201,168,76,0.25)",
+                fontFamily: "var(--font-sans)",
+                color: "#e2e8f0",
+                background: "rgba(15, 23, 42, 0.8)",
+                border: "1px solid rgba(99, 102, 241, 0.3)",
               }}
             >
               {st.name}
@@ -342,32 +342,32 @@ function CheckpointPanel({
     <AnimatePresence>
       <motion.div
         key="cp-panel"
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
+        initial={{ x: "100%", opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 32 }}
-        className="absolute right-0 top-0 bottom-0 z-30 flex flex-col"
+        className="absolute right-0 top-0 bottom-0 z-30 flex flex-col font-sans"
         style={{
-          width: "340px",
+          width: "360px",
           background:
-            "linear-gradient(180deg, rgba(10,20,32,0.98), rgba(7,13,20,0.99))",
-          borderLeft: "1px solid rgba(201,168,76,0.18)",
-          fontFamily: "'Cinzel', serif",
+            "linear-gradient(180deg, rgba(11, 15, 25, 0.85), rgba(7, 10, 18, 0.95))",
+          backdropFilter: "blur(20px)",
+          borderLeft: "1px solid rgba(255,255,255,0.05)",
+          boxShadow: "-10px 0 50px rgba(0,0,0,0.5)",
         }}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full flex items-center justify-center text-[13px] transition-colors duration-150"
-          style={{ border: "1px solid rgba(58,90,114,0.6)", color: "#6A90AA" }}
+          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[14px] transition-all duration-200 bg-white/5 hover:bg-white/10"
+          style={{ border: "1px solid rgba(255,255,255,0.1)", color: "#cbd5e1" }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.borderColor = "#C9A84C";
-            (e.currentTarget as HTMLElement).style.color = "#C9A84C";
+            (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.2)";
+            (e.currentTarget as HTMLElement).style.color = "#ffffff";
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.borderColor =
-              "rgba(58,90,114,0.6)";
-            (e.currentTarget as HTMLElement).style.color = "#6A90AA";
+            (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.1)";
+            (e.currentTarget as HTMLElement).style.color = "#cbd5e1";
           }}
         >
           ✕
@@ -377,25 +377,24 @@ function CheckpointPanel({
           {/* Stage label */}
           <div>
             <p
-              className="text-[9px] tracking-[3px] uppercase mb-1"
+              className="text-[10px] tracking-[0.2em] font-bold uppercase mb-1.5"
               style={{ color: detail.stageGlow }}
             >
               Stage {detail.stage} · {detail.stageName}
             </p>
             <h2
-              className="text-[18px] font-semibold leading-tight"
-              style={{ color: "#D4E8F5" }}
+              className="text-xl font-bold tracking-tight leading-tight text-white mb-2"
             >
               {detail.title}
             </h2>
           </div>
 
           {/* Status */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
             <StatusDot status={detail.status} />
             <span
-              className="text-[10px] tracking-[2px] uppercase"
-              style={{ color: "#6A90AA" }}
+              className="text-[11px] font-semibold tracking-wider uppercase"
+              style={{ color: "#94a3b8" }}
             >
               {detail.status === "completed"
                 ? "Completed"
@@ -411,12 +410,12 @@ function CheckpointPanel({
 
           {/* Outcome */}
           <div
-            className="text-[13px] leading-relaxed italic px-3 py-2 rounded"
+            className="text-[13px] leading-relaxed font-medium px-4 py-3 rounded-xl backdrop-blur-md"
             style={{
-              color: "#8AAFCC",
-              borderLeft: `2px solid ${detail.stageGlow}`,
-              background: "rgba(255,255,255,0.025)",
-              fontFamily: "'Crimson Pro', serif",
+              color: "#cbd5e1",
+              borderLeft: `3px solid ${detail.stageGlow}`,
+              background: "linear-gradient(90deg, rgba(255,255,255,0.05), transparent)",
+              fontFamily: "var(--font-sans)",
             }}
           >
             {detail.outcome}
@@ -436,27 +435,26 @@ function CheckpointPanel({
           </div>
 
           {/* Progress dots */}
-          <div className="flex items-center gap-1.5 px-1">
+          <div className="flex items-center gap-2 px-1 mt-2">
             {detail.tasks.map((t, i) => (
               <div
                 key={i}
-                className="h-1.5 flex-1 rounded-full transition-all duration-300"
-                style={{
-                  background: t.done
-                    ? i === 2
-                      ? "#C9A84C"
-                      : "#2EC99A"
-                    : "rgba(58,90,114,0.4)",
-                  boxShadow: t.done
-                    ? `0 0 4px ${i === 2 ? "#C9A84C" : "#2EC99A"}`
-                    : "none",
-                }}
-              />
+                className="h-2 flex-1 rounded-full transition-all duration-300 relative overflow-hidden bg-white/5"
+              >
+                 <motion.div
+                   className="absolute inset-y-0 left-0"
+                   initial={{ width: 0 }}
+                   animate={{ width: t.done ? "100%" : "0%" }}
+                   style={{
+                     background: i === 2 ? "#eab308" : "#818cf8",
+                     boxShadow: t.done ? `0 0 10px ${i === 2 ? "#eab308" : "#818cf8"}` : "none",
+                   }}
+                 />
+              </div>
             ))}
           </div>
           <p
-            className="text-[10px] tracking-[1px]"
-            style={{ color: "#3A5A72" }}
+            className="text-[11px] font-medium tracking-wide text-slate-400"
           >
             {doneTasks}/3 tasks ·{" "}
             {2 - doneTasks > 0 && !canAdvance
@@ -468,21 +466,16 @@ function CheckpointPanel({
 
           {/* Crossing animation label */}
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded"
-            style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.06)",
-            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] mt-auto"
           >
             <span
-              className="text-[10px] tracking-[2px] uppercase"
-              style={{ color: "#3A5A72" }}
+              className="text-[10px] tracking-[0.15em] font-semibold uppercase text-slate-500"
             >
               Crossing:
             </span>
             <span
-              className="text-[10px] tracking-[1px]"
-              style={{ color: detail.stageGlow, opacity: 0.8 }}
+              className="text-[11px] font-bold tracking-wide"
+              style={{ color: detail.stageGlow }}
             >
               {STAGE_ANIMATION[detail.stage]}
             </span>
@@ -497,30 +490,40 @@ function CheckpointPanel({
               <motion.button
                 onClick={onAdvance}
                 disabled={!canAdvance}
-                whileHover={canAdvance ? { scale: 1.02 } : {}}
+                whileHover={canAdvance ? { scale: 1.02, y: -2 } : {}}
                 whileTap={canAdvance ? { scale: 0.98 } : {}}
-                className="w-full py-3 rounded-lg text-[11px] tracking-[2px] uppercase font-bold transition-all duration-250"
+                className="w-full py-3.5 rounded-xl text-[12px] tracking-[0.1em] uppercase font-black transition-all duration-300 relative overflow-hidden"
                 style={{
                   background: isGold
-                    ? "linear-gradient(135deg, rgba(201,168,76,0.35), rgba(240,208,128,0.15))"
+                    ? "linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.1))"
                     : canAdvance
-                      ? "linear-gradient(135deg, rgba(201,168,76,0.2), rgba(201,168,76,0.08))"
-                      : "rgba(20,35,50,0.4)",
+                      ? "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(79, 70, 229, 0.1))"
+                      : "rgba(255, 255, 255, 0.03)",
                   border: isGold
-                    ? "1px solid #C9A84C"
+                    ? "1px solid rgba(234, 179, 8, 0.4)"
                     : canAdvance
-                      ? "1px solid rgba(201,168,76,0.4)"
-                      : "1px solid rgba(58,90,114,0.3)",
-                  color: canAdvance ? "#C9A84C" : "#3A5A72",
+                      ? "1px solid rgba(99, 102, 241, 0.4)"
+                      : "1px solid rgba(255, 255, 255, 0.1)",
+                  color: isGold ? "#fde047" : canAdvance ? "#818cf8" : "#64748b",
                   cursor: canAdvance ? "pointer" : "not-allowed",
-                  boxShadow: isGold ? "0 0 20px rgba(201,168,76,0.25)" : "none",
+                  boxShadow: isGold ? "0 4px 20px rgba(234, 179, 8, 0.15)" : canAdvance ? "0 4px 20px rgba(99, 102, 241, 0.15)" : "none",
                 }}
               >
-                {isGold
-                  ? "⭐  Gold Checkpoint — Advance"
-                  : canAdvance
-                    ? "Advance Checkpoint →"
-                    : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
+                {canAdvance && (
+                   <motion.div
+                     className="absolute inset-0 bg-white/10"
+                     initial={{ x: "-100%" }}
+                     whileHover={{ x: "100%" }}
+                     transition={{ duration: 0.5, ease: "easeInOut" }}
+                   />
+                )}
+                <span className="relative z-10">
+                  {isGold
+                    ? "⭐  Gold Checkpoint — Advance"
+                    : canAdvance
+                      ? "Advance Checkpoint →"
+                      : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
+                </span>
               </motion.button>
             </div>
           )}
@@ -531,22 +534,22 @@ function CheckpointPanel({
 
 function StatusDot({ status }: { status: CheckpointStatus }) {
   const colors: Record<CheckpointStatus, string> = {
-    locked: "#3A5A72",
-    active: "#1ECFCF",
-    partial: "#FBBF24",
-    completed: "#2EC99A",
-    gold: "#C9A84C",
+    locked: "#475569",
+    active: "#6366f1",
+    partial: "#a855f7",
+    completed: "#818cf8",
+    gold: "#eab308",
   };
   const glow: Record<CheckpointStatus, string | undefined> = {
     locked: undefined,
-    active: "#1ECFCF",
-    partial: "#FBBF24",
-    completed: "#2EC99A",
-    gold: "#C9A84C",
+    active: "#818cf8",
+    partial: "#c084fc",
+    completed: "#a5b4fc",
+    gold: "#fde047",
   };
   return (
     <motion.div
-      className="w-2 h-2 rounded-full flex-shrink-0"
+      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
       style={{
         background: colors[status],
         boxShadow: glow[status] ? `0 0 6px ${glow[status]}` : "none",
@@ -569,39 +572,44 @@ function TaskCard({
 }) {
   const accentColor =
     task.difficulty === "stretch"
-      ? "#C9A84C"
+      ? "#eab308" // Yellow 500
       : task.difficulty === "medium"
-        ? "#1ECFCF"
-        : "#2EC99A";
+        ? "#a855f7" // Purple 500
+        : "#6366f1"; // Indigo 500
 
   return (
     <motion.div
       onClick={locked ? undefined : onToggle}
-      whileHover={locked ? {} : { x: 3 }}
-      whileTap={locked ? {} : { scale: 0.99 }}
-      className="flex items-start gap-3 px-3 py-2.5 rounded-lg relative overflow-hidden cursor-pointer"
+      whileHover={locked ? {} : { x: 4 }}
+      whileTap={locked ? {} : { scale: 0.98 }}
+      className="flex items-start gap-3.5 px-4 py-3 rounded-xl relative overflow-hidden cursor-pointer group/task transition-colors"
       style={{
         background: task.done
-          ? "rgba(46,201,154,0.04)"
-          : "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.06)",
+          ? "rgba(99, 102, 241, 0.05)"
+          : "rgba(255, 255, 255, 0.02)",
+        border: "1px solid",
+        borderColor: task.done ? "rgba(99, 102, 241, 0.2)" : "rgba(255,255,255,0.05)",
         cursor: locked ? "default" : "pointer",
-        opacity: task.done ? 0.7 : 1,
+        opacity: task.done ? 0.6 : 1,
       }}
     >
+      {/* Hover glow */}
+      {!locked && !task.done && (
+         <div className="absolute inset-0 bg-gradient-to-r from-white/[0.02] to-transparent opacity-0 group-hover/task:opacity-100 transition-opacity" />
+      )}
       {/* Left accent bar */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
-        style={{ background: task.done ? "#2EC99A" : accentColor }}
+        className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-xl"
+        style={{ background: task.done ? "#818cf8" : accentColor }}
       />
 
       {/* Check circle */}
       <motion.div
-        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px]"
+        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] font-bold"
         style={{
-          background: task.done ? "#2EC99A" : "transparent",
-          border: `1.5px solid ${task.done ? "#2EC99A" : "rgba(58,90,114,0.6)"}`,
-          color: task.done ? "#000" : "transparent",
+          background: task.done ? "#6366f1" : "rgba(255,255,255,0.05)",
+          border: `1.5px solid ${task.done ? "#6366f1" : "rgba(255,255,255,0.15)"}`,
+          color: task.done ? "#ffffff" : "transparent",
         }}
         animate={task.done ? { scale: [1.2, 1] } : {}}
         transition={{ duration: 0.2 }}
@@ -609,28 +617,22 @@ function TaskCard({
         {task.done && "✓"}
       </motion.div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
+      <div className="flex-1 min-w-0 relative z-10">
+        <div className="flex items-center gap-2 mb-1">
           <span
-            className="text-[9px] tracking-[2px] uppercase"
-            style={{ color: accentColor, opacity: 0.8 }}
+            className="text-[10px] tracking-[0.1em] font-bold uppercase"
+            style={{ color: accentColor }}
           >
             {task.label}
           </span>
         </div>
         <p
-          className="text-[12.5px] leading-snug"
-          style={{
-            color: "#D4E8F5",
-            fontFamily: "'Crimson Pro', serif",
-            fontWeight: 300,
-          }}
+          className="text-[13px] leading-relaxed text-slate-300 font-medium"
         >
           {task.description}
         </p>
         <p
-          className="text-[9px] tracking-[1px] mt-1 uppercase"
-          style={{ color: "#1ECFCF", opacity: 0.65 }}
+          className="text-[10px] tracking-[0.1em] mt-2 font-semibold uppercase text-slate-500"
         >
           {task.tool}
         </p>
@@ -650,7 +652,7 @@ function CrossingFlash({ trigger }: { trigger: number }) {
           initial={{ opacity: 0.5 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          style={{ background: "rgba(201,168,76,0.12)" }}
+          style={{ background: "rgba(99, 102, 241, 0.15)" }}
         />
       )}
     </AnimatePresence>
@@ -671,12 +673,11 @@ function AudioToggle({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 1 }}
       onClick={onToggle}
-      className="absolute bottom-12 right-5 z-20 w-9 h-9 rounded-full flex items-center justify-center text-[14px]"
+      className="absolute bottom-12 right-5 z-20 w-10 h-10 rounded-full flex items-center justify-center text-[16px] backdrop-blur-xl shadow-lg"
       style={{
-        background: "rgba(7,13,20,0.85)",
-        border: "1px solid rgba(58,90,114,0.5)",
-        color: muted ? "#3A5A72" : "#C9A84C",
-        backdropFilter: "blur(8px)",
+        background: "rgba(15, 23, 42, 0.6)",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        color: muted ? "#64748b" : "#e2e8f0",
       }}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
@@ -692,25 +693,25 @@ function LoadingScreen() {
   return (
     <div
       className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
-      style={{ background: "#070D14", fontFamily: "'Cinzel', serif" }}
+      style={{ background: "#050810", fontFamily: "var(--font-sans)" }}
     >
       <motion.div
         animate={{ opacity: [0.4, 1, 0.4] }}
         transition={{ duration: 2, repeat: Infinity }}
-        className="text-[11px] tracking-[5px] uppercase"
-        style={{ color: "#C9A84C" }}
+        className="text-xs tracking-[0.3em] uppercase font-black"
+        style={{ color: "#6366f1" }}
       >
         Entering the World…
       </motion.div>
       <div
-        className="mt-4 h-[2px] w-32 rounded-full overflow-hidden"
-        style={{ background: "rgba(255,255,255,0.06)" }}
+        className="mt-6 h-[3px] w-40 rounded-full overflow-hidden"
+        style={{ background: "rgba(255,255,255,0.05)" }}
       >
         <motion.div
           className="h-full"
-          style={{ background: "linear-gradient(90deg, #7A6128, #C9A84C)" }}
+          style={{ background: "linear-gradient(90deg, #4f46e5, #818cf8)" }}
           animate={{ x: ["-100%", "100%"] }}
-          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
     </div>
@@ -1349,12 +1350,11 @@ export default function MapPage() {
 
   return (
     <div
-      className="relative w-full h-screen overflow-hidden"
-      style={{ background: "#070D14" }}
+      className="relative w-full h-screen overflow-hidden font-sans"
+      style={{ background: "#050810" }}
     >
       {/* Fonts + keyframes */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap');
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
       `}</style>
 
@@ -1394,32 +1394,33 @@ export default function MapPage() {
       {/* No venture state */}
       {!isLoading && !activeVenture && phaserReady && (
         <div
-          className="absolute inset-0 z-30 flex items-center justify-center"
-          style={{ fontFamily: "'Cinzel', serif" }}
+          className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-md"
         >
           <div
-            className="text-center px-8 py-10 rounded-2xl"
+            className="text-center px-10 py-12 rounded-3xl"
             style={{
-              background: "rgba(7,13,20,0.96)",
-              border: "1px solid rgba(201,168,76,0.25)",
+              background: "rgba(10, 15, 30, 0.8)",
+              border: "1px solid rgba(255, 255, 255, 0.05)",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
             }}
           >
             <p
-              className="text-[10px] tracking-[4px] uppercase mb-3"
-              style={{ color: "#C9A84C" }}
+              className="text-xs tracking-[0.2em] uppercase font-black mb-4"
+              style={{ color: "#6366f1" }}
             >
               No Active Venture
             </p>
-            <p className="text-[14px] mb-6" style={{ color: "#6A90AA" }}>
+            <p className="text-sm font-medium mb-8" style={{ color: "#94a3b8" }}>
               Create a venture to begin your journey
             </p>
             <Link
               href="/venture/create"
-              className="px-5 py-2.5 rounded-lg text-[11px] tracking-[2px] uppercase"
+              className="px-6 py-3 rounded-xl text-xs tracking-wider font-bold uppercase transition-all duration-300 hover:scale-105"
               style={{
-                background: "rgba(201,168,76,0.15)",
-                border: "1px solid rgba(201,168,76,0.4)",
-                color: "#C9A84C",
+                background: "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(79, 70, 229, 0.1))",
+                border: "1px solid rgba(99, 102, 241, 0.4)",
+                color: "#818cf8",
+                boxShadow: "0 4px 20px rgba(99, 102, 241, 0.15)",
               }}
             >
               Create Venture →

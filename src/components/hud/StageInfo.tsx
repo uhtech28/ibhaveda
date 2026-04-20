@@ -25,90 +25,62 @@ export function StageInfo({
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: -50, opacity: 0, scale: 0.8 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="fixed top-24 left-1/2 -translate-x-1/2 z-50"
+        className="fixed top-24 left-1/2 -translate-x-1/2 z-50 font-sans"
       >
         <div
-          className="relative px-8 py-4 bg-[#0f1419] border-4 border-white/30 rounded-none"
-          style={{
-            boxShadow:
-              "6px 6px 0px rgba(0, 0, 0, 0.9), inset 2px 2px 0px rgba(255, 255, 255, 0.15)",
-          }}
+          className="relative px-10 py-5 bg-slate-900/60 backdrop-blur-xl border border-white/20 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.1)] flex flex-col items-center"
         >
           {/* Biome icon */}
           <div className="absolute -top-8 left-1/2 -translate-x-1/2">
             <div
-              className="w-14 h-14 bg-gradient-to-br from-[#1a1f2e] to-[#0f1419] border-4 border-white/30 rounded-none flex items-center justify-center"
-              style={{
-                boxShadow: "4px 4px 0px rgba(0, 0, 0, 0.9)",
-              }}
+              className="w-16 h-16 bg-slate-800/90 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(30,20,50,0.5)]"
             >
-              <span className="text-3xl">{stageIcon}</span>
+              <span className="text-3xl drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">{stageIcon}</span>
             </div>
+            {/* Subtle glow behind icon */}
+            <div className="absolute inset-0 rounded-full bg-indigo-500/20 blur-md -z-10" />
           </div>
 
           {/* Title */}
-          <div className="text-center mt-2">
+          <div className="text-center mt-4">
             <h2
-              className="text-2xl font-bold text-white uppercase tracking-wider mb-1"
-              style={{
-                textShadow:
-                  "3px 3px 0px rgba(0, 0, 0, 0.8), 0 0 10px rgba(255, 255, 255, 0.3)",
-              }}
+              className="text-2xl font-black text-white uppercase tracking-[0.15em] mb-1.5 drop-shadow-[0_2px_10px_rgba(99,102,241,0.3)]"
             >
               {biomeName}
             </h2>
-            <p className="text-sm text-gray-400 uppercase tracking-widest">
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-widest text-balance max-w-[200px] leading-tight mx-auto">
               Stage {stage} · {stageName}
             </p>
           </div>
-
-          {/* Pixel-art corner decorations */}
-          <div className="absolute -top-2 -left-2 w-4 h-4 bg-white/30 border-2 border-white/50" />
-          <div className="absolute -top-2 -right-2 w-4 h-4 bg-white/30 border-2 border-white/50" />
-          <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-white/30 border-2 border-white/50" />
-          <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-white/30 border-2 border-white/50" />
         </div>
       </motion.div>
     );
   }
 
-  // Standard HUD variant (compact, left-aligned)
   return (
     <motion.div
-      className="flex items-center gap-3"
+      className="flex items-center gap-3.5 font-sans"
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay: 0.1 }}
     >
-      {/* Biome icon with pixel-art frame */}
+      {/* Biome icon with modern frame */}
       <div
-        className="relative w-12 h-12 bg-gradient-to-br from-[#1a1f2e] to-[#0f1419] border-2 border-white/20 rounded-none flex items-center justify-center overflow-hidden"
-        style={{
-          boxShadow:
-            "3px 3px 0px rgba(0, 0, 0, 0.8), inset 1px 1px 0px rgba(255, 255, 255, 0.1)",
-        }}
+        className="relative w-12 h-12 bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl flex items-center justify-center shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
       >
-        <span className="text-2xl">{stageIcon}</span>
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-
-        {/* Pixel corner accents */}
-        <div className="absolute top-0 left-0 w-1.5 h-1.5 bg-white/40" />
-        <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-white/40" />
-        <div className="absolute bottom-0 left-0 w-1.5 h-1.5 bg-white/40" />
-        <div className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-white/40" />
+        <span className="text-[26px] drop-shadow-[0_0_6px_rgba(255,255,255,0.3)]">{stageIcon}</span>
+        {/* Subtle inner glow */}
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-500/10 to-transparent pointer-events-none" />
       </div>
 
       {/* Text info - biome name is primary */}
-      <div className="flex flex-col">
+      <div className="flex flex-col justify-center">
         <span
-          className="text-sm font-bold text-white uppercase tracking-wide"
-          style={{
-            textShadow: "1px 1px 2px rgba(0, 0, 0, 0.8)",
-          }}
+          className="text-[13px] font-black text-white uppercase tracking-wider leading-tight drop-shadow-[0_2px_8px_rgba(99,102,241,0.3)]"
         >
           Stage {stage}: {biomeName}
         </span>
-        <span className="text-xs text-gray-500 uppercase tracking-wider">
+        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">
           {stageName}
         </span>
       </div>

@@ -34,6 +34,9 @@ export type VentureBiome = {
  * Layout flows left-to-right representing the founder journey:
  * Ideation Hub → Research Lab → Validation Center → Product Studio → 
  * Development Zone → Launch Pad → Growth Engine → Unicorn Valley
+ * 
+ * THEME: Interactive Ideas - Modern startup platform with glassmorphism
+ * Primary: #6366F1 (Indigo), Accent: #8B5CF6 (Purple)
  */
 export const VENTURE_BIOMES: VentureBiome[] = [
   {
@@ -54,7 +57,7 @@ export const VENTURE_BIOMES: VentureBiome[] = [
       "Sketch Initial Solution",
       "Validate Core Assumption"
     ],
-    pathColor: 0x6366F1,
+    pathColor: 0x6366F1, // Interactive Ideas primary indigo
     visualElements: ["lightbulbs", "sketches", "notes"],
     icon: "💡",
   },

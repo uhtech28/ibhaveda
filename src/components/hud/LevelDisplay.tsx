@@ -11,15 +11,17 @@ export function LevelDisplay({ level, phase }: LevelDisplayProps) {
   const getPhaseColors = (phase: number) => {
     switch (phase) {
       case 1:
-        return { primary: "#3B82F6", gradient: "from-blue-500 to-blue-600", bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400" };
+        return { primary: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]" };
       case 2:
-        return { primary: "#8B5CF6", gradient: "from-violet-500 to-purple-600", bg: "bg-violet-500/10", border: "border-violet-500/30", text: "text-violet-400" };
+        return { primary: "bg-indigo-500/20", border: "border-indigo-500/30", text: "text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]" };
       case 3:
-        return { primary: "#F59E0B", gradient: "from-amber-500 to-orange-600", bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400" };
+        return { primary: "bg-violet-500/20", border: "border-violet-500/30", text: "text-violet-400 drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]" };
       case 4:
-        return { primary: "#10B981", gradient: "from-emerald-500 to-green-600", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400" };
+        return { primary: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.6)]" };
+      case 5:
+        return { primary: "bg-amber-500/20", border: "border-amber-500/30", text: "text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" };
       default:
-        return { primary: "#3B82F6", gradient: "from-blue-500 to-blue-600", bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400" };
+        return { primary: "bg-indigo-500/20", border: "border-indigo-500/30", text: "text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]" };
     }
   };
 
@@ -35,29 +37,26 @@ export function LevelDisplay({ level, phase }: LevelDisplayProps) {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2.5 font-sans">
       {/* Level badge - sleek modern design */}
       <motion.div
         className="relative"
         whileHover={{ scale: 1.05 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
       >
-        <div className={`relative w-11 h-11 rounded-xl bg-gradient-to-br ${phaseStyle.gradient} flex items-center justify-center shadow-lg shadow-${phaseStyle.primary}/20`}>
+        <div className={`relative w-11 h-11 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/10 ${phaseStyle.primary} flex items-center justify-center shadow-[0_4px_15px_rgba(0,0,0,0.3)]`}>
           <motion.span
             key={level}
             initial={{ scale: 0.5, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 500, damping: 25 }}
-            className="text-xl font-bold text-white"
+            className={`text-[18px] font-black tracking-tight ${phaseStyle.text}`}
           >
             {level}
           </motion.span>
           
-          {/* Shine effect */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-xl pointer-events-none" />
-          
           {/* Subtle inner glow */}
-          <div className="absolute inset-0 rounded-xl shadow-[inset_0_-2px_4px_rgba(0,0,0,0.2)]" />
+          <div className="absolute inset-0 rounded-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] pointer-events-none" />
         </div>
 
         {/* Mentor crown badge */}
@@ -76,13 +75,13 @@ export function LevelDisplay({ level, phase }: LevelDisplayProps) {
       </motion.div>
 
       {/* Level info */}
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[9px] text-slate-500 uppercase tracking-widest font-medium">
+      <div className="flex flex-col gap-0.5 justify-center">
+        <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">
           Level
         </span>
         
-        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md ${phaseStyle.bg} border ${phaseStyle.border}`}>
-          <span className={`text-[10px] font-semibold ${phaseStyle.text} uppercase tracking-wide`}>
+        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 backdrop-blur-sm border ${phaseStyle.border}`}>
+          <span className={`text-[10px] font-bold ${phaseStyle.text} uppercase tracking-widest`}>
             {phaseNames[phase] || `Phase ${phase}`}
           </span>
         </div>

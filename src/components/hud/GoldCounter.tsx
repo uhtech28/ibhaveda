@@ -50,10 +50,10 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
         </div>
         <motion.span
           key={gold}
-          initial={{ scale: 1.2, color: "#fbbf24" }}
+          initial={{ scale: 1.2, color: "#818cf8" }} // Indigo 400
           animate={{ scale: 1, color: "#ffffff" }}
           transition={{ duration: 0.3 }}
-          className="text-sm font-bold text-white font-mono"
+          className="text-sm font-bold text-white font-sans tracking-wide"
         >
           {gold.toLocaleString()}
         </motion.span>
@@ -65,24 +65,24 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      whileHover={{ scale: 1.05 }}
+      whileHover={{ scale: 1.02 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="relative"
+      className="relative font-sans"
     >
-      {/* Main container with pixel-art border */}
+      {/* Main container with modern glassmorphism */}
       <div
-        className="relative flex items-center gap-3 px-3 py-2 bg-[#0f1419] border-2 border-amber-500/40 rounded-none"
+        className="relative flex items-center gap-3 px-4 py-2.5 bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-full"
         style={{
-          boxShadow: "3px 3px 0px rgba(0, 0, 0, 0.8), inset 1px 1px 0px rgba(255, 255, 255, 0.1)",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05)",
         }}
       >
-        {/* Coin sprite with pixel-art style */}
+        {/* Coin sprite - modern styling */}
         <div className="relative">
           <motion.div
             animate={
               isIncreasing
                 ? {
-                  scale: [1, 1.3, 1],
+                  scale: [1, 1.2, 1],
                   rotate: [0, 360],
                 }
                 : {}
@@ -90,19 +90,16 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
             transition={{ duration: 0.6, ease: "easeOut" }}
             className="relative w-8 h-8"
           >
-            {/* Outer coin border */}
+            {/* Outer coin border - Indigo gradient */}
             <div
-              className="absolute inset-0 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-full border-2 border-amber-300"
-              style={{
-                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.5), inset 0 -2px 2px rgba(0, 0, 0, 0.3)",
-              }}
+              className="absolute inset-0 bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 rounded-full border-[1.5px] border-indigo-300/50 shadow-lg shadow-indigo-500/20"
             />
             {/* Inner coin detail */}
-            <div className="absolute inset-1 bg-gradient-to-br from-amber-300 to-amber-500 rounded-full flex items-center justify-center">
-              <span className="text-sm font-bold text-amber-900">G</span>
+            <div className="absolute inset-[3px] bg-gradient-to-br from-[#0f1420] to-[#0a0d14] rounded-full flex items-center justify-center border border-indigo-500/30">
+              <span className="text-sm font-black text-indigo-400">V</span>
             </div>
             {/* Shine effect */}
-            <div className="absolute top-1 left-1 w-2 h-2 bg-white/60 rounded-full blur-[1px]" />
+            <div className="absolute top-1 left-1.5 w-2 h-2.5 bg-white/40 rounded-full blur-[2px] rotate-45" />
           </motion.div>
 
           {/* Sparkle effect when increasing */}
@@ -128,29 +125,23 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
         </div>
 
         {/* Gold amount with animated counter */}
-        <div className="flex flex-col">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
-            Gold
+        <div className="flex flex-col pr-2">
+          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+            Points
           </span>
           <motion.div
             key={gold}
-            initial={{ scale: 1.2, y: -5 }}
+            initial={{ scale: 1.1, y: -2 }}
             animate={{ scale: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 500, damping: 25 }}
-            className="text-lg font-bold text-amber-400 font-mono leading-none"
+            className="text-[17px] font-black text-white leading-none tracking-wide"
             style={{
-              textShadow: "0 2px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(251, 191, 36, 0.3)",
+              textShadow: "0 2px 10px rgba(99, 102, 241, 0.3)",
             }}
           >
             {gold.toLocaleString()}
           </motion.div>
         </div>
-
-        {/* Pixel-art corner decorations */}
-        <div className="absolute -top-1 -left-1 w-2 h-2 bg-amber-400 border border-amber-300" />
-        <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 border border-amber-300" />
-        <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-amber-400 border border-amber-300" />
-        <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-amber-400 border border-amber-300" />
       </div>
 
       {/* Floating gain indicator */}
@@ -164,12 +155,9 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
             className="absolute -top-8 left-1/2 -translate-x-1/2 pointer-events-none"
           >
             <div
-              className="px-2 py-1 bg-amber-500 border-2 border-amber-300 rounded-none whitespace-nowrap"
-              style={{
-                boxShadow: "2px 2px 0px rgba(0, 0, 0, 0.8)",
-              }}
+              className="px-3 py-1 bg-indigo-500/90 border border-indigo-400/50 backdrop-blur-md rounded-full whitespace-nowrap shadow-[0_4px_15px_rgba(99,102,241,0.5)]"
             >
-              <span className="text-xs font-bold text-white">
+              <span className="text-xs font-black text-white tracking-wide">
                 +{gainAmount.toLocaleString()}
               </span>
             </div>
@@ -185,9 +173,9 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
             animate={{ opacity: [0, 0.6, 0] }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1, repeat: 2 }}
-            className="absolute inset-0 bg-amber-400/20 rounded-none pointer-events-none"
+            className="absolute inset-0 bg-indigo-500/10 rounded-full pointer-events-none"
             style={{
-              boxShadow: "0 0 20px rgba(251, 191, 36, 0.6)",
+              boxShadow: "0 0 30px rgba(99, 102, 241, 0.4)",
             }}
           />
         )}
