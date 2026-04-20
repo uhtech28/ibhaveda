@@ -381,6 +381,7 @@ export default defineSchema({
   ventures: defineTable({
     ideaId: v.id("ideas"),
     userId: v.id("users"),
+    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))),
     currentStage: v.number(), // 1-8
     currentCheckpoint: v.number(), // 1-N within current stage
     status: v.union(

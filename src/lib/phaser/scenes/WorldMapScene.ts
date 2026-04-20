@@ -213,18 +213,11 @@ export class WorldMapScene extends Phaser.Scene {
       this.boundHandlers.playCheckpointAnimation,
     );
 
-    // Setup camera for adventure map (vertical-scrolling view)
+    // Setup camera for Level Devil horizontal map
     this.cameras.main.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
-    this.cameras.main.setBackgroundColor("#fbbf24"); // Amber 400
-
-    // Zoom scaled slightly out to see snaking path
-    this.cameras.main.setZoom(0.85);
-
-    // Start camera at the BOTTOM (Start)
-    this.cameras.main.centerOn(
-      this.MAP_WIDTH / 2,
-      VENTURE_BIOMES[0].y + VENTURE_BIOMES[0].height - 400,
-    );
+    this.cameras.main.setBackgroundColor("#f59e0b");
+    this.cameras.main.setZoom(0.92);
+    this.cameras.main.centerOn(this.MAP_WIDTH / 2, this.MAP_HEIGHT / 2);
 
     // Enable smooth camera lerp (no target object, just for lerp settings)
     // Note: We use pan() for actual camera movements
@@ -694,43 +687,22 @@ export class WorldMapScene extends Phaser.Scene {
     checkpoint: number,
     _globalIndex: number,
   ): { x: number; y: number } {
-    const biome = getBiomeForStage(stage);
-    if (!biome) return { x: 0, y: 0 };
-
-    // Calculate global cumulative index directly
-    let globalProgressIndex = 0;
+    const POSITIONS = [
+      { x: 200, y: 460 },
+      { x: 390, y: 340 },
+      { x: 560, y: 490 },
+      { x: 770, y: 360 },
+      { x: 1070, y: 440 },
+      { x: 1270, y: 330 },
+      { x: 1480, y: 470 },
+      { x: 1680, y: 350 },
+    ];
+    let idx = 0;
     for (let s = 1; s < stage; s++) {
-      globalProgressIndex += this.getCheckpointsForStage(s);
+      idx += this.getCheckpointsForStage(s);
     }
-    globalProgressIndex += checkpoint - 1;
-
-    // Total checkpoints is 8
-    const TOTAL_CHECKPOINTS = 8;
-    const pathProgress = globalProgressIndex / (TOTAL_CHECKPOINTS - 1); // 0.0 to 1.0
-
-    // Vertical padding so starting and ending nodes aren't touching edges
-    const yPadding = 200;
-    const usableHeight = biome.height - yPadding * 2;
-
-    // Y axis moves from BOTTOM to TOP
-    const baseY =
-      biome.y + biome.height - yPadding - usableHeight * pathProgress;
-
-    // X axis snakes back and forth with a sine wave
-    const centerX = biome.x + biome.width / 2;
-    // 5 full sweeps left-to-right over the entire map length
-    const waveOffset =
-      Math.sin(pathProgress * Math.PI * 5) * (biome.width * 0.35);
-
-    // Organic micro-randomness to make the islands feel naturally placed
-    const seed = stage * 100 + checkpoint;
-    const randomX = (Math.sin(seed) * 0.5 + 0.5) * 40 - 20;
-    const randomY = (Math.cos(seed) * 0.5 + 0.5) * 40 - 20;
-
-    return {
-      x: centerX + waveOffset + randomX,
-      y: baseY + randomY,
-    };
+    idx += checkpoint - 1;
+    return POSITIONS[idx] ?? { x: 400, y: 400 };
   }
 
   /**
@@ -928,78 +900,84 @@ export class WorldMapScene extends Phaser.Scene {
    * Theme: Deep space with nebula clouds, stars, and dynamic lighting
    */
   private createAdventureBackground(): void {
-    // LEVEL DEVIL STYLE BACKGROUND
-    const bg = this.add.graphics();
+    // 1. Orange/amber ground fill
+    const ground = this.add.graphics();
+    ground.fillStyle(0xf59e0b, 1);
+    ground.fillRect(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
+    ground.setDepth(-200);
+    this.backgroundLayer.add(ground);
 
-    // Base solid orange/yellow color
-    bg.fillStyle(0xfbbf24, 1); // Amber 400
-    bg.fillRect(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
-    bg.setDepth(-200);
-    this.backgroundLayer.add(bg);
+    // 2. Dark crimson top band
+    const topBand = this.add.graphics();
+    topBand.fillStyle(0x4a0505, 1);
+    topBand.fillRect(0, 0, this.MAP_WIDTH, 180);
+    topBand.setDepth(-195);
+    this.backgroundLayer.add(topBand);
 
-    // Jagged spikes at the top and bottom of the map
-    const spikes = this.add.graphics();
-    spikes.fillStyle(0xb45309, 1); // Amber 700
-
-    // Top spikes
-    spikes.beginPath();
-    spikes.moveTo(0, 0);
-    for (let x = 0; x <= this.MAP_WIDTH; x += 30) {
-      spikes.lineTo(x, 40 + Math.random() * 60);
-      spikes.lineTo(x + 15, Math.random() * 20);
+    // 3. Flame silhouettes - multiple layers of flames below the dark band
+    const flames = this.add.graphics();
+    // Back flame layer (darker orange-red)
+    flames.fillStyle(0xc2410c, 1);
+    for (let x = -10; x < this.MAP_WIDTH + 20; x += 22) {
+      const h = 60 + Math.sin(x * 0.12) * 30 + Math.cos(x * 0.07) * 20;
+      flames.fillTriangle(x - 14, 180, x + 14, 180, x, 180 - h);
     }
-    spikes.lineTo(this.MAP_WIDTH, 0);
-    spikes.closePath();
-    spikes.fillPath();
-
-    // Bottom spikes
-    spikes.beginPath();
-    spikes.moveTo(0, this.MAP_HEIGHT);
-    for (let x = 0; x <= this.MAP_WIDTH; x += 30) {
-      spikes.lineTo(x, this.MAP_HEIGHT - (40 + Math.random() * 60));
-      spikes.lineTo(x + 15, this.MAP_HEIGHT - Math.random() * 20);
+    // Front flame layer (lighter orange)
+    flames.fillStyle(0xf97316, 1);
+    for (let x = 8; x < this.MAP_WIDTH + 10; x += 18) {
+      const h = 40 + Math.sin(x * 0.15 + 1) * 20 + Math.cos(x * 0.09 + 2) * 15;
+      flames.fillTriangle(x - 10, 180, x + 10, 180, x, 180 - h);
     }
-    spikes.lineTo(this.MAP_WIDTH, this.MAP_HEIGHT);
-    spikes.closePath();
-    spikes.fillPath();
+    // Bright tips
+    flames.fillStyle(0xfbbf24, 1);
+    for (let x = 14; x < this.MAP_WIDTH; x += 30) {
+      const h = 20 + Math.sin(x * 0.2) * 10;
+      flames.fillTriangle(x - 5, 180, x + 5, 180, x, 180 - h);
+    }
+    flames.setDepth(-190);
+    this.backgroundLayer.add(flames);
 
-    spikes.setDepth(-190);
-    this.backgroundLayer.add(spikes);
+    // 4. Ground texture — subtle horizontal lines for depth
+    const groundLines = this.add.graphics();
+    groundLines.lineStyle(1, 0xe59e0b, 0.3);
+    for (let y = 200; y < this.MAP_HEIGHT; y += 40) {
+      groundLines.lineBetween(0, y, this.MAP_WIDTH, y);
+    }
+    groundLines.setDepth(-185);
+    this.backgroundLayer.add(groundLines);
 
-    // Add LEVEL DEVIL Title text at the very top of the map
-    const titleText = this.add
-      .text(this.MAP_WIDTH / 2, 120, "LEVEL DEVIL", {
-        fontFamily: '"Press Start 2P", monospace, sans-serif',
-        fontSize: "80px",
-        fontStyle: "bold",
-        color: "#ef4444", // Red text
-      })
-      .setOrigin(0.5);
-
-    // Title shadow/drop-shadow effect
+    // Title text in the dark top band
     const titleShadow = this.add
-      .text(this.MAP_WIDTH / 2 + 6, 126, "LEVEL DEVIL", {
-        fontFamily: '"Press Start 2P", monospace, sans-serif',
-        fontSize: "80px",
-        fontStyle: "bold",
-        color: "#7f1d1d", // Dark red shadow
+      .text(this.MAP_WIDTH / 2 + 4, 75, "INTERACTIVE IDEAS", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "36px",
+        color: "#3d0505",
       })
-      .setOrigin(0.5);
-
+      .setOrigin(0.5)
+      .setDepth(-188);
     this.backgroundLayer.add(titleShadow);
+
+    const titleText = this.add
+      .text(this.MAP_WIDTH / 2, 70, "INTERACTIVE IDEAS", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "36px",
+        color: "#ef4444",
+      })
+      .setOrigin(0.5)
+      .setDepth(-187);
     this.backgroundLayer.add(titleText);
 
-    // Subtitle
-    const subTitle = this.add
-      .text(this.MAP_WIDTH / 2, 200, "by Unept", {
-        fontFamily: '"Press Start 2P", monospace, sans-serif',
-        fontSize: "24px",
+    const subText = this.add
+      .text(this.MAP_WIDTH / 2, 110, "startup journey", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "14px",
         color: "#b45309",
       })
-      .setOrigin(0.5);
-    this.backgroundLayer.add(subTitle);
+      .setOrigin(0.5)
+      .setDepth(-187);
+    this.backgroundLayer.add(subText);
 
-    this.cameras.main.setBackgroundColor("#fbbf24");
+    this.cameras.main.setBackgroundColor("#f59e0b");
   }
 
   /**
@@ -1008,185 +986,192 @@ export class WorldMapScene extends Phaser.Scene {
    * island base beneath each checkpoint coordinate.
    */
   private createAdventurePath(): void {
-    const environmentGraphics = this.add.graphics();
     const TOTAL_CHECKPOINTS = 8;
+    const POSITIONS = [
+      { x: 200, y: 460 },
+      { x: 390, y: 340 },
+      { x: 560, y: 490 },
+      { x: 770, y: 360 },
+      { x: 1070, y: 440 },
+      { x: 1270, y: 330 },
+      { x: 1480, y: 470 },
+      { x: 1680, y: 350 },
+    ];
 
-    const checkpointCoords: { x: number; y: number }[] = [];
-
-    // Calculate all 8 coordinates first
-    let currentStage = 1;
-    let checkpointsInCurrentStageCount = 0;
-
-    for (let i = 0; i < TOTAL_CHECKPOINTS; i++) {
-      const stageCheckpoints = this.getCheckpointsForStage(currentStage);
-      checkpointsInCurrentStageCount++;
-
-      const pos = this.calculateCheckpointPosition(
-        currentStage,
-        checkpointsInCurrentStageCount,
-        i,
-      );
-      checkpointCoords.push(pos);
-
-      if (checkpointsInCurrentStageCount >= stageCheckpoints) {
-        currentStage++;
-        checkpointsInCurrentStageCount = 0;
-      }
-    }
-
-    // DRAW START SIGN (Bottom)
-    const startPos = checkpointCoords[0];
-    const startSign = this.add.container(startPos.x - 140, startPos.y + 60);
-    const startGfx = this.add.graphics();
-    startGfx.fillStyle(0xef4444, 1); // Red background
-    startGfx.fillRoundedRect(0, 0, 140, 50, 16);
-    startGfx.lineStyle(4, 0x7f1d1d, 1); // Dark red border
-    startGfx.strokeRoundedRect(0, 0, 140, 50, 16);
-    const startTxt = this.add
-      .text(70, 25, "LEVEL 1", {
-        fontFamily: '"Press Start 2P", "Courier New", Courier, monospace',
-        fontSize: "18px",
-        fontStyle: "900",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5);
-    startSign.add([startGfx, startTxt]);
-    this.backgroundLayer.add(startSign);
-
-    // DRAW FINISH SIGN (Top)
-    const finishPos = checkpointCoords[checkpointCoords.length - 1];
-    const finishSign = this.add.container(finishPos.x + 60, finishPos.y - 30);
-    const finishGfx = this.add.graphics();
-    finishGfx.fillStyle(0x3b82f6, 1); // Blue background
-    finishGfx.fillRoundedRect(0, 0, 100, 50, 12);
-    finishGfx.lineStyle(4, 0x1e3a8a, 1); // Dark blue border
-    finishGfx.strokeRoundedRect(0, 0, 100, 50, 12);
-
-    // Draw simple right arrow in finish sign
-    const arrow = this.add.graphics();
-    arrow.fillStyle(0xffffff, 1);
-    arrow.beginPath();
-    arrow.moveTo(30, 20);
-    arrow.lineTo(60, 20);
-    arrow.lineTo(60, 15);
-    arrow.lineTo(75, 25);
-    arrow.lineTo(60, 35);
-    arrow.lineTo(60, 30);
-    arrow.lineTo(30, 30);
-    arrow.closePath();
-    arrow.fillPath();
-
-    finishSign.add([finishGfx, arrow]);
-    this.backgroundLayer.add(finishSign);
-
-    // Pre-calculate control points so both path layers use identical curves
-    const pathSegments: {
-      c1x: number;
-      c1y: number;
+    // Pre-compute path control points (same for both outline and inner)
+    const pathSegs: {
+      x0: number;
+      y0: number;
       cp1x: number;
       cp1y: number;
       cp2x: number;
       cp2y: number;
-      c2x: number;
-      c2y: number;
+      x1: number;
+      y1: number;
     }[] = [];
-    for (let i = 1; i < checkpointCoords.length; i++) {
-      const c1x = checkpointCoords[i - 1].x;
-      const c1y = checkpointCoords[i - 1].y;
-      const c2x = checkpointCoords[i].x;
-      const c2y = checkpointCoords[i].y;
-      pathSegments.push({
-        c1x,
-        c1y,
-        cp1x: c1x + (c2x - c1x) * 0.25 + (Math.random() * 60 - 30),
-        cp1y: c1y + (c2y - c1y) * 0.25,
-        cp2x: c1x + (c2x - c1x) * 0.75 + (Math.random() * 60 - 30),
-        cp2y: c1y + (c2y - c1y) * 0.75,
-        c2x,
-        c2y,
+    for (let i = 1; i < POSITIONS.length; i++) {
+      const prev = POSITIONS[i - 1];
+      const curr = POSITIONS[i];
+      pathSegs.push({
+        x0: prev.x,
+        y0: prev.y,
+        cp1x: prev.x + (curr.x - prev.x) * 0.3 + Math.sin(i * 1.7) * 60,
+        cp1y: prev.y + (curr.y - prev.y) * 0.2 + Math.cos(i * 2.1) * 40,
+        cp2x: prev.x + (curr.x - prev.x) * 0.7 + Math.sin(i * 2.3) * 60,
+        cp2y: prev.y + (curr.y - prev.y) * 0.8 + Math.cos(i * 1.4) * 40,
+        x1: curr.x,
+        y1: curr.y,
       });
     }
 
-    // LAYER 1: Draw the Path (Dirt track)
-    // Outer border (dark brown)
-    environmentGraphics.lineStyle(24, 0x78350f, 1); // Amber 900
-    environmentGraphics.beginPath();
-    environmentGraphics.moveTo(checkpointCoords[0].x, checkpointCoords[0].y);
-    for (const seg of pathSegments) {
+    const pathGfx = this.add.graphics();
+
+    // Outer dark path
+    pathGfx.lineStyle(10, 0x78350f, 1);
+    pathGfx.beginPath();
+    pathGfx.moveTo(POSITIONS[0].x, POSITIONS[0].y);
+    for (const seg of pathSegs) {
       this.cubicBezierPath(
-        environmentGraphics,
-        seg.c1x,
-        seg.c1y,
+        pathGfx,
+        seg.x0,
+        seg.y0,
         seg.cp1x,
         seg.cp1y,
         seg.cp2x,
         seg.cp2y,
-        seg.c2x,
-        seg.c2y,
+        seg.x1,
+        seg.y1,
       );
     }
-    environmentGraphics.strokePath();
+    pathGfx.strokePath();
 
-    // Inner dirt path
-    environmentGraphics.lineStyle(16, 0xd97706, 1); // Amber 600
-    environmentGraphics.beginPath();
-    environmentGraphics.moveTo(checkpointCoords[0].x, checkpointCoords[0].y);
-    for (const seg of pathSegments) {
+    // Inner lighter path
+    pathGfx.lineStyle(6, 0xd97706, 1);
+    pathGfx.beginPath();
+    pathGfx.moveTo(POSITIONS[0].x, POSITIONS[0].y);
+    for (const seg of pathSegs) {
       this.cubicBezierPath(
-        environmentGraphics,
-        seg.c1x,
-        seg.c1y,
+        pathGfx,
+        seg.x0,
+        seg.y0,
         seg.cp1x,
         seg.cp1y,
         seg.cp2x,
         seg.cp2y,
-        seg.c2x,
-        seg.c2y,
+        seg.x1,
+        seg.y1,
       );
     }
-    environmentGraphics.strokePath();
+    pathGfx.strokePath();
+    pathGfx.setDepth(-5);
+    this.backgroundLayer.add(pathGfx);
 
-    // LAYER 2: Draw Tombstones beneath each checkpoint
-    for (let i = 0; i < checkpointCoords.length; i++) {
-      const pos = checkpointCoords[i];
+    // Tombstones beneath each checkpoint
+    const tombGfx = this.add.graphics();
+    for (let i = 0; i < TOTAL_CHECKPOINTS; i++) {
+      const { x, y } = POSITIONS[i];
+      const w = 70;
+      const h = 80;
+      const bx = x - w / 2;
+      const by = y - h / 2;
 
-      // Tombstone base
-      environmentGraphics.fillStyle(0x78350f, 1); // Amber 900
+      // Shadow
+      tombGfx.fillStyle(0x78350f, 0.5);
+      tombGfx.fillEllipse(x + 4, y + h / 2 + 4, w + 10, 18);
 
-      // Draw tombstone shape (arch top, flat bottom)
-      const width = 80;
-      const height = 90;
-      const x = pos.x - width / 2;
-      const y = pos.y - height / 2;
+      // Body fill
+      tombGfx.fillStyle(0x92400e, 1);
+      tombGfx.fillRect(bx, by + 28, w, h - 28);
 
-      environmentGraphics.beginPath();
-      environmentGraphics.moveTo(x, y + height);
-      environmentGraphics.lineTo(x, y + 30);
-      // Top arch
-      environmentGraphics.arc(
-        x + width / 2,
-        y + 30,
-        width / 2,
-        Math.PI,
-        0,
-        false,
-      );
-      environmentGraphics.lineTo(x + width, y + height);
-      environmentGraphics.closePath();
-      environmentGraphics.fillPath();
+      // Arch top
+      tombGfx.fillStyle(0x92400e, 1);
+      tombGfx.beginPath();
+      tombGfx.arc(x, by + 28, w / 2, Math.PI, 0, false);
+      tombGfx.fillPath();
 
-      // Little dirt pile at base
-      environmentGraphics.fillStyle(0x92400e, 1); // Amber 800
-      environmentGraphics.fillEllipse(
-        pos.x,
-        pos.y + height / 2,
-        width + 20,
-        20,
-      );
+      // Outline
+      tombGfx.lineStyle(3, 0x78350f, 1);
+      tombGfx.beginPath();
+      tombGfx.moveTo(bx, by + h / 2);
+      tombGfx.lineTo(bx, by + 28);
+      tombGfx.arc(x, by + 28, w / 2, Math.PI, 0, false);
+      tombGfx.lineTo(bx + w, by + h / 2);
+      tombGfx.strokePath();
+
+      // Cross on tombstone
+      tombGfx.lineStyle(3, 0xfbbf24, 0.7);
+      tombGfx.lineBetween(x, by + 10, x, by + 42);
+      tombGfx.lineBetween(x - 12, by + 22, x + 12, by + 22);
+
+      // Stage label near first checkpoint of each stage
+      if (i === 0 || i === 4) {
+        const label = i === 0 ? "IDEATION" : "RESEARCH";
+        const labelGfx = this.add.graphics();
+        labelGfx.fillStyle(i === 0 ? 0xef4444 : 0x3b82f6, 1);
+        labelGfx.fillRoundedRect(x - 55, y - h / 2 - 38, 110, 30, 6);
+        labelGfx.lineStyle(2, i === 0 ? 0x7f1d1d : 0x1e3a8a, 1);
+        labelGfx.strokeRoundedRect(x - 55, y - h / 2 - 38, 110, 30, 6);
+        labelGfx.setDepth(2);
+        this.backgroundLayer.add(labelGfx);
+        const labelTxt = this.add
+          .text(x, y - h / 2 - 23, label, {
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: "9px",
+            color: "#ffffff",
+          })
+          .setOrigin(0.5)
+          .setDepth(3);
+        this.backgroundLayer.add(labelTxt);
+      }
     }
+    tombGfx.setDepth(-3);
+    this.backgroundLayer.add(tombGfx);
 
-    environmentGraphics.setDepth(-10);
-    this.backgroundLayer.add(environmentGraphics);
+    // START sign (green, left)
+    const startGfx = this.add.graphics();
+    startGfx.fillStyle(0x4d7c0f, 1);
+    startGfx.fillRoundedRect(0, 0, 100, 40, 8);
+    startGfx.lineStyle(2, 0x1a2e05, 1);
+    startGfx.strokeRoundedRect(0, 0, 100, 40, 8);
+    const startSign = this.add.container(
+      POSITIONS[0].x - 120,
+      POSITIONS[0].y + 50,
+    );
+    const startTxt = this.add
+      .text(50, 20, "START", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "10px",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5);
+    startSign.add([startGfx, startTxt]);
+    startSign.setDepth(2);
+    this.backgroundLayer.add(startSign);
+
+    // FINISH arrow sign (blue, right)
+    const finishGfx = this.add.graphics();
+    finishGfx.fillStyle(0x1d4ed8, 1);
+    finishGfx.fillRoundedRect(0, 0, 80, 40, 8);
+    finishGfx.lineStyle(2, 0x1e3a8a, 1);
+    finishGfx.strokeRoundedRect(0, 0, 80, 40, 8);
+    const arrowGfx = this.add.graphics();
+    arrowGfx.fillStyle(0xffffff, 1);
+    arrowGfx.fillTriangle(55, 20, 35, 10, 35, 30);
+    arrowGfx.fillRect(15, 15, 20, 10);
+    const finishSign = this.add.container(
+      POSITIONS[7].x + 50,
+      POSITIONS[7].y - 10,
+    );
+    finishSign.add([finishGfx, arrowGfx]);
+    finishSign.setDepth(2);
+    this.backgroundLayer.add(finishSign);
+
+    // Stage divider line between stage 1 and stage 2
+    const divGfx = this.add.graphics();
+    divGfx.lineStyle(3, 0x92400e, 0.4);
+    divGfx.lineBetween(920, 180, 920, this.MAP_HEIGHT);
+    divGfx.setDepth(-4);
+    this.backgroundLayer.add(divGfx);
   }
 
   /**

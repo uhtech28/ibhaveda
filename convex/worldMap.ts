@@ -413,3 +413,21 @@ export const getVenturesByUser = query({
     return ventures;
   },
 });
+
+export const savePersonaGender = mutation({
+  args: {
+    ventureId: v.id("ventures"),
+    gender: v.union(v.literal("male"), v.literal("female")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const venture = await ctx.db.get(args.ventureId);
+    if (!venture) throw new Error("Venture not found");
+    await ctx.db.patch(args.ventureId, {
+      personaGender: args.gender,
+      updatedAt: Date.now(),
+    });
+    return { success: true };
+  },
+});

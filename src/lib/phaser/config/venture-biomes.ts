@@ -46,8 +46,8 @@ export const VENTURE_BIOMES: VentureBiome[] = [
     subtitle: "Stages 1-8 · Great Voyage",
     x: 0,
     y: 0,
-    width: 1200,
-    height: 1600,
+    width: 1800,
+    height: 700,
     biomeType: "garage", // Note: The map scene overrides rendering, so this enum doesn't strictly matter
     checkpoints: 8,
     challenges: ["Navigation"],
