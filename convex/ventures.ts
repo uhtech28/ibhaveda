@@ -186,18 +186,23 @@ export const startCheckpoint = mutation({
  */
 function validateContributionRequirement(
   toolType: string,
-  content: any,
+  content: unknown,
   storageId?: string,
 ): { valid: boolean; reason?: string } {
   // For write/text tool, require minimum 50 words
   if (toolType === "write") {
-    if (!content || !content.text) {
+    if (!content || typeof content !== "object" || !("text" in content)) {
+      return { valid: false, reason: "Text content is required" };
+    }
+
+    const contentObj = content as { text?: string; wordCount?: number };
+    if (!contentObj.text) {
       return { valid: false, reason: "Text content is required" };
     }
 
     const wordCount =
-      content.wordCount ||
-      (content.text.trim() ? content.text.trim().split(/\s+/).length : 0);
+      contentObj.wordCount ||
+      (contentObj.text.trim() ? contentObj.text.trim().split(/\s+/).length : 0);
 
     if (wordCount < 50) {
       return {
@@ -211,7 +216,11 @@ function validateContributionRequirement(
 
   // For upload tool, require file to exist (storageId or in content)
   if (toolType === "upload") {
-    const uploadStorageId = storageId || content?.storageId;
+    const contentObj =
+      content && typeof content === "object" && "storageId" in content
+        ? (content as { storageId?: string })
+        : null;
+    const uploadStorageId = storageId || contentObj?.storageId;
     if (!uploadStorageId) {
       return {
         valid: false,
@@ -769,7 +778,12 @@ type QueryDbCtx = QueryCtx["db"];
  */
 async function tryAdvanceStage(
   ctx: { db: MutationDbCtx },
-  venture: { _id: Id<"ventures">; userId: Id<"users">; currentStage: number },
+  venture: {
+    _id: Id<"ventures">;
+    userId: Id<"users">;
+    currentStage: number;
+    ideaId: Id<"ideas">;
+  },
   currentStage: number,
 ) {
   const now = Date.now();

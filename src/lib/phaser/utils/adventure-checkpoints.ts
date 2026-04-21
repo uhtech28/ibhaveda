@@ -1,24 +1,24 @@
 /**
  * adventure-checkpoints.ts
- * 
+ *
  * Adventure-themed checkpoint marker textures for each biome.
  * Replaces the Among Us task-style icons with fantasy markers.
  */
 
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 
 /**
  * Checkpoint marker types for each biome
  */
 export const CHECKPOINT_MARKER_TYPES = {
-  forest: "flag",        // Wooden flag post
-  desert: "pillar",      // Stone pillar
-  dungeon: "orb",        // Crystal orb
-  tundra: "campfire",    // Campfire
-  mine: "pickaxe",       // Pickaxe in rock
-  harbour: "anchor",     // Ship anchor
-  floatingIsle: "rune",  // Rune stone
-  capital: "crown",      // Crown pedestal
+  forest: "flag", // Wooden flag post
+  desert: "pillar", // Stone pillar
+  dungeon: "orb", // Crystal orb
+  tundra: "campfire", // Campfire
+  mine: "pickaxe", // Pickaxe in rock
+  harbour: "anchor", // Ship anchor
+  floatingIsle: "rune", // Rune stone
+  capital: "crown", // Crown pedestal
 };
 
 /**
@@ -62,7 +62,13 @@ export class AdventureCheckpointCreator {
 
     // Locked
     const lockedGfx = scene.add.graphics();
-    AdventureCheckpointCreator.drawFlag(lockedGfx, SIZE, 0x6b4423, 0x4a5a62, 0.5);
+    AdventureCheckpointCreator.drawFlag(
+      lockedGfx,
+      SIZE,
+      0x6b4423,
+      0x4a5a62,
+      0.5,
+    );
     lockedGfx.generateTexture("cp_forest_locked", SIZE, SIZE);
     lockedGfx.destroy();
 
@@ -74,7 +80,13 @@ export class AdventureCheckpointCreator {
 
     // Completed
     const completedGfx = scene.add.graphics();
-    AdventureCheckpointCreator.drawFlag(completedGfx, SIZE, 0x6b4423, 0x4caf50, 1);
+    AdventureCheckpointCreator.drawFlag(
+      completedGfx,
+      SIZE,
+      0x6b4423,
+      0x4caf50,
+      1,
+    );
     completedGfx.generateTexture("cp_forest_completed", SIZE, SIZE);
     completedGfx.destroy();
 
@@ -312,7 +324,7 @@ export class AdventureCheckpointCreator {
     size: number,
     poleColor: number,
     flagColor: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;
@@ -323,19 +335,11 @@ export class AdventureCheckpointCreator {
 
     // Flag
     gfx.fillStyle(flagColor, alpha);
-    gfx.fillTriangle(
-      cx, cy - 10,
-      cx, cy + 10,
-      cx + 20, cy
-    );
+    gfx.fillTriangle(cx, cy - 10, cx, cy + 10, cx + 20, cy);
 
     // Flag border
     gfx.lineStyle(2, 0x000000, alpha * 0.5);
-    gfx.strokeTriangle(
-      cx, cy - 10,
-      cx, cy + 10,
-      cx + 20, cy
-    );
+    gfx.strokeTriangle(cx, cy - 10, cx, cy + 10, cx + 20, cy);
   }
 
   /**
@@ -345,7 +349,7 @@ export class AdventureCheckpointCreator {
     gfx: Phaser.GameObjects.Graphics,
     size: number,
     color: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;
@@ -374,7 +378,7 @@ export class AdventureCheckpointCreator {
     gfx: Phaser.GameObjects.Graphics,
     size: number,
     color: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;
@@ -407,7 +411,7 @@ export class AdventureCheckpointCreator {
     gfx: Phaser.GameObjects.Graphics,
     size: number,
     color: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;
@@ -419,19 +423,11 @@ export class AdventureCheckpointCreator {
 
     // Flames
     gfx.fillStyle(color, alpha);
-    gfx.fillTriangle(
-      cx, cy - 12,
-      cx - 8, cy + 4,
-      cx + 8, cy + 4
-    );
+    gfx.fillTriangle(cx, cy - 12, cx - 8, cy + 4, cx + 8, cy + 4);
 
     // Inner flame
     gfx.fillStyle(0xffeb3b, alpha * 0.8);
-    gfx.fillTriangle(
-      cx, cy - 6,
-      cx - 4, cy + 2,
-      cx + 4, cy + 2
-    );
+    gfx.fillTriangle(cx, cy - 6, cx - 4, cy + 2, cx + 4, cy + 2);
   }
 
   /**
@@ -441,7 +437,7 @@ export class AdventureCheckpointCreator {
     gfx: Phaser.GameObjects.Graphics,
     size: number,
     color: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;
@@ -470,7 +466,7 @@ export class AdventureCheckpointCreator {
     gfx: Phaser.GameObjects.Graphics,
     size: number,
     color: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;
@@ -483,16 +479,8 @@ export class AdventureCheckpointCreator {
     gfx.fillRect(cx - 12, cy - 6, 24, 4);
 
     // Flukes
-    gfx.fillTriangle(
-      cx - 12, cy + 8,
-      cx - 12, cy + 16,
-      cx - 6, cy + 12
-    );
-    gfx.fillTriangle(
-      cx + 12, cy + 8,
-      cx + 12, cy + 16,
-      cx + 6, cy + 12
-    );
+    gfx.fillTriangle(cx - 12, cy + 8, cx - 12, cy + 16, cx - 6, cy + 12);
+    gfx.fillTriangle(cx + 12, cy + 8, cx + 12, cy + 16, cx + 6, cy + 12);
 
     // Ring
     gfx.lineStyle(3, color, alpha);
@@ -506,7 +494,7 @@ export class AdventureCheckpointCreator {
     gfx: Phaser.GameObjects.Graphics,
     size: number,
     color: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;
@@ -536,7 +524,7 @@ export class AdventureCheckpointCreator {
     gfx: Phaser.GameObjects.Graphics,
     size: number,
     color: number,
-    alpha: number
+    alpha: number,
   ): void {
     const cx = size / 2;
     const cy = size / 2;

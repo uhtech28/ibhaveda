@@ -5,8 +5,14 @@
  * that progressively weaken as the player completes checkpoints within a stage.
  *
  * Supported Types:
- * - Fog of Vagueness (Stage 1 - Ideation): Gray fog cloud with eyes
- * - Pathwarden Wraith (Stage 2 - Research): Dark hooded figure with sigils
+ * - Fog of Vagueness (Stage 1 - Ideation)
+ * - Pathwarden Wraith (Stage 2 - Research)
+ * - Advocate of Comfortable Lies (Stage 3 - Validation)
+ * - Unfinished Golem (Stage 4 - Offer Design)
+ * - Collapse Specter (Stage 5 - Build & Deliver)
+ * - Harbourmaster of Hesitation (Stage 6 - Launch)
+ * - Babel Merchant (Stage 7 - Iteration)
+ * - Iron Bureaucrat (Stage 8 - Scale)
  */
 
 import * as Phaser from "phaser";
@@ -16,9 +22,17 @@ import * as Phaser from "phaser";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The two mini-boss types corresponding to venture stages
+ * All eight mini-boss types corresponding to venture stages (PRD-compliant)
  */
-export type MiniBossType = "fog_of_vagueness" | "pathwarden_wraith";
+export type MiniBossType =
+  | "Fog of Vagueness"
+  | "Pathwarden Wraith"
+  | "Advocate of Comfortable Lies"
+  | "Unfinished Golem"
+  | "Collapse Specter"
+  | "Harbourmaster of Hesitation"
+  | "Babel Merchant"
+  | "Iron Bureaucrat";
 
 /**
  * Configuration data required to construct a {@link MiniBoss}.
@@ -101,10 +115,17 @@ export class MiniBoss extends Phaser.GameObjects.Container {
     this.cracksGraphics.setAlpha(0);
 
     // Draw type-specific boss visuals
-    if (this.bossType === "fog_of_vagueness") {
-      this.drawFogOfVagueness();
-    } else {
-      this.drawPathwardenWraith();
+    switch (this.bossType) {
+      case "Fog of Vagueness":
+        this.drawFogOfVagueness();
+        break;
+      case "Pathwarden Wraith":
+        this.drawPathwardenWraith();
+        break;
+      default:
+        // Generic boss visual for other types
+        this.drawGenericBoss();
+        break;
     }
 
     // ── Nameplate ───────────────────────────────────────────────────────────
@@ -141,7 +162,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
     const weakness = checkpointsComplete / totalCheckpoints;
     this.currentWeakness = Phaser.Math.Clamp(weakness, 0, 1);
 
-    if (this.bossType === "fog_of_vagueness") {
+    if (this.bossType === "Fog of Vagueness") {
       // Fog dissipates by reducing opacity
       const targetAlpha = 1.0 - this.currentWeakness * 0.7; // 100% -> 30%
       this.scene.tweens.add({
@@ -187,7 +208,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
       this.namePlate,
     ]);
 
-    if (this.bossType === "fog_of_vagueness") {
+    if (this.bossType === "Fog of Vagueness") {
       // Fog dissipates outward with scale and fade
       this.scene.tweens.add({
         targets: this,
@@ -460,16 +481,63 @@ export class MiniBoss extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Get display name for this boss type.
+   * Draws a generic boss silhouette for boss types that don't have custom visuals yet
+   * Used for stages 3-8 until specific art is implemented
+   */
+  private drawGenericBoss(): void {
+    const g = this.bossGraphics;
+    const offsetX = -50;
+    const offsetY = -60;
+
+    // Draw a generic imposing figure silhouette
+    g.fillStyle(0x1f2937, 1.0); // Dark gray
+
+    // Head
+    g.fillCircle(offsetX + 50, offsetY + 20, 15);
+
+    // Body (trapezoid shape)
+    g.beginPath();
+    g.moveTo(offsetX + 35, offsetY + 35);
+    g.lineTo(offsetX + 65, offsetY + 35);
+    g.lineTo(offsetX + 75, offsetY + 85);
+    g.lineTo(offsetX + 25, offsetY + 85);
+    g.closePath();
+    g.fillPath();
+
+    // Arms
+    g.fillRect(offsetX + 15, offsetY + 40, 10, 35);
+    g.fillRect(offsetX + 75, offsetY + 40, 10, 35);
+
+    // Add glowing effect
+    const glow = new Phaser.GameObjects.Arc(
+      this.scene,
+      offsetX + 50,
+      offsetY + 50,
+      40,
+      0,
+      360,
+      false,
+      0x000000,
+      0,
+    );
+    glow.setStrokeStyle(2, 0x6366f1, 0.5);
+    this.add(glow);
+
+    this.scene.tweens.add({
+      targets: glow,
+      alpha: { from: 0.3, to: 0.7 },
+      duration: 1500,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  /**
+   * Returns display name for this boss type
    */
   private getBossName(): string {
-    switch (this.bossType) {
-      case "fog_of_vagueness":
-        return "Fog of Vagueness";
-      case "pathwarden_wraith":
-        return "Pathwarden Wraith";
-      default:
-        return "Mini-Boss";
-    }
+    // Boss type is already the display name (PRD-compliant naming)
+    return this.bossType;
   }
 }
