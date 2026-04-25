@@ -1086,20 +1086,7 @@ export class WorldMapScene extends Phaser.Scene {
           globalIndex: globalIndex,
         });
 
-        // Set up click handler
         node.setInteractive();
-        node.on(
-          "checkpoint_clicked",
-          (data: { id: string; stage: number; checkpoint: number }) => {
-            eventBridge.dispatchToReact({
-              type: "CHECKPOINT_CLICKED",
-              checkpointId: data.id,
-              stage: data.stage,
-              checkpoint: data.checkpoint,
-            });
-          },
-        );
-
         this.checkpointNodes.set(checkpointId, node);
         this.gameLayer.add(node);
 
@@ -1235,6 +1222,20 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "PLAY_CHECKPOINT_ANIMATION",
       this.boundHandlers.playCheckpointAnimation,
+    );
+
+    // Handle checkpoint clicks (emitted by CheckpointNode)
+    this.events.on(
+      "checkpoint_clicked",
+      (data: { id: string; stage: number; checkpoint: number }) => {
+        console.log("[Phaser] Checkpoint clicked:", data);
+        eventBridge.dispatchToReact({
+          type: "CHECKPOINT_CLICKED",
+          checkpointId: data.id,
+          stage: data.stage,
+          checkpoint: data.checkpoint,
+        });
+      },
     );
   }
 

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { ComposerModal } from "@/components/ideaforge/composer-modal";
+import { CategorySelectorModal } from "@/components/ideaforge/category-selector-modal";
 import {
   CompactIdeaCard,
   EmptyState,
@@ -96,6 +97,7 @@ export function IdeaForgeExperience({
   const router = useRouter();
   const userIdeas = useQuery(api.ideas.getUserIdeas) || [];
   const publicIdeas = useQuery(api.ideas.getPublicIdeas, { limit: 60 }) || [];
+  const [categorySelectorOpen, setCategorySelectorOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerDraft, setComposerDraft] = useState<Partial<ComposerDraft>>({});
   const [feedTab, setFeedTab] = useState<FeedTabKey>("for-you");
@@ -191,6 +193,18 @@ export function IdeaForgeExperience({
     setSavedIdeaIds([...savedIdeaIds, ideaId]);
   };
 
+  const openCategorySelector = () => {
+    setCategorySelectorOpen(true);
+  };
+
+  const handleCategorySelect = (category: string) => {
+    setCategorySelectorOpen(false);
+    // Capitalize first letter to match the format
+    const formattedCategory = category.charAt(0).toUpperCase() + category.slice(1);
+    setComposerDraft({ category: formattedCategory });
+    setComposerOpen(true);
+  };
+
   const openComposerWithDraft = (draft?: Partial<ComposerDraft>) => {
     setComposerDraft(draft || {});
     setComposerOpen(true);
@@ -205,7 +219,7 @@ export function IdeaForgeExperience({
 
   return (
     <div className="min-h-screen bg-[#0A0D12] pb-28 text-[#F9FAFB]">
-      <IdeaForgeNavbar currentUser={currentUser} searchQuery={searchQuery} onSearchChange={onSearchChange} onOpenComposer={() => openComposerWithDraft()} />
+      <IdeaForgeNavbar currentUser={currentUser} searchQuery={searchQuery} onSearchChange={onSearchChange} onOpenComposer={openCategorySelector} />
 
       <main className={cn(shellMax, "px-4 pb-12 pt-28 sm:px-6 xl:px-8") }>
         <div className="flex items-start gap-6">
@@ -213,7 +227,7 @@ export function IdeaForgeExperience({
             currentUser={currentUser}
             mode={mode}
             userIdeas={userIdeas as IdeaForgeIdea[]}
-            onOpenComposer={() => openComposerWithDraft()}
+            onOpenComposer={openCategorySelector}
             onTagSelect={onSearchChange}
             onOpenFeedTab={setFeedTab}
             onOpenMyIdeasTab={setMyIdeasTab}
@@ -223,7 +237,7 @@ export function IdeaForgeExperience({
             <div className="mx-auto max-w-[680px] space-y-5">
               {mode === "feed" ? (
                 <>
-                  <FeedComposer currentUser={currentUser} onOpenComposer={() => openComposerWithDraft()} />
+                  <FeedComposer currentUser={currentUser} onOpenComposer={openCategorySelector} />
                   {!isProfileComplete && (
                     <section className="rounded-[16px] border border-[#F59E0B]/20 bg-[#2A1A07]/70 p-5 text-[#FCD34D]">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -310,7 +324,7 @@ export function IdeaForgeExperience({
                     title="Nothing matched this feed yet"
                     description="Try another search, switch to a different feed tab, or post the spark that should exist here."
                     actionLabel="+ Post an Idea"
-                    onAction={() => openComposerWithDraft()}
+                    onAction={openCategorySelector}
                   />
                 )
               ) : myIdeasTab === "analytics" ? (
@@ -360,7 +374,7 @@ export function IdeaForgeExperience({
                     title="No drafts yet"
                     description="Start a concept in the composer and save it here when you want to polish it later."
                     actionLabel="Start a Draft"
-                    onAction={() => openComposerWithDraft()}
+                    onAction={openCategorySelector}
                   />
                 )
               ) : ((myIdeasTab === "saved" ? savedIdeas : currentIdeas).length > 0 ? (
@@ -406,7 +420,7 @@ export function IdeaForgeExperience({
                   title={myIdeasTab === "saved" ? "Nothing saved yet" : "No ideas yet. Your first idea could change everything."}
                   description={myIdeasTab === "saved" ? "Save promising concepts from the feed and they&apos;ll be waiting here for your next building session." : "Draft the startup thought you keep circling back to and give it a home in InteractiveIdeas."}
                   actionLabel="+ Post Your First Idea"
-                  onAction={() => openComposerWithDraft()}
+                  onAction={openCategorySelector}
                 />
               ))}
             </div>
@@ -418,13 +432,18 @@ export function IdeaForgeExperience({
 
       <button
         type="button"
-        onClick={() => openComposerWithDraft()}
+        onClick={openCategorySelector}
         aria-label="Post idea"
         className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#6366F1] text-white shadow-[0_18px_42px_rgba(99,102,241,0.3)] transition-all duration-200 hover:scale-[1.02] hover:bg-[#8B5CF6] md:bottom-8 md:right-8"
       >
         <Plus className="h-6 w-6" />
       </button>
 
+      <CategorySelectorModal 
+        open={categorySelectorOpen} 
+        onOpenChange={setCategorySelectorOpen}
+        onSelectCategory={handleCategorySelect}
+      />
       <ComposerModal open={composerOpen} onOpenChange={setComposerOpen} initialDraft={composerDraft} />
     </div>
   );

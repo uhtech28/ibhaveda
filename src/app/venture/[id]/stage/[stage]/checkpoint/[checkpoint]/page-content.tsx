@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -58,6 +58,8 @@ const TOOL_ICONS: Record<string, any> = {
 export default function CheckpointPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromMap = searchParams.get("from") === "map";
   const ventureId = params.id as string;
   const stageNum = parseInt(params.stage as string);
   const checkpointNum = parseInt(params.checkpoint as string);
@@ -126,6 +128,11 @@ export default function CheckpointPageContent() {
     setAdvancing(true);
     try {
       await advanceCheckpoint({ checkpointId: checkpoint._id });
+      // If the user came from the world map, send them back there after advancing.
+      if (fromMap) {
+        router.push("/map/world");
+        return;
+      }
       const nextCp = venture.checkpoints?.find(
         (cp: any) =>
           cp.stage === stageNum && cp.checkpoint === checkpointNum + 1,
@@ -206,7 +213,11 @@ export default function CheckpointPageContent() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push(`/venture/${ventureId}`)}
+            onClick={() =>
+              fromMap
+                ? router.push("/map/world")
+                : router.push(`/venture/${ventureId}`)
+            }
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -291,7 +302,7 @@ export default function CheckpointPageContent() {
         </div>
 
         {canAdvance && checkpoint.status !== "completed" && (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex flex-col items-center gap-3">
             <Button
               size="lg"
               className="gap-2"
@@ -306,46 +317,70 @@ export default function CheckpointPageContent() {
               ) : (
                 <>
                   <Check className="h-5 w-5" />
-                  Advance to Next Checkpoint
+                  {fromMap
+                    ? "Advance Checkpoint & Return to Map"
+                    : "Advance to Next Checkpoint"}
                 </>
               )}
             </Button>
+            {fromMap && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => router.push("/map/world")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Return to Map
+              </Button>
+            )}
           </div>
         )}
 
         {checkpoint.status === "completed" && (
-          <div className="mt-8 flex justify-center">
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => {
-                const nextCp = venture.checkpoints?.find(
-                  (cp: any) =>
-                    cp.stage === stageNum &&
-                    cp.checkpoint === checkpointNum + 1,
-                );
-                if (nextCp) {
-                  router.push(
-                    `/venture/${ventureId}/stage/${stageNum}/checkpoint/${checkpointNum + 1}`,
-                  );
-                } else {
-                  const nextStage = venture.checkpoints?.find(
+          <div className="mt-8 flex flex-col items-center gap-3">
+            {fromMap ? (
+              <Button
+                size="lg"
+                onClick={() => router.push("/map/world")}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                Return to Map
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => {
+                  const nextCp = venture.checkpoints?.find(
                     (cp: any) =>
-                      cp.stage === stageNum + 1 && cp.checkpoint === 1,
+                      cp.stage === stageNum &&
+                      cp.checkpoint === checkpointNum + 1,
                   );
-                  if (nextStage) {
+                  if (nextCp) {
                     router.push(
-                      `/venture/${ventureId}/stage/${stageNum + 1}/checkpoint/1`,
+                      `/venture/${ventureId}/stage/${stageNum}/checkpoint/${checkpointNum + 1}`,
                     );
                   } else {
-                    router.push(`/venture/${ventureId}`);
+                    const nextStage = venture.checkpoints?.find(
+                      (cp: any) =>
+                        cp.stage === stageNum + 1 && cp.checkpoint === 1,
+                    );
+                    if (nextStage) {
+                      router.push(
+                        `/venture/${ventureId}/stage/${stageNum + 1}/checkpoint/1`,
+                      );
+                    } else {
+                      router.push(`/venture/${ventureId}`);
+                    }
                   }
-                }
-              }}
-            >
-              Continue to Next Checkpoint
-              <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-            </Button>
+                }}
+              >
+                Continue to Next Checkpoint
+                <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+              </Button>
+            )}
           </div>
         )}
       </div>

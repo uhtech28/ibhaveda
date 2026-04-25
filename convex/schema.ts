@@ -17,6 +17,7 @@ export default defineSchema({
     skills: v.optional(v.array(v.string())), // Array of user skills (handled via userSkills table)
     industry: v.optional(v.string()), // Primary industry (kept for backward compatibility)
     industries: v.optional(v.array(v.string())), // Multiple industries
+    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))), // Character gender selection
     completedOnboarding: v.boolean(), // Onboarding status
     isActive: v.optional(v.boolean()), // Account status for user management
     role: v.optional(v.string()), // User role (user, moderator, admin)

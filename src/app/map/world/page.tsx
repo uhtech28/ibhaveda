@@ -26,6 +26,7 @@ import { BadgeAwardSequence } from "@/components/animations/BadgeAwardSequence";
 import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useRouter } from "next/navigation";
+import { TaskSubmissionModal } from "@/components/map/TaskSubmissionModal";
 import {
   activeVentureAtom,
   userProgressAtom,
@@ -877,6 +878,17 @@ export default function MapPage() {
     checkpoint: number;
   } | null>(null);
 
+  // Task submission state
+  const [submittingTask, setSubmittingTask] = useState<{
+    id: any;
+    checkpointId: any;
+    taskLevel: "t1" | "t2" | "t3";
+    title: string;
+    description: string;
+    toolType: string;
+    points: number;
+  } | null>(null);
+
   // Track previous level to detect level-up events
   const prevLevelRef = useRef<number | null>(null);
 
@@ -1254,14 +1266,43 @@ export default function MapPage() {
 
   // ── Checkpoint click from Phaser ───────────────────────────────────────────
   useEffect(() => {
+    // Expose eventBridge for console debugging
+    if (typeof window !== "undefined") {
+      (window as any).debugEventBridge = eventBridge;
+    }
+
     const handleClick = (e: {
       checkpointId: string;
       stage: number;
       checkpoint: number;
     }) => {
-      // e.checkpointId is the real Convex _id (string) — look it up
-      const cp = checkpoints.find((c) => c._id === e.checkpointId);
-      if (!cp) return;
+      console.log("[React] Received CHECKPOINT_CLICKED event:", e);
+      console.log("[React] Current activeVenture:", activeVenture?._id);
+      console.log("[React] Current checkpoints count:", checkpoints.length);
+
+      const ventureId = activeVenture?._id;
+      if (!ventureId) {
+        console.warn("[MapPage] No active venture — cannot navigate to checkpoint");
+        return;
+      }
+
+      // Phaser nodes use synthetic IDs like "1-1", "2-3" — look up by stage+checkpoint
+      // numbers which are always correct, rather than by Convex _id.
+      const cp = checkpoints.find(
+        (c) => c.stage === e.stage && c.checkpoint === e.checkpoint,
+      );
+
+      if (cp) {
+        console.log("[React] Found matching checkpoint in Convex data:", cp);
+        const status = deriveCheckpointStatus(cp, activeStage, activeCP);
+        console.log("[React] Derived status:", status);
+        if (status === "locked") {
+          console.log("[React] Checkpoint is locked, ignoring click.");
+          return;
+        }
+      } else {
+        console.log("[React] No matching checkpoint found in checkpoints array. Proceeding with navigation anyway.");
+      }
 
       // Hide first checkpoint pulse when any checkpoint is clicked
       if (showFirstCheckpointPulse) {
@@ -1271,81 +1312,14 @@ export default function MapPage() {
         }
       }
 
-      const stageIdx = cp.stage - 1;
-      const cpIdx = cp.checkpoint - 1;
-      const status = deriveCheckpointStatus(cp, activeStage, activeCP);
-
-      // Build tasks from Convex rows which now include real prompt text
-      // (enriched by getWorldMapData joining with CHECKPOINT_DEFINITIONS)
-      type ConvexTask = {
-        taskLevel: string;
-        toolType: string;
-        prompt?: string;
-        _id: string;
-      };
-      const convexTasks: ConvexTask[] =
-        "tasks" in cp && Array.isArray((cp as { tasks: ConvexTask[] }).tasks)
-          ? (cp as { tasks: ConvexTask[] }).tasks
-          : [];
-
-      const taskLevels: Array<"t1" | "t2" | "t3"> = ["t1", "t2", "t3"];
-
-      const tasks: Task[] = taskLevels.map((lvl) => {
-        const convexTask = convexTasks.find((t) => t.taskLevel === lvl);
-        const isDone =
-          lvl === "t1"
-            ? cp.t1Completed
-            : lvl === "t2"
-              ? cp.t2Completed
-              : cp.t3Completed;
-
-        // Use the real task prompt from CHECKPOINT_DEFINITIONS (via Convex enrichment)
-        // Fall back to a clear label if somehow missing
-        const description =
-          convexTask?.prompt ||
-          `Complete task ${lvl.toUpperCase()} for this checkpoint.`;
-
-        return {
-          label:
-            lvl === "t1"
-              ? "T1 Easy"
-              : lvl === "t2"
-                ? "T2 Medium"
-                : "T3 Stretch",
-          description,
-          tool: convexTask?.toolType ?? "write",
-          difficulty:
-            lvl === "t1" ? "easy" : lvl === "t2" ? "medium" : "stretch",
-          done: isDone,
-          _convexCheckpointId: cp._id,
-          _taskLevel: lvl,
-        } as Task & { _convexCheckpointId: string; _taskLevel: string };
-      });
-
-      // Use real checkpoint name and outcome from Convex (enriched from CHECKPOINT_DEFINITIONS)
-      const cpWithMeta = cp as typeof cp & {
-        outcome?: string;
-        checkpointName?: string;
-      };
-
-      setSelectedDetail({
-        id: cp._id,
-        stage: cp.stage,
-        stageIdx,
-        stageName: STAGES[stageIdx]?.name ?? `Stage ${cp.stage}`,
-        biome: STAGES[stageIdx]?.biome ?? "",
-        stageGlow: STAGES[stageIdx]?.glow ?? "#C9A84C",
-        checkpointIndex: cpIdx,
-        title: cpWithMeta.checkpointName ?? `Checkpoint ${cp.checkpoint}`,
-        outcome: cpWithMeta.outcome ?? "",
-        status,
-        tasks,
-      });
+      const url = `/venture/${ventureId}/stage/${e.stage}/checkpoint/${e.checkpoint}?from=map`;
+      console.log("[React] Redirecting to:", url);
+      router.push(url);
     };
 
     eventBridge.onReact("CHECKPOINT_CLICKED", handleClick);
     return () => eventBridge.off("CHECKPOINT_CLICKED", handleClick);
-  }, [checkpoints, activeStage, activeCP]);
+  }, [checkpoints, activeStage, activeCP, activeVenture, router, showFirstCheckpointPulse]);
 
   // ── Task toggle → Convex mutation ─────────────────────────────────────────
   const handleTaskToggle = useCallback(
@@ -1365,26 +1339,18 @@ export default function MapPage() {
 
       if (!checkpointId || !taskLevel) return;
 
-      try {
-        await markTaskComplete({ checkpointId, taskLevel });
-        // Convex subscription will re-fetch worldMapData and auto-update the panel
-        // via the useEffect that rebuilds selectedDetail on checkpoints change.
-        // Optimistically update the panel immediately so there's no flicker.
-        setSelectedDetail((d) =>
-          d
-            ? {
-                ...d,
-                tasks: d.tasks.map((t, i) =>
-                  i === taskIdx ? { ...t, done: true } : t,
-                ),
-              }
-            : null,
-        );
-      } catch (err) {
-        console.error("markTaskComplete failed:", err);
-      }
+      // Instead of immediately marking complete, open the submission modal
+      setSubmittingTask({
+        id: `${checkpointId}_${taskLevel}` as any,
+        checkpointId,
+        taskLevel,
+        title: task.label,
+        description: task.description,
+        toolType: task.tool,
+        points: taskLevel === "t1" ? 10 : taskLevel === "t2" ? 20 : 30,
+      });
     },
-    [selectedDetail, markTaskComplete],
+    [selectedDetail],
   );
 
   // ── Advance checkpoint → Convex mutation ──────────────────────────────────
@@ -1664,6 +1630,19 @@ export default function MapPage() {
               }}
             />
           )}
+
+          {/* Task submission modal */}
+          <TaskSubmissionModal
+            isOpen={!!submittingTask}
+            onClose={() => setSubmittingTask(null)}
+            task={submittingTask}
+            onSuccess={() => {
+              // The mutation inside the modal will trigger a Convex update,
+              // but we can also optimistically update the UI here if we want.
+              // For now, relying on Convex is safer.
+              console.log("[MapPage] Task submitted successfully");
+            }}
+          />
         </>
       )}
     </div>

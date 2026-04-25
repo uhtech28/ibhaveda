@@ -678,7 +678,8 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       Phaser.Geom.Circle.Contains,
     );
 
-    this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
+    this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
+      console.log(`[Phaser] CheckpointNode pointerup: ${this.checkpointId}`);
       this.scene.events.emit("checkpoint_clicked", {
         id: this.checkpointId,
         stage: this.stage,
