@@ -15,6 +15,9 @@ import { currentQuestAtom, goldCountAtom, stageInfoAtom } from "@/lib/stores/hud
 import { CHECKPOINT_DEFINITIONS } from "@convex/ventureConstants";
 import { VENTURE_BIOMES } from "@/lib/phaser/config/venture-biomes";
 
+const getStageCheckpointCount = (stage: number) =>
+  CHECKPOINT_DEFINITIONS.filter((definition) => definition.stage === stage).length || 4;
+
 // ============================================================================
 // EXAMPLE 1: Update Quest When Checkpoint is Selected
 // ============================================================================
@@ -73,6 +76,8 @@ export function ExampleQuestIntegration() {
         stageIcon: biome.icon,
         biomeName: biome.biomeName,
         stage: stage,
+        currentCheckpoint: checkpoint,
+        totalCheckpointsInStage: getStageCheckpointCount(stage),
       });
     }
   };
@@ -213,6 +218,8 @@ export function ExampleMapPageIntegration() {
           stageIcon: biome.icon,
           biomeName: biome.biomeName,
           stage: activeStage,
+          currentCheckpoint: activeCheckpoint,
+          totalCheckpointsInStage: getStageCheckpointCount(activeStage),
         });
       }
 
@@ -316,6 +323,8 @@ export function ExampleBiomeTransition() {
       stageIcon: biome.icon,
       biomeName: biome.biomeName,
       stage,
+      currentCheckpoint: 1,
+      totalCheckpointsInStage: getStageCheckpointCount(stage),
     });
 
     // Use StageInfo with centered prop:

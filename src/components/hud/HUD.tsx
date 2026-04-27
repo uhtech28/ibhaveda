@@ -57,9 +57,16 @@ const HUDComponent = () => {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -100, opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed top-4 left-4 right-4 z-50 flex justify-center"
+        className="fixed top-2 left-2 right-2 z-50 flex justify-center md:top-3 md:left-3 md:right-3"
       >
-        <div className="bg-[#0A0D12]/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden w-full max-w-7xl">
+        <div
+          className="w-full max-w-6xl overflow-hidden rounded-[20px] border shadow-[0_12px_30px_rgba(34,24,12,0.38)]"
+          style={{
+            borderColor: "rgba(110, 86, 48, 0.9)",
+            background:
+              "linear-gradient(180deg, rgba(90, 82, 52, 0.94), rgba(70, 63, 40, 0.96))",
+          }}
+        >
           <AnimatePresence mode="wait">
             {(!isMobile || hudExpanded) && (
               <motion.div
@@ -69,47 +76,68 @@ const HUDComponent = () => {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="px-4 py-3">
-                  <div className="flex items-center justify-between gap-6 max-w-7xl mx-auto">
-                    {/* Bento Left: Stage & Progress */}
-                    <div className="flex items-center gap-2 p-1.5 bg-white/5 rounded-xl border border-white/5 relative overflow-hidden group">
-                      <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-                      
+                <div className="px-2 py-1.5 sm:px-3 sm:py-2">
+                  <div
+                    className="mx-auto flex max-w-[1400px] items-center justify-between gap-1.5 sm:gap-3 rounded-xl border px-2 py-1.5 sm:px-4"
+                    style={{
+                      borderColor: "rgba(202, 175, 118, 0.12)",
+                      background:
+                        "linear-gradient(180deg, rgba(64, 76, 43, 0.32), rgba(78, 72, 41, 0.22))",
+                    }}
+                  >
+                    {/* Unified HUD Content - Left Section */}
+                    <div className="flex items-center gap-3 sm:gap-6">
                       <StageInfo
                         stageName={stageInfo.stageName}
                         stageIcon={stageInfo.stageIcon}
                         biomeName={stageInfo.biomeName}
-                      />
-                      <div className="w-px h-8 bg-white/10" />
-                      <GoldCounter compact={true} />
-                      <div className="w-px h-8 bg-white/10" />
-                      <CheckpointProgress
-                        completed={checkpointProgress.completed}
-                        total={checkpointProgress.total}
-                        goldCount={checkpointProgress.goldCount}
+                        stage={stageInfo.stage}
+                        currentCheckpoint={stageInfo.currentCheckpoint}
+                        totalCheckpointsInStage={stageInfo.totalCheckpointsInStage}
                         compact={true}
                       />
+                      
+                      <div className="h-6 w-px bg-[#c8b47a]/15 hidden sm:block" />
+                      
+                      <div className="flex items-center gap-4 sm:gap-6">
+                        <GoldCounter compact={true} />
+                        <CheckpointProgress
+                          completed={checkpointProgress.completed}
+                          total={checkpointProgress.total}
+                          goldCount={checkpointProgress.goldCount}
+                          compact={true}
+                        />
+                      </div>
                     </div>
 
-                    {/* Bento Right: Performance & XP */}
-                    <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-xl border border-white/5 relative overflow-hidden group">
-                      <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+                    {/* Right Section */}
+                    <div className="flex items-center gap-3 sm:gap-6">
+                      <div className="hidden lg:flex items-center gap-4 sm:gap-6">
+                        <StreakCounter streak={userProgress.streak} compact={true} />
+                        <QualityScore
+                          qualityScore={userProgress.qualityScore}
+                          valuationScore={userProgress.valuationScore}
+                          compact={true}
+                        />
+                      </div>
                       
-                      <StreakCounter streak={userProgress.streak} />
-                      <QualityScore
-                        qualityScore={userProgress.qualityScore}
-                        valuationScore={userProgress.valuationScore}
-                      />
-                      <div className="hidden lg:block w-px h-8 bg-white/10" />
-                      <LevelDisplay
-                        level={userProgress.level}
-                        phase={userProgress.phase}
-                      />
-                      <XPBar
-                        currentXP={userProgress.xp}
-                        maxXP={userProgress.xpToNextLevel}
-                      />
-                      <AudioControls />
+                      <div className="h-6 w-px bg-[#c8b47a]/15 hidden lg:block" />
+
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <LevelDisplay
+                          level={userProgress.level}
+                          phase={userProgress.phase}
+                          compact={true}
+                        />
+                        <XPBar
+                          currentXP={userProgress.xp}
+                          maxXP={userProgress.xpToNextLevel}
+                          compact={true}
+                        />
+                        <div className="hidden sm:block ml-1">
+                          <AudioControls />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -122,7 +150,7 @@ const HUDComponent = () => {
               onClick={toggleExpanded}
               className="w-full flex items-center justify-center gap-2 py-2 text-gray-400 hover:text-white transition-colors border-t border-white/5"
             >
-              {hudExpanded ? (
+            {hudExpanded ? (
                 <ChevronUp className="w-4 h-4" />
               ) : (
                 <ChevronDown className="w-4 h-4" />
@@ -138,14 +166,15 @@ const HUDComponent = () => {
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="absolute left-4 top-full mt-2 flex items-center gap-2 px-3 py-1.5 bg-slate-900/60 backdrop-blur-md rounded-lg border border-white/10 shadow-[0_4px_15px_rgba(0,0,0,0.3)] overflow-hidden"
+            className="absolute left-3 top-full mt-2 flex items-center gap-2 overflow-hidden rounded-lg border px-3 py-1.5 shadow-[0_4px_15px_rgba(0,0,0,0.3)]"
+            style={{
+              borderColor: "rgba(196, 175, 120, 0.28)",
+              background:
+                "linear-gradient(180deg, rgba(72, 68, 44, 0.96), rgba(58, 54, 35, 0.96))",
+            }}
           >
-            {/* Premium Texture Overlay: Grain & Scanning Lines */}
-            <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-            <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-white/[0.02] to-transparent bg-[length:100%_4px]" />
-            
-            <Sparkles className="w-4 h-4 text-indigo-400 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]" />
-            <span className="text-sm text-white font-medium truncate max-w-[150px]">
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span className="max-w-[150px] truncate text-sm font-medium text-[#f5ead0]">
               {activeVenture.name}
             </span>
           </motion.div>
@@ -155,10 +184,15 @@ const HUDComponent = () => {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="absolute right-4 top-full mt-2 flex items-center gap-2 px-3 py-1.5 bg-indigo-500/20 backdrop-blur-md border border-indigo-400/30 rounded-lg shadow-[0_4px_15px_rgba(99,102,241,0.2)]"
+            className="absolute right-3 top-full mt-2 flex items-center gap-2 rounded-lg border px-3 py-1.5 shadow-[0_4px_15px_rgba(99,102,241,0.2)]"
+            style={{
+              borderColor: "rgba(196, 175, 120, 0.28)",
+              background:
+                "linear-gradient(180deg, rgba(72, 68, 44, 0.96), rgba(58, 54, 35, 0.96))",
+            }}
           >
-            <Crown className="w-4 h-4 text-indigo-400 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]" />
-            <span className="text-sm text-white font-semibold">Mentor</span>
+            <Crown className="w-4 h-4 text-amber-300" />
+            <span className="text-sm font-semibold text-[#f5ead0]">Mentor</span>
           </motion.div>
         )}
       </motion.div>

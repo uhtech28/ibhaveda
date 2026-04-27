@@ -261,64 +261,83 @@ export class MiniBoss extends Phaser.GameObjects.Container {
   // ── Private: drawing methods ──────────────────────────────────────────────
 
   /**
-   * Draw "Fog of Vagueness" - a gray fog cloud with glowing eyes.
+   * Draw "Fog of Vagueness" — grey smoky cloud monster with amber glowing eyes
+   * and a dark gaping mouth. Matches IMG_9275 reference.
    */
   private drawFogOfVagueness(): void {
     const g = this.bossGraphics;
+    const cx = 0;  // center X
+    const cy = 0;  // center Y
 
-    // Offset to center around (0, 0)
-    const offsetX = -50;
-    const offsetY = -40;
+    // ── Outer wispy cloud (lightest grey, largest) ───────────────────────────
+    g.fillStyle(0x9ca3af, 0.45);
+    g.fillCircle(cx - 28, cy + 18, 28);
+    g.fillCircle(cx + 28, cy + 18, 28);
+    g.fillCircle(cx, cy + 30, 32);
+    g.fillCircle(cx - 42, cy + 30, 20);
+    g.fillCircle(cx + 42, cy + 30, 20);
+    g.fillCircle(cx, cy + 50, 24);
 
-    // ── Fog body (multiple overlapping circles for cloud effect) ───────────
-    g.fillStyle(0x6b7280, 0.8); // Gray-500
+    // ── Mid cloud layer (medium grey) ────────────────────────────────────────
+    g.fillStyle(0x6b7280, 0.75);
+    g.fillCircle(cx, cy + 5, 30);
+    g.fillCircle(cx - 22, cy + 18, 26);
+    g.fillCircle(cx + 22, cy + 18, 26);
+    g.fillCircle(cx - 10, cy + 35, 22);
+    g.fillCircle(cx + 10, cy + 35, 22);
 
-    // Main cloud mass
-    g.fillCircle(offsetX + 50, offsetY + 30, 35);
-    g.fillCircle(offsetX + 30, offsetY + 40, 28);
-    g.fillCircle(offsetX + 70, offsetY + 40, 28);
-    g.fillCircle(offsetX + 50, offsetY + 55, 30);
+    // ── Inner core (darkest grey for density) ────────────────────────────────
+    g.fillStyle(0x4b5563, 0.9);
+    g.fillCircle(cx, cy + 8, 20);
+    g.fillCircle(cx - 14, cy + 20, 16);
+    g.fillCircle(cx + 14, cy + 20, 16);
+    g.fillCircle(cx, cy + 28, 18);
 
-    // Upper puffs
-    g.fillCircle(offsetX + 25, offsetY + 20, 20);
-    g.fillCircle(offsetX + 75, offsetY + 20, 20);
+    // ── Dark gaping mouth ────────────────────────────────────────────────────
+    g.fillStyle(0x111827, 0.95);
+    g.fillEllipse(cx, cy + 26, 24, 14);
+    // mouth detail — inner darkness
+    g.fillStyle(0x000000, 1);
+    g.fillEllipse(cx, cy + 28, 16, 8);
 
-    // Wispy edges
-    g.fillStyle(0x9ca3af, 0.6); // Gray-400
-    g.fillCircle(offsetX + 15, offsetY + 35, 15);
-    g.fillCircle(offsetX + 85, offsetY + 35, 15);
-    g.fillCircle(offsetX + 50, offsetY + 70, 18);
+    // ── Pixel scatter base (crumbling pixel effect at bottom) ────────────────
+    const pixSizes = [5, 4, 3, 4, 5, 3, 4];
+    const pixOffsets = [-30, -20, -10, 0, 10, 20, 30];
+    g.fillStyle(0x6b7280, 0.5);
+    pixOffsets.forEach((px, i) => {
+      g.fillRect(cx + px - pixSizes[i] / 2, cy + 56 + (i % 3) * 4, pixSizes[i], pixSizes[i]);
+    });
 
-    // ── Eyes (glowing red circles, added as separate objects for animation) ─
+    // ── Eyes (glowing amber — matches IMG_9275) ──────────────────────────────
     this.eyeLeft = new Phaser.GameObjects.Arc(
-      this.scene,
-      offsetX + 35,
-      offsetY + 30,
-      6,
-      0,
-      360,
-      false,
-      0xff4444,
+      this.scene, cx - 10, cy + 12, 5, 0, 360, false, 0xfbbf24,
     );
-    this.eyeLeft.setStrokeStyle(2, 0xff0000, 0.8);
+    this.eyeLeft.setStrokeStyle(2, 0xf59e0b, 1);
 
     this.eyeRight = new Phaser.GameObjects.Arc(
-      this.scene,
-      offsetX + 65,
-      offsetY + 30,
-      6,
-      0,
-      360,
-      false,
-      0xff4444,
+      this.scene, cx + 10, cy + 12, 5, 0, 360, false, 0xfbbf24,
     );
-    this.eyeRight.setStrokeStyle(2, 0xff0000, 0.8);
+    this.eyeRight.setStrokeStyle(2, 0xf59e0b, 1);
 
-    // Subtle eye glow pulse
+    // Pulsing glow on eyes
     this.scene.tweens.add({
       targets: [this.eyeLeft, this.eyeRight],
-      alpha: { from: 0.7, to: 1.0 },
-      duration: 1200,
+      alpha: { from: 0.6, to: 1.0 },
+      scaleX: { from: 0.9, to: 1.3 },
+      scaleY: { from: 0.9, to: 1.3 },
+      duration: 900,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // Fog body slow pulse (expand/contract like breathing)
+    this.scene.tweens.add({
+      targets: this.bossGraphics,
+      scaleX: { from: 1.0, to: 1.06 },
+      scaleY: { from: 1.0, to: 1.06 },
+      alpha: { from: 0.9, to: 1.0 },
+      duration: 1800,
       ease: "Sine.easeInOut",
       yoyo: true,
       repeat: -1,
@@ -326,98 +345,95 @@ export class MiniBoss extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Draw "Pathwarden Wraith" - a dark hooded figure with sigils.
+   * Draw "Pathwarden Wraith" — dark navy/purple hooded figure with crumbling
+   * pixel base and floating animation. Matches IMG_9274 reference (3 frames).
    */
   private drawPathwardenWraith(): void {
     const g = this.bossGraphics;
+    const cx = 0;
+    const cy = 0;
 
-    const offsetX = -40;
-    const offsetY = -60;
-
-    // ── Hood/cloak (dark shadowy figure) ────────────────────────────────────
-    g.fillStyle(0x1a0a2e, 0.9); // Very dark purple
-
-    // Hood shape (triangle-ish)
+    // ── Cloak body — dark navy-purple ────────────────────────────────────────
+    g.fillStyle(0x1e1b4b, 0.95);  // deep indigo (matches reference blue-black)
+    // Main robe trapezoid
     g.beginPath();
-    g.moveTo(offsetX + 40, offsetY + 10); // Top of hood
-    g.lineTo(offsetX + 20, offsetY + 40); // Left side
-    g.lineTo(offsetX + 60, offsetY + 40); // Right side
+    g.moveTo(cx - 18, cy + 10);   // left shoulder
+    g.lineTo(cx + 18, cy + 10);   // right shoulder
+    g.lineTo(cx + 28, cy + 65);   // bottom right (wider hem)
+    g.lineTo(cx - 28, cy + 65);   // bottom left
     g.closePath();
     g.fillPath();
 
-    // ── Face void (darker) ──────────────────────────────────────────────────
-    g.fillStyle(0x000000, 0.95);
-    g.fillEllipse(offsetX + 40, offsetY + 30, 18, 22);
-
-    // ── Cloak body ──────────────────────────────────────────────────────────
-    g.fillStyle(0x2d1b4e, 0.85); // Dark purple
-    g.fillRect(offsetX + 15, offsetY + 40, 50, 40);
-
-    // Cloak bottom taper
+    // ── Hood — rounded triangle top ──────────────────────────────────────────
+    g.fillStyle(0x1e1b4b, 1);
+    g.fillCircle(cx, cy - 5, 20);   // head behind hood
+    g.fillStyle(0x0f0a24, 1);
     g.beginPath();
-    g.moveTo(offsetX + 15, offsetY + 80);
-    g.lineTo(offsetX + 25, offsetY + 100);
-    g.lineTo(offsetX + 55, offsetY + 100);
-    g.lineTo(offsetX + 65, offsetY + 80);
+    g.moveTo(cx - 20, cy + 10);
+    g.lineTo(cx + 20, cy + 10);
+    g.lineTo(cx + 14, cy - 10);
+    g.lineTo(cx, cy - 28);   // hood peak
+    g.lineTo(cx - 14, cy - 10);
     g.closePath();
     g.fillPath();
 
-    // ── Glowing sigils (protective wards) ───────────────────────────────────
-    g.lineStyle(2, 0x8b5cf6, 0.8); // Purple-500
+    // ── Face void (inside hood — black ellipse) ───────────────────────────────
+    g.fillStyle(0x000000, 1);
+    g.fillEllipse(cx, cy + 2, 18, 24);
 
-    // Left sigil (circle with rune)
-    g.strokeCircle(offsetX + 25, offsetY + 55, 8);
-    g.beginPath();
-    g.moveTo(offsetX + 25, offsetY + 47);
-    g.lineTo(offsetX + 25, offsetY + 63);
-    g.strokePath();
+    // ── Cloak shading layers ─────────────────────────────────────────────────
+    g.fillStyle(0x312e81, 0.6);   // lighter indigo highlight on left edge
+    g.fillRect(cx - 18, cy + 10, 7, 55);
+    g.fillStyle(0x000000, 0.25);  // dark edge right
+    g.fillRect(cx + 11, cy + 10, 7, 55);
 
-    // Right sigil (circle with rune)
-    g.strokeCircle(offsetX + 55, offsetY + 55, 8);
-    g.beginPath();
-    g.moveTo(offsetX + 55, offsetY + 47);
-    g.lineTo(offsetX + 55, offsetY + 63);
-    g.strokePath();
+    // ── Sleeve tips (hands barely visible) ──────────────────────────────────
+    g.fillStyle(0x1e1b4b, 0.9);
+    g.fillEllipse(cx - 22, cy + 40, 12, 8);
+    g.fillEllipse(cx + 22, cy + 40, 12, 8);
 
-    // Center sigil (diamond)
-    g.beginPath();
-    g.moveTo(offsetX + 40, offsetY + 62);
-    g.lineTo(offsetX + 45, offsetY + 68);
-    g.lineTo(offsetX + 40, offsetY + 74);
-    g.lineTo(offsetX + 35, offsetY + 68);
-    g.closePath();
-    g.strokePath();
+    // ── Pixel dissolve base (crumbling effect — rows of pixels breaking apart)
+    const pixRows = [
+      { y: cy + 66, pixels: [-20, -12, -4, 4, 12, 20], size: 6 },
+      { y: cy + 73, pixels: [-16, -6, 4, 14], size: 5 },
+      { y: cy + 79, pixels: [-12, 0, 10], size: 4 },
+      { y: cy + 84, pixels: [-6, 6], size: 3 },
+    ];
+    g.fillStyle(0x2d1b69, 0.8);
+    pixRows.forEach(row => {
+      row.pixels.forEach(px => {
+        g.fillRect(px - row.size / 2, row.y, row.size, row.size);
+      });
+    });
+    // scattered dissolve pixels below
+    g.fillStyle(0x4c1d95, 0.5);
+    [[-18, cy + 90], [-5, cy + 88], [8, cy + 92], [18, cy + 87]].forEach(([px, py]) => {
+      g.fillRect(px, py as number, 3, 3);
+    });
 
-    // ── Eyes (faint red glow in hood shadow) ───────────────────────────────
+    // ── Eyes — faint red glow in hood shadow ────────────────────────────────
     this.eyeLeft = new Phaser.GameObjects.Arc(
-      this.scene,
-      offsetX + 33,
-      offsetY + 28,
-      3,
-      0,
-      360,
-      false,
-      0xdc2626,
-      0.6,
+      this.scene, cx - 5, cy + 2, 3, 0, 360, false, 0xdc2626, 0.7,
     );
-
     this.eyeRight = new Phaser.GameObjects.Arc(
-      this.scene,
-      offsetX + 47,
-      offsetY + 28,
-      3,
-      0,
-      360,
-      false,
-      0xdc2626,
-      0.6,
+      this.scene, cx + 5, cy + 2, 3, 0, 360, false, 0xdc2626, 0.7,
     );
 
-    // Subtle eye pulse
+    // Eye pulse
     this.scene.tweens.add({
       targets: [this.eyeLeft, this.eyeRight],
-      alpha: { from: 0.4, to: 0.8 },
-      duration: 1500,
+      alpha: { from: 0.3, to: 0.9 },
+      duration: 1400,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // ── Floating animation (wraith hovers up & down) ─────────────────────────
+    this.scene.tweens.add({
+      targets: this,
+      y: this.y - 14,
+      duration: 2200,
       ease: "Sine.easeInOut",
       yoyo: true,
       repeat: -1,
@@ -495,13 +511,13 @@ export class MiniBoss extends Phaser.GameObjects.Container {
     const offsetY = -70;
 
     g.fillStyle(0x52525b, 1); // Dark stone
-    
+
     // Head (blocky)
     g.fillRect(offsetX + 30, offsetY + 0, 30, 25);
-    
+
     // Torso (massive)
     g.fillRect(offsetX + 10, offsetY + 30, 70, 50);
-    
+
     // Arms (asymmetrical)
     g.fillRect(offsetX + 0, offsetY + 35, 15, 60);
     g.fillRect(offsetX + 75, offsetY + 35, 15, 40);
@@ -528,10 +544,10 @@ export class MiniBoss extends Phaser.GameObjects.Container {
     const offsetY = -60;
 
     g.fillStyle(0x312e81, 0.6); // Deep indigo translucent
-    
+
     // Phantom head
     g.fillCircle(offsetX + 40, offsetY + 20, 18);
-    
+
     // Tattered cloak
     g.beginPath();
     g.moveTo(offsetX + 40, offsetY + 0);

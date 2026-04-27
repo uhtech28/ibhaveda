@@ -272,7 +272,7 @@ function StageStrip({
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.5, duration: 0.5 }}
-      className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2 backdrop-blur-md bg-[#0a0d14]/60 p-2 rounded-full border border-white/5 shadow-[0_0_20px_rgba(30,20,50,0.5)]"
+      className="absolute bottom-20 left-1/2 z-20 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-2 overflow-x-auto rounded-full border border-white/5 bg-[#0a0d14]/60 p-2 shadow-[0_0_20px_rgba(30,20,50,0.5)] backdrop-blur-md sm:bottom-8"
     >
       {STAGES.map((st, i) => {
         const isDone = i + 1 < activeStage;
@@ -295,13 +295,12 @@ function StageStrip({
                   : isCurrent
                     ? st.glow
                     : "rgba(255,255,255,0.05)",
-                border: `1px solid ${
-                  isDone
+                border: `1px solid ${isDone
                     ? "#6366f1"
                     : isCurrent
                       ? st.glow
                       : "rgba(255,255,255,0.1)"
-                }`,
+                  }`,
                 boxShadow: isCurrent ? `0 0 15px ${st.glow}` : "none",
                 transition:
                   "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease",
@@ -685,7 +684,7 @@ function AudioToggle({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 1 }}
       onClick={onToggle}
-      className="absolute bottom-12 right-5 z-20 w-10 h-10 rounded-full flex items-center justify-center text-[16px] backdrop-blur-xl shadow-lg"
+      className="absolute bottom-32 right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full text-[16px] shadow-lg backdrop-blur-xl sm:bottom-12 sm:right-5"
       style={{
         background: "rgba(15, 23, 42, 0.6)",
         border: "1px solid rgba(255, 255, 255, 0.1)",
@@ -837,9 +836,9 @@ export default function MapPage() {
     api.aiScoring.getStageQualityScore,
     activeVenture && worldMapData?.venture
       ? {
-          ventureId: activeVenture._id,
-          stageNumber: worldMapData.venture.currentStage,
-        }
+        ventureId: activeVenture._id,
+        stageNumber: worldMapData.venture.currentStage,
+      }
       : "skip",
   );
 
@@ -952,7 +951,7 @@ export default function MapPage() {
       savePersonaGender({
         ventureId: activeVenture._id,
         gender: selectedGender,
-      }).catch(() => {});
+      }).catch(() => { });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVenture?._id, selectedGender]);
@@ -996,13 +995,13 @@ export default function MapPage() {
   const xpPercent = levelData?.progress ?? 0;
   const levelPhase = levelData?.phase
     ? (() => {
-        const p = levelData.phase as string;
-        if (p === "tutorial") return 1;
-        if (p === "early") return 2;
-        if (p === "mid") return 3;
-        if (p === "senior") return 4;
-        return 5; // mentor
-      })()
+      const p = levelData.phase as string;
+      if (p === "tutorial") return 1;
+      if (p === "early") return 2;
+      if (p === "mid") return 3;
+      if (p === "senior") return 4;
+      return 5; // mentor
+    })()
     : 1;
 
   // Streak from Convex
@@ -1155,6 +1154,8 @@ export default function MapPage() {
       stageIcon: stageData?.icon ?? "💡",
       biomeName: stageData?.biome ?? "The Village",
       stage: activeStage,
+      currentCheckpoint: activeCP,
+      totalCheckpointsInStage: stageData?.checkpoints ?? 4,
     });
 
     const goldCount = checkpoints.filter(
@@ -1470,7 +1471,7 @@ export default function MapPage() {
 
   return (
     <div
-      className="relative w-full h-screen overflow-hidden font-sans"
+      className="relative h-[100dvh] w-full overflow-hidden font-sans"
       style={{ background: "#050810" }}
     >
       {/* Fonts + keyframes */}
@@ -1481,7 +1482,7 @@ export default function MapPage() {
       {/* Phaser canvas */}
       <div
         ref={containerRef}
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-0 [image-rendering:pixelated]"
         style={{ touchAction: "none" }}
       />
 

@@ -38,14 +38,14 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
 
   if (compact) {
     return (
-      <div className="flex items-center gap-2">
-        <div className="relative w-6 h-6">
+      <div className="flex items-center gap-1.5">
+        <div className="relative h-5 w-5">
           <motion.div
             animate={isIncreasing ? { scale: [1, 1.2, 1], rotate: [0, 360] } : {}}
             transition={{ duration: 0.5 }}
-            className="w-6 h-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full border-2 border-amber-300 flex items-center justify-center"
+            className="flex h-5 w-5 items-center justify-center rounded-full border border-amber-300/80 bg-gradient-to-br from-amber-400 to-amber-600"
           >
-            <span className="text-xs">💰</span>
+            <span className="text-[10px]">💰</span>
           </motion.div>
         </div>
         <motion.span
@@ -53,7 +53,7 @@ export function GoldCounter({ compact = false }: GoldCounterProps) {
           initial={{ scale: 1.2, color: "#818cf8" }} // Indigo 400
           animate={{ scale: 1, color: "#ffffff" }}
           transition={{ duration: 0.3 }}
-          className="text-sm font-bold text-white font-sans tracking-wide"
+          className="text-[13px] font-bold text-white font-sans tracking-wide"
         >
           {gold.toLocaleString()}
         </motion.span>

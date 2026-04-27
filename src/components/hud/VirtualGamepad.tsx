@@ -37,7 +37,7 @@ const GamepadButton: React.FC<GamepadButtonProps> = ({ icon, label, color, onCli
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={handlePress}
-        className={`relative w-12 h-12 flex items-center justify-center rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/10 shadow-lg group overflow-hidden`}
+        className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900/80 shadow-lg backdrop-blur-md group sm:h-12 sm:w-12`}
       >
         {/* Haptic Glow Ring */}
         <AnimatePresence>
@@ -55,7 +55,7 @@ const GamepadButton: React.FC<GamepadButtonProps> = ({ icon, label, color, onCli
           {icon}
         </div>
       </motion.button>
-      <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-white/40 uppercase tracking-tighter pointer-events-none">
+      <span className="absolute -bottom-5 left-1/2 hidden -translate-x-1/2 text-[9px] uppercase tracking-tighter text-white/40 pointer-events-none sm:block">
         {label}
       </span>
     </div>
@@ -68,9 +68,8 @@ export const VirtualGamepad = () => {
   };
 
   return (
-    <div className="fixed bottom-8 left-8 right-8 z-[60] pointer-events-none flex justify-between items-end">
-      {/* Left: Directional Pad */}
-      <div className="relative w-32 h-32 pointer-events-auto">
+    <div className="pointer-events-none fixed bottom-4 left-3 right-3 z-[60] flex items-end justify-between sm:bottom-6 sm:left-6 sm:right-6">
+      <div className="relative h-24 w-24 pointer-events-auto sm:h-32 sm:w-32">
         <GamepadButton 
           icon={<ChevronUp />} 
           label="Up" 
@@ -101,13 +100,12 @@ export const VirtualGamepad = () => {
         />
         
         {/* Center Pad */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-sm flex items-center justify-center">
+        <div className="absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-indigo-500/20 bg-indigo-500/10 backdrop-blur-sm sm:h-10 sm:w-10">
           <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
         </div>
       </div>
 
-      {/* Right: Action Buttons */}
-      <div className="relative w-32 h-32 pointer-events-auto">
+      <div className="relative h-24 w-24 pointer-events-auto sm:h-32 sm:w-32">
         <GamepadButton 
           icon={<Triangle className="w-5 h-5 fill-emerald-500/20 text-emerald-400" />} 
           label="Interact" 
@@ -138,11 +136,10 @@ export const VirtualGamepad = () => {
         />
 
         {/* Center Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/5 border border-white/10 blur-[2px]" />
+        <div className="absolute top-1/2 left-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/5 blur-[2px] sm:h-8 sm:w-8" />
       </div>
 
-      {/* Center Label (Optional) */}
-      <div className="flex flex-col items-center mb-4">
+      <div className="mb-2 hidden flex-col items-center sm:flex">
         <motion.div 
           animate={{ opacity: [0.4, 0.8, 0.4] }}
           transition={{ duration: 4, repeat: Infinity }}

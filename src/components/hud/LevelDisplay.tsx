@@ -6,9 +6,10 @@ import { motion } from "framer-motion";
 interface LevelDisplayProps {
   level: number;
   phase: number;
+  compact?: boolean;
 }
 
-const LevelDisplayComponent = ({ level, phase }: LevelDisplayProps) => {
+const LevelDisplayComponent = ({ level, phase, compact = false }: LevelDisplayProps) => {
   const getPhaseColors = (phase: number) => {
     switch (phase) {
       case 1:
@@ -61,23 +62,42 @@ const LevelDisplayComponent = ({ level, phase }: LevelDisplayProps) => {
     5: "Mentor",
   };
 
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2 font-sans">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-950/50 ${phaseStyle.primary}`}>
+          <span className={`text-[15px] font-black tracking-tighter ${phaseStyle.text}`}>
+            {level}
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[7px] text-zinc-500 uppercase tracking-widest font-black leading-none mb-0.5">
+            Level
+          </span>
+          <span className={`text-[8px] font-black uppercase leading-none tracking-widest ${phaseStyle.text}`}>
+            {phaseNames[phase] || `Phase ${phase}`}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-3 font-sans group">
-      {/* Level badge - sleek modern design */}
+    <div className="flex items-center gap-2.5 font-sans group">
       <motion.div
         className="relative"
         whileHover={{ scale: 1.05 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
       >
         <div
-          className={`relative w-12 h-12 rounded-xl bg-zinc-950/50 backdrop-blur-xl border border-white/10 ${phaseStyle.primary} flex items-center justify-center shadow-lg transition-all group-hover:border-indigo-500/50`}
+          className={`relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-zinc-950/50 ${phaseStyle.primary} shadow-lg backdrop-blur-xl transition-all group-hover:border-indigo-500/50`}
         >
           <motion.span
             key={level}
             initial={{ scale: 0.5, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 500, damping: 25 }}
-            className={`text-[20px] font-black tracking-tighter ${phaseStyle.text}`}
+            className={`text-[17px] font-black tracking-tighter ${phaseStyle.text}`}
           >
             {level}
           </motion.span>
@@ -92,10 +112,10 @@ const LevelDisplayComponent = ({ level, phase }: LevelDisplayProps) => {
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center shadow-[0_4px_12px_rgba(245,158,11,0.5)] border border-amber-300"
+            className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-md border border-amber-300 bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_4px_12px_rgba(245,158,11,0.5)]"
           >
             <svg
-              className="w-4 h-4 text-white"
+              className="h-3 w-3 text-white"
               viewBox="0 0 24 24"
               fill="currentColor"
             >
@@ -115,7 +135,7 @@ const LevelDisplayComponent = ({ level, phase }: LevelDisplayProps) => {
           className={`px-2 py-0.5 rounded-md bg-zinc-950/40 border border-white/5 ${phaseStyle.border}`}
         >
           <span
-            className={`text-[10px] font-black ${phaseStyle.text} uppercase tracking-widest leading-none`}
+            className={`text-[9px] font-black uppercase leading-none tracking-[0.18em] ${phaseStyle.text}`}
           >
             {phaseNames[phase] || `Phase ${phase}`}
           </span>

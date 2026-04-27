@@ -26,17 +26,21 @@ import { WorldMapScene } from "./scenes/WorldMapScene";
 export function createGameConfig(
   parent: HTMLElement,
 ): Phaser.Types.Core.GameConfig {
+  const isCompactViewport = parent.clientWidth < 768;
+  const baseWidth = isCompactViewport ? 960 : 1280;
+  const baseHeight = isCompactViewport ? 540 : 720;
+
   return {
     type: Phaser.AUTO,
     parent,
-    width: 1280,
-    height: 720,
+    width: baseWidth,
+    height: baseHeight,
     backgroundColor: "#0A0D12",
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: 1280,
-      height: 720,
+      width: baseWidth,
+      height: baseHeight,
       resizeInterval: 200,
     },
     physics: {
@@ -50,6 +54,7 @@ export function createGameConfig(
     render: {
       antialias: false,
       pixelArt: true,
+      roundPixels: true,
       powerPreference: "high-performance",
     },
     fps: {

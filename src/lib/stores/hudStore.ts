@@ -64,6 +64,8 @@ export const stageInfoAtom = atom({
   stageIcon: "💡",
   biomeName: "The Forest",
   stage: 1,
+  currentCheckpoint: 1,
+  totalCheckpointsInStage: 4,
 });
 
 export const checkpointProgressAtom = atom({

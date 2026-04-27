@@ -46,7 +46,7 @@ export class Persona extends Phaser.GameObjects.Container {
   private shadowEllipse: Phaser.GameObjects.Ellipse;
   private shadowTween: Phaser.Tweens.Tween | null = null;
   private walkTween: Phaser.Tweens.Tween | null = null;
-  private currentAnimation: "idle" | "walk" = "idle";
+  private currentAnimation: "idle" | "walk" | null = null;
   private isWalking = false;
 
   // ── Constructor ───────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ export class Persona extends Phaser.GameObjects.Container {
 
     this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, spriteSheetKey, 0);
     this.sprite.setOrigin(0.5, 1.0);
-    this.sprite.setScale(3); // 32×48px → 96×144px with nearest-neighbor
+    this.sprite.setScale(2); // 32x48px -> 64x96px, sized for the Fan-tasy map
 
     // ── Assemble container ──────────────────────────────────────────────────
     // Shadow is added first so it renders behind the sprite
@@ -135,7 +135,7 @@ export class Persona extends Phaser.GameObjects.Container {
    * Resume idle animation (sprite-based animation)
    */
   playIdle(): void {
-    if (this.currentAnimation === "idle") return;
+    if (this.currentAnimation === "idle" && this.sprite.anims.isPlaying) return;
 
     this.currentAnimation = "idle";
     this.isWalking = false;
@@ -164,7 +164,7 @@ export class Persona extends Phaser.GameObjects.Container {
    * @param duration Movement duration in milliseconds (default: 1000ms).
    */
   playWalk(targetX: number, targetY: number, duration = 1000): void {
-    if (this.currentAnimation === "walk") return;
+    if (this.currentAnimation === "walk" && this.walkTween?.isPlaying()) return;
 
     this.currentAnimation = "walk";
     this.isWalking = true;

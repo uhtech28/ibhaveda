@@ -1,370 +1,4 @@
-// /**
-//  * Checkpoint.ts
-//  *
-//  * CheckpointNode — a Phaser Container representing a single checkpoint on the
-//  * Interactive Ideas world-map. Manages status-driven textures, tween animations,
-//  * and progress indicators without destroying or recreating the object on state
-//  * transitions.
-//  */
-
-// import * as Phaser from "phaser";
-
-// // ─────────────────────────────────────────────────────────────────────────────
-// // Exported types
-// // ─────────────────────────────────────────────────────────────────────────────
-
-// /**
-//  * The five mutually-exclusive visual states a checkpoint can occupy.
-//  */
-// export type CheckpointStatus =
-//   | "locked"
-//   | "active"
-//   | "in_progress"
-//   | "completed"
-//   | "gold";
-
-// /**
-//  * All data required to construct a {@link CheckpointNode}.
-//  */
-// export interface CheckpointConfig {
-//   /** Unique identifier — matches the Convex checkpoint document `_id`. */
-//   id: string;
-//   /** Parent stage index (1–8). */
-//   stage: number;
-//   /** Checkpoint index within its stage (1-based). */
-//   checkpoint: number;
-//   /** Initial visual status. */
-//   status: CheckpointStatus;
-//   /** World-space X coordinate (scene pixels). */
-//   x: number;
-//   /** World-space Y coordinate (scene pixels). */
-//   y: number;
-//   /** Sub-task 1 completion flag. */
-//   t1: boolean;
-
-//   t2: boolean;
-//   /** Sub-task 3 completion flag. */
-//   t3: boolean;
-//   /** The 1-based global checkpoint number (1 to 36) */
-//   globalIndex: number;
-// }
-
-// // ─────────────────────────────────────────────────────────────────────────────
-// // CheckpointNode
-// // ─────────────────────────────────────────────────────────────────────────────
-
-// /**
-//  * A Phaser Container that renders a single checkpoint node on the world map.
-//  *
-//  * @example
-//  * const node = new CheckpointNode(this, {
-//  *   id: 'cp_001', stage: 1, checkpoint: 1,
-//  *   status: 'active', x: 400, y: 300,
-//  *   t1: false, t2: false, t3: false,
-//  * });
-//  * node.setInteractive();
-//  * this.events.on('checkpoint_clicked', (payload) => console.log(payload));
-//  */
-// export class CheckpointNode extends Phaser.GameObjects.Container {
-//   // ── Identity ──────────────────────────────────────────────────────────────
-
-//   readonly checkpointId: string;
-//   readonly stage: number;
-//   readonly checkpoint: number;
-
-//   // ── Private state ─────────────────────────────────────────────────────────
-
-//   private _status: CheckpointStatus;
-
-//   // ── Public getters ────────────────────────────────────────────────────────
-
-//   /**
-//    * Get the current status of this checkpoint
-//    */
-//   get status(): CheckpointStatus {
-//     return this._status;
-//   }
-//   private mainSprite: Phaser.GameObjects.Image;
-//   private pulseRing: Phaser.GameObjects.Arc;
-//   private glowCircle: Phaser.GameObjects.Arc;
-//   private numberText: Phaser.GameObjects.Text;
-//   private pulseTween: Phaser.Tweens.Tween | null = null;
-//   private shimmerTween: Phaser.Tweens.Tween | null = null;
-
-//   // ── Constructor ───────────────────────────────────────────────────────────
-
-//   /**
-//    * @param scene  The Phaser Scene this node belongs to.
-//    * @param config Full checkpoint configuration including position and status.
-//    */
-//   constructor(scene: Phaser.Scene, config: CheckpointConfig) {
-//     super(scene, config.x, config.y);
-
-//     this.checkpointId = config.id;
-//     this.stage = config.stage;
-//     this.checkpoint = config.checkpoint;
-//     this._status = config.status;
-
-//     // ── Glow circle (behind everything) ─────────────────────────────────────
-//     this.glowCircle = new Phaser.GameObjects.Arc(
-//       scene, 0, 0, 48, 0, 360, false, 0xe8003d, 0.35,
-//     );
-//     this.glowCircle.setVisible(false);
-
-//     // ── Pulse ring (animated for active state) ─────────────────────────────
-//     this.pulseRing = new Phaser.GameObjects.Arc(
-//       scene, 0, 0, 42, 0, 360, false, 0xff4081, 0.5,
-//     );
-//     this.pulseRing.setStrokeStyle(4, 0xffffff, 0.9);
-//     this.pulseRing.setVisible(false);
-
-//     // ── Main sprite (64×64 checkpoint texture) ──────────────────────────────
-//     this.mainSprite = new Phaser.GameObjects.Image(
-//       scene,
-//       0,
-//       0,
-//       `cp_${config.status}`,
-//     );
-//     this.mainSprite.setOrigin(0.5, 0.5);
-
-//     // ── Global Number Text (large white bold inside button) ─────────────────
-//     this.numberText = new Phaser.GameObjects.Text(
-//       scene, 0, 2,
-//       `${config.globalIndex}`,
-//       {
-//         fontSize: "22px",
-//         fontFamily: '"Fredoka One", "Comic Sans MS", Impact, cursive',
-//         color: "#ffffff",
-//         align: "center",
-//         fontStyle: "bold",
-//         stroke: "#7f0020",
-//         strokeThickness: 3,
-//       },
-//     );
-//     this.numberText.setOrigin(0.5, 0.5);
-
-//     // ── Assemble container ──────────────────────────────────────────────────
-//     this.add([
-//       this.glowCircle,
-//       this.pulseRing,
-//       this.mainSprite,
-//       this.numberText,
-//     ]);
-
-//     scene.add.existing(this);
-
-//     // Apply initial visual state
-//     this.applyStatusVisuals();
-//   }
-
-//   // ── Public API ────────────────────────────────────────────────────────────
-
-//   /**
-//    * Transitions the node to a new status, updating all visuals and animations.
-//    *
-//    * @param status The new checkpoint status.
-//    */
-//   updateStatus(status: CheckpointStatus): void {
-//     if (this._status === status) return;
-//     this._status = status;
-//     this.applyStatusVisuals();
-//   }
-
-//   /**
-//    * Updates progress visual states (no-op for new design)
-//    */
-//   updateProgressDots(t1: boolean, t2: boolean, t3: boolean, isGold = false): void {
-//     // Progress stars disabled in favor of purely numbered map nodes
-//   }
-
-//   /**
-//    * Get the absolute world position of this checkpoint node.
-//    *
-//    * @returns Object with x and y world coordinates.
-//    */
-//   getWorldPosition(): { x: number; y: number } {
-//     return { x: this.x, y: this.y };
-//   }
-
-//   /**
-//    * Activates pointer input on this node and wires up event listeners.
-//    *
-//    * Emits `'checkpoint_clicked'` on the scene's event bus with a payload of
-//    * `{ id, stage, checkpoint }` whenever the user clicks or taps the node.
-//    */
-//   override setInteractive(): this {
-//     // Register a circular hit area matching the 80 px diameter sprite
-//     super.setInteractive(
-//       new Phaser.Geom.Circle(0, 0, 40),
-//       Phaser.Geom.Circle.Contains,
-//     );
-
-//     // Click / tap
-//     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
-//       this.scene.events.emit("checkpoint_clicked", {
-//         id: this.checkpointId,
-//         stage: this.stage,
-//         checkpoint: this.checkpoint,
-//       });
-//     });
-
-//     // Hover in
-//     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-//       this.mainSprite.setScale(1.12);
-//       this.numberText.setStyle({ color: "#fde68a" });
-//       if (typeof document !== "undefined") {
-//         document.body.style.cursor = "pointer";
-//       }
-//     });
-
-//     // Hover out
-//     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-//       this.mainSprite.setScale(1.0);
-//       this.numberText.setStyle({ color: "#ffffff" });
-//       if (typeof document !== "undefined") {
-//         document.body.style.cursor = "default";
-//       }
-//     });
-
-//     return this;
-//   }
-
-//   // ── Private: animations ───────────────────────────────────────────────────
-
-//   /**
-//    * Starts the active-state pulse animation on the pulse ring.
-//    */
-//   private startPulse(): void {
-//     this.pulseTween?.stop();
-//     this.pulseRing.setVisible(true);
-
-//     this.pulseTween = this.scene.tweens.add({
-//       targets: this.pulseRing,
-//       alpha: { from: 0.2, to: 0.7 },
-//       scaleX: { from: 1.0, to: 1.2 },
-//       scaleY: { from: 1.0, to: 1.2 },
-//       duration: 800,
-//       ease: Phaser.Math.Easing.Sine.InOut,
-//       yoyo: true,
-//       repeat: -1,
-//     });
-//   }
-
-//   /**
-//    * Starts the gold-shimmer tween on the main sprite.
-//    */
-//   private startGoldShimmer(): void {
-//     this.shimmerTween?.stop();
-
-//     const startColor = Phaser.Display.Color.IntegerToColor(0xf59e0b);
-//     const endColor = Phaser.Display.Color.IntegerToColor(0xfef08a);
-
-//     const counter = { t: 0 };
-
-//     this.shimmerTween = this.scene.tweens.add({
-//       targets: counter,
-//       t: 1,
-//       duration: 1500,
-//       ease: Phaser.Math.Easing.Sine.InOut,
-//       yoyo: true,
-//       repeat: -1,
-//       onUpdate: () => {
-//         const t = counter.t;
-//         const r = Math.round(
-//           Phaser.Math.Linear(startColor.red, endColor.red, t),
-//         );
-//         const g = Math.round(
-//           Phaser.Math.Linear(startColor.green, endColor.green, t),
-//         );
-//         const b = Math.round(
-//           Phaser.Math.Linear(startColor.blue, endColor.blue, t),
-//         );
-//         this.mainSprite.setTint(Phaser.Display.Color.GetColor(r, g, b));
-//       },
-//     });
-//   }
-
-//   /**
-//    * Stops all running tweens and resets visuals.
-//    */
-//   private stopAnimations(): void {
-//     if (this.pulseTween) {
-//       this.pulseTween.stop();
-//       this.pulseTween = null;
-//     }
-//     if (this.shimmerTween) {
-//       this.shimmerTween.stop();
-//       this.shimmerTween = null;
-//     }
-
-//     this.pulseRing.setVisible(false);
-//     this.glowCircle.setVisible(false);
-//     this.mainSprite.setScale(1.0);
-//     this.mainSprite.setAlpha(1.0);
-//     this.mainSprite.clearTint();
-//   }
-
-//   // ── Private: visual state ─────────────────────────────────────────────────
-
-//   /**
-//    * Applies the full visual treatment for the current status.
-//    */
-//   private applyStatusVisuals(): void {
-//     this.stopAnimations();
-
-//     // Swap to the matching texture
-//     this.mainSprite.setTexture(`cp_${this._status}`);
-
-//     switch (this._status) {
-//       case "locked":
-//         this.mainSprite.setAlpha(0.55);
-//         this.numberText.setStyle({ color: "#94a3b8" });
-//         break;
-
-//       case "active":
-//         this.mainSprite.setAlpha(1.0);
-//         this.numberText.setStyle({ color: "#ffffff" });
-//         this.startPulse();
-//         break;
-
-//       case "in_progress":
-//         this.mainSprite.setAlpha(0.9);
-//         this.numberText.setStyle({ color: "#ffffff" });
-//         break;
-
-//       case "completed":
-//         this.mainSprite.setAlpha(1.0);
-//         this.numberText.setStyle({ color: "#fde68a" });
-//         break;
-
-//       case "gold":
-//         this.mainSprite.setAlpha(1.0);
-//         this.numberText.setStyle({ color: "#ffffff" });
-//         this.startGoldShimmer();
-//         // glowCircle kept hidden — the shimmer tint is enough visual feedback
-//         break;
-//     }
-//   }
-// }
-
-/**
- * Checkpoint.ts
- *
- * CheckpointNode — a Phaser Container representing a single checkpoint on the
- * Interactive Ideas world-map.
- *
- * Theme: Dark Tech Platform
- * Active: Indigo glow + pulse ring
- * Gold:   Amber shimmer
- * Locked: Muted slate
- * Complete: Indigo-gold gradient button
- */
-
 import * as Phaser from "phaser";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Exported types
-// ─────────────────────────────────────────────────────────────────────────────
 
 export type CheckpointStatus =
   | "locked"
@@ -384,18 +18,14 @@ export interface CheckpointConfig {
   t1: boolean;
   t2: boolean;
   t3: boolean;
-  /** 1-based global checkpoint number across all stages */
   globalIndex: number;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CheckpointNode
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class CheckpointNode extends Phaser.GameObjects.Container {
   readonly checkpointId: string;
   readonly stage: number;
   readonly checkpoint: number;
+  readonly globalIndex: number;
 
   private _status: CheckpointStatus;
 
@@ -404,45 +34,31 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   }
 
   private mainSprite: Phaser.GameObjects.Image;
-
-  /**
-   * Outer glow ring — indigo for active, amber for gold, hidden otherwise.
-   * Rendered as a fat-stroked circle outside the button.
-   */
   private glowRing: Phaser.GameObjects.Arc;
-
-  /**
-   * Inner pulse ring — animated scale+alpha tween on "active" state.
-   */
   private pulseRing: Phaser.GameObjects.Arc;
-
-  /** Stage + checkpoint label (e.g. "1-1", "2-3") */
-  private stageLabel: Phaser.GameObjects.Text;
-
-  /** Global sequential number shown inside the button */
-  private numberText: Phaser.GameObjects.Text;
-
-  /** Small stage indicator dot above the button */
   private stageDot: Phaser.GameObjects.Arc;
-
+  private labelPlate: Phaser.GameObjects.Rectangle;
+  private stageLabel: Phaser.GameObjects.Text;
+  private numberText: Phaser.GameObjects.Text;
   private pulseTween: Phaser.Tweens.Tween | null = null;
   private shimmerTween: Phaser.Tweens.Tween | null = null;
 
-  // Website palette constants kept local for readability
   private static readonly C = {
-    bg: 0x0f0f1a,
-    surface: 0x1a1a2e,
-    indigo: 0x6366f1,
-    indigoLight: 0x818cf8,
-    indigoDark: 0x4f46e5,
-    purple: 0x8b5cf6,
-    cyan: 0x06b6d4,
-    amber: 0xf59e0b,
-    amberLight: 0xfcd34d,
-    slate: 0x475569,
-    slateDim: 0x334155,
+    barkDark: 0x342416,
+    bark: 0x6c4b2a,
+    barkLight: 0xa67b49,
+    moss: 0x4b7a43,
+    mossLight: 0x89b96b,
+    river: 0x4c74c9,
+    riverLight: 0x8ab2ff,
+    amber: 0xd79220,
+    amberLight: 0xf1cf76,
+    parchment: 0xf5e8c8,
+    parchmentDark: 0xd2bb8e,
+    slate: 0x6b6254,
+    ink: 0x251911,
+    gold: 0xf2c55a,
     white: 0xffffff,
-    gold: 0xfbbf24,
   };
 
   constructor(scene: Phaser.Scene, config: CheckpointConfig) {
@@ -451,106 +67,83 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     this.checkpointId = config.id;
     this.stage = config.stage;
     this.checkpoint = config.checkpoint;
+    this.globalIndex = config.globalIndex;
     this._status = config.status;
 
     const C = CheckpointNode.C;
 
-    // ── Premium depth shadow (creates 3D effect) ────────────────────────────
-    const shadow = new Phaser.GameObjects.Arc(
+    const shadow = new Phaser.GameObjects.Ellipse(
       scene,
-      2,
-      4,
-      46,
       0,
-      360,
-      false,
+      31,
+      60,
+      18,
       0x000000,
-      0.4,
+      0.22,
     );
-    shadow.setStrokeStyle(2, 0x000000, 0.2);
-    this.add(shadow);
 
-    // ── Outer premium frame (Sokoban-style border) ──────────────────────────
     const outerFrame = scene.add.graphics();
-    outerFrame.lineStyle(4, 0x18181b, 1); // Zinc 900
-    outerFrame.strokeCircle(0, 0, 50);
-    outerFrame.lineStyle(2, C.indigoLight, 0.4);
-    outerFrame.strokeCircle(0, 0, 48);
-    this.add(outerFrame);
+    outerFrame.fillStyle(C.barkDark, 1);
+    outerFrame.fillCircle(0, 0, 39);
+    outerFrame.lineStyle(4, C.barkLight, 0.95);
+    outerFrame.strokeCircle(0, 0, 36);
+    outerFrame.lineStyle(2, C.parchmentDark, 0.7);
+    outerFrame.strokeCircle(0, 0, 31);
 
-    // ── Inner decorative ring ───────────────────────────────────────────────
     const innerRing = scene.add.graphics();
-    
-    // Premium Gradient Island Base
     innerRing.fillGradientStyle(
-      C.indigoDark, C.indigoDark, C.indigo, C.indigo, 1
+      C.parchmentDark,
+      C.parchmentDark,
+      C.barkLight,
+      C.barkLight,
+      1,
     );
-    innerRing.fillCircle(0, 0, 42);
-    
-    // Shoreline highlight (3D edge)
-    innerRing.lineStyle(2, 0xffffff, 0.1);
-    innerRing.strokeCircle(0, 0, 42);
-    
-    this.add(innerRing);
+    innerRing.fillCircle(0, 0, 28);
+    innerRing.lineStyle(2, C.parchment, 0.5);
+    innerRing.strokeCircle(0, 0, 26);
 
-    // ── Outer glow ring (hidden by default, shown for active / gold) ────────
     this.glowRing = new Phaser.GameObjects.Arc(
       scene,
       0,
       0,
-      58,
+      44,
       0,
       360,
       false,
-      C.indigo,
+      C.moss,
       0,
     );
-    this.glowRing.setStrokeStyle(8, C.indigoLight, 0.4);
+    this.glowRing.setStrokeStyle(3, C.mossLight, 0.35);
 
-    // ── Pulse ring ──────────────────────────────────────────────────────────
     this.pulseRing = new Phaser.GameObjects.Arc(
       scene,
       0,
       0,
-      48,
+      33,
       0,
       360,
       false,
-      C.indigo,
-      0.3,
+      C.mossLight,
+      0.18,
     );
-    this.pulseRing.setStrokeStyle(3, C.indigoLight, 0.6);
+    this.pulseRing.setStrokeStyle(2, C.parchment, 0.55);
     this.pulseRing.setVisible(false);
 
-    // ── Floating animation ──────────────────────────────────────────────────
-    scene.tweens.add({
-      targets: this,
-      y: config.y - 5,
-      duration: 2000 + Math.random() * 1000,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-      delay: Math.random() * 2000
-    });
-
-    // ── Small stage indicator dot ──────────────────────────────────────────
-    // Stage 1 → Indigo, Stage 2 → Purple, others → Cyan
     const stageDotColor =
-      config.stage === 1 ? C.indigo : config.stage === 2 ? C.purple : C.cyan;
+      config.stage === 1 ? C.amber : config.stage === 2 ? C.moss : C.river;
     this.stageDot = new Phaser.GameObjects.Arc(
       scene,
       0,
-      -50,
-      6,
+      -38,
+      4,
       0,
       360,
       false,
       stageDotColor,
-      1.0,
+      1,
     );
-    this.stageDot.setStrokeStyle(2, C.white, 0.4);
+    this.stageDot.setStrokeStyle(2, C.parchment, 0.65);
 
-    // ── Main sprite (80×80 texture key: cp_<status>) ────────────────────────
     this.mainSprite = new Phaser.GameObjects.Image(
       scene,
       0,
@@ -558,78 +151,93 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       `cp_${config.status}`,
     );
     this.mainSprite.setOrigin(0.5, 0.5);
+    this.mainSprite.setScale(0.72);
 
-    // ── Global number text inside button ────────────────────────────────────
-    this.numberText = new Phaser.GameObjects.Text(
-      scene,
-      0,
-      1,
-      `${config.globalIndex}`,
-      {
-        fontSize: "20px",
-        fontFamily:
-          '"Space Grotesk", "Plus Jakarta Sans", "Segoe UI", sans-serif',
-        color: "#ffffff",
-        align: "center",
-        fontStyle: "bold",
-        stroke: "#1e1b4b",
-        strokeThickness: 3,
-      },
-    );
+    this.numberText = new Phaser.GameObjects.Text(scene, 0, 2, `${config.checkpoint}`, {
+      fontSize: "18px",
+      fontFamily: '"VT323", "Courier New", monospace',
+      color: "#fff7e6",
+      align: "center",
+      fontStyle: "bold",
+      stroke: "#2a1c11",
+      strokeThickness: 3,
+    });
     this.numberText.setOrigin(0.5, 0.5);
 
-    // ── Stage.Checkpoint label below the button ─────────────────────────────
+    this.labelPlate = new Phaser.GameObjects.Rectangle(
+      scene,
+      0,
+      39,
+      42,
+      12,
+      C.barkDark,
+      0.92,
+    );
+    this.labelPlate.setStrokeStyle(2, C.parchmentDark, 0.8);
+
     this.stageLabel = new Phaser.GameObjects.Text(
       scene,
       0,
-      50,
-      `${config.stage}.${config.checkpoint}`,
+      39,
+      `LV ${config.checkpoint}`,
       {
-        fontSize: "10px",
-        fontFamily: '"Space Mono", monospace',
-        color: "#64748b",
+        fontSize: "8px",
+        fontFamily: '"VT323", "Courier New", monospace',
+        color: "#f5e7c6",
         align: "center",
       },
     );
     this.stageLabel.setOrigin(0.5, 0.5);
 
-    // ── Assemble ─────────────────────────────────────────────────────────────
     this.add([
+      shadow,
       this.glowRing,
+      outerFrame,
+      innerRing,
       this.pulseRing,
       this.mainSprite,
       this.stageDot,
+      this.labelPlate,
       this.stageLabel,
       this.numberText,
     ]);
 
-    // ── Interactive hover effects ───────────────────────────────────────────
-    this.setSize(100, 100);
+    scene.tweens.add({
+      targets: this,
+      y: config.y - 2,
+      duration: 2200 + Math.random() * 800,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+      delay: Math.random() * 1800,
+    });
+
+    this.setSize(84, 84);
     this.setInteractive();
 
     this.on("pointerover", () => {
       if (this._status !== "locked") {
         this.scene.tweens.add({
           targets: this,
-          scaleX: 1.1,
-          scaleY: 1.1,
-          duration: 200,
-          ease: "Back.easeOut",
+          scaleX: 1.05,
+          scaleY: 1.05,
+          duration: 140,
+          ease: "Quad.easeOut",
         });
-        this.glowRing.setStrokeStyle(8, C.indigoLight, 0.8);
+        this.glowRing.setStrokeStyle(4, C.amberLight, 0.65);
       }
     });
 
     this.on("pointerout", () => {
       this.scene.tweens.add({
         targets: this,
-        scaleX: 1.0,
-        scaleY: 1.0,
-        duration: 150,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 140,
         ease: "Quad.easeOut",
       });
       if (this._status === "active") {
-        this.glowRing.setStrokeStyle(6, C.indigoLight, 0.5);
+        this.glowRing.setStrokeStyle(4, C.mossLight, 0.55);
       } else {
         this.glowRing.setStrokeStyle(0);
       }
@@ -639,9 +247,9 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       if (this._status !== "locked") {
         this.scene.tweens.add({
           targets: this,
-          scaleX: 0.95,
-          scaleY: 0.95,
-          duration: 100,
+          scaleX: 0.96,
+          scaleY: 0.96,
+          duration: 90,
           yoyo: true,
           ease: "Quad.easeOut",
         });
@@ -652,15 +260,12 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     this.applyStatusVisuals();
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
-
   updateStatus(status: CheckpointStatus): void {
     if (this._status === status) return;
     this._status = status;
     this.applyStatusVisuals();
   }
 
-  /** No-op — progress dots replaced by numbered style */
   updateProgressDots(
     _t1: boolean,
     _t2: boolean,
@@ -674,12 +279,11 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
   override setInteractive(): this {
     super.setInteractive(
-      new Phaser.Geom.Circle(0, 0, 40),
+      new Phaser.Geom.Circle(0, 0, 32),
       Phaser.Geom.Circle.Contains,
     );
 
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-      console.log(`[Phaser] CheckpointNode pointerup: ${this.checkpointId}`);
       this.scene.events.emit("checkpoint_clicked", {
         id: this.checkpointId,
         stage: this.stage,
@@ -688,36 +292,32 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     });
 
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      this.mainSprite.setScale(1.1);
-      this.numberText.setStyle({ color: "#e0e7ff" });
-      if (typeof document !== "undefined")
-        document.body.style.cursor = "pointer";
+      this.numberText.setStyle({ color: "#fff3d6" });
+      if (typeof document !== "undefined") document.body.style.cursor = "pointer";
     });
 
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      this.mainSprite.setScale(1.0);
-      this.numberText.setStyle({ color: "#ffffff" });
-      if (typeof document !== "undefined")
-        document.body.style.cursor = "default";
+      this.numberText.setStyle({
+        color: this._status === "gold" ? "#3b2412" : "#fff7e6",
+      });
+      if (typeof document !== "undefined") document.body.style.cursor = "default";
     });
 
     return this;
   }
 
-  // ── Private: animations ───────────────────────────────────────────────────
-
   private startPulse(): void {
     this.pulseTween?.stop();
     this.pulseRing.setVisible(true);
-    this.pulseRing.setAlpha(0.5);
-    this.pulseRing.setScale(1.0);
+    this.pulseRing.setAlpha(0.42);
+    this.pulseRing.setScale(1);
 
     this.pulseTween = this.scene.tweens.add({
       targets: this.pulseRing,
-      alpha: { from: 0.15, to: 0.6 },
-      scaleX: { from: 0.95, to: 1.25 },
-      scaleY: { from: 0.95, to: 1.25 },
-      duration: 900,
+      alpha: { from: 0.12, to: 0.42 },
+      scaleX: { from: 0.96, to: 1.14 },
+      scaleY: { from: 0.96, to: 1.14 },
+      duration: 850,
       ease: Phaser.Math.Easing.Sine.InOut,
       yoyo: true,
       repeat: -1,
@@ -727,9 +327,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   private startGoldShimmer(): void {
     this.shimmerTween?.stop();
     const start = Phaser.Display.Color.IntegerToColor(CheckpointNode.C.amber);
-    const end = Phaser.Display.Color.IntegerToColor(
-      CheckpointNode.C.amberLight,
-    );
+    const end = Phaser.Display.Color.IntegerToColor(CheckpointNode.C.amberLight);
     const counter = { t: 0 };
 
     this.shimmerTween = this.scene.tweens.add({
@@ -741,12 +339,8 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       repeat: -1,
       onUpdate: () => {
         const r = Math.round(Phaser.Math.Linear(start.red, end.red, counter.t));
-        const g = Math.round(
-          Phaser.Math.Linear(start.green, end.green, counter.t),
-        );
-        const b = Math.round(
-          Phaser.Math.Linear(start.blue, end.blue, counter.t),
-        );
+        const g = Math.round(Phaser.Math.Linear(start.green, end.green, counter.t));
+        const b = Math.round(Phaser.Math.Linear(start.blue, end.blue, counter.t));
         this.mainSprite.setTint(Phaser.Display.Color.GetColor(r, g, b));
       },
     });
@@ -757,14 +351,11 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     this.pulseTween = null;
     this.shimmerTween?.stop();
     this.shimmerTween = null;
-
     this.pulseRing.setVisible(false);
-    this.mainSprite.setScale(1.0);
-    this.mainSprite.setAlpha(1.0);
+    this.mainSprite.setScale(0.72);
+    this.mainSprite.setAlpha(1);
     this.mainSprite.clearTint();
   }
-
-  // ── Private: visual state ─────────────────────────────────────────────────
 
   private applyStatusVisuals(): void {
     this.stopAnimations();
@@ -776,58 +367,71 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
     switch (this._status) {
       case "locked":
-        this.mainSprite.setAlpha(0.45);
-        this.numberText.setStyle({ color: "#475569" });
-        this.stageLabel.setStyle({ color: "#334155" });
-        this.stageDot.setAlpha(0.3);
+        this.mainSprite.setAlpha(0.42);
+        this.mainSprite.setTint(C.slate);
+        this.numberText.setStyle({ color: "#82756a" });
+        this.stageLabel.setStyle({ color: "#ae9779" });
+        this.labelPlate.setFillStyle(C.barkDark, 0.78);
+        this.stageDot.setAlpha(0.28);
         this.glowRing.setAlpha(0);
         break;
 
       case "active":
-        this.mainSprite.setAlpha(1.0);
-        this.numberText.setStyle({ color: "#ffffff" });
-        this.stageLabel.setStyle({ color: "#818cf8" });
-        this.stageDot.setAlpha(1.0);
-        // Show the glow ring softly
-        this.glowRing.setFillStyle(C.indigo, 0.2);
+        this.mainSprite.setTint(C.moss, C.moss, C.river, C.river);
+        this.numberText.setStyle({ color: "#fff8ed" });
+        this.stageLabel.setStyle({ color: "#fff0cc" });
+        this.labelPlate.setFillStyle(C.bark, 0.95);
+        this.stageDot.setFillStyle(C.amber, 1);
+        this.stageDot.setAlpha(1);
+        this.glowRing.setFillStyle(C.mossLight, 0.14);
+        this.glowRing.setStrokeStyle(4, C.mossLight, 0.55);
         this.glowRing.setAlpha(1);
         this.startPulse();
         break;
 
       case "in_progress":
-        this.mainSprite.setAlpha(0.92);
-        this.numberText.setStyle({ color: "#ffffff" });
-        this.stageLabel.setStyle({ color: "#fcd34d" });
-        this.stageDot.setAlpha(1.0);
+        this.mainSprite.setTint(C.barkLight, C.amber, C.amber, C.barkLight);
+        this.numberText.setStyle({ color: "#fff5db" });
+        this.stageLabel.setStyle({ color: "#ffe39a" });
+        this.labelPlate.setFillStyle(C.bark, 0.95);
+        this.stageDot.setFillStyle(C.amberLight, 1);
+        this.stageDot.setAlpha(1);
         this.glowRing.setFillStyle(C.amber, 0.12);
+        this.glowRing.setStrokeStyle(4, C.amberLight, 0.45);
         this.glowRing.setAlpha(1);
         break;
 
       case "partial":
-        // One or two tasks completed — amber partial glow
-        this.mainSprite.setAlpha(0.96);
-        this.numberText.setStyle({ color: "#ffffff" });
-        this.stageLabel.setStyle({ color: "#fbbf24" });
-        this.stageDot.setAlpha(1.0);
+        this.mainSprite.setTint(C.amber, C.amberLight, C.river, C.riverLight);
+        this.numberText.setStyle({ color: "#fff6e4" });
+        this.stageLabel.setStyle({ color: "#ffe0a1" });
+        this.labelPlate.setFillStyle(C.bark, 0.95);
+        this.stageDot.setFillStyle(C.gold, 1);
+        this.stageDot.setAlpha(1);
         this.glowRing.setFillStyle(C.amber, 0.18);
+        this.glowRing.setStrokeStyle(4, C.amberLight, 0.52);
         this.glowRing.setAlpha(1);
         break;
 
       case "completed":
-        this.mainSprite.setAlpha(1.0);
-        this.numberText.setStyle({ color: "#e0e7ff" });
-        this.stageLabel.setStyle({ color: "#6366f1" });
-        this.stageDot.setAlpha(1.0);
+        this.mainSprite.setTint(C.river, C.riverLight, C.moss, C.mossLight);
+        this.numberText.setStyle({ color: "#f5efe1" });
+        this.stageLabel.setStyle({ color: "#efe1c2" });
+        this.labelPlate.setFillStyle(C.barkDark, 0.95);
+        this.stageDot.setFillStyle(C.mossLight, 1);
+        this.stageDot.setAlpha(1);
         this.glowRing.setAlpha(0);
         break;
 
       case "gold":
-        this.mainSprite.setAlpha(1.0);
-        this.numberText.setStyle({ color: "#1c1917" });
-        this.stageLabel.setStyle({ color: "#f59e0b" });
+        this.mainSprite.setTint(C.amber, C.amberLight, C.gold, C.parchment);
+        this.numberText.setStyle({ color: "#3b2412" });
+        this.stageLabel.setStyle({ color: "#ffe09e" });
+        this.labelPlate.setFillStyle(C.bark, 0.98);
         this.stageDot.setFillStyle(C.gold, 1);
-        this.stageDot.setAlpha(1.0);
+        this.stageDot.setAlpha(1);
         this.glowRing.setFillStyle(C.amber, 0.25);
+        this.glowRing.setStrokeStyle(4, C.amberLight, 0.55);
         this.glowRing.setAlpha(1);
         this.startGoldShimmer();
         break;
