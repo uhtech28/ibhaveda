@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -163,6 +163,12 @@ export function KanbanTool({
     "todo" | "inprogress" | "done"
   >("todo");
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
+
+  useEffect(() => {
+    if (initialContent?.cards) {
+      setCards(initialContent.cards);
+    }
+  }, [initialContent]);
 
   const columns: {
     id: "todo" | "inprogress" | "done";

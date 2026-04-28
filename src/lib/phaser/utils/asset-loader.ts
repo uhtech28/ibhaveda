@@ -1341,6 +1341,11 @@ export class AssetLoader {
       { frameWidth: 16, frameHeight: 16 },
     );
     scene.load.image("Tileset_Water", `${fanTasyPath}/Tileset_Water.png`);
+    scene.load.spritesheet(
+      "Tileset_Water_Sheet",
+      `${fanTasyPath}/Tileset_Water.png`,
+      { frameWidth: 16, frameHeight: 16 },
+    );
     scene.load.image("Tileset_RockSlope", `${fanTasyPath}/Tileset_RockSlope.png`);
     scene.load.image("Tileset_RockSlope_Simple", `${fanTasyPath}/Tileset_RockSlope_Simple.png`);
     scene.load.image("Tileset_Road", `${fanTasyPath}/Tileset_Road.png`);

@@ -466,6 +466,71 @@ export const getVenturesByUser = query({
   },
 });
 
+export const getToolData = query({
+  args: {
+    ventureId: v.id("ventures"),
+    toolType: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const toolDoc = await ctx.db
+      .query("ventureTools")
+      .withIndex("by_venture_tool", (q) => 
+        q.eq("ventureId", args.ventureId).eq("toolType", args.toolType)
+      )
+      .first();
+
+    return toolDoc?.data ?? null;
+  },
+});
+
+export const saveToolData = mutation({
+  args: {
+    ventureId: v.id("ventures"),
+    toolType: v.string(),
+    data: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const venture = await ctx.db.get(args.ventureId);
+    if (!venture) throw new Error("Venture not found");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    
+    if (!user || venture.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+
+    const existing = await ctx.db
+      .query("ventureTools")
+      .withIndex("by_venture_tool", (q) => 
+        q.eq("ventureId", args.ventureId).eq("toolType", args.toolType)
+      )
+      .first();
+
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, { data: args.data, updatedAt: now });
+    } else {
+      await ctx.db.insert("ventureTools", {
+        ventureId: args.ventureId,
+        toolType: args.toolType,
+        data: args.data,
+        updatedAt: now,
+      });
+    }
+
+    return { success: true };
+  },
+});
+
 export const savePersonaGender = mutation({
   args: {
     ventureId: v.id("ventures"),

@@ -27,6 +27,8 @@ import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useRouter } from "next/navigation";
 import { TaskSubmissionModal } from "@/components/map/TaskSubmissionModal";
+import { LeftSidebar } from "@/components/map/LeftSidebar";
+import { ToolsPanel } from "@/components/map/ToolsPanel";
 import {
   activeVentureAtom,
   userProgressAtom,
@@ -857,6 +859,8 @@ export default function MapPage() {
   const [selectedDetail, setSelectedDetail] = useState<CheckpointDetail | null>(
     null,
   );
+  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState(false);
+  const [activeToolsTab, setActiveToolsTab] = useState<"tools" | "calendar" | "kanban" | "week-prd" | "all-prd" | "write" | "map" | "journal" | "survey">("tools");
   const [flashTrigger, setFlashTrigger] = useState(0);
   const [showLevelUp, setShowLevelUp] = useState(false);
   // fps tracked by useMapGame but only used in debug — keep for future use
@@ -1652,6 +1656,26 @@ export default function MapPage() {
             onDismiss={() => setGoldCheckpointNotification(null)}
           />
 
+          {/* Left Sidebar Trigger */}
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
+            <LeftSidebar 
+              onOpenPanel={(tab) => {
+                setActiveToolsTab(tab);
+                setIsToolsPanelOpen(true);
+                setSelectedDetail(null); // Close right panel if opening left
+              }} 
+            />
+          </div>
+
+          {/* Tools Panel (Left) */}
+          <ToolsPanel 
+            isOpen={isToolsPanelOpen} 
+            onClose={() => setIsToolsPanelOpen(false)} 
+            activeTab={activeToolsTab}
+            onTabChange={setActiveToolsTab}
+            activeVentureId={activeVenture?._id}
+          />
+
           {/* Checkpoint detail panel */}
           <AnimatePresence>
             {selectedDetail && (
@@ -1670,6 +1694,15 @@ export default function MapPage() {
               className="absolute inset-0 z-[55]"
               style={{ right: "340px" }}
               onClick={() => setSelectedDetail(null)}
+            />
+          )}
+
+          {/* Click-away backdrop (right of tools panel) */}
+          {isToolsPanelOpen && (
+            <div
+              className="absolute inset-0 z-[55]"
+              style={{ left: "420px" }}
+              onClick={() => setIsToolsPanelOpen(false)}
             />
           )}
 

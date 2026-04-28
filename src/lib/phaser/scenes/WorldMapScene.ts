@@ -438,50 +438,156 @@ export class WorldMapScene extends Phaser.Scene {
     const cols = this.map.width;
     const rows = this.map.height;
     const grassFrames = [96, 97, 98, 99, 100, 101, 108, 109, 110, 111, 112, 113];
-    const mossFrames = [54, 55, 58, 59, 66, 67, 78, 79, 82, 83, 90, 91];
-    const roadFrames = [48, 49, 50, 54, 55, 56];
-    const soilFrames = [14, 20, 30, 31, 32, 43, 44, 45];
-    const baseTint =
-      biome.id === 2 ? 0xffffff : biome.id === 5 ? 0x9ca3af : 0xc4b5fd;
+    const deepGrassFrames = [54, 55, 58, 59, 66, 67, 78, 79, 82, 83, 90, 91];
+    const mudFrames = [14, 20, 30, 31, 32, 43, 44, 45];
+    const bankFrames = [0, 1, 2, 3, 5, 7, 8, 9, 13, 14, 15, 24, 25, 30, 31, 40, 41, 47, 48, 49, 50, 55, 56];
+    const waterFrame = 26;
+    const style =
+      biome.id === 2
+        ? {
+            grassTint: 0x63b93f,
+            deepGrassTint: 0x377c24,
+            mudTint: 0x6f5b2c,
+            bankTint: 0x8e6f37,
+            canopyTint: 0x173d1e,
+            fogTint: 0xb9efae,
+            waterTint: 0x59b8ea,
+            waterShadowTint: 0x1c5f79,
+          }
+        : biome.id === 5
+          ? {
+              grassTint: 0x647550,
+              deepGrassTint: 0x445239,
+              mudTint: 0x584d38,
+              bankTint: 0x736549,
+              canopyTint: 0x1c1917,
+              fogTint: 0xc9d2c0,
+              waterTint: 0x4a8ba8,
+              waterShadowTint: 0x294c58,
+            }
+          : {
+              grassTint: 0x6b9366,
+              deepGrassTint: 0x597852,
+              mudTint: 0x65574b,
+              bankTint: 0x8d775d,
+              canopyTint: 0x25353f,
+              fogTint: 0xd9e2e8,
+              waterTint: 0x5d97b0,
+              waterShadowTint: 0x3f6271,
+            };
+
+    const riverCenterAtRow = (row: number) =>
+      20 +
+      Math.sin((row + biomeIndex * 2) / 6.3) * 3.6 +
+      Math.cos((row + biomeIndex * 5) / 11.5) * 1.2;
+
+    const riverWidthAtRow = (row: number) => {
+      const neck = row > 10 && row < 32 ? 1.35 : 0;
+      const poolA = Math.max(0, 1.25 - Math.abs(row - 13) * 0.16);
+      const poolB = Math.max(0, 1.05 - Math.abs(row - 28) * 0.18);
+      return neck + poolA + poolB;
+    };
+
+    const addTile = (
+      texture: string,
+      frame: number,
+      x: number,
+      y: number,
+      tint: number,
+      depth: number,
+      alpha = 1,
+    ) => {
+      const tile = this.add.sprite(
+        panelX + x * tileSize + tileSize / 2,
+        panelOffsetY + y * tileSize + tileSize / 2,
+        texture,
+        frame,
+      );
+      tile.setOrigin(0.5);
+      tile.setScale(scale);
+      tile.setTint(tint);
+      tile.setAlpha(alpha);
+      tile.setDepth(depth);
+      this.backgroundLayer.add(tile);
+    };
 
     for (let row = 0; row < rows; row += 1) {
-      const pathCenter =
-        cols * 0.5 +
-        Math.sin((row + biomeIndex * 4) / 5) * 5 +
-        Math.cos((row + biomeIndex * 3) / 9) * 2;
-      const pathRadius = 2 + (row % 7 === 0 ? 1 : 0);
+      const riverCenter = riverCenterAtRow(row);
+      const riverHalfWidth = riverWidthAtRow(row);
 
       for (let col = 0; col < cols; col += 1) {
-        const inPath = Math.abs(col - pathCenter) <= pathRadius;
-        const inClearing =
-          ((col - 10) * (col - 10)) / 28 + ((row - 12) * (row - 12)) / 18 < 1 ||
-          ((col - 29) * (col - 29)) / 30 + ((row - 25) * (row - 25)) / 20 < 1 ||
-          ((col - 18) * (col - 18)) / 20 + ((row - 31) * (row - 31)) / 10 < 1;
-        const edgeNoise = (col * 17 + row * 23 + biome.id * 11) % grassFrames.length;
+        const distToMainRiver = Math.abs(col - riverCenter);
+        const inWater = riverHalfWidth > 0 && distToMainRiver <= riverHalfWidth;
+        const inBank =
+          !inWater && riverHalfWidth > 0 && distToMainRiver <= riverHalfWidth + 0.75;
 
-        let key = "Tileset_Ground_Sheet";
-        let frame = grassFrames[edgeNoise];
+        // Minimal mud patches - only 2 small natural clearings
+        const inMudPatch =
+          (((col - 9) * (col - 9)) / 12 + ((row - 11) * (row - 11)) / 9 < 1) ||
+          (((col - 29) * (col - 29)) / 13 + ((row - 29) * (row - 29)) / 8 < 1);
 
-        if (inPath) {
-          key = "Tileset_Road_Sheet";
-          frame = roadFrames[(col + row + biome.id) % roadFrames.length];
-        } else if (inClearing) {
-          frame = soilFrames[(col * 3 + row + biome.id) % soilFrames.length];
-        } else if ((col + row + biomeIndex) % 5 === 0) {
-          frame = mossFrames[(col + row * 2 + biome.id) % mossFrames.length];
+        // Smooth, organized deep grass zones
+        const inDeepGrass =
+          ((col - 7) * (col - 7)) / 28 + ((row - 20) * (row - 20)) / 22 < 1 ||
+          ((col - 31) * (col - 31)) / 26 + ((row - 21) * (row - 21)) / 20 < 1 ||
+          ((col - 19) * (col - 19)) / 24 + ((row - 8) * (row - 8)) / 14 < 1 ||
+          ((col + row * 3 + biomeIndex) % 9 === 0 && !inMudPatch && !inBank);
+
+        if (inWater) {
+          addTile(
+            "Tileset_Water_Sheet",
+            waterFrame,
+            col,
+            row,
+            style.waterTint,
+            3,
+          );
+          addTile(
+            "Tileset_Water_Sheet",
+            waterFrame,
+            col,
+            row,
+            style.waterShadowTint,
+            2,
+            0.16,
+          );
+          continue;
         }
 
-        const tile = this.add.sprite(
-          panelX + col * tileSize + tileSize / 2,
-          panelOffsetY + row * tileSize + tileSize / 2,
-          key,
-          frame,
+        if (inBank) {
+          addTile(
+            "Tileset_Road_Sheet",
+            bankFrames[(col + row + biome.id) % bankFrames.length],
+            col,
+            row,
+            style.bankTint,
+            2,
+          );
+          continue;
+        }
+
+        if (inMudPatch) {
+          addTile(
+            "Tileset_Ground_Sheet",
+            mudFrames[(col * 3 + row + biome.id) % mudFrames.length],
+            col,
+            row,
+            style.mudTint,
+            2,
+          );
+          continue;
+        }
+
+        addTile(
+          "Tileset_Ground_Sheet",
+          inDeepGrass
+            ? deepGrassFrames[(col + row * 2 + biome.id) % deepGrassFrames.length]
+            : grassFrames[(col * 11 + row * 7 + biome.id) % grassFrames.length],
+          col,
+          row,
+          inDeepGrass ? style.deepGrassTint : style.grassTint,
+          2,
         );
-        tile.setOrigin(0.5);
-        tile.setScale(scale);
-        tile.setTint(baseTint);
-        tile.setDepth(inPath ? 3 : 2);
-        this.backgroundLayer.add(tile);
       }
     }
 
@@ -508,34 +614,55 @@ export class WorldMapScene extends Phaser.Scene {
       this.midgroundLayer.add(image);
     };
 
+    const humidShade = this.add.graphics();
+    humidShade.fillStyle(style.canopyTint, 0.09);
+    humidShade.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
+    humidShade.setDepth(1);
+    this.backgroundLayer.add(humidShade);
+
     const canopy = this.add.graphics();
-    canopy.fillStyle(biome.id === 2 ? 0x052e16 : biome.id === 5 ? 0x1c1917 : 0x2e1065, 0.22);
-    canopy.fillEllipse(panelX + 260, panelOffsetY + 220, 420, 180);
-    canopy.fillEllipse(panelX + 1080, panelOffsetY + 180, 360, 150);
-    canopy.fillEllipse(panelX + 760, panelOffsetY + 960, 520, 170);
+    canopy.fillStyle(style.canopyTint, 0.14);
+    canopy.fillEllipse(panelX + 180, panelOffsetY + 118, 420, 128);
+    canopy.fillEllipse(panelX + 690, panelOffsetY + 108, 680, 138);
+    canopy.fillEllipse(panelX + 1180, panelOffsetY + 148, 378, 122);
+    canopy.fillEllipse(panelX + 260, panelOffsetY + 1092, 510, 142);
+    canopy.fillEllipse(panelX + 980, panelOffsetY + 1082, 548, 146);
     canopy.setDepth(2);
     this.backgroundLayer.add(canopy);
 
-    for (let i = 0; i < 8; i += 1) {
+    const mist = this.add.graphics();
+    mist.fillStyle(style.fogTint, 0.028);
+    mist.fillEllipse(panelX + 340, panelOffsetY + 502, 360, 64);
+    mist.fillEllipse(panelX + 968, panelOffsetY + 838, 420, 72);
+    mist.setDepth(6);
+    this.backgroundLayer.add(mist);
+
+    for (let i = 0; i < 12; i += 1) {
       addForestProp(
         `Tree_Emerald_${(i % 4) + 1}`,
-        panelX + 110 + i * 150,
-        panelOffsetY + 210 + ((i + biome.id) % 2) * 42,
-        1.05 + (i % 3) * 0.08,
+        panelX + 64 + i * 105,
+        panelOffsetY + 176 + ((i + biome.id) % 3) * 22,
+        1.08 + (i % 3) * 0.06,
+        7,
+        0.94,
       );
       addForestProp(
         `Tree_Emerald_${((i + 2) % 4) + 1}`,
-        panelX + 90 + i * 152,
-        panelOffsetY + 1180 - (i % 2) * 36,
-        1.08 + (i % 2) * 0.1,
+        panelX + 54 + i * 108,
+        panelOffsetY + 1178 - (i % 3) * 24,
+        1.12 + (i % 2) * 0.08,
+        7,
+        0.95,
       );
     }
 
     [
-      [panelX + 196, panelOffsetY + 505, 1.3],
-      [panelX + 1188, panelOffsetY + 540, 1.24],
-      [panelX + 294, panelOffsetY + 872, 1.15],
-      [panelX + 1094, panelOffsetY + 842, 1.18],
+      [panelX + 210, panelOffsetY + 438, 1.18],
+      [panelX + 294, panelOffsetY + 720, 1.08],
+      [panelX + 1126, panelOffsetY + 472, 1.16],
+      [panelX + 1078, panelOffsetY + 796, 1.14],
+      [panelX + 354, panelOffsetY + 908, 1.08],
+      [panelX + 946, panelOffsetY + 916, 1.14],
     ].forEach(([x, y, propScale], index) => {
       addForestProp(
         `Tree_Emerald_${((index + biome.id) % 4) + 1}`,
@@ -546,16 +673,41 @@ export class WorldMapScene extends Phaser.Scene {
     });
 
     [
-      ["Bush_Emerald_2", panelX + 370, panelOffsetY + 430, 0.9],
-      ["Bush_Emerald_5", panelX + 892, panelOffsetY + 420, 0.94],
-      ["Bush_Emerald_7", panelX + 640, panelOffsetY + 906, 1],
-      ["Rock_Brown_4", panelX + 522, panelOffsetY + 478, 1.05],
-      ["Rock_Brown_9", panelX + 826, panelOffsetY + 890, 1],
-      ["Animation_Campfire", panelX + 752, panelOffsetY + 544, 0.88],
-      ["Sign_2", panelX + 860, panelOffsetY + 560, 0.92],
-      ["Chopped_Tree_1", panelX + 630, panelOffsetY + 560, 0.96],
+      ["Rock_Brown_1", panelX + 240, panelOffsetY + 420, 0.88],
+      ["Rock_Brown_4", panelX + 1020, panelOffsetY + 370, 1.0],
+      ["Rock_Brown_6", panelX + 920, panelOffsetY + 900, 0.88],
+      ["Rock_Brown_9", panelX + 390, panelOffsetY + 990, 0.98],
+      ["Bush_Emerald_1", panelX + 310, panelOffsetY + 480, 0.86],
+      ["Bush_Emerald_3", panelX + 1050, panelOffsetY + 540, 0.88],
+      ["Bush_Emerald_5", panelX + 1170, panelOffsetY + 750, 0.92],
+      ["Bush_Emerald_6", panelX + 800, panelOffsetY + 970, 0.84],
     ].forEach(([key, x, y, propScale]) => {
       addForestProp(key as string, x as number, y as number, propScale as number, 8);
+    });
+
+    // Minimal, neat bush clusters
+    const bushClusters = [
+      { x: 8, y: 8, radius: 1.5 },
+      { x: 30, y: 10, radius: 1.5 },
+      { x: 10, y: 29, radius: 1.5 },
+      { x: 28, y: 29, radius: 1.5 },
+    ];
+
+    bushClusters.forEach((cluster, clusterIndex) => {
+      for (let row = -cluster.radius; row <= cluster.radius; row += 1) {
+        for (let col = -cluster.radius; col <= cluster.radius; col += 1) {
+          if (col * col + row * row > cluster.radius * cluster.radius) continue;
+          if ((col + row + clusterIndex) % 4 !== 0) continue;
+          addForestProp(
+            `Bush_Emerald_${((clusterIndex + col + row + 14) % 7) + 1}`,
+            panelX + (cluster.x + col) * tileSize + tileSize / 2,
+            panelOffsetY + (cluster.y + row) * tileSize + tileSize,
+            0.62 + (((col + row + cluster.radius) % 2) * 0.04),
+            7,
+            0.97,
+          );
+        }
+      }
     });
   }
 
@@ -887,16 +1039,24 @@ export class WorldMapScene extends Phaser.Scene {
     const centerX = (first.x + last.x) / 2;
     const centerY = (first.y + last.y) / 2;
 
-    this.addLandmarkSprite("CityWall_Gate_1", first.x - 110, first.y + 96, 1.4, 0.92);
-    this.addLandmarkSprite("Animation_Campfire", centerX, centerY + 165, 0.95);
-    this.addLandmarkSprite("Sign_2", centerX + 145, centerY + 148, 1);
-    this.addLandmarkSprite("Rock_Brown_1", centerX - 170, centerY + 196, 1.08);
-    this.addLandmarkSprite("Rock_Brown_9", centerX + 205, centerY + 212, 1.02);
+    this.addLandmarkSprite("Tree_Emerald_3", first.x - 130, first.y + 128, 1.16, 0.96);
+    this.addLandmarkSprite("Tree_Emerald_1", centerX - 160, centerY + 144, 1.2, 0.94);
+    this.addLandmarkSprite("Tree_Emerald_4", centerX + 170, centerY + 138, 1.12, 0.94);
+    this.addLandmarkSprite("Rock_Brown_1", centerX - 56, centerY + 204, 0.92);
+    this.addLandmarkSprite("Rock_Brown_4", centerX + 82, centerY + 196, 1.02);
+    this.addLandmarkSprite("Bush_Emerald_5", centerX + 18, centerY + 176, 0.94);
 
     nodes.forEach((node, index) => {
       const treeKey = `Tree_Emerald_${(index % 4) + 1}`;
       this.addLandmarkSprite(treeKey, node.x - 118, node.y + 130, 1.15);
       this.addLandmarkSprite(treeKey, node.x + 118, node.y + 120, 1.02, 0.96);
+      this.addLandmarkSprite(
+        `Bush_Emerald_${(index % 7) + 1}`,
+        node.x + (index % 2 === 0 ? 52 : -48),
+        node.y + 138,
+        0.82,
+        0.92,
+      );
     });
   }
 

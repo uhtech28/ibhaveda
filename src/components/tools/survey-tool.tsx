@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -29,6 +29,12 @@ export function SurveyTool({ prompt, onSubmit, initialContent, isSubmitting }: S
       { id: "1", text: "", type: "text" },
     ]
   )
+
+  useEffect(() => {
+    if (initialContent?.questions) {
+      setQuestions(initialContent.questions)
+    }
+  }, [initialContent])
 
   const addQuestion = () => {
     setQuestions([

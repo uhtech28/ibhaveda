@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -116,6 +116,13 @@ export function MapTool({
   const [elements, setElements] = useState<CanvasElement[]>(
     initialContent?.elements || [],
   );
+
+  useEffect(() => {
+    if (initialContent?.elements) {
+      setElements(initialContent.elements);
+    }
+  }, [initialContent]);
+
   const [selectedTool, setSelectedTool] = useState<Tool>("select");
   const [selectedColor, setSelectedColor] = useState<string>(COLORS[0]);
   const [dragging, setDragging] = useState<string | null>(null);

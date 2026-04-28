@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,6 +27,10 @@ export function WriteTool({
   isSubmitting,
 }: WriteToolProps) {
   const [text, setText] = useState(initialContent || "");
+
+  useEffect(() => {
+    if (initialContent) setText(initialContent);
+  }, [initialContent]);
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
   const handleSubmit = () => {

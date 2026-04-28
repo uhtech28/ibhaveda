@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -75,6 +75,12 @@ export function JournalTool({
   const [entries, setEntries] = useState<JournalEntry[]>(
     initialContent?.entries || [],
   );
+
+  useEffect(() => {
+    if (initialContent?.entries) {
+      setEntries(initialContent.entries);
+    }
+  }, [initialContent]);
   const [title, setTitle] = useState("");
   const [entry, setEntry] = useState("");
   const [sharedWithTeam, setSharedWithTeam] = useState(false);

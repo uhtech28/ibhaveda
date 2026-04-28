@@ -481,6 +481,16 @@ export default defineSchema({
     .index("by_venture", ["ventureId"])
     .index("by_venture_status", ["ventureId", "status"]),
 
+  // Venture tools — stores JSON blobs for generic world-map tools (Kanban, Calendar, etc.)
+  ventureTools: defineTable({
+    ventureId: v.id("ventures"),
+    toolType: v.string(), // "kanban", "calendar", etc.
+    data: v.any(), // Tool-specific JSON state
+    updatedAt: v.number(),
+  })
+    .index("by_venture", ["ventureId"])
+    .index("by_venture_tool", ["ventureId", "toolType"]),
+
   // ─────────────────────────────────────────────────────────────────────────
   // LEVEL PROGRESSION SYSTEM
   // ─────────────────────────────────────────────────────────────────────────
