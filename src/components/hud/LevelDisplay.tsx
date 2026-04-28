@@ -7,9 +7,10 @@ interface LevelDisplayProps {
   level: number;
   phase: number;
   compact?: boolean;
+  onClick?: () => void;
 }
 
-const LevelDisplayComponent = ({ level, phase, compact = false }: LevelDisplayProps) => {
+const LevelDisplayComponent = ({ level, phase, compact = false, onClick }: LevelDisplayProps) => {
   const getPhaseColors = (phase: number) => {
     switch (phase) {
       case 1:
@@ -64,7 +65,10 @@ const LevelDisplayComponent = ({ level, phase, compact = false }: LevelDisplayPr
 
   if (compact) {
     return (
-      <div className="flex items-center gap-2 font-sans">
+      <div 
+        className={`flex items-center gap-2 font-sans transition-all active:scale-95 ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
+        onClick={onClick}
+      >
         <div className={`flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-950/50 ${phaseStyle.primary}`}>
           <span className={`text-[15px] font-black tracking-tighter ${phaseStyle.text}`}>
             {level}
@@ -83,7 +87,10 @@ const LevelDisplayComponent = ({ level, phase, compact = false }: LevelDisplayPr
   }
 
   return (
-    <div className="flex items-center gap-2.5 font-sans group">
+    <div 
+      className={`flex items-center gap-2.5 font-sans group transition-all active:scale-95 ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+    >
       <motion.div
         className="relative"
         whileHover={{ scale: 1.05 }}

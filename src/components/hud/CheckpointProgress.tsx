@@ -7,6 +7,7 @@ interface CheckpointProgressProps {
   total: number;
   goldCount: number;
   compact?: boolean;
+  onClick?: () => void;
 }
 
 export function CheckpointProgress({
@@ -14,12 +15,16 @@ export function CheckpointProgress({
   total,
   goldCount,
   compact = false,
+  onClick,
 }: CheckpointProgressProps) {
   const percentage = Math.min((completed / total) * 100, 100);
 
   if (compact) {
     return (
-      <div className="flex items-center gap-2 font-sans group">
+      <div 
+        className={`flex items-center gap-2 font-sans group transition-all active:scale-95 ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
+        onClick={onClick}
+      >
         <div className="flex flex-col">
           <span className="text-[7px] text-zinc-500 uppercase tracking-widest font-black leading-none mb-0.5">
             Progress
@@ -58,7 +63,10 @@ export function CheckpointProgress({
   }
 
   return (
-    <div className="flex items-center gap-2.5 font-sans group">
+    <div 
+      className={`flex items-center gap-2.5 font-sans group transition-all active:scale-95 ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
+      onClick={onClick}
+    >
       <div className="flex flex-col">
         <span className="mb-1 text-[8px] font-black uppercase leading-none tracking-[0.24em] text-zinc-500">
           Progress

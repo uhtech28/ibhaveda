@@ -264,8 +264,10 @@ export class WorldMapScene extends Phaser.Scene {
     this.createBiomeZones();
     this.createTilemap();
     this.createSnakePath();
+    this.createBiomeLandmarks();
     this.createSuperBoss();
     this.createMiniBosses();
+    this.createAtmosphericEffects();
     
     this.setupGamepadListeners();
     
@@ -396,7 +398,13 @@ export class WorldMapScene extends Phaser.Scene {
     const objectLayer = this.map.getObjectLayer("Object Layer 1");
 
     for (let i = 0; i < BIOME_CONFIGS.length; i++) {
+      const biome = BIOME_CONFIGS[i];
       const panelX = i * this.BIOME_WIDTH + panelOffsetX;
+      if (biome.visualTheme === "forest") {
+        this.createForestTilePanel(panelX, panelOffsetY, scale, biome, i);
+        continue;
+      }
+
       layerNames.forEach((name) => {
         const layer = this.map.createLayer(name, phaserTilesets, panelX, 0);
         if (!layer) return;
@@ -417,6 +425,138 @@ export class WorldMapScene extends Phaser.Scene {
         this.renderMapObjects(objectLayer.objects, panelX, panelOffsetY, scale);
       }
     }
+  }
+
+  private createForestTilePanel(
+    panelX: number,
+    panelOffsetY: number,
+    scale: number,
+    biome: BiomeConfig,
+    biomeIndex: number,
+  ): void {
+    const tileSize = 16 * scale;
+    const cols = this.map.width;
+    const rows = this.map.height;
+    const grassFrames = [96, 97, 98, 99, 100, 101, 108, 109, 110, 111, 112, 113];
+    const mossFrames = [54, 55, 58, 59, 66, 67, 78, 79, 82, 83, 90, 91];
+    const roadFrames = [48, 49, 50, 54, 55, 56];
+    const soilFrames = [14, 20, 30, 31, 32, 43, 44, 45];
+    const baseTint =
+      biome.id === 2 ? 0xffffff : biome.id === 5 ? 0x9ca3af : 0xc4b5fd;
+
+    for (let row = 0; row < rows; row += 1) {
+      const pathCenter =
+        cols * 0.5 +
+        Math.sin((row + biomeIndex * 4) / 5) * 5 +
+        Math.cos((row + biomeIndex * 3) / 9) * 2;
+      const pathRadius = 2 + (row % 7 === 0 ? 1 : 0);
+
+      for (let col = 0; col < cols; col += 1) {
+        const inPath = Math.abs(col - pathCenter) <= pathRadius;
+        const inClearing =
+          ((col - 10) * (col - 10)) / 28 + ((row - 12) * (row - 12)) / 18 < 1 ||
+          ((col - 29) * (col - 29)) / 30 + ((row - 25) * (row - 25)) / 20 < 1 ||
+          ((col - 18) * (col - 18)) / 20 + ((row - 31) * (row - 31)) / 10 < 1;
+        const edgeNoise = (col * 17 + row * 23 + biome.id * 11) % grassFrames.length;
+
+        let key = "Tileset_Ground_Sheet";
+        let frame = grassFrames[edgeNoise];
+
+        if (inPath) {
+          key = "Tileset_Road_Sheet";
+          frame = roadFrames[(col + row + biome.id) % roadFrames.length];
+        } else if (inClearing) {
+          frame = soilFrames[(col * 3 + row + biome.id) % soilFrames.length];
+        } else if ((col + row + biomeIndex) % 5 === 0) {
+          frame = mossFrames[(col + row * 2 + biome.id) % mossFrames.length];
+        }
+
+        const tile = this.add.sprite(
+          panelX + col * tileSize + tileSize / 2,
+          panelOffsetY + row * tileSize + tileSize / 2,
+          key,
+          frame,
+        );
+        tile.setOrigin(0.5);
+        tile.setScale(scale);
+        tile.setTint(baseTint);
+        tile.setDepth(inPath ? 3 : 2);
+        this.backgroundLayer.add(tile);
+      }
+    }
+
+    const addForestProp = (
+      key: string,
+      x: number,
+      y: number,
+      propScale: number,
+      depth = 7,
+      alpha = 1,
+    ) => {
+      const shadow = this.add.image(x + 8, y + 14, "Shadow_Round_48x24_Flat_Black");
+      shadow.setOrigin(0.5, 0.5);
+      shadow.setScale(propScale * 0.95);
+      shadow.setAlpha(0.24);
+      shadow.setDepth(depth - 1);
+      this.midgroundLayer.add(shadow);
+
+      const image = this.add.image(x, y, key);
+      image.setOrigin(0.5, 1);
+      image.setScale(propScale);
+      image.setAlpha(alpha);
+      image.setDepth(depth);
+      this.midgroundLayer.add(image);
+    };
+
+    const canopy = this.add.graphics();
+    canopy.fillStyle(biome.id === 2 ? 0x052e16 : biome.id === 5 ? 0x1c1917 : 0x2e1065, 0.22);
+    canopy.fillEllipse(panelX + 260, panelOffsetY + 220, 420, 180);
+    canopy.fillEllipse(panelX + 1080, panelOffsetY + 180, 360, 150);
+    canopy.fillEllipse(panelX + 760, panelOffsetY + 960, 520, 170);
+    canopy.setDepth(2);
+    this.backgroundLayer.add(canopy);
+
+    for (let i = 0; i < 8; i += 1) {
+      addForestProp(
+        `Tree_Emerald_${(i % 4) + 1}`,
+        panelX + 110 + i * 150,
+        panelOffsetY + 210 + ((i + biome.id) % 2) * 42,
+        1.05 + (i % 3) * 0.08,
+      );
+      addForestProp(
+        `Tree_Emerald_${((i + 2) % 4) + 1}`,
+        panelX + 90 + i * 152,
+        panelOffsetY + 1180 - (i % 2) * 36,
+        1.08 + (i % 2) * 0.1,
+      );
+    }
+
+    [
+      [panelX + 196, panelOffsetY + 505, 1.3],
+      [panelX + 1188, panelOffsetY + 540, 1.24],
+      [panelX + 294, panelOffsetY + 872, 1.15],
+      [panelX + 1094, panelOffsetY + 842, 1.18],
+    ].forEach(([x, y, propScale], index) => {
+      addForestProp(
+        `Tree_Emerald_${((index + biome.id) % 4) + 1}`,
+        x as number,
+        y as number,
+        propScale as number,
+      );
+    });
+
+    [
+      ["Bush_Emerald_2", panelX + 370, panelOffsetY + 430, 0.9],
+      ["Bush_Emerald_5", panelX + 892, panelOffsetY + 420, 0.94],
+      ["Bush_Emerald_7", panelX + 640, panelOffsetY + 906, 1],
+      ["Rock_Brown_4", panelX + 522, panelOffsetY + 478, 1.05],
+      ["Rock_Brown_9", panelX + 826, panelOffsetY + 890, 1],
+      ["Animation_Campfire", panelX + 752, panelOffsetY + 544, 0.88],
+      ["Sign_2", panelX + 860, panelOffsetY + 560, 0.92],
+      ["Chopped_Tree_1", panelX + 630, panelOffsetY + 560, 0.96],
+    ].forEach(([key, x, y, propScale]) => {
+      addForestProp(key as string, x as number, y as number, propScale as number, 8);
+    });
   }
 
   private renderMapObjects(

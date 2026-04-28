@@ -336,26 +336,28 @@ export function CompactIdeaCard({
 
   return (
     <article className={cn(cardSurface, transitionBase, "group relative overflow-hidden p-4 hover:border-[#6366F1]/50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]")}>
-      <div className="absolute inset-0 z-10 flex items-start justify-end gap-2 bg-[#0A0D12]/72 p-4 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100">
-        <button type="button" onClick={() => onOpenIdea(idea._id)} className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" aria-label="Edit idea">
+      <div onClick={() => onOpenIdea(idea._id)} className="absolute inset-0 z-10 flex cursor-pointer items-start justify-end gap-2 bg-[#0A0D12]/72 p-4 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100">
+        <button type="button" onClick={(e) => { e.stopPropagation(); onOpenIdea(idea._id); }} className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" aria-label="Edit idea">
           <PencilLine className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => onRepost?.({ title: idea.title, description: idea.description, tags, category: tags[0] || "SaaS", stage: getIdeaStage(idea) })} className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" aria-label="Repost idea">
+        <button type="button" onClick={(e) => { e.stopPropagation(); onRepost?.({ title: idea.title, description: idea.description, tags, category: tags[0] || "SaaS", stage: getIdeaStage(idea) }); }} className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" aria-label="Repost idea">
           <Repeat2 className="h-4 w-4" />
         </button>
         {onDelete && (
-          <button type="button" onClick={() => onDelete(idea._id)} className="rounded-full border border-red-500/25 bg-red-500/10 p-2 text-red-200 hover:bg-red-500/16" aria-label="Delete idea">
+          <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(idea._id); }} className="rounded-full border border-red-500/25 bg-red-500/10 p-2 text-red-200 hover:bg-red-500/16" aria-label="Delete idea">
             <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>
 
       <div className="relative z-0">
-        {bannerImage ? (
-          <img src={bannerImage} alt={idea.title} className="aspect-[16/9] w-full rounded-[16px] border border-white/8 object-cover" />
-        ) : (
-          <MeshBanner title={idea.title} />
-        )}
+        <button type="button" onClick={() => onOpenIdea(idea._id)} className="block w-full text-left">
+          {bannerImage ? (
+            <img src={bannerImage} alt={idea.title} className="aspect-[16/9] w-full rounded-[16px] border border-white/8 object-cover" />
+          ) : (
+            <MeshBanner title={idea.title} />
+          )}
+        </button>
         <div className="mt-4 flex items-center justify-between gap-3">
           <span className={cn("rounded-full border px-3 py-1 text-[11px]", status.className)}>{status.label}</span>
           <button type="button" onClick={() => onToggleSave(idea._id)} className={cn(transitionBase, "rounded-full p-2", saved ? "bg-[#6366F1]/14 text-[#C7D2FE]" : "text-[#9CA3AF] hover:bg-[#6366F1]/10 hover:text-[#C7D2FE]")} aria-label="Save idea">

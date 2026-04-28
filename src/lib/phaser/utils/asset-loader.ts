@@ -1335,10 +1335,20 @@ export class AssetLoader {
     
     // Core Tilesets
     scene.load.image("Tileset_Ground", `${fanTasyPath}/Tileset_Ground.png`);
+    scene.load.spritesheet(
+      "Tileset_Ground_Sheet",
+      `${fanTasyPath}/Tileset_Ground.png`,
+      { frameWidth: 16, frameHeight: 16 },
+    );
     scene.load.image("Tileset_Water", `${fanTasyPath}/Tileset_Water.png`);
     scene.load.image("Tileset_RockSlope", `${fanTasyPath}/Tileset_RockSlope.png`);
     scene.load.image("Tileset_RockSlope_Simple", `${fanTasyPath}/Tileset_RockSlope_Simple.png`);
     scene.load.image("Tileset_Road", `${fanTasyPath}/Tileset_Road.png`);
+    scene.load.spritesheet(
+      "Tileset_Road_Sheet",
+      `${fanTasyPath}/Tileset_Road.png`,
+      { frameWidth: 16, frameHeight: 16 },
+    );
     scene.load.image("Tileset_Shadow", `${fanTasyPath}/Tileset_Shadow.png`);
 
     // Atlases

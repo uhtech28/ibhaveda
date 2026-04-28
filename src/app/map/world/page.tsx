@@ -33,6 +33,9 @@ import {
   stageInfoAtom,
   checkpointProgressAtom,
   audioSettingsAtom,
+  submittingTaskAtom,
+  currentQuestAtom,
+  activeTaskAtom,
 } from "@/lib/stores/hudStore";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -351,7 +354,7 @@ function CheckpointPanel({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 32 }}
-        className="absolute right-0 top-0 bottom-0 z-30 flex flex-col font-sans"
+        className="absolute right-0 top-0 bottom-0 z-[60] flex flex-col font-sans"
         style={{
           width: "360px",
           background:
@@ -792,6 +795,8 @@ export default function MapPage() {
   const setUserProgressAtom = useSetAtom(userProgressAtom);
   const setStageInfoAtom = useSetAtom(stageInfoAtom);
   const setCheckpointProgressAtom = useSetAtom(checkpointProgressAtom);
+  const setCurrentQuestAtom = useSetAtom(currentQuestAtom);
+  const setActiveTaskAtom = useSetAtom(activeTaskAtom);
   const [audioSettings, setAudioSettings] = useAtom(audioSettingsAtom);
 
   // ── Convex queries ─────────────────────────────────────────────────────────
@@ -877,16 +882,9 @@ export default function MapPage() {
     checkpoint: number;
   } | null>(null);
 
-  // Task submission state
-  const [submittingTask, setSubmittingTask] = useState<{
-    id: any;
-    checkpointId: any;
-    taskLevel: "t1" | "t2" | "t3";
-    title: string;
-    description: string;
-    toolType: string;
-    points: number;
-  } | null>(null);
+  // Task submission state (now using Jotai atom for global access)
+  const [submittingTask, setSubmittingTask] = useAtom(submittingTaskAtom);
+  const [activeTask] = useAtom(activeTaskAtom);
 
   // Track previous level to detect level-up events
   const prevLevelRef = useRef<number | null>(null);
@@ -1167,6 +1165,41 @@ export default function MapPage() {
       total: TOTAL_CHECKPOINTS,
       goldCount,
     });
+
+    // Populate current quest and active task atoms
+    const currentCPData = checkpoints.find(
+      (cp) => cp.stage === activeStage && cp.checkpoint === activeCP,
+    );
+
+    if (currentCPData) {
+      setCurrentQuestAtom({
+        checkpointName: currentCPData.checkpointName,
+        tasks: currentCPData.tasks.map((t: any) => ({
+          label: t.taskLevel.toUpperCase(),
+          description: t.prompt,
+          tool: t.toolType,
+          done: t.status === "completed",
+        })),
+        stage: activeStage,
+        checkpoint: activeCP,
+      });
+
+      // Find first uncompleted task
+      const nextTask = currentCPData.tasks.find((t: any) => t.status !== "completed");
+      if (nextTask) {
+        setActiveTaskAtom({
+          id: nextTask._id,
+          checkpointId: nextTask.checkpointId,
+          taskLevel: nextTask.taskLevel,
+          title: nextTask.taskLevel.toUpperCase() + ": " + currentCPData.checkpointName,
+          description: nextTask.prompt,
+          toolType: nextTask.toolType,
+          points: nextTask.taskLevel === "t1" ? 10 : nextTask.taskLevel === "t2" ? 20 : 30,
+        });
+      } else {
+        setActiveTaskAtom(null);
+      }
+    }
   }, [
     venture,
     ideaTitle,
@@ -1177,6 +1210,8 @@ export default function MapPage() {
     setActiveVentureAtom,
     setStageInfoAtom,
     setCheckpointProgressAtom,
+    setCurrentQuestAtom,
+    setActiveTaskAtom,
   ]);
 
   useEffect(() => {
@@ -1278,32 +1313,13 @@ export default function MapPage() {
       checkpoint: number;
     }) => {
       console.log("[React] Received CHECKPOINT_CLICKED event:", e);
-      console.log("[React] Current activeVenture:", activeVenture?._id);
-      console.log("[React] Current checkpoints count:", checkpoints.length);
 
       const ventureId = activeVenture?._id;
-      if (!ventureId) {
-        console.warn("[MapPage] No active venture — cannot navigate to checkpoint");
-        return;
-      }
+      if (!ventureId) return;
 
-      // Phaser nodes use synthetic IDs like "1-1", "2-3" — look up by stage+checkpoint
-      // numbers which are always correct, rather than by Convex _id.
       const cp = checkpoints.find(
         (c) => c.stage === e.stage && c.checkpoint === e.checkpoint,
       );
-
-      if (cp) {
-        console.log("[React] Found matching checkpoint in Convex data:", cp);
-        const status = deriveCheckpointStatus(cp, activeStage, activeCP);
-        console.log("[React] Derived status:", status);
-        if (status === "locked") {
-          console.log("[React] Checkpoint is locked, ignoring click.");
-          return;
-        }
-      } else {
-        console.log("[React] No matching checkpoint found in checkpoints array. Proceeding with navigation anyway.");
-      }
 
       // Hide first checkpoint pulse when any checkpoint is clicked
       if (showFirstCheckpointPulse) {
@@ -1313,14 +1329,45 @@ export default function MapPage() {
         }
       }
 
-      const url = `/venture/${ventureId}/stage/${e.stage}/checkpoint/${e.checkpoint}?from=map`;
-      console.log("[React] Redirecting to:", url);
-      router.push(url);
+      if (cp) {
+        const status = deriveCheckpointStatus(cp, activeStage, activeCP);
+        if (status === "locked") {
+          console.log("[React] Checkpoint is locked, ignoring click.");
+          return;
+        }
+
+        const stageData = STAGES[cp.stage - 1];
+
+        const detail: CheckpointDetail = {
+          id: cp._id,
+          stage: cp.stage,
+          stageIdx: cp.stage,
+          stageName: stageData?.name ?? `Stage ${cp.stage}`,
+          biome: stageData?.biome ?? "Unknown Biome",
+          stageGlow: stageData?.glow ?? "rgba(255,255,255,0.5)",
+          checkpointIndex: cp.checkpoint,
+          title: cp.checkpointName || `Checkpoint ${cp.checkpoint}`,
+          outcome: cp.outcome || "Complete tasks to advance your venture.",
+          status,
+          tasks: (cp.tasks || []).map((t: any, i: number) => ({
+            label: t.taskLevel ? t.taskLevel.toUpperCase() : `TASK ${i + 1}`,
+            description: t.prompt || "No description provided.",
+            tool: t.toolType || "Unknown Tool",
+            difficulty: t.taskLevel === "t1" ? "easy" : t.taskLevel === "t2" ? "medium" : "stretch",
+            done: t.status === "completed",
+            _convexCheckpointId: cp._id,
+            _taskLevel: t.taskLevel,
+          })),
+        };
+
+        console.log("[React] Opening CheckpointPanel with detail:", detail);
+        setSelectedDetail(detail);
+      }
     };
 
     eventBridge.onReact("CHECKPOINT_CLICKED", handleClick);
     return () => eventBridge.off("CHECKPOINT_CLICKED", handleClick);
-  }, [checkpoints, activeStage, activeCP, activeVenture, router, showFirstCheckpointPulse]);
+  }, [checkpoints, activeStage, activeCP, activeVenture, router, showFirstCheckpointPulse, activeTask, setSubmittingTask]);
 
   // ── Task toggle → Convex mutation ─────────────────────────────────────────
   const handleTaskToggle = useCallback(
@@ -1336,9 +1383,15 @@ export default function MapPage() {
       const checkpointId = task._convexCheckpointId as
         | Id<"ventureCheckpoints">
         | undefined;
-      const taskLevel = task._taskLevel as "t1" | "t2" | "t3" | undefined;
+      const taskLevelRaw = task._taskLevel;
+      const taskLevel = typeof taskLevelRaw === "string" ? (taskLevelRaw.toLowerCase() as "t1" | "t2" | "t3") : undefined;
 
-      if (!checkpointId || !taskLevel) return;
+      if (!checkpointId || !taskLevel) {
+        console.error("[React] Missing checkpointId or taskLevel", { checkpointId, taskLevelRaw });
+        return;
+      }
+
+      console.log("[React] Opening TaskSubmissionModal for:", { checkpointId, taskLevel });
 
       // Instead of immediately marking complete, open the submission modal
       setSubmittingTask({
@@ -1614,7 +1667,7 @@ export default function MapPage() {
           {/* Click-away backdrop (left of panel) */}
           {selectedDetail && (
             <div
-              className="absolute inset-0 z-[25]"
+              className="absolute inset-0 z-[55]"
               style={{ right: "340px" }}
               onClick={() => setSelectedDetail(null)}
             />

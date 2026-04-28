@@ -12,7 +12,7 @@ import { QualityScore } from "./QualityScore";
 import { AudioControls } from "./AudioControls";
 import { QuestList } from "./QuestList";
 import { GoldCounter } from "./GoldCounter";
-import { VirtualGamepad } from "./VirtualGamepad";
+
 import {
   hudVisibleAtom,
   hudExpandedAtom,
@@ -20,6 +20,8 @@ import {
   userProgressAtom,
   stageInfoAtom,
   checkpointProgressAtom,
+  submittingTaskAtom,
+  activeTaskAtom,
 } from "@/lib/stores/hudStore";
 import { ChevronDown, ChevronUp, Sparkles, Crown } from "lucide-react";
 
@@ -30,6 +32,8 @@ const HUDComponent = () => {
   const [userProgress] = useAtom(userProgressAtom);
   const [stageInfo] = useAtom(stageInfoAtom);
   const [checkpointProgress] = useAtom(checkpointProgressAtom);
+  const [, setSubmittingTask] = useAtom(submittingTaskAtom);
+  const [activeTask] = useAtom(activeTaskAtom);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -106,6 +110,11 @@ const HUDComponent = () => {
                           total={checkpointProgress.total}
                           goldCount={checkpointProgress.goldCount}
                           compact={true}
+                          onClick={() => {
+                            if (activeTask) {
+                              setSubmittingTask(activeTask);
+                            }
+                          }}
                         />
                       </div>
                     </div>
@@ -128,6 +137,11 @@ const HUDComponent = () => {
                           level={userProgress.level}
                           phase={userProgress.phase}
                           compact={true}
+                          onClick={() => {
+                            if (activeTask) {
+                              setSubmittingTask(activeTask);
+                            }
+                          }}
                         />
                         <XPBar
                           currentXP={userProgress.xp}
@@ -200,8 +214,6 @@ const HUDComponent = () => {
       {/* Quest List - floating top-right panel (manages own positioning) */}
       <QuestList />
 
-      {/* Virtual Gamepad - Floating bottom controller */}
-      <VirtualGamepad />
     </>
   );
 };

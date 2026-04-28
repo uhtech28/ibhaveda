@@ -77,8 +77,20 @@ export const checkpointProgressAtom = atom({
 export const isAnimatingAtom = atom<boolean>(false);
 export const animationTypeAtom = atom<string | null>(null);
 
-// Quest system atoms
+// Task system atoms
+export interface SubmittingTask {
+  id: string;
+  checkpointId: any;
+  taskLevel: "t1" | "t2" | "t3";
+  title: string;
+  description: string;
+  toolType: string;
+  points: number;
+}
+
 export const currentQuestAtom = atom<CurrentQuest | null>(null);
+export const submittingTaskAtom = atom<SubmittingTask | null>(null);
+export const activeTaskAtom = atom<SubmittingTask | null>(null);
 
 // Gold counter atom
 export const goldCountAtom = atom<number>(0);

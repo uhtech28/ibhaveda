@@ -1,30 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { useAtom } from "jotai";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Circle, Scroll } from "lucide-react";
-import { atom } from "jotai";
-
-// Quest data structure
-export interface QuestTask {
-  label: string;
-  description: string;
-  tool: string;
-  done: boolean;
-}
-
-export interface CurrentQuest {
-  checkpointName: string;
-  tasks: QuestTask[];
-  stage: number;
-  checkpoint: number;
-}
-
-// Atom for current quest data
-export const currentQuestAtom = atom<CurrentQuest | null>(null);
+import { Check, Circle, Scroll, ChevronUp } from "lucide-react";
+import { currentQuestAtom } from "@/lib/stores/hudStore";
 
 export function QuestList() {
   const [currentQuest] = useAtom(currentQuestAtom);
+  const [isFolded, setIsFolded] = useState(false);
 
   if (!currentQuest || currentQuest.tasks.length === 0) {
     return null;
@@ -45,9 +29,10 @@ export function QuestList() {
       <div
         className="relative bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
       >
-        {/* Header */}
+        {/* Header (Clickable for folding) */}
         <div
-          className="px-4 py-3 bg-slate-800/40 border-b border-white/10"
+          className="px-4 py-3 bg-slate-800/40 border-b border-white/10 cursor-pointer hover:bg-slate-800/60 transition-colors"
+          onClick={() => setIsFolded(!isFolded)}
         >
           <div className="flex items-center gap-2">
             <Scroll className="w-5 h-5 text-indigo-400" />
@@ -59,101 +44,121 @@ export function QuestList() {
                 Stage {currentQuest.stage} · CP {currentQuest.checkpoint}
               </p>
             </div>
-            <div className="flex items-center gap-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg">
-              <span className="text-xs font-black text-indigo-400">
-                {completedCount}/{totalCount}
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg">
+                <span className="text-xs font-black text-indigo-400">
+                  {completedCount}/{totalCount}
+                </span>
+              </div>
+              <motion.div
+                animate={{ rotate: isFolded ? 180 : 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              </motion.div>
             </div>
           </div>
         </div>
 
-        {/* Quest name */}
-        <div className="px-4 py-2 bg-slate-800/20 border-b border-white/5">
-          <p className="text-xs font-bold text-indigo-200/80 uppercase tracking-widest">
-            {currentQuest.checkpointName}
-          </p>
-        </div>
+        <AnimatePresence initial={false}>
+          {!isFolded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              {/* Quest name */}
+              <div className="px-4 py-2 bg-slate-800/20 border-b border-white/5">
+                <p className="text-xs font-bold text-indigo-200/80 uppercase tracking-widest">
+                  {currentQuest.checkpointName}
+                </p>
+              </div>
 
-        {/* Task list */}
-        <div className="p-3 space-y-2">
-          <AnimatePresence mode="popLayout">
-            {currentQuest.tasks.map((task, index) => (
-              <motion.div
-                key={task.label}
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: 20, opacity: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className={`relative p-3 border rounded-xl transition-all ${
-                  task.done
-                    ? "bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                    : "bg-slate-800/30 border-white/5 hover:border-white/10 hover:bg-slate-800/50"
-                }`}
-              >
-                {/* Task header */}
-                <div className="flex items-start gap-2">
-                  {/* Checkbox */}
-                  <div className="mt-0.5 flex-shrink-0">
-                    {task.done ? (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                        className="w-5 h-5 bg-indigo-500 border border-indigo-400 flex items-center justify-center rounded-md shadow-[0_0_10px_rgba(99,102,241,0.5)]"
-                      >
-                        <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                      </motion.div>
-                    ) : (
-                      <div className="w-5 h-5 bg-slate-900/50 border border-white/20 rounded-md shadow-inner" />
-                    )}
-                  </div>
-
-                  {/* Task info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className={`text-xs font-black uppercase tracking-wider ${
-                          task.done ? "text-indigo-400 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]" : "text-violet-300"
-                        }`}
-                      >
-                        {task.label}
-                      </span>
-                      {!task.done && (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/5 border border-white/10 rounded-md">
-                          <span className="text-[9px] text-indigo-200/60 uppercase font-bold tracking-widest">
-                            {task.tool}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <p
-                      className={`text-xs leading-relaxed ${
-                        task.done ? "text-slate-500 line-through" : "text-slate-300"
+              {/* Task list */}
+              <div className="p-3 space-y-2">
+                <AnimatePresence mode="popLayout">
+                  {currentQuest.tasks.map((task, index) => (
+                    <motion.div
+                      key={task.label}
+                      initial={{ x: -20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: 20, opacity: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`relative p-3 border rounded-xl transition-all ${
+                        task.done
+                          ? "bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+                          : "bg-slate-800/30 border-white/5 hover:border-white/10 hover:bg-slate-800/50"
                       }`}
                     >
-                      {task.description}
-                    </p>
-                  </div>
-                </div>
+                      {/* Task header */}
+                      <div className="flex items-start gap-2">
+                        {/* Checkbox */}
+                        <div className="mt-0.5 flex-shrink-0">
+                          {task.done ? (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                              className="w-5 h-5 bg-indigo-500 border border-indigo-400 flex items-center justify-center rounded-md shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+                            >
+                              <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                            </motion.div>
+                          ) : (
+                            <div className="w-5 h-5 bg-slate-900/50 border border-white/20 rounded-md shadow-inner" />
+                          )}
+                        </div>
 
-                {/* Completion glow effect */}
-                {task.done && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: [0, 0.3, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent pointer-events-none rounded-xl"
-                  />
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+                        {/* Task info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className={`text-xs font-black uppercase tracking-wider ${
+                                task.done ? "text-indigo-400 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]" : "text-violet-300"
+                              }`}
+                            >
+                              {task.label}
+                            </span>
+                            {!task.done && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/5 border border-white/10 rounded-md">
+                                <span className="text-[9px] text-indigo-200/60 uppercase font-bold tracking-widest">
+                                  {task.tool}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <p
+                            className={`text-xs leading-relaxed ${
+                              task.done ? "text-slate-500 line-through" : "text-slate-300"
+                            }`}
+                          >
+                            {task.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Completion glow effect */}
+                      {task.done && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: [0, 0.3, 0] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent pointer-events-none rounded-xl"
+                        />
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Completion banner */}
       <AnimatePresence>
-        {completedCount === totalCount && (
+        {!isFolded && completedCount === totalCount && (
           <motion.div
             initial={{ y: -10, opacity: 0, scale: 0.95 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
