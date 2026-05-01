@@ -140,4 +140,67 @@ export const CollaboratorCard: React.FC<CollaboratorCardProps> = ({
               ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border border-green-500/20"
               : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20 hover:shadow-lg"
           }`}
-    
+          onClick={() => !isInvited && setDialogOpen(true)}
+          disabled={isInvited}
+        >
+          {isInvited ? (
+            <>
+              <Check className="w-4 h-4 mr-2" />
+              Invited
+            </>
+          ) : (
+            <>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Connect
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Connect message dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Connect with {profile.displayName}</DialogTitle>
+            <DialogDescription>
+              Add a short note so they know why you'd like to collaborate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label htmlFor={`connect-message-${profile._id}`} className="text-sm font-medium">
+              Message <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <textarea
+              id={`connect-message-${profile._id}`}
+              rows={4}
+              maxLength={500}
+              placeholder={`Hi ${profile.displayName}, I really like your work on ${profile.skills?.[0] || "your skills"}. I'd love to collaborate...`}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            />
+            <p className="text-xs text-muted-foreground text-right">{message.length}/500</p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setMessage("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSend}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Send Connect Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
+  );
+};
