@@ -20,11 +20,36 @@ interface BadgeAwardSequenceProps {
 }
 
 const RARITY_COLORS = {
-  common: { bg: "bg-gray-500/20", border: "border-gray-500", text: "text-gray-400", glow: "shadow-gray-500/20" },
-  uncommon: { bg: "bg-green-500/20", border: "border-green-500", text: "text-green-400", glow: "shadow-green-500/20" },
-  rare: { bg: "bg-blue-500/20", border: "border-blue-500", text: "text-blue-400", glow: "shadow-blue-500/20" },
-  epic: { bg: "bg-purple-500/20", border: "border-purple-500", text: "text-purple-400", glow: "shadow-purple-500/20" },
-  legendary: { bg: "bg-amber-500/20", border: "border-amber-500", text: "text-amber-400", glow: "shadow-amber-500/20" },
+  common: {
+    bg: "bg-gray-500/20",
+    border: "border-gray-500",
+    text: "text-gray-400",
+    glow: "shadow-gray-500/20",
+  },
+  uncommon: {
+    bg: "bg-green-500/20",
+    border: "border-green-500",
+    text: "text-green-400",
+    glow: "shadow-green-500/20",
+  },
+  rare: {
+    bg: "bg-blue-500/20",
+    border: "border-blue-500",
+    text: "text-blue-400",
+    glow: "shadow-blue-500/20",
+  },
+  epic: {
+    bg: "bg-purple-500/20",
+    border: "border-purple-500",
+    text: "text-purple-400",
+    glow: "shadow-purple-500/20",
+  },
+  legendary: {
+    bg: "bg-amber-500/20",
+    border: "border-amber-500",
+    text: "text-amber-400",
+    glow: "shadow-amber-500/20",
+  },
 };
 
 export function BadgeAwardSequence({
@@ -37,18 +62,39 @@ export function BadgeAwardSequence({
   const [showBadge, setShowBadge] = useState(false);
   const [showReveal, setShowReveal] = useState(false);
   const [isLegendary, setIsLegendary] = useState(false);
+  const [showLegendaryBurst, setShowLegendaryBurst] = useState(false);
 
   useEffect(() => {
     if (isVisible && badge) {
       setShowFlash(true);
       setShowBadge(false);
       setShowReveal(false);
+      setShowLegendaryBurst(false);
       setIsLegendary(badge.rarity === "legendary");
+
+      if (badge.rarity === "legendary") {
+        setShowLegendaryBurst(true);
+        setTimeout(() => setShowLegendaryBurst(false), 500);
+      }
+
+      const isLegendaryBadge = badge.rarity === "legendary";
+
+      if (isLegendaryBadge) {
+        // Legendary: gold burst FIRST (0.5s), then normal sequence offset by 0.5s
+        const flashTimer = setTimeout(() => setShowFlash(false), 600); // 0.1s flash starts at 0.5s
+        const badgeTimer = setTimeout(() => setShowBadge(true), 700); // badge at 0.7s
+        const revealTimer = setTimeout(() => setShowReveal(true), 1300); // reveal at 1.3s
+        return () => {
+          clearTimeout(flashTimer);
+          clearTimeout(badgeTimer);
+          clearTimeout(revealTimer);
+        };
+      }
 
       const flashTimer = setTimeout(() => setShowFlash(false), 100);
       const badgeTimer = setTimeout(() => setShowBadge(true), 200);
       const revealTimer = setTimeout(() => setShowReveal(true), 800);
-      
+
       const autoDismissTimer = setTimeout(() => {
         if (badge.rarity !== "legendary") {
           handleDismiss();
@@ -91,6 +137,21 @@ export function BadgeAwardSequence({
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
         >
           <AnimatePresence mode="wait">
+            {showLegendaryBurst && (
+              <motion.div
+                key="legendary_burst"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 0.8, 0] }}
+                transition={{ duration: 0.5, times: [0, 0.2, 0.7, 1] }}
+                className="absolute inset-0 pointer-events-none z-10"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at center, rgba(251,191,36,0.4) 0%, rgba(245,158,11,0.6) 50%, rgba(217,119,6,0.3) 100%)",
+                  boxShadow: "inset 0 0 200px 100px rgba(251,191,36,0.3)",
+                }}
+              />
+            )}
+
             {showFlash && (
               <motion.div
                 key="flash"
@@ -111,10 +172,18 @@ export function BadgeAwardSequence({
                 className="relative"
               >
                 <motion.div
-                  animate={{ 
-                    boxShadow: isLegendary 
-                      ? ["0 0 0 rgba(245,158,11,0)", "0 0 60px rgba(245,158,11,0.5)", "0 0 40px rgba(245,158,11,0.3)"]
-                      : ["0 0 0 rgba(99,102,241,0)", "0 0 30px rgba(99,102,241,0.3)", "0 0 20px rgba(99,102,241,0.2)"]
+                  animate={{
+                    boxShadow: isLegendary
+                      ? [
+                          "0 0 0 rgba(245,158,11,0)",
+                          "0 0 60px rgba(245,158,11,0.5)",
+                          "0 0 40px rgba(245,158,11,0.3)",
+                        ]
+                      : [
+                          "0 0 0 rgba(99,102,241,0)",
+                          "0 0 30px rgba(99,102,241,0.3)",
+                          "0 0 20px rgba(99,102,241,0.2)",
+                        ],
                   }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
                   className={`w-32 h-32 rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center`}
@@ -137,7 +206,9 @@ export function BadgeAwardSequence({
                   animate={{ y: 0, opacity: 1 }}
                   className="mb-2"
                 >
-                  <span className={`text-sm font-semibold uppercase tracking-widest ${rarityStyle.text}`}>
+                  <span
+                    className={`text-sm font-semibold uppercase tracking-widest ${rarityStyle.text}`}
+                  >
                     Badge Earned!
                   </span>
                 </motion.div>
@@ -151,18 +222,22 @@ export function BadgeAwardSequence({
                   {isLegendary && (
                     <motion.div
                       animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 10,
+                        ease: "linear",
+                      }}
                       className="absolute inset-0 flex items-center justify-center"
                     >
                       <div className="w-40 h-40 rounded-full border-2 border-dashed border-amber-400/30" />
                     </motion.div>
                   )}
-                  
+
                   <motion.div
-                    animate={{ 
-                      boxShadow: isLegendary 
+                    animate={{
+                      boxShadow: isLegendary
                         ? "0 0 60px rgba(245,158,11,0.5)"
-                        : "0 0 30px rgba(99,102,241,0.3)"
+                        : "0 0 30px rgba(99,102,241,0.3)",
                     }}
                     className={`w-32 h-32 mx-auto rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center shadow-lg ${rarityStyle.glow}`}
                   >
@@ -176,7 +251,9 @@ export function BadgeAwardSequence({
                   transition={{ delay: 0.2 }}
                   className="mb-2"
                 >
-                  <h3 className="text-2xl font-bold text-white">{badge.name}</h3>
+                  <h3 className="text-2xl font-bold text-white">
+                    {badge.name}
+                  </h3>
                 </motion.div>
 
                 <motion.p

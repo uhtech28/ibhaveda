@@ -39,7 +39,7 @@ const XPBarComponent = ({ currentXP, maxXP, compact = false }: XPBarProps) => {
               className="h-full bg-gradient-to-r from-cyan-600 to-indigo-500"
               initial={{ width: 0 }}
               animate={{ width: `${percentage}%` }}
-              transition={{ duration: 0.8 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
             />
           </div>
         </div>
@@ -73,16 +73,15 @@ const XPBarComponent = ({ currentXP, maxXP, compact = false }: XPBarProps) => {
             initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
             transition={{
-              type: "spring",
-              stiffness: 100,
-              damping: 15,
+              duration: 0.6,
+              ease: "easeOut",
             }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-400" />
-            <motion.div 
+            <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-full h-full"
               animate={{
-                x: ['-100%', '100%'],
+                x: ["-100%", "100%"],
               }}
               transition={{
                 duration: 2,

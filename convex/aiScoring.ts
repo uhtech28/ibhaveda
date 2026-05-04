@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { action, mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -17,18 +16,18 @@ import { Id } from "./_generated/dataModel";
  *   High     9–12
  */
 export interface ScoringDimensions {
-  completeness: number;  // Does the submission fully address the task prompt?
-  specificity:  number;  // Are claims specific, named, and concrete?
-  evidence:     number;  // Is real-world evidence attached or referenced?
-  originality:  number;  // Is the thinking genuinely the user's own?
+  completeness: number; // Does the submission fully address the task prompt?
+  specificity: number; // Are claims specific, named, and concrete?
+  evidence: number; // Is real-world evidence attached or referenced?
+  originality: number; // Is the thinking genuinely the user's own?
 }
 
 export interface EvaluationResult extends ScoringDimensions {
-  totalScore:   number;          // 0–12
-  qualityTier:  "low" | "standard" | "high";
-  feedback:     string;          // One-sentence guidance for the user
-  modelUsed:    string;
-  valuationScore: number;        // Mapped ₹ valuation (see VALUATION_MAP)
+  totalScore: number; // 0–12
+  qualityTier: "low" | "standard" | "high";
+  feedback: string; // One-sentence guidance for the user
+  modelUsed: string;
+  valuationScore: number; // Mapped ₹ valuation (see VALUATION_MAP)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,9 +39,9 @@ export interface EvaluationResult extends ScoringDimensions {
  * The UI can format this as ₹ or any currency later.
  */
 const VALUATION_MAP: Record<"low" | "standard" | "high", number> = {
-  low:      100_000,   // ₹1 Lakh
-  standard: 500_000,   // ₹5 Lakh
-  high:     2_000_000, // ₹20 Lakh
+  low: 100_000, // ₹1 Lakh
+  standard: 500_000, // ₹5 Lakh
+  high: 2_000_000, // ₹20 Lakh
 };
 
 function getQualityTier(total: number): "low" | "standard" | "high" {
@@ -55,7 +54,10 @@ function getQualityTier(total: number): "low" | "standard" | "high" {
 // SCORING PROMPT BUILDER
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildScoringPrompt(content: string, checkpointOutcome: string): string {
+function buildScoringPrompt(
+  content: string,
+  checkpointOutcome: string,
+): string {
   return `You are a rigorous academic evaluator assessing a startup founder's checkpoint submission.
 
 CHECKPOINT OUTCOME BEING EVALUATED:
@@ -89,36 +91,41 @@ RESPOND WITH ONLY THIS JSON (no markdown, no extra text):
 // MOCK SCORER (fallback when API keys are absent)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function mockScore(content: string): ScoringDimensions & { feedback: string; modelUsed: string } {
+function mockScore(
+  content: string,
+): ScoringDimensions & { feedback: string; modelUsed: string } {
   const words = content.trim().split(/\s+/).length;
 
   // Deterministic scoring based on submission length and keyword presence
-  const hasNumbers   = /\d+/.test(content);
-  const hasLinks     = /https?:\/\//.test(content);
-  const hasQuotes    = /"[^"]+"/.test(content);
-  const hasNames     = /[A-Z][a-z]+ [A-Z][a-z]+/.test(content);
+  const hasNumbers = /\d+/.test(content);
+  const hasLinks = /https?:\/\//.test(content);
+  const hasQuotes = /"[^"]+"/.test(content);
+  const hasNames = /[A-Z][a-z]+ [A-Z][a-z]+/.test(content);
 
   const completeness = words > 100 ? 3 : words > 50 ? 2 : words > 20 ? 1 : 0;
-  const specificity  = (hasNumbers ? 1 : 0) + (hasNames ? 1 : 0) + (words > 80 ? 1 : 0);
-  const evidence     = (hasLinks ? 2 : 0) + (hasQuotes ? 1 : 0);
-  const originality  = words > 60 ? 2 : words > 30 ? 1 : 0;
+  const specificity =
+    (hasNumbers ? 1 : 0) + (hasNames ? 1 : 0) + (words > 80 ? 1 : 0);
+  const evidence = (hasLinks ? 2 : 0) + (hasQuotes ? 1 : 0);
+  const originality = words > 60 ? 2 : words > 30 ? 1 : 0;
 
-  const total = completeness + specificity + Math.min(evidence, 3) + originality;
-  const tier  = getQualityTier(total);
+  const total =
+    completeness + specificity + Math.min(evidence, 3) + originality;
+  const tier = getQualityTier(total);
 
   const feedbackMap = {
-    low:      "Add specific names, numbers, and at least one external link to strengthen your submission.",
-    standard: "Good start — include more concrete evidence like quotes, data sources, or user feedback.",
-    high:     "Strong submission. Consider adding direct quotes from users or competitors to reach gold standard.",
+    low: "Add specific names, numbers, and at least one external link to strengthen your submission.",
+    standard:
+      "Good start — include more concrete evidence like quotes, data sources, or user feedback.",
+    high: "Strong submission. Consider adding direct quotes from users or competitors to reach gold standard.",
   };
 
   return {
     completeness,
     specificity,
-    evidence:   Math.min(evidence, 3),
+    evidence: Math.min(evidence, 3),
     originality,
-    feedback:   feedbackMap[tier],
-    modelUsed:  "mock",
+    feedback: feedbackMap[tier],
+    modelUsed: "mock",
   };
 }
 
@@ -134,27 +141,34 @@ async function scoreWithReplicate(
   const prompt = buildScoringPrompt(content, checkpointOutcome);
 
   // Using Llama 3 8B Instruct via Replicate
-  const response = await fetch("https://api.replicate.com/v1/models/meta/meta-llama-3-8b-instruct/predictions", {
-    method:  "POST",
-    headers: {
-      "Authorization": `Bearer ${replicateApiKey}`,
-      "Content-Type":  "application/json",
-    },
-    body: JSON.stringify({
-      input: {
-        prompt,
-        max_tokens:  300,
-        temperature: 0.1,
-        system_prompt: "You are a strict JSON-only evaluator. Respond only with valid JSON.",
+  const response = await fetch(
+    "https://api.replicate.com/v1/models/meta/meta-llama-3-8b-instruct/predictions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${replicateApiKey}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        input: {
+          prompt,
+          max_tokens: 300,
+          temperature: 0.1,
+          system_prompt:
+            "You are a strict JSON-only evaluator. Respond only with valid JSON.",
+        },
+      }),
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`Replicate API error: ${response.status}`);
   }
 
-  const prediction = await response.json() as { urls?: { get?: string }; id?: string };
+  const prediction = (await response.json()) as {
+    urls?: { get?: string };
+    id?: string;
+  };
 
   // Poll for completion (Replicate is async)
   const getUrl = prediction?.urls?.get;
@@ -164,9 +178,12 @@ async function scoreWithReplicate(
   while (attempts < 30) {
     await new Promise((r) => setTimeout(r, 1000));
     const poll = await fetch(getUrl, {
-      headers: { "Authorization": `Bearer ${replicateApiKey}` },
+      headers: { Authorization: `Bearer ${replicateApiKey}` },
     });
-    const result = await poll.json() as { status?: string; output?: string[] };
+    const result = (await poll.json()) as {
+      status?: string;
+      output?: string[];
+    };
 
     if (result.status === "succeeded" && result.output) {
       const raw = Array.isArray(result.output)
@@ -189,6 +206,52 @@ async function scoreWithReplicate(
 // PRO TIER SCORER — OpenAI GPT-4o
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Score with Anthropic Claude (Haiku) for Pro tier users.
+ * Uses the Anthropic HTTP API directly via fetch.
+ */
+async function scoreWithClaude(
+  content: string,
+  checkpointOutcome: string,
+  anthropicApiKey: string,
+): Promise<ScoringDimensions & { feedback: string; modelUsed: string }> {
+  const prompt = buildScoringPrompt(content, checkpointOutcome);
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": anthropicApiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: `You are a strict JSON-only evaluator. Respond only with valid JSON, no markdown fences.\n\n${prompt}`,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Anthropic API error ${response.status}: ${body}`);
+  }
+
+  const data = (await response.json()) as {
+    content?: Array<{ text?: string; type?: string }>;
+  };
+
+  const raw = data?.content?.[0]?.text ?? "";
+  return parseAIResponse(raw, "claude-3-haiku-20240307");
+}
+
+/**
+ * Score with OpenAI GPT-4o (fallback or Free tier).
+ */
 async function scoreWithOpenAI(
   content: string,
   checkpointOutcome: string,
@@ -197,22 +260,23 @@ async function scoreWithOpenAI(
   const prompt = buildScoringPrompt(content, checkpointOutcome);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method:  "POST",
+    method: "POST",
     headers: {
-      "Authorization": `Bearer ${openAIApiKey}`,
-      "Content-Type":  "application/json",
+      Authorization: `Bearer ${openAIApiKey}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model:       "gpt-4o",
+      model: "gpt-4o",
       temperature: 0.1,
-      max_tokens:  300,
+      max_tokens: 300,
       messages: [
         {
-          role:    "system",
-          content: "You are a strict JSON-only evaluator. Respond only with valid JSON, no markdown fences.",
+          role: "system",
+          content:
+            "You are a strict JSON-only evaluator. Respond only with valid JSON, no markdown fences.",
         },
         {
-          role:    "user",
+          role: "user",
           content: prompt,
         },
       ],
@@ -224,7 +288,7 @@ async function scoreWithOpenAI(
     throw new Error(`OpenAI API error ${response.status}: ${body}`);
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
 
@@ -249,15 +313,17 @@ function parseAIResponse(
   // Find the first JSON object in the response
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error(`Could not parse JSON from AI response: ${raw.slice(0, 200)}`);
+    throw new Error(
+      `Could not parse JSON from AI response: ${raw.slice(0, 200)}`,
+    );
   }
 
   const parsed = JSON.parse(jsonMatch[0]) as {
     completeness?: unknown;
-    specificity?:  unknown;
-    evidence?:     unknown;
-    originality?:  unknown;
-    feedback?:     unknown;
+    specificity?: unknown;
+    evidence?: unknown;
+    originality?: unknown;
+    feedback?: unknown;
   };
 
   const clamp = (v: unknown): number =>
@@ -265,10 +331,10 @@ function parseAIResponse(
 
   return {
     completeness: clamp(parsed.completeness),
-    specificity:  clamp(parsed.specificity),
-    evidence:     clamp(parsed.evidence),
-    originality:  clamp(parsed.originality),
-    feedback:     String(parsed.feedback ?? "Continue refining your submission."),
+    specificity: clamp(parsed.specificity),
+    evidence: clamp(parsed.evidence),
+    originality: clamp(parsed.originality),
+    feedback: String(parsed.feedback ?? "Continue refining your submission."),
     modelUsed,
   };
 }
@@ -279,37 +345,37 @@ function parseAIResponse(
 
 export const saveEvaluationResult = internalMutation({
   args: {
-    taskId:       v.id("ventureTasks"),
+    taskId: v.id("ventureTasks"),
     checkpointId: v.id("ventureCheckpoints"),
-    ventureId:    v.id("ventures"),
-    stageNumber:  v.number(),
-    content:      v.string(),
+    ventureId: v.id("ventures"),
+    stageNumber: v.number(),
+    content: v.string(),
     completeness: v.number(),
-    specificity:  v.number(),
-    evidence:     v.number(),
-    originality:  v.number(),
-    totalScore:   v.number(),
-    qualityTier:  v.string(),
+    specificity: v.number(),
+    evidence: v.number(),
+    originality: v.number(),
+    totalScore: v.number(),
+    qualityTier: v.string(),
     valuationScore: v.number(),
-    feedback:     v.optional(v.string()),
-    modelUsed:    v.string(),
+    feedback: v.optional(v.string()),
+    modelUsed: v.string(),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
 
     // Save per-task AI evaluation
     await ctx.db.insert("aiEvaluations", {
-      taskId:       args.taskId,
+      taskId: args.taskId,
       checkpointId: args.checkpointId,
-      content:      args.content,
+      content: args.content,
       completeness: args.completeness,
-      specificity:  args.specificity,
-      evidence:     args.evidence,
-      originality:  args.originality,
-      totalScore:   args.totalScore,
-      feedback:     args.feedback,
-      modelUsed:    args.modelUsed,
-      evaluatedAt:  now,
+      specificity: args.specificity,
+      evidence: args.evidence,
+      originality: args.originality,
+      totalScore: args.totalScore,
+      feedback: args.feedback,
+      modelUsed: args.modelUsed,
+      evaluatedAt: now,
     });
 
     // Upsert aggregate quality score for the stage
@@ -323,29 +389,29 @@ export const saveEvaluationResult = internalMutation({
     if (existing) {
       // Average new score with existing (rolling update)
       const avgScore = (existing.totalScore + args.totalScore) / 2;
-      const newTier  = getQualityTier(Math.round(avgScore));
+      const newTier = getQualityTier(Math.round(avgScore));
       await ctx.db.patch(existing._id, {
-        completeness:   (existing.completeness + args.completeness) / 2,
-        specificity:    (existing.specificity  + args.specificity)  / 2,
-        evidence:       (existing.evidence     + args.evidence)     / 2,
-        originality:    (existing.originality  + args.originality)  / 2,
-        totalScore:     avgScore,
-        qualityTier:    newTier,
+        completeness: (existing.completeness + args.completeness) / 2,
+        specificity: (existing.specificity + args.specificity) / 2,
+        evidence: (existing.evidence + args.evidence) / 2,
+        originality: (existing.originality + args.originality) / 2,
+        totalScore: avgScore,
+        qualityTier: newTier,
         valuationScore: VALUATION_MAP[newTier],
-        evaluatedAt:    now,
+        evaluatedAt: now,
       });
     } else {
       await ctx.db.insert("qualityScores", {
-        ventureId:      args.ventureId,
-        stageNumber:    args.stageNumber,
-        completeness:   args.completeness,
-        specificity:    args.specificity,
-        evidence:       args.evidence,
-        originality:    args.originality,
-        totalScore:     args.totalScore,
-        qualityTier:    args.qualityTier,
+        ventureId: args.ventureId,
+        stageNumber: args.stageNumber,
+        completeness: args.completeness,
+        specificity: args.specificity,
+        evidence: args.evidence,
+        originality: args.originality,
+        totalScore: args.totalScore,
+        qualityTier: args.qualityTier,
         valuationScore: args.valuationScore,
-        evaluatedAt:    now,
+        evaluatedAt: now,
       });
     }
   },
@@ -354,29 +420,51 @@ export const saveEvaluationResult = internalMutation({
 // ─────────────────────────────────────────────────────────────────────────────
 export const evaluateTaskSubmission = action({
   args: {
-    taskId:       v.id("ventureTasks"),
+    taskId: v.id("ventureTasks"),
     checkpointId: v.id("ventureCheckpoints"),
-    ventureId:    v.id("ventures"),
-    stageNumber:  v.number(),
-    content:      v.string(),
+    ventureId: v.id("ventures"),
+    stageNumber: v.number(),
+    content: v.string(),
     checkpointOutcome: v.string(),
-    userTier:     v.union(v.literal("free"), v.literal("pro")),
+    userTier: v.union(v.literal("free"), v.literal("pro")),
   },
   handler: async (ctx, args) => {
     const { content, checkpointOutcome, userTier } = args;
 
     // ── Get API keys from env ────────────────────────────────────────────────
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
-    const OPENAI_API_KEY    = process.env.OPENAI_API_KEY;
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
     let scored;
-    
+
     try {
-      if (userTier === "pro" && OPENAI_API_KEY) {
-        scored = await scoreWithOpenAI(content, checkpointOutcome, OPENAI_API_KEY);
-      } else if (REPLICATE_API_KEY) {
-        scored = await scoreWithReplicate(content, checkpointOutcome, REPLICATE_API_KEY);
-      } else {
+      // Pro tier: Use Claude Haiku (Anthropic) for cost-efficiency and quality
+      if (userTier === "pro" && ANTHROPIC_API_KEY) {
+        scored = await scoreWithClaude(
+          content,
+          checkpointOutcome,
+          ANTHROPIC_API_KEY,
+        );
+      }
+      // Fallback to OpenAI if Anthropic key is unavailable
+      else if (userTier === "pro" && OPENAI_API_KEY) {
+        scored = await scoreWithOpenAI(
+          content,
+          checkpointOutcome,
+          OPENAI_API_KEY,
+        );
+      }
+      // Free tier: Use Replicate (Llama 3)
+      else if (REPLICATE_API_KEY) {
+        scored = await scoreWithReplicate(
+          content,
+          checkpointOutcome,
+          REPLICATE_API_KEY,
+        );
+      }
+      // Final fallback: mock scoring
+      else {
         scored = mockScore(content);
       }
     } catch (e) {
@@ -385,38 +473,42 @@ export const evaluateTaskSubmission = action({
     }
 
     // ── Build result ──────────────────────────────────────────────────────────
-    const totalScore    = scored.completeness + scored.specificity + scored.evidence + scored.originality;
-    const qualityTier   = getQualityTier(totalScore);
+    const totalScore =
+      scored.completeness +
+      scored.specificity +
+      scored.evidence +
+      scored.originality;
+    const qualityTier = getQualityTier(totalScore);
     const valuationScore = VALUATION_MAP[qualityTier];
 
     const result: EvaluationResult = {
-      completeness:  scored.completeness,
-      specificity:   scored.specificity,
-      evidence:      scored.evidence,
-      originality:   scored.originality,
+      completeness: scored.completeness,
+      specificity: scored.specificity,
+      evidence: scored.evidence,
+      originality: scored.originality,
       totalScore,
       qualityTier,
-      feedback:      scored.feedback,
-      modelUsed:     scored.modelUsed,
+      feedback: scored.feedback,
+      modelUsed: scored.modelUsed,
       valuationScore,
     };
 
     // ── Persist to database ───────────────────────────────────────────────────
     await ctx.runMutation(internal.aiScoring.saveEvaluationResult, {
-      taskId:        args.taskId,
-      checkpointId:  args.checkpointId,
-      ventureId:     args.ventureId,
-      stageNumber:   args.stageNumber,
+      taskId: args.taskId,
+      checkpointId: args.checkpointId,
+      ventureId: args.ventureId,
+      stageNumber: args.stageNumber,
       content,
-      completeness:  scored.completeness,
-      specificity:   scored.specificity,
-      evidence:      scored.evidence,
-      originality:   scored.originality,
+      completeness: scored.completeness,
+      specificity: scored.specificity,
+      evidence: scored.evidence,
+      originality: scored.originality,
       totalScore,
       qualityTier,
       valuationScore,
-      feedback:      scored.feedback,
-      modelUsed:     scored.modelUsed,
+      feedback: scored.feedback,
+      modelUsed: scored.modelUsed,
     });
 
     return result;
@@ -433,7 +525,7 @@ export const evaluateTaskSubmission = action({
  */
 export const getStageQualityScore = query({
   args: {
-    ventureId:   v.id("ventures"),
+    ventureId: v.id("ventures"),
     stageNumber: v.number(),
   },
   handler: async (ctx, args) => {
@@ -478,6 +570,55 @@ export const getTaskEvaluation = query({
   },
 });
 
+/**
+ * Get AI evaluation status for every task in a checkpoint.
+ * Used by the world-map checkpoint panel to show pending vs scored tasks.
+ */
+export const getCheckpointEvaluationSummary = query({
+  args: {
+    checkpointId: v.id("ventureCheckpoints"),
+  },
+  handler: async (ctx, args) => {
+    const deriveQualityTier = (score: number) => {
+      if (score >= 9) return "High";
+      if (score >= 5) return "Standard";
+      return "Low";
+    };
+
+    const tasks = await ctx.db
+      .query("ventureTasks")
+      .withIndex("by_checkpoint", (q) =>
+        q.eq("checkpointId", args.checkpointId),
+      )
+      .collect();
+
+    const evaluations = await Promise.all(
+      tasks.map(async (task) => {
+        const evaluation = await ctx.db
+          .query("aiEvaluations")
+          .withIndex("by_task", (q) => q.eq("taskId", task._id))
+          .first();
+
+        return {
+          taskId: task._id,
+          taskLevel: task.taskLevel,
+          taskStatus: task.status,
+          evaluation: evaluation
+            ? {
+                qualityTier: deriveQualityTier(evaluation.totalScore),
+                totalScore: evaluation.totalScore,
+                feedback: evaluation.feedback,
+              }
+            : null,
+          isPending: task.status === "completed" && evaluation === null,
+        };
+      }),
+    );
+
+    return evaluations;
+  },
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FEATURE FLAGS — read/write
 // ─────────────────────────────────────────────────────────────────────────────
@@ -490,17 +631,67 @@ export const seedFeatureFlags = mutation({
   args: {},
   handler: async (ctx) => {
     const V1_FLAGS = [
-      { flag: "phaser_world_map",    enabled: true,  rolloutPercentage: 100, description: "Phaser 3 world map rendering" },
-      { flag: "ai_quality_scoring",  enabled: true,  rolloutPercentage: 100, description: "AI-powered task evaluation" },
-      { flag: "persona_system",      enabled: true,  rolloutPercentage: 100, description: "Character sprites on world map" },
-      { flag: "audio_system",        enabled: true,  rolloutPercentage: 100, description: "Howler.js ambient + SFX audio" },
+      {
+        flag: "phaser_world_map",
+        enabled: true,
+        rolloutPercentage: 100,
+        description: "Phaser 3 world map rendering",
+      },
+      {
+        flag: "ai_quality_scoring",
+        enabled: true,
+        rolloutPercentage: 100,
+        description: "AI-powered task evaluation",
+      },
+      {
+        flag: "persona_system",
+        enabled: true,
+        rolloutPercentage: 100,
+        description: "Character sprites on world map",
+      },
+      {
+        flag: "audio_system",
+        enabled: true,
+        rolloutPercentage: 100,
+        description: "Howler.js ambient + SFX audio",
+      },
       // Post-V1 (disabled)
-      { flag: "academic_template",   enabled: false, rolloutPercentage: 0,   description: "Academic project template" },
-      { flag: "lab_template",        enabled: false, rolloutPercentage: 0,   description: "Lab/experimental template" },
-      { flag: "creative_template",   enabled: false, rolloutPercentage: 0,   description: "Creative project template" },
-      { flag: "ai_tag_suggestion",   enabled: false, rolloutPercentage: 0,   description: "AI-generated skill/industry tags" },
-      { flag: "ai_matching",         enabled: false, rolloutPercentage: 0,   description: "Collaborator matching algorithm" },
-      { flag: "corruption_mechanic", enabled: false, rolloutPercentage: 0,   description: "World corruption on inactivity" },
+      {
+        flag: "academic_template",
+        enabled: false,
+        rolloutPercentage: 0,
+        description: "Academic project template",
+      },
+      {
+        flag: "lab_template",
+        enabled: false,
+        rolloutPercentage: 0,
+        description: "Lab/experimental template",
+      },
+      {
+        flag: "creative_template",
+        enabled: false,
+        rolloutPercentage: 0,
+        description: "Creative project template",
+      },
+      {
+        flag: "ai_tag_suggestion",
+        enabled: false,
+        rolloutPercentage: 0,
+        description: "AI-generated skill/industry tags",
+      },
+      {
+        flag: "ai_matching",
+        enabled: false,
+        rolloutPercentage: 0,
+        description: "Collaborator matching algorithm",
+      },
+      {
+        flag: "corruption_mechanic",
+        enabled: false,
+        rolloutPercentage: 0,
+        description: "World corruption on inactivity",
+      },
     ] as const;
 
     const now = Date.now();
@@ -513,13 +704,13 @@ export const seedFeatureFlags = mutation({
 
       if (!existing) {
         await ctx.db.insert("featureFlags", {
-          flag:              f.flag,
-          enabled:           f.enabled,
+          flag: f.flag,
+          enabled: f.enabled,
           rolloutPercentage: f.rolloutPercentage,
-          enabledForUsers:   [],
-          description:       f.description,
-          createdAt:         now,
-          updatedAt:         now,
+          enabledForUsers: [],
+          description: f.description,
+          createdAt: now,
+          updatedAt: now,
         });
       }
     }
@@ -534,7 +725,7 @@ export const seedFeatureFlags = mutation({
  */
 export const isFeatureEnabled = query({
   args: {
-    flag:   v.string(),
+    flag: v.string(),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -557,7 +748,8 @@ export const isFeatureEnabled = query({
 
     if (args.userId) {
       // Simple deterministic hash: sum char codes mod 100
-      const hash = [...args.userId].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 100;
+      const hash =
+        [...args.userId].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 100;
       return hash < flagDoc.rolloutPercentage;
     }
 

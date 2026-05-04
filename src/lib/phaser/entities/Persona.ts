@@ -92,7 +92,7 @@ export class Persona extends Phaser.GameObjects.Container {
 
     this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, spriteSheetKey, 0);
     this.sprite.setOrigin(0.5, 1.0);
-    this.sprite.setScale(2); // 32x48px -> 64x96px, sized for the Fan-tasy map
+    this.sprite.setScale(3); // 32x48px -> 96x144px (3× nearest-neighbour, per PRD §3.1)
 
     // ── Assemble container ──────────────────────────────────────────────────
     // Shadow is added first so it renders behind the sprite

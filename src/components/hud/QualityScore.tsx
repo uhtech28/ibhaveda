@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { TrendingUp, DollarSign } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 
 interface QualityScoreProps {
   qualityScore: number;
@@ -9,11 +9,46 @@ interface QualityScoreProps {
   compact?: boolean;
 }
 
-export function QualityScore({ qualityScore, valuationScore, compact = false }: QualityScoreProps) {
+/**
+ * Formats a number as Indian Rupees with lakh/crore shorthand.
+ * e.g. 12,00,000 → "₹12L"  |  500 → "₹500"  |  1,20,00,000 → "₹1.2Cr"
+ */
+function formatINR(value: number): string {
+  if (value >= 10_000_000) {
+    return `₹${(value / 10_000_000).toFixed(1).replace(/\.0$/, "")}Cr`;
+  }
+  if (value >= 100_000) {
+    return `₹${(value / 100_000).toFixed(1).replace(/\.0$/, "")}L`;
+  }
+  if (value >= 1_000) {
+    return `₹${(value / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  return `₹${value.toLocaleString("en-IN")}`;
+}
+
+export function QualityScore({
+  qualityScore,
+  valuationScore,
+  compact = false,
+}: QualityScoreProps) {
   const getQualityTier = (score: number) => {
-    if (score >= 9) return { label: "High", color: "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]", bg: "bg-emerald-500/10 border-emerald-500/30", icon: "text-emerald-400" };
-    if (score >= 5) return { label: "Standard", color: "text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.4)]", bg: "bg-indigo-500/10 border-indigo-500/30", icon: "text-indigo-400" };
-    return { label: "Low", color: "text-gray-400", bg: "bg-gray-500/10 border-gray-500/30", icon: "text-gray-400" };
+    if (score >= 9)
+      return {
+        label: "High",
+        color: "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]",
+        bg: "bg-emerald-500/10 border-emerald-500/30",
+      };
+    if (score >= 5)
+      return {
+        label: "Standard",
+        color: "text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.4)]",
+        bg: "bg-indigo-500/10 border-indigo-500/30",
+      };
+    return {
+      label: "Low",
+      color: "text-gray-400",
+      bg: "bg-gray-500/10 border-gray-500/30",
+    };
   };
 
   const tier = getQualityTier(qualityScore);
@@ -26,7 +61,11 @@ export function QualityScore({ qualityScore, valuationScore, compact = false }: 
             Build
           </span>
           <div className="flex items-baseline gap-0.5">
-            <span className={`text-[13px] font-black leading-none ${tier.color}`}>{qualityScore}</span>
+            <span
+              className={`text-[13px] font-black leading-none ${tier.color}`}
+            >
+              {qualityScore}
+            </span>
             <span className="text-[8px] text-zinc-600 font-bold">/12</span>
           </div>
         </div>
@@ -36,8 +75,9 @@ export function QualityScore({ qualityScore, valuationScore, compact = false }: 
             Value
           </span>
           <div className="flex items-center gap-0.5 text-emerald-400">
-            <span className="text-[9px] font-black">$</span>
-            <span className="text-[13px] font-black leading-none">{valuationScore.toLocaleString()}</span>
+            <span className="text-[13px] font-black leading-none">
+              {formatINR(valuationScore)}
+            </span>
           </div>
         </div>
       </div>
@@ -55,8 +95,14 @@ export function QualityScore({ qualityScore, valuationScore, compact = false }: 
             Build Quality
           </span>
           <div className="flex items-baseline gap-1">
-            <span className={`text-[15px] font-black leading-none ${tier.color}`}>{qualityScore}</span>
-            <span className="text-[10px] text-zinc-500 font-bold uppercase">/12</span>
+            <span
+              className={`text-[15px] font-black leading-none ${tier.color}`}
+            >
+              {qualityScore}
+            </span>
+            <span className="text-[10px] text-zinc-500 font-bold uppercase">
+              /12
+            </span>
           </div>
         </div>
       </motion.div>
@@ -67,12 +113,12 @@ export function QualityScore({ qualityScore, valuationScore, compact = false }: 
       >
         <div className="flex flex-col">
           <span className="text-[9px] text-zinc-500 uppercase tracking-[0.2em] font-black leading-none mb-1">
-            Market Value
+            Pre-Seed Value
           </span>
           <div className="flex items-center gap-1.5">
-            <DollarSign className="h-3 w-3 text-emerald-400" />
+            <TrendingUp className="h-3 w-3 text-emerald-400" />
             <span className="text-[15px] font-black leading-none tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-emerald-400 to-emerald-500">
-              {valuationScore.toLocaleString()}
+              {formatINR(valuationScore)}
             </span>
           </div>
         </div>

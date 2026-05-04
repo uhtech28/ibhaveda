@@ -62,7 +62,7 @@ export function getAnimationTypeForStage(
     4: "rune_inscription", // Stage 4: Development - Stone tablet with rune inscription
     5: "bridge_repair", // Stage 5: Testing - Bridge planks appear and transform
     6: "ward_placement", // Stage 6: Launch - Ward stones create protective boundary
-    7: "beacon_lighting", // Stage 7: Growth - Reuse beacon lighting
+    7: "compass_calibration", // Stage 7: Iteration - Compass Calibration (per PRD §5)
     8: "seal_break", // Stage 8: Scale - Final seal break with golden effects
   };
   return stageToAnimation[stage] || "compass_calibration";

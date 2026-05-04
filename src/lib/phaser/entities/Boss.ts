@@ -1,9 +1,12 @@
 /**
  * Boss.ts
  *
- * BossSilhouette — a Phaser Container representing a boss enemy on the
+ * BossSilhouette — a Phaser Container representing a Super Boss enemy on the
  * Interactive Ideas world-map. Renders a menacing humanoid silhouette with
  * status-based alpha transitions.
+ *
+ * Each of the 3 Super Bosses (The Gravemind, The Unraveller, The Pale Architect)
+ * has unique entrance(), retreat(), and slay() cinematics per PRD §4.2.
  */
 
 import * as Phaser from "phaser";
@@ -47,19 +50,19 @@ export interface BossConfig {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A Phaser Container that renders a boss silhouette on the world map.
+ * A Phaser Container that renders a Super Boss silhouette on the world map.
  *
  * Features:
  * - Menacing humanoid silhouette (~96×128px) with jagged crown/horns
  * - Glowing red eyes
  * - Status-based alpha (silhouette: 0.15, present: 0.5, foreground: 1.0)
  * - Optional nameplate text
- * - Smooth alpha transitions via tween
+ * - Per-boss-ID unique entrance(), retreat(), slay() animations
  *
  * @example
  * const boss = new BossSilhouette(this, {
- *   bossId: 'boss_001',
- *   bossName: 'The Gatekeeper',
+ *   bossId: 'super_boss',
+ *   bossName: 'The Gravemind',
  *   status: 'silhouette',
  *   x: 800,
  *   y: 400,
@@ -91,7 +94,6 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
     this.status = config.status;
 
     // ── Silhouette graphics ─────────────────────────────────────────────────
-    // Draw at origin (0, 0) relative to container
     this.silhouetteGraphics = this.drawSilhouette(scene);
 
     // ── Nameplate ───────────────────────────────────────────────────────────
@@ -119,10 +121,7 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
   // ── Public API ────────────────────────────────────────────────────────────
 
   /**
-   * Update boss status with smooth opacity transition
-   *
-   * @param status - New boss status
-   * @param smooth - Whether to animate the transition (default: true)
+   * Update boss status with smooth opacity transition.
    */
   updateStatus(status: BossStatus, smooth: boolean = true): void {
     if (this.status === status) return;
@@ -142,157 +141,302 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
       this.setAlpha(targetAlpha);
     }
 
-    // Update name plate
     if (status === "foreground" && this.config.bossName) {
       this.namePlate.setText(this.config.bossName);
     }
   }
 
-  // ── Private: drawing ──────────────────────────────────────────────────────
+  // ── Public cinematics ─────────────────────────────────────────────────────
 
   /**
-   * Draws the boss silhouette onto a Graphics object.
-   *
-   * The silhouette is a menacing humanoid shape approximately 96×128px,
-   * drawn with origin at (48, 64) for center-based positioning.
-   *
-   * @param scene The scene to create the graphics in.
-   * @returns A Graphics object containing the silhouette.
+   * Play the entrance animation.
+   * Each Super Boss has a thematically distinct materialisation sequence (~1s).
+   * PRD §4.2: "entrance animation per Super Boss."
    */
-  private drawSilhouette(scene: Phaser.Scene): Phaser.GameObjects.Graphics {
-    const g = scene.add.graphics();
+  entrance(): void {
+    if (!this.scene || !this.scene.tweens) return;
+    this.setAlpha(0);
+    this.setScale(0.5);
 
-    // Offset to center the silhouette around (0, 0)
-    // The drawing instructions assume (48, 0) as the center-top
-    const offsetX = -48;
-    const offsetY = -64;
+    switch (this.bossId) {
+      // ── The Unraveller — indigo threads converge and weave the form ─────────
+      case "the_unraveller": {
+        for (let i = 0; i < 12; i++) {
+          const thread = this.scene.add.graphics();
+          thread.lineStyle(2, 0x818cf8, 0.8);
+          const startX = (Math.random() - 0.5) * 300;
+          thread.lineBetween(startX, -200, 0, 0);
+          this.add(thread);
+          this.scene.tweens.add({
+            targets: thread,
+            alpha: 0,
+            duration: 700,
+            delay: i * 60,
+            onComplete: () => thread.destroy(),
+          });
+        }
+        this.scene.tweens.add({
+          targets: this,
+          alpha: 0.5,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 900,
+          ease: "Cubic.easeOut",
+        });
+        break;
+      }
 
-    // ── Body (dark silhouette color) ────────────────────────────────────────
-    g.fillStyle(0x1a0a2e);
+      // ── The Pale Architect — geometric fragments assemble ────────────────────
+      case "the_pale_architect": {
+        const cols = 4;
+        const rows = 5;
+        for (let c = 0; c < cols; c++) {
+          for (let r = 0; r < rows; r++) {
+            const frag = this.scene.add.graphics();
+            frag.fillStyle(0xe2e8f0, 0.85);
+            frag.fillRect(0, 0, 22, 22);
+            frag.setPosition(
+              (c - cols / 2) * 26 + (Math.random() - 0.5) * 120,
+              (r - rows / 2) * 26 + (Math.random() - 0.5) * 120,
+            );
+            this.add(frag);
+            this.scene.tweens.add({
+              targets: frag,
+              x: (c - cols / 2) * 26,
+              y: (r - rows / 2) * 26,
+              alpha: { from: 0, to: 0.7 },
+              duration: 600,
+              delay: (c + r) * 60,
+              ease: "Cubic.easeOut",
+              onComplete: () => {
+                this.scene.tweens.add({
+                  targets: frag,
+                  alpha: 0,
+                  duration: 400,
+                  onComplete: () => frag.destroy(),
+                });
+              },
+            });
+          }
+        }
+        this.scene.tweens.add({
+          targets: this,
+          alpha: 0.5,
+          scaleX: 1,
+          scaleY: 1,
+          delay: 600,
+          duration: 600,
+          ease: "Linear",
+        });
+        break;
+      }
 
-    // ── Jagged crown / horns at top (3 triangles) ───────────────────────────
-    // Left horn
-    g.fillTriangle(
-      offsetX + 18,
-      offsetY + 0,
-      offsetX + 28,
-      offsetY - 30,
-      offsetX + 38,
-      offsetY + 0,
-    );
-
-    // Center crown (tallest)
-    g.fillTriangle(
-      offsetX + 43,
-      offsetY + 0,
-      offsetX + 48,
-      offsetY - 40,
-      offsetX + 53,
-      offsetY + 0,
-    );
-
-    // Right horn
-    g.fillTriangle(
-      offsetX + 58,
-      offsetY + 0,
-      offsetX + 68,
-      offsetY - 30,
-      offsetX + 78,
-      offsetY + 0,
-    );
-
-    // ── Massive shoulders ───────────────────────────────────────────────────
-    g.fillRect(offsetX + 0, offsetY + 0, 96, 20);
-
-    // ── Body core (torso) ───────────────────────────────────────────────────
-    g.fillRect(offsetX + 20, offsetY + 20, 56, 60);
-
-    // ── Lower body (legs, widening stance) ──────────────────────────────────
-    // Left leg mass
-    g.fillRect(offsetX + 16, offsetY + 70, 24, 40);
-
-    // Right leg mass
-    g.fillRect(offsetX + 56, offsetY + 70, 24, 40);
-
-    // ── Glowing eyes (red/amber) ────────────────────────────────────────────
-    g.fillStyle(0xff4400, 0.8);
-
-    // Left eye
-    g.fillRect(offsetX + 30, offsetY + 10, 6, 4);
-
-    // Right eye
-    g.fillRect(offsetX + 60, offsetY + 10, 6, 4);
-
-    return g;
-  }
-
-  // ── Private: visual state ─────────────────────────────────────────────────
-
-  /**
-   * Get target alpha for each boss status
-   *
-   * @param status The boss status.
-   * @returns Alpha value (0–1).
-   */
-  private getAlphaForStatus(status: BossStatus): number {
-    switch (status) {
-      case "silhouette":
-        return 0.15;
-      case "present":
-        return 0.5;
-      case "foreground":
-        return 1.0;
-      case "slain":
-      case "retreated":
-        return 0;
+      // ── The Gravemind — void rings expand, form rises from darkness ──────────
+      case "super_boss":
+      case "the_gravemind":
+      default: {
+        for (let ring = 0; ring < 3; ring++) {
+          const ringG = this.scene.add.graphics();
+          ringG.lineStyle(2, 0x4f46e5, 0.6);
+          ringG.strokeCircle(0, 0, 30 + ring * 25);
+          ringG.setAlpha(0);
+          this.add(ringG);
+          this.scene.tweens.add({
+            targets: ringG,
+            alpha: { from: 0.6, to: 0 },
+            scaleX: 2.5,
+            scaleY: 2.5,
+            duration: 900,
+            delay: ring * 200,
+            ease: "Cubic.easeOut",
+            onComplete: () => ringG.destroy(),
+          });
+        }
+        this.scene.tweens.add({
+          targets: this,
+          alpha: 0.5,
+          scaleX: 1.1,
+          scaleY: 1.1,
+          duration: 800,
+          ease: "Cubic.easeOut",
+          onComplete: () => {
+            this.scene.tweens.add({
+              targets: this,
+              scaleX: 1,
+              scaleY: 1,
+              duration: 400,
+              ease: "Back.easeOut",
+            });
+          },
+        });
+        this.scene.tweens.add({
+          targets: this,
+          y: this.y + 15,
+          duration: 600,
+          ease: "Sine.easeOut",
+          yoyo: true,
+          repeat: 2,
+        });
+      }
     }
   }
 
   /**
-   * Play the entrance animation - boss materializes with dramatic effect.
-   * Called when the player reaches stage 7+ and encounters the super boss.
+   * Play the retreat animation — boss backs off when player leaves a stage
+   * partially complete. Returns boss to silhouette state (alpha 0.15).
+   * PRD §4.2: "retreat on partial stage complete" (~2s per boss).
    */
-  entrance(): void {
-    this.setAlpha(0);
-    this.setScale(0.8);
+  retreat(): void {
+    if (!this.scene || !this.scene.tweens) return;
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.killTweensOf(this.silhouetteGraphics);
 
-    this.scene.tweens.add({
-      targets: this,
-      alpha: 0.5,
-      scaleX: 1.1,
-      scaleY: 1.1,
-      duration: 800,
-      ease: "Cubic.easeOut",
-      onComplete: () => {
+    switch (this.bossId) {
+      // ── The Unraveller — threads re-absorb the body rightward ───────────────
+      case "the_unraveller": {
+        for (let i = 0; i < 8; i++) {
+          const thread = this.scene.add.graphics();
+          thread.lineStyle(2, 0x818cf8, 0.6);
+          thread.lineBetween(0, (i - 4) * 18, 120, (i - 4) * 18);
+          this.add(thread);
+          this.scene.tweens.add({
+            targets: thread,
+            x: 200,
+            alpha: 0,
+            duration: 900,
+            delay: i * 80,
+            ease: "Cubic.easeIn",
+            onComplete: () => thread.destroy(),
+          });
+        }
+        this.scene.tweens.add({
+          targets: this.silhouetteGraphics,
+          scaleX: 0.2,
+          alpha: 0,
+          duration: 800,
+          delay: 200,
+          ease: "Cubic.easeIn",
+        });
+        const retreatX = this.x + 180;
         this.scene.tweens.add({
           targets: this,
-          scaleX: 1,
-          scaleY: 1,
-          duration: 400,
-          ease: "Back.easeOut",
+          x: retreatX,
+          alpha: 0,
+          duration: 1600,
+          ease: "Cubic.easeIn",
+          onComplete: () => {
+            this.setPosition(retreatX - 180, this.y);
+            this.silhouetteGraphics.setScale(1);
+            this.setAlpha(0.15);
+          },
         });
-      },
-    });
+        break;
+      }
 
-    this.scene.tweens.add({
-      targets: this,
-      y: this.y + 15,
-      duration: 600,
-      ease: "Sine.easeOut",
-      yoyo: true,
-      repeat: 2,
-    });
+      // ── The Pale Architect — fragments drop away, form fades ────────────────
+      case "the_pale_architect": {
+        const cols = 3;
+        const rows = 4;
+        for (let c = 0; c < cols; c++) {
+          for (let r = 0; r < rows; r++) {
+            const frag = this.scene.add.graphics();
+            frag.fillStyle(0xe2e8f0, 0.5);
+            frag.fillRect(0, 0, 26, 22);
+            frag.setPosition(
+              this.x + (c - cols / 2) * 28,
+              this.y + (r - rows / 2) * 24,
+            );
+            this.scene.add.existing(frag);
+            this.scene.tweens.add({
+              targets: frag,
+              y: frag.y + 300,
+              alpha: 0,
+              scaleX: 0.5,
+              scaleY: 0.5,
+              duration: 1200,
+              delay: (c + r) * 50,
+              ease: "Cubic.easeIn",
+              onComplete: () => frag.destroy(),
+            });
+          }
+        }
+        this.scene.tweens.add({
+          targets: [this.silhouetteGraphics, this],
+          alpha: 0,
+          scaleY: 0.8,
+          duration: 800,
+          delay: 400,
+          ease: "Sine.easeIn",
+          onComplete: () => {
+            this.silhouetteGraphics.setScale(1);
+            this.setAlpha(0.15);
+          },
+        });
+        break;
+      }
+
+      // ── The Gravemind — void tendrils retract, sinks below ──────────────────
+      case "super_boss":
+      case "the_gravemind":
+      default: {
+        for (let i = 0; i < 12; i++) {
+          const tendril = this.scene.add.graphics();
+          tendril.lineStyle(2, 0x4f46e5, 0.5);
+          const angle = (i / 12) * Math.PI * 2;
+          tendril.lineBetween(
+            Math.cos(angle) * 80, Math.sin(angle) * 80,
+            Math.cos(angle) * 30, Math.sin(angle) * 30,
+          );
+          tendril.setPosition(this.x, this.y);
+          this.scene.add.existing(tendril);
+          this.scene.tweens.add({
+            targets: tendril,
+            alpha: 0,
+            scale: 0.2,
+            duration: 800,
+            delay: i * 40,
+            ease: "Cubic.easeIn",
+            onComplete: () => tendril.destroy(),
+          });
+        }
+        this.scene.tweens.add({
+          targets: this.silhouetteGraphics,
+          scaleX: 0,
+          scaleY: 0,
+          alpha: 0,
+          duration: 900,
+          delay: 300,
+          ease: "Back.easeIn",
+        });
+        const sinkY = this.y + 60;
+        this.scene.tweens.add({
+          targets: this,
+          alpha: 0,
+          y: sinkY,
+          duration: 1800,
+          ease: "Cubic.easeIn",
+          onComplete: () => {
+            this.setPosition(this.x, sinkY - 60);
+            this.silhouetteGraphics.setScale(1);
+            this.setAlpha(0.15);
+          },
+        });
+      }
+    }
   }
 
   /**
    * Play the slay animation and destroy the boss.
-   * Called when the player defeats the super boss.
+   * Each Super Boss has a thematically distinct defeat sequence (~3.5s).
+   * PRD §4.2: "slay animation per Super Boss."
    */
   slay(): void {
+    if (!this.scene || !this.scene.tweens) return;
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.killTweensOf(this.silhouetteGraphics);
     this.scene.tweens.killTweensOf(this.namePlate);
 
+    // Nameplate always fades first
     this.scene.tweens.add({
       targets: this.namePlate,
       alpha: 0,
@@ -300,26 +444,212 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
       ease: "Sine.easeOut",
     });
 
-    this.scene.tweens.add({
-      targets: this.silhouetteGraphics,
-      alpha: 0,
-      scaleX: 1.3,
-      scaleY: 1.3,
-      duration: 1200,
-      ease: "Cubic.easeIn",
-    });
+    switch (this.bossId) {
+      // ── The Unraveller — body shreds into 18 horizontal streaks (3.5s) ────
+      case "the_unraveller": {
+        const streaks = 18;
+        for (let i = 0; i < streaks; i++) {
+          const streak = this.scene.add.graphics();
+          const dir = i % 2 === 0 ? 1 : -1;
+          streak.lineStyle(2 + Math.random() * 2, 0x818cf8, 0.9);
+          streak.lineBetween(0, (i - streaks / 2) * 10, dir * 20, (i - streaks / 2) * 10);
+          this.add(streak);
+          this.scene.tweens.add({
+            targets: streak,
+            x: dir * (150 + Math.random() * 100),
+            alpha: 0,
+            duration: 1800,
+            delay: i * 50,
+            ease: "Cubic.easeIn",
+            onComplete: () => streak.destroy(),
+          });
+        }
+        this.scene.tweens.add({
+          targets: this.silhouetteGraphics,
+          alpha: 0,
+          scaleX: 0.1,
+          duration: 1500,
+          ease: "Cubic.easeIn",
+        });
+        this.scene.tweens.add({
+          targets: this,
+          alpha: 0,
+          duration: 3500,
+          ease: "Linear",
+          onComplete: () => this.destroy(),
+        });
+        break;
+      }
 
-    this.scene.tweens.add({
-      targets: this,
-      alpha: 0,
-      scaleX: 1.2,
-      scaleY: 1.2,
-      rotation: Math.PI * 0.5,
-      duration: 2000,
-      ease: "Cubic.easeOut",
-      onComplete: () => {
-        this.destroy();
-      },
-    });
+      // ── The Pale Architect — 5×7 geometric grid shatters outward (3.5s) ───
+      case "the_pale_architect": {
+        const cols = 5;
+        const rows = 7;
+        const pieceW = 20;
+        const pieceH = 18;
+        for (let c = 0; c < cols; c++) {
+          for (let r = 0; r < rows; r++) {
+            const piece = this.scene.add.graphics();
+            piece.fillStyle(0xe2e8f0, 0.9);
+            piece.fillRect(0, 0, pieceW, pieceH);
+            piece.setPosition(
+              this.x + (c - cols / 2) * pieceW - pieceW / 2,
+              this.y + (r - rows / 2) * pieceH - pieceH / 2,
+            );
+            this.scene.add.existing(piece);
+            const angle = Math.atan2(r - rows / 2, c - cols / 2);
+            const dist = 200 + Math.random() * 150;
+            this.scene.tweens.add({
+              targets: piece,
+              x: piece.x + Math.cos(angle) * dist,
+              y: piece.y + Math.sin(angle) * dist,
+              alpha: 0,
+              rotation: (Math.random() - 0.5) * Math.PI,
+              duration: 2500,
+              delay: (c + r) * 40,
+              ease: "Cubic.easeIn",
+              onComplete: () => piece.destroy(),
+            });
+          }
+        }
+        this.scene.tweens.add({
+          targets: [this.silhouetteGraphics, this],
+          alpha: 0,
+          duration: 800,
+          ease: "Sine.easeOut",
+          onComplete: () => this.destroy(),
+        });
+        break;
+      }
+
+      // ── The Gravemind — 3-phase: spiral implosion → collapse → shockwave ─
+      case "super_boss":
+      case "the_gravemind":
+      default: {
+        // Phase 1: 24 void particles spiral inward (0–1.2s)
+        for (let i = 0; i < 24; i++) {
+          const particle = this.scene.add.graphics();
+          particle.fillStyle(0x4f46e5, 0.8);
+          particle.fillCircle(0, 0, 4 + Math.random() * 3);
+          const angle = (i / 24) * Math.PI * 2;
+          particle.setPosition(
+            this.x + Math.cos(angle) * 120,
+            this.y + Math.sin(angle) * 120,
+          );
+          this.scene.add.existing(particle);
+          this.scene.tweens.add({
+            targets: particle,
+            x: this.x,
+            y: this.y,
+            alpha: 0,
+            scale: 0,
+            duration: 1200,
+            delay: i * 20,
+            ease: "Cubic.easeIn",
+            onComplete: () => particle.destroy(),
+          });
+        }
+        // Phase 2: Silhouette collapses (0.8–2.0s)
+        this.scene.tweens.add({
+          targets: this.silhouetteGraphics,
+          scaleX: 0,
+          scaleY: 0,
+          alpha: 0,
+          duration: 1200,
+          delay: 800,
+          ease: "Back.easeIn",
+        });
+        // Phase 3: Dark energy shockwave + scatter (2.0–3.5s)
+        this.scene.time.delayedCall(2000, () => {
+          if (!this.scene) return;
+          const shockwave = this.scene.add.graphics();
+          shockwave.lineStyle(4, 0x1a0a2e, 1);
+          shockwave.strokeCircle(this.x, this.y, 10);
+          this.scene.add.existing(shockwave);
+          this.scene.tweens.add({
+            targets: shockwave,
+            scaleX: 15,
+            scaleY: 15,
+            alpha: 0,
+            duration: 1000,
+            ease: "Cubic.easeOut",
+            onComplete: () => shockwave.destroy(),
+          });
+          for (let j = 0; j < 16; j++) {
+            const vp = this.scene.add.graphics();
+            vp.fillStyle(0x6366f1, 1);
+            vp.fillCircle(0, 0, 5);
+            vp.setPosition(this.x, this.y);
+            this.scene.add.existing(vp);
+            const ang = (j / 16) * Math.PI * 2;
+            this.scene.tweens.add({
+              targets: vp,
+              x: this.x + Math.cos(ang) * (160 + Math.random() * 60),
+              y: this.y + Math.sin(ang) * (160 + Math.random() * 60),
+              alpha: 0,
+              scale: 0,
+              duration: 900,
+              ease: "Cubic.easeOut",
+              onComplete: () => vp.destroy(),
+            });
+          }
+        });
+        this.scene.tweens.add({
+          targets: this,
+          alpha: 0,
+          duration: 3500,
+          ease: "Linear",
+          onComplete: () => this.destroy(),
+        });
+      }
+    }
+  }
+
+  // ── Private: drawing ──────────────────────────────────────────────────────
+
+  /**
+   * Draws the boss silhouette — a menacing procedural humanoid (~96×128px).
+   */
+  private drawSilhouette(scene: Phaser.Scene): Phaser.GameObjects.Graphics {
+    const g = scene.add.graphics();
+
+    const offsetX = -48;
+    const offsetY = -64;
+
+    g.fillStyle(0x1a0a2e);
+
+    // Jagged crown / horns
+    g.fillTriangle(offsetX + 18, offsetY + 0, offsetX + 28, offsetY - 30, offsetX + 38, offsetY + 0);
+    g.fillTriangle(offsetX + 43, offsetY + 0, offsetX + 48, offsetY - 40, offsetX + 53, offsetY + 0);
+    g.fillTriangle(offsetX + 58, offsetY + 0, offsetX + 68, offsetY - 30, offsetX + 78, offsetY + 0);
+
+    // Massive shoulders
+    g.fillRect(offsetX + 0, offsetY + 0, 96, 20);
+
+    // Torso
+    g.fillRect(offsetX + 20, offsetY + 20, 56, 60);
+
+    // Legs
+    g.fillRect(offsetX + 16, offsetY + 70, 24, 40);
+    g.fillRect(offsetX + 56, offsetY + 70, 24, 40);
+
+    // Glowing red eyes
+    g.fillStyle(0xff4400, 0.8);
+    g.fillRect(offsetX + 30, offsetY + 10, 6, 4);
+    g.fillRect(offsetX + 60, offsetY + 10, 6, 4);
+
+    return g;
+  }
+
+  // ── Private: visual state ─────────────────────────────────────────────────
+
+  private getAlphaForStatus(status: BossStatus): number {
+    switch (status) {
+      case "silhouette": return 0.15;
+      case "present":    return 0.5;
+      case "foreground": return 1.0;
+      case "slain":
+      case "retreated":  return 0;
+    }
   }
 }

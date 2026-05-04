@@ -24,10 +24,10 @@ import { Howl, Howler } from "howler";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface VolumeSettings {
-  master: number;   // 0–1
-  music: number;    // 0–1 (ambience + boss themes)
-  sfx: number;      // 0–1 (checkpoints, level-up, badges)
-  ui: number;       // 0–1 (click, confirm, error)
+  master: number; // 0–1
+  music: number; // 0–1 (ambience + boss themes)
+  sfx: number; // 0–1 (checkpoints, level-up, badges)
+  ui: number; // 0–1 (click, confirm, error)
   muted: boolean;
 }
 
@@ -64,7 +64,7 @@ export type UISound = "click" | "confirm" | "error" | "hover";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = "interactiveideas_audio_settings";
-const CROSSFADE_DURATION = 800; // ms — PRD spec
+const CROSSFADE_DURATION = 1000; // ms — PRD §10 specifies 1s crossfade on stage transition
 
 /**
  * Default volume levels.
@@ -72,8 +72,8 @@ const CROSSFADE_DURATION = 800; // ms — PRD spec
  */
 const DEFAULT_VOLUME: VolumeSettings = {
   master: 0.8,
-  music: 0.6,
-  sfx: 0.75,
+  music: 0.7,
+  sfx: 0.9,
   ui: 0.6,
   muted: false,
 };
@@ -88,57 +88,129 @@ const DEFAULT_VOLUME: VolumeSettings = {
  */
 const AUDIO_PATHS = {
   ambience: {
-    village:    ["/audio/ambience/village.mp3",    "/audio/ambience/village.ogg"],
-    forest:     ["/audio/ambience/forest.mp3",     "/audio/ambience/forest.ogg"],
-    arena:      ["/audio/ambience/arena.mp3",      "/audio/ambience/arena.ogg"],
-    artisan:    ["/audio/ambience/artisan.mp3",    "/audio/ambience/artisan.ogg"],
-    mine:       ["/audio/ambience/mine.mp3",       "/audio/ambience/mine.ogg"],
-    harbour:    ["/audio/ambience/harbour.mp3",    "/audio/ambience/harbour.ogg"],
-    crossroads: ["/audio/ambience/crossroads.mp3", "/audio/ambience/crossroads.ogg"],
-    capital:    ["/audio/ambience/capital.mp3",    "/audio/ambience/capital.ogg"],
+    village: ["/audio/ambience/village.mp3", "/audio/ambience/village.ogg"],
+    forest: ["/audio/ambience/forest.mp3", "/audio/ambience/forest.ogg"],
+    arena: ["/audio/ambience/arena.mp3", "/audio/ambience/arena.ogg"],
+    artisan: ["/audio/ambience/artisan.mp3", "/audio/ambience/artisan.ogg"],
+    mine: ["/audio/ambience/mine.mp3", "/audio/ambience/mine.ogg"],
+    harbour: ["/audio/ambience/harbour.mp3", "/audio/ambience/harbour.ogg"],
+    crossroads: [
+      "/audio/ambience/crossroads.mp3",
+      "/audio/ambience/crossroads.ogg",
+    ],
+    capital: ["/audio/ambience/capital.mp3", "/audio/ambience/capital.ogg"],
   } as Record<BiomeId, string[]>,
 
   sfx: {
-    seal_break_standard:          ["/audio/sfx/seal_break_standard.mp3", "/audio/sfx/seal_break_standard.ogg"],
-    seal_break_gold:               ["/audio/sfx/seal_break_gold.mp3", "/audio/sfx/seal_break_gold.ogg"],
-    rune_inscription_standard:    ["/audio/sfx/rune_inscription_standard.mp3", "/audio/sfx/rune_inscription_standard.ogg"],
-    rune_inscription_gold:         ["/audio/sfx/rune_inscription_gold.mp3", "/audio/sfx/rune_inscription_gold.ogg"],
-    beacon_lighting_standard:     ["/audio/sfx/beacon_lighting_standard.mp3", "/audio/sfx/beacon_lighting_standard.ogg"],
-    beacon_lighting_gold:          ["/audio/sfx/beacon_lighting_gold.mp3", "/audio/sfx/beacon_lighting_gold.ogg"],
-    bridge_repair_standard:       ["/audio/sfx/bridge_repair_standard.mp3", "/audio/sfx/bridge_repair_standard.ogg"],
-    bridge_repair_gold:            ["/audio/sfx/bridge_repair_gold.mp3", "/audio/sfx/bridge_repair_gold.ogg"],
-    compass_calibration_standard: ["/audio/sfx/compass_calibration_standard.mp3", "/audio/sfx/compass_calibration_standard.ogg"],
-    compass_calibration_gold:      ["/audio/sfx/compass_calibration_gold.mp3", "/audio/sfx/compass_calibration_gold.ogg"],
-    ward_placement_standard:      ["/audio/sfx/ward_placement_standard.mp3", "/audio/sfx/ward_placement_standard.ogg"],
-    ward_placement_gold:           ["/audio/sfx/ward_placement_gold.mp3", "/audio/sfx/ward_placement_gold.ogg"],
-    level_up:                      ["/audio/sfx/level_up.mp3", "/audio/sfx/level_up.ogg"],
-    badge_common:                  ["/audio/sfx/badge_common.mp3", "/audio/sfx/badge_common.ogg"],
-    badge_uncommon:                ["/audio/sfx/badge_uncommon.mp3", "/audio/sfx/badge_uncommon.ogg"],
-    badge_rare:                    ["/audio/sfx/badge_rare.mp3", "/audio/sfx/badge_rare.ogg"],
-    badge_epic:                    ["/audio/sfx/badge_epic.mp3", "/audio/sfx/badge_epic.ogg"],
-    badge_legendary:               ["/audio/sfx/badge_legendary.mp3", "/audio/sfx/badge_legendary.ogg"],
-    gold_gain:                     ["/audio/sfx/gold_gain.mp3"],
+    seal_break_standard: [
+      "/audio/sfx/seal_break_standard.mp3",
+      "/audio/sfx/seal_break_standard.ogg",
+    ],
+    seal_break_gold: [
+      "/audio/sfx/seal_break_gold.mp3",
+      "/audio/sfx/seal_break_gold.ogg",
+    ],
+    rune_inscription_standard: [
+      "/audio/sfx/rune_inscription_standard.mp3",
+      "/audio/sfx/rune_inscription_standard.ogg",
+    ],
+    rune_inscription_gold: [
+      "/audio/sfx/rune_inscription_gold.mp3",
+      "/audio/sfx/rune_inscription_gold.ogg",
+    ],
+    beacon_lighting_standard: [
+      "/audio/sfx/beacon_lighting_standard.mp3",
+      "/audio/sfx/beacon_lighting_standard.ogg",
+    ],
+    beacon_lighting_gold: [
+      "/audio/sfx/beacon_lighting_gold.mp3",
+      "/audio/sfx/beacon_lighting_gold.ogg",
+    ],
+    bridge_repair_standard: [
+      "/audio/sfx/bridge_repair_standard.mp3",
+      "/audio/sfx/bridge_repair_standard.ogg",
+    ],
+    bridge_repair_gold: [
+      "/audio/sfx/bridge_repair_gold.mp3",
+      "/audio/sfx/bridge_repair_gold.ogg",
+    ],
+    compass_calibration_standard: [
+      "/audio/sfx/compass_calibration_standard.mp3",
+      "/audio/sfx/compass_calibration_standard.ogg",
+    ],
+    compass_calibration_gold: [
+      "/audio/sfx/compass_calibration_gold.mp3",
+      "/audio/sfx/compass_calibration_gold.ogg",
+    ],
+    ward_placement_standard: [
+      "/audio/sfx/ward_placement_standard.mp3",
+      "/audio/sfx/ward_placement_standard.ogg",
+    ],
+    ward_placement_gold: [
+      "/audio/sfx/ward_placement_gold.mp3",
+      "/audio/sfx/ward_placement_gold.ogg",
+    ],
+    level_up: ["/audio/sfx/level_up.mp3", "/audio/sfx/level_up.ogg"],
+    badge_common: [
+      "/audio/sfx/badge_common.mp3",
+      "/audio/sfx/badge_common.ogg",
+    ],
+    badge_uncommon: [
+      "/audio/sfx/badge_uncommon.mp3",
+      "/audio/sfx/badge_uncommon.ogg",
+    ],
+    badge_rare: ["/audio/sfx/badge_rare.mp3", "/audio/sfx/badge_rare.ogg"],
+    badge_epic: ["/audio/sfx/badge_epic.mp3", "/audio/sfx/badge_epic.ogg"],
+    badge_legendary: [
+      "/audio/sfx/badge_legendary.mp3",
+      "/audio/sfx/badge_legendary.ogg",
+    ],
+    gold_gain: ["/audio/sfx/gold_gain.mp3"],
   } as Record<string, string[]>,
 
   ui: {
-    click:   ["/audio/ui/click.mp3", "/audio/ui/click.ogg"],
+    click: ["/audio/ui/click.mp3", "/audio/ui/click.ogg"],
     confirm: ["/audio/ui/confirm.mp3", "/audio/ui/confirm.ogg"],
-    error:   ["/audio/ui/error.mp3", "/audio/ui/error.ogg"],
-    hover:   ["/audio/ui/hover.mp3", "/audio/ui/hover.ogg"],
+    error: ["/audio/ui/error.mp3", "/audio/ui/error.ogg"],
+    hover: ["/audio/ui/hover.mp3", "/audio/ui/hover.ogg"],
   } as Record<UISound, string[]>,
 
   music: {
-    boss_unraveller:    ["/audio/music/boss_unraveller.mp3", "/audio/music/boss_unraveller.ogg"],
-    boss_pale_architect:["/audio/music/boss_pale_architect.mp3", "/audio/music/boss_pale_architect.ogg"],
-    boss_gravemind:     ["/audio/music/boss_gravemind.mp3", "/audio/music/boss_gravemind.ogg"],
-    stage_1:            ["/audio/music/stage_village.mp3", "/audio/music/stage_village.ogg"],
-    stage_2:            ["/audio/music/stage_forest.mp3", "/audio/music/stage_forest.ogg"],
-    stage_3:            ["/audio/music/stage_arena.mp3", "/audio/music/stage_arena.ogg"],
-    stage_4:            ["/audio/music/stage_artisan.mp3", "/audio/music/stage_artisan.ogg"],
-    stage_5:            ["/audio/music/stage_mine.mp3", "/audio/music/stage_mine.ogg"],
-    stage_6:            ["/audio/music/stage_harbour.mp3", "/audio/music/stage_harbour.ogg"],
-    stage_7:            ["/audio/music/stage_crossroads.mp3", "/audio/music/stage_crossroads.ogg"],
-    stage_8:            ["/audio/music/stage_capital.mp3", "/audio/music/stage_capital.ogg"],
+    boss_unraveller: [
+      "/audio/music/boss_unraveller.mp3",
+      "/audio/music/boss_unraveller.ogg",
+    ],
+    boss_pale_architect: [
+      "/audio/music/boss_pale_architect.mp3",
+      "/audio/music/boss_pale_architect.ogg",
+    ],
+    boss_gravemind: [
+      "/audio/music/boss_gravemind.mp3",
+      "/audio/music/boss_gravemind.ogg",
+    ],
+    stage_1: [
+      "/audio/music/stage_village.mp3",
+      "/audio/music/stage_village.ogg",
+    ],
+    stage_2: ["/audio/music/stage_forest.mp3", "/audio/music/stage_forest.ogg"],
+    stage_3: ["/audio/music/stage_arena.mp3", "/audio/music/stage_arena.ogg"],
+    stage_4: [
+      "/audio/music/stage_artisan.mp3",
+      "/audio/music/stage_artisan.ogg",
+    ],
+    stage_5: ["/audio/music/stage_mine.mp3", "/audio/music/stage_mine.ogg"],
+    stage_6: [
+      "/audio/music/stage_harbour.mp3",
+      "/audio/music/stage_harbour.ogg",
+    ],
+    stage_7: [
+      "/audio/music/stage_crossroads.mp3",
+      "/audio/music/stage_crossroads.ogg",
+    ],
+    stage_8: [
+      "/audio/music/stage_capital.mp3",
+      "/audio/music/stage_capital.ogg",
+    ],
   } as Record<string, string[]>,
 } as const;
 
@@ -433,7 +505,11 @@ class AudioManager {
     if (this.crossfadeTimer) clearTimeout(this.crossfadeTimer);
 
     const unloadAll = (cache: Partial<Record<string, Howl>>) => {
-      Object.values(cache).forEach((h) => { try { h?.unload(); } catch {} });
+      Object.values(cache).forEach((h) => {
+        try {
+          h?.unload();
+        } catch {}
+      });
     };
 
     unloadAll(this.ambienceCache);
@@ -566,10 +642,10 @@ class AudioManager {
       const saved = JSON.parse(raw) as Partial<VolumeSettings>;
       this.volumes = {
         master: clamp(saved.master ?? DEFAULT_VOLUME.master),
-        music:  clamp(saved.music  ?? DEFAULT_VOLUME.music),
-        sfx:    clamp(saved.sfx    ?? DEFAULT_VOLUME.sfx),
-        ui:     clamp(saved.ui     ?? DEFAULT_VOLUME.ui),
-        muted:  saved.muted        ?? DEFAULT_VOLUME.muted,
+        music: clamp(saved.music ?? DEFAULT_VOLUME.music),
+        sfx: clamp(saved.sfx ?? DEFAULT_VOLUME.sfx),
+        ui: clamp(saved.ui ?? DEFAULT_VOLUME.ui),
+        muted: saved.muted ?? DEFAULT_VOLUME.muted,
       };
     } catch {
       // Ignore — use defaults

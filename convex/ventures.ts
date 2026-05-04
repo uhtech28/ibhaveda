@@ -216,7 +216,9 @@ export const ensureVentureStructure = mutation({
         .withIndex("by_checkpoint", (q) => q.eq("checkpointId", checkpoint._id))
         .collect();
 
-      const existingTaskLevels = new Set(existingTasks.map((task) => task.taskLevel));
+      const existingTaskLevels = new Set(
+        existingTasks.map((task) => task.taskLevel),
+      );
 
       for (const taskLevel of ["t1", "t2", "t3"] as const) {
         if (existingTaskLevels.has(taskLevel)) continue;
@@ -263,8 +265,9 @@ export const ensureVentureStructure = mutation({
 
     // Find the first checkpoint that still needs work.
     const nextCheckpoint =
-      orderedCheckpoints.find((checkpoint) => checkpoint.status !== "completed") ??
-      null;
+      orderedCheckpoints.find(
+        (checkpoint) => checkpoint.status !== "completed",
+      ) ?? null;
 
     if (nextCheckpoint) {
       // ── ANTI-REGRESSION GUARD ─────────────────────────────────────────────
@@ -506,6 +509,40 @@ export const submitEvidence = mutation({
         `🏆 ${ventureName} - ${stageName}: ${checkpointName} - Gold Checkpoint! All 3 tasks completed. +${POINT_VALUES.gold_checkpoint_bonus} points`,
         venture._id,
       );
+
+      // Broadcast gold checkpoint to community — create notifications for all
+      // venture collaborators so it appears in their venture feed (PRD §12)
+      const collaborators = await ctx.db
+        .query("invitations")
+        .withIndex("by_idea", (q) => q.eq("ideaId", venture.ideaId))
+        .filter((q) => q.eq(q.field("status"), "accepted"))
+        .collect();
+
+      for (const collaborator of collaborators) {
+        if (collaborator.inviteeId !== user._id) {
+          await ctx.db.insert("notifications", {
+            recipientId: collaborator.inviteeId,
+            senderId: user._id,
+            type: "gold_checkpoint",
+            message: `🏆 ${ventureName} - ${stageName}: ${checkpointName} - Gold Checkpoint achieved by your collaborator!`,
+            relatedId: venture._id,
+            isRead: false,
+            createdAt: now,
+          });
+        }
+      }
+
+      // Create community-wide social feed post for gold checkpoint achievement
+      // This notification will appear in the community venture feed for all users
+      await ctx.db.insert("notifications", {
+        recipientId: user._id, // Self-notification acts as the feed post
+        senderId: user._id,
+        type: "gold_checkpoint",
+        message: `🏆 ${user.displayName || user.username} earned a Gold Checkpoint on ${checkpointName} in ${ventureName}! (${stageName})`,
+        relatedId: venture._id,
+        isRead: false, // Keeps it visible in feeds
+        createdAt: now,
+      });
     }
 
     // Keep checkpoint + venture progression in sync when a full checkpoint is done.
@@ -534,27 +571,22 @@ export const submitEvidence = mutation({
     // Resolve checkpoint def for the outcome text the scorer needs
     const checkpointDef = CHECKPOINT_DEFINITIONS.find(
       (d) =>
-        d.stage === checkpoint.stage &&
-        d.checkpoint === checkpoint.checkpoint,
+        d.stage === checkpoint.stage && d.checkpoint === checkpoint.checkpoint,
     );
     const contentText =
       typeof args.content?.text === "string"
         ? args.content.text
         : JSON.stringify(args.content ?? "");
     if (contentText.trim().split(/\s+/).length >= 10) {
-      await ctx.scheduler.runAfter(
-        0,
-        api.aiScoring.evaluateTaskSubmission,
-        {
-          taskId: args.taskId,
-          checkpointId: task.checkpointId,
-          ventureId: checkpoint.ventureId,
-          stageNumber: checkpoint.stage,
-          content: contentText,
-          checkpointOutcome: checkpointDef?.outcome ?? "",
-          userTier: "free",
-        },
-      );
+      await ctx.scheduler.runAfter(0, api.aiScoring.evaluateTaskSubmission, {
+        taskId: args.taskId,
+        checkpointId: task.checkpointId,
+        ventureId: checkpoint.ventureId,
+        stageNumber: checkpoint.stage,
+        content: contentText,
+        checkpointOutcome: checkpointDef?.outcome ?? "",
+        userTier: "free",
+      });
     }
 
     return evidenceId;
@@ -681,7 +713,7 @@ export const getVenture = query({
         ctx.db
           .query("ventureTasks")
           .withIndex("by_checkpoint", (q) => q.eq("checkpointId", id))
-          .collect()
+          .collect(),
       ),
     );
     const allTasks = tasksPerCheckpoint.flat();
@@ -803,7 +835,22 @@ export const getUserVentureSummaries = query({
       .collect();
 
     // Batch fetch checkpoints using by_venture index (avoids full table scan)
-    const checkpointsByVenture = new Map<string, Array<{ ventureId: Id<"ventures">; stage: number; checkpoint: number; status: string; t1Completed: boolean; t2Completed: boolean; t3Completed: boolean; goldBonusEarned: boolean; _id: Id<"ventureCheckpoints">; completedAt?: number; _creationTime: number }>>();
+    const checkpointsByVenture = new Map<
+      string,
+      Array<{
+        ventureId: Id<"ventures">;
+        stage: number;
+        checkpoint: number;
+        status: string;
+        t1Completed: boolean;
+        t2Completed: boolean;
+        t3Completed: boolean;
+        goldBonusEarned: boolean;
+        _id: Id<"ventureCheckpoints">;
+        completedAt?: number;
+        _creationTime: number;
+      }>
+    >();
     await Promise.all(
       ventures.map(async (v) => {
         const cps = await ctx.db
@@ -815,7 +862,20 @@ export const getUserVentureSummaries = query({
     );
 
     // Batch fetch bosses using by_venture index (avoids full table scan)
-    const bossesByVenture = new Map<string, Array<{ ventureId: Id<"ventures">; bossId: number; status: string; corruptionLevel: number; bossSpecificCounters: unknown; assignedAt: number; defeatedAt?: number; _id: Id<"ventureBosses">; _creationTime: number }>>();
+    const bossesByVenture = new Map<
+      string,
+      Array<{
+        ventureId: Id<"ventures">;
+        bossId: number;
+        status: string;
+        corruptionLevel: number;
+        bossSpecificCounters: unknown;
+        assignedAt: number;
+        defeatedAt?: number;
+        _id: Id<"ventureBosses">;
+        _creationTime: number;
+      }>
+    >();
     await Promise.all(
       ventures.map(async (v) => {
         const bs = await ctx.db

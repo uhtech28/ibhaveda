@@ -12,12 +12,26 @@ export const TOOL_TYPES = [
   "poll",
   "link",
   "upload",
-  "oauth",
   "self_report",
   "journal",
   "kanban",
+  "calendar",
 ] as const;
 export type ToolType = (typeof TOOL_TYPES)[number];
+
+export const TOOL_INFO: Record<ToolType, { name: string; icon: string }> = {
+  write: { name: "Text Editor", icon: "✍️" },
+  table: { name: "Data Table", icon: "📊" },
+  map: { name: "Mind Map", icon: "🗺️" },
+  survey: { name: "Survey Builder", icon: "📋" },
+  poll: { name: "Quick Poll", icon: "📊" },
+  link: { name: "Link Collector", icon: "🔗" },
+  upload: { name: "File Upload", icon: "📎" },
+  self_report: { name: "Self Report", icon: "📝" },
+  journal: { name: "Journal", icon: "📓" },
+  kanban: { name: "Kanban Board", icon: "📌" },
+  calendar: { name: "Calendar", icon: "📅" },
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VENTURE STAGES
@@ -26,8 +40,8 @@ export const VENTURE_STAGES = [
   { id: 1, name: "Ideation", checkpoints: 4 },
   { id: 2, name: "Research", checkpoints: 5 },
   { id: 3, name: "Validation", checkpoints: 4 },
-  { id: 4, name: "Design", checkpoints: 5 },
-  { id: 5, name: "Development", checkpoints: 6 },
+  { id: 4, name: "Offer Design", checkpoints: 5 },
+  { id: 5, name: "Build & Deliver", checkpoints: 6 },
   { id: 6, name: "Launch", checkpoints: 3 },
   { id: 7, name: "Iteration", checkpoints: 4 },
   { id: 8, name: "Scale", checkpoints: 5 },
@@ -283,7 +297,7 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
     t3: {
       prompt:
         "Build a simple landing page or one-pager that you could put in front of potential users to gauge real interest before building anything.",
-      tool: "oauth",
+      tool: "link",
     },
   },
   {
@@ -368,7 +382,7 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
     t3: {
       prompt:
         "Link your logo or wordmark file — created in Figma or any design tool — and confirm it exists in a usable format.",
-      tool: "oauth",
+      tool: "link",
     },
   },
   {
@@ -385,7 +399,7 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
     t2: {
       prompt:
         "Link your prototype from Figma or another design tool — interactive enough that someone could click through the core journey.",
-      tool: "oauth",
+      tool: "link",
     },
     t3: {
       prompt:
@@ -428,7 +442,7 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
     t2: {
       prompt:
         "Link the final design file from Figma or your design tool — the version that a developer could build from.",
-      tool: "oauth",
+      tool: "link",
     },
     t3: {
       prompt:
@@ -1014,6 +1028,7 @@ export interface LevelDef {
   phase: "tutorial" | "early" | "mid" | "senior" | "mentor";
   titlePoints: number;
   requirements: string[];
+  unlockedTools?: ToolType[];
 }
 
 export const LEVEL_DEFINITIONS: LevelDef[] = [
@@ -1049,6 +1064,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
       "Fill in the idea title, description and type",
       "Complete the first checkpoint on your idea",
     ],
+    unlockedTools: ["write"],
   },
   {
     level: 4,
@@ -1073,6 +1089,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
       "Earn 150 points",
       "Resolve at least 1 flare you fired",
     ],
+    unlockedTools: ["survey", "table"],
   },
   {
     level: 6,
@@ -1091,6 +1108,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
     phase: "early",
     titlePoints: 500,
     requirements: ["550 points", "Posted at least 2 ideas"],
+    unlockedTools: ["map", "link"],
   },
   {
     level: 8,
@@ -1109,6 +1127,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
       "Left 10 total comments across any ideas",
       "Respond helpfully to at least 1 flare from another user",
     ],
+    unlockedTools: ["poll", "upload"],
   },
   {
     level: 10,
@@ -1134,6 +1153,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
     phase: "early",
     titlePoints: 3000,
     requirements: ["3,400 points", "Earned at least 1 gold checkpoint"],
+    unlockedTools: ["journal", "self_report"],
   },
   {
     level: 13,
@@ -1159,6 +1179,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
       "At least 1 idea reached Stage 6 (Launch)",
       "Earned 3 gold checkpoints",
     ],
+    unlockedTools: ["kanban", "calendar"],
   },
   {
     level: 16,

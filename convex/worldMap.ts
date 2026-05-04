@@ -609,22 +609,17 @@ export const markTaskComplete = mutation({
     // ── Trigger AI quality scoring (async, non-blocking) ──────────────────────
     const checkpointDef = CHECKPOINT_DEFINITIONS.find(
       (d) =>
-        d.stage === checkpoint.stage &&
-        d.checkpoint === checkpoint.checkpoint,
+        d.stage === checkpoint.stage && d.checkpoint === checkpoint.checkpoint,
     );
-    await ctx.scheduler.runAfter(
-      0,
-      api.aiScoring.evaluateTaskSubmission,
-      {
-        taskId: task._id,
-        checkpointId: args.checkpointId,
-        ventureId: checkpoint.ventureId,
-        stageNumber: checkpoint.stage,
-        content: `Self-report: World-map task ${args.taskLevel.toUpperCase()} marked complete. Stage ${checkpoint.stage}, Checkpoint ${checkpoint.checkpoint}.`,
-        checkpointOutcome: checkpointDef?.outcome ?? "",
-        userTier: "free",
-      },
-    );
+    await ctx.scheduler.runAfter(0, api.aiScoring.evaluateTaskSubmission, {
+      taskId: task._id,
+      checkpointId: args.checkpointId,
+      ventureId: checkpoint.ventureId,
+      stageNumber: checkpoint.stage,
+      content: `Self-report: World-map task ${args.taskLevel.toUpperCase()} marked complete. Stage ${checkpoint.stage}, Checkpoint ${checkpoint.checkpoint}.`,
+      checkpointOutcome: checkpointDef?.outcome ?? "",
+      userTier: "free",
+    });
 
     return {
       success: true,
@@ -676,8 +671,8 @@ export const getToolData = query({
 
     const toolDoc = await ctx.db
       .query("ventureTools")
-      .withIndex("by_venture_tool", (q) => 
-        q.eq("ventureId", args.ventureId).eq("toolType", args.toolType)
+      .withIndex("by_venture_tool", (q) =>
+        q.eq("ventureId", args.ventureId).eq("toolType", args.toolType),
       )
       .first();
 
@@ -702,15 +697,15 @@ export const saveToolData = mutation({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
-    
+
     if (!user || venture.userId !== user._id) {
       throw new Error("Unauthorized");
     }
 
     const existing = await ctx.db
       .query("ventureTools")
-      .withIndex("by_venture_tool", (q) => 
-        q.eq("ventureId", args.ventureId).eq("toolType", args.toolType)
+      .withIndex("by_venture_tool", (q) =>
+        q.eq("ventureId", args.ventureId).eq("toolType", args.toolType),
       )
       .first();
 
@@ -730,14 +725,14 @@ export const saveToolData = mutation({
   },
 });
 
-export const savePersonaGender = mutation({
+const savePersonaGender = mutation({
   args: {
     ventureId: v.id("ventures"),
     gender: v.union(v.literal("male"), v.literal("female")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthenticated");
+    if (!identity) throw new Error("Not authenticated");
     const venture = await ctx.db.get(args.ventureId);
     if (!venture) throw new Error("Venture not found");
     await ctx.db.patch(args.ventureId, {
@@ -748,9 +743,199 @@ export const savePersonaGender = mutation({
   },
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL-SPECIFIC CONTENT VALIDATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Validates submission content based on tool type.
+ *
+ * - Text tools (write, journal): Enforce 50-word minimum
+ * - Structured tools (table, map, kanban, calendar): Validate data structure exists
+ * - Upload tool: Verify file IDs exist
+ * - Survey/poll: Verify questions/options exist
+ * - Self-report: Verify required fields are filled
+ *
+ * @throws Error with tool-specific validation message
+ */
+function validateToolContent(toolType: string, content: string): void {
+  let parsed: unknown;
+
+  // Try to parse JSON content (most tools send JSON-stringified data)
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    // If it's not JSON, it's likely plain text (shouldn't happen with current frontend)
+    parsed = content;
+  }
+
+  switch (toolType) {
+    case "write":
+    case "journal": {
+      // Extract text from structured content or use raw string
+      const text =
+        typeof parsed === "object" && parsed !== null && "text" in parsed
+          ? String((parsed as { text: unknown }).text)
+          : typeof parsed === "string"
+            ? parsed
+            : content;
+
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+      if (wordCount < 50) {
+        throw new Error(
+          `Content must be at least 50 words. Current: ${wordCount} words.`,
+        );
+      }
+      break;
+    }
+
+    case "table": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Table data must be a valid object.");
+      }
+      const data = parsed as { headers?: unknown; rows?: unknown };
+
+      if (!Array.isArray(data.headers) || data.headers.length === 0) {
+        throw new Error("Table must have at least one column header.");
+      }
+      if (!Array.isArray(data.rows) || data.rows.length === 0) {
+        throw new Error("Table must have at least one row of data.");
+      }
+      break;
+    }
+
+    case "map": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Map data must be a valid object.");
+      }
+      const data = parsed as { elements?: unknown };
+
+      if (!Array.isArray(data.elements) || data.elements.length === 0) {
+        throw new Error(
+          "Mind map must have at least one element (node or connection).",
+        );
+      }
+      break;
+    }
+
+    case "kanban": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Kanban data must be a valid object.");
+      }
+      const data = parsed as { cards?: unknown; columns?: unknown };
+
+      if (!Array.isArray(data.cards) || data.cards.length === 0) {
+        throw new Error("Kanban board must have at least one card.");
+      }
+      if (!Array.isArray(data.columns) || data.columns.length === 0) {
+        throw new Error("Kanban board must have at least one column.");
+      }
+      break;
+    }
+
+    case "calendar": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Calendar data must be a valid object.");
+      }
+      const data = parsed as { events?: unknown };
+
+      if (!Array.isArray(data.events) || data.events.length === 0) {
+        throw new Error("Calendar must have at least one event.");
+      }
+      break;
+    }
+
+    case "survey": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Survey data must be a valid object.");
+      }
+      const data = parsed as { questions?: unknown };
+
+      if (!Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error("Survey must have at least one question.");
+      }
+      break;
+    }
+
+    case "poll": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Poll data must be a valid object.");
+      }
+      const data = parsed as { question?: unknown; options?: unknown };
+
+      if (typeof data.question !== "string" || !data.question.trim()) {
+        throw new Error("Poll must have a question.");
+      }
+      if (!Array.isArray(data.options) || data.options.length < 2) {
+        throw new Error("Poll must have at least two options.");
+      }
+      break;
+    }
+
+    case "link": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Link data must be a valid object.");
+      }
+      const data = parsed as { url?: unknown };
+
+      if (typeof data.url !== "string" || !data.url.trim()) {
+        throw new Error("Link must have a URL.");
+      }
+      // Basic URL validation
+      try {
+        new URL(data.url);
+      } catch {
+        throw new Error("Link must be a valid URL.");
+      }
+      break;
+    }
+
+    case "upload": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Upload data must be a valid object.");
+      }
+      const data = parsed as { storageId?: unknown; fileName?: unknown };
+
+      if (typeof data.storageId !== "string" || !data.storageId.trim()) {
+        throw new Error("Upload must have a valid file storage ID.");
+      }
+      if (typeof data.fileName !== "string" || !data.fileName.trim()) {
+        throw new Error("Upload must have a file name.");
+      }
+      break;
+    }
+
+    case "self_report": {
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Self-report data must be a valid object.");
+      }
+      const data = parsed as { values?: unknown; confirmed?: unknown };
+
+      if (typeof data.values !== "object" || data.values === null) {
+        throw new Error("Self-report must have values.");
+      }
+      const values = data.values as Record<string, unknown>;
+      const hasAnyValue = Object.keys(values).length > 0;
+      if (!hasAnyValue) {
+        throw new Error("Self-report must have at least one field filled.");
+      }
+      if (data.confirmed !== true) {
+        throw new Error("Self-report must be confirmed before submission.");
+      }
+      break;
+    }
+
+    default:
+      // Unknown tool type - apply basic validation
+      if (!content || !content.trim()) {
+        throw new Error("Content cannot be empty.");
+      }
+  }
+}
+
 /**
  * Submit actual content for a task (replaces simple checkbox toggle).
- * 
+ *
  * This mutation:
  * 1. Validates content (minimum 50 words)
  * 2. Creates evidence record with actual content
@@ -775,12 +960,6 @@ export const submitTaskContent = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
     if (!user) throw new Error("User not found");
-
-    // ── Validate content ──────────────────────────────────────────────────────
-    const wordCount = args.content.trim().split(/\s+/).filter(Boolean).length;
-    if (wordCount < 50) {
-      throw new Error("Content must be at least 50 words");
-    }
 
     // ── Get checkpoint ────────────────────────────────────────────────────────
     const checkpoint = await ctx.db.get(args.checkpointId);
@@ -816,18 +995,41 @@ export const submitTaskContent = mutation({
 
     if (!task) throw new Error(`Task ${args.taskLevel} not found`);
 
+    // ── Validate content based on tool type ───────────────────────────────────
+    validateToolContent(task.toolType, args.content);
+
     const now = Date.now();
 
-    // ── Create evidence with actual content ───────────────────────────────────
+    // ── Parse and store tool-specific content ────────────────────────────────────
+    let parsedContent: unknown;
+    try {
+      parsedContent = JSON.parse(args.content);
+    } catch {
+      // If parsing fails, store as-is (shouldn't happen with current frontend)
+      parsedContent = args.content;
+    }
+
+    // For text tools, ensure word count is preserved; for others, store the parsed structure
+    const evidenceContent =
+      task.toolType === "write" || task.toolType === "journal"
+        ? {
+            ...(typeof parsedContent === "object" && parsedContent !== null
+              ? parsedContent
+              : { text: args.content }),
+            submittedAt: now,
+          }
+        : {
+            ...(typeof parsedContent === "object" && parsedContent !== null
+              ? parsedContent
+              : {}),
+            submittedAt: now,
+          };
+
     const evidenceId = await ctx.db.insert("ventureEvidence", {
       taskId: task._id,
       userId: user._id,
       toolType: task.toolType,
-      content: {
-        text: args.content,
-        wordCount,
-        submittedAt: now,
-      },
+      content: evidenceContent,
       createdAt: now,
     });
 
@@ -919,27 +1121,22 @@ export const submitTaskContent = mutation({
     // ── Trigger AI quality scoring (async, non-blocking) ──────────────────────
     const checkpointDefForScore = CHECKPOINT_DEFINITIONS.find(
       (d) =>
-        d.stage === checkpoint.stage &&
-        d.checkpoint === checkpoint.checkpoint,
+        d.stage === checkpoint.stage && d.checkpoint === checkpoint.checkpoint,
     );
     const contentForScore =
       typeof args.content === "string"
         ? args.content
         : JSON.stringify(args.content ?? "");
     if (contentForScore.trim().split(/\s+/).length >= 10) {
-      await ctx.scheduler.runAfter(
-        0,
-        api.aiScoring.evaluateTaskSubmission,
-        {
-          taskId: task._id,
-          checkpointId: args.checkpointId,
-          ventureId: checkpoint.ventureId,
-          stageNumber: checkpoint.stage,
-          content: contentForScore,
-          checkpointOutcome: checkpointDefForScore?.outcome ?? "",
-          userTier: "free",
-        },
-      );
+      await ctx.scheduler.runAfter(0, api.aiScoring.evaluateTaskSubmission, {
+        taskId: task._id,
+        checkpointId: args.checkpointId,
+        ventureId: checkpoint.ventureId,
+        stageNumber: checkpoint.stage,
+        content: contentForScore,
+        checkpointOutcome: checkpointDefForScore?.outcome ?? "",
+        userTier: "free",
+      });
     }
 
     return {

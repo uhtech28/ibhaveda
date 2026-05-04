@@ -436,10 +436,10 @@ export default defineSchema({
       v.literal("poll"),
       v.literal("link"),
       v.literal("upload"),
-      v.literal("oauth"),
       v.literal("self_report"),
       v.literal("journal"),
       v.literal("kanban"),
+      v.literal("calendar"),
     ),
     status: v.union(
       v.literal("not_started"),

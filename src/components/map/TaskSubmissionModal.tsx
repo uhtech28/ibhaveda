@@ -1,20 +1,33 @@
 /**
  * Task Submission Modal
- * 
- * Opens when user clicks on a task to work on it.
- * Provides tool-specific interface for submitting work.
+ *
+ * Opens when user clicks a task to work on it.
+ * Routes to the correct tool component based on task.toolType.
  */
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { X, CheckCircle, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { X } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { audioManager } from "@/lib/audio/audioManager";
+
+// Tool components
+import { WriteTool } from "@/components/tools/write-tool";
+import { TableTool } from "@/components/tools/table-tool";
+import { MapTool } from "@/components/tools/map-tool";
+import { SurveyTool } from "@/components/tools/survey-tool";
+import { PollTool } from "@/components/tools/poll-tool";
+import { LinkTool } from "@/components/tools/link-tool";
+import { UploadTool } from "@/components/tools/upload-tool";
+import { SelfReportTool } from "@/components/tools/self-report-tool";
+import { JournalTool } from "@/components/tools/journal-tool";
+import { KanbanTool } from "@/components/tools/kanban-tool";
+import { CalendarTool } from "@/components/tools/calendar-tool";
 
 interface TaskSubmissionModalProps {
   isOpen: boolean;
@@ -31,21 +44,49 @@ interface TaskSubmissionModalProps {
   onSuccess: () => void;
 }
 
+/** Returns a human-readable minimum requirement label per PRD §8 */
+function getMinRequirementLabel(toolType: string): string {
+  switch (toolType) {
+    case "write":
+      return "Minimum 50 words";
+    case "table":
+      return "At least 2 rows + headers";
+    case "map":
+      return "At least 1 element placed";
+    case "survey":
+      return "Survey created & at least 1 response";
+    case "poll":
+      return "Poll created & published";
+    case "link":
+      return "At least 1 URL with annotation";
+    case "upload":
+      return "At least 1 file attached";
+    case "self_report":
+      return "Form completed & confirmed";
+    case "journal":
+      return "At least 1 entry written";
+    case "kanban":
+      return "Board with at least 2 columns & 1 card";
+    case "calendar":
+      return "At least 1 event or milestone placed";
+    default:
+      return "Complete the form";
+  }
+}
+
 export function TaskSubmissionModal({
   isOpen,
   onClose,
   task,
   onSuccess,
 }: TaskSubmissionModalProps) {
-  const [content, setContent] = useState("");
-  const [wordCount, setWordCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
-  const [draftRestored, setDraftRestored] = useState(false);
   const [showQueuedMessage, setShowQueuedMessage] = useState(false);
 
   const submitTask = useMutation(api.worldMap.submitTaskContent);
+
   const draftKey = useMemo(
     () =>
       task ? `venture-task-draft:${task.checkpointId}:${task.taskLevel}` : "",
@@ -53,81 +94,54 @@ export function TaskSubmissionModal({
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     const syncOnlineStatus = () => setIsOnline(window.navigator.onLine);
     syncOnlineStatus();
-
     window.addEventListener("online", syncOnlineStatus);
     window.addEventListener("offline", syncOnlineStatus);
-
     return () => {
       window.removeEventListener("online", syncOnlineStatus);
       window.removeEventListener("offline", syncOnlineStatus);
     };
   }, []);
 
+  // Reset error/message when modal opens
   useEffect(() => {
-    if (!isOpen || !task || typeof window === "undefined") return;
-
-    const savedDraft = window.localStorage.getItem(draftKey);
-    if (!savedDraft) {
-      setContent("");
-      setWordCount(0);
-      setDraftRestored(false);
-      setShowQueuedMessage(false);
+    if (isOpen) {
       setError(null);
-      return;
+      setShowQueuedMessage(false);
+      setIsSubmitting(false);
     }
-
-    setContent(savedDraft);
-    const words = savedDraft.trim().split(/\s+/).filter(Boolean).length;
-    setWordCount(words);
-    setDraftRestored(true);
-    setShowQueuedMessage(false);
-    setError(null);
-  }, [draftKey, isOpen, task]);
+  }, [isOpen, task]);
 
   if (!task) return null;
 
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    const words = newContent.trim().split(/\s+/).filter(Boolean);
-    setWordCount(words.length);
-    setError(null);
-    setDraftRestored(false);
-
-    if (typeof window !== "undefined") {
-      const normalized = newContent.trim();
-      if (normalized.length === 0) {
-        window.localStorage.removeItem(draftKey);
-      } else {
-        window.localStorage.setItem(draftKey, newContent);
-      }
-    }
-  };
-
-  const handleSubmit = async () => {
+  const handleToolSubmit = async (content: unknown) => {
     if (!isOnline) {
       audioManager.playUI("error");
-      setError("You are offline. Your draft is saved locally until you reconnect.");
-      return;
-    }
-
-    if (wordCount < 50) {
-      audioManager.playUI("error");
-      setError("Please write at least 50 words");
+      setError(
+        "You are offline. Your draft is saved locally until you reconnect.",
+      );
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
 
+    // submitTaskContent expects a plain string; extract prose text when
+    // available (WriteTool gives { text, wordCount }) or JSON-serialize
+    // structured tool payloads so the AI scorer can read them.
+    const serialized: string =
+      typeof content === "string"
+        ? content
+        : typeof (content as Record<string, unknown>)?.text === "string"
+          ? ((content as Record<string, unknown>).text as string)
+          : JSON.stringify(content);
+
     try {
       await submitTask({
         checkpointId: task.checkpointId,
         taskLevel: task.taskLevel,
-        content,
+        content: serialized,
       });
 
       audioManager.playUI("confirm");
@@ -138,8 +152,6 @@ export function TaskSubmissionModal({
       onSuccess();
       window.setTimeout(() => {
         onClose();
-        setContent("");
-        setWordCount(0);
         setShowQueuedMessage(false);
       }, 900);
     } catch (err) {
@@ -150,7 +162,146 @@ export function TaskSubmissionModal({
     }
   };
 
-  const isValid = wordCount >= 50;
+  /** Renders the appropriate tool component for this task type */
+  const renderTool = () => {
+    switch (task.toolType) {
+      case "write":
+        return (
+          <WriteTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+            initialContent={
+              typeof window !== "undefined"
+                ? (window.localStorage.getItem(draftKey) ?? undefined)
+                : undefined
+            }
+          />
+        );
+
+      case "table":
+        return (
+          <TableTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "map":
+        return (
+          <MapTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "survey":
+        return (
+          <SurveyTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "poll":
+        return (
+          <PollTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "link":
+        return (
+          <LinkTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "upload":
+        // UploadTool requires taskId to generate a scoped Convex upload URL
+        return (
+          <UploadTool
+            prompt={task.description}
+            taskId={task.id}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "self_report":
+        // SelfReportTool requires explicit field definitions.
+        // These generic fields cover most self-report tasks; extend per PRD §8.
+        return (
+          <SelfReportTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+            fields={[
+              {
+                key: "what_happened",
+                label: "What happened / what did you do?",
+                type: "textarea",
+              },
+              { key: "outcome", label: "Outcome or result", type: "textarea" },
+              {
+                key: "learning",
+                label: "Key learning or next step",
+                type: "textarea",
+              },
+            ]}
+          />
+        );
+
+      case "journal":
+        return (
+          <JournalTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "kanban":
+        return (
+          <KanbanTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "calendar":
+        return (
+          <CalendarTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      default:
+        // Fallback: generic write tool for unknown tool types
+        return (
+          <WriteTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+            initialContent={
+              typeof window !== "undefined"
+                ? (window.localStorage.getItem(draftKey) ?? undefined)
+                : undefined
+            }
+          />
+        );
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -174,7 +325,7 @@ export function TaskSubmissionModal({
           >
             <div className="bg-[#111827] border-2 border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
               {/* Header */}
-              <div className="p-6 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20">
+              <div className="p-6 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20 flex-shrink-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h2 className="text-2xl font-bold text-white mb-2">
@@ -183,12 +334,12 @@ export function TaskSubmissionModal({
                     <p className="text-gray-300 text-sm mb-3">
                       {task.description}
                     </p>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <span className="text-xs text-indigo-400 font-semibold uppercase tracking-wider">
-                        Tool: {task.toolType}
+                        Tool: {task.toolType.replace(/_/g, " ")}
                       </span>
                       <span className="text-xs text-gray-400">
-                        Minimum: 50 words
+                        {getMinRequirementLabel(task.toolType)}
                       </span>
                       <span className="text-xs text-[#6366F1] font-bold">
                         +{task.points} points
@@ -196,8 +347,11 @@ export function TaskSubmissionModal({
                     </div>
                   </div>
                   <button
-                    onClick={() => { audioManager.playUI("click"); onClose(); }}
-                    className="p-2 rounded-lg bg-black/20 hover:bg-black/40 transition-colors"
+                    onClick={() => {
+                      audioManager.playUI("click");
+                      onClose();
+                    }}
+                    className="p-2 rounded-lg bg-black/20 hover:bg-black/40 transition-colors ml-4"
                   >
                     <X className="w-5 h-5 text-white" />
                   </button>
@@ -208,13 +362,8 @@ export function TaskSubmissionModal({
               <div className="flex-1 overflow-y-auto p-6">
                 {!isOnline && (
                   <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-                    Offline mode detected. Keep writing if you want, and this draft will stay on this device until you reconnect.
-                  </div>
-                )}
-
-                {draftRestored && (
-                  <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-sm text-cyan-100">
-                    Restored your saved draft for this task.
+                    Offline mode detected. Your draft will stay on this device
+                    until you reconnect.
                   </div>
                 )}
 
@@ -224,16 +373,13 @@ export function TaskSubmissionModal({
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-100"
                   >
-                    Submission saved. AI quality scoring is now running in the background and your valuation updates will follow asynchronously.
+                    ✅ Submission saved. AI quality scoring is running in the
+                    background — your valuation will update shortly.
                   </motion.div>
                 )}
 
-                <textarea
-                  value={content}
-                  onChange={(e) => handleContentChange(e.target.value)}
-                  placeholder="Write your response here... (minimum 50 words)"
-                  className="w-full h-64 p-4 bg-black/20 border-2 border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-[#6366F1] focus:outline-none resize-none"
-                />
+                {/* Tool Component */}
+                {renderTool()}
 
                 {/* Error Message */}
                 {error && (
@@ -246,61 +392,6 @@ export function TaskSubmissionModal({
                     <p className="text-red-400 text-sm">{error}</p>
                   </motion.div>
                 )}
-              </div>
-
-              {/* Footer */}
-              <div className="p-6 border-t border-white/10 bg-black/20">
-                <div className="flex items-center justify-between">
-                  {/* Word Count */}
-                  <div className="text-sm space-y-1">
-                    <div>
-                      <span
-                        className={
-                          isValid ? "text-green-400" : "text-gray-400"
-                        }
-                      >
-                        {wordCount} words
-                      </span>
-                      {!isValid && (
-                        <span className="text-gray-500 ml-2">
-                          ({50 - wordCount} more needed)
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Drafts save automatically on this device. AI scoring runs after submission.
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="ghost"
-                      onClick={onClose}
-                      disabled={isSubmitting}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={!isValid || isSubmitting}
-                      className="bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5558E3] hover:to-[#7C3AED] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Submit Task
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
               </div>
             </div>
           </motion.div>

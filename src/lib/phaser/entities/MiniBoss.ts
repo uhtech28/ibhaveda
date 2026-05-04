@@ -265,7 +265,103 @@ export class MiniBoss extends Phaser.GameObjects.Container {
     }
   }
 
+  /**
+   * Play the retreat animation.
+   * Called when a player leaves the stage with partial progress —
+   * boss backs off but remains visible as a looming threat.
+   *
+   * PRD §4.2: "retreat on partial stage complete."
+   * Mini-bosses settle at 40% alpha after retreating (still lurking).
+   */
+  retreat(): void {
+    if (!this.scene || !this.scene.tweens) return;
+
+    this.scene.tweens.killTweensOf([
+      this,
+      this.bossGraphics,
+      this.cracksGraphics,
+      this.eyeLeft,
+      this.eyeRight,
+    ]);
+
+    if (this.bossType === "Fog of Vagueness") {
+      // Fog swirls inward — condenses then settles at 40% alpha
+      this.scene.tweens.add({
+        targets: this.bossGraphics,
+        scaleX: { from: 1.0, to: 0.6 },
+        scaleY: { from: 1.0, to: 0.6 },
+        alpha: 0.15,
+        duration: 600,
+        ease: "Cubic.easeIn",
+        onComplete: () => {
+          if (!this.scene) return;
+          this.scene.tweens.add({
+            targets: this.bossGraphics,
+            scaleX: 0.85,
+            scaleY: 0.85,
+            alpha: 0.4,
+            duration: 800,
+            ease: "Sine.easeOut",
+          });
+        },
+      });
+      if (this.eyeLeft) {
+        this.scene.tweens.add({
+          targets: [this.eyeLeft, this.eyeRight],
+          alpha: 0.25,
+          duration: 700,
+          ease: "Sine.easeOut",
+        });
+      }
+      this.scene.tweens.add({
+        targets: this.namePlate,
+        alpha: 0.3,
+        duration: 500,
+      });
+    } else {
+      // Wraith / Golem / Specter / Generic — slides into the ground, re-emerges dimly
+      const retreatY = this.y + 120;
+
+      this.scene.tweens.add({
+        targets: this.bossGraphics,
+        y: this.bossGraphics.y + 40,
+        alpha: 0,
+        duration: 900,
+        ease: "Cubic.easeIn",
+      });
+      this.scene.tweens.add({ targets: this.cracksGraphics, alpha: 0, duration: 400 });
+      if (this.eyeLeft) {
+        this.scene.tweens.add({ targets: [this.eyeLeft, this.eyeRight], alpha: 0, duration: 400 });
+      }
+      this.scene.tweens.add({ targets: this.namePlate, alpha: 0, duration: 400 });
+
+      this.scene.tweens.add({
+        targets: this,
+        y: retreatY,
+        alpha: 0,
+        duration: 1200,
+        ease: "Cubic.easeIn",
+        onComplete: () => {
+          this.setPosition(this.x, retreatY - 80);
+          this.bossGraphics.setPosition(0, 0);
+          this.bossGraphics.setAlpha(0.4);
+          this.namePlate.setAlpha(0.3);
+          this.setAlpha(0.4);
+          if (this.scene) {
+            this.scene.tweens.add({
+              targets: this,
+              y: this.y - 20,
+              duration: 1200,
+              ease: "Sine.easeOut",
+            });
+          }
+        },
+      });
+    }
+  }
+
   // ── Private: drawing methods ──────────────────────────────────────────────
+
 
   /**
    * Draw "Fog of Vagueness" — grey smoky cloud monster with amber glowing eyes

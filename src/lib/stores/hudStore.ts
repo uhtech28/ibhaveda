@@ -52,12 +52,10 @@ export const userProgressAtom = atom<UserProgress>({
 
 export const audioSettingsAtom = atom({
   masterVolume: 0.8,
-  musicVolume: 0.6,
-  sfxVolume: 0.7,
+  musicVolume: 0.7,
+  sfxVolume: 0.9,
   muted: false,
 });
-
-export const corruptionAtom = atom<number>(0);
 
 export const stageInfoAtom = atom({
   stageName: "Ideation",
@@ -74,13 +72,10 @@ export const checkpointProgressAtom = atom({
   goldCount: 0,
 });
 
-export const isAnimatingAtom = atom<boolean>(false);
-export const animationTypeAtom = atom<string | null>(null);
-
 // Task system atoms
 export interface SubmittingTask {
   id: string;
-  checkpointId: any;
+  checkpointId: string;
   taskLevel: "t1" | "t2" | "t3";
   title: string;
   description: string;
