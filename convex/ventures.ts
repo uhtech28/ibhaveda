@@ -31,6 +31,8 @@ export const generateUploadUrl = mutation({
 export const createVenture = mutation({
   args: {
     ideaId: v.id("ideas"),
+    skills: v.optional(v.array(v.string())),
+    industries: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -71,6 +73,8 @@ export const createVenture = mutation({
       currentCheckpoint: 1,
       status: "active",
       assignedBosses: [],
+      skills: args.skills,
+      industries: args.industries,
       createdAt: now,
       updatedAt: now,
     });

@@ -49,12 +49,42 @@ const XPBarComponent = ({ currentXP, maxXP, compact = false }: XPBarProps) => {
 
   return (
     <div className="flex items-center gap-2.5 font-sans group">
-      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-zinc-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md transition-transform group-hover:scale-105">
+      <div
+        className={`relative flex h-9 w-9 items-center justify-center rounded-xl border backdrop-blur-md transition-transform group-hover:scale-105 ${
+          isNearlyFull
+            ? "border-emerald-400/50 bg-zinc-900/60 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+            : "border-white/10 bg-zinc-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+        }`}
+      >
         <Zap
-          className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+          className={`h-4 w-4 ${
+            isNearlyFull
+              ? "text-emerald-400 drop-shadow-[0_0_12px_rgba(16,185,129,0.9)]"
+              : "text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+          }`}
           fill="currentColor"
         />
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-cyan-500/10 to-transparent pointer-events-none" />
+        <div
+          className={`absolute inset-0 rounded-xl pointer-events-none ${
+            isNearlyFull
+              ? "bg-gradient-to-br from-emerald-500/20 to-transparent"
+              : "bg-gradient-to-br from-cyan-500/10 to-transparent"
+          }`}
+        />
+        {isNearlyFull && (
+          <motion.div
+            className="absolute inset-0 rounded-xl border-2 border-emerald-400/40 pointer-events-none"
+            animate={{
+              opacity: [0.3, 0.8, 0.3],
+              scale: [1, 1.05, 1],
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -67,7 +97,13 @@ const XPBarComponent = ({ currentXP, maxXP, compact = false }: XPBarProps) => {
           </span>
         </div>
 
-        <div className="relative flex h-3 w-28 items-center overflow-hidden rounded-full border border-white/5 bg-black/40 p-[1px] shadow-[inset_0_1px_4px_rgba(255,255,255,0.05)] backdrop-blur-sm sm:w-36 lg:w-40">
+        <div
+          className={`relative flex h-3 w-28 items-center overflow-hidden rounded-full border p-[1px] backdrop-blur-sm sm:w-36 lg:w-40 ${
+            isNearlyFull
+              ? "border-emerald-400/30 bg-black/50 shadow-[inset_0_1px_4px_rgba(255,255,255,0.05),0_0_15px_rgba(16,185,129,0.3)]"
+              : "border-white/5 bg-black/40 shadow-[inset_0_1px_4px_rgba(255,255,255,0.05)]"
+          }`}
+        >
           <motion.div
             className="h-full rounded-full relative overflow-hidden"
             initial={{ width: 0 }}
@@ -77,7 +113,13 @@ const XPBarComponent = ({ currentXP, maxXP, compact = false }: XPBarProps) => {
               ease: "easeOut",
             }}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-400" />
+            <div
+              className={`absolute inset-0 ${
+                isNearlyFull
+                  ? "bg-gradient-to-r from-emerald-600 via-green-500 to-emerald-400"
+                  : "bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-400"
+              }`}
+            />
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-full h-full"
               animate={{
@@ -93,17 +135,37 @@ const XPBarComponent = ({ currentXP, maxXP, compact = false }: XPBarProps) => {
           </motion.div>
 
           {isNearlyFull && (
-            <motion.div
-              className="absolute inset-0 bg-cyan-400/20 pointer-events-none rounded-full"
-              animate={{
-                opacity: [0, 0.4, 0],
-              }}
-              transition={{
-                duration: 1,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            />
+            <>
+              {/* Inner glow pulsing effect */}
+              <motion.div
+                className="absolute inset-0 bg-emerald-400/25 pointer-events-none rounded-full"
+                animate={{
+                  opacity: [0.2, 0.5, 0.2],
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              {/* Outer edge glow */}
+              <motion.div
+                className="absolute -inset-[2px] rounded-full pointer-events-none"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at center, rgba(16,185,129,0) 40%, rgba(16,185,129,0.4) 100%)",
+                  filter: "blur(4px)",
+                }}
+                animate={{
+                  opacity: [0.4, 0.8, 0.4],
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+            </>
           )}
         </div>
       </div>

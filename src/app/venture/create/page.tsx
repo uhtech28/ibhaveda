@@ -12,10 +12,13 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Rocket, Skull, Shield, Loader2 } from "lucide-react";
+import { ArrowLeft, Rocket, Skull, Shield, Loader2, Tags } from "lucide-react";
 import { BOSS_DEFINITIONS } from "@convex/ventureConstants";
 import { useState } from "react";
 import type { Id } from "@convex/_generated/dataModel";
+import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
+import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
+import { Label } from "@/components/ui/label";
 
 export default function VentureCreatePage() {
   const router = useRouter();
@@ -25,6 +28,8 @@ export default function VentureCreatePage() {
   const [selectedGender, setSelectedGender] = useState<
     "male" | "female" | null
   >(null);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
 
   const ideas = useQuery(api.ideas.getUserIdeas, {});
   const createVenture = useMutation(api.ventures.createVenture);
@@ -35,7 +40,12 @@ export default function VentureCreatePage() {
     if (!ideaId || !selectedGender) return;
     setCreating(true);
     try {
-      const ventureId = await createVenture({ ideaId: ideaId as Id<"ideas"> });
+      const ventureId = await createVenture({
+        ideaId: ideaId as Id<"ideas">,
+        skills: selectedSkills.length > 0 ? selectedSkills : undefined,
+        industries:
+          selectedIndustries.length > 0 ? selectedIndustries : undefined,
+      });
 
       // Save persona gender selection to localStorage for /map/world
       if (typeof window !== "undefined") {
@@ -183,6 +193,56 @@ export default function VentureCreatePage() {
                 <p className="text-xs text-muted-foreground mt-2">
                   + 6 more bosses you might encounter
                 </p>
+              </CardContent>
+            </Card>
+
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tags className="h-5 w-5" />
+                  Tags & Focus Areas
+                </CardTitle>
+                <CardDescription>
+                  Select skills and industries to help personalize your venture
+                  journey
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Skills */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      Skills (Max 5)
+                    </Label>
+                    <SkillsMultiSelect
+                      selectedSkills={selectedSkills}
+                      onChange={(skills) => setSelectedSkills(skills)}
+                      maxSelection={5}
+                      placeholder="Select relevant skills..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional: Choose skills relevant to this venture
+                    </p>
+                  </div>
+
+                  {/* Industries */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      Industries (Max 4)
+                    </Label>
+                    <IndustriesMultiSelect
+                      selectedIndustries={selectedIndustries}
+                      onChange={(industries) =>
+                        setSelectedIndustries(industries)
+                      }
+                      maxSelection={4}
+                      placeholder="Select target industries..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional: Choose industries this venture targets
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 

@@ -872,7 +872,11 @@ function validateToolContent(toolType: string, content: string): void {
       break;
     }
 
-    case "link": {
+    case "link":
+    case "oauth": {
+      // "oauth" is a legacy database value from an older tool registry.
+      // Treat legacy OAuth evidence as a link-style submission so old rows remain usable
+      // while new tasks continue to be generated only from PRD-approved TOOL_TYPES.
       if (typeof parsed !== "object" || parsed === null) {
         throw new Error("Link data must be a valid object.");
       }

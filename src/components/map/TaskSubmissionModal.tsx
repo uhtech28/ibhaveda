@@ -313,25 +313,25 @@ export function TaskSubmissionModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
           />
 
-          {/* Modal */}
+          {/* Modal - Full responsive */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl max-h-[90vh] z-50 overflow-hidden"
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="fixed left-0 right-0 bottom-0 top-0 sm:left-1/2 sm:top-1/2 z-[101] sm:w-[min(92vw,800px)] sm:max-w-4xl sm:h-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl rounded-none max-h-screen overflow-y-auto"
           >
-            <div className="bg-[#111827] border-2 border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-[#111827] border-0 sm:border-2 border-white/10 sm:rounded-2xl rounded-none shadow-2xl flex flex-col h-full sm:max-h-[90vh]">
               {/* Header */}
-              <div className="p-6 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20 flex-shrink-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-white mb-2">
+              <div className="p-4 sm:p-6 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20 flex-shrink-0 safe-top">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2 truncate sm:whitespace-normal">
                       {task.title}
                     </h2>
-                    <p className="text-gray-300 text-sm mb-3">
+                    <p className="text-xs sm:text-sm text-gray-400 line-clamp-2">
                       {task.description}
                     </p>
                     <div className="flex items-center gap-4 flex-wrap">
@@ -351,15 +351,16 @@ export function TaskSubmissionModal({
                       audioManager.playUI("click");
                       onClose();
                     }}
-                    className="p-2 rounded-lg bg-black/20 hover:bg-black/40 transition-colors ml-4"
+                    className="p-2 sm:p-2 rounded-lg bg-black/20 hover:bg-black/40 active:bg-black/60 transition-colors flex-shrink-0 touch-manipulation"
+                    aria-label="Close modal"
                   >
-                    <X className="w-5 h-5 text-white" />
+                    <X className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
                   </button>
                 </div>
               </div>
 
               {/* Content Area */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 safe-bottom">
                 {!isOnline && (
                   <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
                     Offline mode detected. Your draft will stay on this device

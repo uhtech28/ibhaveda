@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Zap, Crown, Sparkles, Star } from "lucide-react";
-import { TOOL_INFO } from "../../../convex/ventureConstants";
+import { TOOL_INFO, LEVEL_DEFINITIONS } from "../../../convex/ventureConstants";
 
 interface LevelUpSequenceProps {
   isVisible: boolean;
@@ -19,31 +19,9 @@ interface LevelUpSequenceProps {
 const PHASE_NAMES = ["Apprentice", "Journeyer", "Master"];
 const PHASE_ICONS = [Shield, Zap, Crown];
 
-const LEVEL_TITLES: Record<number, string> = {
-  1: "Spark of an Idea",
-  2: "Early Thinker",
-  3: "Problem Seeker",
-  4: "Concept Builder",
-  5: "Validation Pioneer",
-  6: "Market Scout",
-  7: "Apprentice Founder",
-  8: "Prototype Crafter",
-  9: "MVP Architect",
-  10: "Launch Strategist",
-  11: "Growth Hacker",
-  12: "Pitch Ready",
-  13: "Seed Stage",
-  14: "Traction Builder",
-  15: "Journeyer Founder",
-  16: "Product-Market Fit",
-  17: "Series A Ready",
-  18: "Scale Engineer",
-  19: "Revenue Generator",
-  20: "Market Leader",
-};
-
 function getLevelTitle(level: number): string {
-  return LEVEL_TITLES[level] ?? `Level ${level} Founder`;
+  const levelDef = LEVEL_DEFINITIONS.find((def) => def.level === level);
+  return levelDef?.title ?? `Level ${level}`;
 }
 
 /**
@@ -305,17 +283,22 @@ export function LevelUpSequence({
                   </span>
                 </div>
 
-                {/* Level title with gold glow */}
+                {/* Level title with enhanced gold glow */}
                 <motion.h2
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                  className="text-3xl font-black tracking-tight"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }}
+                  className="text-4xl md:text-5xl font-black tracking-tight"
                   style={{
-                    color: "#f59e0b",
+                    background:
+                      "linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
                     textShadow:
-                      "0 0 20px rgba(245,158,11,0.6), 0 0 40px rgba(245,158,11,0.3)",
+                      "0 0 30px rgba(251,191,36,0.8), 0 0 60px rgba(245,158,11,0.5), 0 0 90px rgba(217,119,6,0.3)",
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    filter: "drop-shadow(0 4px 20px rgba(251,191,36,0.4))",
                   }}
                 >
                   {levelTitle}

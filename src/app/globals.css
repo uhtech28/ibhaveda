@@ -45,71 +45,71 @@
 
 :root {
   --radius: 0.625rem;
-  --background: #0A0D12;
-  --foreground: #F9FAFB;
+  --background: #0a0d12;
+  --foreground: #f9fafb;
   --card: #111827;
-  --card-foreground: #F9FAFB;
+  --card-foreground: #f9fafb;
   --popover: #111827;
-  --popover-foreground: #F9FAFB;
-  --primary: #6366F1;
-  --primary-foreground: #F9FAFB;
-  --secondary: #161F30;
-  --secondary-foreground: #F9FAFB;
-  --muted: #121A29;
-  --muted-foreground: #9CA3AF;
-  --accent: #1B2440;
-  --accent-foreground: #F9FAFB;
-  --destructive: #EF4444;
+  --popover-foreground: #f9fafb;
+  --primary: #6366f1;
+  --primary-foreground: #f9fafb;
+  --secondary: #161f30;
+  --secondary-foreground: #f9fafb;
+  --muted: #121a29;
+  --muted-foreground: #9ca3af;
+  --accent: #1b2440;
+  --accent-foreground: #f9fafb;
+  --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.07);
   --input: rgba(255, 255, 255, 0.08);
-  --ring: #6366F1;
-  --chart-1: #6366F1;
-  --chart-2: #8B5CF6;
-  --chart-3: #10B981;
-  --chart-4: #F59E0B;
-  --chart-5: #EF4444;
+  --ring: #6366f1;
+  --chart-1: #6366f1;
+  --chart-2: #8b5cf6;
+  --chart-3: #10b981;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
   --sidebar: #111827;
-  --sidebar-foreground: #F9FAFB;
-  --sidebar-primary: #6366F1;
-  --sidebar-primary-foreground: #F9FAFB;
-  --sidebar-accent: #1B2440;
-  --sidebar-accent-foreground: #F9FAFB;
+  --sidebar-foreground: #f9fafb;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #f9fafb;
+  --sidebar-accent: #1b2440;
+  --sidebar-accent-foreground: #f9fafb;
   --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: #6366F1;
+  --sidebar-ring: #6366f1;
 }
 
 .dark {
-  --background: #0A0D12;
-  --foreground: #F9FAFB;
+  --background: #0a0d12;
+  --foreground: #f9fafb;
   --card: #111827;
-  --card-foreground: #F9FAFB;
+  --card-foreground: #f9fafb;
   --popover: #111827;
-  --popover-foreground: #F9FAFB;
-  --primary: #6366F1;
-  --primary-foreground: #F9FAFB;
-  --secondary: #161F30;
-  --secondary-foreground: #F9FAFB;
-  --muted: #121A29;
-  --muted-foreground: #9CA3AF;
-  --accent: #1B2440;
-  --accent-foreground: #F9FAFB;
-  --destructive: #EF4444;
+  --popover-foreground: #f9fafb;
+  --primary: #6366f1;
+  --primary-foreground: #f9fafb;
+  --secondary: #161f30;
+  --secondary-foreground: #f9fafb;
+  --muted: #121a29;
+  --muted-foreground: #9ca3af;
+  --accent: #1b2440;
+  --accent-foreground: #f9fafb;
+  --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.07);
   --input: rgba(255, 255, 255, 0.08);
-  --ring: #6366F1;
-  --chart-1: #6366F1;
-  --chart-2: #8B5CF6;
-  --chart-3: #10B981;
-  --chart-4: #F59E0B;
-  --chart-5: #EF4444;
+  --ring: #6366f1;
+  --chart-1: #6366f1;
+  --chart-2: #8b5cf6;
+  --chart-3: #10b981;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
   --sidebar: #111827;
-  --sidebar-foreground: #F9FAFB;
-  --sidebar-primary: #6366F1;
-  --sidebar-primary-foreground: #F9FAFB;
-  --sidebar-accent: #1B2440;
-  --sidebar-accent-foreground: #F9FAFB;
+  --sidebar-foreground: #f9fafb;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #f9fafb;
+  --sidebar-accent: #1b2440;
+  --sidebar-accent-foreground: #f9fafb;
   --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: #6366F1;
+  --sidebar-ring: #6366f1;
 }
 
 @layer base {
@@ -143,6 +143,82 @@
 }
 
 @layer utilities {
+  /* Mobile safe area utilities */
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
+
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+
+  .safe-left {
+    padding-left: max(env(safe-area-inset-left), 1rem);
+  }
+
+  .safe-right {
+    padding-right: max(env(safe-area-inset-right), 1rem);
+  }
+
+  .safe-area-inset-top {
+    top: env(safe-area-inset-top);
+  }
+
+  .safe-area-inset-bottom {
+    bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Touch-friendly tap targets (min 44x44px per Apple HIG) */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Prevent text selection on touch devices during interaction */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+
+  /* Responsive text sizes */
+  @media (max-width: 640px) {
+    .text-responsive-xs {
+      font-size: 0.75rem;
+    }
+    .text-responsive-sm {
+      font-size: 0.875rem;
+    }
+    .text-responsive-base {
+      font-size: 1rem;
+    }
+    .text-responsive-lg {
+      font-size: 1.125rem;
+    }
+    .text-responsive-xl {
+      font-size: 1.25rem;
+    }
+  }
+
+  @media (min-width: 641px) {
+    .text-responsive-xs {
+      font-size: 0.875rem;
+    }
+    .text-responsive-sm {
+      font-size: 1rem;
+    }
+    .text-responsive-base {
+      font-size: 1.125rem;
+    }
+    .text-responsive-lg {
+      font-size: 1.25rem;
+    }
+    .text-responsive-xl {
+      font-size: 1.5rem;
+    }
+  }
+
   @keyframes shimmer {
     0% {
       background-position: 200% 0;
@@ -154,7 +230,6 @@
   }
 
   @keyframes bounce {
-
     0%,
     20%,
     50%,
@@ -174,18 +249,19 @@
 
   .animate-shimmer {
     animation: shimmer 1.8s linear infinite;
-    background-image: linear-gradient(90deg,
-        rgba(255, 255, 255, 0.03) 0%,
-        rgba(255, 255, 255, 0.08) 20%,
-        rgba(255, 255, 255, 0.03) 40%);
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.08) 20%,
+      rgba(255, 255, 255, 0.03) 40%
+    );
     background-size: 200% 100%;
   }
 }
 
 @media (max-width: 640px) {
-
   [data-notification][data-radix-popper-content-wrapper],
-  [data-notification]~[data-radix-popper-content-wrapper],
+  [data-notification] ~ [data-radix-popper-content-wrapper],
   div:has(> [data-notification]) {
     left: 50% !important;
     transform: translateX(-50%) !important;
@@ -198,7 +274,6 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 @keyframes boss-crack {
-
   0%,
   100% {
     opacity: 0.3;
@@ -226,7 +301,6 @@
 }
 
 @keyframes boss-greyscale {
-
   0%,
   100% {
     filter: grayscale(0.4);
@@ -238,7 +312,6 @@
 }
 
 @keyframes boss-thorns {
-
   0%,
   100% {
     transform: translateX(0);
@@ -254,7 +327,6 @@
 }
 
 @keyframes boss-mirror {
-
   0%,
   100% {
     opacity: 0.5;
@@ -278,7 +350,6 @@
 }
 
 @keyframes boss-flood {
-
   0%,
   100% {
     transform: scaleY(1);
@@ -290,7 +361,6 @@
 }
 
 @keyframes boss-grave {
-
   0%,
   100% {
     opacity: 0.3;
@@ -302,7 +372,6 @@
 }
 
 @keyframes boss-rust {
-
   0%,
   100% {
     filter: sepia(0.3);
@@ -314,7 +383,6 @@
 }
 
 @keyframes boss-wraith {
-
   0%,
   100% {
     opacity: 0.4;
@@ -333,7 +401,6 @@
 }
 
 @keyframes boss-stone {
-
   0%,
   100% {
     filter: brightness(0.7) contrast(1.2);
@@ -345,7 +412,6 @@
 }
 
 @keyframes boss-veil {
-
   0%,
   100% {
     opacity: 0.6;
@@ -428,7 +494,6 @@
 
 /* Monument glow */
 @keyframes monument-glow {
-
   0%,
   100% {
     box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);

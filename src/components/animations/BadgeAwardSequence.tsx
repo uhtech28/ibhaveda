@@ -4,6 +4,287 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, ArrowRight } from "lucide-react";
 
+// Generate random particle data
+function generateParticles(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    angle: (360 / count) * i + Math.random() * (360 / count),
+    distance: 100 + Math.random() * 200,
+    size: 4 + Math.random() * 8,
+    duration: 0.4 + Math.random() * 0.3,
+    delay: Math.random() * 0.1,
+  }));
+}
+
+// Legendary Full-Screen Gold Particle Burst
+function LegendaryParticleBurst() {
+  const particles = generateParticles(30);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 pointer-events-none overflow-hidden"
+    >
+      {/* White flash overlay */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 1, 0] }}
+        transition={{ duration: 0.1, times: [0, 0.5, 1], delay: 0.4 }}
+        className="absolute inset-0 bg-white z-20"
+      />
+
+      {/* Gold radial gradient background */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: [0, 0.8, 0], scale: [0.5, 1.5, 2] }}
+        transition={{ duration: 0.5, times: [0, 0.3, 1] }}
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(251,191,36,0.6) 0%, rgba(245,158,11,0.4) 30%, rgba(217,119,6,0.2) 60%, transparent 100%)",
+        }}
+      />
+
+      {/* Particles radiating from center */}
+      {particles.map((particle) => {
+        const centerX = 50; // center percentage
+        const centerY = 50;
+        const endX =
+          centerX +
+          (Math.cos((particle.angle * Math.PI) / 180) * particle.distance) / 5;
+        const endY =
+          centerY +
+          (Math.sin((particle.angle * Math.PI) / 180) * particle.distance) / 5;
+
+        return (
+          <motion.div
+            key={particle.id}
+            initial={{
+              left: `${centerX}%`,
+              top: `${centerY}%`,
+              opacity: 0,
+              scale: 0,
+            }}
+            animate={{
+              left: `${endX}%`,
+              top: `${endY}%`,
+              opacity: [0, 1, 0.8, 0],
+              scale: [0, 1.2, 1, 0.5],
+            }}
+            transition={{
+              duration: particle.duration,
+              delay: particle.delay,
+              ease: "easeOut",
+            }}
+            className="absolute rounded-full"
+            style={{
+              width: particle.size,
+              height: particle.size,
+              background:
+                "radial-gradient(circle, rgba(251,191,36,1) 0%, rgba(245,158,11,0.8) 50%, rgba(217,119,6,0.4) 100%)",
+              boxShadow: "0 0 10px rgba(251,191,36,0.8)",
+            }}
+          />
+        );
+      })}
+
+      {/* Additional sparkle particles */}
+      {Array.from({ length: 15 }, (_, i) => {
+        const angle = (360 / 15) * i;
+        const distance = 150 + Math.random() * 150;
+        const centerX = 50;
+        const centerY = 50;
+        const endX =
+          centerX + (Math.cos((angle * Math.PI) / 180) * distance) / 5;
+        const endY =
+          centerY + (Math.sin((angle * Math.PI) / 180) * distance) / 5;
+
+        return (
+          <motion.div
+            key={`sparkle-${i}`}
+            initial={{
+              left: `${centerX}%`,
+              top: `${centerY}%`,
+              opacity: 0,
+              rotate: 0,
+            }}
+            animate={{
+              left: `${endX}%`,
+              top: `${endY}%`,
+              opacity: [0, 1, 0],
+              rotate: 360,
+            }}
+            transition={{
+              duration: 0.5,
+              delay: 0.1 + Math.random() * 0.2,
+              ease: "easeOut",
+            }}
+            className="absolute"
+            style={{
+              width: 6,
+              height: 6,
+            }}
+          >
+            <Star
+              className="w-full h-full text-amber-300"
+              fill="currentColor"
+            />
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
+}
+
+// Rare Badge Blue Particle Burst (on badge land)
+function RareParticleBurst() {
+  const particles = generateParticles(20);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 pointer-events-none"
+    >
+      {particles.map((particle) => {
+        const angle = (360 / particles.length) * particle.id;
+        const endX =
+          Math.cos((angle * Math.PI) / 180) * (particle.distance / 2);
+        const endY =
+          Math.sin((angle * Math.PI) / 180) * (particle.distance / 2);
+
+        return (
+          <motion.div
+            key={particle.id}
+            initial={{
+              x: 0,
+              y: 0,
+              opacity: 0,
+              scale: 0,
+            }}
+            animate={{
+              x: endX,
+              y: endY,
+              opacity: [0, 1, 0.7, 0],
+              scale: [0, 1.5, 1, 0.3],
+            }}
+            transition={{
+              duration: 0.3,
+              delay: particle.delay,
+              ease: "easeOut",
+            }}
+            className="absolute left-1/2 top-1/2 rounded-full"
+            style={{
+              width: particle.size,
+              height: particle.size,
+              background:
+                "radial-gradient(circle, rgba(59,130,246,1) 0%, rgba(37,99,235,0.8) 50%, rgba(29,78,216,0.4) 100%)",
+              boxShadow: "0 0 8px rgba(59,130,246,0.9)",
+            }}
+          />
+        );
+      })}
+    </motion.div>
+  );
+}
+
+// Epic Badge Purple Particle Burst with Color Pulse (on badge land)
+function EpicParticleBurst() {
+  const particles = generateParticles(25);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 pointer-events-none"
+    >
+      {/* Pulsing glow ring */}
+      <motion.div
+        animate={{
+          scale: [1, 1.4, 1.2],
+          opacity: [0.8, 0.3, 0],
+        }}
+        transition={{
+          duration: 0.5,
+          ease: "easeOut",
+        }}
+        className="absolute inset-0 rounded-2xl"
+        style={{
+          boxShadow:
+            "0 0 40px 10px rgba(168,85,247,0.8), inset 0 0 40px rgba(168,85,247,0.5)",
+          border: "2px solid rgba(168,85,247,0.8)",
+        }}
+      />
+
+      {/* Color pulse waves */}
+      {[0, 0.15, 0.3].map((delay, idx) => (
+        <motion.div
+          key={`pulse-${idx}`}
+          initial={{ scale: 1, opacity: 0 }}
+          animate={{
+            scale: [1, 1.8],
+            opacity: [0.6, 0],
+          }}
+          transition={{
+            duration: 0.5,
+            delay,
+            ease: "easeOut",
+          }}
+          className="absolute inset-0 rounded-2xl"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(168,85,247,0.4) 0%, rgba(147,51,234,0.2) 50%, transparent 100%)",
+          }}
+        />
+      ))}
+
+      {/* Particles */}
+      {particles.map((particle) => {
+        const angle = (360 / particles.length) * particle.id;
+        const endX =
+          Math.cos((angle * Math.PI) / 180) * (particle.distance / 1.8);
+        const endY =
+          Math.sin((angle * Math.PI) / 180) * (particle.distance / 1.8);
+
+        return (
+          <motion.div
+            key={particle.id}
+            initial={{
+              x: 0,
+              y: 0,
+              opacity: 0,
+              scale: 0,
+            }}
+            animate={{
+              x: endX,
+              y: endY,
+              opacity: [0, 1, 0.8, 0],
+              scale: [0, 1.5, 1.2, 0.4],
+            }}
+            transition={{
+              duration: 0.5,
+              delay: particle.delay,
+              ease: "easeOut",
+            }}
+            className="absolute left-1/2 top-1/2 rounded-full"
+            style={{
+              width: particle.size,
+              height: particle.size,
+              background:
+                "radial-gradient(circle, rgba(168,85,247,1) 0%, rgba(147,51,234,0.8) 50%, rgba(126,34,206,0.4) 100%)",
+              boxShadow: "0 0 10px rgba(168,85,247,0.9)",
+            }}
+          />
+        );
+      })}
+    </motion.div>
+  );
+}
+
 interface Badge {
   id: string;
   name: string;
@@ -18,6 +299,14 @@ interface BadgeAwardSequenceProps {
   onComplete?: () => void;
   onSkip?: () => void;
 }
+
+const BURST_COLORS = {
+  common: "rgba(156, 163, 175, 0.8)", // gray
+  uncommon: "rgba(34, 197, 94, 0.8)", // green
+  rare: "rgba(59, 130, 246, 0.8)", // blue
+  epic: "rgba(168, 85, 247, 0.8)", // purple
+  legendary: "rgba(251, 191, 36, 0.8)", // gold
+};
 
 const RARITY_COLORS = {
   common: {
@@ -63,6 +352,9 @@ export function BadgeAwardSequence({
   const [showReveal, setShowReveal] = useState(false);
   const [isLegendary, setIsLegendary] = useState(false);
   const [showLegendaryBurst, setShowLegendaryBurst] = useState(false);
+  const [showEdgeBurst, setShowEdgeBurst] = useState(false);
+  const [showRareParticles, setShowRareParticles] = useState(false);
+  const [showEpicParticles, setShowEpicParticles] = useState(false);
 
   useEffect(() => {
     if (isVisible && badge) {
@@ -70,29 +362,53 @@ export function BadgeAwardSequence({
       setShowBadge(false);
       setShowReveal(false);
       setShowLegendaryBurst(false);
+      setShowEdgeBurst(false);
+      setShowRareParticles(false);
+      setShowEpicParticles(false);
       setIsLegendary(badge.rarity === "legendary");
 
-      if (badge.rarity === "legendary") {
+      const isLegendaryBadge = badge.rarity === "legendary";
+      const isRareBadge = badge.rarity === "rare";
+      const isEpicBadge = badge.rarity === "epic";
+
+      // Legendary: Full-screen gold particle burst BEFORE everything
+      if (isLegendaryBadge) {
         setShowLegendaryBurst(true);
         setTimeout(() => setShowLegendaryBurst(false), 500);
       }
 
-      const isLegendaryBadge = badge.rarity === "legendary";
-
       if (isLegendaryBadge) {
         // Legendary: gold burst FIRST (0.5s), then normal sequence offset by 0.5s
         const flashTimer = setTimeout(() => setShowFlash(false), 600); // 0.1s flash starts at 0.5s
-        const badgeTimer = setTimeout(() => setShowBadge(true), 700); // badge at 0.7s
+        const badgeTimer = setTimeout(() => {
+          setShowBadge(true);
+          setShowEdgeBurst(true);
+        }, 700); // badge drops at 0.7s
+        const edgeBurstTimer = setTimeout(() => setShowEdgeBurst(false), 900); // 200ms burst
         const revealTimer = setTimeout(() => setShowReveal(true), 1300); // reveal at 1.3s
         return () => {
           clearTimeout(flashTimer);
           clearTimeout(badgeTimer);
+          clearTimeout(edgeBurstTimer);
           clearTimeout(revealTimer);
         };
       }
 
       const flashTimer = setTimeout(() => setShowFlash(false), 100);
-      const badgeTimer = setTimeout(() => setShowBadge(true), 200);
+      const badgeTimer = setTimeout(() => {
+        setShowBadge(true);
+        setShowEdgeBurst(true);
+
+        // Trigger rare/epic particles on badge land
+        if (isRareBadge) {
+          setShowRareParticles(true);
+          setTimeout(() => setShowRareParticles(false), 300);
+        } else if (isEpicBadge) {
+          setShowEpicParticles(true);
+          setTimeout(() => setShowEpicParticles(false), 500);
+        }
+      }, 200);
+      const edgeBurstTimer = setTimeout(() => setShowEdgeBurst(false), 400); // 200ms burst
       const revealTimer = setTimeout(() => setShowReveal(true), 800);
 
       const autoDismissTimer = setTimeout(() => {
@@ -104,6 +420,7 @@ export function BadgeAwardSequence({
       return () => {
         clearTimeout(flashTimer);
         clearTimeout(badgeTimer);
+        clearTimeout(edgeBurstTimer);
         clearTimeout(revealTimer);
         clearTimeout(autoDismissTimer);
       };
@@ -136,6 +453,11 @@ export function BadgeAwardSequence({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
         >
+          {/* Legendary Full-Screen Particle Burst */}
+          <AnimatePresence>
+            {showLegendaryBurst && <LegendaryParticleBurst />}
+          </AnimatePresence>
+
           <AnimatePresence mode="wait">
             {showLegendaryBurst && (
               <motion.div
@@ -171,6 +493,84 @@ export function BadgeAwardSequence({
                 transition={{ type: "spring", stiffness: 200, damping: 20 }}
                 className="relative"
               >
+                {/* Rare Badge Particles */}
+                <AnimatePresence>
+                  {showRareParticles && <RareParticleBurst />}
+                </AnimatePresence>
+
+                {/* Epic Badge Particles */}
+                <AnimatePresence>
+                  {showEpicParticles && <EpicParticleBurst />}
+                </AnimatePresence>
+                {/* Edge burst effect - 4 bursts emanating from corners */}
+                <AnimatePresence>
+                  {showEdgeBurst && (
+                    <>
+                      {/* Top-left burst */}
+                      <motion.div
+                        key="burst-tl"
+                        initial={{ scale: 0, opacity: 1 }}
+                        animate={{ scale: 3, opacity: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="absolute -top-4 -left-4 w-8 h-8 rounded-full pointer-events-none"
+                        style={{
+                          background: `radial-gradient(circle, ${BURST_COLORS[badge.rarity]} 0%, transparent 70%)`,
+                        }}
+                      />
+                      {/* Top-right burst */}
+                      <motion.div
+                        key="burst-tr"
+                        initial={{ scale: 0, opacity: 1 }}
+                        animate={{ scale: 3, opacity: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="absolute -top-4 -right-4 w-8 h-8 rounded-full pointer-events-none"
+                        style={{
+                          background: `radial-gradient(circle, ${BURST_COLORS[badge.rarity]} 0%, transparent 70%)`,
+                        }}
+                      />
+                      {/* Bottom-left burst */}
+                      <motion.div
+                        key="burst-bl"
+                        initial={{ scale: 0, opacity: 1 }}
+                        animate={{ scale: 3, opacity: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="absolute -bottom-4 -left-4 w-8 h-8 rounded-full pointer-events-none"
+                        style={{
+                          background: `radial-gradient(circle, ${BURST_COLORS[badge.rarity]} 0%, transparent 70%)`,
+                        }}
+                      />
+                      {/* Bottom-right burst */}
+                      <motion.div
+                        key="burst-br"
+                        initial={{ scale: 0, opacity: 1 }}
+                        animate={{ scale: 3, opacity: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="absolute -bottom-4 -right-4 w-8 h-8 rounded-full pointer-events-none"
+                        style={{
+                          background: `radial-gradient(circle, ${BURST_COLORS[badge.rarity]} 0%, transparent 70%)`,
+                        }}
+                      />
+                      {/* Center expanding ring burst */}
+                      <motion.div
+                        key="burst-ring"
+                        initial={{ scale: 1, opacity: 1 }}
+                        animate={{ scale: 1.6, opacity: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="absolute inset-0 rounded-2xl pointer-events-none"
+                        style={{
+                          border: `2px solid ${BURST_COLORS[badge.rarity]}`,
+                          boxShadow: `0 0 20px ${BURST_COLORS[badge.rarity]}`,
+                        }}
+                      />
+                    </>
+                  )}
+                </AnimatePresence>
+
                 <motion.div
                   animate={{
                     boxShadow: isLegendary
@@ -186,7 +586,7 @@ export function BadgeAwardSequence({
                         ],
                   }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
-                  className={`w-32 h-32 rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center`}
+                  className={`w-32 h-32 rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center relative z-10`}
                 >
                   <span className="text-5xl">{badge.icon}</span>
                 </motion.div>

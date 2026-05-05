@@ -395,6 +395,8 @@ export default defineSchema({
       v.literal("archived"),
     ),
     assignedBosses: v.array(v.number()), // boss IDs 1-12
+    skills: v.optional(v.array(v.string())), // Selected skill tags (max 5)
+    industries: v.optional(v.array(v.string())), // Selected industry tags (max 4)
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -436,6 +438,9 @@ export default defineSchema({
       v.literal("poll"),
       v.literal("link"),
       v.literal("upload"),
+      // Legacy database value only. Do not add this back to TOOL_TYPES;
+      // existing rows may still contain "oauth" and must validate until migrated.
+      v.literal("oauth"),
       v.literal("self_report"),
       v.literal("journal"),
       v.literal("kanban"),
