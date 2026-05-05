@@ -1,0 +1,80 @@
+"use client";
+
+import React from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { HeroHeader } from "@/components/header";
+import FooterSection from "@/components/footer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import { ArrowLeft } from "lucide-react";
+import { BadgeShowcase } from "@/components/badges/badge-showcase";
+
+export default function ProfileBadgesPage() {
+  const params = useParams();
+  const router = useRouter();
+  const username = params.username as string;
+
+  const profile = useQuery(api.users.getUserProfile, { username });
+
+  if (profile === undefined) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <HeroHeader />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
+            <Spinner />
+            <p className="text-muted-foreground mt-4">Loading badges...</p>
+          </div>
+        </main>
+        <FooterSection />
+      </div>
+    );
+  }
+
+  if (profile === null) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <HeroHeader />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <h1 className="text-2xl font-bold text-destructive mb-2">Profile Not Found</h1>
+              <p className="text-muted-foreground mb-4">
+                The user @{username} doesn&apos;t exist.
+              </p>
+              <Button variant="outline" onClick={() => router.back()}>
+                <ArrowLeft className="w-4 h-4 mr-2" /> Go Back
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+        <FooterSection />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <HeroHeader />
+
+      <main className="flex-1 container mx-auto px-4 py-12 pt-32 max-w-5xl">
+        <div className="mb-6 flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{profile.displayName}&apos;s Badges</h1>
+            <p className="text-sm text-muted-foreground">@{profile.username}</p>
+          </div>
+        </div>
+
+        <BadgeShowcase userId={profile._id as string} />
+      </main>
+
+      <FooterSection />
+    </div>
+  );
+}

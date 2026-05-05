@@ -20,9 +20,12 @@ type InvitationSectionProps = {
     isAuthor: boolean;
     parentId?: Id<"ideas">;
   };
+  /** When true, drop the outer page-width wrapper + card so the section
+   * fits cleanly inside a tab panel. */
+  embedded?: boolean;
 };
 
-export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) => {
+export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea, embedded = false }) => {
   const sendInvitationMutation = useMutation(api.invitations.sendInvitation);
   const cancelInvitationMutation = useMutation(api.invitations.cancelInvitation);
   const myInvitationsQuery = useQuery(api.invitations.getMyInvitations);
@@ -67,7 +70,7 @@ export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) =>
   };
 
   const handleCancelInvitation = async (invitationId: Id<"invitations">) => {
-    if (!confirm("Are you sure you want to cancel this invitation?")) return;
+    // Inline action — clicking the Cancel button is itself the confirmation.
     try {
       await cancelInvitationMutation({ invitationId });
     } catch (err) {
@@ -76,7 +79,7 @@ export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) =>
   };
 
   const handleAcceptInvitation = async (invitationId: Id<"invitations">) => {
-    if (!confirm("Are you sure you want to accept this invitation?")) return;
+    // Inline action — clicking the Accept Invitation button is the confirm.
     try {
       setIsAccepting(invitationId);
       await acceptInvitationMutation({ invitationId });
@@ -97,7 +100,7 @@ export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) =>
   };
 
   const handleRejectInvitation = async (invitationId: Id<"invitations">) => {
-    if (!confirm("Are you sure you want to decline this invitation?")) return;
+    // Inline action — clicking Decline is the explicit user intent.
     try {
       setIsRejecting(invitationId);
       await rejectInvitationMutation({ invitationId });
@@ -122,7 +125,7 @@ export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) =>
   const myPendingInvitation = myInvitationsQuery?.find(inv => inv.idea?._id === idea._id) || null;
 
   return (
-    <div className="max-w-4xl mx-auto mt-8">
+    <div className={embedded ? "" : "max-w-4xl mx-auto mt-8"}>
       {/* Show pending invitation for current user */}
       {myPendingInvitation && (
         <div className="bg-card border border-border rounded-xl p-6 transition-colors mb-8">
@@ -164,8 +167,8 @@ export const InvitationSection: React.FC<InvitationSectionProps> = ({ idea }) =>
 
       {/* Author invitation section */}
       {idea.isAuthor && isRootIdea && (
-        <div className="bg-card border border-border rounded-xl p-6 transition-colors">
-          <h3 className="text-lg font-semibold mb-4">Invite Contributors</h3>
+        <div className={embedded ? "" : "bg-card border border-border rounded-xl p-6 transition-colors"}>
+          {!embedded && <h3 className="text-lg font-semibold mb-4">Invite Contributors</h3>}
 
           {/* Send invitation form */}
           <form onSubmit={handleSendInvitation} className="space-y-4 mb-6">

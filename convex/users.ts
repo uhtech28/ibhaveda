@@ -178,6 +178,37 @@ export const createUserProfile = mutation({
         );
       }
 
+      // Initialize userLevels record so the new user shows up as Level 1 — Newcomer
+      // and starts accumulating titlePoints toward Level 2 immediately.
+      try {
+        await db.insert("userLevels", {
+          userId,
+          currentLevel: 1,
+          titlePoints: 0,
+          totalPoints: 0,
+          goldCheckpoints: 0,
+          fullLifecycles: 0,
+          helpfulFlareResponses: 0,
+          flaresResolved: 0,
+          menteesCount: 0,
+          menteeCheckpointAdvances: 0,
+          menteeLevelAchievements: 0,
+          ideasLaunched: 0,
+          ideasScaled: 0,
+          collaboratorsRecruited: 0,
+          collaboratorsJoined: 0,
+          commentsCount: 0,
+          upvotedCommentsCount: 0,
+          ideasCreated: 0,
+          ideasWithStage6: 0,
+          ideasWithStage8: 0,
+          activeIdeaTypes: [],
+          updatedAt: now,
+        })
+      } catch (levelInitError) {
+        console.error("Non-fatal: failed to initialize userLevels:", levelInitError)
+      }
+
       console.log("Successfully created user profile:", userId, "username:", normalizedUsername)
       return userId
     } catch (error) {

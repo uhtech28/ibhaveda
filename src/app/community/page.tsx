@@ -3,6 +3,7 @@
 import React from "react";
 import { useQuery } from "convex/react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -14,14 +15,12 @@ import { Spinner } from "@/components/ui/spinner";
 import FooterSection from "@/components/footer";
 import { InvitationButton } from "@/components/requests/invitation-button";
 import { useChat } from "@/components/chat/ChatContext";
+import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 
 import { UserProfile } from "../../../convex/users";
 
 // Error Boundary to prevent leaderboard failures from crashing the page
-class LeaderboardErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
+class LeaderboardErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false };
@@ -38,7 +37,14 @@ class LeaderboardErrorBoundary extends React.Component<
 
 export default function CommunityPage() {
   const { isLoaded: isClerkUserLoaded, user: clerkUser } = useUser();
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams?.get("q") ?? "";
+  const [searchQuery, setSearchQuery] = React.useState(initialQuery);
+
+  // If the URL `?q=` changes (e.g., user clicks a different tag), update state.
+  React.useEffect(() => {
+    setSearchQuery(searchParams?.get("q") ?? "");
+  }, [searchParams]);
 
   // Convex data
   const users = useQuery(api.users.getAllUsers);
@@ -155,49 +161,160 @@ export default function CommunityPage() {
         </div>
       </main>
 
+      <FloatingChatButton />
       <FooterSection />
     </div>
   );
 }
 
 // Weekly Leaderboard Component
+type LeaderboardUser = {
+  _id: string;
+  username: string;
+  displayName: string;
+  avatar?: string | null;
+  points: number;
+};
+
+const RANK_STYLES = {
+  1: {
+    border: "border-yellow-500/50",
+    bg: "bg-yellow-500/5",
+    accent: "bg-yellow-500",
+    avatarRing: "border-yellow-500/30",
+    pointsText: "text-yellow-400",
+  },
+  2: {
+    border: "border-gray-400/50",
+    bg: "bg-gray-400/5",
+    accent: "bg-gray-400",
+    avatarRing: "border-gray-400/30",
+    pointsText: "text-gray-300",
+  },
+  3: {
+    border: "border-orange-700/50",
+    bg: "bg-orange-700/5",
+    accent: "bg-orange-700",
+    avatarRing: "border-orange-700/30",
+    pointsText: "text-orange-400",
+  },
+} as const;
+
+const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user, rank }) => {
+  const styles = RANK_STYLES[rank];
+  const isFirst = rank === 1;
+
+  return (
+    <Card
+      className={`relative overflow-hidden border-2 ${styles.border} ${styles.bg} shadow-lg flex flex-col items-center text-center transition-transform duration-300 hover:scale-[1.03] ${
+        isFirst ? "p-6 md:p-8" : "p-4 md:p-5"
+      }`}
+    >
+      <div className={`absolute top-0 left-0 w-full ${isFirst ? "h-1.5" : "h-1"} ${styles.accent}`} />
+
+      {/* Rank badge — clearly visible at top */}
+      <div
+        className={`flex items-center justify-center rounded-full text-white font-bold shadow-md ${styles.accent} ${
+          isFirst ? "w-12 h-12 text-lg -mt-2 mb-3" : "w-9 h-9 text-sm -mt-1 mb-2"
+        }`}
+        aria-label={`Rank ${rank}`}
+      >
+        #{rank}
+      </div>
+
+      {/* Crown for 1st place */}
+      {isFirst && (
+        <Trophy className="absolute top-3 right-3 w-5 h-5 text-yellow-500" aria-hidden="true" />
+      )}
+
+      <Link
+        href={`/profile/${encodeURIComponent(user.username)}`}
+        className="w-full flex flex-col items-center"
+      >
+        <Avatar
+          className={`shadow-md border-4 ${styles.avatarRing} ${
+            isFirst ? "w-24 h-24 mb-4" : "w-16 h-16 mb-3"
+          }`}
+        >
+          <AvatarImage src={user.avatar ?? undefined} alt={user.displayName} />
+          <AvatarFallback className={`font-semibold bg-background ${isFirst ? "text-2xl" : "text-lg"}`}>
+            {user.displayName.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+
+        <h3
+          className={`font-bold text-foreground truncate w-full hover:text-primary transition-colors ${
+            isFirst ? "text-xl" : "text-base"
+          }`}
+        >
+          {user.displayName}
+        </h3>
+        <p
+          className={`text-muted-foreground ${
+            isFirst ? "text-xs mb-4" : "text-[11px] mb-3"
+          }`}
+        >
+          @{user.username}
+        </p>
+
+        <div
+          className={`bg-background rounded-full border border-border/50 flex items-center gap-1.5 ${
+            isFirst ? "px-4 py-1.5" : "px-3 py-1"
+          }`}
+        >
+          <span className={`font-bold font-mono ${styles.pointsText} ${isFirst ? "text-base" : "text-sm"}`}>
+            {user.points}
+          </span>
+          <span className={`text-muted-foreground font-medium uppercase tracking-wider ${isFirst ? "text-xs" : "text-[10px]"}`}>
+            Points
+          </span>
+        </div>
+      </Link>
+    </Card>
+  );
+};
+
 const WeeklyLeaderboard = () => {
   const topUsers = useQuery(api.leaderboard.getWeeklyLeaderboard, { limit: 3 });
 
   if (topUsers === undefined) return null; // Loading silently
   if (topUsers === null || topUsers.length === 0) return null; // No one earned points this week
 
+  // topUsers[0] is rank 1, [1] is rank 2, [2] is rank 3 (per leaderboard ordering).
+  // Podium display order on screen: rank 2 (left) → rank 1 (center, elevated) → rank 3 (right).
+  const first = topUsers[0];
+  const second = topUsers[1];
+  const third = topUsers[2];
+
   return (
     <div className="mb-16">
       <div className="flex items-center justify-center gap-3 mb-8">
         <Trophy className="w-8 h-8 text-yellow-500" />
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">Weekly Top Contributors</h2>
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
+          Weekly Top Contributors
+        </h2>
         <Trophy className="w-8 h-8 text-yellow-500" />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-        {topUsers.map((user, index) => (
-          <Card key={user._id} className={`relative overflow-hidden border-2 flex flex-col items-center p-6 text-center ${index === 0 ? 'border-yellow-500/50 bg-yellow-500/5 shadow-yellow-500/20' : index === 1 ? 'border-gray-400/50 bg-gray-400/5 shadow-gray-400/20' : 'border-orange-700/50 bg-orange-700/5 shadow-orange-700/20'} shadow-lg transform hover:scale-105 transition-transform duration-300`}>
-            <div className={`absolute top-0 left-0 w-full h-1 ${index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-orange-700'}`}></div>
-            <div className={`absolute -top-4 -right-4 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg rotate-12 ${index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-orange-700'}`}>
-              #{index + 1}
-            </div>
-            
-            <Link href={`/profile/${encodeURIComponent(user.username)}`} className="w-full flex flex-col items-center">
-              <Avatar className={`w-20 h-20 mb-4 border-4 ${index === 0 ? 'border-yellow-500/20' : index === 1 ? 'border-gray-400/20' : 'border-orange-700/20'} shadow-md`}>
-                <AvatarImage src={user.avatar ?? undefined} alt={user.displayName} />
-                <AvatarFallback className="text-2xl font-semibold bg-background">{user.displayName.charAt(0).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              
-              <h3 className="font-bold text-lg text-foreground truncate w-full hover:text-primary transition-colors">{user.displayName}</h3>
-              <p className="text-xs text-muted-foreground mb-4">@{user.username}</p>
-              
-              <div className="bg-background rounded-full px-4 py-1.5 border border-border/50 flex items-center gap-1.5">
-                <span className="font-bold font-mono text-primary text-sm">{user.points}</span>
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Points</span>
-              </div>
-            </Link>
-          </Card>
-        ))}
+
+      {/* Podium grid.
+       * Mobile (grid-cols-1): cards stack in DOM order — rank 1, 2, 3.
+       * Desktop (md:grid-cols-3): podium layout via md:order-X — rank 2 on
+       * the left, rank 1 elevated in the center, rank 3 on the right. */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
+        {/* Rank 1 — first in DOM (top on mobile), centered + elevated on desktop */}
+        <div className="md:order-2 md:-translate-y-2">
+          {first && <PodiumCard user={first} rank={1} />}
+        </div>
+
+        {/* Rank 2 — second in DOM, left column on desktop */}
+        <div className="md:order-1 md:pb-0 md:translate-y-2">
+          {second ? <PodiumCard user={second} rank={2} /> : <div className="hidden md:block" />}
+        </div>
+
+        {/* Rank 3 — third in DOM, right column on desktop */}
+        <div className="md:order-3 md:translate-y-2">
+          {third ? <PodiumCard user={third} rank={3} /> : <div className="hidden md:block" />}
+        </div>
       </div>
     </div>
   );

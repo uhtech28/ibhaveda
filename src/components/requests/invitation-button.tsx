@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@convex/_generated/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Id } from "@convex/_generated/dataModel";
-import { UserPlus, Check } from "lucide-react";
+import { UserPlus, Check, X, Clock, UserCheck } from "lucide-react";
 
 interface InvitationButtonProps {
   targetUser: {
@@ -41,10 +41,15 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
     currentUser ? { inviterId: currentUser._id as Id<"users">, inviteeId: targetUser._id as Id<"users"> } : "skip"
   );
 
-  // Check if there's already a pending/accepted/rejected invitation
-  const hasActiveInvitation = existingInvitations && existingInvitations.length > 0 && existingInvitations.some(inv =>
-    inv.status === "pending" || inv.status === "accepted" || inv.status === "rejected"
-  );
+  // Detect the most relevant existing invitation so we can render a
+  // disabled state instead of hiding the button outright.
+  const invitationState: "pending" | "accepted" | null = (() => {
+    if (!existingInvitations || existingInvitations.length === 0) return null;
+    if (existingInvitations.some((inv) => inv.status === "accepted")) return "accepted";
+    if (existingInvitations.some((inv) => inv.status === "pending")) return "pending";
+    // "rejected" intentionally falls through — user should be able to retry.
+    return null;
+  })();
 
   // Send invitation mutation
   const sendInvitationMutation = useMutation(api.invitations.sendInvitation);
@@ -100,9 +105,47 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
     );
   }
 
-  // If there's already an active invitation, hide the button
-  if (hasActiveInvitation) {
-    return null; // Hide the button completely when there's an active invitation
+  // If there's already an active (pending or accepted) invitation, show a
+  // greyed-out, disabled button so the user knows the invite has been sent
+  // — the button no longer disappears.
+  if (invitationState === "pending") {
+    return (
+      <Button
+        variant="outline"
+        size={iconOnly ? "icon" : "sm"}
+        disabled
+        title="Invitation pending"
+        aria-label="Invitation pending"
+        className={
+          iconOnly
+            ? "h-8 w-8 rounded-full flex-shrink-0 opacity-60 cursor-not-allowed"
+            : "w-full opacity-60 cursor-not-allowed"
+        }
+      >
+        <Clock className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
+        {!iconOnly && "Invited"}
+      </Button>
+    );
+  }
+
+  if (invitationState === "accepted") {
+    return (
+      <Button
+        variant="outline"
+        size={iconOnly ? "icon" : "sm"}
+        disabled
+        title="Already collaborating"
+        aria-label="Already collaborating"
+        className={
+          iconOnly
+            ? "h-8 w-8 rounded-full flex-shrink-0 opacity-60 cursor-not-allowed"
+            : "w-full opacity-60 cursor-not-allowed"
+        }
+      >
+        <UserCheck className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
+        {!iconOnly && "Collaborating"}
+      </Button>
+    );
   }
 
   if (myIdeas.length === 0) {
@@ -135,9 +178,17 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-96 max-h-[80vh] overflow-y-auto" align="start">
+        <PopoverContent className="relative w-[min(92vw,384px)] max-h-[80vh] overflow-y-auto pr-3 pt-3" align="start">
+          <button
+            type="button"
+            onClick={() => setIsPopoverOpen(false)}
+            aria-label="Close invitation"
+            className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            <X className="h-4 w-4" />
+          </button>
           <div className="space-y-4">
-            <div>
+            <div className="pr-8">
               <h4 className="font-medium text-sm mb-2">Invite {targetUser.displayName} to collaborate</h4>
               <p className="text-xs text-muted-foreground mb-4">
                 Select one or more of your ideas that you'd like {targetUser.displayName} to contribute to.

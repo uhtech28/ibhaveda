@@ -105,17 +105,26 @@ export default function MyFeedPage() {
       />
 
       <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
-        <DialogContent className="h-[85vh] max-w-[600px] border-white/10 bg-[#111827] p-4 text-white sm:p-6">
-          <div className="mb-4">
+        <DialogContent
+          className="
+            grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#111827] p-0 text-white
+            w-full max-w-[600px]
+            h-[100dvh] max-h-[100dvh] rounded-none
+            sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
+          "
+        >
+          <div className="border-b border-white/8 px-5 py-4">
             <DialogTitle className="text-xl font-semibold">Comments</DialogTitle>
-            <p className="text-sm text-[#9CA3AF]">{activeCommentIdea?.title}</p>
+            <p className="mt-0.5 truncate text-sm text-[#9CA3AF]">{activeCommentIdea?.title}</p>
           </div>
-          {activeCommentIdea && (
-            <CommentsSection
-              ideaId={activeCommentIdea._id as Id<"ideas">}
-              commentCount={activeCommentIdea.commentCount || 0}
-            />
-          )}
+          <div className="min-h-0 px-5 py-4 overflow-hidden">
+            {activeCommentIdea && (
+              <CommentsSection
+                ideaId={activeCommentIdea._id as Id<"ideas">}
+                commentCount={activeCommentIdea.commentCount || 0}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
-import { Flame, Home, Lightbulb, Sparkles, Tag, TrendingUp, Users } from "lucide-react";
+import { Tag } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -20,41 +18,105 @@ import {
   transitionBase,
 } from "@/components/ideaforge/shared";
 
-const navItems = [
-  { key: "feed", label: "Feed", icon: Home },
-  { key: "ideas", label: "My Ideas", icon: Lightbulb },
-  { key: "hot", label: "Trending", icon: TrendingUp },
-  { key: "saved", label: "Saved", icon: Sparkles },
-  { key: "community", label: "Community", icon: Users },
-] as const;
+// Mirrors convex/ventureConstants.ts and the official "level_table_with_flare"
+// spec — single source of truth for level → title / threshold / phase. Lv 1-3
+// are purely task-gated (titlePoints = 0); Lv 4 onward needs accumulating pts.
+type Phase = "Tutorial" | "Early" | "Mid" | "Senior" | "Mentor";
+const LEVEL_TABLE: Array<{ level: number; title: string; pts: number; phase: Phase }> = [
+  { level:  1, title: "Newcomer",     pts:      0, phase: "Tutorial" },
+  { level:  2, title: "Explorer",     pts:      0, phase: "Tutorial" },
+  { level:  3, title: "Thinker",      pts:      0, phase: "Tutorial" },
+  { level:  4, title: "Connector",    pts:     50, phase: "Tutorial" },
+  { level:  5, title: "Contributor",  pts:    150, phase: "Tutorial" },
+  { level:  6, title: "Initiator",    pts:    300, phase: "Tutorial" },
+  { level:  7, title: "Spark",        pts:    500, phase: "Early" },
+  { level:  8, title: "Kindler",      pts:    800, phase: "Early" },
+  { level:  9, title: "Surveyor",     pts:   1200, phase: "Early" },
+  { level: 10, title: "Pathfinder",   pts:   1700, phase: "Early" },
+  { level: 11, title: "Builder",      pts:   2300, phase: "Early" },
+  { level: 12, title: "Artisan",      pts:   3000, phase: "Early" },
+  { level: 13, title: "Cultivator",   pts:   3800, phase: "Early" },
+  { level: 14, title: "Shaper",       pts:   4400, phase: "Early" },
+  { level: 15, title: "Strategist",   pts:   5000, phase: "Early" },
+  { level: 16, title: "Pioneer",      pts:   6000, phase: "Mid" },
+  { level: 17, title: "Catalyst",     pts:   7200, phase: "Mid" },
+  { level: 18, title: "Luminary",     pts:   8600, phase: "Mid" },
+  { level: 19, title: "Vanguard",     pts:  10200, phase: "Mid" },
+  { level: 20, title: "Architect",    pts:  12000, phase: "Mid" },
+  { level: 21, title: "Trailblazer",  pts:  14000, phase: "Mid" },
+  { level: 22, title: "Visionary",    pts:  16200, phase: "Mid" },
+  { level: 23, title: "Navigator",    pts:  18600, phase: "Mid" },
+  { level: 24, title: "Forger",       pts:  21200, phase: "Mid" },
+  { level: 25, title: "Innovator",    pts:  24000, phase: "Mid" },
+  { level: 26, title: "Magnate",      pts:  27000, phase: "Mid" },
+  { level: 27, title: "Curator",      pts:  30200, phase: "Mid" },
+  { level: 28, title: "Orchestrator", pts:  33600, phase: "Mid" },
+  { level: 29, title: "Sage",         pts:  37200, phase: "Senior" },
+  { level: 30, title: "Maven",        pts:  41000, phase: "Senior" },
+  { level: 31, title: "Pillar",       pts:  45000, phase: "Senior" },
+  { level: 32, title: "Champion",     pts:  49200, phase: "Senior" },
+  { level: 33, title: "Exemplar",     pts:  53600, phase: "Senior" },
+  { level: 34, title: "Harbinger",    pts:  58200, phase: "Senior" },
+  { level: 35, title: "Virtuoso",     pts:  63000, phase: "Senior" },
+  { level: 36, title: "Elder",        pts:  68000, phase: "Senior" },
+  { level: 37, title: "Sovereign",    pts:  73200, phase: "Senior" },
+  { level: 38, title: "Luminary",     pts:  78600, phase: "Senior" },
+  { level: 39, title: "Legend",       pts:  84200, phase: "Senior" },
+  { level: 40, title: "Mentor",       pts:  90000, phase: "Mentor" },
+  { level: 41, title: "Guide",        pts:  96000, phase: "Mentor" },
+  { level: 42, title: "Steward",      pts: 102200, phase: "Mentor" },
+  { level: 43, title: "Luminary",     pts: 108600, phase: "Mentor" },
+  { level: 44, title: "Pillar",       pts: 115200, phase: "Mentor" },
+  { level: 45, title: "Oracle",       pts: 122000, phase: "Mentor" },
+  { level: 46, title: "Paragon",      pts: 129000, phase: "Mentor" },
+  { level: 47, title: "Titan",        pts: 136200, phase: "Mentor" },
+  { level: 48, title: "Legend",       pts: 143600, phase: "Mentor" },
+  { level: 49, title: "Icon",         pts: 151200, phase: "Mentor" },
+  { level: 50, title: "Visionary",    pts: 159000, phase: "Mentor" },
+];
+
+const titleFor = (lv: number) => LEVEL_TABLE.find((l) => l.level === lv)?.title ?? "—";
 
 export function IdeaForgeLeftRail({
   currentUser,
-  mode,
   userIdeas,
-  onOpenComposer,
   onTagSelect,
-  onOpenFeedTab,
-  onOpenMyIdeasTab,
 }: {
   currentUser: CurrentUserProfile | null | undefined;
-  mode: "feed" | "my-ideas";
   userIdeas: IdeaForgeIdea[];
-  onOpenComposer: () => void;
   onTagSelect: (value: string) => void;
-  onOpenFeedTab: (key: "for-you" | "latest" | "hot" | "following") => void;
-  onOpenMyIdeasTab: (key: "ideas" | "saved" | "drafts" | "analytics") => void;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const wallet = useQuery(api.gamification.getWallet);
-  const streak = useQuery(api.gamification.getStreak);
+  // Real, live backend data
+  const levelProgress = useQuery(
+    api.levels.getUserLevelProgress,
+    currentUser?._id ? { userId: currentUser._id } : "skip"
+  );
 
-  const ideasPosted = userIdeas.length;
-  const totalSparks = userIdeas.reduce((sum, idea) => sum + (idea.sparkCount || 0), 0);
+  // Level / title — prefer backend, fall back to local table & XP heuristic.
   const xp = currentUser?.xp || 0;
-  const level = currentUser?.level || Math.max(1, Math.floor(xp / 100) + 1);
-  const progress = Math.min(100, Math.max(8, xp % 100 === 0 && xp > 0 ? 100 : xp % 100));
+  const level = levelProgress?.level ?? currentUser?.level ?? Math.max(1, Math.floor(xp / 100) + 1);
+  const title = (levelProgress?.title && levelProgress.title !== "Unknown")
+    ? levelProgress.title
+    : titleFor(level);
+
+  // Smart bar target: walk the level table forward to find the FIRST threshold
+  // strictly greater than the user's current points. The bar always represents
+  // a real, achievable next milestone — never stuck "full". (Lv 4 needs 50 pts
+  // but also a task gate; if a user with 74 pts is still at Lv 3 because of
+  // the gate, we show "74 / 150 XP" toward Lv 5 instead.)
+  const titlePoints = levelProgress?.titlePoints ?? xp;
+  const targetLevel = (() => {
+    for (let lv = level + 1; lv <= 50; lv++) {
+      const def = LEVEL_TABLE.find((l) => l.level === lv);
+      if (def && def.pts > titlePoints) return def;
+    }
+    return null;
+  })();
+  const isApex = targetLevel === null;
+  const progress = isApex
+    ? 100
+    : Math.min(100, Math.round((titlePoints / targetLevel!.pts) * 100));
+
   const activeTags = Array.from(
     new Set(
       [
@@ -64,120 +126,67 @@ export function IdeaForgeLeftRail({
     )
   ).slice(0, 8);
 
-  const handleNav = (key: (typeof navItems)[number]["key"]) => {
-    if (key === "community") {
-      router.push("/community");
-      return;
-    }
-
-    if (key === "feed") {
-      if (mode === "feed") {
-        onOpenFeedTab("for-you");
-      } else {
-        router.push("/feed");
-      }
-      return;
-    }
-
-    if (key === "ideas") {
-      if (mode === "my-ideas") {
-        onOpenMyIdeasTab("ideas");
-      } else {
-        router.push("/my-ideas");
-      }
-      return;
-    }
-
-    if (key === "hot") {
-      if (mode === "feed") {
-        onOpenFeedTab("hot");
-      } else {
-        router.push("/feed");
-      }
-      return;
-    }
-
-    if (key === "saved") {
-      if (mode === "my-ideas") {
-        onOpenMyIdeasTab("saved");
-      } else {
-        router.push("/my-ideas");
-      }
-    }
-  };
-
   return (
-    <aside className="hidden xl:block xl:w-[240px] xl:flex-shrink-0">
-      <div className="sticky top-28 space-y-4">
+    <aside className="hidden lg:block lg:w-[240px] lg:flex-shrink-0">
+      <div
+        className="
+          sticky top-24
+          max-h-[calc(100vh-6rem)]
+          overflow-y-auto overscroll-contain
+          space-y-4 pr-1 -mr-1
+          [&::-webkit-scrollbar]:w-1.5
+          [&::-webkit-scrollbar-thumb]:rounded-full
+          [&::-webkit-scrollbar-thumb]:bg-white/10
+          [&::-webkit-scrollbar-track]:bg-transparent
+        "
+      >
+        {/* Profile card */}
         <section className={cn(cardSurface, "relative overflow-hidden p-5")}>
-          <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.45),transparent_45%),linear-gradient(135deg,rgba(17,24,39,0.98),rgba(31,41,55,0.92))]" />
+          <div className="absolute inset-x-0 top-0 h-14 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.45),transparent_45%),linear-gradient(135deg,rgba(17,24,39,0.98),rgba(31,41,55,0.92))]" />
           <div className="relative">
-            <Avatar className="h-14 w-14 ring-2 ring-[#6366F1] ring-offset-4 ring-offset-[#111827]">
-              <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
-              <AvatarFallback className="bg-[#1B2440] text-white">{getInitials(currentUser?.displayName)}</AvatarFallback>
-            </Avatar>
+            <Link
+              href={currentUser?.username ? `/profile/${currentUser.username}` : "/profile-setup"}
+              className="block group focus:outline-none"
+              aria-label="Open my profile"
+            >
+              <Avatar className="h-10 w-10 ring-2 ring-[#6366F1] ring-offset-2 ring-offset-[#111827] transition-transform duration-200 group-hover:scale-[1.03]">
+                <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                <AvatarFallback className="bg-[#1B2440] text-white text-sm">
+                  {getInitials(currentUser?.displayName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="mt-3">
+                <h2 className={cn(displayFontClass, "text-base font-semibold text-[#F9FAFB] truncate group-hover:text-white")}>
+                  {currentUser?.displayName || "InteractiveIdeas Member"}
+                </h2>
+              </div>
+            </Link>
+
             <div className="mt-4">
-              <h2 className={cn(displayFontClass, "text-lg font-semibold text-[#F9FAFB]")}>{currentUser?.displayName || "InteractiveIdeas Member"}</h2>
-              <div className="mt-2 inline-flex items-center rounded-full border border-[#6366F1]/30 bg-[#6366F1]/12 px-3 py-1 text-[11px] font-medium text-[#C7D2FE]">
-                {currentUser?.role === "admin" ? "AI Curator" : "Builder"}
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-[14px] border border-white/8 bg-white/[0.03] p-4">
               <div className="flex items-center justify-between text-sm text-[#F9FAFB]">
-                <span>Level {level}</span>
-                <span className="text-[#9CA3AF]">{xp} XP</span>
+                <span className="flex flex-col">
+                  <span className="font-semibold">Level {level}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-[#7C86A2]">
+                    {title}
+                  </span>
+                </span>
+                <span className="text-[#9CA3AF] tabular-nums text-xs">
+                  {isApex
+                    ? `${titlePoints.toLocaleString()} XP · Apex`
+                    : `${titlePoints.toLocaleString()} / ${targetLevel!.pts.toLocaleString()} XP`}
+                </span>
               </div>
-              <Progress value={progress} className="mt-3 h-2.5 bg-[#20293B] [&>div]:bg-[linear-gradient(90deg,#6366F1,#8B5CF6)]" />
-              <div className="mt-3 flex items-center justify-between text-xs text-[#9CA3AF]">
-                <span>{wallet?.balance || 0} sparks banked</span>
-                <span>{streak?.currentStreak || 0} day streak</span>
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3 rounded-[14px] border border-white/8 bg-[#0A0D12]/70 p-4 text-sm">
-              <div>
-                <div className="text-[#F9FAFB]">{ideasPosted}</div>
-                <div className="text-xs text-[#9CA3AF]">Ideas Posted</div>
-              </div>
-              <div>
-                <div className="text-[#F9FAFB]">{totalSparks}</div>
-                <div className="text-xs text-[#9CA3AF]">Upvotes</div>
-              </div>
+              <Progress
+                value={progress}
+                className="mt-3 h-2 bg-[#20293B] [&>div]:bg-[linear-gradient(90deg,#6366F1,#8B5CF6)]"
+              />
             </div>
           </div>
         </section>
 
-        <section className={cn(cardSurface, "p-3")}>
-          <div className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive =
-                (item.key === "feed" && pathname === "/feed" && mode === "feed") ||
-                (item.key === "ideas" && pathname?.startsWith("/my-ideas") && mode === "my-ideas") ||
-                (item.key === "community" && pathname?.startsWith("/community"));
+        {/* Navigation menu removed — navbar covers Feed / My Ideas / Community. */}
 
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => handleNav(item.key)}
-                  className={cn(
-                    transitionBase,
-                    "flex w-full items-center gap-3 rounded-[14px] px-3 py-3 text-left text-sm",
-                    isActive
-                      ? "bg-[#6366F1]/14 text-white shadow-[inset_0_0_0_1px_rgba(99,102,241,0.28)]"
-                      : "text-[#9CA3AF] hover:bg-white/[0.03] hover:text-white"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
+        {/* Active tags */}
         <section className={cn(cardSurface, "p-4")}>
           <div className="flex items-center gap-2 text-sm text-[#F9FAFB]">
             <Tag className="h-4 w-4 text-[#6366F1]" />
@@ -199,22 +208,13 @@ export function IdeaForgeLeftRail({
                 </button>
               ))
             ) : (
-              <p className="text-sm text-[#9CA3AF]">Post a few ideas and your strongest topics will show up here.</p>
+              <p className="text-sm text-[#9CA3AF]">
+                Post a few ideas and your strongest topics will show up here.
+              </p>
             )}
           </div>
         </section>
-
-        <Button
-          type="button"
-          onClick={onOpenComposer}
-          className="h-11 w-full rounded-[10px] bg-[#6366F1] text-white shadow-[0_8px_32px_rgba(99,102,241,0.15)] hover:bg-[#8B5CF6]"
-        >
-          <Flame className="mr-2 h-4 w-4" />
-          Invite a Builder
-        </Button>
       </div>
     </aside>
   );
 }
-
-

@@ -216,7 +216,7 @@ type OutOfBoundsDayProps = {
 };
 
 const OutOfBoundsDay = ({ day }: OutOfBoundsDayProps) => (
-  <div className="relative h-full w-full bg-secondary p-1 text-muted-foreground text-sm min-h-[40px] sm:min-h-[50px] md:min-h-[60px]">
+  <div className="relative h-full w-full bg-secondary/30 p-1 text-muted-foreground/60 text-xs sm:text-sm">
     <span className="font-medium">{day}</span>
   </div>
 );
@@ -448,8 +448,8 @@ export const CalendarBody = ({ features: legacyFeatures, tasks, children }: Cale
         {days.map((day, index) => (
           <div
             className={cn(
-              "relative aspect-square overflow-hidden bg-background",
-              "min-h-[40px] sm:min-h-[50px] md:min-h-[60px]"
+              "relative overflow-hidden bg-background",
+              "min-h-[44px] sm:min-h-[60px] lg:min-h-[80px]"
             )}
             key={index}
           >
@@ -826,7 +826,7 @@ export const CalendarHeader = ({ className }: CalendarHeaderProps) => {
   return (
     <div className={cn("grid flex-grow grid-cols-7", className)}>
       {daysData.map((day) => (
-        <div className="p-3 text-right text-muted-foreground text-sm font-medium" key={day}>
+        <div className="p-1 text-center text-muted-foreground text-[10px] font-medium sm:p-3 sm:text-right sm:text-sm" key={day}>
           {day}
         </div>
       ))}
@@ -845,29 +845,29 @@ export type CalendarItemProps = {
 export const CalendarItem = memo(
   ({ feature, task, className, onEdit, children }: CalendarItemProps) => (
     <div
-      className={cn("flex flex-col gap-1 cursor-pointer hover:bg-accent/50 p-1 rounded", className)}
+      className={cn("flex flex-col gap-1 cursor-pointer hover:bg-accent/50 p-1 rounded min-w-0 max-w-full overflow-hidden", className)}
       onClick={(e) => {
         e.stopPropagation();
         if (task && onEdit) onEdit(task);
       }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 min-w-0 max-w-full">
         <div
-          className="h-2 w-2 shrink-0 rounded-full"
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
           style={{
             backgroundColor: feature.status.color,
           }}
         />
-        <span className="truncate text-xs">
+        <span className="truncate text-[10px] sm:text-xs min-w-0 flex-1">
           {feature.name}
           {task?.assignedTo && (
-            <span className="ml-1 text-muted-foreground">
+            <span className="ml-1 text-muted-foreground hidden sm:inline">
               ({task.assignedTo.name})
             </span>
           )}
         </span>
         {task?.completionTarget && (
-          <span className="truncate text-xs text-muted-foreground ml-1">
+          <span className="truncate text-[10px] text-muted-foreground hidden sm:inline">
             - {task.completionTarget}
           </span>
         )}

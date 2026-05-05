@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import { LEVEL_DEFINITIONS } from "./ventureConstants";
+import { meetsLevelRequirements } from "./levels";
 
 // Helper to get consistent date string (UTC)
 function getTodayString(): string {
@@ -418,6 +420,98 @@ export const internalAwardPoints = internalMutation({
             relatedId: args.relatedId,
             createdAt: Date.now(),
         });
+
+        // Mirror the award into the userLevels.titlePoints/totalPoints so the
+        // Level progress bar in the profile UI actually moves. This unifies the
+        // two parallel reward systems (wallet + userLevels) so creating ideas,
+        // commenting, and sparking all advance the same level bar that venture
+        // checkpoint completions advance.
+        const now = Date.now();
+        const userLevel = await db
+            .query("userLevels")
+            .withIndex("by_user", (q) => q.eq("userId", args.userId))
+            .first();
+
+        // Map action types to counter increments so task-gate fields
+        // (ideasCreated, commentsCount, collaboratorsRecruited, collaboratorsJoined)
+        // actually move when the user performs the gating action.
+        const counterDelta = {
+            ideasCreated: args.type === "create_idea" ? 1 : 0,
+            commentsCount: args.type === "comment" ? 1 : 0,
+            collaboratorsRecruited: args.type === "request_accepted" ? 1 : 0,
+            collaboratorsJoined: args.type === "contribution_accepted" ? 1 : 0,
+        };
+
+        if (userLevel) {
+            const newTitlePoints = (userLevel.titlePoints || 0) + args.amount;
+            const newTotalPoints = (userLevel.totalPoints || 0) + args.amount;
+            const newIdeasCreated = (userLevel.ideasCreated || 0) + counterDelta.ideasCreated;
+            const newCommentsCount = (userLevel.commentsCount || 0) + counterDelta.commentsCount;
+            const newCollabRecruited = (userLevel.collaboratorsRecruited || 0) + counterDelta.collaboratorsRecruited;
+            const newCollabJoined = (userLevel.collaboratorsJoined || 0) + counterDelta.collaboratorsJoined;
+
+            // Level-up check — must satisfy BOTH (a) titlePoints threshold AND
+            // (b) task-gate requirements per the PDF (Lv 1–6 are task-gated;
+            // Lv 7+ is purely points-based). Loops in case a single award crosses
+            // multiple levels (only relevant for Lv 7+).
+            const projectedUserLevel = {
+                ...userLevel,
+                titlePoints: newTitlePoints,
+                totalPoints: newTotalPoints,
+                ideasCreated: newIdeasCreated,
+                commentsCount: newCommentsCount,
+                collaboratorsRecruited: newCollabRecruited,
+                collaboratorsJoined: newCollabJoined,
+            };
+            let newLevel = userLevel.currentLevel || 1;
+            while (newLevel < 50) {
+                const nextDef = LEVEL_DEFINITIONS.find((l) => l.level === newLevel + 1);
+                if (!nextDef) break;
+                const pointsOk = newTitlePoints >= nextDef.titlePoints;
+                const gateOk = meetsLevelRequirements(nextDef.level, projectedUserLevel);
+                if (pointsOk && gateOk) {
+                    newLevel = nextDef.level;
+                } else {
+                    break;
+                }
+            }
+
+            await db.patch(userLevel._id, {
+                titlePoints: newTitlePoints,
+                totalPoints: newTotalPoints,
+                ideasCreated: newIdeasCreated,
+                commentsCount: newCommentsCount,
+                collaboratorsRecruited: newCollabRecruited,
+                collaboratorsJoined: newCollabJoined,
+                currentLevel: newLevel,
+                updatedAt: now,
+            });
+        } else {
+            await db.insert("userLevels", {
+                userId: args.userId,
+                currentLevel: 1,
+                titlePoints: args.amount,
+                totalPoints: args.amount,
+                goldCheckpoints: 0,
+                fullLifecycles: 0,
+                helpfulFlareResponses: 0,
+                flaresResolved: 0,
+                menteesCount: 0,
+                menteeCheckpointAdvances: 0,
+                menteeLevelAchievements: 0,
+                ideasLaunched: 0,
+                ideasScaled: 0,
+                collaboratorsRecruited: counterDelta.collaboratorsRecruited,
+                collaboratorsJoined: counterDelta.collaboratorsJoined,
+                commentsCount: counterDelta.commentsCount,
+                upvotedCommentsCount: 0,
+                ideasCreated: counterDelta.ideasCreated,
+                ideasWithStage6: 0,
+                ideasWithStage8: 0,
+                activeIdeaTypes: [],
+                updatedAt: now,
+            });
+        }
     },
 });
 

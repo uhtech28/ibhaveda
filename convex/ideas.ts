@@ -710,9 +710,14 @@ export const getIdeaTree = query({
       };
     };
 
-    // Build the root of the tree
-    const rootIdea = await buildIdeaTree(args.rootIdeaId);
+    // Walk up to the TRUE root before building. This way, when the caller
+    // passes a sub-idea id, the hierarchy still renders the entire chain
+    // (top-level ancestor → all descendants), not just the sub-tree under
+    // the passed node. The UI can highlight the current node by id.
+    const trueRoot = await findRootIdea(args.rootIdeaId);
+    if (!trueRoot) return null;
 
+    const rootIdea = await buildIdeaTree(trueRoot._id);
     if (!rootIdea) {
       return null;
     }

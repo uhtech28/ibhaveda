@@ -39,6 +39,14 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
     }
   }, [userRequests, ideaId]);
 
+  // Pull the human-readable line out of a Convex server error string.
+  // Convex format: "[CONVEX M(...)] [Request ID: ...] Server Error Uncaught Error: <real message> at handler ..."
+  const friendlyError = (raw: string): string => {
+    const match = raw.match(/Uncaught Error:\s*(.+?)\s*at handler/i);
+    if (match && match[1]) return match[1];
+    return raw.replace(/^\[CONVEX[^\]]*\]\s*\[[^\]]*\]\s*Server Error\s*/i, "").split("\n")[0];
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || isSubmitting) return;
@@ -57,7 +65,8 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
       onClose();
     } catch (err: unknown) {
       console.error("Failed to send contribution request:", err);
-      setError(err instanceof Error ? err.message : "Failed to send contribution request.");
+      const raw = err instanceof Error ? err.message : "Failed to send contribution request.";
+      setError(friendlyError(raw));
     } finally {
       setIsSubmitting(false);
     }

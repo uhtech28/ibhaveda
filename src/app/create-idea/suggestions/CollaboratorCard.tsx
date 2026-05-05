@@ -1,9 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Lightbulb, Sparkles, UserPlus, Check, GitPullRequest } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -22,7 +30,7 @@ interface UserProfile {
 
 interface CollaboratorCardProps {
   profile: UserProfile;
-  onInvite?: (userId: string) => void;
+  onInvite?: (userId: string, message?: string) => void;
   isInvited?: boolean;
 }
 
@@ -31,6 +39,15 @@ export const CollaboratorCard: React.FC<CollaboratorCardProps> = ({
   onInvite,
   isInvited = false,
 }) => {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const handleSend = () => {
+    onInvite?.(profile._id, message.trim() || undefined);
+    setDialogOpen(false);
+    setMessage("");
+  };
+
   return (
     <motion.div
       whileHover={{ y: -5 }}
@@ -117,13 +134,13 @@ export const CollaboratorCard: React.FC<CollaboratorCardProps> = ({
 
       {/* Action Button */}
       <div className="mt-auto relative z-10">
-        <Button 
+        <Button
           className={`w-full rounded-xl h-10 font-semibold shadow-sm transition-all duration-300 ${
-            isInvited 
-              ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border border-green-500/20" 
+            isInvited
+              ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border border-green-500/20"
               : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20 hover:shadow-lg"
           }`}
-          onClick={() => onInvite?.(profile._id)}
+          onClick={() => !isInvited && setDialogOpen(true)}
           disabled={isInvited}
         >
           {isInvited ? (
@@ -139,6 +156,51 @@ export const CollaboratorCard: React.FC<CollaboratorCardProps> = ({
           )}
         </Button>
       </div>
+
+      {/* Connect message dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Connect with {profile.displayName}</DialogTitle>
+            <DialogDescription>
+              Add a short note so they know why you'd like to collaborate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label htmlFor={`connect-message-${profile._id}`} className="text-sm font-medium">
+              Message <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <textarea
+              id={`connect-message-${profile._id}`}
+              rows={4}
+              maxLength={500}
+              placeholder={`Hi ${profile.displayName}, I really like your work on ${profile.skills?.[0] || "your skills"}. I'd love to collaborate...`}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            />
+            <p className="text-xs text-muted-foreground text-right">{message.length}/500</p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setMessage("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSend}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Send Connect Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };

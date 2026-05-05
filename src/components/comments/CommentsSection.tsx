@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
-import { Trash2, MessageCircle, Send } from "lucide-react";
+import { Trash2, Send, MessageSquare } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 type Comment = {
@@ -31,6 +30,14 @@ interface CommentsSectionProps {
   commentCount: number;
 }
 
+const initialsOf = (name?: string) =>
+  (name || "U")
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
 export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
   const { userId } = useAuth();
   const comments = useQuery(api.ideas.getComments, { ideaId, limit: 100 });
@@ -39,33 +46,44 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim() || !userId) return;
+  useEffect(() => {
+    if (!scrollRef.current || !comments) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [comments?.length]);
+
+  // Auto-resize the textarea so it grows with the message but never overruns the dialog.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 140) + "px";
+  }, [content]);
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!content.trim() || !userId || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await addCommentMutation({
-        ideaId,
-        content: content.trim(),
-      });
+      await addCommentMutation({ ideaId, content: content.trim() });
       setContent("");
       setError("");
     } catch (err) {
-      setError("Failed to post comment");
+      setError("Couldn't post that comment. Please try again.");
       console.error(err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const groupByParent = (comments: Comment[]) => {
+  const groupByParent = (list: Comment[]) => {
     const roots: Comment[] = [];
-    const replies: { [key: string]: Comment[] } = {};
-    comments?.forEach(c => {
+    const replies: Record<string, Comment[]> = {};
+    list?.forEach((c) => {
       if (c.parentCommentId) {
-        if (!replies[c.parentCommentId]) replies[c.parentCommentId] = [];
-        replies[c.parentCommentId].push(c);
+        (replies[c.parentCommentId] ||= []).push(c);
       } else {
         roots.push(c);
       }
@@ -76,56 +94,80 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
   const { roots, replies } = groupByParent(comments || []);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 w-full">
-      <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+    <div className="grid h-full min-h-0 grid-rows-[1fr_auto] w-full">
+      {/* Scrollable comment list */}
+      <div
+        ref={scrollRef}
+        className="overflow-y-auto pr-1 -mr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-track]:bg-transparent"
+      >
         {comments === undefined ? (
-          <div className="flex justify-center py-8"><Spinner size={24} /></div>
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-[#6B7280]">
+            <Spinner size={20} />
+            <span className="text-xs">Loading comments…</span>
+          </div>
         ) : roots.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-            <MessageCircle className="w-12 h-12 mb-4 opacity-20" />
-            <p>No comments yet.</p>
-            <p className="text-sm">Be the first to share your thoughts!</p>
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-full bg-[#6366F1]/10 ring-1 ring-[#6366F1]/20">
+              <MessageSquare className="h-6 w-6 text-[#A5B4FC]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">No comments yet</p>
+              <p className="mt-1 text-xs text-[#9CA3AF]">Be the first to share your thoughts.</p>
+            </div>
           </div>
         ) : (
-          roots.map(comment => (
-            <CommentItem
-              key={comment._id}
-              comment={comment}
-              replies={replies[comment._id] || []}
-              ideaId={ideaId}
-            />
-          ))
+          <div className="space-y-4 py-1">
+            {roots.map((comment) => (
+              <CommentItem
+                key={comment._id}
+                comment={comment}
+                replies={replies[comment._id] || []}
+                ideaId={ideaId}
+              />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Sticky Bottom Input */}
-      <div className="pt-4 mt-auto border-t border-border bg-background sticky bottom-0 z-10">
+      {/* Input — pinned bottom row of the grid */}
+      <div className="pt-3 border-t border-white/8">
         {userId ? (
-          <form onSubmit={handleSubmit} className="relative">
-            <Textarea
-              placeholder="Share your thoughts..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[80px] pr-12 resize-none rounded-xl bg-muted/30 focus:bg-background transition-colors"
-              disabled={isSubmitting}
-              maxLength={1200}
-            />
-            <div className="absolute bottom-3 right-3 flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">{content.length}/1200</span>
+          <form onSubmit={handleSubmit}>
+            <div className="relative rounded-xl border border-white/10 bg-[#0A0D12] transition-colors focus-within:border-[#6366F1]/45 focus-within:bg-[#111827]">
+              <textarea
+                ref={textareaRef}
+                placeholder="Share your thoughts…"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="block w-full resize-none rounded-xl bg-transparent px-4 pt-3 pb-9 text-sm leading-relaxed text-white placeholder:text-[#6B7280] outline-none focus:ring-0"
+                disabled={isSubmitting}
+                maxLength={1200}
+                rows={2}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+              <div className="pointer-events-none absolute bottom-2.5 left-4 text-[10px] tabular-nums text-[#6B7280]">
+                {content.length}/1200
+              </div>
               <Button
                 type="submit"
                 size="icon"
                 disabled={!content.trim() || isSubmitting}
-                className="h-8 w-8 rounded-lg"
+                className="absolute bottom-2 right-2 h-8 w-8 rounded-lg bg-[#6366F1] text-white hover:bg-[#8B5CF6] disabled:opacity-40 disabled:hover:bg-[#6366F1]"
+                title="Post comment (⌘ + Enter)"
               >
-                {isSubmitting ? <Spinner size={14} /> : <Send className="w-4 h-4" />}
+                {isSubmitting ? <Spinner size={14} /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
-            {error && <p className="text-destructive text-xs mt-2">{error}</p>}
+            {error && <p className="mt-2 text-[11px] text-rose-400">{error}</p>}
           </form>
         ) : (
-          <div className="p-4 bg-muted/30 rounded-xl text-center text-sm text-muted-foreground">
-            Please sign in to join the conversation.
+          <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3 text-center text-sm text-[#9CA3AF]">
+            Sign in to join the conversation.
           </div>
         )}
       </div>
@@ -133,7 +175,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
   );
 };
 
-const CommentItem: React.FC<{ comment: Comment; replies: Comment[]; ideaId: Id<"ideas">; level?: number }> = ({ comment, replies, ideaId, level = 0 }) => {
+const CommentItem: React.FC<{
+  comment: Comment;
+  replies: Comment[];
+  ideaId: Id<"ideas">;
+  level?: number;
+}> = ({ comment, replies, ideaId, level = 0 }) => {
   const { userId } = useAuth();
   const [showReply, setShowReply] = useState(false);
   const [replyContent, setReplyContent] = useState("");
@@ -173,78 +220,103 @@ const CommentItem: React.FC<{ comment: Comment; replies: Comment[]; ideaId: Id<"
     }
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
-  };
+  const isMine = userId === comment.authorId;
 
   return (
-    <div className={`group ${level > 0 ? "ml-8 mt-3" : ""}`}>
+    <div className={`group ${level > 0 ? "ml-9" : ""}`}>
       <div className="flex gap-3">
-        <Avatar className="w-8 h-8 shrink-0 border border-border">
+        <Avatar className="h-9 w-9 shrink-0 ring-1 ring-white/10">
           <AvatarImage src={comment.author?.avatar} alt={comment.author?.name} />
-          <AvatarFallback className="text-[10px]">{getInitials(comment.author?.name || comment.author?.username || "U")}</AvatarFallback>
+          <AvatarFallback className="bg-[#1B2440] text-[11px] text-white">
+            {initialsOf(comment.author?.name || comment.author?.username)}
+          </AvatarFallback>
         </Avatar>
 
-        <div className="flex-1 space-y-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm">{comment.author?.name || comment.author?.username}</span>
-              <span className="text-xs text-muted-foreground">{formatDistanceToNow(comment.createdAt, { addSuffix: true })}</span>
+        <div className="min-w-0 flex-1">
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-2.5 transition-colors hover:border-white/12">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-semibold text-white">
+                  {comment.author?.name || comment.author?.username || "Unknown"}
+                </span>
+                <span className="shrink-0 text-[11px] text-[#6B7280]">
+                  {formatDistanceToNow(comment.createdAt, { addSuffix: true })}
+                </span>
+              </div>
+              {isMine && (
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="rounded p-1 text-[#6B7280] opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100 focus:opacity-100"
+                  title="Delete"
+                  type="button"
+                >
+                  {isDeleting ? <Spinner size={12} /> : <Trash2 className="h-3.5 w-3.5" />}
+                </button>
+              )}
             </div>
-            {userId === comment.authorId && (
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
-                title="Delete"
-              >
-                {isDeleting ? <Spinner size={12} /> : <Trash2 className="w-3 h-3" />}
-              </button>
-            )}
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[#E5E7EB]">
+              {comment.content}
+            </p>
           </div>
 
-          <p className="text-sm text-foreground/90 leading-relaxed">{comment.content}</p>
-
-          <div className="flex items-center gap-4 pt-1">
-            {userId && (
+          {userId && (
+            <div className="flex items-center gap-3 px-1 pt-1.5">
               <button
-                className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
+                type="button"
+                className="text-[11px] font-medium text-[#9CA3AF] transition-colors hover:text-[#A5B4FC]"
                 onClick={() => setShowReply(!showReply)}
               >
-                Reply
+                {showReply ? "Cancel" : "Reply"}
               </button>
-            )}
-          </div>
+              {replies.length > 0 && (
+                <span className="text-[11px] text-[#6B7280]">
+                  {replies.length} {replies.length === 1 ? "reply" : "replies"}
+                </span>
+              )}
+            </div>
+          )}
 
           {showReply && (
-            <form onSubmit={handleReply} className="mt-3 flex gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
-              <Textarea
-                placeholder="Write a reply..."
+            <form
+              onSubmit={handleReply}
+              className="mt-2 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200"
+            >
+              <textarea
+                placeholder="Write a reply…"
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
-                className="min-h-[60px] flex-1 resize-none text-sm bg-muted/30"
+                className="min-h-[56px] flex-1 resize-none rounded-xl border border-white/8 bg-[#0A0D12] px-3 py-2 text-sm text-white placeholder:text-[#6B7280] focus:border-[#6366F1]/45 focus:outline-none"
                 maxLength={500}
                 autoFocus
               />
-              <div className="flex flex-col gap-2">
-                <Button type="submit" size="sm" disabled={!replyContent.trim() || isReplying}>
-                  {isReplying ? <Spinner size={14} /> : "Reply"}
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowReply(false)}>
-                  Cancel
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!replyContent.trim() || isReplying}
+                className="bg-[#6366F1] text-white hover:bg-[#8B5CF6]"
+              >
+                {isReplying ? <Spinner size={14} /> : "Reply"}
+              </Button>
             </form>
           )}
         </div>
       </div>
 
       {replies.length > 0 && (
-        <div className="mt-3 relative">
-          <div className="absolute left-4 top-0 bottom-0 w-px bg-border/50" />
-          {replies.map(reply => (
-            <CommentItem key={reply._id} comment={reply} replies={[]} ideaId={ideaId} level={level + 1} />
-          ))}
+        <div className="relative mt-3 pl-4">
+          <div className="absolute bottom-0 left-[18px] top-0 w-px bg-white/8" />
+          <div className="space-y-3">
+            {replies.map((reply) => (
+              <CommentItem
+                key={reply._id}
+                comment={reply}
+                replies={[]}
+                ideaId={ideaId}
+                level={level + 1}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import CardUpload from "@/components/card-upload";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Globe, Lock } from "lucide-react";
 import { Id } from "@convex/_generated/dataModel";
 
 interface CreateSubIdeaDialogProps {
@@ -97,8 +97,8 @@ export function CreateSubIdeaDialog({
         parentId,
         title: title.trim(),
         description: description.trim(),
-        category: skills.join(', '),
-        industries: industries.length > 0 ? industries.join(', ') : undefined,
+        category: JSON.stringify(skills),
+        industries: industries.length > 0 ? JSON.stringify(industries) : undefined,
         visibility,
       });
       const createdId = res.subIdeaId;
@@ -205,17 +205,65 @@ export function CreateSubIdeaDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="visibility">Visibility</Label>
-            <Select value={visibility} onValueChange={setVisibility}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select visibility" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="public">Public</SelectItem>
-                <SelectItem value="private">Private</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Visibility — same Public/Private card style as the main
+           * /create-idea form, so the contribute flow feels identical. */}
+          <div className="space-y-1.5">
+            <Label className="sr-only">Visibility</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setVisibility("public")}
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                  visibility === "public"
+                    ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
+                    : "border-border/60 bg-muted/20 hover:border-border"
+                }`}
+              >
+                <div className={`mt-0.5 grid h-8 w-8 place-items-center rounded-lg ${
+                  visibility === "public" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                }`}>
+                  <Globe className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Public</span>
+                    {visibility === "public" && (
+                      <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">Selected</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Visible in the feed. Anyone can spark, comment, and request to collaborate.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setVisibility("private")}
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                  visibility === "private"
+                    ? "border-amber-500/50 bg-amber-500/5 ring-1 ring-amber-500/30"
+                    : "border-border/60 bg-muted/20 hover:border-border"
+                }`}
+              >
+                <div className={`mt-0.5 grid h-8 w-8 place-items-center rounded-lg ${
+                  visibility === "private" ? "bg-amber-500/15 text-amber-500" : "bg-muted text-muted-foreground"
+                }`}>
+                  <Lock className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Private</span>
+                    {visibility === "private" && (
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-500">Selected</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Only you can see it. Use as a draft, then publish later.
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">

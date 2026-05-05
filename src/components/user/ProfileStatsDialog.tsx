@@ -7,9 +7,8 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
-import { Heart, Users, Calendar, ArrowRight } from "lucide-react";
+import { Sparkles, UserPlus, Lightbulb } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 
 interface ProfileStatsDialogProps {
   userId: Id<"users">;
@@ -82,77 +81,17 @@ export function ProfileStatsDialog({ userId, type, isOpen, onOpenChange }: Profi
               <p>Loading ideas...</p>
             </div>
           ) : ideas && ideas.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {ideas.map((idea) => (
-                <div 
-                  key={idea._id} 
-                  className="group p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-muted/30 transition-all cursor-pointer relative overflow-hidden"
-                  onClick={() => handleIdeaClick(idea._id)}
-                >
-                  <div className="absolute top-0 left-0 w-1 h-full bg-primary/0 group-hover:bg-primary/50 transition-all duration-300"></div>
-                  
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <h3 className="font-semibold text-base truncate pr-2 group-hover:text-primary transition-colors">
-                          {idea.title}
-                        </h3>
-                        {idea.category && (
-                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 rounded-sm font-normal text-muted-foreground shrink-0">
-                            {idea.category}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                        {idea.description}
-                      </p>
-                      
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>
-                            {new Date(
-                              type === 'sparked' ? idea.sparkedAt || idea.createdAt : 
-                              type === 'contributed' ? idea.contributedAt || idea.createdAt : 
-                              idea.createdAt
-                            ).toLocaleDateString()}
-                          </span>
-                        </div>
-                        
-                        {idea.author && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-muted-foreground/50">by</span>
-                            <span className="font-medium text-foreground/80">@{idea.author.username}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
-                        <Heart className="w-3 h-3" />
-                        {idea.sparkCount || 0}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
-                        <Users className="w-3 h-3" />
-                        {idea.contributionCount || 0}
-                      </div>
-                      
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity mt-auto">
-                        <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <IdeaRow key={idea._id} idea={idea} onClick={() => handleIdeaClick(idea._id)} />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/50">
               <div className="p-4 bg-muted/20 rounded-full mb-4">
-                {type === 'created' ? <Users className="w-8 h-8 opacity-50" /> :
-                 type === 'sparked' ? <Heart className="w-8 h-8 opacity-50" /> :
-                 <Users className="w-8 h-8 opacity-50" />}
+                {type === 'created' ? <Lightbulb className="w-8 h-8 opacity-50" /> :
+                 type === 'sparked' ? <Sparkles className="w-8 h-8 opacity-50" /> :
+                 <UserPlus className="w-8 h-8 opacity-50" />}
               </div>
               <p className="text-base font-medium">No ideas found</p>
               <p className="text-sm max-w-xs text-center mt-1">
@@ -165,5 +104,59 @@ export function ProfileStatsDialog({ userId, type, isOpen, onOpenChange }: Profi
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Single row for an idea inside the stats dialog. Pulls live counts:
+ * - sparks: from idea.sparkCount (denormalized into idea doc on toggle)
+ * - contributors: from api.contributionRequests.getAcceptedContributors,
+ *   the same query the feed uses, so the number is always accurate.
+ */
+function IdeaRow({
+  idea,
+  onClick,
+}: {
+  idea: IdeaWithDetails;
+  onClick: () => void;
+}) {
+  const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
+    ideaId: idea._id as Id<"ideas">,
+  });
+  const contributorCount = contributors?.length ?? idea.contributionCount ?? 0;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group w-full text-left flex items-center justify-between gap-3 p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 hover:border-primary/40 transition-all cursor-pointer"
+    >
+      <div className="flex flex-col min-w-0 flex-1">
+        <h3 className="font-medium text-sm text-foreground truncate group-hover:text-primary transition-colors">
+          {idea.title || "Untitled"}
+        </h3>
+        {idea.author?.username && (
+          <span className="text-xs text-muted-foreground truncate">
+            @{idea.author.username}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-full"
+          title="Sparks"
+        >
+          <Sparkles className="w-3 h-3 text-orange-500" />
+          {idea.sparkCount ?? 0}
+        </span>
+        <span
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-full"
+          title="Contributors"
+        >
+          <UserPlus className="w-3 h-3 text-green-500" />
+          {contributorCount}
+        </span>
+      </div>
+    </button>
   );
 }

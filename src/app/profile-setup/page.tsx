@@ -27,7 +27,6 @@ export default function ProfileSetupPage() {
   const [error, setError] = useState("");
   const [profilePopulated, setProfilePopulated] = useState(false);
 
-  // Username validation state
   const [usernameValidation, setUsernameValidation] = useState({
     checking: false,
     available: null as boolean | null,
@@ -35,13 +34,9 @@ export default function ProfileSetupPage() {
     suggestions: [] as string[],
   });
 
-  // Current username for validation queries
   const [validationUsername, setValidationUsername] = useState('');
-
-  // Debounced validation ref
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Convex queries for username validation
   const availabilityQuery = useQuery(
     api.users.checkUsernameAvailability,
     validationUsername ? { username: validationUsername } : 'skip'
@@ -52,7 +47,6 @@ export default function ProfileSetupPage() {
     (validationUsername && usernameValidation.available === false) ? { baseUsername: validationUsername, count: 3 } : 'skip'
   );
 
-  // Comprehensive profile form data
   const [formData, setFormData] = useState({
     username: '',
     displayName: '',
@@ -65,137 +59,79 @@ export default function ProfileSetupPage() {
 
   const createUserProfile = useMutation(api.users.createUserProfile);
   const updateUserProfile = useMutation(api.users.updateUserProfile);
-
-  // Query existing user profile to check if onboarding is completed
   const existingProfile = useQuery(api.users.getCurrentUser);
 
-  // Effect to update validation state based on query results
   useEffect(() => {
     if (!validationUsername) {
-      setUsernameValidation({
-        checking: false,
-        available: null,
-        error: '',
-        suggestions: [],
-      });
+      setUsernameValidation({ checking: false, available: null, error: '', suggestions: [] });
       return;
     }
-
     if (availabilityQuery === undefined) {
-      // Query is still loading
       setUsernameValidation(prev => ({ ...prev, checking: true, error: '' }));
       return;
     }
-
     if (availabilityQuery.available) {
-      setUsernameValidation({
-        checking: false,
-        available: true,
-        error: '',
-        suggestions: [],
-      });
+      setUsernameValidation({ checking: false, available: true, error: '', suggestions: [] });
     } else {
-      setUsernameValidation({
-        checking: false,
-        available: false,
-        error: 'This username is already taken',
-        suggestions: suggestionsQuery || [],
-      });
+      setUsernameValidation({ checking: false, available: false, error: 'This username is already taken', suggestions: suggestionsQuery || [] });
     }
   }, [availabilityQuery, suggestionsQuery, validationUsername]);
 
-  // Debounced username validation function
   const validateUsername = useCallback((username: string) => {
     if (!username.trim()) {
-      setUsernameValidation({
-        checking: false,
-        available: null,
-        error: '',
-        suggestions: [],
-      });
+      setUsernameValidation({ checking: false, available: null, error: '', suggestions: [] });
       setValidationUsername('');
       return;
     }
-
     if (username.length < 3) {
-      setUsernameValidation({
-        checking: false,
-        available: null,
-        error: 'Username must be 3-30 characters',
-        suggestions: [],
-      });
+      setUsernameValidation({ checking: false, available: null, error: 'Username must be 3-30 characters', suggestions: [] });
       setValidationUsername('');
       return;
     }
-
-    // Check regex - note: this allows underscores but form validation doesn't
     const regexTest = /^[a-z0-9_]+$/.test(username);
-
     if (!regexTest) {
-      setUsernameValidation({
-        checking: false,
-        available: null,
-        error: 'Username must only use lowercase characters, numbers, and underscores',
-        suggestions: [],
-      });
+      setUsernameValidation({ checking: false, available: null, error: 'Username must only use lowercase characters, numbers, and underscores', suggestions: [] });
       setValidationUsername('');
       return;
     }
-
     setValidationUsername(username);
   }, []);
 
-  // Debounced onChange handler for username
   const handleUsernameChange = useCallback((username: string) => {
     const normalizedUsername = username.toLowerCase().replace(/[^a-z0-9_]/g, '');
-
     setFormData(prev => ({ ...prev, username: normalizedUsername }));
-
-    // Clear previous timer
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-
-    // Set new debounced validation
-    debounceTimer.current = setTimeout(() => {
-      validateUsername(normalizedUsername);
-    }, 500); // 500ms debounce
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => { validateUsername(normalizedUsername); }, 500);
   }, [validateUsername]);
 
-  // Cleanup timer on unmount
   useEffect(() => {
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, []);
 
-  // Pre-populate with Clerk data
   useEffect(() => {
     if (user) {
       const suggestedUsername = (user.username || user.firstName || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '');
       const suggestedName = user.fullName || suggestedUsername;
-
+      // Auto-pull avatar from Clerk if available, so first-time setup
+      // doesn't have to ask the user to upload one.
+      const clerkAvatar = user.imageUrl || "";
       setFormData(prev => ({
         ...prev,
         displayName: prev.displayName || suggestedName,
         username: prev.username || suggestedUsername,
+        avatar: prev.avatar || clerkAvatar,
       }));
-
-      // Trigger initial username validation if we have a suggested username
       if (suggestedUsername && suggestedUsername.length >= 3) {
         setValidationUsername(suggestedUsername);
       }
     }
   }, [user, userId]);
 
-  // Populate form with existing profile data
   useEffect(() => {
     if (existingProfile && !profilePopulated) {
       setFormData(prev => ({
         ...prev,
-        username: existingProfile.username || prev.username, // Use DB username, not Clerk suggestion
+        username: existingProfile.username || prev.username,
         displayName: existingProfile.displayName || prev.displayName,
         bio: existingProfile.bio || prev.bio,
         avatar: existingProfile.avatar || prev.avatar,
@@ -207,93 +143,47 @@ export default function ProfileSetupPage() {
     }
   }, [existingProfile, profilePopulated]);
 
-  // Form validation with toast notifications
   const validateForm = () => {
     const errors: string[] = [];
-
     if (!formData.username.trim()) {
       errors.push("Username is required");
-      toast({
-        title: "Username required",
-        description: "Please enter a username to continue.",
-        variant: "destructive",
-        duration: 4000,
-      });
+      toast({ title: "Username required", description: "Please enter a username to continue.", variant: "destructive", duration: 4000 });
     } else if (!/^[a-z0-9_]+$/.test(formData.username)) {
       errors.push("Username can only contain lowercase letters, numbers, and underscores");
-      toast({
-        title: "Invalid username",
-        description: "Username can only contain lowercase letters, numbers, and underscores.",
-        variant: "destructive",
-        duration: 4000,
-      });
+      toast({ title: "Invalid username", description: "Username can only contain lowercase letters, numbers, and underscores.", variant: "destructive", duration: 4000 });
     } else if (formData.username.length < 3) {
       errors.push("Username must be at least 3 characters");
-      toast({
-        title: "Username too short",
-        description: "Your username must be at least 3 characters long.",
-        variant: "destructive",
-        duration: 4000,
-      });
+      toast({ title: "Username too short", description: "Your username must be at least 3 characters long.", variant: "destructive", duration: 4000 });
     }
-
-    // Validate displayName (required by Convex mutation)
-    if (!formData.displayName.trim()) {
+    if (existingProfile && !formData.displayName.trim()) {
       errors.push("Display name is required");
-      toast({
-        title: "Display name required",
-        description: "Please enter your full name to continue.",
-        variant: "destructive",
-        duration: 4000,
-      });
+      toast({ title: "Display name required", description: "Please enter your full name to continue.", variant: "destructive", duration: 4000 });
     }
-
     return errors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Block submission if username is taken (for new profiles only)
     if (!existingProfile && usernameValidation.available === false) {
       setError("Username is already taken. Please choose a different username.");
-      toast({
-        title: "Username unavailable",
-        description: "This username is already taken. Please choose one of the suggestions or try a different username.",
-        variant: "destructive",
-        duration: 5000,
-      });
+      toast({ title: "Username unavailable", description: "This username is already taken. Please choose one of the suggestions or try a different username.", variant: "destructive", duration: 5000 });
       return;
     }
-
-    // Block submission if username validation is still in progress
     if (!existingProfile && usernameValidation.checking) {
-      toast({
-        title: "Please wait",
-        description: "Checking username availability...",
-        duration: 2000,
-      });
+      toast({ title: "Please wait", description: "Checking username availability...", duration: 2000 });
       return;
     }
-
-    // Validate form
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
       setError(validationErrors.join(". "));
       return;
     }
-
     if (!userId) return;
-
     setLoading(true);
     setError("");
-
     try {
-      // Ensure displayName has a value (fallback to username if empty)
       const finalDisplayName = formData.displayName.trim() || formData.username;
-
       if (existingProfile) {
-        // Update existing profile
         await updateUserProfile({
           displayName: finalDisplayName,
           bio: formData.bio || undefined,
@@ -303,7 +193,6 @@ export default function ProfileSetupPage() {
           skills: formData.skills,
         });
       } else {
-        // Create new profile
         await createUserProfile({
           username: formData.username,
           displayName: finalDisplayName,
@@ -314,90 +203,63 @@ export default function ProfileSetupPage() {
           skills: formData.skills,
         });
       }
-
-      // Redirect to feed
-      toast({
-        title: "Profile completed!",
-        description: "Welcome to the community! Your profile has been successfully set up.",
-        duration: 4000,
-      });
-
-      // Use router.push first, then fallback to window.location for production compatibility
+      toast({ title: "Profile completed!", description: "Welcome to the community! Your profile has been successfully set up.", duration: 4000 });
       try {
         router.push('/feed');
-        // Fallback: if still on same page after 500ms, force redirect
         setTimeout(() => {
           if (typeof window !== 'undefined' && window.location.pathname.includes('profile-setup')) {
             window.location.href = '/feed';
           }
         }, 500);
       } catch {
-        // Hard fallback for production environments
-        if (typeof window !== 'undefined') {
-          window.location.href = '/feed';
-        }
+        if (typeof window !== 'undefined') window.location.href = '/feed';
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : `Failed to ${existingProfile ? 'update' : 'create'} profile`;
       setError(errorMessage);
-      toast({
-        title: `Failed to ${existingProfile ? 'update' : 'create'} profile`,
-        description: errorMessage,
-        variant: "destructive",
-        duration: 6000,
-      });
+      toast({ title: `Failed to ${existingProfile ? 'update' : 'create'} profile`, description: errorMessage, variant: "destructive", duration: 6000 });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => {
-    // Navigate back to home or sign-in page
-    router.push('/');
-  };
+  const handleCancel = () => { router.push('/'); };
 
-  // Username validation status component
   const UsernameValidationStatus = () => {
     if (!formData.username || existingProfile) return null;
-
     return (
-      <div className="mt-1 space-y-1 bg-background/80 backdrop-blur-sm z-10 rounded-md">
-        {/* Availability Status */}
+      <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
           {usernameValidation.checking ? (
             <>
-              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">Checking...</span>
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Checking availability…</span>
             </>
           ) : usernameValidation.available === true ? (
             <>
-              <CheckCircle className="w-3 h-3 text-green-600" />
-              <span className="text-[10px] text-green-600 font-medium">Available</span>
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-xs text-emerald-500 font-medium">Available</span>
             </>
           ) : usernameValidation.available === false ? (
             <>
-              <XCircle className="w-3 h-3 text-destructive" />
-              <span className="text-[10px] text-destructive font-medium">Taken</span>
+              <XCircle className="w-3.5 h-3.5 text-destructive" />
+              <span className="text-xs text-destructive font-medium">Taken</span>
             </>
           ) : null}
         </div>
-
-        {/* Error Messages */}
-        {usernameValidation.error && (
-          <p className="text-[10px] text-destructive leading-tight">{usernameValidation.error}</p>
+        {usernameValidation.error && !usernameValidation.suggestions.length && (
+          <p className="text-xs text-destructive leading-tight">{usernameValidation.error}</p>
         )}
-
-        {/* Suggestions */}
         {usernameValidation.available === false && usernameValidation.suggestions.length > 0 && (
-          <div className="space-y-1 pt-0.5">
-            <p className="text-[10px] text-muted-foreground font-medium">Suggestions:</p>
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">Try one of these:</p>
             <div className="flex flex-wrap gap-1.5">
               {usernameValidation.suggestions.map((suggestion, index) => (
                 <button
                   key={index}
                   type="button"
                   onClick={() => handleUsernameChange(suggestion)}
-                  className="px-1.5 py-0.5 text-[10px] bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded transition-colors duration-200"
+                  className="px-2 py-0.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md transition-colors"
                 >
                   {suggestion}
                 </button>
@@ -428,39 +290,87 @@ export default function ProfileSetupPage() {
     );
   }
 
+  if (!existingProfile) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
+        <HeroHeader />
+        <main className="flex-1 flex items-center justify-center px-4 py-12 pt-32 w-full">
+          <div className="w-full max-w-3xl">
+            <div className="text-center mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+                Complete Your Profile
+              </h1>
+              <p className="mt-2 text-sm md:text-base text-muted-foreground">
+                Pick a username to get started
+              </p>
+            </div>
+            <Card className="border-border/50 shadow-xl">
+              <CardContent className="p-6 md:p-10">
+                <form onSubmit={handleSubmit}>
+                  {/* First-time setup is intentionally minimal:
+                   *   - No avatar upload (auto-generated from initials/Clerk image)
+                   *   - No Cancel button (forces profile completion before they
+                   *     can use the app)
+                   *   - Submit drops the user straight into /feed */}
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+                      <Input
+                        id="username"
+                        value={formData.username}
+                        onChange={(e) => handleUsernameChange(e.target.value)}
+                        placeholder="yourname"
+                        className="h-11 text-sm"
+                        maxLength={30}
+                        autoFocus
+                      />
+                      <UsernameValidationStatus />
+                    </div>
+                    {error && (
+                      <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                        <p className="text-xs text-destructive font-medium">{error}</p>
+                      </div>
+                    )}
+                    <Button
+                      type="submit"
+                      disabled={loading || usernameValidation.available === false || usernameValidation.checking || !formData.username}
+                      size="default"
+                      className="w-full h-11"
+                    >
+                      {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Setting up…</>) : ("Complete Setup")}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+        <FooterSection />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background overflow-hidden">
       <HeroHeader />
-
       <main className="flex-1 container mx-auto px-4 flex items-center justify-center py-4 pt-24">
         <div className="max-w-5xl w-full">
           <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold text-foreground">
-              {existingProfile ? "Edit Your Profile" : "Complete Your Profile"}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {existingProfile ? "Update your profile information" : "Tell us about yourself"}
-            </p>
+            <h1 className="text-2xl font-bold text-foreground">Edit Your Profile</h1>
+            <p className="text-sm text-muted-foreground">Update your profile information</p>
           </div>
-
           <Card className="shadow-lg border-border/50">
             <CardContent className="p-6">
               <form onSubmit={handleSubmit}>
                 <div className="flex flex-col md:flex-row gap-6">
-                  {/* Left Column: Avatar */}
                   <div className="flex-shrink-0 flex flex-col items-center justify-start pt-2">
                     <AvatarUpload
                       currentAvatar={formData.avatar}
-                      onAvatarChange={(avatarUrl: string) =>
-                        setFormData(prev => ({ ...prev, avatar: avatarUrl }))
-                      }
+                      onAvatarChange={(avatarUrl: string) => setFormData(prev => ({ ...prev, avatar: avatarUrl }))}
                       displayName={formData.displayName || "User"}
                     />
                   </div>
-
-                  {/* Right Column: Form Fields */}
                   <div className="flex-1 space-y-3">
-                    {/* Row 1: Name & Username */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label htmlFor="displayName" className="text-xs font-medium">Full Name</Label>
@@ -473,26 +383,19 @@ export default function ProfileSetupPage() {
                           maxLength={100}
                         />
                       </div>
-
-                      <div className="space-y-1 relative">
-                        <Label htmlFor="username" className="text-xs font-medium">Username *</Label>
+                      <div className="space-y-1">
+                        <Label htmlFor="username" className="text-xs font-medium">Username</Label>
                         <Input
                           id="username"
                           value={formData.username}
-                          onChange={(e) => !existingProfile && handleUsernameChange(e.target.value)}
                           placeholder="uniqueusername"
-                          className={`h-8 text-sm ${existingProfile ? 'bg-muted cursor-not-allowed' : ''}`}
+                          className="h-8 text-sm bg-muted cursor-not-allowed"
                           maxLength={30}
-                          disabled={!!existingProfile}
-                          readOnly={!!existingProfile}
+                          disabled
+                          readOnly
                         />
-                        <div className="absolute top-full left-0 w-full mt-0.5">
-                          <UsernameValidationStatus />
-                        </div>
                       </div>
                     </div>
-
-                    {/* Row 2: Bio */}
                     <div className="space-y-1 pt-1">
                       <div className="flex justify-between items-center">
                         <Label htmlFor="bio" className="text-xs font-medium">Bio</Label>
@@ -507,63 +410,31 @@ export default function ProfileSetupPage() {
                         maxLength={500}
                       />
                     </div>
-
-                    {/* Row 3: Industries & Skills */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs font-medium">Industries</Label>
                         <IndustriesMultiSelect
                           selectedIndustries={formData.industries}
-                          onChange={(newIndustries) =>
-                            setFormData(prev => ({ ...prev, industries: newIndustries }))
-                          }
+                          onChange={(newIndustries) => setFormData(prev => ({ ...prev, industries: newIndustries }))}
                         />
                       </div>
-
                       <div className="space-y-1">
                         <Label className="text-xs font-medium">Skills</Label>
                         <SkillsMultiSelect
                           selectedSkills={formData.skills}
-                          onChange={(newSkills) =>
-                            setFormData(prev => ({ ...prev, skills: newSkills }))
-                          }
+                          onChange={(newSkills) => setFormData(prev => ({ ...prev, skills: newSkills }))}
                         />
                       </div>
                     </div>
-
-                    {/* Error Display */}
                     {error && (
                       <div className="p-2 rounded-md bg-destructive/10 border border-destructive/20">
                         <p className="text-xs text-destructive font-medium">{error}</p>
                       </div>
                     )}
-
-                    {/* Action Buttons */}
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancel}
-                        disabled={loading}
-                        size="sm"
-                        className="h-8 px-4"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={loading || (usernameValidation.available === false && !existingProfile)}
-                        size="sm"
-                        className="h-8 px-4"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          existingProfile ? "Update Profile" : "Complete Setup"
-                        )}
+                      <Button type="button" variant="outline" onClick={handleCancel} disabled={loading} size="sm" className="h-8 px-4">Cancel</Button>
+                      <Button type="submit" disabled={loading} size="sm" className="h-8 px-4">
+                        {loading ? (<><Loader2 className="mr-2 h-3 w-3 animate-spin" />Saving...</>) : ("Update Profile")}
                       </Button>
                     </div>
                   </div>

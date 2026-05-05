@@ -34,32 +34,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message }) => {
       )}
     >
       {!isCurrentUser && (
-        <Avatar className="w-8 h-8 mr-2 flex-shrink-0">
+        <Avatar className="w-8 h-8 mr-2 flex-shrink-0 ring-2 ring-indigo-500/20">
           <AvatarImage src={sender.avatar || undefined} alt={sender.name} />
-          <AvatarFallback>{sender.name.charAt(0)}</AvatarFallback>
+          <AvatarFallback className="bg-indigo-500/20 text-indigo-200 text-xs">
+            {sender.name.charAt(0)}
+          </AvatarFallback>
         </Avatar>
       )}
 
       <div
         className={cn(
-          "max-w-[15rem] px-4 py-2 rounded-lg relative",
+          "max-w-[15rem] px-4 py-2.5 rounded-2xl relative shadow-sm",
           isCurrentUser
-            ? "bg-primary text-primary-foreground mr-2"
-            : "bg-accent text-accent-foreground ml-2"
+            ? "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white mr-2 rounded-br-sm"
+            : "bg-[#1a2030] text-foreground border border-white/[0.06] ml-2 rounded-bl-sm"
         )}
       >
         {!isCurrentUser && (
-          <div className="text-xs font-semibold mb-1 text-accent-foreground/70">
+          <div className="text-xs font-semibold mb-1 text-indigo-300/90">
             {sender.name}
           </div>
         )}
-        <div className="text-sm whitespace-pre-wrap break-words overflow-hidden">{text}</div>
+        <div className="text-sm whitespace-pre-wrap break-words overflow-hidden leading-relaxed">
+          {text}
+        </div>
         <div
           className={cn(
-            "text-xs mt-1",
+            "text-[10px] mt-1",
             isCurrentUser
-              ? "text-primary-foreground/70 text-right"
-              : "text-accent-foreground/70 text-left"
+              ? "text-white/70 text-right"
+              : "text-muted-foreground text-left"
           )}
         >
           {timestampStr}
@@ -67,9 +71,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message }) => {
       </div>
 
       {isCurrentUser && (
-        <Avatar className="w-8 h-8 ml-2 flex-shrink-0">
+        <Avatar className="w-8 h-8 ml-2 flex-shrink-0 ring-2 ring-indigo-500/30">
           <AvatarImage src={sender.avatar || undefined} alt={sender.name} />
-          <AvatarFallback>{sender.name.charAt(0)}</AvatarFallback>
+          <AvatarFallback className="bg-indigo-500/30 text-indigo-100 text-xs">
+            {sender.name.charAt(0)}
+          </AvatarFallback>
         </Avatar>
       )}
     </div>

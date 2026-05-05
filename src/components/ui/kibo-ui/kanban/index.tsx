@@ -26,6 +26,7 @@ import {
   type HTMLAttributes,
   type ReactNode,
   useContext,
+  useEffect,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
@@ -35,18 +36,16 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Plus, Pencil } from "lucide-react";
+import { User, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { useToast } from "@/components/ui/use-toast";
-import { useEffect } from "react";
 
 type UserProfile = {
   _id: string;
@@ -60,32 +59,19 @@ const t = tunnel();
 
 export type { DragEndEvent } from "@dnd-kit/core";
 
-// Utility functions for task enhancements
-function formatDeadlineDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  const isTomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString() === date.toDateString();
-  const isYesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toDateString() === date.toDateString();
-
-  if (isToday) return "Today";
-  if (isTomorrow) return "Tomorrow";
-  if (isYesterday) return "Yesterday";
-
-  return format(date, "MMM dd");
-}
-
-function getDeadlineIndicator(deadline?: number, status?: string): { color: string; label: string } {
-  if (!deadline) return { color: "secondary", label: "" };
-
-  const now = Date.now();
-  const diff = deadline - now;
-  const hours = diff / (1000 * 60 * 60);
-
-  if (status === "done") return { color: "green", label: "✓ Done" };
-  if (diff < 0) return { color: "destructive", label: formatDeadlineDate(deadline) };
-  if (hours < 24) return { color: "yellow", label: formatDeadlineDate(deadline) };
-  return { color: "secondary", label: formatDeadlineDate(deadline) };
+// Color of the small dot next to the deadline pill on each card.
+//   - done       → green
+//   - overdue    → destructive (red)
+//   - <24h left  → yellow
+//   - otherwise  → blue/secondary
+type DeadlineColor = "secondary" | "destructive" | "yellow" | "green";
+function getDeadlineColor(deadline?: number, status?: string): DeadlineColor {
+  if (status === "done") return "green";
+  if (!deadline) return "secondary";
+  const diff = deadline - Date.now();
+  if (diff < 0) return "destructive";
+  if (diff < 24 * 60 * 60 * 1000) return "yellow";
+  return "secondary";
 }
 
 // Task Edit Dialog Component
@@ -93,19 +79,22 @@ type TaskEditDialogProps = {
   todo: KanbanItemProps;
   contributors?: UserProfile[];
   onClose: () => void;
-  onSave: (updates: { assignedTo?: string; deadline?: number; completionTarget?: string }) => void;
+  onSave: (updates: { title?: string; assignedTo?: string; deadline?: number; completionTarget?: string }) => void;
 };
 
-function TaskEditDialog({ todo, contributors = [], onClose, onSave }: TaskEditDialogProps) {
+export function TaskEditDialog({ todo, contributors = [], onClose, onSave }: TaskEditDialogProps) {
+  const [title, setTitle] = useState(todo.name || "");
   const [assignedTo, setAssignedTo] = useState(todo.assignedTo?._id || "unassigned");
   const [deadline, setDeadline] = useState<Date | undefined>(todo.deadline ? new Date(todo.deadline) : undefined);
   const [completionTarget, setCompletionTarget] = useState(todo.completionTarget || "");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSave = async () => {
+    if (!title.trim()) return;
     setIsLoading(true);
     try {
       await onSave({
+        title: title.trim(),
         assignedTo: assignedTo === "unassigned" ? undefined : assignedTo,
         deadline: deadline?.getTime(),
         completionTarget: completionTarget || undefined,
@@ -123,13 +112,29 @@ function TaskEditDialog({ todo, contributors = [], onClose, onSave }: TaskEditDi
       <DialogHeader>
         <DialogTitle>Edit Task</DialogTitle>
       </DialogHeader>
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="assignee" className="text-right">
+      <div className="space-y-4 py-4">
+        {/* Title */}
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-title" className="text-sm font-medium">
+            Title <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="edit-title"
+            placeholder="Task title..."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
+            required
+          />
+        </div>
+
+        {/* Assignee */}
+        <div className="space-y-1.5">
+          <Label htmlFor="assignee" className="text-sm font-medium">
             Assignee
           </Label>
           <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="col-span-3">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Select assignee..." />
             </SelectTrigger>
             <SelectContent>
@@ -142,8 +147,10 @@ function TaskEditDialog({ todo, contributors = [], onClose, onSave }: TaskEditDi
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="deadline" className="text-right">
+
+        {/* Deadline */}
+        <div className="space-y-1.5">
+          <Label htmlFor="deadline" className="text-sm font-medium">
             Deadline
           </Label>
           <Input
@@ -151,20 +158,21 @@ function TaskEditDialog({ todo, contributors = [], onClose, onSave }: TaskEditDi
             type="date"
             value={deadline ? format(deadline, "yyyy-MM-dd") : ""}
             onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value) : undefined)}
-            className="col-span-3"
             min={new Date().toISOString().slice(0, 10)}
           />
         </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="completionTarget" className="text-right">
-            Target
+
+        {/* Target */}
+        <div className="space-y-1.5">
+          <Label htmlFor="completionTarget" className="text-sm font-medium">
+            Target <span className="text-xs text-muted-foreground font-normal">(optional)</span>
           </Label>
           <Textarea
             id="completionTarget"
             placeholder="What needs to be completed..."
             value={completionTarget}
             onChange={(e) => setCompletionTarget(e.target.value)}
-            className="col-span-3"
+            rows={3}
           />
         </div>
       </div>
@@ -172,7 +180,7 @@ function TaskEditDialog({ todo, contributors = [], onClose, onSave }: TaskEditDi
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={isLoading}>
+        <Button onClick={handleSave} disabled={isLoading || !title.trim()}>
           {isLoading ? "Saving..." : "Save"}
         </Button>
       </div>
@@ -180,7 +188,7 @@ function TaskEditDialog({ todo, contributors = [], onClose, onSave }: TaskEditDi
   );
 }
 
-type KanbanItemProps = {
+export type KanbanItemProps = {
   id: string;
   name: string;
   column: string;
@@ -197,10 +205,7 @@ type KanbanColumnProps = {
   name: string;
 } & Record<string, unknown>;
 
-type KanbanContextProps<
-  T extends KanbanItemProps = KanbanItemProps,
-  C extends KanbanColumnProps = KanbanColumnProps,
-> = {
+type KanbanContextProps<T extends KanbanItemProps = KanbanItemProps, C extends KanbanColumnProps = KanbanColumnProps> = {
   columns: C[];
   data: T[];
   activeCardId: string | null;
@@ -252,10 +257,11 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   status,
   // canDelete,
   canEdit = true,
+  onEditClick,
   children,
   className,
   contributors,
-}: KanbanCardProps<T> & { canEdit?: boolean }) => {
+}: KanbanCardProps<T> & { canEdit?: boolean; onEditClick?: (id: string) => void }) => {
   const {
     attributes,
     listeners,
@@ -265,48 +271,13 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
     isDragging,
   } = useSortable({
     id,
+    // Even when canEdit is false the card stays mounted; we just disable
+    // sortable so drag is a no-op for read-only viewers.
     disabled: !canEdit,
   });
   const { activeCardId } = useContext(KanbanContext) as KanbanContextProps;
-  const { toast } = useToast();
 
-  const deadlineIndicator = getDeadlineIndicator(deadline, status);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  const updateTodo = useMutation(api.todos.updateTodo);
-
-  const handleEditSave = async (updates: { assignedTo?: string; deadline?: number; completionTarget?: string }) => {
-    try {
-      await updateTodo({
-        todoId: id as Id<"todos">,
-        assignedTo: updates.assignedTo as Id<"users"> | undefined,
-        deadline: updates.deadline,
-        completionTarget: updates.completionTarget,
-      });
-      // toast removed
-    } catch (error) {
-      console.error("Failed to update task:", error);
-      // toast removed
-    }
-  };
-
-  // const handleDelete = async () => {
-  //   if (!confirm("Are you sure you want to delete this todo?")) return;
-  //   try {
-  //     await deleteTodo({ todoId: id as Id<"todos"> });
-  //     toast({
-  //       title: "Task deleted",
-  //       description: "Task has been successfully deleted.",
-  //     });
-  //   } catch (error) {
-  //     console.error("Failed to delete task:", error);
-  //     toast({
-  //       title: "Delete failed",
-  //       description: "Failed to delete task. Please try again.",
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
+  const deadlineColor = getDeadlineColor(deadline, status);
 
   const style = {
     transition,
@@ -316,62 +287,75 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   const cardContent = (
     <Card
       className={cn(
-        "cursor-default rounded-xl p-3 shadow-sm transition-all hover:shadow-md border-border/50 bg-card group relative",
+        // overflow-hidden — keeps icon buttons inside the card border on
+        // narrow PC columns where flex children were bleeding past the
+        // right edge. w-full + box-border ensure the card always matches
+        // the column width exactly.
+        "cursor-default rounded-xl p-2.5 pr-2 shadow-sm transition-all hover:shadow-md border-border/50 bg-card group relative w-full box-border overflow-hidden",
         isDragging && "pointer-events-none cursor-grabbing opacity-50 scale-105 shadow-xl rotate-2",
         status === "done" && "opacity-70",
         className
       )}
     >
-
-
-      <div className="space-y-2">
-        {/* Header: Drag Handle & Metadata (Deadline + Assignee) */}
-        <div
-          className="flex items-start justify-between mb-1.5 cursor-grab active:cursor-grabbing touch-action-none"
-          {...listeners}
-          {...attributes}
-        >
-          {/* Deadline Badge */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-            <div className={cn("w-2 h-2 rounded-full",
-              deadlineIndicator.color === "destructive" ? "bg-red-500" :
-                deadlineIndicator.color === "yellow" ? "bg-amber-500" :
-                  deadlineIndicator.color === "green" ? "bg-emerald-500" :
+      <div className="space-y-2 w-full min-w-0">
+        {/* Header: split into a draggable LEFT side (deadline pill) and a
+         * non-draggable RIGHT side (assignee + edit). The edit button used
+         * to live INSIDE the drag-listener div, which on mobile caused the
+         * TouchSensor to swallow taps before the click could fire.
+         */}
+        <div className="flex items-center justify-between mb-1.5 gap-1 w-full min-w-0">
+          {/* Drag handle: deadline pill */}
+          <div
+            className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium cursor-grab active:cursor-grabbing touch-action-none flex-1 min-w-0"
+            {...listeners}
+            {...attributes}
+          >
+            <div className={cn("w-1.5 h-1.5 rounded-full shrink-0",
+              deadlineColor === "destructive" ? "bg-red-500" :
+                deadlineColor === "yellow" ? "bg-amber-500" :
+                  deadlineColor === "green" ? "bg-emerald-500" :
                     "bg-blue-400"
             )} />
-            {deadline ? format(new Date(deadline), "MMM dd") : "No deadline"}
+            <span className="truncate">{deadline ? format(new Date(deadline), "MMM dd") : "No deadline"}</span>
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* Assignee */}
-            <div className="flex items-center gap-2 ml-2">
-              {assignedTo ? (
-                <Avatar className="h-5 w-5 shrink-0 ring-1 ring-background">
-                  <AvatarImage src={assignedTo.avatar} alt={assignedTo.name} />
-                  <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
-                    {assignedTo.name
-                      ? assignedTo.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                      : assignedTo.username.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              ) : (
-                <div className="flex items-center text-muted-foreground/40">
-                  <User className="h-4 w-4" />
-                </div>
-              )}
-            </div>
+          {/* Assignee + Edit — outside listeners so taps reliably register.
+           * Compact sizes so we never overflow the card edge on narrow
+           * desktop columns. */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {assignedTo ? (
+              <Avatar className="h-5 w-5 shrink-0 ring-1 ring-background">
+                <AvatarImage src={assignedTo.avatar} alt={assignedTo.name} />
+                <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                  {assignedTo.name
+                    ? assignedTo.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                    : assignedTo.username.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <span className="inline-flex h-5 w-5 items-center justify-center text-muted-foreground/40 shrink-0">
+                <User className="h-3.5 w-3.5" />
+              </span>
+            )}
 
-            {/* Edit Button */}
-            {canEdit && (
+            {/* Edit Button — sits outside drag listeners and delegates to a
+             * parent-owned Dialog via onEditClick. */}
+            {canEdit && onEditClick && (
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 ml-1 text-muted-foreground/50 hover:text-foreground"
-                onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
+                className="h-6 w-6 shrink-0 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  setIsEditDialogOpen(true);
+                  onEditClick(id);
                 }}
+                aria-label="Edit task"
+                title="Edit task"
               >
                 <Pencil className="h-3 w-3" />
               </Button>
@@ -380,11 +364,11 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
         </div>
 
         {/* Title / Body */}
-        <div className="mb-0">
+        <div className="mb-0 w-full min-w-0">
           {children ? (
             children
           ) : (
-            <p className="font-medium text-sm text-foreground leading-relaxed">{name}</p>
+            <p className="font-medium text-sm text-foreground leading-relaxed break-words">{name}</p>
           )}
         </div>
       </div>
@@ -393,7 +377,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
 
   return (
     <>
-      <div style={style} {...attributes} ref={setNodeRef} className="group">
+      <div style={style} ref={setNodeRef} className="group w-full min-w-0">
         {cardContent}
       </div>
       {activeCardId === id && (
@@ -409,39 +393,20 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
           </Card>
         </t.In>
       )}
-
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <TaskEditDialog
-          todo={{
-            id,
-            name,
-            column: "todo",
-            assignedTo,
-            deadline,
-            completionTarget,
-            status,
-            contributors,
-          }}
-          contributors={contributors}
-          onClose={() => setIsEditDialogOpen(false)}
-          onSave={handleEditSave}
-        />
-      </Dialog>
     </>
   );
 };
 
-export type KanbanCardsProps<T extends KanbanItemProps = KanbanItemProps> =
-  Omit<HTMLAttributes<HTMLDivElement>, "children" | "id"> & {
-    children: (item: T) => ReactNode;
-    id: string;
-    onAdd?: () => void;
-  };
+export type KanbanCardsProps<T extends KanbanItemProps = KanbanItemProps> = Omit<HTMLAttributes<HTMLDivElement>, "children" | "id"> & {
+  children: (item: T) => ReactNode;
+  id: string;
+  onAdd?: () => void;
+};
 
 export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
   children,
   className,
-  onAdd,
+  onAdd: _onAdd,
   ...props
 }: KanbanCardsProps<T>) => {
   const { data } = useContext(KanbanContext) as KanbanContextProps<T>;
@@ -494,10 +459,7 @@ export const KanbanHeader = ({ className, color = "default", count, children, ..
   );
 };
 
-export type KanbanProviderProps<
-  T extends KanbanItemProps = KanbanItemProps,
-  C extends KanbanColumnProps = KanbanColumnProps,
-> = Omit<DndContextProps, "children"> & {
+export type KanbanProviderProps<T extends KanbanItemProps = KanbanItemProps, C extends KanbanColumnProps = KanbanColumnProps> = Omit<DndContextProps, "children"> & {
   children: (column: C) => ReactNode;
   className?: string;
   columns: C[];
@@ -508,10 +470,7 @@ export type KanbanProviderProps<
   onDragOver?: (event: DragOverEvent) => void;
 };
 
-export const KanbanProvider = <
-  T extends KanbanItemProps = KanbanItemProps,
-  C extends KanbanColumnProps = KanbanColumnProps,
->({
+export const KanbanProvider = <T extends KanbanItemProps = KanbanItemProps, C extends KanbanColumnProps = KanbanColumnProps>({
   children,
   onDragStart,
   onDragEnd,
@@ -525,15 +484,21 @@ export const KanbanProvider = <
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const updateTodoStatus = useMutation(api.todos.updateTodoStatus);
   const checkDeadlinesAndNotify = useMutation(api.todos.checkDeadlinesAndNotify);
-  const { toast } = useToast();
 
   useEffect(() => {
     checkDeadlinesAndNotify();
   }, [checkDeadlinesAndNotify]);
 
+  // Sensors with activationConstraint: prevents click events on cards from
+  // being swallowed as drag-starts. Drag only activates after the pointer
+  // moves 8px (mouse) or after a 200ms long-press without moving (touch).
   const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor),
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
     useSensor(KeyboardSensor)
   );
 
@@ -581,13 +546,8 @@ export const KanbanProvider = <
         newData = arrayMove(newData, activeIndex, overIndex);
 
         onDataChange?.(newData);
-
-        onDataChange?.(newData);
-
-        // toast removed
       } catch (error) {
         console.error("Failed to update task status:", error);
-        // toast removed
       }
     }
 

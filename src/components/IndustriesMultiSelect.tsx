@@ -134,20 +134,28 @@ export function IndustriesMultiSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between"
+            className="w-full justify-between min-w-0"
           >
-            {displayValue}
+            <span className="truncate text-left flex-1 min-w-0">{displayValue}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <PopoverContent
+          className="w-[var(--radix-popover-trigger-width)] p-0 flex flex-col h-[min(50dvh,420px)] overflow-hidden"
+          align="start"
+          side="bottom"
+          sideOffset={4}
+          collisionPadding={16}
+          avoidCollisions={false}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <Command>
             <CommandInput
               placeholder="Search industries..."
               value={searchValue}
               onValueChange={setSearchValue}
             />
-            <CommandList>
+            <CommandList className="flex-1 overflow-y-auto max-h-none">
               <CommandEmpty>No industries found.</CommandEmpty>
               {filteredIndustries.map(group => (
                 <CommandGroup key={group.group} heading={group.group} className="hidden md:block">
@@ -174,9 +182,6 @@ export function IndustriesMultiSelect({
                             readOnly
                           />
                           {item.label}
-                          {selectedIndustries.includes(item.value) && (
-                            <Check className="ml-auto h-4 w-4 opacity-50" />
-                          )}
                         </>
                       )}
                     </CommandItem>
@@ -211,9 +216,6 @@ export function IndustriesMultiSelect({
                               readOnly
                             />
                             {item.label}
-                            {selectedIndustries.includes(item.value) && (
-                              <Check className="ml-auto h-4 w-4 opacity-50" />
-                            )}
                           </>
                         )}
                       </CommandItem>
@@ -229,21 +231,36 @@ export function IndustriesMultiSelect({
       {/* Selected Industries Badges */}
       {selectedIndustries.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {selectedIndustries.map((industry) => (
-            <Badge key={industry} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
-              {industry}
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleSelect(industry);
-                }}
-                className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors focus:outline-none"
+          {selectedIndustries.map((industry) => {
+            const isMandatory = mandatoryIndustries.includes(industry);
+            return (
+              <Badge
+                key={industry}
+                variant="secondary"
+                className="pl-2 pr-1 py-1 flex items-center gap-1 max-w-full"
               >
-                <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                <span className="sr-only">Remove {industry}</span>
-              </button>
-            </Badge>
-          ))}
+                <span className="truncate">{industry}</span>
+                {!isMandatory && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSelect(industry);
+                    }}
+                    onMouseDown={(e) => {
+                      // Prevent badge from absorbing the click before button receives it.
+                      e.stopPropagation();
+                    }}
+                    className="ml-1 shrink-0 hover:bg-destructive/20 rounded-full p-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 cursor-pointer"
+                    aria-label={`Remove ${industry}`}
+                  >
+                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive pointer-events-none" />
+                  </button>
+                )}
+              </Badge>
+            );
+          })}
         </div>
       )}
     </div>

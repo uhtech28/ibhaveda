@@ -11,6 +11,7 @@ import { IdeaForgeExperience } from "@/components/ideaforge/experience";
 import { IdeaForgeIdea } from "@/components/ideaforge/shared";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MessageCircle } from "lucide-react";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useToast } from "@/components/ui/use-toast";
@@ -82,17 +83,43 @@ export default function FeedPage() {
       />
 
       <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
-        <DialogContent className="h-[85vh] max-w-[600px] border-white/10 bg-[#111827] p-4 text-white sm:p-6">
-          <div className="mb-4">
-            <DialogTitle className="text-xl font-semibold">Comments</DialogTitle>
-            <p className="text-sm text-[#9CA3AF]">{activeCommentIdea?.title}</p>
+        <DialogContent
+          className="
+            grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
+            w-full max-w-[640px]
+            h-[100dvh] max-h-[100dvh] rounded-none
+            sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
+          "
+        >
+          {/* Header */}
+          <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
+              <MessageCircle className="h-4.5 w-4.5 text-[#C7D2FE]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="flex items-center gap-2 text-base font-semibold leading-tight text-white">
+                <span>Comments</span>
+                {activeCommentIdea && (
+                  <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-[#9CA3AF]">
+                    {activeCommentIdea.commentCount ?? 0}
+                  </span>
+                )}
+              </DialogTitle>
+              <p className="mt-0.5 truncate text-xs text-[#9CA3AF]">
+                on <span className="text-[#E5E7EB]">{activeCommentIdea?.title}</span>
+              </p>
+            </div>
+          </header>
+
+          {/* Body — min-h-0 lets it shrink when keyboard appears */}
+          <div className="min-h-0 px-5 py-4 overflow-hidden">
+            {activeCommentIdea && (
+              <CommentsSection
+                ideaId={activeCommentIdea._id as Id<"ideas">}
+                commentCount={activeCommentIdea.commentCount || 0}
+              />
+            )}
           </div>
-          {activeCommentIdea && (
-            <CommentsSection
-              ideaId={activeCommentIdea._id as Id<"ideas">}
-              commentCount={activeCommentIdea.commentCount || 0}
-            />
-          )}
         </DialogContent>
       </Dialog>
 

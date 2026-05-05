@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { ChevronsUpDown, X } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -97,20 +97,30 @@ export function SkillsMultiSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between"
+            className="w-full justify-between min-w-0"
           >
-            {selectedSkills.length > 0 ? `${selectedSkills.length} selected` : placeholder}
+            <span className="truncate text-left flex-1 min-w-0">
+              {selectedSkills.length > 0 ? `${selectedSkills.length} selected` : placeholder}
+            </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <PopoverContent
+          className="w-[var(--radix-popover-trigger-width)] p-0 flex flex-col h-[min(50dvh,420px)] overflow-hidden"
+          align="start"
+          side="bottom"
+          sideOffset={4}
+          collisionPadding={16}
+          avoidCollisions={false}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <Command>
             <CommandInput
               placeholder="Search skills..."
               value={searchValue}
               onValueChange={setSearchValue}
             />
-            <CommandList>
+            <CommandList className="flex-1 overflow-y-auto max-h-none">
               <CommandEmpty>No skills found.</CommandEmpty>
               {filteredSkills.map(group => (
                 <CommandGroup key={group.group} heading={group.group} className="hidden md:block">
@@ -128,9 +138,6 @@ export function SkillsMultiSelect({
                         readOnly
                       />
                       {item.label}
-                      {selectedSkills.includes(item.value) && (
-                        <Check className="ml-auto h-4 w-4 opacity-50" />
-                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -154,9 +161,6 @@ export function SkillsMultiSelect({
                           readOnly
                         />
                         {item.label}
-                        {selectedSkills.includes(item.value) && (
-                          <Check className="ml-auto h-4 w-4 opacity-50" />
-                        )}
                       </CommandItem>
                     ))
                   )}

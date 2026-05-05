@@ -8,15 +8,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Lightbulb, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle } from "lucide-react"
 import { ProfileStatsDialog } from "./ProfileStatsDialog";
+import { ProfileProgress } from "./ProfileProgress";
 import { Id } from "@convex/_generated/dataModel";
-import { RequestStatusCard, ContributionRequest } from "@/components/requests/request-status-card"
+import { ContributionRequest } from "@/components/requests/request-status-card"
 import { useChat } from "@/components/chat/ChatContext";
 import { InvitationButton } from "@/components/requests/invitation-button";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Flame, Star, Trophy } from "lucide-react";
-import { LevelBadge } from "@/components/levels/level-badge";
-import { BadgeGrid } from "@/components/badges/badge-grid";
 import Link from "next/link";
 
 export interface UserProfile {
@@ -105,10 +103,6 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
     }
   };
 
-  const userWallet = useQuery(api.gamification.getUserWallet, { userId: profile._id as Id<"users"> });
-  const userStreak = useQuery(api.gamification.getUserStreak, { userId: profile._id as Id<"users"> });
-  const levelInfo = useQuery(api.gamification.getLevelProgress, { xp: profile.xp || 0 });
-
   const metrics = {
     ideasCreated: profile.ideasCreated || 0,
     ideasSparked: profile.ideasSparked || 0,
@@ -195,23 +189,38 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                   )}
                 </div>
 
-                {/* Skills & Industries */}
+                {/* Skills & Industries — clickable, navigates to a filtered community page */}
                 <div className="pt-1.5 space-y-2">
                   {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
                     <div className="flex flex-wrap gap-1.5">
                       {profile.industry && (
-                        <Badge variant="outline" className="rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20">
-                          {profile.industry}
-                        </Badge>
+                        <Link
+                          href={`/community?q=${encodeURIComponent(profile.industry)}`}
+                          aria-label={`Browse community filtered by ${profile.industry}`}
+                          title={`See others in ${profile.industry}`}
+                        >
+                          <Badge
+                            variant="outline"
+                            className="cursor-pointer rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40 transition-colors"
+                          >
+                            {profile.industry}
+                          </Badge>
+                        </Link>
                       )}
                       {profile.skills && profile.skills.slice(0, 5).map((skill, index) => (
-                        <Badge
+                        <Link
                           key={index}
-                          variant="outline"
-                          className="rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20"
+                          href={`/community?q=${encodeURIComponent(skill)}`}
+                          aria-label={`Browse community filtered by ${skill}`}
+                          title={`See others with skill: ${skill}`}
                         >
-                          {skill}
-                        </Badge>
+                          <Badge
+                            variant="outline"
+                            className="cursor-pointer rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 hover:border-blue-500/40 transition-colors"
+                          >
+                            {skill}
+                          </Badge>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -219,36 +228,8 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                   {/* V2 Skill Mastery */}
                   <SkillMasteryList userId={profile._id} />
 
-                  {/* Gamification Stats */}
-                  <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-border/40">
-                    <div className="flex items-center gap-2" title="Current Level">
-                      <div className="p-1.5 bg-primary/10 rounded-md">
-                        <Trophy className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold leading-none">Level {levelInfo?.level || profile.level || 1}</span>
-                        <span className="text-[10px] text-muted-foreground">{profile.xp || 0} XP</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2" title="Total Points">
-                      <div className="p-1.5 bg-yellow-500/10 rounded-md">
-                        <Star className="w-4 h-4 text-yellow-500" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold leading-none">{userWallet?.balance || 0}</span>
-                        <span className="text-[10px] text-muted-foreground">Points</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2" title="Current Login Streak">
-                      <div className="p-1.5 bg-orange-500/10 rounded-md">
-                        <Flame className="w-4 h-4 text-orange-500" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold leading-none">{userStreak?.currentStreak || 0}</span>
-                        <span className="text-[10px] text-muted-foreground">Day Streak</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Level / Points / Day Streak progress bars */}
+                  <ProfileProgress userId={profile._id} />
                 </div>
               </div>
             </div>
@@ -312,77 +293,37 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
           </Card>
         </div>
 
-        {/* 1.5 Badges (Span 2) */}
-        {/* Removed Gamification BadgeList */}
-
-        {/* Venture System Integration */}
-        <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          <LevelBadge userId={profile._id} />
-          <BadgeGrid userId={profile._id} />
-        </div>
-
       </div>
 
-      {/* Contribution Requests (Only visible to owner) */}
+      {/* Contribution Requests (Only visible to owner) — single button to dedicated page */}
       {isOwner && (
-        <div className="mt-16 pt-8 border-t">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">Contribution Requests</h2>
-            <Link href="/profile/contribution-requests">
-              <Button variant="outline" size="sm" className="gap-2">
-                Manage Requests
-              </Button>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Outgoing Requests */}
-            {myRequests && myRequests.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">My Requests</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {myRequests.slice(0, 3).map((request) => (
-                      <RequestStatusCard key={request._id} request={request} />
-                    ))}
-                    {myRequests.length > 3 && (
-                      <Button variant="link" className="w-full text-xs">View all {myRequests.length} requests</Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Incoming Requests */}
-            {incomingRequests && incomingRequests.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Incoming Requests</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {incomingRequests.slice(0, 3).map((request) => (
-                      <div key={request._id} className="border rounded-lg p-3 bg-muted/20 text-sm">
-                        <p className="font-medium truncate">{request.idea?.title || "Idea"}</p>
-                        <p className="text-muted-foreground truncate">{request.message}</p>
-                      </div>
-                    ))}
-                    {incomingRequests.length > 3 && (
-                      <Button variant="link" className="w-full text-xs">View all {incomingRequests.length} incoming</Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {(!myRequests?.length && !incomingRequests?.length) && (
-              <div className="col-span-full text-center py-8 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
-                No active contribution requests.
-              </div>
-            )}
-          </div>
+        <div className="mt-6 pt-6 border-t lg:mt-10 lg:pt-8">
+          <Link
+            href="/profile/contribution-requests"
+            className="block max-w-md"
+            aria-label="Open contribution requests"
+          >
+            <Button
+              type="button"
+              variant="outline"
+              className="h-14 w-full justify-between gap-3 rounded-xl px-4"
+            >
+              <span className="flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Users className="h-4 w-4" />
+                </span>
+                <span className="flex flex-col items-start leading-tight">
+                  <span className="text-sm font-semibold">Contribution Requests</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {(myRequests?.length || 0) + (incomingRequests?.length || 0) > 0
+                      ? `${(myRequests?.length || 0) + (incomingRequests?.length || 0)} active — Manage Requests`
+                      : "No active requests — Manage Requests"}
+                  </span>
+                </span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </Link>
         </div>
       )}
 

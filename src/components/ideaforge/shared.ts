@@ -14,9 +14,8 @@ export const feedTabs = [
   { key: "following", label: "Following" },
 ] as const;
 export const myIdeaTabs = [
-  { key: "ideas", label: "My Ideas" },
-  { key: "saved", label: "Saved" },
-  { key: "drafts", label: "Drafts" },
+  { key: "public", label: "Public" },
+  { key: "private", label: "Private" },
   { key: "analytics", label: "Analytics" },
 ] as const;
 

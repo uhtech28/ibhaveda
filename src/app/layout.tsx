@@ -30,7 +30,7 @@ const monoFont = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InteractiveIdeas - Share & Cultivate Brilliant Ideas",
+  title: "Interactive Ideas - Share & Cultivate Brilliant Ideas",
   description: "Connect with like-minded creators, share your brilliant ideas, get valuable feedback, and collaborate on groundbreaking projects in our innovative community.",
   keywords: "ideas, innovation, collaboration, creativity, community, startup, prototyping",
   icons: {
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     apple: '/logo.png',
   },
   openGraph: {
-    title: "InteractiveIdeas - Where Brilliant Ideas Come to Life",
+    title: "Interactive Ideas - Where Brilliant Ideas Come to Life",
     description: "Join thousands of creators sharing ideas, finding collaborators, and building the future together.",
     type: "website",
     url: "/",

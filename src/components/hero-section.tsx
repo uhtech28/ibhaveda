@@ -1,35 +1,15 @@
 import React from 'react'
-import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { TextEffect } from '@/components/ui/text-effect'
-import { AnimatedGroup } from '@/components/ui/animated-group'
 // HeroHeader import removed or unused
-import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/nextjs'
-
-const transitionVariants = {
-    hidden: {
-        opacity: 0,
-        filter: 'blur(12px)',
-        y: 12,
-    },
-    visible: {
-        opacity: 1,
-        filter: 'blur(0px)',
-        y: 0,
-        transition: {
-            type: 'spring' as const,
-            bounce: 0.3,
-            duration: 1.5,
-        },
-    },
-}
+import { SignedOut, SignInButton, SignUpButton } from '@clerk/nextjs'
 
 export default function HeroSection() {
     return (
         <>
             {/* HeroHeader removed */}
-            <main className="overflow-hidden">
+            {/* Desktop top-right Login bar lives in app/page.tsx via <LandingTopBar />. */}
+            <main className="overflow-hidden relative">
                 <div
                     aria-hidden
                     className="absolute inset-0 isolate hidden opacity-65 contain-strict lg:block">
@@ -43,29 +23,28 @@ export default function HeroSection() {
                         <div className="absolute inset-0 -z-10 size-full [background:radial-gradient(125%_125%_at_50%_100%,transparent_0%,var(--color-background)_75%)]"></div>
                         <div className="mx-auto max-w-7xl px-6">
                             <div className="text-center sm:mx-auto lg:mr-auto lg:mt-0">
-                                {/* AnimatedGroup with link removed */}
-
-                                <div className="mt-8 flex items-center justify-center gap-4">
+                                {/* Mobile-only Login/Sign-up — desktop uses the top-right bar above. */}
+                                <div className="mt-8 flex items-center justify-center gap-4 lg:hidden">
                                     <SignedOut>
-                                        <SignInButton mode="modal">
+                                        <SignInButton
+                                            mode="modal"
+                                            forceRedirectUrl="/feed"
+                                            fallbackRedirectUrl="/feed"
+                                        >
                                             <Button variant="outline" size="sm">
                                                 Login
                                             </Button>
                                         </SignInButton>
-                                        <SignUpButton mode="modal">
+                                        <SignUpButton
+                                            mode="modal"
+                                            forceRedirectUrl="/profile-setup"
+                                            fallbackRedirectUrl="/profile-setup"
+                                        >
                                             <Button size="sm">
                                                 Sign Up
                                             </Button>
                                         </SignUpButton>
                                     </SignedOut>
-                                    <SignedIn>
-                                        <Button asChild size="sm">
-                                            <Link href="/feed">
-                                                Go to Feed
-                                                <ArrowRight className="ml-2 size-4" />
-                                            </Link>
-                                        </Button>
-                                    </SignedIn>
                                 </div>
 
                                 <TextEffect
@@ -85,31 +64,6 @@ export default function HeroSection() {
                                     Connect with like-minded creators, share your brilliant ideas, get valuable feedback, and collaborate on groundbreaking projects.
                                 </TextEffect>
 
-                                <AnimatedGroup
-                                    variants={{
-                                        container: {
-                                            visible: {
-                                                transition: {
-                                                    staggerChildren: 0.05,
-                                                    delayChildren: 0.75,
-                                                },
-                                            },
-                                        },
-                                        item: transitionVariants,
-                                    }}
-                                    className="mt-12 flex flex-col items-center justify-center gap-2 md:flex-row">
-                                    <div
-                                        className="bg-foreground/10 rounded-[calc(var(--radius-xl)+0.125rem)] border p-0.5">
-                                        <Button
-                                            asChild
-                                            size="lg"
-                                            className="rounded-xl px-8 text-lg h-12 bg-primary hover:bg-primary/90">
-                                            <Link href="/sign-up?return_to=/profile-setup">
-                                                <span className="text-nowrap">Get Started — It's Free</span>
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                </AnimatedGroup>
                             </div>
                         </div>
 

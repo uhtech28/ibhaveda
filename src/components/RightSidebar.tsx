@@ -125,27 +125,6 @@ export function RightSidebar({
             </TooltipContent>
           </Tooltip>
 
-          {/* Theme Toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="rounded-xl w-10 h-10 hover:bg-primary/10 hover:text-primary transition-all duration-200"
-                onClick={toggleTheme}
-              >
-                {theme === "dark" ? (
-                  <Moon className="w-5 h-5" />
-                ) : (
-                  <Sun className="w-5 h-5" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="mr-2">
-              <p>Toggle Theme</p>
-            </TooltipContent>
-          </Tooltip>
-
         </TooltipProvider>
     </div>
   );

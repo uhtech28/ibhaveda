@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
-import { Sparkles, MessageCircle, UserPlus, Bell, X, Medal } from "lucide-react"
+import { Sparkles, MessageCircle, UserPlus, Bell, X, Medal, Check, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
@@ -85,15 +85,75 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
     }
   }
 
+  const isPendingInvitation = notification.type === 'invitation_received'
+
+  // Real Convex hooks for accept/reject — only fetched/used for invitation rows.
+  const myInvitations = useQuery(
+    api.invitations.getMyInvitations,
+    isPendingInvitation ? {} : "skip"
+  )
+  const acceptInvitationMutation = useMutation(api.invitations.acceptInvitation)
+  const rejectInvitationMutation = useMutation(api.invitations.rejectInvitation)
+  const [respondingState, setRespondingState] = useState<'idle' | 'accepting' | 'rejecting'>('idle')
+  const [respondError, setRespondError] = useState<string | null>(null)
+
+  // Match the notification's relatedId (the idea id) to a pending invitation.
+  const matchedInvitation = isPendingInvitation && Array.isArray(myInvitations)
+    ? myInvitations.find((inv: any) => inv.ideaId === notification.relatedId)
+    : null
+
+  const handleAccept = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!matchedInvitation || respondingState !== 'idle') return
+    setRespondingState('accepting')
+    setRespondError(null)
+    try {
+      await acceptInvitationMutation({ invitationId: matchedInvitation._id })
+      onMarkAsRead(notification._id)
+      onDismiss(notification._id)
+    } catch (err) {
+      setRespondError(err instanceof Error ? err.message : 'Failed to accept invitation')
+      setRespondingState('idle')
+    }
+  }
+
+  const handleReject = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!matchedInvitation || respondingState !== 'idle') return
+    setRespondingState('rejecting')
+    setRespondError(null)
+    try {
+      await rejectInvitationMutation({ invitationId: matchedInvitation._id })
+      onMarkAsRead(notification._id)
+      onDismiss(notification._id)
+    } catch (err) {
+      setRespondError(err instanceof Error ? err.message : 'Failed to decline invitation')
+      setRespondingState('idle')
+    }
+  }
+
   const handleClick = async () => {
     if (!notification.isRead) {
       onMarkAsRead(notification._id)
     }
-    // Handle navigation to related item if needed
+    // Pending invitations stay on this page so the inline ✓/✗ buttons can do
+    // their job. For everything else, drill into the idea or sender profile.
+    if (isPendingInvitation) return
     if (notification.relatedId) {
-      if (['new_idea', 'spark_received', 'comment_received', 'contribution_request_received'].includes(notification.type)) {
-        window.location.href = `/idea/${notification.relatedId}`
-      } else if (['invitation_received', 'invitation_accepted', 'invitation_rejected'].includes(notification.type)) {
+      // Anything tied to an idea — sparks, comments, contribution requests
+      // (received/accepted/rejected) and invitation responses — drills into
+      // that idea's page.
+      const ideaTypes = [
+        'new_idea',
+        'spark_received',
+        'comment_received',
+        'contribution_request_received',
+        'contribution_request_accepted',
+        'contribution_request_rejected',
+        'invitation_accepted',
+        'invitation_rejected',
+      ];
+      if (ideaTypes.includes(notification.type)) {
         window.location.href = `/idea/${notification.relatedId}`
       } else if (notification.type === 'badge_awarded') {
         const username = notification.sender?.username;
@@ -104,7 +164,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
 
   return (
     <div
-      className={`p-3 sm:p-4 cursor-pointer hover:bg-muted/50 transition-colors w-full relative group ${!notification.isRead ? 'bg-blue-50/50 dark:bg-blue-950/10' : ''
+      className={`p-3 sm:p-4 ${isPendingInvitation ? '' : 'cursor-pointer'} hover:bg-muted/50 transition-colors w-full relative group ${!notification.isRead ? 'bg-blue-50/50 dark:bg-blue-950/10' : ''
         }`}
       onClick={handleClick}
     >
@@ -134,10 +194,46 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
             </span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-5 font-normal ${getNotificationBadgeColor(notification.type)}`}>
-              {notification.type.replace(/_/g, ' ')}
-            </Badge>
+          <div className="flex items-center justify-between gap-2">
+            {isPendingInvitation && matchedInvitation ? (
+              // Inline accept / reject — replaces the "invitation received" badge
+              // and the previous browser-confirm flow. Tick = green, cross = red.
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAccept}
+                  disabled={respondingState !== 'idle'}
+                  aria-label="Accept invitation"
+                  title="Accept"
+                  className="h-7 px-2.5 gap-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30"
+                >
+                  {respondingState === 'accepting'
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <Check className="h-3.5 w-3.5" />}
+                  <span className="text-xs">Accept</span>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleReject}
+                  disabled={respondingState !== 'idle'}
+                  aria-label="Decline invitation"
+                  title="Decline"
+                  className="h-7 px-2.5 gap-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/25"
+                >
+                  {respondingState === 'rejecting'
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <X className="h-3.5 w-3.5" />}
+                  <span className="text-xs">Decline</span>
+                </Button>
+              </div>
+            ) : (
+              <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-5 font-normal ${getNotificationBadgeColor(notification.type)}`}>
+                {notification.type.replace(/_/g, ' ')}
+              </Badge>
+            )}
 
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               {!notification.isRead && (
@@ -156,6 +252,10 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
               </Button>
             </div>
           </div>
+
+          {respondError && (
+            <p className="text-[11px] text-red-400 mt-1">{respondError}</p>
+          )}
         </div>
       </div>
       {!notification.isRead && (
@@ -210,7 +310,7 @@ export const NotificationList = () => {
   if (notifications.length === 0) {
     return (
       <div className="flex flex-col h-full bg-background">
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background sticky top-0 z-10">
           <h3 className="font-semibold text-sm">Notifications</h3>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">

@@ -788,6 +788,33 @@ async function awardPoints(
       titlePoints: (userLevel.titlePoints || 0) + amount,
       updatedAt: now,
     })
+  } else {
+    // Auto-create the userLevels record on the user's first point award so
+    // every new user starts accumulating titlePoints from their first action.
+    await ctx.db.insert("userLevels", {
+      userId,
+      currentLevel: 1,
+      titlePoints: amount,
+      totalPoints: amount,
+      goldCheckpoints: 0,
+      fullLifecycles: 0,
+      helpfulFlareResponses: 0,
+      flaresResolved: 0,
+      menteesCount: 0,
+      menteeCheckpointAdvances: 0,
+      menteeLevelAchievements: 0,
+      ideasLaunched: 0,
+      ideasScaled: 0,
+      collaboratorsRecruited: 0,
+      collaboratorsJoined: 0,
+      commentsCount: 0,
+      upvotedCommentsCount: 0,
+      ideasCreated: 0,
+      ideasWithStage6: 0,
+      ideasWithStage8: 0,
+      activeIdeaTypes: [],
+      updatedAt: now,
+    })
   }
 }
 

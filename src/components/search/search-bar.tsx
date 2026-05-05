@@ -276,11 +276,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </div>
       </form>
 
-      {/* Suggestions Dropdown */}
-      {(showSearchResults || (showSuggestions && popularSuggestions.length > 0)) && (
+      {/* Suggestions Dropdown — show search results on all sizes; show trending only on desktop */}
+      {(showSearchResults || (showSuggestions && popularSuggestions.length > 0 && !showSearchResults)) && (
         <div
           ref={suggestionsRef}
-          className="fixed top-14 left-2 right-2 lg:absolute lg:top-full lg:left-0 lg:right-0 z-50 bg-background border lg:border-t-0 rounded-md lg:rounded-t-none lg:rounded-b-md shadow-xl lg:shadow-lg max-h-[80vh] lg:max-h-96 overflow-y-auto"
+          className={cn(
+            "fixed left-2 right-2 lg:absolute lg:left-0 lg:right-0 z-40 bg-background border rounded-md shadow-xl lg:shadow-lg max-h-[70vh] lg:max-h-96 overflow-y-auto",
+            "top-[80px] lg:top-full lg:border-t-0 lg:rounded-t-none lg:rounded-b-md",
+            !showSearchResults && "hidden lg:block"
+          )}
           role="listbox"
         >
           {/* Show search results when query is active */}

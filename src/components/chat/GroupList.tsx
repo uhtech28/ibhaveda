@@ -10,31 +10,36 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { useChat } from "./ChatContext";
 import { formatDistanceToNow } from "date-fns";
 import { CreateGroupDialog } from "./CreateGroupDialog";
+import { NewDirectMessagePanel } from "./NewDirectMessageDialog";
 
 interface GroupListProps {
   onSelectGroup?: (conversationId: Id<"conversations"> | undefined, ideaId: Id<"ideas">) => void;
   onClose: () => void;
-  ideaId?: Id<"ideas">; // Optional: If strictly in context of one idea
+  ideaId?: Id<"ideas">;
 }
 
-
-
-const GroupList: React.FC<GroupListProps> = memo(({
-  onClose,
-}) => {
+const GroupList: React.FC<GroupListProps> = memo(({ onClose }) => {
   const communities = useQuery(api.communities.getUserCommunities);
   const directConversations = useQuery(api.chat.getUserConversations);
   const { openChatWithUser, openGroupChat, selectedIdeaId } = useChat();
   const [showCreateGroup, setShowCreateGroup] = React.useState(false);
+  const [showNewDM, setShowNewDM] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<"communities" | "direct">("communities");
 
-  // We need to know if the user can create groups for the CURRENTLY selected idea (if any)
-  // Or simpler: We allow creating groups for any idea where they are a contributor.
-  // BUT the UI for that would be complex (dropdown of ideas?)
-  // Let's stick to: If we are viewing a specific Idea page (passed via props or context), show the button.
-  // `selectedIdeaId` from context might be enough if it's set.
-
-  const canCreateGroup = !!selectedIdeaId; // Ideally we check permissions, but backend enforces it.
-
+  // When showing the new-DM panel, render it INSTEAD of the list. This
+  // avoids any z-index conflicts with the chat sheet (which sits at z-[60]).
+  if (showNewDM) {
+    return (
+      <NewDirectMessagePanel
+        onBack={() => setShowNewDM(false)}
+        onClose={onClose}
+        onSelectUser={(userId) => {
+          // openChatWithUser will swap the chat sheet over to ChatThread.
+          openChatWithUser(userId);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="w-full h-full bg-background flex flex-col">
@@ -48,14 +53,17 @@ const GroupList: React.FC<GroupListProps> = memo(({
         </Button>
       </div>
 
-      <Tabs defaultValue="communities" className="flex-1 flex flex-col min-h-0">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "communities" | "direct")}
+        className="flex-1 flex flex-col min-h-0"
+      >
         <div className="px-3 pt-2 shrink-0 space-y-2">
           <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="communities">Communities</TabsTrigger>
             <TabsTrigger value="direct">Direct</TabsTrigger>
           </TabsList>
 
-          {/* Create Group Button (only visible if an Idea is selected contextually - NOT NEEDED HERE) */}
           {false && (
             <Button
               variant="outline"
@@ -90,7 +98,6 @@ const GroupList: React.FC<GroupListProps> = memo(({
                     className="w-full flex items-center gap-3 p-3 h-auto justify-start hover:bg-accent/50 transition-all duration-200 group relative overflow-hidden"
                     onClick={() => openGroupChat(community._id)}
                   >
-                    {/* Gradient Avatar */}
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm group-hover:shadow-md transition-all text-white font-bold text-lg">
                       {community.name.charAt(0).toUpperCase()}
                     </div>
@@ -112,9 +119,9 @@ const GroupList: React.FC<GroupListProps> = memo(({
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="direct" className="flex-1 min-h-0 mt-0">
+        <TabsContent value="direct" className="flex-1 min-h-0 mt-0 relative">
           <ScrollArea className="h-full w-full">
-            <div className="px-2 pb-2 space-y-1">
+            <div className="px-2 pb-20 space-y-1">
               {directConversations === undefined ? (
                 <div className="text-center text-muted-foreground py-4 text-xs">Loading messages...</div>
               ) : directConversations.length === 0 ? (
@@ -123,7 +130,7 @@ const GroupList: React.FC<GroupListProps> = memo(({
                     <MessageSquare className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <p>No direct messages.</p>
-                  <p className="text-xs mt-1 opacity-70">Start a conversation from the community page!</p>
+                  <p className="text-xs mt-1 opacity-70">Tap the + button below to find people and start chatting.</p>
                 </div>
               ) : (
                 directConversations.map((convo) => (
@@ -162,20 +169,33 @@ const GroupList: React.FC<GroupListProps> = memo(({
               )}
             </div>
           </ScrollArea>
+
+          {/* Floating + button — opens the inline new-DM panel. */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowNewDM(true);
+            }}
+            aria-label="New direct message"
+            title="New direct message"
+            className="absolute bottom-4 right-4 z-10 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-black/10 hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
         </TabsContent>
       </Tabs>
 
-      {
-        selectedIdeaId && (
-          <CreateGroupDialog
-            isOpen={showCreateGroup}
-            onClose={() => setShowCreateGroup(false)}
-            ideaId={selectedIdeaId!}
-            onGroupCreated={(id) => openGroupChat(selectedIdeaId, id)}
-          />
-        )
-      }
-    </div >
+      {selectedIdeaId && (
+        <CreateGroupDialog
+          isOpen={showCreateGroup}
+          onClose={() => setShowCreateGroup(false)}
+          ideaId={selectedIdeaId!}
+          onGroupCreated={(id) => openGroupChat(selectedIdeaId, id)}
+        />
+      )}
+    </div>
   );
 });
 
