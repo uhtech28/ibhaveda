@@ -18,15 +18,15 @@ interface ContributionRequestModalProps {
   onClose: () => void;
 }
 
-export const ContributionRequestModal: React.FC<ContributionRequestModalProps> = ({
-  ideaId,
-  ideaTitle,
+export const ContributionRequestModal: React.FC<ContributionRequestModalProps> = ({ 
+  ideaId, 
+  ideaTitle, 
   authorName,
-  onClose,
+  onClose 
 }) => {
   const createRequestMutation = useMutation(api.contributionRequests.createContributionRequest);
   const userRequests = useQuery(api.contributionRequests.getMyRequests);
-
+  
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -34,7 +34,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
 
   useEffect(() => {
     if (userRequests) {
-      const request = userRequests.find((req) => req.ideaId === ideaId);
+      const request = userRequests.find(req => req.ideaId === ideaId);
       setExistingRequest(request || null);
     }
   }, [userRequests, ideaId]);
@@ -74,12 +74,11 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
 
   if (existingRequest) {
     const status = existingRequest.status;
-    const statusConfig =
-      {
-        pending: { color: "bg-yellow-100 text-yellow-800 border-yellow-300", icon: Clock },
-        accepted: { color: "bg-green-100 text-green-800 border-green-300", icon: CheckCircle2 },
-        rejected: { color: "bg-red-100 text-red-800 border-red-300", icon: XCircle },
-      }[status as "pending" | "accepted" | "rejected"] || { color: "bg-gray-100", icon: Clock };
+    const statusConfig = {
+      pending: { color: "bg-yellow-100 text-yellow-800 border-yellow-300", icon: Clock },
+      accepted: { color: "bg-green-100 text-green-800 border-green-300", icon: CheckCircle2 },
+      rejected: { color: "bg-red-100 text-red-800 border-red-300", icon: XCircle },
+    }[status as "pending" | "accepted" | "rejected"] || { color: "bg-gray-100", icon: Clock };
 
     const StatusIcon = statusConfig.icon;
 
@@ -93,32 +92,33 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className={`p-4 rounded-xl border ${statusConfig.color} flex items-center gap-3`}>
-            <StatusIcon className="w-5 h-5" />
-            <div className="flex-1">
-              <p className="font-semibold capitalize">{status}</p>
-              <p className="text-xs opacity-90">
-                {status === "pending" && "Waiting for author's response."}
-                {status === "accepted" && "You are now a contributor!"}
-                {status === "rejected" && "Your request was declined."}
-              </p>
+            <div className={`p-4 rounded-xl border ${statusConfig.color} flex items-center gap-3`}>
+                <StatusIcon className="w-5 h-5" />
+                <div className="flex-1">
+                    <p className="font-semibold capitalize">{status}</p>
+                    <p className="text-xs opacity-90">
+                        {status === 'pending' && "Waiting for author's response."}
+                        {status === 'accepted' && "You are now a contributor!"}
+                        {status === 'rejected' && "Your request was declined."}
+                    </p>
+                </div>
             </div>
-          </div>
 
-          <div className="bg-muted/30 p-4 rounded-xl border border-border/50">
-            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Your Message</p>
-            <p className="text-sm italic text-foreground/80">"{existingRequest.message}"</p>
-          </div>
+            <div className="bg-muted/30 p-4 rounded-xl border border-border/50">
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Your Message</p>
+                <p className="text-sm italic text-foreground/80">"{existingRequest.message}"</p>
+            </div>
         </div>
 
         <DialogFooter>
-          {status === "rejected" ? (
-            <div className="flex w-full justify-end gap-2">
-              <Button variant="outline" onClick={onClose}>Close</Button>
-            </div>
-          ) : (
-            <Button onClick={onClose} className="w-full sm:w-auto">Close</Button>
-          )}
+            {status === "rejected" ? (
+                <div className="flex w-full justify-end gap-2">
+                     <Button variant="outline" onClick={onClose}>Close</Button>
+                     {/* Allow resubmitting if rejected? Logic for that would need to be handled, maybe delete old request? For now just close. */}
+                </div>
+            ) : (
+                <Button onClick={onClose} className="w-full sm:w-auto">Close</Button>
+            )}
         </DialogFooter>
       </div>
     );
@@ -129,7 +129,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
       <DialogHeader>
         <DialogTitle>Request to Contribute</DialogTitle>
         <DialogDescription>
-          Let {authorName || "the author"} know how you'd like to help with "{ideaTitle}".
+          Let {authorName || 'the author'} know how you'd like to help with "{ideaTitle}".
         </DialogDescription>
       </DialogHeader>
 
@@ -149,13 +149,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
             required
           />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>
-              {error && (
-                <span className="rounded-md bg-destructive/10 px-2 py-1 text-destructive border border-destructive/20">
-                  {error}
-                </span>
-              )}
-            </span>
+            <span>{error && <span className="text-destructive">{error}</span>}</span>
             <span>{message.length}/1200</span>
           </div>
         </div>

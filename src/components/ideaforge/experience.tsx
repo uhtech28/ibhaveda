@@ -205,7 +205,10 @@ export function IdeaForgeExperience({
                       <h1 className={cn(displayFontClass, "text-2xl font-semibold text-white")}>My Ideas</h1>
                       <p className="text-sm text-[#9CA3AF]">Your posted ideas, drafts, and saved concepts.</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* Grid / List view toggle — desktop only.
+                     * On mobile users only need the Public/Private/Analytics
+                     * tabs below. */}
+                    <div className="hidden md:flex items-center gap-2">
                       <button type="button" onClick={() => setViewMode("grid")} className={cn(transitionBase, "rounded-[10px] p-2", viewMode === "grid" ? "bg-[#6366F1]/14 text-[#C7D2FE]" : "text-[#9CA3AF] hover:bg-white/[0.04] hover:text-white")} aria-label="Grid view">
                         <Grid2X2 className="h-4 w-4" />
                       </button>
@@ -214,9 +217,9 @@ export function IdeaForgeExperience({
                       </button>
                     </div>
                   </div>
-                  <div className="hidden lg:block">
-                    <FilterTabs tabs={myIdeaTabs} activeKey={myIdeasTab} onChange={setMyIdeasTab} />
-                  </div>
+                  {/* Public / Private / Analytics tabs — visible on every
+                   * viewport so mobile users can switch between them. */}
+                  <FilterTabs tabs={myIdeaTabs} activeKey={myIdeasTab} onChange={setMyIdeasTab} />
                 </>
               )}
 

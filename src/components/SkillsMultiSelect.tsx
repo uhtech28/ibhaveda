@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { ChevronsUpDown, X } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ const groupSkills = (skills: SkillOption[]) => {
   const groups: { [key: string]: SkillOption[] } = {};
 
   skills.forEach(skill => {
+    // Categorize skills based on their content
     let group = "Other";
 
     if (skill.label.includes("Engineering") || skill.label.includes("Mathematics") || skill.label.includes("Architecture")) {
@@ -80,7 +81,7 @@ export function SkillsMultiSelect({
   const handleSelect = (value: string) => {
     const newSelected = selectedSkills.includes(value)
       ? mandatorySkills.includes(value)
-        ? selectedSkills
+        ? selectedSkills // Cannot remove mandatory skills
         : selectedSkills.filter(skill => skill !== value)
       : maxSelection && selectedSkills.length >= maxSelection
         ? selectedSkills
@@ -105,12 +106,13 @@ export function SkillsMultiSelect({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[var(--radix-popover-trigger-width)] p-0 flex flex-col h-[min(60dvh,420px)] overflow-hidden"
+          className="w-[var(--radix-popover-trigger-width)] p-0 flex flex-col h-[min(50dvh,420px)] overflow-hidden"
           align="start"
           side="bottom"
           sideOffset={4}
           collisionPadding={16}
-          avoidCollisions
+          avoidCollisions={false}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <Command>
             <CommandInput

@@ -169,3 +169,4 @@ export function matchesSearch(idea: IdeaForgeIdea, searchQuery: string) {
 
   return haystack.includes(needle);
 }
+

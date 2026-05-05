@@ -23,16 +23,32 @@ const INTRO_FLAG = "ii.introSeen.v2";
  * browser; returning visitors skip straight to the landing page.
  *
  * Phase 1 — The Hook
+ *   Lightbulb glows in → "What if building your startup felt like
+ *   playing a video game?" → struck-through pain points → "Interactive
+ *   Ideas changes that." pill.
+ *
  * Phase 2 — Platform Interface & Idea Submission
+ *   Mock dashboard slides up (sidebar + profile + composer typing
+ *   "AI-Powered Study Planner").
+ *
  * Phase 3 — Collaborator Matchmaking
+ *   "Scanning for matches…" → three suggested collaborator cards →
+ *   "AI finds your dream team. You just connect."
+ *
  * Phase 4 — Venture Quest Map
- * Closing — Brand mark + tagline + stats + CTA
+ *   Horizontal 6-stage map (Village → Forest → Arena → Artisan's Quarter
+ *   → Mine → Harbour) with checkpoints lighting up.
+ *
+ * Closing
+ *   Brand mark + tagline + stats (76+ Builders · Free to Join · 8 Quest
+ *   Stages) + "Start Your Quest →" CTA, then fade out.
  */
 export default function LandingIntro() {
   const [active, setActive] = useState<boolean | null>(null);
   const [stage, setStage] = useState(0);
   const [closing, setClosing] = useState(false);
 
+  // Decide whether to play. Returning visitors skip entirely.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -42,27 +58,29 @@ export default function LandingIntro() {
     }
   }, []);
 
+  // Stage timeline (ms from mount). Tight enough to keep attention.
   useEffect(() => {
     if (!active) return;
     const t: { at: number; s: number }[] = [
-      { at: 200, s: 1 },
-      { at: 1200, s: 2 },
-      { at: 3800, s: 3 },
-      { at: 4600, s: 4 },
-      { at: 5400, s: 5 },
-      { at: 6200, s: 6 },
-      { at: 8800, s: 7 },
-      { at: 11200, s: 8 },
-      { at: 14400, s: 9 },
-      { at: 15600, s: 10 },
-      { at: 18800, s: 11 },
-      { at: 20800, s: 12 },
-      { at: 22400, s: 13 },
-      { at: 23400, s: 14 },
-      { at: 24400, s: 15 },
-      { at: 25600, s: 16 },
-      { at: 27600, s: 17 },
-      { at: 31600, s: 18 },
+      { at: 200, s: 1 }, // P1: bulb in
+      { at: 1200, s: 2 }, // P1: question in
+      { at: 3800, s: 3 }, // P1: problems appear
+      { at: 4600, s: 4 }, // P1: strike line 1
+      { at: 5400, s: 5 }, // P1: strike line 2
+      { at: 6200, s: 6 }, // P1: changes-that pill
+      { at: 8800, s: 7 }, // P2: dashboard reveal
+      { at: 11200, s: 8 }, // P2: composer focus + typing
+      { at: 14400, s: 9 }, // P3: scanning
+      { at: 15600, s: 10 }, // P3: collaborator cards
+      { at: 18800, s: 11 }, // P3: tagline
+      { at: 20800, s: 12 }, // P4: quest map
+      { at: 22400, s: 13 }, // P4: stage progress 1
+      { at: 23400, s: 14 }, // P4: stage progress 2
+      { at: 24400, s: 15 }, // P4: stage progress 3
+      { at: 25600, s: 16 }, // P4: tagline "Defeat monsters…"
+      { at: 27600, s: 17 }, // Closing — briefly visible
+      { at: 28200, s: 18 }, // Begin closing fade after ~600ms so users
+                            // don't get a chance to click a fake CTA
     ];
     const timers = t.map(({ at, s }) =>
       window.setTimeout(() => setStage(s), at)
@@ -94,6 +112,10 @@ export default function LandingIntro() {
 
   if (active !== true) return null;
 
+  // Match the body background (--color-background = #0A0D12) plus the
+  // top indigo radial glow already used elsewhere on the site, so the
+  // intro feels like a continuation of the landing page rather than a
+  // separate splash screen.
   const backdrop =
     "radial-gradient(60% 45% at 50% 28%, rgba(99,102,241,0.18), transparent 60%), radial-gradient(50% 40% at 78% 78%, rgba(139,92,246,0.10), transparent 65%), linear-gradient(180deg, #0A0D12 0%, #060810 100%)";
 
@@ -114,6 +136,7 @@ export default function LandingIntro() {
         color: "#F9FAFB",
       }}
     >
+      {/* Progress bar — bottom edge, tracks total runtime. */}
       <div
         aria-hidden
         style={{
@@ -129,13 +152,15 @@ export default function LandingIntro() {
           style={{
             height: "100%",
             width: "0%",
-            background: "linear-gradient(90deg, #6366F1 0%, #8B5CF6 50%, #A78BFA 100%)",
+            background:
+              "linear-gradient(90deg, #6366F1 0%, #8B5CF6 50%, #A78BFA 100%)",
             animation: "ii-progress 32s linear forwards",
             boxShadow: "0 0 12px rgba(99,102,241,0.6)",
           }}
         />
       </div>
 
+      {/* Skip */}
       <button
         type="button"
         onClick={skip}
@@ -143,6 +168,7 @@ export default function LandingIntro() {
           position: "absolute",
           top: 24,
           right: 24,
+          zIndex: 10,
           padding: "8px 16px",
           borderRadius: 9999,
           border: "1px solid rgba(255,255,255,0.10)",
@@ -158,6 +184,7 @@ export default function LandingIntro() {
         Skip intro →
       </button>
 
+      {/* Stage container — pointer-events:none so it never blocks the skip button */}
       <div
         style={{
           position: "absolute",
@@ -166,8 +193,10 @@ export default function LandingIntro() {
           alignItems: "center",
           justifyContent: "center",
           padding: "0 20px",
+          pointerEvents: "none",
         }}
       >
+        {/* === PHASE 1: HOOK === */}
         {stage < 7 && (
           <div
             style={{
@@ -183,17 +212,36 @@ export default function LandingIntro() {
               <>
                 <Bulb visible={stage >= 1} />
                 <Headline visible={stage >= 2}>
-                  <span style={{ color: "#F9FAFB" }}>What if building your startup</span>
+                  <span style={{ color: "#F9FAFB" }}>
+                    What if building your startup
+                  </span>
                   <br />
-                  <span style={GRADIENT_TEXT}>felt like playing a video game?</span>
+                  <span style={GRADIENT_TEXT}>
+                    felt like playing a video game?
+                  </span>
                 </Headline>
               </>
             )}
 
             {stage >= 3 && stage < 6 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: "center" }}>
-                <ProblemLine visible={stage >= 3} struck={stage >= 4} text="Traditional incubators? Gatekept." />
-                <ProblemLine visible={stage >= 3} struck={stage >= 5} text="Ideas stuck in group chats. Going nowhere." />
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                  alignItems: "center",
+                }}
+              >
+                <ProblemLine
+                  visible={stage >= 3}
+                  struck={stage >= 4}
+                  text="Traditional incubators? Gatekept."
+                />
+                <ProblemLine
+                  visible={stage >= 3}
+                  struck={stage >= 5}
+                  text="Ideas stuck in group chats. Going nowhere."
+                />
               </div>
             )}
 
@@ -206,17 +254,22 @@ export default function LandingIntro() {
                   padding: "16px 28px",
                   borderRadius: 14,
                   border: "1px solid rgba(99,102,241,0.45)",
-                  background: "linear-gradient(135deg, rgba(99,102,241,0.20), rgba(139,92,246,0.16))",
-                  boxShadow: "0 0 50px rgba(99,102,241,0.40), 0 0 120px rgba(99,102,241,0.18)",
+                  background:
+                    "linear-gradient(135deg, rgba(99,102,241,0.20), rgba(139,92,246,0.16))",
+                  boxShadow:
+                    "0 0 50px rgba(99,102,241,0.40), 0 0 120px rgba(99,102,241,0.18)",
                   animation: "ii-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1)",
                 }}
               >
-                <Sparkles style={{ width: 22, height: 22, color: "#C7D2FE" }} />
+                <Sparkles
+                  style={{ width: 22, height: 22, color: "#C7D2FE" }}
+                />
                 <span
                   style={{
                     fontWeight: 700,
                     fontSize: "clamp(20px, 3vw, 32px)",
-                    background: "linear-gradient(90deg, #C7D2FE, #DDD6FE 60%, #F0ABFC)",
+                    background:
+                      "linear-gradient(90deg, #C7D2FE, #DDD6FE 60%, #F0ABFC)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -230,14 +283,24 @@ export default function LandingIntro() {
           </div>
         )}
 
+        {/* === PHASE 2: PLATFORM INTERFACE === */}
         {stage >= 7 && stage < 9 && <PlatformMockup typing={stage >= 8} />}
 
+        {/* === PHASE 3: COLLABORATOR MATCHMAKING === */}
         {stage >= 9 && stage < 12 && (
-          <MatchmakingPanel scanning={stage === 9} showCards={stage >= 10} showTagline={stage >= 11} />
+          <MatchmakingPanel
+            scanning={stage === 9}
+            showCards={stage >= 10}
+            showTagline={stage >= 11}
+          />
         )}
 
-        {stage >= 12 && stage < 17 && <QuestMap completed={stage - 12} taglineVisible={stage >= 16} />}
+        {/* === PHASE 4: VENTURE QUEST MAP === */}
+        {stage >= 12 && stage < 17 && (
+          <QuestMap completed={stage - 12} taglineVisible={stage >= 16} />
+        )}
 
+        {/* === CLOSING === */}
         {stage >= 17 && <ClosingCard />}
       </div>
 
@@ -250,6 +313,10 @@ export default function LandingIntro() {
         @keyframes ii-fade-up {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes ii-fade-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
         @keyframes ii-bulb-pulse {
           0%, 100% { box-shadow: 0 0 50px rgba(99,102,241,0.45), 0 0 120px rgba(99,102,241,0.18); }
@@ -277,8 +344,13 @@ export default function LandingIntro() {
   );
 }
 
+/* =========================================================
+   Shared style objects
+   ========================================================= */
+
 const GRADIENT_TEXT: React.CSSProperties = {
-  background: "linear-gradient(90deg, #C7D2FE 0%, #DDD6FE 50%, #F0ABFC 100%)",
+  background:
+    "linear-gradient(90deg, #C7D2FE 0%, #DDD6FE 50%, #F0ABFC 100%)",
   WebkitBackgroundClip: "text",
   WebkitTextFillColor: "transparent",
   backgroundClip: "text",
@@ -292,6 +364,10 @@ const CARD_SURFACE: React.CSSProperties = {
   boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
 };
 
+/* =========================================================
+   Phase 1 helpers
+   ========================================================= */
+
 function Bulb({ visible }: { visible: boolean }) {
   return (
     <div
@@ -302,10 +378,12 @@ function Bulb({ visible }: { visible: boolean }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 60%, #A78BFA 100%)",
+        background:
+          "linear-gradient(135deg, #6366F1 0%, #8B5CF6 60%, #A78BFA 100%)",
         opacity: visible ? 1 : 0,
         transform: visible ? "scale(1)" : "scale(0.6)",
-        transition: "opacity 700ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        transition:
+          "opacity 700ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1)",
         animation: visible ? "ii-bulb-pulse 2400ms ease-in-out infinite" : undefined,
       }}
     >
@@ -314,7 +392,13 @@ function Bulb({ visible }: { visible: boolean }) {
   );
 }
 
-function Headline({ visible, children }: { visible: boolean; children: React.ReactNode }) {
+function Headline({
+  visible,
+  children,
+}: {
+  visible: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div
       style={{
@@ -333,7 +417,15 @@ function Headline({ visible, children }: { visible: boolean; children: React.Rea
   );
 }
 
-function ProblemLine({ visible, struck, text }: { visible: boolean; struck: boolean; text: string }) {
+function ProblemLine({
+  visible,
+  struck,
+  text,
+}: {
+  visible: boolean;
+  struck: boolean;
+  text: string;
+}) {
   return (
     <div
       style={{
@@ -344,7 +436,8 @@ function ProblemLine({ visible, struck, text }: { visible: boolean; struck: bool
         color: struck ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.92)",
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(10px)",
-        transition: "opacity 600ms ease, transform 600ms ease, color 500ms ease",
+        transition:
+          "opacity 600ms ease, transform 600ms ease, color 500ms ease",
       }}
     >
       <span>{text}</span>
@@ -356,7 +449,8 @@ function ProblemLine({ visible, struck, text }: { visible: boolean; struck: bool
           right: -4,
           top: "52%",
           height: 2,
-          background: "linear-gradient(90deg, rgba(248,113,113,0.0) 0%, #F87171 15%, #EC4899 50%, #F87171 85%, rgba(248,113,113,0.0) 100%)",
+          background:
+            "linear-gradient(90deg, rgba(248,113,113,0.0) 0%, #F87171 15%, #EC4899 50%, #F87171 85%, rgba(248,113,113,0.0) 100%)",
           borderRadius: 2,
           transform: struck ? "scaleX(1)" : "scaleX(0)",
           transformOrigin: "left center",
@@ -367,9 +461,24 @@ function ProblemLine({ visible, struck, text }: { visible: boolean; struck: bool
   );
 }
 
+/* =========================================================
+   Phase 2: Platform mock-up
+   ========================================================= */
+
 function PlatformMockup({ typing }: { typing: boolean }) {
   const TYPED = "AI-Powered Study Planner";
   const [chars, setChars] = useState(0);
+  // Collapse the sidebar on narrow screens so the mockup doesn't
+  // overflow horizontally or get cropped on phones.
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = window.matchMedia("(max-width: 640px)");
+    const sync = () => setIsNarrow(m.matches);
+    sync();
+    m.addEventListener?.("change", sync);
+    return () => m.removeEventListener?.("change", sync);
+  }, []);
   useEffect(() => {
     if (!typing) return;
     setChars(0);
@@ -389,12 +498,14 @@ function PlatformMockup({ typing }: { typing: boolean }) {
     <div
       style={{
         ...CARD_SURFACE,
-        width: "min(960px, 96vw)",
+        width: "min(960px, 94vw)",
+        maxHeight: "82dvh",
         padding: 0,
         overflow: "hidden",
         animation: "ii-fade-up 700ms cubic-bezier(0.4,0,0.2,1)",
       }}
     >
+      {/* Window chrome */}
       <div
         style={{
           padding: "10px 14px",
@@ -412,12 +523,19 @@ function PlatformMockup({ typing }: { typing: boolean }) {
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", minHeight: 380 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isNarrow ? "1fr" : "200px 1fr",
+          minHeight: isNarrow ? 280 : 380,
+        }}
+      >
+        {/* Sidebar — hidden on narrow screens to avoid cropping. */}
         <div
           style={{
+            display: isNarrow ? "none" : "flex",
             borderRight: "1px solid rgba(255,255,255,0.06)",
             padding: 16,
-            display: "flex",
             flexDirection: "column",
             gap: 14,
           }}
@@ -429,7 +547,8 @@ function PlatformMockup({ typing }: { typing: boolean }) {
               gap: 10,
               padding: "10px 12px",
               borderRadius: 12,
-              background: "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.12))",
+              background:
+                "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.12))",
               border: "1px solid rgba(99,102,241,0.28)",
             }}
           >
@@ -459,8 +578,11 @@ function PlatformMockup({ typing }: { typing: boolean }) {
           <SidebarItem label="Community" />
         </div>
 
+        {/* Composer */}
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Create New Idea</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+            Create New Idea
+          </div>
           <div
             style={{
               border: "1px solid rgba(99,102,241,0.45)",
@@ -470,7 +592,9 @@ function PlatformMockup({ typing }: { typing: boolean }) {
               boxShadow: "0 0 24px rgba(99,102,241,0.15)",
             }}
           >
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>Title</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
+              Title
+            </div>
             <div style={{ fontSize: 22, fontWeight: 700, minHeight: 32 }}>
               {typing ? TYPED.slice(0, chars) : ""}
               <span
@@ -485,7 +609,14 @@ function PlatformMockup({ typing }: { typing: boolean }) {
                 }}
               />
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 14,
+                flexWrap: "wrap",
+              }}
+            >
               {["Edtech", "AI", "Productivity"].map((t) => (
                 <span
                   key={t}
@@ -544,8 +675,21 @@ function SidebarItem({ label, active }: { label: string; active?: boolean }) {
 }
 
 function Dot({ color }: { color: string }) {
-  return <div style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />;
+  return (
+    <div
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: "50%",
+        background: color,
+      }}
+    />
+  );
 }
+
+/* =========================================================
+   Phase 3: Matchmaking
+   ========================================================= */
 
 const COLLABORATORS = [
   { name: "Riya Nair", role: "Chemical Engineer", initial: "R", color: "#6366F1" },
@@ -566,8 +710,10 @@ function MatchmakingPanel({
     <div
       style={{
         ...CARD_SURFACE,
-        width: "min(820px, 96vw)",
-        padding: 28,
+        width: "min(820px, 94vw)",
+        maxHeight: "82dvh",
+        overflow: "auto",
+        padding: "clamp(16px, 4vw, 28px)",
         animation: "ii-fade-up 700ms cubic-bezier(0.4,0,0.2,1)",
       }}
     >
@@ -585,6 +731,7 @@ function MatchmakingPanel({
         Scanning for matches…
       </div>
 
+      {/* Scan bar */}
       <div
         style={{
           height: 3,
@@ -599,8 +746,11 @@ function MatchmakingPanel({
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(90deg, transparent, #6366F1 50%, transparent)",
-            animation: scanning ? "ii-scan 1100ms ease-in-out infinite" : "ii-scan 1100ms ease-in-out 1",
+            background:
+              "linear-gradient(90deg, transparent, #6366F1 50%, transparent)",
+            animation: scanning
+              ? "ii-scan 1100ms ease-in-out infinite"
+              : "ii-scan 1100ms ease-in-out 1",
           }}
         />
       </div>
@@ -619,7 +769,8 @@ function MatchmakingPanel({
               padding: 14,
               borderRadius: 14,
               border: "1px solid rgba(255,255,255,0.08)",
-              background: "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
               opacity: showCards ? 1 : 0,
               transform: showCards ? "translateY(0)" : "translateY(10px)",
               transition: `opacity 500ms ${i * 150}ms ease, transform 500ms ${i * 150}ms ease`,
@@ -694,6 +845,10 @@ function MatchmakingPanel({
   );
 }
 
+/* =========================================================
+   Phase 4: Venture Quest Map
+   ========================================================= */
+
 const STAGES = [
   { name: "The Village", sub: "Ideation", icon: Castle },
   { name: "The Forest", sub: "Build the MVP", icon: Trees },
@@ -703,9 +858,35 @@ const STAGES = [
   { name: "The Harbour", sub: "Scaling", icon: Anchor },
 ];
 
-function QuestMap({ completed, taglineVisible }: { completed: number; taglineVisible: boolean }) {
+function QuestMap({
+  completed,
+  taglineVisible,
+}: {
+  completed: number;
+  taglineVisible: boolean;
+}) {
+  // Shrink the stage nodes on narrow screens so all 6 stages fit
+  // without horizontal cropping or overflow.
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = window.matchMedia("(max-width: 640px)");
+    const sync = () => setIsNarrow(m.matches);
+    sync();
+    m.addEventListener?.("change", sync);
+    return () => m.removeEventListener?.("change", sync);
+  }, []);
+  const nodeSize = isNarrow ? 36 : 56;
+  const iconSize = isNarrow ? 16 : 22;
   return (
-    <div style={{ width: "min(1080px, 96vw)", animation: "ii-fade-up 700ms cubic-bezier(0.4,0,0.2,1)" }}>
+    <div
+      style={{
+        width: "min(1080px, 94vw)",
+        maxHeight: "82dvh",
+        overflow: "hidden",
+        animation: "ii-fade-up 700ms cubic-bezier(0.4,0,0.2,1)",
+      }}
+    >
       <div
         style={{
           fontSize: 12,
@@ -729,23 +910,29 @@ function QuestMap({ completed, taglineVisible }: { completed: number; taglineVis
         Six stages from <span style={GRADIENT_TEXT}>idea to scale</span>.
       </div>
 
-      <div style={{ ...CARD_SURFACE, padding: "32px 20px" }}>
+      <div
+        style={{
+          ...CARD_SURFACE,
+          padding: isNarrow ? "20px 8px" : "32px 20px",
+        }}
+      >
         <div
           style={{
             display: "flex",
             alignItems: "stretch",
             justifyContent: "space-between",
-            gap: 8,
+            gap: isNarrow ? 2 : 8,
             position: "relative",
           }}
         >
+          {/* Connector line behind nodes */}
           <div
             aria-hidden
             style={{
               position: "absolute",
               left: "8%",
               right: "8%",
-              top: 28,
+              top: nodeSize / 2,
               height: 2,
               background: "rgba(255,255,255,0.08)",
             }}
@@ -755,10 +942,11 @@ function QuestMap({ completed, taglineVisible }: { completed: number; taglineVis
             style={{
               position: "absolute",
               left: "8%",
-              top: 28,
+              top: nodeSize / 2,
               height: 2,
               width: `${Math.min(completed, STAGES.length - 1) * (84 / (STAGES.length - 1))}%`,
-              background: "linear-gradient(90deg, #6366F1, #8B5CF6, #A78BFA)",
+              background:
+                "linear-gradient(90deg, #6366F1, #8B5CF6, #A78BFA)",
               boxShadow: "0 0 12px rgba(99,102,241,0.6)",
               transition: "width 700ms cubic-bezier(0.4,0,0.2,1)",
             }}
@@ -783,8 +971,8 @@ function QuestMap({ completed, taglineVisible }: { completed: number; taglineVis
               >
                 <div
                   style={{
-                    width: 56,
-                    height: 56,
+                    width: nodeSize,
+                    height: nodeSize,
                     borderRadius: "50%",
                     display: "flex",
                     alignItems: "center",
@@ -804,27 +992,46 @@ function QuestMap({ completed, taglineVisible }: { completed: number; taglineVis
                       : isActive
                         ? "0 0 16px rgba(99,102,241,0.28)"
                         : "none",
-                    animation: isDone ? "ii-checkpoint-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1)" : undefined,
+                    animation: isDone
+                      ? "ii-checkpoint-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1)"
+                      : undefined,
                     transition: "background 400ms ease, box-shadow 400ms ease",
                   }}
                 >
                   {isDone ? (
-                    <Check style={{ width: 22, height: 22, color: "#fff" }} />
+                    <Check style={{ width: iconSize, height: iconSize, color: "#fff" }} />
                   ) : (
-                    <Icon style={{ width: 22, height: 22, color: isActive ? "#C7D2FE" : "rgba(255,255,255,0.55)" }} />
+                    <Icon
+                      style={{
+                        width: iconSize,
+                        height: iconSize,
+                        color: isActive ? "#C7D2FE" : "rgba(255,255,255,0.55)",
+                      }}
+                    />
                   )}
                 </div>
-                <div style={{ textAlign: "center", minHeight: 38 }}>
+                <div style={{ textAlign: "center", minHeight: isNarrow ? 24 : 38, padding: isNarrow ? "0 2px" : 0 }}>
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: isNarrow ? 9 : 12,
                       fontWeight: 600,
                       color: isDone || isActive ? "#F9FAFB" : "rgba(255,255,255,0.6)",
+                      lineHeight: 1.15,
                     }}
                   >
                     {s.name}
                   </div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>{s.sub}</div>
+                  {!isNarrow && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "rgba(255,255,255,0.45)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {s.sub}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -849,6 +1056,10 @@ function QuestMap({ completed, taglineVisible }: { completed: number; taglineVis
   );
 }
 
+/* =========================================================
+   Closing card
+   ========================================================= */
+
 function ClosingCard() {
   return (
     <div
@@ -862,16 +1073,35 @@ function ClosingCard() {
       }}
     >
       <Bulb visible />
-      <div style={{ fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 700, letterSpacing: "-0.02em", marginTop: 6 }}>
+      <div
+        style={{
+          fontSize: "clamp(36px, 5vw, 56px)",
+          fontWeight: 700,
+          letterSpacing: "-0.02em",
+          marginTop: 6,
+        }}
+      >
         Interactive Ideas
       </div>
-      <div style={{ fontSize: "clamp(14px, 1.5vw, 17px)", color: "rgba(255,255,255,0.7)", maxWidth: 620 }}>
+      <div
+        style={{
+          fontSize: "clamp(14px, 1.5vw, 17px)",
+          color: "rgba(255,255,255,0.7)",
+          maxWidth: 620,
+        }}
+      >
         The Idea Incubator — designed as a social media,{" "}
         <span style={GRADIENT_TEXT}>played like a game.</span>
       </div>
       <div style={{ fontSize: 13, color: "#C7D2FE" }}>theinteractiveideas.com</div>
 
-      <div style={{ display: "flex", gap: 36, marginTop: 14 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 36,
+          marginTop: 14,
+        }}
+      >
         <Stat value="76+" label="Builders" />
         <Stat value="Free" label="To Join" />
         <Stat value="8" label="Quest Stages" />

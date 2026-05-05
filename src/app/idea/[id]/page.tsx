@@ -26,6 +26,7 @@ import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionDashboard } from "@/components/requests/ContributionDashboard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogClose,
@@ -52,6 +53,7 @@ import {
   KanbanHeader,
   KanbanCards,
   KanbanCard,
+  TaskEditDialog,
 } from "@/components/ui/kibo-ui/kanban";
 import PdfViewer from "@/components/PdfViewer";
 import ExcelViewer from "@/components/ExcelViewer";
@@ -176,12 +178,12 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
         onOpenCalendar={() => setShowCalendar(true)}
       />
 
-      <main className="flex-1 w-full py-12 pt-24">
+      <main className="flex-1 w-full py-12 pt-24 lg:pr-40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          {/* Desktop: persistent right rail */}
+          {/* Desktop: persistent right rail — pulled ~3-4 cm in from the right edge */}
           <div className="hidden lg:block">
             <IdeaSideNav
-              className="fixed right-3 top-1/2 -translate-y-1/2 z-40 rounded-2xl border border-white/10 bg-[#0F1726]/95 backdrop-blur-xl p-2 shadow-[0_18px_44px_rgba(3,7,18,0.55)]"
+              className="fixed right-32 top-1/2 -translate-y-1/2 z-40 rounded-2xl border border-white/10 bg-[#0F1726]/95 backdrop-blur-xl p-2 shadow-[0_18px_44px_rgba(3,7,18,0.55)]"
               onOpenHierarchy={() => setShowHierarchy(true)}
               onOpenTodos={() => setShowTodos(true)}
               onOpenCalendar={() => setShowCalendar(true)}
@@ -265,19 +267,47 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
               </Dialog>
 
               <Dialog open={showRequests} onOpenChange={setShowRequests}>
-                <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto w-full">
+                <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto w-full">
                   <DialogHeader>
                     <DialogTitle>Contribution Requests</DialogTitle>
                   </DialogHeader>
-                  <ContributionDashboard
-                    ideaId={ideaQuery._id as Id<"ideas">}
-                    ideaTitle={(ideaQuery as ConvexIdea).title}
-                    authorId={(ideaQuery as ConvexIdea).authorId}
-                    authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
-                    isAuthor={(ideaQuery as ConvexIdea).isAuthor || false}
-                    onClose={() => setShowRequests(false)}
-                  />
-                  <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: (ideaQuery as ConvexIdea).isAuthor || false }} />
+                  {(ideaQuery as ConvexIdea).isAuthor ? (
+                    <Tabs defaultValue="incoming" className="w-full mt-2">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="incoming">Incoming Requests</TabsTrigger>
+                        <TabsTrigger value="invite">Invite Contributors</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="incoming" className="mt-4">
+                        <ContributionDashboard
+                          ideaId={ideaQuery._id as Id<"ideas">}
+                          ideaTitle={(ideaQuery as ConvexIdea).title}
+                          authorId={(ideaQuery as ConvexIdea).authorId}
+                          authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
+                          isAuthor
+                          onClose={() => setShowRequests(false)}
+                          embedded
+                        />
+                      </TabsContent>
+                      <TabsContent value="invite" className="mt-4">
+                        <InvitationSection
+                          idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: true }}
+                          embedded
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  ) : (
+                    <>
+                      <ContributionDashboard
+                        ideaId={ideaQuery._id as Id<"ideas">}
+                        ideaTitle={(ideaQuery as ConvexIdea).title}
+                        authorId={(ideaQuery as ConvexIdea).authorId}
+                        authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
+                        isAuthor={false}
+                        onClose={() => setShowRequests(false)}
+                      />
+                      <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: false }} />
+                    </>
+                  )}
                 </DialogContent>
               </Dialog>
 
@@ -570,18 +600,14 @@ const IdeaContent: React.FC<{
                 const key = att.fileId || `${att.name}-${idx}`;
                 if (mime.startsWith("image/")) {
                   return (
-                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
-                      <div className="flex items-center justify-between gap-2 mb-2 text-xs"><span>{att.name}</span><a href={att.url} target="_blank" rel="noreferrer" className="underline">Open</a></div>
-                      <div className="w-full h-[70vh] rounded-md border overflow-hidden relative"><Image src={att.url} alt={att.name} fill className="object-contain" /></div>
-                    </div>
+                    <a key={key} href={att.url} target="_blank" rel="noreferrer" aria-label={`Open ${att.name}`} className="block">
+                      <img src={att.url} alt={att.name} className="w-full max-h-[75vh] object-contain rounded-xl" />
+                    </a>
                   );
                 }
                 if (mime.startsWith("video/") || mime.includes("mp4")) {
                   return (
-                    <div key={key} className="rounded-xl border bg-muted/30 p-4">
-                      <div className="flex items-center justify-between gap-2 mb-2 text-xs"><span>{att.name}</span><a href={att.url} target="_blank" rel="noreferrer" className="underline">Open</a></div>
-                      <div className="w-full h-[70vh] rounded-md border overflow-hidden"><video src={att.url} className="w-full h-full" controls autoPlay muted loop playsInline preload="metadata" /></div>
-                    </div>
+                    <video key={key} src={att.url} className="w-full max-h-[75vh] rounded-xl" controls autoPlay muted loop playsInline preload="metadata" />
                   );
                 }
                 if (mime.includes("pdf")) return <div key={key} className="rounded-xl border bg-muted/30 p-4"><PdfViewer url={att.url} fileName={att.name} /></div>;
@@ -630,7 +656,7 @@ const TodoSection: React.FC<{
   updateTodoMutation: (args: { todoId: Id<"todos">; title: string }) => Promise<{ message: string }>;
   updateTodoStatusMutation: (args: { todoId: Id<"todos">; status: "todo" | "in_progress" | "done" }) => Promise<{ status: "todo" | "in_progress" | "done"; message: string }>;
   deleteTodoMutation: (args: { todoId: Id<"todos"> }) => Promise<{ message: string }>;
-}> = ({ idea, todos, createTodoMutation, updateTodoStatusMutation, deleteTodoMutation }) => {
+}> = ({ idea, todos, createTodoMutation, updateTodoMutation, updateTodoStatusMutation, deleteTodoMutation }) => {
   const { userId } = useAuth();
   const [isCreateTodoDialogOpen, setIsCreateTodoDialogOpen] = useState(false);
   const [newTodoTitle, setNewTodoTitle] = useState("");
@@ -641,6 +667,12 @@ const TodoSection: React.FC<{
   const [error, setError] = useState("");
   const [todoToDelete, setTodoToDelete] = useState<Id<"todos"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Lifted edit-dialog state — owns ONE Dialog at the top level rather
+  // than one Dialog per KanbanCard, which fixes the "edit button does
+  // nothing" bug caused by nested Radix Dialogs inside the Project
+  // Management Dialog.
+  const [editingTodoId, setEditingTodoId] = useState<Id<"todos"> | null>(null);
+  const updateTodoFull = useMutation(api.todos.updateTodo);
 
   const isAuthor = idea.isAuthor || false;
   const hasAcceptedContribution = useQuery(api.contributionRequests.getMyRequests)?.find((req) => req.ideaId === idea._id && req.status === "accepted");
@@ -746,10 +778,10 @@ const TodoSection: React.FC<{
                     {(item) => {
                       const todo = todos?.find((t) => t._id === item.id);
                       return (
-                        <KanbanCard key={item.id} id={item.id} name={item.name} column={item.column} assignedTo={item.assignedTo} deadline={item.deadline} completionTarget={item.completionTarget} status={item.status} canDelete={item.canDelete} canEdit={todo?.canEdit} contributors={contributors} className="w-full">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`flex-1 text-sm ${column.id === "done" ? "line-through text-muted-foreground" : ""}`}>{item.name}</span>
-                            <div className="flex items-center gap-1">
+                        <KanbanCard key={item.id} id={item.id} name={item.name} column={item.column} assignedTo={item.assignedTo} deadline={item.deadline} completionTarget={item.completionTarget} status={item.status} canDelete={item.canDelete} canEdit={todo?.canEdit} contributors={contributors} className="w-full" onEditClick={(todoId) => setEditingTodoId(todoId as Id<"todos">)}>
+                          <div className="flex items-start justify-between gap-2 w-full">
+                            <span className={`flex-1 min-w-0 text-sm break-words ${column.id === "done" ? "line-through text-muted-foreground" : ""}`}>{item.name}</span>
+                            <div className="flex items-center gap-1 shrink-0">
                               {todo?.canDelete && (<Button variant="ghost" size="sm" onClick={() => setTodoToDelete(todo._id as Id<"todos">)} className="text-destructive hover:text-destructive/80 h-6 w-6 p-0 opacity-70 hover:opacity-100 flex-shrink-0"><Trash2 className="w-4 h-4" /></Button>)}
                             </div>
                           </div>
@@ -810,6 +842,56 @@ const TodoSection: React.FC<{
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Lifted Edit dialog — modal={false} so it doesn't fight the
+         * outer "Project Management" Dialog's focus trap. Rendered once
+         * at the TodoSection level instead of once per KanbanCard. */}
+        {(() => {
+          const editingTodo = todos?.find((t) => t._id === editingTodoId);
+          if (!editingTodo) return null;
+          return (
+            <Dialog
+              open={!!editingTodoId}
+              onOpenChange={(open) => !open && setEditingTodoId(null)}
+              modal={false}
+            >
+              <TaskEditDialog
+                todo={{
+                  id: editingTodo._id as string,
+                  name: editingTodo.title,
+                  column: editingTodo.status,
+                  assignedTo: editingTodo.assignedTo
+                    ? {
+                        _id: editingTodo.assignedTo._id,
+                        name: editingTodo.assignedTo.name || editingTodo.assignedTo.username,
+                        username: editingTodo.assignedTo.username,
+                        avatar: editingTodo.assignedTo.avatar,
+                      }
+                    : undefined,
+                  deadline: editingTodo.deadline,
+                  completionTarget: editingTodo.completionTarget,
+                  status: editingTodo.status,
+                  contributors,
+                }}
+                contributors={contributors}
+                onClose={() => setEditingTodoId(null)}
+                onSave={async (updates) => {
+                  try {
+                    await updateTodoFull({
+                      todoId: editingTodo._id as Id<"todos">,
+                      title: updates.title,
+                      assignedTo: updates.assignedTo as Id<"users"> | undefined,
+                      deadline: updates.deadline,
+                      completionTarget: updates.completionTarget,
+                    });
+                  } catch (err) {
+                    console.error("Failed to update todo:", err);
+                  }
+                }}
+              />
+            </Dialog>
+          );
+        })()}
       </div>
     </div>
   );

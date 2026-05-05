@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Image from "next/image";
-import { MessageCircle, Users, Sparkles, Handshake } from "lucide-react";
+import { MessageCircle, Users, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export type ConvexIdea = {
@@ -288,7 +288,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
               </button>
             </div>
 
-            {/* Contributors */}
+            {/* Contributors — use Users icon to match the feed/idea page */}
             <div className="flex items-center gap-1">
               <button
                 onClick={(e) => {
@@ -296,19 +296,13 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
                   onContributeClick?.(idea._id);
                 }}
                 className="p-1.5 rounded-full hover:bg-green-50 text-muted-foreground hover:text-green-500 transition-colors"
-                title="Contribute"
+                title="Contributors"
               >
-                <Handshake className="w-4 h-4" />
+                <Users className="w-4 h-4" />
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // TODO: Show list of contributors
-                }}
-                className="text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:underline min-w-[12px] text-center"
-              >
+              <span className="text-[11px] font-semibold text-muted-foreground min-w-[12px] text-center tabular-nums">
                 {contributorsCount}
-              </button>
+              </span>
             </div>
 
           </div>

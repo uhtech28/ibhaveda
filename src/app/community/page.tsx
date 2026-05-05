@@ -20,7 +20,6 @@ import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { UserProfile } from "../../../convex/users";
 
 // Error Boundary to prevent leaderboard failures from crashing the page
-// NOTE: keep generic params on a single line — multiline breaks Turbopack
 class LeaderboardErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
@@ -30,7 +29,7 @@ class LeaderboardErrorBoundary extends React.Component<{ children: React.ReactNo
     return { hasError: true };
   }
   render() {
-    if (this.state.hasError) return null;
+    if (this.state.hasError) return null; // Silently hide if leaderboard fails
     return this.props.children;
   }
 }
@@ -42,12 +41,15 @@ export default function CommunityPage() {
   const initialQuery = searchParams?.get("q") ?? "";
   const [searchQuery, setSearchQuery] = React.useState(initialQuery);
 
+  // If the URL `?q=` changes (e.g., user clicks a different tag), update state.
   React.useEffect(() => {
     setSearchQuery(searchParams?.get("q") ?? "");
   }, [searchParams]);
 
+  // Convex data
   const users = useQuery(api.users.getAllUsers);
 
+  // Filter users based on search query
   const filteredUsers = React.useMemo(() => {
     if (!users) return [];
     const query = searchQuery.toLowerCase().trim();
@@ -64,6 +66,7 @@ export default function CommunityPage() {
     });
   }, [users, searchQuery]);
 
+  // Loading state
   if (!isClerkUserLoaded || users === undefined) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -79,6 +82,7 @@ export default function CommunityPage() {
     );
   }
 
+  // Error state
   if (users === null) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -88,11 +92,16 @@ export default function CommunityPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <AlertCircle className="w-8 h-8 text-destructive mx-auto mb-2" />
-                <h3 className="text-lg font-semibold mb-2">Failed to Load Community</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  Failed to Load Community
+                </h3>
                 <p className="text-muted-foreground mb-4">
-                  Unable to fetch community data. Please try refreshing the page.
+                  Unable to fetch community data. Please try refreshing the
+                  page.
                 </p>
-                <Button onClick={() => window.location.reload()}>Try Again</Button>
+                <Button onClick={() => window.location.reload()}>
+                  Try Again
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -108,6 +117,7 @@ export default function CommunityPage() {
 
       <main className="flex-1 container mx-auto px-4 py-12 pt-24">
         <div className="max-w-5xl mx-auto">
+          {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
               Community
@@ -127,6 +137,7 @@ export default function CommunityPage() {
             <WeeklyLeaderboard />
           </LeaderboardErrorBoundary>
 
+          {/* Users Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredUsers.filter(user => user.clerkId !== clerkUser?.id).map((user: UserProfile) => (
               <UserCard
@@ -201,6 +212,7 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
     >
       <div className={`absolute top-0 left-0 w-full ${isFirst ? "h-1.5" : "h-1"} ${styles.accent}`} />
 
+      {/* Rank badge — clearly visible at top */}
       <div
         className={`flex items-center justify-center rounded-full text-white font-bold shadow-md ${styles.accent} ${
           isFirst ? "w-12 h-12 text-lg -mt-2 mb-3" : "w-9 h-9 text-sm -mt-1 mb-2"
@@ -210,11 +222,15 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
         #{rank}
       </div>
 
+      {/* Crown for 1st place */}
       {isFirst && (
         <Trophy className="absolute top-3 right-3 w-5 h-5 text-yellow-500" aria-hidden="true" />
       )}
 
-      <Link href={`/profile/${encodeURIComponent(user.username)}`} className="w-full flex flex-col items-center">
+      <Link
+        href={`/profile/${encodeURIComponent(user.username)}`}
+        className="w-full flex flex-col items-center"
+      >
         <Avatar
           className={`shadow-md border-4 ${styles.avatarRing} ${
             isFirst ? "w-24 h-24 mb-4" : "w-16 h-16 mb-3"
@@ -233,7 +249,11 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
         >
           {user.displayName}
         </h3>
-        <p className={`text-muted-foreground ${isFirst ? "text-xs mb-4" : "text-[11px] mb-3"}`}>
+        <p
+          className={`text-muted-foreground ${
+            isFirst ? "text-xs mb-4" : "text-[11px] mb-3"
+          }`}
+        >
           @{user.username}
         </p>
 
@@ -257,9 +277,11 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
 const WeeklyLeaderboard = () => {
   const topUsers = useQuery(api.leaderboard.getWeeklyLeaderboard, { limit: 3 });
 
-  if (topUsers === undefined) return null;
-  if (topUsers === null || topUsers.length === 0) return null;
+  if (topUsers === undefined) return null; // Loading silently
+  if (topUsers === null || topUsers.length === 0) return null; // No one earned points this week
 
+  // topUsers[0] is rank 1, [1] is rank 2, [2] is rank 3 (per leaderboard ordering).
+  // Podium display order on screen: rank 2 (left) → rank 1 (center, elevated) → rank 3 (right).
   const first = topUsers[0];
   const second = topUsers[1];
   const third = topUsers[2];
@@ -274,15 +296,22 @@ const WeeklyLeaderboard = () => {
         <Trophy className="w-8 h-8 text-yellow-500" />
       </div>
 
+      {/* Podium grid.
+       * Mobile (grid-cols-1): cards stack in DOM order — rank 1, 2, 3.
+       * Desktop (md:grid-cols-3): podium layout via md:order-X — rank 2 on
+       * the left, rank 1 elevated in the center, rank 3 on the right. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
-        <div className="md:order-1 md:pb-0 md:translate-y-2">
-          {second ? <PodiumCard user={second} rank={2} /> : <div className="hidden md:block" />}
-        </div>
-
+        {/* Rank 1 — first in DOM (top on mobile), centered + elevated on desktop */}
         <div className="md:order-2 md:-translate-y-2">
           {first && <PodiumCard user={first} rank={1} />}
         </div>
 
+        {/* Rank 2 — second in DOM, left column on desktop */}
+        <div className="md:order-1 md:pb-0 md:translate-y-2">
+          {second ? <PodiumCard user={second} rank={2} /> : <div className="hidden md:block" />}
+        </div>
+
+        {/* Rank 3 — third in DOM, right column on desktop */}
         <div className="md:order-3 md:translate-y-2">
           {third ? <PodiumCard user={third} rank={3} /> : <div className="hidden md:block" />}
         </div>
@@ -310,8 +339,12 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 flex flex-col h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
-      <Link href={`/profile/${encodeURIComponent(user.username)}`} className="flex-1 flex flex-col">
+      <Link
+        href={`/profile/${encodeURIComponent(user.username)}`}
+        className="flex-1 flex flex-col"
+      >
         <div className="p-3 flex-1 flex flex-col">
+          {/* Header: Avatar & Name */}
           <div className="flex items-center gap-3 mb-2">
             <Avatar className="w-8 h-8 border-2 border-background shadow-sm shrink-0">
               <AvatarImage src={user.avatar} alt={user.displayName} className="object-cover" />
@@ -323,24 +356,31 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               <h3 className="font-bold text-sm leading-tight truncate group-hover:text-primary transition-colors">
                 {user.displayName}
               </h3>
-              <p className="text-[10px] text-muted-foreground truncate">@{user.username}</p>
+              <p className="text-[10px] text-muted-foreground truncate">
+                @{user.username}
+              </p>
             </div>
           </div>
 
+          {/* Bio - Hidden if empty to save space, else truncated more aggressively */}
           {user.bio && (
             <p className="text-[10px] text-muted-foreground mb-2 line-clamp-1 leading-relaxed">
               {user.bio}
             </p>
           )}
 
+          {/* Tags Section */}
           <div className="flex flex-col gap-1.5 mb-2 mt-auto">
+            {/* Ind + Skills mixed or stacked compactly */}
             <div className="flex flex-wrap gap-1 items-center">
+              {/* Industry */}
               {user.industry && user.industry.split(',').map(s => s.trim()).slice(0, 1).map((ind, i) => (
                 <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 border border-purple-500/20 truncate max-w-[80px]">
                   {ind}
                 </span>
               ))}
 
+              {/* Skills */}
               {user.skills.slice(0, 2).map((skill, i) => (
                 <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 truncate max-w-[80px]">
                   {skill}
@@ -354,6 +394,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
             </div>
           </div>
 
+          {/* Stats Row */}
           <div className="grid grid-cols-3 gap-1 py-1.5 border-t border-b border-border/40 mb-1">
             <div className="flex flex-col items-center justify-center text-center">
               <Lightbulb className="w-3 h-3 text-primary mb-0.5" />
@@ -371,6 +412,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
         </div>
       </Link>
 
+      {/* Footer Actions */}
       {!isCurrentUser && currentUserId && (
         <div className="px-3 pb-3 pt-0 flex items-center gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1">

@@ -23,8 +23,9 @@ interface IdeaSideNavProps {
 }
 
 /**
- * Compact vertical side rail for an idea page — Sub-idea, Hierarchy, Todos, Calendar.
- * Renders identically on mobile and desktop; the parent positions it.
+ * Compact vertical side rail for an idea page — Sub-idea, Hierarchy, Todos, Calendar,
+ * (and optional "Convert to Venture"). Renders identically on mobile and desktop;
+ * the parent positions it (typically `fixed right-3 top-1/2 -translate-y-1/2`).
  */
 export function IdeaSideNav({
   onOpenHierarchy,
@@ -32,12 +33,14 @@ export function IdeaSideNav({
   onOpenCalendar,
   todoCount = 0,
   className,
+  ideaId,
   isContributor = false,
   onCreateSubIdea,
 }: IdeaSideNavProps) {
   return (
     <div className={cn("flex flex-col items-center gap-1.5 lg:gap-2", className)}>
       <TooltipProvider delayDuration={0}>
+        {/* Create Sub-Idea — contributor-only on this idea page */}
         {isContributor && onCreateSubIdea && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -55,6 +58,7 @@ export function IdeaSideNav({
           </Tooltip>
         )}
 
+        {/* Hierarchy */}
         {onOpenHierarchy && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -72,6 +76,7 @@ export function IdeaSideNav({
           </Tooltip>
         )}
 
+        {/* Todos / Kanban */}
         {onOpenTodos && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -94,6 +99,7 @@ export function IdeaSideNav({
           </Tooltip>
         )}
 
+        {/* Calendar */}
         {onOpenCalendar && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -110,6 +116,8 @@ export function IdeaSideNav({
             <TooltipContent side="left">Calendar</TooltipContent>
           </Tooltip>
         )}
+
+        {/* Convert to Venture */}
       </TooltipProvider>
     </div>
   );

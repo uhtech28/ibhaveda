@@ -4,9 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,17 +15,13 @@ import {
     Users,
     ChevronLeft,
     MoreHorizontal,
-    Search,
     Plus,
     X,
-    Phone,
-    Video,
     Settings,
     Image as ImageIcon,
     Send
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { ChannelSettingsDialog } from "./ChannelSettingsDialog";
 
@@ -72,6 +67,13 @@ export function ChatInterface() {
     const messages = useQuery(api.communities.getMessages, selectedChannel ? { conversationId: selectedChannel._id } : "skip");
     const sendMessage = useMutation(api.communities.sendMessage);
     const createChannel = useMutation(api.communities.createChannel);
+    // Live member count for the open channel — drives the visible
+    // "Members (N)" pill in the chat header so people can find the
+    // add/remove flow.
+    const channelMembers = useQuery(
+        api.chat.getGroupMembers,
+        selectedChannel ? { conversationId: selectedChannel._id } : "skip"
+    );
 
     // Auto-scroll to bottom of chat
     const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -265,11 +267,26 @@ export function ChatInterface() {
                     <h2 className="text-base font-bold leading-none truncate">{selectedChannel?.name}</h2>
                     <span className="text-xs text-muted-foreground truncate">{selectedCommunity?.name}</span>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 items-center">
                     {selectedCommunity && selectedChannel && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSettings(true)}>
-                            <Settings className="w-4 h-4" />
-                        </Button>
+                        <>
+                            {/* Discoverable Members pill — primary path to add /
+                             * remove people. Also keeps the cog for power users. */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 px-2.5 text-xs"
+                                onClick={() => setShowSettings(true)}
+                                aria-label="Manage members"
+                                title="Manage members"
+                            >
+                                <Users className="w-3.5 h-3.5" />
+                                <span className="tabular-nums">{channelMembers?.length ?? 0}</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSettings(true)} aria-label="Channel settings" title="Channel settings">
+                                <Settings className="w-4 h-4" />
+                            </Button>
+                        </>
                     )}
                 </div>
             </div>
@@ -284,10 +301,10 @@ export function ChatInterface() {
                             <p>No messages yet. Start the conversation!</p>
                         </div>
                     ) : (
-                        messages.map((msg: Message, i: number) => {
-                            const isMe = false; // TODO: Compare msg.senderId with current user
-                            // We need current user ID. Can get from useQuery(api.users.me) or passed prop
-
+                        messages.map((msg: Message) => {
+                            // TODO: compare msg.senderId with current user once we
+                            // pass the viewer id through (see ChatThread for the pattern).
+                            const isMe = false;
                             return (
                                 <div key={msg._id} className={`flex gap-3 max-w-[85%] ${isMe ? "ml-auto flex-row-reverse" : ""}`}>
                                     {!isMe && (
@@ -383,3 +400,4 @@ export function GlobalChatSheet() {
         </Sheet>
     );
 }
+

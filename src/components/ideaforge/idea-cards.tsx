@@ -455,7 +455,7 @@ export function IdeaStoryCard({
 
       <div className="mt-5 border-t border-white/8 pt-3">
         <div className="flex flex-nowrap items-center gap-1">
-          <StoryAction icon={Sparkles} label="Spark" count={idea.sparkCount || 0} onClick={() => onSpark(idea._id)} animateOnClick />
+          <StoryAction icon={Sparkles} label="Spark" count={idea.sparkCount || 0} onClick={() => onSpark(idea._id)} animateOnClick iconOnly />
           <StoryAction icon={MessageCircle} label="Comment" count={idea.commentCount || 0} onClick={() => onComment(idea._id)} iconOnly />
           <ContributorsAction
             ideaId={idea._id}
@@ -581,7 +581,16 @@ export function CompactIdeaCard({
           <IdeaVentureBadge ideaId={idea._id} />
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-[#9CA3AF]">
-          <span>{idea.sparkCount || 0} sparks</span>
+          <div className="inline-flex items-center gap-3">
+            <span className="inline-flex items-center gap-1">
+              <Sparkles className="h-3 w-3 text-orange-400" />
+              <span className="tabular-nums">{idea.sparkCount || 0}</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Users className="h-3 w-3 text-fuchsia-300" />
+              <span className="tabular-nums">{idea.contributionCount || 0}</span>
+            </span>
+          </div>
           <span>{formatRelativeTime(idea.createdAt)}</span>
         </div>
       </div>

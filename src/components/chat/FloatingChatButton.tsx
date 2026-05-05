@@ -14,7 +14,7 @@ export const FloatingChatButton: React.FC = () => {
   const { isAuthenticated } = useConvexAuth();
 
   if (!isAuthenticated) return null;
-  if (isOpen) return null;
+  if (isOpen) return null; // hide while chat sheet is open
 
   return (
     <button
@@ -23,7 +23,7 @@ export const FloatingChatButton: React.FC = () => {
       aria-label="Open chat"
       className="
         fixed z-[45]
-        right-4 bottom-20 lg:bottom-5
+        right-12 bottom-28 lg:right-12 lg:bottom-12
         flex h-10 w-10 items-center justify-center rounded-full
         bg-primary text-primary-foreground
         border border-white/10

@@ -336,3 +336,4 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
     </div>
   )
 }
+

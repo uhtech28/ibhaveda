@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@convex/_generated/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Id } from "@convex/_generated/dataModel";
-import { UserPlus, Check, X } from "lucide-react";
+import { UserPlus, Check, X, Clock, UserCheck } from "lucide-react";
 
 interface InvitationButtonProps {
   targetUser: {
@@ -29,19 +29,29 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
 
   const { toast } = useToast();
 
+  // Get current user's ideas
   const myIdeas = useQuery(api.ideas.getUserIdeas);
 
+  // Get current user to check for existing invitations
   const currentUser = useQuery(api.users.getCurrentUser);
 
+  // Check for existing invitations to this user
   const existingInvitations = useQuery(
     api.invitations.getInvitationsByInviterAndInvitee,
     currentUser ? { inviterId: currentUser._id as Id<"users">, inviteeId: targetUser._id as Id<"users"> } : "skip"
   );
 
-  const hasActiveInvitation = existingInvitations && existingInvitations.length > 0 && existingInvitations.some(inv =>
-    inv.status === "pending" || inv.status === "accepted" || inv.status === "rejected"
-  );
+  // Detect the most relevant existing invitation so we can render a
+  // disabled state instead of hiding the button outright.
+  const invitationState: "pending" | "accepted" | null = (() => {
+    if (!existingInvitations || existingInvitations.length === 0) return null;
+    if (existingInvitations.some((inv) => inv.status === "accepted")) return "accepted";
+    if (existingInvitations.some((inv) => inv.status === "pending")) return "pending";
+    // "rejected" intentionally falls through — user should be able to retry.
+    return null;
+  })();
 
+  // Send invitation mutation
   const sendInvitationMutation = useMutation(api.invitations.sendInvitation);
 
   const handleSendInvitations = async () => {
@@ -64,6 +74,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
         description: `Successfully invited ${targetUser.displayName} to collaborate on ${selectedIdeas.length} idea(s).`,
       });
 
+      // Reset state
       setIsPopoverOpen(false);
       setInvitationMessage("");
       setSelectedIdeas([]);
@@ -94,8 +105,47 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
     );
   }
 
-  if (hasActiveInvitation) {
-    return null;
+  // If there's already an active (pending or accepted) invitation, show a
+  // greyed-out, disabled button so the user knows the invite has been sent
+  // — the button no longer disappears.
+  if (invitationState === "pending") {
+    return (
+      <Button
+        variant="outline"
+        size={iconOnly ? "icon" : "sm"}
+        disabled
+        title="Invitation pending"
+        aria-label="Invitation pending"
+        className={
+          iconOnly
+            ? "h-8 w-8 rounded-full flex-shrink-0 opacity-60 cursor-not-allowed"
+            : "w-full opacity-60 cursor-not-allowed"
+        }
+      >
+        <Clock className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
+        {!iconOnly && "Invited"}
+      </Button>
+    );
+  }
+
+  if (invitationState === "accepted") {
+    return (
+      <Button
+        variant="outline"
+        size={iconOnly ? "icon" : "sm"}
+        disabled
+        title="Already collaborating"
+        aria-label="Already collaborating"
+        className={
+          iconOnly
+            ? "h-8 w-8 rounded-full flex-shrink-0 opacity-60 cursor-not-allowed"
+            : "w-full opacity-60 cursor-not-allowed"
+        }
+      >
+        <UserCheck className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
+        {!iconOnly && "Collaborating"}
+      </Button>
+    );
   }
 
   if (myIdeas.length === 0) {

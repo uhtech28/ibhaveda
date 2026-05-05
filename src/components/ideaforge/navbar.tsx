@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Home, Lightbulb, Plus, Search, Users } from "lucide-react";
+import { ArrowLeft, Home, Plus, Search, Users } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,25 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { LogoIcon } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import { CurrentUserProfile, displayFontClass, getInitials, shellMax, transitionBase } from "@/components/ideaforge/shared";
+
+// Slim lightbulb (no rays) — keeps "My Ideas" nav icon consistent with the
+// HeroHeader version.
+const IdeaBulb = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M9 18h6" />
+    <path d="M10 21h4" />
+    <path d="M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.7 1.5 2.8V18h4v-1.3c0-1.1.6-2.1 1.5-2.8A6 6 0 0 0 12 3Z" />
+  </svg>
+);
 
 export function IdeaForgeNavbar({
   currentUser,
@@ -28,7 +47,7 @@ export function IdeaForgeNavbar({
 
   const navMenu = [
     { name: "Feed", href: "/feed", icon: Home },
-    { name: "My Ideas", href: "/my-ideas", icon: Lightbulb },
+    { name: "My Ideas", href: "/my-ideas", icon: IdeaBulb },
     { name: "Communities", href: "/community", icon: Users },
   ];
 

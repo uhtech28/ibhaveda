@@ -49,6 +49,7 @@ export const CreateChannelPanel: React.FC<CreateChannelPanelProps> = ({
       onCreated(conversationId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create channel.";
+      // Surface a friendlier message for permission errors.
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("contributor")) {
         setError("Only the idea owner or accepted contributors can create channels.");
       } else {

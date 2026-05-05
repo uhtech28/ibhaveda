@@ -18,6 +18,7 @@ const groupIndustries = (industries: IndustryOption[]) => {
   const groups: { [key: string]: IndustryOption[] } = {};
 
   industries.forEach(industry => {
+    // Categorize industries based on their content
     let group = "Other";
 
     if (industry.label.includes("Software") || industry.label.includes("Electronics") || industry.label.includes("Telecommunication")) {
@@ -103,11 +104,13 @@ export function IndustriesMultiSelect({
     let newSelected: string[];
 
     if (singleSelect) {
+      // Single select mode
       newSelected = selectedIndustries.includes(value) ? [] : [value];
     } else {
+      // Multi select mode
       newSelected = selectedIndustries.includes(value)
         ? mandatoryIndustries.includes(value)
-          ? selectedIndustries
+          ? selectedIndustries // Cannot remove mandatory industries
           : selectedIndustries.filter(industry => industry !== value)
         : maxSelection && selectedIndustries.length >= maxSelection
           ? selectedIndustries
@@ -138,12 +141,13 @@ export function IndustriesMultiSelect({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[var(--radix-popover-trigger-width)] p-0 flex flex-col h-[min(60dvh,420px)] overflow-hidden"
+          className="w-[var(--radix-popover-trigger-width)] p-0 flex flex-col h-[min(50dvh,420px)] overflow-hidden"
           align="start"
           side="bottom"
           sideOffset={4}
           collisionPadding={16}
-          avoidCollisions
+          avoidCollisions={false}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <Command>
             <CommandInput
@@ -245,6 +249,7 @@ export function IndustriesMultiSelect({
                       handleSelect(industry);
                     }}
                     onMouseDown={(e) => {
+                      // Prevent badge from absorbing the click before button receives it.
                       e.stopPropagation();
                     }}
                     className="ml-1 shrink-0 hover:bg-destructive/20 rounded-full p-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 cursor-pointer"

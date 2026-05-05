@@ -3,7 +3,8 @@
 import React, { memo, useEffect, useRef, useCallback, useState } from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, X, Settings } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ArrowLeft, X, Settings, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import MessageBubble from "./MessageBubble";
@@ -33,10 +34,22 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
   const sendMessage = useMutation(api.chat.sendMessage);
   const users = useQuery(api.chat.getAllUsers, isAuthenticated ? {} : "skip");
   const currentUserDoc = useQuery(api.chat.getUserByClerkId, isAuthenticated ? {} : "skip");
+  // For group chats — pull the idea title so the header reads "<idea title>"
+  const ideaForHeader = useQuery(
+    api.ideas.getIdeaById,
+    isAuthenticated && ideaId ? { ideaId } : "skip"
+  );
 
   // Add loading and error states
   const [sendError, setSendError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Live member count for group chats — surfaces add/remove flow as a
+  // visible Members pill in the header rather than just a settings cog.
+  const groupMembers = useQuery(
+    api.chat.getGroupMembers,
+    isAuthenticated && ideaId && activeConversationId ? { conversationId: activeConversationId } : "skip"
+  );
 
   useEffect(() => {
     // Auto scroll to bottom on new messages
@@ -97,20 +110,73 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
     }
   }, [sendMessage, messages, currentUserId, receiverId, conversationId, activeConversationId, ideaId]);
 
+  // Resolve the header — show the recipient's name for DMs, or the idea
+  // title for group/channel chats. Falls back to "Conversation" only as
+  // an absolute last resort while data loads.
+  // NOTE: api.chat.getAllUsers maps _id -> id, so we match against u.id.
+  const otherUser = (() => {
+    if (ideaId) return null;
+    if (!users) return null;
+    if (receiverId) {
+      return users.find((u) => u.id === receiverId) || null;
+    }
+    if (messages && messages.length > 0 && currentUserId) {
+      const first = messages[0];
+      const otherId = first.senderId === currentUserId ? first.receiverId : first.senderId;
+      if (otherId) return users.find((u) => u.id === otherId) || null;
+    }
+    return null;
+  })();
+
+  const headerTitle = ideaId
+    ? ideaForHeader?.title || "Channel"
+    : otherUser
+      ? otherUser.displayName || otherUser.username || "Direct message"
+      : "Conversation";
+  const headerSubtitle = !ideaId && otherUser?.username ? `@${otherUser.username}` : null;
+
   return (
     <div className="flex flex-col h-full bg-background max-w-full">
       <div className="px-4 py-3 border-b flex items-center justify-between bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 -ml-2 hover:bg-muted/50">
+        <div className="flex items-center gap-2 min-w-0">
+          <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 -ml-2 hover:bg-muted/50 shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <h3 className="font-semibold text-sm text-foreground">Conversation</h3>
+          {!ideaId && otherUser && (
+            <Avatar className="h-7 w-7 shrink-0 ring-1 ring-indigo-500/30">
+              <AvatarImage src={otherUser.avatar} alt={headerTitle} />
+              <AvatarFallback className="bg-indigo-500/20 text-indigo-200 text-[11px]">
+                {(otherUser.displayName || otherUser.username || "U").charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm text-foreground truncate">{headerTitle}</h3>
+            {headerSubtitle && (
+              <p className="text-[11px] text-muted-foreground truncate leading-tight">{headerSubtitle}</p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-1">
           {ideaId && activeConversationId && (
-            <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} className="h-8 w-8 hover:bg-muted/50">
-              <Settings className="w-4 h-4" />
-            </Button>
+            <>
+              {/* Visible Members pill — primary entry point for the
+               * add/remove people flow on community channels. */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSettings(true)}
+                className="h-8 gap-1.5 px-2.5 text-xs"
+                aria-label="Manage members"
+                title="Manage members"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span className="tabular-nums">{groupMembers?.length ?? 0}</span>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} className="h-8 w-8 hover:bg-muted/50" aria-label="Channel settings" title="Channel settings">
+                <Settings className="w-4 h-4" />
+              </Button>
+            </>
           )}
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 -mr-2 hover:bg-muted/50">
             <X className="w-4 h-4" />

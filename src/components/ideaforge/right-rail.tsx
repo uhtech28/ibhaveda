@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
-import { ArrowUpRight, Flame } from "lucide-react";
+import { ArrowUpRight, Flame, MessageCircle, Trophy, Zap } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import { useChat } from "@/components/chat/ChatContext";
 import {
   BuilderSuggestion,
   cardSurface,
@@ -25,19 +27,34 @@ function SuggestedBuilderCard({ builder }: { builder: BuilderSuggestion }) {
   const displayName = builder.displayName || builder.username || "Builder";
   const primarySkill = builder.skills?.[0] || "Creative strategy";
   const profileHref = builder.username ? `/profile/${builder.username}` : "/community";
+  const builderId = (builder._id || builder.id) as Id<"users"> | undefined;
+  const { openChatWithUser } = useChat();
 
   return (
     <div className="flex items-center gap-3 rounded-[14px] border border-white/7 bg-white/[0.03] p-3">
-      <Avatar className="h-11 w-11">
-        <AvatarImage src={builder.avatar} alt={displayName} />
-        <AvatarFallback className="bg-[#1B2440] text-white">{getInitials(displayName)}</AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-[#F9FAFB]">{displayName}</p>
+      <Link href={profileHref} className="shrink-0" aria-label={`View ${displayName}'s profile`}>
+        <Avatar className="h-11 w-11">
+          <AvatarImage src={builder.avatar} alt={displayName} />
+          <AvatarFallback className="bg-[#1B2440] text-white">{getInitials(displayName)}</AvatarFallback>
+        </Avatar>
+      </Link>
+      <Link href={profileHref} className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-[#F9FAFB] hover:text-[#C7D2FE] transition-colors">{displayName}</p>
         <p className="truncate text-xs text-[#9CA3AF]">{primarySkill}</p>
-      </div>
-      <Button asChild size="sm" className="h-8 rounded-[10px] bg-[#6366F1]/12 px-3 text-[#C7D2FE] hover:bg-[#6366F1] hover:text-white">
-        <Link href={profileHref}>Contribute</Link>
+      </Link>
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => {
+          if (builderId) openChatWithUser(builderId);
+        }}
+        disabled={!builderId}
+        aria-label={`Message ${displayName}`}
+        title={`Message ${displayName}`}
+        className="h-8 rounded-[10px] bg-[#6366F1]/15 px-3 text-[#C7D2FE] hover:bg-[#6366F1] hover:text-white inline-flex items-center gap-1.5 disabled:opacity-50"
+      >
+        <MessageCircle className="h-3.5 w-3.5" />
+        <span>Message</span>
       </Button>
     </div>
   );
@@ -137,3 +154,4 @@ export function IdeaForgeRightRail({
     </aside>
   );
 }
+

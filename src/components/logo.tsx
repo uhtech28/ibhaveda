@@ -7,12 +7,12 @@ export const Logo = ({ className }: { className?: string; uniColor?: boolean; id
             <Image
                 src="/logo.png"
                 alt="Interactive Ideas Logo"
-                width={28}
-                height={28}
-                className="rounded-lg"
+                width={40}
+                height={40}
+                className="shrink-0"
                 priority
             />
-            <span className="hidden md:block text-sm md:text-base font-bold tracking-tight bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
+            <span className="hidden md:block text-base md:text-lg font-bold tracking-tight bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
                 Interactive Ideas
             </span>
         </div>
@@ -24,9 +24,9 @@ export const LogoIcon = ({ className }: { className?: string; uniColor?: boolean
         <Image
             src="/logo.png"
             alt="Interactive Ideas"
-            width={28}
-            height={28}
-            className={cn('rounded-lg', className)}
+            width={36}
+            height={36}
+            className={cn('shrink-0', className)}
             priority
         />
     )

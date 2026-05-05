@@ -5,10 +5,12 @@ import { internal } from "./_generated/api";
 import { LEVEL_DEFINITIONS } from "./ventureConstants";
 import { meetsLevelRequirements } from "./levels";
 
+// Helper to get consistent date string (UTC)
 function getTodayString(): string {
     return new Date().toISOString().split('T')[0];
 }
 
+// Get user's current streak
 export const getStreak = query({
     handler: async ({ db, auth }) => {
         const identity = await auth.getUserIdentity();
@@ -35,6 +37,7 @@ export const getStreak = query({
     },
 });
 
+// Get any user's current streak
 export const getUserStreak = query({
     args: { userId: v.id("users") },
     handler: async ({ db }, args) => {
@@ -52,6 +55,7 @@ export const getUserStreak = query({
     },
 });
 
+// Update streak logic - usually called on session start
 export const updateStreak = mutation({
     handler: async ({ db, auth, scheduler }) => {
         const identity = await auth.getUserIdentity();
@@ -66,12 +70,14 @@ export const updateStreak = mutation({
 
         const today = getTodayString();
 
+        // Get existing streak record
         const streakRecord = await db
             .query("userStreaks")
             .withIndex("by_user", (q) => q.eq("userId", user._id))
             .first();
 
         if (!streakRecord) {
+            // First time streak creation
             await db.insert("userStreaks", {
                 userId: user._id,
                 currentStreak: 1,
@@ -81,6 +87,7 @@ export const updateStreak = mutation({
                 recoveryAvailable: true,
             });
 
+            // Gamification: Daily Login Reward (First time)
             await scheduler.runAfter(0, internal.gamification.internalAwardXP, {
                 userId: user._id,
                 amount: 10,
@@ -96,6 +103,7 @@ export const updateStreak = mutation({
             return { status: "started", streak: 1 };
         }
 
+        // Already logged in today?
         if (streakRecord.lastLoginDate === today) {
             return { status: "maintained", streak: streakRecord.currentStreak };
         }
@@ -105,6 +113,7 @@ export const updateStreak = mutation({
         const yesterdayString = yesterday.toISOString().split('T')[0];
 
         if (streakRecord.lastLoginDate === yesterdayString) {
+            // Logged in yesterday -> Increment streak
             const newStreak = streakRecord.currentStreak + 1;
             await db.patch(streakRecord._id, {
                 currentStreak: newStreak,
@@ -113,6 +122,7 @@ export const updateStreak = mutation({
                 lastStreakUpdate: Date.now(),
             });
 
+            // Gamification: Daily Login Reward (Streak Continue)
             await scheduler.runAfter(0, internal.gamification.internalAwardXP, {
                 userId: user._id,
                 amount: 10,
@@ -127,12 +137,15 @@ export const updateStreak = mutation({
 
             return { status: "incremented", streak: newStreak };
         } else {
+            // Missed a day (or more) -> Reset streak
+            // Check if recovery is available? (Future feature: Streak Freeze)
             await db.patch(streakRecord._id, {
                 currentStreak: 1,
                 lastLoginDate: today,
                 lastStreakUpdate: Date.now(),
             });
 
+            // Gamification: Daily Login Reward (Streak Reset)
             await scheduler.runAfter(0, internal.gamification.internalAwardXP, {
                 userId: user._id,
                 amount: 10,
@@ -150,6 +163,9 @@ export const updateStreak = mutation({
     },
 });
 
+// Gamification: Wallet & Points System
+
+// Get user's wallet balance
 export const getWallet = query({
     handler: async ({ db, auth }) => {
         const identity = await auth.getUserIdentity();
@@ -171,6 +187,7 @@ export const getWallet = query({
     },
 });
 
+// Get any user's wallet balance
 export const getUserWallet = query({
     args: { userId: v.id("users") },
     handler: async ({ db }, args) => {
@@ -183,9 +200,11 @@ export const getUserWallet = query({
     },
 });
 
+// Award points to a user (Internal or admin use primarily)
+// Usage: await awardPoints({ db, userId: ..., amount: 10, type: 'daily_login', description: 'Daily Login Reward' })
 export const awardPoints = mutation({
     args: {
-        userId: v.optional(v.id("users")),
+        userId: v.optional(v.id("users")), // Optional if calling as user
         amount: v.number(),
         type: v.string(),
         description: v.string(),
@@ -194,6 +213,7 @@ export const awardPoints = mutation({
     handler: async ({ db, auth }, args) => {
         let userId = args.userId;
 
+        // If no userId provided, try to get from auth
         if (!userId) {
             const identity = await auth.getUserIdentity();
             if (!identity) throw new Error("Unauthorized");
@@ -205,6 +225,7 @@ export const awardPoints = mutation({
             userId = user._id;
         }
 
+        // Get or create wallet
         let wallet = await db
             .query("wallets")
             .withIndex("by_user", (q) => q.eq("userId", userId!))
@@ -221,13 +242,16 @@ export const awardPoints = mutation({
 
         if (!wallet) throw new Error("Failed to initialize wallet");
 
+        // Calculate new balance
         const newBalance = wallet.balance + args.amount;
 
+        // Update wallet
         await db.patch(wallet._id, {
             balance: newBalance,
             updatedAt: Date.now(),
         });
 
+        // Record transaction
         await db.insert("transactions", {
             walletId: wallet._id,
             amount: args.amount,
@@ -241,14 +265,23 @@ export const awardPoints = mutation({
     },
 });
 
+// Award XP to a user and handle level ups
+// Usage: await awardXP({ db, userId: ..., amount: 50, action: 'create_idea' })
+// Helper: Level Calculation Strategy
+// Levels 1-10: Linear (100 XP per level)
+// Levels 11+: Exponential (Base 1000 XP, 1.5x multiplier per level relative to base)
 function calculateLevelFromXP(xp: number): number {
     if (xp < 1000) {
         return Math.floor(xp / 100) + 1;
     }
+    // xp = 1000 * (1.5 ^ (level - 10))
+    // level - 10 = log(xp / 1000) / log(1.5)
+    // level = 10 + ...
     const power = Math.log(xp / 1000) / Math.log(1.5);
     return Math.floor(10 + power);
 }
 
+// Helper: Calculate XP required for a specific level
 function calculateXPForLevel(level: number): number {
     if (level <= 10) {
         return (level - 1) * 100;
@@ -273,15 +306,18 @@ export const getLevelProgress = query({
     }
 });
 
+// Award XP to a user and handle level ups
+// Usage: await awardXP({ db, userId: ..., amount: 50, action: 'create_idea' })
 export const awardXP = mutation({
     args: {
         userId: v.optional(v.id("users")),
         amount: v.number(),
-        action: v.string(),
+        action: v.string(), // For logging/history if we add it later
     },
     handler: async ({ db, auth }, args) => {
         let userId = args.userId;
 
+        // If no userId provided, try to get from auth
         if (!userId) {
             const identity = await auth.getUserIdentity();
             if (!identity) throw new Error("Unauthorized");
@@ -316,6 +352,7 @@ export const awardXP = mutation({
     },
 });
 
+// Internal mutation to award XP (for use by other mutations via scheduler)
 export const internalAwardXP = internalMutation({
     args: {
         userId: v.id("users"),
@@ -324,7 +361,7 @@ export const internalAwardXP = internalMutation({
     },
     handler: async ({ db }, args) => {
         const user = await db.get(args.userId);
-        if (!user) return;
+        if (!user) return; // Fail silently for background tasks
 
         const currentXP = user.xp || 0;
         const newXP = currentXP + args.amount;
@@ -338,6 +375,7 @@ export const internalAwardXP = internalMutation({
     },
 });
 
+// Internal mutation to award Points (for use by other mutations via scheduler)
 export const internalAwardPoints = internalMutation({
     args: {
         userId: v.id("users"),
@@ -347,6 +385,7 @@ export const internalAwardPoints = internalMutation({
         relatedId: v.optional(v.string()),
     },
     handler: async ({ db }, args) => {
+        // Get or create wallet
         let wallet = await db
             .query("wallets")
             .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -363,13 +402,16 @@ export const internalAwardPoints = internalMutation({
 
         if (!wallet) return;
 
+        // Calculate new balance
         const newBalance = wallet.balance + args.amount;
 
+        // Update wallet
         await db.patch(wallet._id, {
             balance: newBalance,
             updatedAt: Date.now(),
         });
 
+        // Record transaction
         await db.insert("transactions", {
             walletId: wallet._id,
             amount: args.amount,
@@ -379,16 +421,20 @@ export const internalAwardPoints = internalMutation({
             createdAt: Date.now(),
         });
 
-        // Mirror the award into userLevels.titlePoints/totalPoints so the Level
-        // bar in the profile UI advances. Also increment the task-gate counters
-        // (ideasCreated/commentsCount/etc.) based on action type so Lv 1–6 gates
-        // can actually be cleared.
+        // Mirror the award into the userLevels.titlePoints/totalPoints so the
+        // Level progress bar in the profile UI actually moves. This unifies the
+        // two parallel reward systems (wallet + userLevels) so creating ideas,
+        // commenting, and sparking all advance the same level bar that venture
+        // checkpoint completions advance.
         const now = Date.now();
         const userLevel = await db
             .query("userLevels")
             .withIndex("by_user", (q) => q.eq("userId", args.userId))
             .first();
 
+        // Map action types to counter increments so task-gate fields
+        // (ideasCreated, commentsCount, collaboratorsRecruited, collaboratorsJoined)
+        // actually move when the user performs the gating action.
         const counterDelta = {
             ideasCreated: args.type === "create_idea" ? 1 : 0,
             commentsCount: args.type === "comment" ? 1 : 0,
@@ -404,8 +450,10 @@ export const internalAwardPoints = internalMutation({
             const newCollabRecruited = (userLevel.collaboratorsRecruited || 0) + counterDelta.collaboratorsRecruited;
             const newCollabJoined = (userLevel.collaboratorsJoined || 0) + counterDelta.collaboratorsJoined;
 
-            // Level-up: must satisfy BOTH titlePoints threshold AND task gates
-            // (Lv 1–6 task-gated; Lv 7+ pure points). Loops only matters past Lv 7.
+            // Level-up check — must satisfy BOTH (a) titlePoints threshold AND
+            // (b) task-gate requirements per the PDF (Lv 1–6 are task-gated;
+            // Lv 7+ is purely points-based). Loops in case a single award crosses
+            // multiple levels (only relevant for Lv 7+).
             const projectedUserLevel = {
                 ...userLevel,
                 titlePoints: newTitlePoints,
@@ -466,3 +514,7 @@ export const internalAwardPoints = internalMutation({
         }
     },
 });
+
+// Update streak logic - usually called on session start
+
+

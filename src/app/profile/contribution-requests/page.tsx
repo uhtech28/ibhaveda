@@ -379,7 +379,7 @@ export default function ContributionRequestsPage() {
               )}
             >
               <Send className="w-4 h-4" />
-              <span>My Requests</span>
+              <span>Outgoing</span>
               <span
                 className={cn(
                   "inline-flex h-5 min-w-5 items-center justify-center rounded-full text-[11px] px-1.5 font-semibold",

@@ -1,6 +1,6 @@
 'use client'
 
-import { LogOut, Plus, Home, Lightbulb, Users, ArrowLeft, Search, Bell } from 'lucide-react'
+import { LogOut, Plus, Home, Users, ArrowLeft, Search, Bell } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -15,9 +15,29 @@ import { useQuery } from "convex/react"
 import { api } from "../../convex/_generated/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
+// Clean lightbulb icon (no rays/dashes around the bulb).
+// lucide-react's <Lightbulb /> includes the rays which look noisy at small
+// sizes — this is a slimmer custom replacement used for "My Ideas".
+const IdeaBulb = ({ className }: { className?: string }) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        aria-hidden="true"
+    >
+        <path d="M9 18h6" />
+        <path d="M10 21h4" />
+        <path d="M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.7 1.5 2.8V18h4v-1.3c0-1.1.6-2.1 1.5-2.8A6 6 0 0 0 12 3Z" />
+    </svg>
+)
+
 const menuItems = [
     { name: 'Feed', href: '/feed', icon: Home },
-    { name: 'My Ideas', href: '/my-ideas', icon: Lightbulb },
+    { name: 'My Ideas', href: '/my-ideas', icon: IdeaBulb },
     { name: 'Community', href: '/community', icon: Users },
 ]
 

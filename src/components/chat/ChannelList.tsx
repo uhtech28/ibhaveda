@@ -1,5 +1,5 @@
 import React, { memo, useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,11 +16,11 @@ interface ChannelListProps {
 
 const ChannelList: React.FC<ChannelListProps> = memo(({ ideaId, onBack, onSelectChannel }) => {
     const channels = useQuery(api.communities.getChannels, { ideaId });
+    const ensureSubIdeaChannel = useMutation(api.communities.ensureSubIdeaChannel);
     const [showCreate, setShowCreate] = useState(false);
+    const [opening, setOpening] = useState<string | null>(null);
     const idea = useQuery(api.ideas.getIdeaById, { ideaId });
 
-    // Inline create-channel panel — replaces this view inside the chat sheet
-    // so it doesn't get hidden behind the sheet's high z-index.
     if (showCreate) {
         return (
             <CreateChannelPanel
@@ -34,6 +34,30 @@ const ChannelList: React.FC<ChannelListProps> = memo(({ ideaId, onBack, onSelect
             />
         );
     }
+
+    // Sub-ideas without a backing conversation are returned with a
+    // `virtual:` prefixed _id. On click we create the conversation, then open
+    // it. Ensures the chat hierarchy mirrors the idea hierarchy 1:1.
+    const handleSelect = async (channel: {
+        _id: string;
+        ideaId: Id<"ideas">;
+        virtual: boolean;
+    }) => {
+        if (opening) return;
+        if (!channel.virtual) {
+            onSelectChannel(channel._id as Id<"conversations">);
+            return;
+        }
+        setOpening(channel._id);
+        try {
+            const conversationId = await ensureSubIdeaChannel({ ideaId: channel.ideaId });
+            onSelectChannel(conversationId);
+        } catch (err) {
+            console.error("Failed to open sub-idea channel:", err);
+        } finally {
+            setOpening(null);
+        }
+    };
 
     return (
         <div className="w-full h-full bg-background flex flex-col">
@@ -79,8 +103,9 @@ const ChannelList: React.FC<ChannelListProps> = memo(({ ideaId, onBack, onSelect
                             <Button
                                 key={channel._id}
                                 variant="ghost"
+                                disabled={opening === channel._id}
                                 className="w-full flex items-center gap-2.5 p-2 h-auto justify-start hover:bg-accent/50 transition-all duration-200"
-                                onClick={() => onSelectChannel(channel._id)}
+                                onClick={() => handleSelect(channel)}
                             >
                                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary">
                                     <Hash className="w-4 h-4" />
@@ -89,11 +114,13 @@ const ChannelList: React.FC<ChannelListProps> = memo(({ ideaId, onBack, onSelect
                                     <span className="font-medium text-sm text-foreground truncate block">
                                         {channel.name}
                                     </span>
-                                    {channel.lastMessageAt && (
+                                    {channel.lastMessageAt ? (
                                         <span className="text-[10px] text-muted-foreground">
                                             Active {formatDistanceToNow(channel.lastMessageAt, { addSuffix: false }).replace('about ', '')} ago
                                         </span>
-                                    )}
+                                    ) : channel.virtual ? (
+                                        <span className="text-[10px] text-muted-foreground">Sub-idea · tap to open</span>
+                                    ) : null}
                                 </div>
                                 {channel.unreadCount > 0 && (
                                     <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">

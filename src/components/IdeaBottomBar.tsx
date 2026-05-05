@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Handshake, Inbox, Sparkles } from "lucide-react";
+import { MessageCircle, Sparkles, Users } from "lucide-react";
 import ParticleButton from "@/components/kokonutui/particle-button";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { useAuth } from "@clerk/nextjs";
@@ -34,6 +34,13 @@ export function IdeaBottomBar({
 }: IdeaBottomBarProps) {
   const { userId } = useAuth();
   const toggleSparkMutation = useMutation(api.ideas.toggleSpark);
+
+  // Live contributor count — same query the feed uses, so the number on the
+  // detail page matches what users see on the idea card.
+  const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
+    ideaId: ideaId as Id<"ideas">,
+  });
+  const contributorCount = contributors?.length ?? 0;
 
   const [isSparking, setIsSparking] = useState(false);
   const [currentSparkCount, setCurrentSparkCount] = useState(initialSparkCount);
@@ -100,27 +107,23 @@ export function IdeaBottomBar({
 
       <div className="w-px h-6 bg-border/50 mx-1" />
 
-      {/* Contribute/Requests Button */}
+      {/* Contribute / Requests Button — same Users icon as the feed card,
+       * regardless of whether the viewer is the author. The red dot in the
+       * top-right surfaces pending request count for authors. */}
       <Button
         variant="ghost"
         size="sm"
         onClick={onOpenRequests}
+        aria-label={isAuthor ? "View contribution requests" : "Contributors"}
+        title={isAuthor ? "Contribution requests" : "Contributors"}
         className="rounded-full px-4 h-10 gap-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 transition-colors relative"
       >
-        {isAuthor ? (
-          <>
-            <Inbox className="w-4 h-4" />
-            <span className="font-semibold text-sm">Requests</span>
-            {requestCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold ring-2 ring-background">
-                {requestCount}
-              </span>
-            )}
-          </>
-        ) : (
-          <>
-            <Handshake className="w-4 h-4" />
-          </>
+        <Users className="w-4 h-4" />
+        <span className="font-semibold text-sm">{contributorCount}</span>
+        {isAuthor && requestCount > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold ring-2 ring-background">
+            {requestCount}
+          </span>
         )}
       </Button>
     </div>

@@ -140,9 +140,20 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
     // their job. For everything else, drill into the idea or sender profile.
     if (isPendingInvitation) return
     if (notification.relatedId) {
-      if (['new_idea', 'spark_received', 'comment_received', 'contribution_request_received'].includes(notification.type)) {
-        window.location.href = `/idea/${notification.relatedId}`
-      } else if (['invitation_accepted', 'invitation_rejected'].includes(notification.type)) {
+      // Anything tied to an idea — sparks, comments, contribution requests
+      // (received/accepted/rejected) and invitation responses — drills into
+      // that idea's page.
+      const ideaTypes = [
+        'new_idea',
+        'spark_received',
+        'comment_received',
+        'contribution_request_received',
+        'contribution_request_accepted',
+        'contribution_request_rejected',
+        'invitation_accepted',
+        'invitation_rejected',
+      ];
+      if (ideaTypes.includes(notification.type)) {
         window.location.href = `/idea/${notification.relatedId}`
       } else if (notification.type === 'badge_awarded') {
         const username = notification.sender?.username;

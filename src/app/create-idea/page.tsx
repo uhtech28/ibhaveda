@@ -20,18 +20,41 @@ import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
 
-const EXAMPLE_SEEDS: Array<{ title: string; description: string }> = [
+const EXAMPLE_SEEDS: Array<{
+  title: string;
+  description: string;
+  industries: string[];
+  skills: string[];
+}> = [
   {
     title: "Voice-first reading companion for kids",
     description: "Most reading apps for kids are passive. What if a voice-led reading buddy listened, gently corrected pronunciation, and turned each chapter into a 60-second adventure recap?",
+    industries: ["Education and Academia", "Software Services, Apps, and Equipment"],
+    skills: ["Computer and Software Engineering", "Designer", "Academia and Education"],
   },
   {
     title: "Local-first community fridge map",
     description: "Community fridges fight food waste, but finding nearby ones is hit-or-miss. A hyperlocal map where neighbors check fridges in/out and post photos of available items.",
+    industries: ["Social Services and Environmentalism", "Food, Beverages, Tobacco, and Other Consumables"],
+    skills: ["Computer and Software Engineering", "Sociology", "Designer"],
   },
   {
     title: "Idea-to-investor matchmaker",
     description: "A two-sided platform where founders write the smallest possible pitch (one paragraph + one diagram) and investors filter by industry / stage / capital.",
+    industries: ["Finance", "Software Services, Apps, and Equipment"],
+    skills: ["Finance and Insurance", "Computer and Software Engineering", "General Management"],
+  },
+  {
+    title: "Carbon-aware home energy coach",
+    description: "Most people want to lower their carbon footprint but don't know which appliance to swap first. A coach that reads your smart-meter data and recommends one high-impact change per month.",
+    industries: ["Energy", "Public Utilities"],
+    skills: ["Electrical Engineering", "Computer and Software Engineering", "Geoscience"],
+  },
+  {
+    title: "Peer-led microlearning for trade skills",
+    description: "Vocational training is bottlenecked by formal certification. A platform where verified tradespeople record 5-minute drills (welding, plumbing, electrical) and learners earn skill badges by uploading proof-of-practice videos.",
+    industries: ["Education and Academia", "Construction and Materials"],
+    skills: ["Training Services", "Film", "Designer"],
   },
 ];
 
@@ -191,6 +214,8 @@ export default function CreateIdeaPage() {
               const seed = EXAMPLE_SEEDS[Math.floor(Math.random() * EXAMPLE_SEEDS.length)];
               setTitle(seed.title.slice(0, 100));
               setDescription(seed.description.slice(0, 1200));
+              setIndustries(seed.industries);
+              setSkills(seed.skills);
             }}
             title="Fill the form with an example you can edit or clear"
             className="shrink-0 gap-2"

@@ -66,11 +66,13 @@ export const NotificationBell = () => {
       {mounted && open &&
         createPortal(
           <>
+            {/* Backdrop on mobile — taps outside close */}
             <div
               aria-hidden
               className="fixed inset-0 z-[55] bg-black/40 lg:hidden"
               onClick={() => setOpen(false)}
             />
+            {/* Panel — half-size, anchored below navbar */}
             <div
               ref={panelRef}
               role="dialog"
@@ -83,6 +85,7 @@ export const NotificationBell = () => {
                 bg-background border border-border/60 rounded-xl shadow-2xl
               "
             >
+              {/* Close button — high z-index, clearly visible */}
               <button
                 type="button"
                 onClick={() => setOpen(false)}

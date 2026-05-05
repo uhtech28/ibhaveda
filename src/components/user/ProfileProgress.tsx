@@ -157,8 +157,6 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
   })();
 
   const currentStreak = streak?.currentStreak ?? 0;
-  const streakGoal = nextStreakMilestone(currentStreak);
-
   // Streak label — just show day count. Distinguish loading / first day / active.
   let streakDetail: string;
   if (streak === undefined) {
@@ -188,15 +186,18 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
         fillClass="bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.45)]"
       />
 
-      <ProgressBar
-        icon={<Flame className="w-3.5 h-3.5 text-orange-300" />}
-        iconBgClass="bg-orange-500/15 ring-1 ring-orange-500/30"
-        label="Day Streak"
-        detail={streakDetail}
-        value={currentStreak}
-        max={streakGoal || 7}
-        fillClass="bg-gradient-to-r from-orange-500 via-red-500 to-rose-500 shadow-[0_0_8px_rgba(251,146,60,0.45)]"
-      />
+      {/* Streak — count only, no progress bar */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-orange-500/15 ring-1 ring-orange-500/30">
+            <Flame className="w-3.5 h-3.5 text-orange-300" />
+          </span>
+          <span className="text-sm font-medium text-foreground truncate">Day Streak</span>
+        </div>
+        <span className="text-sm font-semibold text-orange-200 tabular-nums shrink-0">
+          {streakDetail}
+        </span>
+      </div>
     </div>
   );
 };

@@ -87,8 +87,6 @@ export function IdeaForgeLeftRail({
   onTagSelect: (value: string) => void;
 }) {
   // Real, live backend data
-  const wallet = useQuery(api.gamification.getWallet);
-  const streak = useQuery(api.gamification.getStreak);
   const levelProgress = useQuery(
     api.levels.getUserLevelProgress,
     currentUser?._id ? { userId: currentUser._id } : "skip"
@@ -164,7 +162,7 @@ export function IdeaForgeLeftRail({
               </div>
             </Link>
 
-            <div className="mt-4 rounded-[14px] border border-white/8 bg-white/[0.03] p-4">
+            <div className="mt-4">
               <div className="flex items-center justify-between text-sm text-[#F9FAFB]">
                 <span className="flex flex-col">
                   <span className="font-semibold">Level {level}</span>
@@ -180,22 +178,8 @@ export function IdeaForgeLeftRail({
               </div>
               <Progress
                 value={progress}
-                className="mt-3 h-2.5 bg-[#20293B] [&>div]:bg-[linear-gradient(90deg,#6366F1,#8B5CF6)]"
+                className="mt-3 h-2 bg-[#20293B] [&>div]:bg-[linear-gradient(90deg,#6366F1,#8B5CF6)]"
               />
-              <div className="mt-4 flex flex-col gap-2 text-xs">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-base font-semibold text-[#F9FAFB] tabular-nums">
-                    {(wallet?.balance || 0).toLocaleString()}
-                  </span>
-                  <span className="text-[#9CA3AF]">sparks banked</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-base font-semibold text-[#F9FAFB] tabular-nums">
-                    {streak?.currentStreak || 0}
-                  </span>
-                  <span className="text-[#9CA3AF]">day streak</span>
-                </div>
-              </div>
             </div>
           </div>
         </section>

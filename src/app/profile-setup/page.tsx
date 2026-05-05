@@ -112,10 +112,14 @@ export default function ProfileSetupPage() {
     if (user) {
       const suggestedUsername = (user.username || user.firstName || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '');
       const suggestedName = user.fullName || suggestedUsername;
+      // Auto-pull avatar from Clerk if available, so first-time setup
+      // doesn't have to ask the user to upload one.
+      const clerkAvatar = user.imageUrl || "";
       setFormData(prev => ({
         ...prev,
         displayName: prev.displayName || suggestedName,
         username: prev.username || suggestedUsername,
+        avatar: prev.avatar || clerkAvatar,
       }));
       if (suggestedUsername && suggestedUsername.length >= 3) {
         setValidationUsername(suggestedUsername);
@@ -303,52 +307,38 @@ export default function ProfileSetupPage() {
             <Card className="border-border/50 shadow-xl">
               <CardContent className="p-6 md:p-10">
                 <form onSubmit={handleSubmit}>
-                  <div className="flex flex-col md:flex-row md:items-center gap-8 md:gap-12">
-                    <div className="flex flex-col items-center gap-3 md:flex-shrink-0">
-                      <AvatarUpload
-                        currentAvatar={formData.avatar}
-                        onAvatarChange={(avatarUrl: string) => setFormData(prev => ({ ...prev, avatar: avatarUrl }))}
-                        displayName={formData.displayName || "User"}
+                  {/* First-time setup is intentionally minimal:
+                   *   - No avatar upload (auto-generated from initials/Clerk image)
+                   *   - No Cancel button (forces profile completion before they
+                   *     can use the app)
+                   *   - Submit drops the user straight into /feed */}
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+                      <Input
+                        id="username"
+                        value={formData.username}
+                        onChange={(e) => handleUsernameChange(e.target.value)}
+                        placeholder="yourname"
+                        className="h-11 text-sm"
+                        maxLength={30}
+                        autoFocus
                       />
+                      <UsernameValidationStatus />
                     </div>
-                    <div className="flex-1 w-full space-y-5">
-                      <div className="space-y-2">
-                        <Label htmlFor="username" className="text-sm font-medium">Username</Label>
-                        <Input
-                          id="username"
-                          value={formData.username}
-                          onChange={(e) => handleUsernameChange(e.target.value)}
-                          placeholder="yourname"
-                          className="h-11 text-sm"
-                          maxLength={30}
-                          autoFocus
-                        />
-                        <UsernameValidationStatus />
+                    {error && (
+                      <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                        <p className="text-xs text-destructive font-medium">{error}</p>
                       </div>
-                      {error && (
-                        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                          <p className="text-xs text-destructive font-medium">{error}</p>
-                        </div>
-                      )}
-                      <div className="space-y-2 pt-1">
-                        <Button
-                          type="submit"
-                          disabled={loading || usernameValidation.available === false || usernameValidation.checking || !formData.username}
-                          size="default"
-                          className="w-full h-11"
-                        >
-                          {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Setting up…</>) : ("Complete Setup")}
-                        </Button>
-                        <button
-                          type="button"
-                          onClick={handleCancel}
-                          disabled={loading}
-                          className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
+                    )}
+                    <Button
+                      type="submit"
+                      disabled={loading || usernameValidation.available === false || usernameValidation.checking || !formData.username}
+                      size="default"
+                      className="w-full h-11"
+                    >
+                      {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Setting up…</>) : ("Complete Setup")}
+                    </Button>
                   </div>
                 </form>
               </CardContent>
