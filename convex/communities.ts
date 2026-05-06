@@ -143,10 +143,10 @@ export const getChannels = query({
       out.push({
         _id: c._id as unknown as string,
         name: c.name || "general",
-        type: c.type,
+        type: c.type ?? "group",
         lastMessageAt: c.updatedAt,
         unreadCount: c.unreadCount || 0,
-        ideaId: c.ideaId,
+        ideaId: c.ideaId ?? args.ideaId,
         virtual: false,
       });
     }
@@ -163,7 +163,7 @@ export const getChannels = query({
         out.push({
           _id: subConversation._id as unknown as string,
           name: subConversation.name || sub.title,
-          type: subConversation.type,
+          type: subConversation.type ?? "group",
           lastMessageAt: subConversation.updatedAt,
           unreadCount: subConversation.unreadCount || 0,
           ideaId: sub._id,
