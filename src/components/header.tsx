@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useQuery } from "convex/react"
 import { api } from "../../convex/_generated/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { IdeaWizard } from "@/components/ideas/IdeaWizard"
 
 // Clean lightbulb icon (no rays/dashes around the bulb).
 // lucide-react's <Lightbulb /> includes the rays which look noisy at small
@@ -61,6 +62,9 @@ export const HeroHeader = ({
 
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
     const mobileSearchRef = useRef<HTMLDivElement | null>(null)
+    // 3-step AI wizard for the + button — same instance shared by both
+    // the mobile compact + and the desktop primary +.
+    const [showIdeaWizard, setShowIdeaWizard] = useState(false)
 
     useEffect(() => {
         if (mobileSearchOpen) {
@@ -173,17 +177,17 @@ export const HeroHeader = ({
                             </SignedOut>
 
                             <SignedIn>
-                                <Link href="/create-idea" aria-label="Post idea" className="shrink-0">
-                                    <button
-                                        type="button"
-                                        className={cn(
-                                            transitionBase,
-                                            "flex h-9 w-9 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white"
-                                        )}
-                                    >
-                                        <Plus className="h-5 w-5" />
-                                    </button>
-                                </Link>
+                                <button
+                                    type="button"
+                                    aria-label="Post idea"
+                                    onClick={() => setShowIdeaWizard(true)}
+                                    className={cn(
+                                        transitionBase,
+                                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white"
+                                    )}
+                                >
+                                    <Plus className="h-5 w-5" />
+                                </button>
 
                                 <div className="shrink-0 [&_button]:h-9 [&_button]:w-9 [&_button]:text-[#D1D5DB] [&_button:hover]:bg-white/[0.06] [&_button:hover]:text-white">
                                     <NotificationBell />
@@ -313,16 +317,15 @@ export const HeroHeader = ({
 
                             <SignedIn>
                                 <div className="flex items-center gap-2 ml-1">
-                                    <Link href="/create-idea">
-                                        <button
-                                            type="button"
-                                            aria-label="Post Idea"
-                                            title="Post Idea"
-                                            className="inline-flex items-center justify-center w-10 h-10 rounded-[10px] bg-[#6366F1] text-white shadow-[0_10px_32px_rgba(99,102,241,0.18)] hover:bg-[#8B5CF6] transition-colors"
-                                        >
-                                            <Plus className="h-5 w-5" />
-                                        </button>
-                                    </Link>
+                                    <button
+                                        type="button"
+                                        aria-label="Post Idea"
+                                        title="Post Idea"
+                                        onClick={() => setShowIdeaWizard(true)}
+                                        className="inline-flex items-center justify-center w-10 h-10 rounded-[10px] bg-[#6366F1] text-white shadow-[0_10px_32px_rgba(99,102,241,0.18)] hover:bg-[#8B5CF6] transition-colors"
+                                    >
+                                        <Plus className="h-5 w-5" />
+                                    </button>
 
                                     <NotificationBell />
 
@@ -369,6 +372,9 @@ export const HeroHeader = ({
                     </div>
                 </div>
             </nav>
+
+            {/* AI-powered 3-step idea wizard — opens from any + button. */}
+            <IdeaWizard isOpen={showIdeaWizard} onOpenChange={setShowIdeaWizard} />
         </header>
     )
 }

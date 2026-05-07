@@ -146,6 +146,8 @@ export const getChannels = query({
         type: c.type ?? "group",
         lastMessageAt: c.updatedAt,
         unreadCount: c.unreadCount || 0,
+        // Older conversation rows pre-date the per-idea index; default
+        // them to the root we're querying so the channel still resolves.
         ideaId: c.ideaId ?? args.ideaId,
         virtual: false,
       });
