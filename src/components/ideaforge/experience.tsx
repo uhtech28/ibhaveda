@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
-import { useRouter } from "next/navigation";
 import {
   BarChart3,
   Eye,
@@ -35,6 +34,7 @@ import { IdeaForgeLeftRail } from "@/components/ideaforge/left-rail";
 import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { IdeaForgeRightRail } from "@/components/ideaforge/right-rail";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
+import { IdeaWizard } from "@/components/ideas/IdeaWizard";
 import {
   cardSurface,
   ComposerDraft,
@@ -105,7 +105,6 @@ export function IdeaForgeExperience({
   isProfileComplete: boolean;
   onCompleteProfile: () => void;
 }) {
-  const router = useRouter();
   const userIdeas = useQuery(api.ideas.getUserIdeas) || [];
   const publicIdeas = useQuery(api.ideas.getPublicIdeas, { limit: 60 }) || [];
   // Real backend signals for the Analytics tab.
@@ -115,6 +114,9 @@ export function IdeaForgeExperience({
   const [myIdeasTab, setMyIdeasTab] = useState<MyIdeasTabKey>("public");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [savedIdeaIds, setSavedIdeaIds] = usePersistentIds(SAVED_STORAGE_KEY);
+  // 3-step AI wizard for the + button. /create-idea remains as a
+  // direct route for power users who want the full single-page form.
+  const [showIdeaWizard, setShowIdeaWizard] = useState(false);
 
   const filteredFeedIdeas = useMemo(() => {
     const searchable = ideas.filter((idea) => matchesSearch(idea, searchQuery));
@@ -161,9 +163,10 @@ export function IdeaForgeExperience({
   };
 
   const openComposerWithDraft = (_draft?: Partial<ComposerDraft>) => {
-    // All composer entry points navigate to the standard /create-idea page so the
-    // form layout stays consistent everywhere instead of forking into a modal variant.
-    router.push("/create-idea");
+    // The + button now opens the 3-step AI wizard (outline → AI preview
+    // → review & post). The legacy /create-idea full-page form is still
+    // reachable via direct URL for users who want the long form layout.
+    setShowIdeaWizard(true);
   };
 
   return (
@@ -353,6 +356,9 @@ export function IdeaForgeExperience({
 
       {/* Floating chat button — same as Community page. */}
       <FloatingChatButton />
+
+      {/* AI-powered 3-step idea wizard — opens from any + button. */}
+      <IdeaWizard isOpen={showIdeaWizard} onOpenChange={setShowIdeaWizard} />
     </div>
   );
 }
