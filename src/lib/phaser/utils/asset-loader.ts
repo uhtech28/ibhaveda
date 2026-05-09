@@ -1333,7 +1333,7 @@ export class AssetLoader {
     // --- Fan-tasy Tileset Assets ---
     const fanTasyPath = "/assets/fan-tasy";
     const sproutPath = "/assets/sprout";
-    
+
     // Core Tilesets
     scene.load.image("Tileset_Ground", `${fanTasyPath}/Tileset_Ground.png`);
     scene.load.spritesheet(
@@ -1408,7 +1408,7 @@ export class AssetLoader {
     const objects = [
       "House_Hay_1", "House_Hay_2", "House_Hay_3", "House_Hay_4_Purple",
       "CityWall_Gate_1", "Well_Hay_1", "Sign_1", "Sign_2", "Table_Medium_1",
-      "Bench_1", "Bench_3", "Barrel_Small_Empty", "Basket_Empty", 
+      "Bench_1", "Bench_3", "Barrel_Small_Empty", "Basket_Empty",
       "Crate_Large_Empty", "Crate_Medium_Closed", "Crate_Water_1",
       "LampPost_3", "BulletinBoard_1", "HayStack_2", "Plant_2", "Sack_3",
       "Rock_Brown_1", "Rock_Brown_2", "Rock_Brown_4", "Rock_Brown_6", "Rock_Brown_9",

@@ -276,7 +276,7 @@ export default function CreateIdeaPage() {
             </CardHeader>
             <CardContent className="p-4 md:p-6">
               <form onSubmit={handleSubmit} className="space-y-4">
-                
+
                 {/* Idea Title */}
                 <div className="space-y-1.5">
                   <Label htmlFor="title" className="text-sm font-medium">

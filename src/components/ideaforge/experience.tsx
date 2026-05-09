@@ -221,7 +221,7 @@ export function IdeaForgeExperience({
     <div className="min-h-screen bg-[#0A0D12] pb-28 text-[#F9FAFB]">
       <IdeaForgeNavbar currentUser={currentUser} searchQuery={searchQuery} onSearchChange={onSearchChange} onOpenComposer={openCategorySelector} />
 
-      <main className={cn(shellMax, "px-4 pb-12 pt-28 sm:px-6 xl:px-8") }>
+      <main className={cn(shellMax, "px-4 pb-12 pt-28 sm:px-6 xl:px-8")}>
         <div className="flex items-start gap-6">
           <IdeaForgeLeftRail
             currentUser={currentUser}
@@ -439,8 +439,8 @@ export function IdeaForgeExperience({
         <Plus className="h-6 w-6" />
       </button>
 
-      <CategorySelectorModal 
-        open={categorySelectorOpen} 
+      <CategorySelectorModal
+        open={categorySelectorOpen}
         onOpenChange={setCategorySelectorOpen}
         onSelectCategory={handleCategorySelect}
       />

@@ -23,14 +23,14 @@ interface BiomeConfig {
   name: string;
   theme: string;
   visualTheme:
-    | "village"
-    | "forest"
-    | "arena"
-    | "artisan"
-    | "mine"
-    | "harbour"
-    | "crossroads"
-    | "capital";
+  | "village"
+  | "forest"
+  | "arena"
+  | "artisan"
+  | "mine"
+  | "harbour"
+  | "crossroads"
+  | "capital";
   colors: {
     sky: number;
     ground: number;
@@ -585,33 +585,33 @@ export class WorldMapScene extends Phaser.Scene {
     const style =
       biome.id === 2
         ? {
-            baseTint: 0xc2ea7b,
-            shadeTint: 0x7dbb49,
-            canopyTint: 0x21532f,
-            mistTint: 0xe9ffd8,
-            waterTint: 0x83d7e5,
-            pathTint: 0xb78b5a,
-            hillTint: 0xffffff,
-          }
+          baseTint: 0xc2ea7b,
+          shadeTint: 0x7dbb49,
+          canopyTint: 0x21532f,
+          mistTint: 0xe9ffd8,
+          waterTint: 0x83d7e5,
+          pathTint: 0xb78b5a,
+          hillTint: 0xffffff,
+        }
         : biome.id === 5
           ? {
-              baseTint: 0xa5c56d,
-              shadeTint: 0x6c8748,
-              canopyTint: 0x2f2a22,
-              mistTint: 0xf4efd9,
-              waterTint: 0x6fb7cb,
-              pathTint: 0x9a7a53,
-              hillTint: 0xf3efe0,
-            }
+            baseTint: 0xa5c56d,
+            shadeTint: 0x6c8748,
+            canopyTint: 0x2f2a22,
+            mistTint: 0xf4efd9,
+            waterTint: 0x6fb7cb,
+            pathTint: 0x9a7a53,
+            hillTint: 0xf3efe0,
+          }
           : {
-              baseTint: 0xb8de7c,
-              shadeTint: 0x6d9157,
-              canopyTint: 0x39455a,
-              mistTint: 0xf2f7fb,
-              waterTint: 0x74aeca,
-              pathTint: 0xaa7d60,
-              hillTint: 0xf6f1e9,
-            };
+            baseTint: 0xb8de7c,
+            shadeTint: 0x6d9157,
+            canopyTint: 0x39455a,
+            mistTint: 0xf2f7fb,
+            waterTint: 0x74aeca,
+            pathTint: 0xaa7d60,
+            hillTint: 0xf6f1e9,
+          };
     const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
     const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
     const hillFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24, 33, 34, 35, 88, 89];
@@ -648,7 +648,7 @@ export class WorldMapScene extends Phaser.Scene {
       radiusY: number,
     ) =>
       ((x - centerX) * (x - centerX)) / (radiusX * radiusX) +
-        ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
+      ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
       1;
 
     const addFrameSprite = (
@@ -790,7 +790,7 @@ export class WorldMapScene extends Phaser.Scene {
           addFrameSprite(
             "sprout_grass_sheet",
             grassAccentFrames[
-              (col + row + biome.id) % grassAccentFrames.length
+            (col + row + biome.id) % grassAccentFrames.length
             ],
             col,
             row,
@@ -2676,7 +2676,7 @@ export class WorldMapScene extends Phaser.Scene {
     if (stageId === 1) {
       const anchor =
         stageOneVillageAnchors[
-          Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
+        Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
         ];
       return {
         x: biomeOffsetX + anchor.x * this.MAP_PANEL_SCALE,

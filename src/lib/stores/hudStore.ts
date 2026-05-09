@@ -33,9 +33,13 @@ export interface HUDVisibility {
 }
 
 export interface QuestTask {
+  id: string;
+  checkpointId: Id<"ventureCheckpoints">;
+  taskLevel: "t1" | "t2" | "t3";
   label: string;
   description: string;
   tool: string;
+  points: number;
   done: boolean;
 }
 

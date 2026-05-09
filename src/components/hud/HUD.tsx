@@ -7,8 +7,6 @@ import { XPBar } from "./XPBar";
 import { LevelDisplay } from "./LevelDisplay";
 import { StageInfo } from "./StageInfo";
 import { CheckpointProgress } from "./CheckpointProgress";
-import { StreakCounter } from "./StreakCounter";
-import { QualityScore } from "./QualityScore";
 import { AudioControls } from "./AudioControls";
 import { QuestList } from "./QuestList";
 import { GoldCounter } from "./GoldCounter";
@@ -67,11 +65,12 @@ const HUDComponent = () => {
         className="fixed top-2 left-2 right-2 z-50 flex justify-center md:top-3 md:left-3 md:right-3"
       >
         <div
-          className="w-full max-w-6xl overflow-hidden rounded-[20px] border shadow-[0_12px_30px_rgba(34,24,12,0.38)]"
+          className="w-full max-w-6xl overflow-hidden rounded-[24px] border shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
           style={{
-            borderColor: "rgba(110, 86, 48, 0.9)",
+            borderColor: "rgba(99, 102, 241, 0.2)",
             background:
-              "linear-gradient(180deg, rgba(90, 82, 52, 0.94), rgba(70, 63, 40, 0.96))",
+              "linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.98))",
+            backdropFilter: "blur(20px)",
           }}
         >
           <AnimatePresence mode="wait">
@@ -85,11 +84,11 @@ const HUDComponent = () => {
               >
                 <div className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <div
-                    className="mx-auto flex items-center justify-center gap-2 sm:gap-4 rounded-xl border px-2 py-1.5 sm:px-4"
+                    className="mx-auto flex items-center justify-center gap-2 sm:gap-4 rounded-2xl border px-2 py-1.5 sm:px-4"
                     style={{
-                      borderColor: "rgba(202, 175, 118, 0.12)",
+                      borderColor: "rgba(255, 255, 255, 0.05)",
                       background:
-                        "linear-gradient(180deg, rgba(64, 76, 43, 0.32), rgba(78, 72, 41, 0.22))",
+                        "rgba(255, 255, 255, 0.02)",
                     }}
                   >
                     <StageInfo
@@ -117,7 +116,7 @@ const HUDComponent = () => {
                       }}
                     />
 
-                    <div className="h-6 w-px bg-[#c8b47a]/15" />
+                    <div className="h-6 w-px bg-white/5" />
 
                     <CorruptionMeter
                       level={corruptionState.level}
@@ -127,14 +126,8 @@ const HUDComponent = () => {
                       bossBaseHp={corruptionState.bossBaseHp}
                       compact={true}
                     />
-                    <StreakCounter streak={userProgress.streak} compact={true} />
-                    <QualityScore
-                      qualityScore={userProgress.qualityScore}
-                      valuationScore={userProgress.valuationScore}
-                      compact={true}
-                    />
 
-                    <div className="h-6 w-px bg-[#c8b47a]/15" />
+                    <div className="h-6 w-px bg-white/5" />
 
                     <LevelDisplay
                       level={userProgress.level}

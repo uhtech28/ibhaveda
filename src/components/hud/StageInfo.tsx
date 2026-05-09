@@ -76,23 +76,23 @@ const StageInfoComponent = ({
         initial={{ x: -10, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
       >
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#d1bd89]/20 bg-[#3d3a24] shadow-md">
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-800 shadow-md">
           <span className="text-[18px]">
             {stageIcon}
           </span>
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#f7e7b0]/10 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         </div>
 
         <div className="flex flex-col justify-center gap-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-[8px] font-black uppercase tracking-wider text-[#a79a72]">
+            <span className="text-[8px] font-black uppercase tracking-wider text-indigo-400">
               Stage {stage}
             </span>
-            <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">
+            <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500">
               {stageName}
             </span>
           </div>
-          <span className="truncate text-[12px] font-black uppercase tracking-tight text-[#f7f0db]">
+          <span className="truncate text-[12px] font-black uppercase tracking-tight text-white">
             {biomeName}
           </span>
           <div className="flex items-center gap-1.5 mt-0.5">

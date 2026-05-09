@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAtom } from "jotai";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Scroll, ChevronUp, Zap } from "lucide-react";
-import { currentQuestAtom } from "@/lib/stores/hudStore";
+import { currentQuestAtom, submittingTaskAtom } from "@/lib/stores/hudStore";
 
 // Stage names for display in the completion banner
 const STAGE_NAMES: Record<number, string> = {
@@ -25,6 +25,7 @@ const STAGE_TOTAL_CHECKPOINTS: Record<number, number> = {
 
 export function QuestList() {
   const [currentQuest] = useAtom(currentQuestAtom);
+  const [, setSubmittingTask] = useAtom(submittingTaskAtom);
   const [isFolded, setIsFolded] = useState(false);
 
   if (!currentQuest || currentQuest.tasks.length === 0) {
@@ -106,10 +107,23 @@ export function QuestList() {
                       animate={{ x: 0, opacity: 1 }}
                       exit={{ x: 20, opacity: 0 }}
                       transition={{ delay: index * 0.05 }}
+                      onClick={() => {
+                        if (!task.done) {
+                          setSubmittingTask({
+                            id: task.id,
+                            checkpointId: task.checkpointId,
+                            taskLevel: task.taskLevel,
+                            title: `${task.label}: ${currentQuest.checkpointName}`,
+                            description: task.description,
+                            toolType: task.tool,
+                            points: task.points,
+                          });
+                        }
+                      }}
                       className={`relative p-3 border rounded-xl transition-all ${
                         task.done
                           ? "bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                          : "bg-slate-800/30 border-white/5 hover:border-white/10 hover:bg-slate-800/50"
+                          : "bg-slate-800/30 border-white/5 hover:border-indigo-500/50 hover:bg-slate-800/50 cursor-pointer group/task"
                       }`}
                     >
                       {/* Task header */}

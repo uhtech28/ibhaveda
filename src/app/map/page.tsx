@@ -52,8 +52,8 @@ export default function MapIntroPage() {
           : false;
 
       if (tutorialCompleted) {
-        // Skip directly to stages for returning users
-        router.push("/map/stages");
+        // Skip directly to world map for returning users
+        router.push("/map/world");
       } else {
         // Show tutorial for first-time users
         setTutorialStep("welcome");
@@ -81,7 +81,7 @@ export default function MapIntroPage() {
 
     if (tutorialCompleted) {
       // Skip tutorial for returning users
-      router.push("/map/stages");
+      router.push("/map/world");
     } else {
       // Show tutorial for new users
       setTutorialStep("welcome");
@@ -94,7 +94,7 @@ export default function MapIntroPage() {
 
   const handleMapIntroComplete = () => {
     setTutorialStep("complete");
-    router.push("/map/stages");
+    router.push("/map/world");
   };
 
   if (!mounted || tutorialStep === null) {

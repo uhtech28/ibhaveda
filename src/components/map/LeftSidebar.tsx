@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { audioManager } from "@/lib/audio/audioManager";
 
 interface LeftSidebarProps {
-  onOpenPanel: (tab: "tools" | "calendar" | "kanban" | "week-prd" | "all-prd" | "roadmap") => void;
+  onOpenPanel: (tab: "tools" | "calendar" | "kanban" | "roadmap") => void;
   className?: string;
 }
 
@@ -31,8 +31,6 @@ export function LeftSidebar({ onOpenPanel, className }: LeftSidebarProps) {
     { id: "tools", icon: Grid, label: "All Tools", color: "text-indigo-400" },
     { id: "calendar", icon: Calendar, label: "Calendar", color: "text-amber-400" },
     { id: "kanban", icon: LayoutDashboard, label: "Kanban Board", color: "text-emerald-400" },
-    { id: "week-prd", icon: FileText, label: "Week PRD", color: "text-rose-400" },
-    { id: "all-prd", icon: Files, label: "All PRDs", color: "text-sky-400" },
     { id: "roadmap", icon: Map, label: "Launch Roadmap", color: "text-cyan-400" },
   ] as const;
 

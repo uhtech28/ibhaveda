@@ -264,7 +264,7 @@ function StageStrip({
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.5, duration: 0.5 }}
-      className="absolute bottom-20 left-1/2 z-20 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-2 overflow-x-auto rounded-full border border-white/5 bg-[#0a0d14]/60 p-2 shadow-[0_0_20px_rgba(30,20,50,0.5)] backdrop-blur-md sm:bottom-8"
+      className="no-scrollbar absolute bottom-20 left-1/2 z-20 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-2 overflow-x-auto rounded-full border border-white/5 bg-[#0a0d14]/60 p-2 shadow-[0_0_20px_rgba(30,20,50,0.5)] backdrop-blur-md sm:bottom-8"
     >
       {STAGES.map((st, i) => {
         const isDone = i + 1 < activeStage;
@@ -287,13 +287,12 @@ function StageStrip({
                   : isCurrent
                     ? st.glow
                     : "rgba(255,255,255,0.05)",
-                border: `1px solid ${
-                  isDone
+                border: `1px solid ${isDone
                     ? "#6366f1"
                     : isCurrent
                       ? st.glow
                       : "rgba(255,255,255,0.1)"
-                }`,
+                  }`,
                 boxShadow: isCurrent ? `0 0 15px ${st.glow}` : "none",
                 transition:
                   "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease",
@@ -992,9 +991,9 @@ export default function MapPage() {
     api.aiScoring.getStageQualityScore,
     activeVenture && worldMapData?.venture
       ? {
-          ventureId: activeVenture._id,
-          stageNumber: worldMapData.venture.currentStage,
-        }
+        ventureId: activeVenture._id,
+        stageNumber: worldMapData.venture.currentStage,
+      }
       : "skip",
   );
 
@@ -1016,8 +1015,6 @@ export default function MapPage() {
     | "tools"
     | "calendar"
     | "kanban"
-    | "week-prd"
-    | "all-prd"
     | "roadmap"
     | "write"
     | "map"
@@ -1372,7 +1369,7 @@ export default function MapPage() {
       savePersonaGender({
         ventureId: activeVenture._id,
         gender: selectedGender,
-      }).catch(() => {});
+      }).catch(() => { });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVenture?._id, selectedGender]);
@@ -1416,13 +1413,13 @@ export default function MapPage() {
   const xpPercent = levelData?.progress ?? 0;
   const levelPhase = levelData?.phase
     ? (() => {
-        const p = levelData.phase as string;
-        if (p === "tutorial") return 1;
-        if (p === "early") return 2;
-        if (p === "mid") return 3;
-        if (p === "senior") return 4;
-        return 5; // mentor
-      })()
+      const p = levelData.phase as string;
+      if (p === "tutorial") return 1;
+      if (p === "early") return 2;
+      if (p === "mid") return 3;
+      if (p === "senior") return 4;
+      return 5; // mentor
+    })()
     : 1;
 
   // Streak from Convex
@@ -1606,9 +1603,13 @@ export default function MapPage() {
       setCurrentQuestAtom({
         checkpointName: currentCPData.checkpointName,
         tasks: currentCPData.tasks.map((t: WorldMapTask) => ({
+          id: t._id,
+          checkpointId: t.checkpointId,
+          taskLevel: t.taskLevel,
           label: t.taskLevel.toUpperCase(),
           description: t.prompt,
           tool: t.toolType,
+          points: t.taskLevel === "t3" ? 35 : 20,
           done: !!optimisticCompletedTaskIds[t._id] || t.status === "completed",
         })),
         stage: activeStage,
@@ -1743,13 +1744,13 @@ export default function MapPage() {
       corruptionLevel,
       superBoss: superBoss
         ? {
-            bossSlug: superBoss.bossSlug,
-            bossName:
-              superBoss.definition?.name ??
-              superBoss.bossName ??
-              "Unknown Boss",
-            visualStatus: superBoss.visualStatus,
-          }
+          bossSlug: superBoss.bossSlug,
+          bossName:
+            superBoss.definition?.name ??
+            superBoss.bossName ??
+            "Unknown Boss",
+          visualStatus: superBoss.visualStatus,
+        }
         : undefined,
     } as Parameters<typeof eventBridge.dispatchToPhaser>[0]);
 
