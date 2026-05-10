@@ -5,6 +5,12 @@ import { useEffect, useState } from "react";
 export default function ContactPage() {
   const [opened, setOpened] = useState(false);
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('save') === 'true') {
+      setOpened(true);
+    }
+  }, []);
+  useEffect(() => {
     if (opened) {
       const timer = setTimeout(() => {
         window.location.href = website;
