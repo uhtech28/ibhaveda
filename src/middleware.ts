@@ -5,7 +5,7 @@ import { ConvexHttpClient } from 'convex/browser'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
-const isPublicRoute = createRouteMatcher(['/', '/contact', '/api/vcard' , '/sign-in(.*)', '/sign-up(.*)', '/onboarding', '/profile-setup'])
+const isPublicRoute = createRouteMatcher(['/', '/contact', '/aryan-awasthi.vcf' , '/sign-in(.*)', '/sign-up(.*)', '/onboarding', '/profile-setup'])
 
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
