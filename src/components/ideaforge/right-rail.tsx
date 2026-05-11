@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
-import { ArrowUpRight, Flame, MessageCircle, Trophy, Zap } from "lucide-react";
+import { ArrowUpRight, Flame, MessageCircle } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -45,9 +45,7 @@ function SuggestedBuilderCard({ builder }: { builder: BuilderSuggestion }) {
       <Button
         type="button"
         size="sm"
-        onClick={() => {
-          if (builderId) openChatWithUser(builderId);
-        }}
+        onClick={() => { if (builderId) openChatWithUser(builderId); }}
         disabled={!builderId}
         aria-label={`Message ${displayName}`}
         title={`Message ${displayName}`}
@@ -77,10 +75,9 @@ export function IdeaForgeRightRail({
     : "skip");
   const allUsers = useQuery(api.users.getAllUsers);
 
-  // Top-5 trending — keeps the right rail's vertical length close to the
-  // feed list so both columns end at roughly the same scroll position.
-  // If the rail still feels too long after a future redesign, drop this
-  // to 3 — the grid below it (Suggested Builders, also 3) will line up.
+  // Top-3 trending — kept tight so the right rail's vertical length matches
+  // the left feed column at roughly the same scroll position.
+  const TRENDING_LIMIT = 3;
   const trendingIdeas = useMemo(() => {
     return [...publicIdeas]
       .sort(
@@ -88,14 +85,13 @@ export function IdeaForgeRightRail({
           (b.sparkCount || 0) - (a.sparkCount || 0) ||
           b.createdAt - a.createdAt
       )
-      .slice(0, 5);
+      .slice(0, TRENDING_LIMIT);
   }, [publicIdeas]);
 
   const builders = useMemo(() => {
     if (suggested && suggested.length > 0) {
       return suggested.slice(0, 3);
     }
-
     return (allUsers || [])
       .filter((user) => user._id !== currentUser?._id)
       .slice(0, 3)
@@ -116,7 +112,7 @@ export function IdeaForgeRightRail({
             <h3 className={cn(displayFontClass, "text-base font-semibold text-[#F9FAFB]")}>Trending Ideas This Week</h3>
             <Flame className="h-4 w-4 text-[#F59E0B]" />
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2">
             {trendingIdeas.length > 0 ? (
               trendingIdeas.map((idea, index) => (
                 <Link
@@ -124,18 +120,18 @@ export function IdeaForgeRightRail({
                   href={`/idea/${idea._id}`}
                   className={cn(
                     transitionBase,
-                    "flex items-start gap-3 rounded-[14px] border border-transparent px-2 py-2 hover:border-[#6366F1]/35 hover:bg-white/[0.03]"
+                    "flex items-start gap-3 rounded-[12px] border border-transparent px-2 py-1.5 hover:border-[#6366F1]/35 hover:bg-white/[0.03]"
                   )}
                 >
-                  <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#6366F1]/14 text-xs font-semibold text-[#C7D2FE]">
+                  <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#6366F1]/14 text-[11px] font-semibold text-[#C7D2FE]">
                     {index + 1}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-sm font-medium text-[#F9FAFB]">{idea.title}</p>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-[#9CA3AF]">
+                    <p className="line-clamp-1 text-sm font-medium text-[#F9FAFB]">{idea.title}</p>
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[#9CA3AF]">
                       <span>{idea.sparkCount || 0} sparks</span>
                       <span className="h-1 w-1 rounded-full bg-[#4B5563]" />
-                      <span>{parseTags(idea.category)[0] || getDisplayName(idea.author)}</span>
+                      <span className="truncate">{parseTags(idea.category)[0] || getDisplayName(idea.author)}</span>
                     </div>
                   </div>
                 </Link>
@@ -157,9 +153,7 @@ export function IdeaForgeRightRail({
             )}
           </div>
         </section>
-
       </div>
     </aside>
   );
 }
-
