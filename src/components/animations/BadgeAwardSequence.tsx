@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, ArrowRight } from "lucide-react";
+import { audioManager } from "@/lib/audio/audioManager";
 
 // Generate random particle data
 function generateParticles(count: number) {
@@ -358,6 +359,7 @@ export function BadgeAwardSequence({
 
   useEffect(() => {
     if (isVisible && badge) {
+      audioManager.playBadgeSFX(badge.rarity);
       setShowFlash(true);
       setShowBadge(false);
       setShowReveal(false);

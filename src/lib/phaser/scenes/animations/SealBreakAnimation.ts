@@ -3,7 +3,6 @@ import {
   BaseCheckpointAnimation,
   type AnimationConfig,
 } from "./BaseCheckpointAnimation";
-import { audioManager } from "@/lib/audio/audioManager";
 
 /**
  * Seal Break Animation
@@ -26,13 +25,6 @@ export class SealBreakAnimation extends BaseCheckpointAnimation {
   }
 
   create(): void {
-    // Play audio SFX
-    const sfxId =
-      this.config.variant === "gold"
-        ? "seal_break_gold"
-        : "seal_break_standard";
-    audioManager.playCheckpointSFX(sfxId);
-
     // Create all visual elements
     this.createGlowBase();
     this.createGate();

@@ -20,23 +20,27 @@ function StandaloneVideoCall() {
     setMounted(true);
   }, []);
 
-  const roomName = venture?.ideaId ? `InteractiveVenture_${venture.ideaId}` : null;
+  const roomName = venture
+    ? encodeURIComponent(`InteractiveVenture_${venture._id}`)
+    : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <div className="border-b bg-card px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="border-b bg-card px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <Link href={`/venture/${ventureId}`}>
             <Button variant="ghost" size="icon" className="rounded-full">
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <Video className="w-5 h-5" />
+          <div className="min-w-0">
+            <h1 className="text-base font-bold flex items-center gap-2 sm:text-xl">
+              <Video className="w-5 h-5 flex-shrink-0" />
               Live Video Call
             </h1>
-            <p className="text-sm text-muted-foreground">Ad-hoc video session with project team. History is not stored.</p>
+            <p className="truncate text-xs text-muted-foreground sm:text-sm">
+              Ad-hoc video session with project team. History is not stored.
+            </p>
           </div>
         </div>
       </div>
@@ -44,11 +48,18 @@ function StandaloneVideoCall() {
         {mounted && roomName ? (
           <iframe
             src={`https://meet.jit.si/${roomName}`}
-            allow="camera; microphone; fullscreen; display-capture"
-            className="w-full h-[calc(100vh-80px)] border-0"
+            title="Venture video call"
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="w-full h-[calc(100vh-65px)] border-0 sm:h-[calc(100vh-80px)]"
           />
+        ) : mounted && venture === null ? (
+          <div className="flex h-[calc(100vh-65px)] items-center justify-center px-6 text-center text-sm text-muted-foreground sm:h-[calc(100vh-80px)]">
+            This venture could not be found, so a video room cannot be started.
+          </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
+          <div className="flex h-[calc(100vh-65px)] items-center justify-center text-sm text-muted-foreground sm:h-[calc(100vh-80px)]">
             Initializing secure video session...
           </div>
         )}

@@ -7,13 +7,13 @@ This directory contains all audio files for the Interactive Ideas game. The audi
 ```
 audio/
 ├── ambience/      # Looping background ambience for each biome (16 files)
-├── sfx/           # One-shot sound effects for gameplay events (18 files)
-├── ui/            # UI interaction sounds (4 files)
-├── music/         # Stage and boss battle music tracks (11 files)
+├── sfx/           # One-shot sound effects for gameplay events (37 files)
+├── ui/            # UI interaction sounds (8 files)
+├── music/         # Stage and boss battle music tracks (22 files)
 └── README.md      # This file
 ```
 
-**Total: 49 audio files required**
+**Total currently delivered: 83 audio files**
 
 ---
 
@@ -112,11 +112,11 @@ Subtle interface feedback sounds.
 
 ---
 
-### 4. Music (11 files)
+### 4. Music (22 files)
 
 Background music for boss battles and stage exploration.
 
-**Format:** MP3, stereo, 128–192kbps, loop-friendly
+**Format:** MP3 primary + OGG fallback, stereo, 128–192kbps, loop-friendly
 
 #### Boss Battle Themes (3 files)
 
@@ -126,7 +126,7 @@ Background music for boss battles and stage exploration.
 | Pale Architect | `music/boss_pale_architect.mp3` | Cold, methodical, architectural |
 | Gravemind | `music/boss_gravemind.mp3` | Dark, heavy, oppressive atmosphere |
 
-#### Stage Themes (8 files)
+#### Stage / Mini-Boss Themes (16 files)
 
 Each stage has a unique musical theme tied to its biome.
 
@@ -140,6 +140,9 @@ Each stage has a unique musical theme tied to its biome.
 | Stage 6 | Harbour | `music/stage_harbour.mp3` |
 | Stage 7 | Crossroads | `music/stage_crossroads.mp3` |
 | Stage 8 | Capital | `music/stage_capital.mp3` |
+
+Each stage theme is delivered in both `.mp3` and `.ogg` formats and is wired
+through `audioManager.playMiniBossStageTheme(stage)`.
 
 **Audio Direction (Stage Progression):**
 - **Stages 1–2:** Gentle, exploratory, inviting
@@ -178,7 +181,10 @@ The audio manager applies runtime volume control, but files should be pre-normal
 ## 🎨 Audio Production Notes
 
 ### Current Status
-**⚠️ 0 of 49 files delivered** — The `audioManager` is configured to handle missing files gracefully (no runtime errors), but the product is completely silent until assets are provided.
+**83 of 83 expected audio files are present in `public/audio`.** This includes
+the eight mini-boss stage theme pairs (`stage_village` through
+`stage_capital`), checkpoint SFX, level-up fanfare, badge award SFX, ambience,
+boss themes, UI sounds, and the gold gain reward sound.
 
 ### Placeholder Workflow (Optional)
 To test the audio system without final assets:
@@ -201,10 +207,10 @@ The audio system is managed by `src/lib/audio/audioManager.ts`:
 - Provides per-category volume control (master, music, sfx, ui)
 
 ### Asset Delivery Checklist
-- [ ] 16 ambience files (8 biomes × 2 formats)
-- [ ] 18 SFX files (12 checkpoint + 6 progression)
-- [ ] 4 UI sound files
-- [ ] 11 music files (3 boss + 8 stage)
+- [x] 16 ambience files (8 biomes x 2 formats)
+- [x] 37 SFX files (checkpoint, progression, badge, and gold reward sounds)
+- [x] 8 UI sound files (4 sounds x 2 formats)
+- [x] 22 music files (3 boss themes + 8 stage themes, MP3 and OGG)
 - [ ] All files tested for seamless looping (where applicable)
 - [ ] All files normalized per guidelines above
 - [ ] Cross-browser playback verified (Chrome, Firefox, Safari)

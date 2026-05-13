@@ -9,7 +9,7 @@
  * Stack: Next.js 15 · React 19 · Framer Motion 12 · Tailwind CSS 4 · Convex · Clerk
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
@@ -269,14 +269,25 @@ function StageStrip({
       {STAGES.map((st, i) => {
         const isDone = i + 1 < activeStage;
         const isCurrent = i + 1 === activeStage;
+        const isUnlocked = i + 1 <= activeStage;
         return (
           <motion.button
             key={st.id}
-            onClick={() => onSelect(st.id)}
-            whileHover={{ scaleY: 1.6, scaleX: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              audioManager.playTouch(isUnlocked ? "click" : "error");
+              if (isUnlocked) onSelect(st.id);
+            }}
+            onMouseEnter={() => {
+              if (isUnlocked) audioManager.playUI("hover");
+            }}
+            whileHover={isUnlocked ? { scaleY: 1.6, scaleX: 1.1 } : {}}
+            whileTap={isUnlocked ? { scale: 0.95 } : {}}
             className="relative group"
-            title={st.name}
+            title={
+              isUnlocked
+                ? st.name
+                : `Complete Stage ${st.id - 1} to unlock ${st.name}`
+            }
           >
             <motion.div
               className="h-[8px] rounded-full"
@@ -294,6 +305,7 @@ function StageStrip({
                       : "rgba(255,255,255,0.1)"
                   }`,
                 boxShadow: isCurrent ? `0 0 15px ${st.glow}` : "none",
+                cursor: isUnlocked ? "pointer" : "not-allowed",
                 transition:
                   "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease",
               }}
@@ -358,7 +370,7 @@ function CheckpointPanel({
         transition={{ type: "spring", stiffness: 300, damping: 32 }}
         className="absolute right-0 top-0 bottom-0 z-[60] flex flex-col font-sans"
         style={{
-          width: "360px",
+          width: "min(100vw, 360px)",
           background:
             "linear-gradient(180deg, rgba(11, 15, 25, 0.85), rgba(7, 10, 18, 0.95))",
           backdropFilter: "blur(20px)",
@@ -368,13 +380,17 @@ function CheckpointPanel({
       >
         {/* Close button */}
         <button
-          onClick={onClose}
+          onClick={() => {
+            audioManager.playTouch("click");
+            onClose();
+          }}
           className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[14px] transition-all duration-200 bg-white/5 hover:bg-white/10"
           style={{
             border: "1px solid rgba(255,255,255,0.1)",
             color: "#cbd5e1",
           }}
           onMouseEnter={(e) => {
+            audioManager.playUI("hover");
             (e.currentTarget as HTMLElement).style.borderColor =
               "rgba(255,255,255,0.2)";
             (e.currentTarget as HTMLElement).style.color = "#ffffff";
@@ -446,7 +462,10 @@ function CheckpointPanel({
                 evaluationSummary={evaluationSummary?.find(
                   (entry) => entry.taskLevel === task._taskLevel,
                 )}
-                onToggle={() => onTaskToggle(i)}
+                onToggle={() => {
+                  audioManager.playTouch("click");
+                  onTaskToggle(i);
+                }}
               />
             ))}
           </div>
@@ -514,8 +533,15 @@ function CheckpointPanel({
           detail.status !== "gold" && (
             <div className="p-4 pt-0">
               <motion.button
-                onClick={onAdvance}
-                disabled={!canAdvance || isAdvancing}
+                onClick={() => {
+                  audioManager.playTouch(canAdvance ? "confirm" : "error");
+                  if (canAdvance && !isAdvancing) onAdvance();
+                }}
+                disabled={isAdvancing}
+                aria-disabled={!canAdvance || isAdvancing}
+                onMouseEnter={() => {
+                  if (canAdvance && !isAdvancing) audioManager.playUI("hover");
+                }}
                 whileHover={
                   canAdvance && !isAdvancing ? { scale: 1.02, y: -2 } : {}
                 }
@@ -628,9 +654,12 @@ function TaskCard({
 
   return (
     <motion.div
-      onClick={locked ? undefined : onToggle}
-      whileHover={locked ? {} : { x: 4 }}
-      whileTap={locked ? {} : { scale: 0.98 }}
+      onClick={locked || task.done ? undefined : onToggle}
+      onMouseEnter={() => {
+        if (!locked && !task.done) audioManager.playUI("hover");
+      }}
+      whileHover={locked || task.done ? {} : { x: 4 }}
+      whileTap={locked || task.done ? {} : { scale: 0.98 }}
       className="flex items-start gap-3.5 px-4 py-3 rounded-xl relative overflow-hidden cursor-pointer group/task transition-colors"
       style={{
         background: task.done
@@ -640,7 +669,7 @@ function TaskCard({
         borderColor: task.done
           ? "rgba(99, 102, 241, 0.2)"
           : "rgba(255,255,255,0.05)",
-        cursor: locked ? "default" : "pointer",
+        cursor: locked || task.done ? "default" : "pointer",
         opacity: task.done ? 0.6 : 1,
       }}
     >
@@ -662,8 +691,8 @@ function TaskCard({
           border: `1.5px solid ${task.done ? "#6366f1" : "rgba(255,255,255,0.15)"}`,
           color: task.done ? "#ffffff" : "transparent",
         }}
-        animate={task.done ? { scale: [1.2, 1] } : {}}
-        transition={{ duration: 0.2 }}
+        animate={task.done ? { scale: [0.8, 1.2, 1] } : {}}
+        transition={{ type: "spring", duration: 0.2, bounce: 0.45 }}
       >
         {task.done && "✓"}
       </motion.div>
@@ -741,7 +770,11 @@ function PhaseLaunchBanner({
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          onClick={onClose}
+          onClick={() => {
+            audioManager.playTouch("click");
+            onClose();
+          }}
+          onMouseEnter={() => audioManager.playUI("hover")}
           className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] text-slate-400 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white z-10 shadow-sm"
         >
           ✕
@@ -757,7 +790,11 @@ function PhaseLaunchBanner({
             </p>
           </div>
           <button
-            onClick={onOpenRoadmap}
+            onClick={() => {
+              audioManager.playTouch("click");
+              onOpenRoadmap();
+            }}
+            onMouseEnter={() => audioManager.playUI("hover")}
             className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-cyan-200 transition hover:bg-cyan-400/15"
           >
             View Roadmap
@@ -788,7 +825,11 @@ function StageResetNotice({
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          onClick={onClose}
+          onClick={() => {
+            audioManager.playTouch("click");
+            onClose();
+          }}
+          onMouseEnter={() => audioManager.playUI("hover")}
           className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] text-slate-400 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white z-10 shadow-sm"
         >
           ✕
@@ -823,6 +864,7 @@ function AudioToggle({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 1 }}
       onClick={onToggle}
+      onMouseEnter={() => audioManager.playUI("hover")}
       className="absolute bottom-32 right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full text-[16px] shadow-lg backdrop-blur-xl sm:bottom-12 sm:right-5"
       style={{
         background: "rgba(15, 23, 42, 0.6)",
@@ -890,7 +932,7 @@ interface BadgePayload {
   rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
 }
 
-export default function MapPage() {
+function MapPageInner() {
   const { containerRef, phaserReady } = useMapGame();
   const searchParams = useSearchParams();
 
@@ -917,8 +959,15 @@ export default function MapPage() {
     const s = localStorage.getItem("selectedStage");
     if (s) setSelectedStageId(parseInt(s, 10));
     const queryVentureId = searchParams.get("ventureId");
-    const storedVentureId = localStorage.getItem("activeVentureId");
-    setPreferredVentureId(queryVentureId || storedVentureId);
+    if (queryVentureId) {
+      // URL param is the authoritative source — overwrite localStorage and use it
+      localStorage.setItem("activeVentureId", queryVentureId);
+      setPreferredVentureId(queryVentureId);
+    } else {
+      // No URL param — use whatever was last cached (e.g. returning directly to /map/world)
+      const storedVentureId = localStorage.getItem("activeVentureId");
+      setPreferredVentureId(storedVentureId);
+    }
   }, [searchParams]);
 
   // ── Audio unlock on first interaction ─────────────────────────────────────
@@ -1020,6 +1069,8 @@ export default function MapPage() {
     | "map"
     | "journal"
     | "survey"
+    | "settings"
+    | "help"
   >("tools");
   const [flashTrigger, setFlashTrigger] = useState(0);
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -1044,6 +1095,15 @@ export default function MapPage() {
   const [badgeQueue, setBadgeQueue] = useState<BadgePayload[]>([]);
   const activeBadge = badgeQueue[0] ?? null;
 
+  // ── Sync Audio Settings ────────────────────────────────────────────────────
+  useEffect(() => {
+    audioManager.setMasterVolume(audioSettings.masterVolume);
+    audioManager.setMusicVolume(audioSettings.musicVolume);
+    audioManager.setSFXVolume(audioSettings.sfxVolume);
+    audioManager.setUIVolume(audioSettings.uiVolume);
+    audioManager.setMuted(audioSettings.muted);
+  }, [audioSettings]);
+
   // Tutorial: First checkpoint pulse
   const [showFirstCheckpointPulse, setShowFirstCheckpointPulse] =
     useState(false);
@@ -1062,6 +1122,11 @@ export default function MapPage() {
     stageName: string;
     isGold: boolean;
   }>({ show: false, stageNumber: 1, stageName: "", isGold: false });
+  const [pendingNextStageOpen, setPendingNextStageOpen] = useState<{
+    detail: CheckpointDetail;
+    stage: number;
+    checkpointId: string;
+  } | null>(null);
 
   // Task submission state (now using Jotai atom for global access)
   const [submittingTask, setSubmittingTask] = useAtom(submittingTaskAtom);
@@ -1331,7 +1396,13 @@ export default function MapPage() {
             (cp) => cp.stage === activeStage && cp.checkpoint === activeCP,
           );
           if (nextActiveCheckpoint) {
-            setSelectedDetail(buildCheckpointDetail(nextActiveCheckpoint));
+            const detail = buildCheckpointDetail(nextActiveCheckpoint);
+            setSelectedDetail(detail);
+            eventBridge.dispatchToPhaser({
+              type: "FOCUS_STAGE",
+              stage: activeStage,
+              checkpointId: nextActiveCheckpoint._id,
+            });
           }
         }
       } else if (stageChanged) {
@@ -1342,9 +1413,23 @@ export default function MapPage() {
         );
         if (newActiveCheckpoint) {
           const detail = buildCheckpointDetail(newActiveCheckpoint);
+          if (stageClearModal.show) {
+            setPendingNextStageOpen({
+              detail,
+              stage: activeStage,
+              checkpointId: newActiveCheckpoint._id,
+            });
+            previousActiveRef.current = {
+              stage: activeStage,
+              checkpoint: activeCP,
+            };
+            return;
+          }
+
           setSelectedDetail(detail);
           eventBridge.dispatchToPhaser({
-            type: "SCROLL_TO_CHECKPOINT",
+            type: "FOCUS_STAGE",
+            stage: activeStage,
             checkpointId: newActiveCheckpoint._id,
           });
           console.log(
@@ -1361,6 +1446,7 @@ export default function MapPage() {
     checkpoints,
     selectedDetail,
     buildCheckpointDetail,
+    stageClearModal.show,
   ]);
 
   // ── Persist gender to DB whenever venture + gender are known ─────────────
@@ -1452,10 +1538,6 @@ export default function MapPage() {
       }));
       console.log(`[MapPage] 🎖️ New badge(s) detected: ${newCount}`, payloads);
       setBadgeQueue((q) => [...q, ...payloads]);
-      // Play SFX for the first new badge
-      if (payloads[0]) {
-        audioManager.playBadgeSFX(payloads[0].rarity);
-      }
     }
 
     prevBadgeCountRef.current = count;
@@ -1507,10 +1589,6 @@ export default function MapPage() {
           );
           return [...q, ...unique];
         });
-        // Play SFX for the first new badge
-        if (payloads[0]) {
-          audioManager.playBadgeSFX(payloads[0].rarity);
-        }
       }
     }
 
@@ -1545,9 +1623,6 @@ export default function MapPage() {
         unlockedTools,
       });
       setShowLevelUp(true);
-
-      // Play level-up fanfare
-      audioManager.playLevelUp();
 
       // Enhanced logging for multi-level gains
       if (isMultiLevel) {
@@ -1700,10 +1775,6 @@ export default function MapPage() {
         if (q.some((b) => b.id === event.id)) return q;
         return [...q, event];
       });
-      audioManager.playBadgeSFX(event.rarity);
-      console.log(
-        `[MapPage] Playing badge SFX: ${event.name} (${event.rarity})`,
-      );
     };
     eventBridge.onReact("BADGE_AWARDED", handleBadge);
     return () => eventBridge.off("BADGE_AWARDED", handleBadge);
@@ -1712,6 +1783,7 @@ export default function MapPage() {
   // ── Sync Convex checkpoint data → Phaser ───────────────────────────────────
   useEffect(() => {
     if (!phaserReady || !venture || checkpoints.length === 0) return;
+    if (stageClearModal.show) return;
 
     const phaserCheckpoints: CheckpointState[] = checkpoints.map((cp) => {
       const localStatus = deriveCheckpointStatus(cp, activeStage, activeCP);
@@ -1725,12 +1797,10 @@ export default function MapPage() {
         t1: cp.t1Completed,
         t2: cp.t2Completed,
         t3: cp.t3Completed,
+        goldBonusEarned:
+          !!cp.goldBonusEarned ||
+          (cp.t1Completed && cp.t2Completed && cp.t3Completed),
       };
-    });
-
-    eventBridge.dispatchToPhaser({
-      type: "UPDATE_CHECKPOINTS",
-      checkpoints: phaserCheckpoints,
     });
 
     eventBridge.dispatchToPhaser({
@@ -1750,9 +1820,19 @@ export default function MapPage() {
             superBoss.bossName ??
             "Unknown Boss",
           visualStatus: superBoss.visualStatus,
+          status: superBoss.status,
+          defeatVariant:
+            worldMapData?.projectState === "project_perfect"
+              ? "gold"
+              : "standard",
         }
         : undefined,
     } as Parameters<typeof eventBridge.dispatchToPhaser>[0]);
+
+    eventBridge.dispatchToPhaser({
+      type: "UPDATE_CHECKPOINTS",
+      checkpoints: phaserCheckpoints,
+    });
 
     eventBridge.dispatchToPhaser({
       type: "UPDATE_BRIGHTNESS",
@@ -1768,6 +1848,8 @@ export default function MapPage() {
     corruptionLevel,
     selectedGender,
     superBoss,
+    stageClearModal.show,
+    worldMapData?.projectState,
   ]);
 
   // ── Checkpoint click from Phaser ───────────────────────────────────────────
@@ -1808,8 +1890,12 @@ export default function MapPage() {
         };
 
         console.log("[React] Opening CheckpointPanel with detail:", detail);
-        audioManager.playUI("click"); // panel open feedback
         setSelectedDetail(detail);
+        eventBridge.dispatchToPhaser({
+          type: "FOCUS_STAGE",
+          stage: cp.stage,
+          checkpointId: cp._id,
+        });
       }
     };
 
@@ -1897,9 +1983,17 @@ export default function MapPage() {
         setCurrentQuestAtom({
           checkpointName: current.title,
           tasks: updatedTasks.map((task) => ({
+            id: task._taskId ?? `${current.id}_${task._taskLevel ?? task.label}`,
+            checkpointId:
+              task._convexCheckpointId ??
+              (current.id as Id<"ventureCheckpoints">),
+            taskLevel:
+              task._taskLevel ??
+              (task.label.toLowerCase() as "t1" | "t2" | "t3"),
             label: task.label,
             description: task.description,
             tool: task.tool,
+            points: task._taskLevel === "t3" ? 35 : 20,
             done: task.done,
           })),
           stage: current.stage,
@@ -2070,13 +2164,6 @@ export default function MapPage() {
         // Close the panel. Convex will update venture.currentStage
         // and the useEffect at line ~1038 will auto-open the new active checkpoint.
         setSelectedDetail(null);
-        if (nextCpNextStage) {
-          // Scroll Phaser camera to the first checkpoint of the new stage
-          eventBridge.dispatchToPhaser({
-            type: "SCROLL_TO_CHECKPOINT",
-            checkpointId: nextCpNextStage._id,
-          });
-        }
       } else if (nextCp) {
         // Same-stage advance — open the next checkpoint panel immediately.
         // Build the detail now: Convex hasn't updated yet, but the next checkpoint
@@ -2084,7 +2171,8 @@ export default function MapPage() {
         // once Convex propagates. We optimistically show it.
         setSelectedDetail(buildCheckpointDetail(nextCp));
         eventBridge.dispatchToPhaser({
-          type: "SCROLL_TO_CHECKPOINT",
+          type: "FOCUS_STAGE",
+          stage: nextCp.stage,
           checkpointId: nextCp._id,
         });
       } else {
@@ -2115,17 +2203,20 @@ export default function MapPage() {
   // ── Stage strip select ─────────────────────────────────────────────────────
   const handleStageSelect = useCallback(
     (stageId: number) => {
+      if (stageId > activeStage) return;
+
       const firstCp = checkpoints.find(
         (c) => c.stage === stageId && c.checkpoint === 1,
       );
       if (firstCp) {
         eventBridge.dispatchToPhaser({
-          type: "SCROLL_TO_CHECKPOINT",
+          type: "FOCUS_STAGE",
+          stage: stageId,
           checkpointId: firstCp._id,
         });
       }
     },
-    [checkpoints],
+    [activeStage, checkpoints],
   );
 
   useEffect(() => {
@@ -2140,6 +2231,24 @@ export default function MapPage() {
       return () => clearTimeout(timer);
     }
   }, [selectedStageId, checkpoints, phaserReady, handleStageSelect]);
+
+  const handleStageClearComplete = useCallback(() => {
+    setStageClearModal((prev) => ({ ...prev, show: false }));
+  }, []);
+
+  useEffect(() => {
+    if (!phaserReady || stageClearModal.show || !pendingNextStageOpen) return;
+
+    if (!pendingNextStageOpen) return;
+
+    setSelectedDetail(pendingNextStageOpen.detail);
+    eventBridge.dispatchToPhaser({
+      type: "FOCUS_STAGE",
+      stage: pendingNextStageOpen.stage,
+      checkpointId: pendingNextStageOpen.checkpointId,
+    });
+    setPendingNextStageOpen(null);
+  }, [pendingNextStageOpen, phaserReady, stageClearModal.show]);
 
   // ── Loading / no-venture guard ─────────────────────────────────────────────
   // worldMapData is "skip"ped while intro is showing, so only check it after
@@ -2299,10 +2408,15 @@ export default function MapPage() {
           <AudioToggle
             muted={audioSettings.muted}
             onToggle={() => {
-              // Play click before muting so it's audible when unmuting
-              if (audioSettings.muted) audioManager.playUI("click");
+              audioManager.unlock();
+              if (audioSettings.muted) {
+                audioManager.setMuted(false);
+                audioManager.playUI("click");
+              } else {
+                audioManager.playUI("click");
+                audioManager.setMuted(true);
+              }
               setAudioSettings((prev) => ({ ...prev, muted: !prev.muted }));
-              audioManager.setMuted(!audioSettings.muted);
             }}
           />
 
@@ -2374,8 +2488,8 @@ export default function MapPage() {
           {/* Click-away backdrop (left of panel) */}
           {selectedDetail && (
             <div
-              className="absolute inset-0 z-[55]"
-              style={{ right: "340px" }}
+              className="absolute inset-0 z-[55] hidden sm:block"
+              style={{ right: "360px" }}
               onClick={() => setSelectedDetail(null)}
             />
           )}
@@ -2415,12 +2529,34 @@ export default function MapPage() {
             stageNumber={stageClearModal.stageNumber}
             stageName={stageClearModal.stageName}
             isGold={stageClearModal.isGold}
-            onComplete={() =>
-              setStageClearModal({ ...stageClearModal, show: false })
-            }
+            onComplete={handleStageClearComplete}
           />
         </>
       )}
     </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
+          style={{ background: "#050810", fontFamily: "var(--font-sans)" }}
+        >
+          <motion.div
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="text-xs tracking-[0.3em] uppercase font-black"
+            style={{ color: "#6366f1" }}
+          >
+            Entering the World…
+          </motion.div>
+        </div>
+      }
+    >
+      <MapPageInner />
+    </Suspense>
   );
 }

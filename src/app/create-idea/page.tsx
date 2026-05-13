@@ -163,16 +163,13 @@ export default function CreateIdeaPage() {
       });
       const createdIdeaId = res.ideaId;
 
-      // Auto-create venture
-      try {
-        await createVenture({
-          ideaId: createdIdeaId as any,
-          skills: formData.skills,
-          industries: formData.industries,
-        });
-      } catch (err) {
-        console.error("Failed to auto-create venture:", err);
-      }
+      // Success - redirect directly to world map with ventureId
+      const venture = await createVenture({
+        ideaId: createdIdeaId as any,
+        skills: formData.skills,
+        industries: formData.industries,
+      });
+      const ventureId = venture;
 
       if (selectedFiles.length === 1) {
         setUploadError("");
@@ -213,16 +210,7 @@ export default function CreateIdeaPage() {
         }
       }
 
-      // Success - redirect to suggestions page with skills and industries
-      const params = new URLSearchParams();
-      if (formData.skills.length > 0) {
-        params.set('skills', formData.skills.join(','));
-      }
-      if (formData.industries.length > 0) {
-        params.set('industries', formData.industries.join(','));
-      }
-
-      router.push(`/create-idea/suggestions?${params.toString()}`);
+      router.push(`/map/world?ventureId=${ventureId}`);
     } catch (error) {
       console.error('Failed to create idea:', error);
       setErrors({ submit: error instanceof Error ? error.message : 'Failed to create idea. Please try again.' });

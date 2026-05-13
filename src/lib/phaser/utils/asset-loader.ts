@@ -1490,28 +1490,28 @@ export class AssetLoader {
         key: "persona_male_idle",
         sheet: "persona_male_idle_sheet",
         frames: 4,
-        frameRate: 4,
+        frameRate: 8,
         repeat: -1,
       },
       {
         key: "persona_male_walk",
         sheet: "persona_male_walk_sheet",
         frames: 6,
-        frameRate: 8,
+        frameRate: 12,
         repeat: -1,
       },
       {
         key: "persona_female_idle",
         sheet: "persona_female_idle_sheet",
         frames: 4,
-        frameRate: 4,
+        frameRate: 8,
         repeat: -1,
       },
       {
         key: "persona_female_walk",
         sheet: "persona_female_walk_sheet",
         frames: 6,
-        frameRate: 8,
+        frameRate: 12,
         repeat: -1,
       },
     ];
@@ -1519,11 +1519,12 @@ export class AssetLoader {
     for (const anim of anims) {
       if (scene.anims.exists(anim.key) || !scene.textures.exists(anim.sheet))
         continue;
+      const isWalk = anim.key.includes("walk");
       scene.anims.create({
         key: anim.key,
         frames: scene.anims.generateFrameNumbers(anim.sheet, {
-          start: 0,
-          end: anim.frames - 1,
+          start: isWalk ? anim.frames - 1 : 0,
+          end: isWalk ? 0 : anim.frames - 1,
         }),
         frameRate: anim.frameRate,
         repeat: anim.repeat,

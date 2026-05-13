@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { audioManager } from "@/lib/audio/audioManager";
 
 interface LeftSidebarProps {
-  onOpenPanel: (tab: "tools" | "calendar" | "kanban" | "roadmap") => void;
+  onOpenPanel: (tab: "tools" | "calendar" | "kanban" | "roadmap" | "settings" | "help") => void;
   className?: string;
 }
 
@@ -80,8 +80,16 @@ export function LeftSidebar({ onOpenPanel, className }: LeftSidebarProps) {
           
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 transition-all">
-                <Settings className="w-5 h-5" />
+              <button 
+                onClick={() => {
+                  audioManager.playUI("click");
+                  onOpenPanel("settings");
+                }}
+                onMouseEnter={() => audioManager.playUI("hover")}
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all duration-300 hover:scale-110 active:scale-95 group relative"
+              >
+                <Settings className="w-5 h-5 transition-colors" />
+                <div className="absolute inset-0 rounded-xl bg-indigo-400 opacity-0 group-hover:opacity-5 transition-opacity" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="right" className="ml-2 bg-slate-900 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest px-3 py-1.5">
@@ -91,8 +99,16 @@ export function LeftSidebar({ onOpenPanel, className }: LeftSidebarProps) {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 transition-all">
-                <HelpCircle className="w-5 h-5" />
+              <button 
+                onClick={() => {
+                  audioManager.playUI("click");
+                  onOpenPanel("help");
+                }}
+                onMouseEnter={() => audioManager.playUI("hover")}
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-110 active:scale-95 group relative"
+              >
+                <HelpCircle className="w-5 h-5 transition-colors" />
+                <div className="absolute inset-0 rounded-xl bg-cyan-400 opacity-0 group-hover:opacity-5 transition-opacity" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="right" className="ml-2 bg-slate-900 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest px-3 py-1.5">

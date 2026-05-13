@@ -3,7 +3,6 @@ import {
   BaseCheckpointAnimation,
   type AnimationConfig,
 } from "./BaseCheckpointAnimation";
-import { audioManager } from "@/lib/audio/audioManager";
 
 /**
  * Rune Inscription Animation
@@ -24,13 +23,6 @@ export class RuneInscriptionAnimation extends BaseCheckpointAnimation {
   }
 
   create(): void {
-    // Play audio SFX
-    const sfxId =
-      this.config.variant === "gold"
-        ? "rune_inscription_gold"
-        : "rune_inscription_standard";
-    audioManager.playCheckpointSFX(sfxId);
-
     // Create all visual elements
     this.createGlowBase();
     this.createTablet();

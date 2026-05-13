@@ -110,10 +110,14 @@ export type ReactToPhaserEvent =
         bossSlug: string;
         bossName: string;
         visualStatus: "silhouette" | "present" | "foreground";
+        status?: "active" | "retreated" | "slain";
+        defeatVariant?: "standard" | "gold";
       };
     }
   /** Ask the camera to pan/zoom to bring a checkpoint node into view. */
   | { type: "SCROLL_TO_CHECKPOINT"; checkpointId: string }
+  /** Ask the camera to frame a full stage biome without exposing neighbors. */
+  | { type: "FOCUS_STAGE"; stage: number; checkpointId?: string }
   /** Pause the Phaser game loop (e.g. modal is open). */
   | { type: "GAME_PAUSE" }
   /** Resume the Phaser game loop after a pause. */

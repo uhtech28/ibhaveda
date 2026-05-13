@@ -16,12 +16,19 @@ import {
   Map,
   MessageSquare,
   Video,
-  Rss
+  Rss,
+  Volume2,
+  VolumeX,
+  HelpCircle as HelpIcon,
+  Settings as SettingsIcon,
+  Info
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Slider } from "../ui/slider";
+import { Switch } from "../ui/switch";
 import { cn } from "@/lib/utils";
 import { useAtom } from "jotai";
-import { stageInfoAtom } from "@/lib/stores/hudStore";
+import { stageInfoAtom, audioSettingsAtom } from "@/lib/stores/hudStore";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
@@ -46,7 +53,7 @@ import { JournalTool } from "@/components/tools/journal-tool";
 import { SurveyTool } from "@/components/tools/survey-tool";
 import { audioManager } from "@/lib/audio/audioManager";
 
-type TabType = "tools" | "calendar" | "kanban" | "roadmap" | "write" | "map" | "journal" | "survey";
+type TabType = "tools" | "calendar" | "kanban" | "roadmap" | "write" | "map" | "journal" | "survey" | "settings" | "help";
 
 interface ToolsPanelProps {
   isOpen: boolean;
@@ -102,10 +109,12 @@ export function ToolsPanel({ isOpen, onClose, activeTab, onTabChange, activeVent
   };
 
   const tabs = [
-    { id: "tools", label: "All Tools", icon: Grid },
+    { id: "tools", label: "Tools", icon: Grid },
     { id: "calendar", label: "Calendar", icon: CalendarIcon },
     { id: "kanban", label: "Kanban", icon: LayoutDashboard },
     { id: "roadmap", label: "Roadmap", icon: Map },
+    { id: "settings", label: "Settings", icon: SettingsIcon },
+    { id: "help", label: "Help", icon: HelpIcon },
   ] as const;
 
   return (
@@ -257,6 +266,8 @@ export function ToolsPanel({ isOpen, onClose, activeTab, onTabChange, activeVent
                 )}
 
                 {activeTab === "roadmap" && <RoadmapPanel />}
+                {activeTab === "settings" && <SettingsPanel />}
+                {activeTab === "help" && <HelpPanel />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -419,6 +430,172 @@ function RoadmapPanel() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SettingsPanel() {
+  const [audioSettings, setAudioSettings] = useAtom(audioSettingsAtom);
+
+  const updateVolume = (key: keyof typeof audioSettings, value: number) => {
+    setAudioSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleMute = () => {
+    setAudioSettings(prev => ({ ...prev, muted: !prev.muted }));
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-5">
+        <h3 className="text-lg font-black text-white uppercase tracking-wider">Audio Settings</h3>
+        <p className="text-[10px] text-indigo-300/60 font-bold uppercase tracking-widest mt-1">Configure your sound experience</p>
+      </div>
+
+      <div className="space-y-6 px-1">
+        {/* Mute Toggle */}
+        <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+              {audioSettings.muted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">Mute All Sounds</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest">Global silence</p>
+            </div>
+          </div>
+          <Switch checked={audioSettings.muted} onCheckedChange={toggleMute} />
+        </div>
+
+        {/* Volume Sliders */}
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Master Volume</label>
+              <span className="text-xs font-bold text-indigo-400">{Math.round(audioSettings.masterVolume * 100)}%</span>
+            </div>
+            <Slider 
+              value={[audioSettings.masterVolume * 100]} 
+              max={100} 
+              step={1} 
+              onValueChange={([val]) => updateVolume("masterVolume", val / 100)}
+              className="py-2"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Music</label>
+              <span className="text-xs font-bold text-amber-400">{Math.round(audioSettings.musicVolume * 100)}%</span>
+            </div>
+            <Slider 
+              value={[audioSettings.musicVolume * 100]} 
+              max={100} 
+              step={1} 
+              onValueChange={([val]) => updateVolume("musicVolume", val / 100)}
+              className="py-2"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">SFX</label>
+              <span className="text-xs font-bold text-emerald-400">{Math.round(audioSettings.sfxVolume * 100)}%</span>
+            </div>
+            <Slider 
+              value={[audioSettings.sfxVolume * 100]} 
+              max={100} 
+              step={1} 
+              onValueChange={([val]) => updateVolume("sfxVolume", val / 100)}
+              className="py-2"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">UI Sounds</label>
+              <span className="text-xs font-bold text-cyan-400">{Math.round(audioSettings.uiVolume * 100)}%</span>
+            </div>
+            <Slider 
+              value={[audioSettings.uiVolume * 100]} 
+              max={100} 
+              step={1} 
+              onValueChange={([val]) => updateVolume("uiVolume", val / 100)}
+              className="py-2"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">App Version 1.2.0-beta</p>
+      </div>
+    </div>
+  );
+}
+
+function HelpPanel() {
+  const faqs = [
+    {
+      q: "How do I progress to the next stage?",
+      a: "Complete at least 2 tasks in every checkpoint of your current stage. Once the final checkpoint is cleared, the path to the next realm will unlock."
+    },
+    {
+      q: "What are Gold Checkpoints?",
+      a: "If you complete all 3 tasks in a checkpoint, you earn a Gold rating. This gives bonus XP and helps your venture reach higher valuation tiers."
+    },
+    {
+      q: "How does the Corruption work?",
+      a: "Corruption spreads if you stay idle for too long or fail tasks. Keep moving and submitting high-quality work to keep the world bright."
+    },
+    {
+      q: "Can I use external tools?",
+      a: "Yes! Many tools like Group Chat and Video Call open in new tabs to keep your workflow flexible."
+    }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-5">
+        <h3 className="text-lg font-black text-white uppercase tracking-wider">Help Center</h3>
+        <p className="text-[10px] text-cyan-300/60 font-bold uppercase tracking-widest mt-1">Guides and Frequently Asked Questions</p>
+      </div>
+
+      <div className="space-y-4">
+        {faqs.map((faq, i) => (
+          <div key={i} className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
+            <div className="flex gap-3">
+              <div className="w-5 h-5 shrink-0 rounded-full bg-cyan-500/20 flex items-center justify-center mt-0.5">
+                <Info className="w-3 h-3 text-cyan-400" />
+              </div>
+              <h4 className="text-sm font-bold text-white leading-tight">{faq.q}</h4>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed ml-8">{faq.a}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-white/10">
+        <h4 className="text-xs font-black text-white uppercase tracking-widest mb-3 text-center">Quick Start Guide</h4>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 rounded-lg bg-black/20">
+            <p className="text-lg mb-1">🏃</p>
+            <p className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">Move with Click</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-black/20">
+            <p className="text-lg mb-1">📝</p>
+            <p className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">Submit Tasks</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-black/20">
+            <p className="text-lg mb-1">🛠️</p>
+            <p className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">Use Tools</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-black/20">
+            <p className="text-lg mb-1">🚀</p>
+            <p className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">Scale Up</p>
+          </div>
+        </div>
       </div>
     </div>
   );

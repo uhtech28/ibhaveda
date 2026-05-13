@@ -953,6 +953,41 @@ export const getVenturesByUser = query({
   },
 });
 
+/**
+ * Look up the venture associated with a specific idea.
+ * Returns the venture doc (with normalized fields) or null if none exists.
+ * Used by the map intro page to route directly to the correct venture map.
+ */
+export const getVentureByIdea = query({
+  args: {
+    ideaId: v.id("ideas"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) return null;
+
+    const venture = await ctx.db
+      .query("ventures")
+      .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
+      .filter((q) => q.eq(q.field("userId"), user._id))
+      .first();
+
+    if (!venture) return null;
+
+    return {
+      ...venture,
+      corruptionLevel: venture.corruptionLevel ?? 0,
+      lastActivityAt: venture.lastActivityAt ?? venture.updatedAt,
+    };
+  },
+});
+
 export const getToolData = query({
   args: {
     ventureId: v.id("ventures"),

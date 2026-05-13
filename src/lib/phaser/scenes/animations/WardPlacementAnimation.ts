@@ -3,7 +3,6 @@ import {
   BaseCheckpointAnimation,
   type AnimationConfig,
 } from "./BaseCheckpointAnimation";
-import { audioManager } from "@/lib/audio/audioManager";
 
 /**
  * Ward Placement Animation
@@ -28,13 +27,6 @@ export class WardPlacementAnimation extends BaseCheckpointAnimation {
   }
 
   create(): void {
-    // Play audio SFX
-    const sfxId =
-      this.config.variant === "gold"
-        ? "ward_placement_gold"
-        : "ward_placement_standard";
-    audioManager.playCheckpointSFX(sfxId);
-
     // Create all visual elements
     this.createGlowBase();
     this.createPersona();

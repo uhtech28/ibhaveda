@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Zap, Crown, Sparkles, Star } from "lucide-react";
+import { Shield, Zap, Crown, Sparkles } from "lucide-react";
 import { TOOL_INFO, LEVEL_DEFINITIONS } from "../../../convex/ventureConstants";
+import { audioManager } from "@/lib/audio/audioManager";
 
 interface LevelUpSequenceProps {
   isVisible: boolean;
@@ -29,7 +30,6 @@ function getLevelTitle(level: number): string {
  * Rolls through all intermediate numbers with bounce easing (500ms duration)
  */
 function RollingCounter({ from, to }: { from: number; to: number }) {
-  const [currentValue, setCurrentValue] = useState(from);
   const [displayValue, setDisplayValue] = useState(from);
 
   useEffect(() => {
@@ -46,11 +46,9 @@ function RollingCounter({ from, to }: { from: number; to: number }) {
     const direction = to > from ? 1 : -1;
 
     let currentLevel = from;
-    let elapsed = 0;
 
     // Roll through each intermediate number
     const interval = setInterval(() => {
-      elapsed += timePerLevel;
       currentLevel += direction;
 
       if (
@@ -59,7 +57,6 @@ function RollingCounter({ from, to }: { from: number; to: number }) {
       ) {
         currentLevel = to;
         setDisplayValue(to);
-        setCurrentValue(to);
         clearInterval(interval);
       } else {
         setDisplayValue(currentLevel);
@@ -112,14 +109,33 @@ export function LevelUpSequence({
   >("edge_burst");
   const [canSkip, setCanSkip] = useState(false);
   const timersRef = useRef<number[]>([]);
+  const onCompleteRef = useRef(onComplete);
+  const onSkipRef = useRef(onSkip);
+  const lastAudioKeyRef = useRef<string | null>(null);
 
   const levelsGained = newLevel - oldLevel;
   const levelTitle = getLevelTitle(newLevel);
   const PhaseIcon = PHASE_ICONS[Math.min(phase - 1, 2)];
   const phaseName = PHASE_NAMES[Math.min(phase - 1, 2)];
+  const unlockedToolsKey = unlockedTools.join("|");
+  const sequenceKey = `${oldLevel}:${newLevel}:${phase}:${unlockedToolsKey}`;
+  const hasToolUnlocks = unlockedTools.length > 0;
 
   useEffect(() => {
-    if (!isVisible) return;
+    onCompleteRef.current = onComplete;
+    onSkipRef.current = onSkip;
+  }, [onComplete, onSkip]);
+
+  useEffect(() => {
+    if (!isVisible) {
+      lastAudioKeyRef.current = null;
+      return;
+    }
+
+    if (lastAudioKeyRef.current !== sequenceKey) {
+      audioManager.playLevelUp();
+      lastAudioKeyRef.current = sequenceKey;
+    }
 
     setStep("edge_burst");
     setCanSkip(false);
@@ -133,7 +149,6 @@ export function LevelUpSequence({
     const t3 = window.setTimeout(() => setStep("title"), 800); // 0.8s: counter done
 
     // Show tool unlock cards if there are unlocked tools, otherwise skip to done
-    const hasToolUnlocks = unlockedTools && unlockedTools.length > 0;
     const t4 = hasToolUnlocks
       ? window.setTimeout(() => setStep("cards"), 1200) // 1.2s: title done, show cards
       : null;
@@ -142,7 +157,7 @@ export function LevelUpSequence({
     const t5 = window.setTimeout(
       () => {
         setStep("done");
-        setTimeout(() => onComplete?.(), 300);
+        setTimeout(() => onCompleteRef.current?.(), 300);
       },
       hasToolUnlocks ? 2000 + cardsDuration : 2000,
     ); // Add cards duration if showing cards
@@ -150,13 +165,13 @@ export function LevelUpSequence({
     timersRef.current = t4 ? [t1, t2, t3, t4, t5] : [t1, t2, t3, t5];
 
     return () => timersRef.current.forEach(clearTimeout);
-  }, [isVisible, onComplete, unlockedTools]);
+  }, [isVisible, sequenceKey, hasToolUnlocks]);
 
   const handleSkip = () => {
     if (!canSkip) return;
     timersRef.current.forEach(clearTimeout);
     setStep("done");
-    setTimeout(() => onSkip?.(), 200);
+    setTimeout(() => onSkipRef.current?.(), 200);
   };
 
   return (

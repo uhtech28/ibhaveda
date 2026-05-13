@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { getAnimationTypeForStage } from "@/lib/phaser/scenes/animations";
+import {
+  audioManager,
+  type CheckpointSFXId,
+} from "@/lib/audio/audioManager";
 
 interface CheckpointAnimationOverlayProps {
   isVisible: boolean;
@@ -19,31 +23,50 @@ export function CheckpointAnimationOverlay({
   onSkip,
 }: CheckpointAnimationOverlayProps) {
   const [showAnimation, setShowAnimation] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+  const onSkipRef = useRef(onSkip);
+  const lastSfxKeyRef = useRef<string | null>(null);
+
+  const animationType = checkpoint ? getAnimationTypeForStage(checkpoint.stage) : "seal_break";
+  const isGold = checkpoint?.status === "gold" || !!checkpoint?.goldBonusEarned;
+  const checkpointKey = checkpoint
+    ? `${checkpoint.id}:${checkpoint.status}:${isGold ? "gold" : "standard"}`
+    : "none";
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+    onSkipRef.current = onSkip;
+  }, [onComplete, onSkip]);
 
   useEffect(() => {
     if (isVisible && checkpoint) {
       setShowAnimation(true);
+      const sfxId = `${animationType}_${isGold ? "gold" : "standard"}`;
+      const playbackKey = `${checkpointKey}:${sfxId}`;
+      if (lastSfxKeyRef.current !== playbackKey) {
+        audioManager.playCheckpointSFX(sfxId as CheckpointSFXId);
+        lastSfxKeyRef.current = playbackKey;
+      }
 
       const timer = setTimeout(() => {
         setShowAnimation(false);
         setTimeout(() => {
-          onComplete?.();
+          onCompleteRef.current?.();
         }, 300);
       }, 3000);
 
       return () => clearTimeout(timer);
     }
-  }, [isVisible, checkpoint, onComplete]);
+
+    lastSfxKeyRef.current = null;
+  }, [isVisible, checkpoint, checkpointKey, animationType, isGold]);
 
   const handleSkip = () => {
     setShowAnimation(false);
     setTimeout(() => {
-      onSkip?.();
+      onSkipRef.current?.();
     }, 200);
   };
-
-  const animationType = checkpoint ? getAnimationTypeForStage(checkpoint.stage) : "seal_break";
-  const isGold = checkpoint?.status === "gold";
 
   return (
     <AnimatePresence>

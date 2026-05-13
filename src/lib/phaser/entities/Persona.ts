@@ -36,6 +36,8 @@ export type PersonaGender = "male" | "female";
  * persona.moveToPosition(600, 400, 1000);
  */
 export class Persona extends Phaser.GameObjects.Container {
+  private static readonly ARRIVAL_EPSILON = 3;
+
   // ── Public readonly ───────────────────────────────────────────────────────
 
   readonly gender: PersonaGender;
@@ -48,6 +50,14 @@ export class Persona extends Phaser.GameObjects.Container {
   private walkTween: Phaser.Tweens.Tween | null = null;
   private currentAnimation: "idle" | "walk" | null = null;
   private isWalking = false;
+
+  /**
+   * True while the persona is actively walking to a destination.
+   * Read by WorldMapScene to avoid re-triggering scrollToCheckpoint movement.
+   */
+  get walking(): boolean {
+    return this.isWalking;
+  }
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
@@ -108,15 +118,28 @@ export class Persona extends Phaser.GameObjects.Container {
   // ── Public API ────────────────────────────────────────────────────────────
 
   /**
-   * Instantly position persona at checkpoint without animation
+   * Instantly position persona at checkpoint without animation.
+   * Stops all movement tweens and resets to idle state.
    *
    * @param x Target world X coordinate.
    * @param y Target world Y coordinate.
    * @returns This persona instance for chaining.
    */
   override setPosition(x: number, y: number): this {
+    // Stop any active movement
+    if (this.walkTween) {
+      this.walkTween.stop();
+      this.walkTween = null;
+    }
+    this.isWalking = false;
+
     this.x = x;
     this.y = y;
+    // Always face right (towards the checkpoint) when instantly positioned
+    // Safe-check because super() constructor calls setPosition before sprite is initialized
+    if (this.sprite) {
+      this.sprite.setFlipX(true);
+    }
     return this;
   }
 
@@ -131,29 +154,112 @@ export class Persona extends Phaser.GameObjects.Container {
     this.playWalk(targetX, targetY, duration);
   }
 
-  /**
-   * Resume idle animation (sprite-based animation)
-   */
-  playIdle(): void {
-    const animState = this.sprite.anims;
-    if (this.currentAnimation === "idle" && animState?.isPlaying) return;
+  moveAlongPath(points: { x: number; y: number }[], duration = 1200): void {
+    const route = points.filter((point) => {
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
+      return (
+        Phaser.Math.Distance.Between(this.x, this.y, point.x, point.y) >
+        Persona.ARRIVAL_EPSILON
+      );
+    });
+    if (route.length === 0) {
+      this.playIdle();
+      return;
+    }
 
-    this.currentAnimation = "idle";
-    this.isWalking = false;
-
-    // Stop walk animation if active
     if (this.walkTween) {
       this.walkTween.stop();
       this.walkTween = null;
     }
 
-    // Play idle sprite animation
+    this.currentAnimation = "walk";
+    this.isWalking = true;
+
+    if (this.shadowTween) {
+      this.shadowTween.stop();
+      this.shadowTween = null;
+    }
+
+    const walkAnimKey =
+      this.gender === "male" ? "persona_male_walk" : "persona_female_walk";
+    this.playSpriteAnimation(walkAnimKey);
+    this.startWalkShadowPulse();
+
+    const segmentDuration = Math.max(120, duration / route.length);
+    let index = 0;
+
+    const walkNextSegment = () => {
+      const point = route[index];
+      if (!point) {
+        this.currentAnimation = "idle";
+        this.playIdle();
+        return;
+      }
+
+      if (
+        Phaser.Math.Distance.Between(this.x, this.y, point.x, point.y) <=
+        Persona.ARRIVAL_EPSILON
+      ) {
+        index += 1;
+        walkNextSegment();
+        return;
+      }
+
+      // Flip sprite based on movement direction
+      // Default sprite faces left, so flipX=true when moving right, flipX=false when moving left
+      if (point.x !== this.x) {
+        this.sprite.setFlipX(point.x > this.x);
+      }
+
+      this.walkTween = this.scene.tweens.add({
+        targets: this,
+        x: point.x,
+        y: point.y,
+        duration: segmentDuration,
+        ease: "Linear", // Linear ease for smooth path segments
+        onComplete: () => {
+          index += 1;
+          walkNextSegment();
+        },
+      });
+    };
+
+    walkNextSegment();
+  }
+
+  /**
+   * Resume idle state — persona stands perfectly still at current checkpoint.
+   * All movement and floating tweens are stopped; sprite plays idle animation
+   * loop (breathing/blinking frames if available) but the container does NOT
+   * drift or translate.
+   */
+  playIdle(): void {
+    this.currentAnimation = "idle";
+    this.isWalking = false;
+
+    // ── Stop all active movement tweens ────────────────────────────────────
+    if (this.walkTween) {
+      this.walkTween.stop();
+      this.walkTween = null;
+    }
+
+    // ── Stop shadow pulse so shadow stays at fixed size ─────────────────────
+    if (this.shadowTween) {
+      this.shadowTween.stop();
+      this.shadowTween = null;
+    }
+    // Reset shadow to its natural scale (no drift)
+    this.shadowEllipse.setScale(1, 1);
+
+    // ── Play idle sprite animation (visual only, no container movement) ──────
     const idleAnimKey =
       this.gender === "male" ? "persona_male_idle" : "persona_female_idle";
     this.playSpriteAnimation(idleAnimKey);
 
-    // Start subtle shadow pulse for idle
-    this.startIdleShadowPulse();
+    // Always face right (towards next checkpoint) when idle
+    if (this.sprite) {
+      this.sprite.setFlipX(true);
+    }
   }
 
   /**
@@ -165,7 +271,20 @@ export class Persona extends Phaser.GameObjects.Container {
    * @param duration Movement duration in milliseconds (default: 1000ms).
    */
   playWalk(targetX: number, targetY: number, duration = 1000): void {
-    if (this.currentAnimation === "walk" && this.walkTween?.isPlaying()) return;
+    if (
+      Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY) <=
+      Persona.ARRIVAL_EPSILON
+    ) {
+      this.x = targetX;
+      this.y = targetY;
+      this.playIdle();
+      return;
+    }
+
+    if (this.walkTween) {
+      this.walkTween.stop();
+      this.walkTween = null;
+    }
 
     this.currentAnimation = "walk";
     this.isWalking = true;
@@ -180,6 +299,12 @@ export class Persona extends Phaser.GameObjects.Container {
     const walkAnimKey =
       this.gender === "male" ? "persona_male_walk" : "persona_female_walk";
     this.playSpriteAnimation(walkAnimKey);
+    this.startWalkShadowPulse();
+
+    // Flip sprite based on movement direction
+    if (targetX !== this.x) {
+      this.sprite.setFlipX(targetX > this.x);
+    }
 
     // Move the container
     this.walkTween = this.scene.tweens.add({
@@ -187,8 +312,10 @@ export class Persona extends Phaser.GameObjects.Container {
       x: targetX,
       y: targetY,
       duration: duration,
-      ease: "Linear",
+      ease: "Sine.easeInOut",
       onComplete: () => {
+        this.x = targetX;
+        this.y = targetY;
         this.currentAnimation = "idle";
         this.playIdle();
       },
@@ -198,21 +325,20 @@ export class Persona extends Phaser.GameObjects.Container {
   // ── Private: animations ───────────────────────────────────────────────────
 
   /**
-   * Starts a subtle shadow pulse during idle animation.
-   * Shadow scales slightly to create a hovering effect.
+   * Plays a subtle shadow compression during walk to give a grounded feel.
+   * Only active while the persona is walking; automatically stopped on idle.
    */
-  private startIdleShadowPulse(): void {
-    // Stop any existing shadow animation
+  private startWalkShadowPulse(): void {
     if (this.shadowTween) {
       this.shadowTween.stop();
     }
+    this.shadowEllipse.setScale(1, 1);
 
-    // Subtle shadow pulse during idle
     this.shadowTween = this.scene.tweens.add({
       targets: this.shadowEllipse,
-      scaleX: 0.85,
-      scaleY: 0.85,
-      duration: 1200,
+      scaleX: { from: 1, to: 0.75 },
+      scaleY: { from: 1, to: 0.75 },
+      duration: 220,
       ease: Phaser.Math.Easing.Sine.InOut,
       yoyo: true,
       repeat: -1,

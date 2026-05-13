@@ -3,7 +3,6 @@ import {
   BaseCheckpointAnimation,
   type AnimationConfig,
 } from "./BaseCheckpointAnimation";
-import { audioManager } from "@/lib/audio/audioManager";
 
 /**
  * Bridge Repair Animation
@@ -26,13 +25,6 @@ export class BridgeRepairAnimation extends BaseCheckpointAnimation {
   }
 
   create(): void {
-    // Play audio SFX
-    const sfxId =
-      this.config.variant === "gold"
-        ? "bridge_repair_gold"
-        : "bridge_repair_standard";
-    audioManager.playCheckpointSFX(sfxId);
-
     // Create all visual elements
     this.createGlowBase();
     this.createBridgeBase();

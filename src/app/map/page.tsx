@@ -1,9 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { IntroScreen } from "@/components/map/IntroScreen";
 import { WelcomeOverlay } from "@/components/map/WelcomeOverlay";
 import { MapIntroOverlay } from "@/components/map/MapIntroOverlay";
@@ -11,25 +13,47 @@ import { motion, AnimatePresence } from "framer-motion";
 
 type TutorialStep = "gender" | "welcome" | "map-intro" | "complete";
 
-export default function MapIntroPage() {
+// ── Inner component that reads searchParams (requires Suspense in Next.js App Router) ─
+function MapIntroInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(null);
+
+  // Read ideaId from URL query param (e.g. /map?ideaId=abc123)
+  const ideaIdParam = searchParams.get("ideaId") as Id<"ideas"> | null;
 
   // Fetch user's saved gender from database
   const savedGender = useQuery(api.users.getPersonaGender);
   const updateGender = useMutation(api.users.updatePersonaGender);
 
-  // Fetch venture name for the intro screen from Convex (real-time)
-  const ventures = useQuery(api.worldMap.getVenturesByUser);
-  const activeVenture = ventures?.[0] ?? null;
+  // ── Venture resolution ──────────────────────────────────────────────────────
+  // If we have an ideaId, look up the specific venture for that idea.
+  // Otherwise, fall back to the user's first venture (backward compat).
+  const ventureByIdea = useQuery(
+    api.worldMap.getVentureByIdea,
+    ideaIdParam ? { ideaId: ideaIdParam } : "skip",
+  );
 
+  const allVentures = useQuery(api.worldMap.getVenturesByUser);
+
+  // Resolve which venture to open:
+  // - If ideaId is in URL → use the venture for that idea (wait for query)
+  // - Otherwise          → use the first venture
+  const activeVenture = ideaIdParam
+    ? (ventureByIdea ?? null)
+    : (allVentures?.[0] ?? null);
+
+  // Fetch venture name for the intro screen
   const ideaQuery = useQuery(
     api.worldMap.getWorldMapData,
     activeVenture ? { ventureId: activeVenture._id } : "skip",
   );
 
   const ventureName = ideaQuery?.ideaTitle ?? "Your Venture";
+
+  // Helper: build the destination URL, always including ventureId
+  const buildWorldMapUrl = (vId: string) => `/map/world?ventureId=${vId}`;
 
   useEffect(() => {
     setMounted(true);
@@ -38,63 +62,62 @@ export default function MapIntroPage() {
   useEffect(() => {
     if (!mounted || savedGender === undefined) return;
 
-    // If gender already saved in database, skip to stages
+    // Wait for venture-by-idea lookup to resolve before redirecting
+    if (ideaIdParam && ventureByIdea === undefined) return;
+
     if (savedGender === "male" || savedGender === "female") {
       // Sync to localStorage for backward compatibility
       if (typeof window !== "undefined") {
         localStorage.setItem("selectedGender", savedGender);
       }
-      
-      // Check if tutorial has been completed before
+
       const tutorialCompleted =
         typeof window !== "undefined"
           ? localStorage.getItem("tutorial_completed") === "true"
           : false;
 
       if (tutorialCompleted) {
-        // Skip directly to world map for returning users
-        router.push("/map/world");
+        const destination = activeVenture
+          ? buildWorldMapUrl(activeVenture._id)
+          : "/map/world";
+        router.push(destination);
       } else {
-        // Show tutorial for first-time users
         setTutorialStep("welcome");
       }
     } else {
-      // No gender saved, show selection screen
       setTutorialStep("gender");
     }
-  }, [mounted, savedGender, router]);
+  }, [mounted, savedGender, router, ideaIdParam, ventureByIdea, activeVenture]);
 
   const handleStart = async (gender: "male" | "female") => {
-    // Save to database (one-time)
     await updateGender({ gender });
-    
-    // Also save to localStorage for backward compatibility
     if (typeof window !== "undefined") {
       localStorage.setItem("selectedGender", gender);
     }
 
-    // Check if tutorial has been completed before
     const tutorialCompleted =
       typeof window !== "undefined"
         ? localStorage.getItem("tutorial_completed") === "true"
         : false;
 
     if (tutorialCompleted) {
-      // Skip tutorial for returning users
-      router.push("/map/world");
+      const destination = activeVenture
+        ? buildWorldMapUrl(activeVenture._id)
+        : "/map/world";
+      router.push(destination);
     } else {
-      // Show tutorial for new users
       setTutorialStep("welcome");
     }
   };
 
-  const handleWelcomeComplete = () => {
-    setTutorialStep("map-intro");
-  };
+  const handleWelcomeComplete = () => setTutorialStep("map-intro");
 
   const handleMapIntroComplete = () => {
     setTutorialStep("complete");
-    router.push("/map/world");
+    const destination = activeVenture
+      ? buildWorldMapUrl(activeVenture._id)
+      : "/map/world";
+    router.push(destination);
   };
 
   if (!mounted || tutorialStep === null) {
@@ -132,5 +155,26 @@ export default function MapIntroPage() {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+// ── Outer page wraps in Suspense (required by Next.js App Router for useSearchParams) ─
+export default function MapIntroPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="fixed inset-0 bg-[#050810] flex items-center justify-center">
+          <motion.div
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="text-xs tracking-[0.3em] uppercase font-black text-indigo-400"
+          >
+            Loading…
+          </motion.div>
+        </div>
+      }
+    >
+      <MapIntroInner />
+    </Suspense>
   );
 }

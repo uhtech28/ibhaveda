@@ -230,7 +230,7 @@ function VentureCard({
             >
               {venture.status}
             </Badge>
-            <Link href="/map">
+            <Link href={`/map/world?ventureId=${venture._id}`}>
               <Button
                 size="sm"
                 className="gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 hover:text-amber-300"
@@ -240,7 +240,7 @@ function VentureCard({
                 Play
               </Button>
             </Link>
-            <Link href={`/venture/${venture._id}`}>
+            <Link href={`/map/world?ventureId=${venture._id}`}>
               <Button variant="ghost" size="icon">
                 <ArrowRight className="h-4 w-4" />
               </Button>

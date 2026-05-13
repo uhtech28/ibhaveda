@@ -244,6 +244,7 @@ class AudioManager {
 
   /** Currently playing music track */
   private currentMusic: Howl | null = null;
+  private currentMusicVolumeScale = 1;
 
   /** Cache of loaded Howl instances keyed by path group */
   private ambienceCache: Partial<Record<BiomeId, Howl>> = {};
@@ -256,6 +257,8 @@ class AudioManager {
 
   /** Pending actions queued before user interaction unlocks audio */
   private pendingBiome: BiomeId | null = null;
+  private pendingMusicTrack: string | null = null;
+  private pendingMusicVolumeScale = 1;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -286,6 +289,12 @@ class AudioManager {
     if (this.pendingBiome) {
       this.playAmbience(this.pendingBiome);
       this.pendingBiome = null;
+    }
+
+    if (this.pendingMusicTrack) {
+      this.playMusic(this.pendingMusicTrack, this.pendingMusicVolumeScale);
+      this.pendingMusicTrack = null;
+      this.pendingMusicVolumeScale = 1;
     }
   }
 
@@ -412,8 +421,12 @@ class AudioManager {
    * Play a boss entrance theme or stage music track.
    * Crossfades from current music track.
    */
-  playMusic(trackId: string): void {
-    if (!this.initialized) return;
+  playMusic(trackId: string, volumeScale = 1): void {
+    if (!this.initialized) {
+      this.pendingMusicTrack = trackId;
+      this.pendingMusicVolumeScale = clamp(volumeScale);
+      return;
+    }
 
     const paths = AUDIO_PATHS.music[trackId];
     if (!paths) return;
@@ -433,7 +446,8 @@ class AudioManager {
       setTimeout(() => outgoing.stop(), CROSSFADE_DURATION + 50);
     }
 
-    const targetVol = this.musicEffectiveVolume();
+    this.currentMusicVolumeScale = clamp(volumeScale);
+    const targetVol = this.musicEffectiveVolume() * this.currentMusicVolumeScale;
     incoming.volume(0);
     incoming.play();
     incoming.fade(0, targetVol, CROSSFADE_DURATION);
@@ -475,7 +489,12 @@ class AudioManager {
 
   /** Play stage music track (stage_1 … stage_8) */
   playStageMusic(stage: number): void {
-    this.playMusic(`stage_${stage}`);
+    this.playMiniBossStageTheme(stage);
+  }
+
+  /** Play the mini-boss stage theme track for the given venture stage. */
+  playMiniBossStageTheme(stage: number): void {
+    this.playMusic(`stage_${stage}`, 0.42);
   }
 
   // ── UI SFX ────────────────────────────────────────────────────────────────
@@ -493,6 +512,12 @@ class AudioManager {
       { volume: this.uiEffectiveVolume() },
     );
     howl?.play();
+  }
+
+  /** Unlock audio from a direct user gesture, then play UI feedback. */
+  playTouch(sound: UISound = "click"): void {
+    this.unlock();
+    this.playUI(sound);
   }
 
   // ── Destroy ───────────────────────────────────────────────────────────────
@@ -524,6 +549,8 @@ class AudioManager {
     this.currentAmbience = null;
     this.currentMusic = null;
     this.currentAmbienceId = null;
+    this.pendingBiome = null;
+    this.pendingMusicTrack = null;
 
     console.info("[AudioManager] Destroyed.");
   }
@@ -608,7 +635,9 @@ class AudioManager {
 
   private updateMusicVolume(): void {
     if (this.currentMusic?.playing()) {
-      this.currentMusic.volume(this.musicEffectiveVolume());
+      this.currentMusic.volume(
+        this.musicEffectiveVolume() * this.currentMusicVolumeScale,
+      );
     }
   }
 

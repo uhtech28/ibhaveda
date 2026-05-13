@@ -67,6 +67,7 @@ export const audioSettingsAtom = atom({
   masterVolume: 0.8,
   musicVolume: 0.7,
   sfxVolume: 0.9,
+  uiVolume: 0.6,
   muted: false,
 });
 

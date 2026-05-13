@@ -322,7 +322,7 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
           targets: this,
           x: retreatX,
           alpha: 0,
-          duration: 1600,
+          duration: 1500,
           ease: "Cubic.easeIn",
           onComplete: () => {
             this.setPosition(retreatX - 180, this.y);
@@ -413,7 +413,7 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
           targets: this,
           alpha: 0,
           y: sinkY,
-          duration: 1800,
+          duration: 1500,
           ease: "Cubic.easeIn",
           onComplete: () => {
             this.setPosition(this.x, sinkY - 60);
@@ -427,10 +427,15 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
 
   /**
    * Play the slay animation and destroy the boss.
-   * Each Super Boss has a thematically distinct defeat sequence (~3.5s).
+   * Standard clears in 2s; gold uses the unique per-boss 3-4s sequence.
    * PRD §4.2: "slay animation per Super Boss."
    */
-  slay(): void {
+  slay(variant: "standard" | "gold" = "gold"): void {
+    if (variant === "standard") {
+      this.slayStandard();
+      return;
+    }
+
     if (!this.scene || !this.scene.tweens) return;
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.killTweensOf(this.silhouetteGraphics);
@@ -603,6 +608,58 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
         });
       }
     }
+  }
+
+  private slayStandard(): void {
+    if (!this.scene || !this.scene.tweens) return;
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.killTweensOf(this.silhouetteGraphics);
+    this.scene.tweens.killTweensOf(this.namePlate);
+
+    this.scene.tweens.add({
+      targets: this.namePlate,
+      alpha: 0,
+      duration: 200,
+      ease: "Sine.easeOut",
+    });
+
+    for (let i = 0; i < 12; i++) {
+      const mote = this.scene.add.graphics();
+      mote.fillStyle(0x818cf8, 0.75);
+      mote.fillCircle(0, 0, 3 + Math.random() * 3);
+      mote.setPosition(this.x, this.y);
+      this.scene.add.existing(mote);
+
+      const angle = (i / 12) * Math.PI * 2;
+      this.scene.tweens.add({
+        targets: mote,
+        x: this.x + Math.cos(angle) * (90 + Math.random() * 40),
+        y: this.y + Math.sin(angle) * (90 + Math.random() * 40),
+        alpha: 0,
+        scale: 0,
+        duration: 1100,
+        delay: i * 35,
+        ease: "Cubic.easeOut",
+        onComplete: () => mote.destroy(),
+      });
+    }
+
+    this.scene.tweens.add({
+      targets: this.silhouetteGraphics,
+      alpha: 0,
+      scaleX: 0.2,
+      scaleY: 0.2,
+      duration: 1600,
+      ease: "Back.easeIn",
+    });
+
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 0,
+      duration: 2000,
+      ease: "Linear",
+      onComplete: () => this.destroy(),
+    });
   }
 
   // ── Private: drawing ──────────────────────────────────────────────────────

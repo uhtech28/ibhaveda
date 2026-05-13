@@ -240,7 +240,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
         targets: this.bossGraphics,
         alpha: 0,
         y: this.bossGraphics.y + 20,
-        duration: 1500,
+        duration: 2000,
         ease: "Cubic.easeIn",
       });
 
@@ -423,7 +423,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
         scaleX: { from: 1.0, to: 0.6 },
         scaleY: { from: 1.0, to: 0.6 },
         alpha: 0.15,
-        duration: 600,
+        duration: 700,
         ease: "Cubic.easeIn",
         onComplete: () => {
           if (!this.scene) return;
@@ -432,7 +432,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
             scaleX: 0.85,
             scaleY: 0.85,
             alpha: 0.4,
-            duration: 800,
+            duration: 900,
             ease: "Sine.easeOut",
           });
         },
@@ -458,7 +458,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
         targets: this.bossGraphics,
         y: this.bossGraphics.y + 40,
         alpha: 0,
-        duration: 900,
+        duration: 700,
         ease: "Cubic.easeIn",
       });
       this.scene.tweens.add({
@@ -483,7 +483,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
         targets: this,
         y: retreatY,
         alpha: 0,
-        duration: 1200,
+        duration: 900,
         ease: "Cubic.easeIn",
         onComplete: () => {
           this.setPosition(this.x, retreatY - 80);
@@ -495,7 +495,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
             this.scene.tweens.add({
               targets: this,
               y: this.y - 20,
-              duration: 1200,
+              duration: 600,
               ease: "Sine.easeOut",
             });
           }
