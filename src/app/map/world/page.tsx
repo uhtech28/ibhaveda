@@ -9,7 +9,14 @@
  * Stack: Next.js 15 · React 19 · Framer Motion 12 · Tailwind CSS 4 · Convex · Clerk
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo, Suspense } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  Suspense,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
@@ -264,7 +271,7 @@ function StageStrip({
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.5, duration: 0.5 }}
-      className="no-scrollbar absolute bottom-20 left-1/2 z-20 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-2 overflow-x-auto rounded-full border border-white/5 bg-[#0a0d14]/60 p-2 shadow-[0_0_20px_rgba(30,20,50,0.5)] backdrop-blur-md sm:bottom-8"
+      className="no-scrollbar absolute bottom-24 left-1/2 z-20 flex max-w-[calc(100vw-0.75rem)] -translate-x-1/2 gap-1.5 overflow-x-auto rounded-full border border-white/5 bg-[#0a0d14]/60 p-1.5 shadow-[0_0_20px_rgba(30,20,50,0.5)] backdrop-blur-md sm:bottom-10 sm:gap-2 sm:p-2 md:bottom-9 lg:bottom-8"
     >
       {STAGES.map((st, i) => {
         const isDone = i + 1 < activeStage;
@@ -298,12 +305,13 @@ function StageStrip({
                   : isCurrent
                     ? st.glow
                     : "rgba(255,255,255,0.05)",
-                border: `1px solid ${isDone
+                border: `1px solid ${
+                  isDone
                     ? "#6366f1"
                     : isCurrent
                       ? st.glow
                       : "rgba(255,255,255,0.1)"
-                  }`,
+                }`,
                 boxShadow: isCurrent ? `0 0 15px ${st.glow}` : "none",
                 cursor: isUnlocked ? "pointer" : "not-allowed",
                 transition:
@@ -865,7 +873,7 @@ function AudioToggle({
       transition={{ delay: 1 }}
       onClick={onToggle}
       onMouseEnter={() => audioManager.playUI("hover")}
-      className="absolute bottom-32 right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full text-[16px] shadow-lg backdrop-blur-xl sm:bottom-12 sm:right-5"
+      className="absolute bottom-40 right-2 z-20 flex h-9 w-9 items-center justify-center rounded-full text-[14px] shadow-lg backdrop-blur-xl sm:bottom-20 sm:right-4 sm:h-10 sm:w-10 sm:text-[16px] md:bottom-14 md:right-5 lg:bottom-12"
       style={{
         background: "rgba(15, 23, 42, 0.6)",
         border: "1px solid rgba(255, 255, 255, 0.1)",
@@ -1040,9 +1048,9 @@ function MapPageInner() {
     api.aiScoring.getStageQualityScore,
     activeVenture && worldMapData?.venture
       ? {
-        ventureId: activeVenture._id,
-        stageNumber: worldMapData.venture.currentStage,
-      }
+          ventureId: activeVenture._id,
+          stageNumber: worldMapData.venture.currentStage,
+        }
       : "skip",
   );
 
@@ -1095,15 +1103,6 @@ function MapPageInner() {
   const [badgeQueue, setBadgeQueue] = useState<BadgePayload[]>([]);
   const activeBadge = badgeQueue[0] ?? null;
 
-  // ── Sync Audio Settings ────────────────────────────────────────────────────
-  useEffect(() => {
-    audioManager.setMasterVolume(audioSettings.masterVolume);
-    audioManager.setMusicVolume(audioSettings.musicVolume);
-    audioManager.setSFXVolume(audioSettings.sfxVolume);
-    audioManager.setUIVolume(audioSettings.uiVolume);
-    audioManager.setMuted(audioSettings.muted);
-  }, [audioSettings]);
-
   // Tutorial: First checkpoint pulse
   const [showFirstCheckpointPulse, setShowFirstCheckpointPulse] =
     useState(false);
@@ -1122,11 +1121,6 @@ function MapPageInner() {
     stageName: string;
     isGold: boolean;
   }>({ show: false, stageNumber: 1, stageName: "", isGold: false });
-  const [pendingNextStageOpen, setPendingNextStageOpen] = useState<{
-    detail: CheckpointDetail;
-    stage: number;
-    checkpointId: string;
-  } | null>(null);
 
   // Task submission state (now using Jotai atom for global access)
   const [submittingTask, setSubmittingTask] = useAtom(submittingTaskAtom);
@@ -1396,13 +1390,7 @@ function MapPageInner() {
             (cp) => cp.stage === activeStage && cp.checkpoint === activeCP,
           );
           if (nextActiveCheckpoint) {
-            const detail = buildCheckpointDetail(nextActiveCheckpoint);
-            setSelectedDetail(detail);
-            eventBridge.dispatchToPhaser({
-              type: "FOCUS_STAGE",
-              stage: activeStage,
-              checkpointId: nextActiveCheckpoint._id,
-            });
+            setSelectedDetail(buildCheckpointDetail(nextActiveCheckpoint));
           }
         }
       } else if (stageChanged) {
@@ -1413,23 +1401,9 @@ function MapPageInner() {
         );
         if (newActiveCheckpoint) {
           const detail = buildCheckpointDetail(newActiveCheckpoint);
-          if (stageClearModal.show) {
-            setPendingNextStageOpen({
-              detail,
-              stage: activeStage,
-              checkpointId: newActiveCheckpoint._id,
-            });
-            previousActiveRef.current = {
-              stage: activeStage,
-              checkpoint: activeCP,
-            };
-            return;
-          }
-
           setSelectedDetail(detail);
           eventBridge.dispatchToPhaser({
-            type: "FOCUS_STAGE",
-            stage: activeStage,
+            type: "SCROLL_TO_CHECKPOINT",
             checkpointId: newActiveCheckpoint._id,
           });
           console.log(
@@ -1446,7 +1420,6 @@ function MapPageInner() {
     checkpoints,
     selectedDetail,
     buildCheckpointDetail,
-    stageClearModal.show,
   ]);
 
   // ── Persist gender to DB whenever venture + gender are known ─────────────
@@ -1455,7 +1428,7 @@ function MapPageInner() {
       savePersonaGender({
         ventureId: activeVenture._id,
         gender: selectedGender,
-      }).catch(() => { });
+      }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVenture?._id, selectedGender]);
@@ -1499,13 +1472,13 @@ function MapPageInner() {
   const xpPercent = levelData?.progress ?? 0;
   const levelPhase = levelData?.phase
     ? (() => {
-      const p = levelData.phase as string;
-      if (p === "tutorial") return 1;
-      if (p === "early") return 2;
-      if (p === "mid") return 3;
-      if (p === "senior") return 4;
-      return 5; // mentor
-    })()
+        const p = levelData.phase as string;
+        if (p === "tutorial") return 1;
+        if (p === "early") return 2;
+        if (p === "mid") return 3;
+        if (p === "senior") return 4;
+        return 5; // mentor
+      })()
     : 1;
 
   // Streak from Convex
@@ -1783,7 +1756,6 @@ function MapPageInner() {
   // ── Sync Convex checkpoint data → Phaser ───────────────────────────────────
   useEffect(() => {
     if (!phaserReady || !venture || checkpoints.length === 0) return;
-    if (stageClearModal.show) return;
 
     const phaserCheckpoints: CheckpointState[] = checkpoints.map((cp) => {
       const localStatus = deriveCheckpointStatus(cp, activeStage, activeCP);
@@ -1814,18 +1786,18 @@ function MapPageInner() {
       corruptionLevel,
       superBoss: superBoss
         ? {
-          bossSlug: superBoss.bossSlug,
-          bossName:
-            superBoss.definition?.name ??
-            superBoss.bossName ??
-            "Unknown Boss",
-          visualStatus: superBoss.visualStatus,
-          status: superBoss.status,
-          defeatVariant:
-            worldMapData?.projectState === "project_perfect"
-              ? "gold"
-              : "standard",
-        }
+            bossSlug: superBoss.bossSlug,
+            bossName:
+              superBoss.definition?.name ??
+              superBoss.bossName ??
+              "Unknown Boss",
+            visualStatus: superBoss.visualStatus,
+            status: superBoss.status,
+            defeatVariant:
+              worldMapData?.projectState === "project_perfect"
+                ? "gold"
+                : "standard",
+          }
         : undefined,
     } as Parameters<typeof eventBridge.dispatchToPhaser>[0]);
 
@@ -1848,7 +1820,6 @@ function MapPageInner() {
     corruptionLevel,
     selectedGender,
     superBoss,
-    stageClearModal.show,
     worldMapData?.projectState,
   ]);
 
@@ -1891,11 +1862,6 @@ function MapPageInner() {
 
         console.log("[React] Opening CheckpointPanel with detail:", detail);
         setSelectedDetail(detail);
-        eventBridge.dispatchToPhaser({
-          type: "FOCUS_STAGE",
-          stage: cp.stage,
-          checkpointId: cp._id,
-        });
       }
     };
 
@@ -1983,7 +1949,8 @@ function MapPageInner() {
         setCurrentQuestAtom({
           checkpointName: current.title,
           tasks: updatedTasks.map((task) => ({
-            id: task._taskId ?? `${current.id}_${task._taskLevel ?? task.label}`,
+            id:
+              task._taskId ?? `${current.id}_${task._taskLevel ?? task.label}`,
             checkpointId:
               task._convexCheckpointId ??
               (current.id as Id<"ventureCheckpoints">),
@@ -2171,8 +2138,7 @@ function MapPageInner() {
         // once Convex propagates. We optimistically show it.
         setSelectedDetail(buildCheckpointDetail(nextCp));
         eventBridge.dispatchToPhaser({
-          type: "FOCUS_STAGE",
-          stage: nextCp.stage,
+          type: "SCROLL_TO_CHECKPOINT",
           checkpointId: nextCp._id,
         });
       } else {
@@ -2208,13 +2174,12 @@ function MapPageInner() {
       const firstCp = checkpoints.find(
         (c) => c.stage === stageId && c.checkpoint === 1,
       );
-      if (firstCp) {
-        eventBridge.dispatchToPhaser({
-          type: "FOCUS_STAGE",
-          stage: stageId,
-          checkpointId: firstCp._id,
-        });
-      }
+
+      eventBridge.dispatchToPhaser({
+        type: "FOCUS_STAGE",
+        stage: stageId,
+        checkpointId: firstCp?._id,
+      });
     },
     [activeStage, checkpoints],
   );
@@ -2231,24 +2196,6 @@ function MapPageInner() {
       return () => clearTimeout(timer);
     }
   }, [selectedStageId, checkpoints, phaserReady, handleStageSelect]);
-
-  const handleStageClearComplete = useCallback(() => {
-    setStageClearModal((prev) => ({ ...prev, show: false }));
-  }, []);
-
-  useEffect(() => {
-    if (!phaserReady || stageClearModal.show || !pendingNextStageOpen) return;
-
-    if (!pendingNextStageOpen) return;
-
-    setSelectedDetail(pendingNextStageOpen.detail);
-    eventBridge.dispatchToPhaser({
-      type: "FOCUS_STAGE",
-      stage: pendingNextStageOpen.stage,
-      checkpointId: pendingNextStageOpen.checkpointId,
-    });
-    setPendingNextStageOpen(null);
-  }, [pendingNextStageOpen, phaserReady, stageClearModal.show]);
 
   // ── Loading / no-venture guard ─────────────────────────────────────────────
   // worldMapData is "skip"ped while intro is showing, so only check it after
@@ -2452,7 +2399,7 @@ function MapPageInner() {
           />
 
           {/* Left Sidebar Trigger */}
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
+          <div className="absolute left-2 bottom-24 z-50 sm:bottom-auto sm:left-4 sm:top-1/2 sm:-translate-y-1/2 md:left-3 lg:left-4">
             <LeftSidebar
               onOpenPanel={(tab) => {
                 setActiveToolsTab(tab);
@@ -2489,7 +2436,7 @@ function MapPageInner() {
           {selectedDetail && (
             <div
               className="absolute inset-0 z-[55] hidden sm:block"
-              style={{ right: "360px" }}
+              style={{ right: "min(92vw, 360px)" }}
               onClick={() => setSelectedDetail(null)}
             />
           )}
@@ -2498,7 +2445,7 @@ function MapPageInner() {
           {isToolsPanelOpen && (
             <div
               className="absolute inset-0 z-[55]"
-              style={{ left: "420px" }}
+              style={{ left: "min(92vw, 420px)" }}
               onClick={() => setIsToolsPanelOpen(false)}
             />
           )}
@@ -2529,7 +2476,9 @@ function MapPageInner() {
             stageNumber={stageClearModal.stageNumber}
             stageName={stageClearModal.stageName}
             isGold={stageClearModal.isGold}
-            onComplete={handleStageClearComplete}
+            onComplete={() =>
+              setStageClearModal({ ...stageClearModal, show: false })
+            }
           />
         </>
       )}

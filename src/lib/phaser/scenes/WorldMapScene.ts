@@ -31,7 +31,8 @@ interface BiomeConfig {
     | "mine"
     | "harbour"
     | "crossroads"
-    | "capital";
+    | "capital"
+    | "dungeon";
   colors: {
     sky: number;
     ground: number;
@@ -96,54 +97,54 @@ const BIOME_CONFIGS: BiomeConfig[] = [
   },
   {
     id: 5,
-    name: "The Mine",
+    name: "The Deep Mine",
     theme: "Build & Deliver",
     visualTheme: "mine",
     colors: {
-      sky: 0x18181b, // Zinc 900
-      ground: 0x09090b, // Zinc 950
-      accent1: 0x27272a, // Zinc 800
-      accent2: 0x71717a, // Zinc 500
-      path: 0x808080,
+      sky: 0x1e1a14,
+      ground: 0x2a2218,
+      accent1: 0x6b4f28,
+      accent2: 0xf97316, // ember orange
+      path: 0x2a2218,
     },
   },
   {
     id: 6,
-    name: "The Harbour",
+    name: "The Sunken Harbour",
     theme: "Launch",
     visualTheme: "harbour",
     colors: {
-      sky: 0x0c4a6e, // Cyan 900
-      ground: 0x082f49, // Cyan 950
-      accent1: 0x075985, // Cyan 800
-      accent2: 0x38bdf8, // Cyan 400
-      path: 0xc0c0c0,
+      sky: 0x083344,
+      ground: 0x0d3d3a,
+      accent1: 0x1a6b3a,
+      accent2: 0x38bdf8, // ocean blue
+      path: 0x1a4f48,
     },
   },
   {
     id: 7,
-    name: "The Crossroads Town",
+    name: "The Shadow Crossroads",
     theme: "Iteration",
     visualTheme: "crossroads",
     colors: {
-      sky: 0x4c1d95, // Violet 900
-      ground: 0x2e1065, // Violet 950
-      accent1: 0x5b21b6, // Violet 800
-      accent2: 0xa78bfa, // Violet 400
-      path: 0xbc8f8f,
+      sky: 0x13082a,
+      ground: 0x1e0d40,
+      accent1: 0x7c3aed,
+      accent2: 0xa78bfa, // lavender
+      path: 0x1e0d40,
     },
   },
   {
     id: 8,
-    name: "The Capital",
+    name: "The Citadel",
     theme: "Scale",
     visualTheme: "capital",
     colors: {
-      sky: 0x713f12, // Yellow 900 (Goldish)
-      ground: 0x422006, // Yellow 950
-      accent1: 0x854d0e, // Yellow 800
-      accent2: 0xfacc15, // Yellow 400
-      path: 0xf0e68c,
+      sky: 0x2a1200,
+      ground: 0x3a1800,
+      accent1: 0xb45309,
+      accent2: 0xfbbf24, // golden
+      path: 0x5c2800,
     },
   },
 ];
@@ -332,29 +333,44 @@ export class WorldMapScene extends Phaser.Scene {
     const isTouchDevice =
       "ontouchstart" in window || navigator.maxTouchPoints > 0;
     const isMobile = this.scale.width < 768;
+    const isTablet = this.scale.width >= 768 && this.scale.width < 1024;
 
-    // Enable camera drag with mobile optimization
+    // Enhanced camera drag with smooth momentum
+    let isDragging = false;
+    let dragVelocityX = 0;
+    let dragVelocityY = 0;
+
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       audioManager.unlock();
+      isDragging = true;
+      dragVelocityX = 0;
+      dragVelocityY = 0;
 
       // Store initial camera position for drag
       this.registry.set("dragStartX", this.cameras.main.scrollX);
       this.registry.set("dragStartY", this.cameras.main.scrollY);
       this.registry.set("pointerStartX", pointer.x);
       this.registry.set("pointerStartY", pointer.y);
+      this.registry.set("lastPointerX", pointer.x);
+      this.registry.set("lastPointerY", pointer.y);
     });
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
-      if (pointer.isDown) {
+      if (pointer.isDown && isDragging) {
         const dragStartX =
           this.registry.get("dragStartX") || this.cameras.main.scrollX;
         const dragStartY =
           this.registry.get("dragStartY") || this.cameras.main.scrollY;
         const pointerStartX = this.registry.get("pointerStartX") || pointer.x;
         const pointerStartY = this.registry.get("pointerStartY") || pointer.y;
+        const lastPointerX = this.registry.get("lastPointerX") || pointer.x;
+        const lastPointerY = this.registry.get("lastPointerY") || pointer.y;
 
-        // Smooth drag with momentum on mobile
-        const dragSensitivity = isMobile ? 1.2 : 1.0;
+        // Adaptive drag sensitivity based on device
+        let dragSensitivity = 1.0;
+        if (isMobile) dragSensitivity = 1.15;
+        else if (isTablet) dragSensitivity = 1.05;
+
         const deltaX =
           ((pointerStartX - pointer.x) / this.cameras.main.zoom) *
           dragSensitivity;
@@ -362,15 +378,45 @@ export class WorldMapScene extends Phaser.Scene {
           ((pointerStartY - pointer.y) / this.cameras.main.zoom) *
           dragSensitivity;
 
+        // Calculate velocity for momentum
+        dragVelocityX = (lastPointerX - pointer.x) * dragSensitivity;
+        dragVelocityY = (lastPointerY - pointer.y) * dragSensitivity;
+
         this.cameras.main.scrollX = dragStartX + deltaX;
         this.cameras.main.scrollY = dragStartY + deltaY;
+
+        this.registry.set("lastPointerX", pointer.x);
+        this.registry.set("lastPointerY", pointer.y);
       }
     });
 
-    // Add pinch-to-zoom for mobile
+    this.input.on("pointerup", () => {
+      isDragging = false;
+
+      // Apply momentum on release (mobile/tablet only)
+      if (
+        (isMobile || isTablet) &&
+        (Math.abs(dragVelocityX) > 2 || Math.abs(dragVelocityY) > 2)
+      ) {
+        const momentumDuration = 400;
+        const momentumDistance = 3;
+
+        this.tweens.add({
+          targets: this.cameras.main,
+          scrollX: this.cameras.main.scrollX + dragVelocityX * momentumDistance,
+          scrollY: this.cameras.main.scrollY + dragVelocityY * momentumDistance,
+          duration: momentumDuration,
+          ease: "Cubic.easeOut",
+        });
+      }
+    });
+
+    // Enhanced pinch-to-zoom for touch devices
     if (isTouchDevice) {
       let initialDistance = 0;
       let initialZoom = 1;
+      let initialCenterX = 0;
+      let initialCenterY = 0;
 
       this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
         if (this.input.pointer2.isDown) {
@@ -378,6 +424,10 @@ export class WorldMapScene extends Phaser.Scene {
           const dy = this.input.pointer1.y - this.input.pointer2.y;
           initialDistance = Math.sqrt(dx * dx + dy * dy);
           initialZoom = this.cameras.main.zoom;
+
+          // Calculate center point for zoom
+          initialCenterX = (this.input.pointer1.x + this.input.pointer2.x) / 2;
+          initialCenterY = (this.input.pointer1.y + this.input.pointer2.y) / 2;
         }
       });
 
@@ -389,7 +439,7 @@ export class WorldMapScene extends Phaser.Scene {
 
           if (initialDistance > 0) {
             const scale = distance / initialDistance;
-            const newZoom = Phaser.Math.Clamp(initialZoom * scale, 0.3, 1.5);
+            const newZoom = Phaser.Math.Clamp(initialZoom * scale, 0.25, 1.8);
             this.cameras.main.setZoom(newZoom);
           }
         }
@@ -417,80 +467,95 @@ export class WorldMapScene extends Phaser.Scene {
     const height = this.scale.height;
     const aspectRatio = width / height;
     const isPortrait = height > width;
-    const isMobile = width < 768;
-    const isTablet = width >= 768 && width < 1024;
+
+    // Device categories
     const isSmallMobile = width < 480;
+    const isMobile = width >= 480 && width < 768;
+    const isTabletPortrait = width >= 768 && width < 1024 && isPortrait;
+    const isTabletLandscape = width >= 768 && width < 1024 && !isPortrait;
+    const isSmallDesktop = width >= 1024 && width < 1440;
+    const isMediumDesktop = width >= 1440 && width < 1920;
+    const isLargeDesktop = width >= 1920;
 
     let zoom = 1;
 
-    // Mobile portrait (phones)
-    if (isSmallMobile && isPortrait) {
-      zoom = 0.38;
-    } else if (isMobile && isPortrait) {
-      zoom = 0.48;
-    }
-    // Mobile landscape
-    else if (isMobile && !isPortrait) {
-      zoom = 0.58;
-    }
-    // Tablet portrait
-    else if (isTablet && isPortrait) {
-      zoom = 0.62;
-    }
-    // Tablet landscape
-    else if (isTablet && !isPortrait) {
-      zoom = 0.72;
-    }
-    // Desktop small
-    else if (width < 1280) {
-      zoom = 0.78;
-    }
-    // Desktop medium
-    else if (width < 1600) {
-      zoom = 0.88;
-    }
-    // Desktop large
-    else if (width < 1920) {
-      zoom = 0.95;
-    }
-    // Desktop XL
-    else {
-      zoom = 1.0;
+    // Responsive zoom calculation
+    if (isSmallMobile) {
+      zoom = isPortrait ? 0.35 : 0.55;
+    } else if (isMobile) {
+      zoom = isPortrait ? 0.45 : 0.65;
+    } else if (isTabletPortrait) {
+      zoom = 0.6;
+    } else if (isTabletLandscape) {
+      zoom = 0.75;
+    } else if (isSmallDesktop) {
+      zoom = 0.8;
+    } else if (isMediumDesktop) {
+      zoom = 0.9;
+    } else if (isLargeDesktop) {
+      zoom = 1;
     }
 
-    // Additional adjustment for very short screens
+    // Height adjustments for short screens
     if (height < 500) {
-      zoom *= 0.82;
+      zoom *= 0.8;
     } else if (height < 600) {
-      zoom *= 0.88;
+      zoom *= 0.85;
+    } else if (height < 700) {
+      zoom *= 0.9;
     }
 
-    // Adjust for extreme aspect ratios
+    // Aspect ratio adjustments
     if (aspectRatio < 0.6) {
-      // Very tall screens
-      zoom *= 0.92;
-    } else if (aspectRatio > 2.2) {
-      // Very wide screens
-      zoom *= 1.08;
+      // Very tall screens (narrow portrait)
+      zoom *= 0.9;
+    } else if (aspectRatio > 2.5) {
+      // Ultra-wide screens
+      zoom *= 1.05;
     }
 
-    // Keep a focused stage wide enough to own the viewport instead of showing
-    // the next biome beside it.
-    const stageFillZoom = width / this.BIOME_WIDTH;
+    // Keep one full stage comfortably framed on tablet/desktop screens
     if (width >= 768) {
-      zoom = Math.max(zoom, stageFillZoom);
+      const stageFillZoom = width / this.BIOME_WIDTH;
+      zoom = Math.max(zoom, stageFillZoom * 0.92);
     }
 
-    this.cameras.main.setZoom(zoom);
+    zoom = Phaser.Math.Clamp(zoom, 0.32, 1.25);
 
+    const activeNode = this.getCurrentActiveCheckpointNode();
+    const stageCenterX =
+      (this.currentStage - 1) * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
+    const stageCenterY = this.MAP_HEIGHT / 2;
+    const { x: targetX, y: targetY } = this.getStageCameraTarget(
+      this.currentStage,
+      activeNode?.x ?? stageCenterX,
+      activeNode?.y ?? stageCenterY,
+      zoom,
+    );
+
+    // Apply zoom + keep the current stage centered after resize
     if (initial) {
-      this.cameras.main.centerOn(this.BIOME_WIDTH / 2, this.MAP_HEIGHT / 2);
+      this.cameras.main.setZoom(zoom);
+      this.cameras.main.centerOn(targetX, targetY);
+    } else {
+      this.tweens.killTweensOf(this.cameras.main);
+      this.tweens.add({
+        targets: this.cameras.main,
+        zoom,
+        duration: 320,
+        ease: "Sine.easeInOut",
+      });
+      this.cameras.main.pan(targetX, targetY, 320, "Sine.easeInOut", false);
     }
 
-    // Store zoom for UI scaling
+    // Store values for UI scaling
     this.registry.set("cameraZoom", zoom);
-    this.registry.set("isMobile", isMobile);
-    this.registry.set("isTablet", isTablet);
+    this.registry.set("isMobile", isSmallMobile || isMobile);
+    this.registry.set("isTablet", isTabletPortrait || isTabletLandscape);
+    this.registry.set(
+      "isDesktop",
+      isSmallDesktop || isMediumDesktop || isLargeDesktop,
+    );
   }
 
   /**
@@ -1297,8 +1362,18 @@ export class WorldMapScene extends Phaser.Scene {
     arenaInk.lineStyle(3, style.chalkTint, 0.38);
     arenaInk.strokeEllipse(toWorldX(20.2), toWorldY(21.2), 245, 138);
     arenaInk.lineStyle(4, style.chalkTint, 0.35);
-    arenaInk.lineBetween(toWorldX(10.4), toWorldY(21.2), toWorldX(30.0), toWorldY(21.2));
-    arenaInk.lineBetween(toWorldX(20.2), toWorldY(14.1), toWorldX(20.2), toWorldY(28.2));
+    arenaInk.lineBetween(
+      toWorldX(10.4),
+      toWorldY(21.2),
+      toWorldX(30.0),
+      toWorldY(21.2),
+    );
+    arenaInk.lineBetween(
+      toWorldX(20.2),
+      toWorldY(14.1),
+      toWorldX(20.2),
+      toWorldY(28.2),
+    );
 
     for (let i = 0; i < 18; i += 1) {
       const angle = (Math.PI * 2 * i) / 18;
@@ -1334,63 +1409,26 @@ export class WorldMapScene extends Phaser.Scene {
     arenaInk.setDepth(5.5);
     this.backgroundLayer.add(arenaInk);
 
-    const structures = this.add.graphics();
-    structures.fillStyle(0x35100d, 0.86);
-    structures.fillRect(toWorldX(3.4), toWorldY(28.6), 144, 74);
-    structures.fillRect(toWorldX(33.1), toWorldY(22.5), 118, 86);
-    structures.fillRect(toWorldX(17.0), toWorldY(5.2), 206, 64);
-    structures.fillStyle(0x8b2a1e, 0.86);
-    structures.fillRect(toWorldX(4.0), toWorldY(29.2), 112, 48);
-    structures.fillRect(toWorldX(33.6), toWorldY(23.0), 86, 56);
-    structures.fillRect(toWorldX(17.7), toWorldY(5.8), 164, 38);
-    structures.lineStyle(3, 0xf2bb63, 0.48);
-    structures.strokeRect(toWorldX(4.0), toWorldY(29.2), 112, 48);
-    structures.strokeRect(toWorldX(33.6), toWorldY(23.0), 86, 56);
-    structures.strokeRect(toWorldX(17.7), toWorldY(5.8), 164, 38);
-    structures.setDepth(6);
-    this.backgroundLayer.add(structures);
+    // Warm glow behind the hero house
+    const houseGlow = this.add.graphics();
+    houseGlow.fillStyle(0xf8c56e, 0.12);
+    houseGlow.fillEllipse(toWorldX(20.5), toWorldY(6.8), 260, 140);
+    houseGlow.fillStyle(0xf87136, 0.07);
+    houseGlow.fillEllipse(toWorldX(20.5), toWorldY(7.2), 180, 100);
+    houseGlow.setDepth(6.2);
+    houseGlow.setBlendMode(Phaser.BlendModes.ADD);
+    this.backgroundLayer.add(houseGlow);
 
-    const addTorch = (x: number, y: number, delay: number) => {
-      const flame = this.add.circle(toWorldX(x), toWorldY(y), 10, style.emberTint, 0.52);
-      flame.setDepth(8);
-      flame.setBlendMode(Phaser.BlendModes.ADD);
-      this.midgroundLayer.add(flame);
-      this.tweens.add({
-        targets: flame,
-        alpha: { from: 0.32, to: 0.74 },
-        scale: { from: 0.84, to: 1.22 },
-        duration: 900 + delay,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
-    };
-
-    [
-      [8.0, 29.1],
-      [12.4, 16.1],
-      [19.0, 11.5],
-      [26.4, 14.4],
-      [32.0, 24.0],
-      [29.8, 31.1],
-    ].forEach(([x, y], index) => addTorch(x, y, index * 80));
-
-    addProp("Banner_Stick_1_Purple", 7.5, 28.8, 9, 0xffffff, 1.45);
-    addProp("Banner_Stick_1_Purple", 32.4, 22.3, 9, 0xffffff, 1.45);
-    addProp("Fireplace_1", arenaCenterX, arenaCenterY + 1.3, 8, 0xffffff, 1.35);
-    addProp("BulletinBoard_1", 18.8, 7.6, 9, 0xffe1a1, 1.05);
-    addProp("Sign_2", 35.2, 25.8, 9, 0xffe1a1, 0.95);
-
-    [
-      [7.2, 34.0, "Rock_Brown_4", 1.2],
-      [10.0, 33.2, "Rock_Brown_6", 1.05],
-      [30.4, 27.8, "Rock_Brown_4", 1.0],
-      [35.8, 28.5, "Rock_Brown_6", 1.06],
-      [16.0, 10.2, "Rock_Brown_9", 1.12],
-      [25.3, 10.6, "Rock_Brown_9", 1.08],
-    ].forEach(([x, y, key, propScale]) =>
-      addProp(key as string, x as number, y as number, 8, 0x9a3412, propScale as number),
-    );
+    // Stage 3 — one hero house above the arena, flanked by lamp posts and rocks
+    addProp("House_Hay_2", 20.5, 7.6, 8, 0xf8c56e, 1.0);
+    addProp("LampPost_3", 14.8, 16.4, 9, 0xffd37a, 0.92);
+    addProp("LampPost_3", 26.2, 16.4, 9, 0xffd37a, 0.92);
+    addProp("Rock_Brown_4", 10.2, 30.8, 7, 0xb05030, 0.88);
+    addProp("Rock_Brown_6", 30.8, 30.2, 7, 0xb05030, 0.88);
+    addProp("Rock_Brown_1", 13.4, 34.2, 6, 0x8a3a22, 0.78);
+    addProp("Rock_Brown_1", 27.6, 34.6, 6, 0x8a3a22, 0.78);
+    addProp("Sign_1", 17.8, 9.8, 9, 0xffd37a, 0.9);
+    addProp("Barrel_Small_Empty", 23.4, 9.8, 9, 0xc88a36, 0.85);
   }
 
   private createArtisanTilePanel(
@@ -1404,43 +1442,8 @@ export class WorldMapScene extends Phaser.Scene {
     const cols = this.map.width;
     const rows = this.map.height;
 
-    const style = {
-      baseTint: 0x2b2f63,
-      shadeTint: 0x1e1b4b,
-      plazaTint: 0x505882,
-      pathTint: 0x9ca3af,
-      pathShadeTint: 0x6b7280,
-      roofTint: 0x8b7bd7,
-      glowTint: 0x9ddcff,
-      warmLightTint: 0xffd166,
-    };
-
-    const stoneFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
-    const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
-    const fenceFrames = [0, 1, 2, 4, 5, 6, 8, 9, 10];
-
-    const addFrameSprite = (
-      texture: string,
-      frame: number,
-      x: number,
-      y: number,
-      depth: number,
-      tint = 0xffffff,
-      alpha = 1,
-    ) => {
-      const tile = this.add.sprite(
-        panelX + x * tileSize + tileSize / 2,
-        panelOffsetY + y * tileSize + tileSize / 2,
-        texture,
-        frame,
-      );
-      tile.setOrigin(0.5);
-      tile.setScale(scale);
-      tile.setTint(tint);
-      tile.setAlpha(alpha);
-      tile.setDepth(depth);
-      this.backgroundLayer.add(tile);
-    };
+    const toWorldX = (tileX: number) => panelX + tileX * tileSize;
+    const toWorldY = (tileY: number) => panelOffsetY + tileY * tileSize;
 
     const addProp = (
       texture: string,
@@ -1464,261 +1467,132 @@ export class WorldMapScene extends Phaser.Scene {
       }
     };
 
-    const toWorldX = (tileX: number) => panelX + tileX * tileSize;
-    const toWorldY = (tileY: number) => panelOffsetY + tileY * tileSize;
-
-    const drawWorkshopPath = (
-      points: Array<[number, number]>,
-      width: number,
-      color: number,
-      alpha = 0.86,
-    ) => {
-      const shadow = this.add.graphics();
-      shadow.lineStyle(width + 18, 0x000000, 0.16);
-      shadow.beginPath();
-      shadow.moveTo(toWorldX(points[0][0]) + 4, toWorldY(points[0][1]) + 8);
-      points.slice(1).forEach(([x, y]) =>
-        shadow.lineTo(toWorldX(x) + 4, toWorldY(y) + 8),
-      );
-      shadow.strokePath();
-      shadow.setDepth(3.2);
-      this.backgroundLayer.add(shadow);
-
-      const path = this.add.graphics();
-      path.lineStyle(width, color, alpha);
-      path.beginPath();
-      path.moveTo(toWorldX(points[0][0]), toWorldY(points[0][1]));
-      points.slice(1).forEach(([x, y]) => path.lineTo(toWorldX(x), toWorldY(y)));
-      path.strokePath();
-      path.lineStyle(Math.max(3, width * 0.16), 0xffffff, 0.2);
-      path.beginPath();
-      path.moveTo(toWorldX(points[0][0]), toWorldY(points[0][1]) - 4);
-      points.slice(1).forEach(([x, y]) =>
-        path.lineTo(toWorldX(x), toWorldY(y) - 4),
-      );
-      path.strokePath();
-      path.setDepth(3.8);
-      this.backgroundLayer.add(path);
-
-      const samples = this.samplePolyline(
-        points.map(([x, y]) => ({ x: toWorldX(x), y: toWorldY(y) })),
-        42,
-      );
-      samples.forEach((sample, index) => {
-        const seam = this.add.rectangle(
-          sample.x,
-          sample.y,
-          width * 0.48,
-          3,
-          0xffffff,
-          index % 2 === 0 ? 0.18 : 0.1,
-        );
-        seam.setRotation(sample.angle + Math.PI / 2);
-        seam.setDepth(4.1);
-        this.backgroundLayer.add(seam);
-      });
-    };
-
+    // Flat indigo ground
     const ground = this.add.graphics();
-    ground.fillStyle(style.baseTint, 1);
+    ground.fillStyle(0x1e1b4b, 1);
     ground.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
 
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const isBlockEdge =
-          row % 10 === 0 || col % 10 === 0 || row % 10 === 1 || col % 10 === 1;
-        const isPlaza =
-          (col >= 17 && col <= 27 && row >= 13 && row <= 23) ||
-          (col >= 4 && col <= 12 && row >= 27 && row <= 34) ||
-          (col >= 29 && col <= 37 && row >= 26 && row <= 35);
-
-        if (isBlockEdge) {
-          addFrameSprite(
-            "sprout_paths_sheet",
-            pathFrames[(col + row) % pathFrames.length],
-            col,
-            row,
-            3,
-            style.pathShadeTint,
-            0.84,
-          );
-          continue;
-        }
-
-        if (isPlaza) {
-          addFrameSprite(
-            "sprout_paths_sheet",
-            pathFrames[(col * 3 + row + biome.id) % pathFrames.length],
-            col,
-            row,
-            3,
-            style.plazaTint,
-            0.9,
-          );
-          continue;
-        }
-
-        addFrameSprite(
-          "sprout_grass_sheet",
-          stoneFrames[(col * 7 + row * 5 + biome.id) % stoneFrames.length],
-          col,
-          row,
-          2,
-          (col + row + biomeIndex) % 4 === 0 ? 0x353a70 : style.shadeTint,
-          0.78,
-        );
-
-        if ((col + row * 2 + biomeIndex) % 13 === 0) {
-          addFrameSprite(
-            "sprout_fences_sheet",
-            fenceFrames[(col + row + biome.id) % fenceFrames.length],
-            col,
-            row,
-            5,
-            0x6f66a9,
-            0.44,
-          );
-        }
+    // Subtle stone tile grid — every other block slightly lighter
+    const grid = this.add.graphics();
+    grid.setDepth(2);
+    for (let row = 0; row < rows; row += 4) {
+      for (let col = 0; col < cols; col += 4) {
+        const shade = (col + row) % 8 === 0 ? 0x2b2f63 : 0x252252;
+        grid.fillStyle(shade, 0.6);
+        grid.fillRect(toWorldX(col), toWorldY(row), tileSize * 4, tileSize * 4);
       }
     }
+    this.backgroundLayer.add(grid);
 
-    drawWorkshopPath(
-      [
-        [4.5, 30.5],
-        [10.6, 25.4],
-        [17.0, 21.0],
-        [24.6, 17.0],
-        [31.8, 21.2],
-        [36.8, 29.0],
-      ],
-      46,
-      style.pathTint,
-      0.82,
-    );
-    drawWorkshopPath(
-      [
-        [12.0, 33.0],
-        [18.0, 27.2],
-        [22.2, 20.5],
-        [22.0, 11.0],
-      ],
-      28,
-      0xb8c1d7,
-      0.58,
-    );
-    drawWorkshopPath(
-      [
-        [8.0, 14.0],
-        [16.0, 17.0],
-        [22.0, 20.5],
-        [32.0, 16.0],
-      ],
-      24,
-      0x8994bf,
-      0.48,
-    );
+    // Single cobblestone path through the center
+    const path = this.add.graphics();
+    path.lineStyle(44, 0x3d3870, 0.9);
+    path.beginPath();
+    path.moveTo(toWorldX(4), toWorldY(rows / 2));
+    path.lineTo(toWorldX(cols - 4), toWorldY(rows / 2));
+    path.strokePath();
+    path.lineStyle(2, 0x9ddcff, 0.18);
+    path.beginPath();
+    path.moveTo(toWorldX(4), toWorldY(rows / 2) - 3);
+    path.lineTo(toWorldX(cols - 4), toWorldY(rows / 2) - 3);
+    path.strokePath();
+    path.setDepth(3);
+    this.backgroundLayer.add(path);
 
-    const districts = this.add.graphics();
-    const drawPad = (
-      x: number,
-      y: number,
-      width: number,
-      height: number,
-      fill: number,
-      stroke: number,
-      alpha = 0.72,
-    ) => {
-      districts.fillStyle(fill, alpha);
-      districts.fillRect(toWorldX(x), toWorldY(y), width * tileSize, height * tileSize);
-      districts.lineStyle(3, stroke, 0.46);
-      districts.strokeRect(toWorldX(x), toWorldY(y), width * tileSize, height * tileSize);
-    };
+    // Soft glow behind the house
+    const glow = this.add.graphics();
+    glow.fillStyle(0x9ddcff, 0.07);
+    glow.fillEllipse(toWorldX(21), toWorldY(rows / 2 - 4), 300, 160);
+    glow.setDepth(4);
+    glow.setBlendMode(Phaser.BlendModes.ADD);
+    this.backgroundLayer.add(glow);
 
-    drawPad(6.0, 8.0, 8.6, 5.2, 0x46407a, style.glowTint);
-    drawPad(26.0, 7.0, 8.0, 5.6, 0x3b376f, style.warmLightTint);
-    drawPad(6.0, 27.5, 8.6, 5.6, 0x504777, 0xf2b560);
-    drawPad(27.8, 27.2, 8.7, 6.0, 0x504777, style.glowTint);
-    districts.setDepth(5);
-    this.backgroundLayer.add(districts);
-
-    const blueprint = this.add.graphics();
-    [
-      [7.0, 8.9, 3.2, 2.3],
-      [27.0, 8.0, 3.4, 2.5],
-      [29.2, 28.2, 3.6, 2.5],
-    ].forEach(([x, y, w, h], index) => {
-      blueprint.fillStyle(0x0f2358, 0.82);
-      blueprint.fillRect(toWorldX(x), toWorldY(y), w * tileSize, h * tileSize);
-      blueprint.lineStyle(2, style.glowTint, 0.58);
-      blueprint.strokeRect(toWorldX(x), toWorldY(y), w * tileSize, h * tileSize);
-      blueprint.lineBetween(toWorldX(x + 0.4), toWorldY(y + 0.7), toWorldX(x + w - 0.4), toWorldY(y + 0.7));
-      blueprint.lineBetween(toWorldX(x + 0.6), toWorldY(y + 1.4), toWorldX(x + w - 0.8), toWorldY(y + h - 0.5));
-      blueprint.strokeCircle(toWorldX(x + w - 0.8), toWorldY(y + h - 0.8), 9 + index * 2);
-    });
-
-    [
-      [8.0, 29.0],
-      [8.9, 29.0],
-      [9.8, 29.0],
-      [10.7, 29.0],
-      [11.6, 29.0],
-    ].forEach(([x, y], index) => {
-      const colors = [0xf87171, 0xfbbf24, 0x34d399, 0x60a5fa, 0xc084fc];
-      blueprint.fillStyle(colors[index], 0.95);
-      blueprint.fillRect(toWorldX(x), toWorldY(y), 18, 18);
-      blueprint.lineStyle(1, 0xffffff, 0.35);
-      blueprint.strokeRect(toWorldX(x), toWorldY(y), 18, 18);
-    });
-    blueprint.setDepth(7);
-    this.backgroundLayer.add(blueprint);
-
-    const workshopGlow = this.add.graphics();
-    workshopGlow.fillStyle(style.glowTint, 0.08);
-    workshopGlow.fillEllipse(toWorldX(22.0), toWorldY(19.2), 380, 220);
-    workshopGlow.fillStyle(style.warmLightTint, 0.08);
-    workshopGlow.fillEllipse(toWorldX(10.0), toWorldY(30.0), 250, 150);
-    workshopGlow.setDepth(6.4);
-    workshopGlow.setBlendMode(Phaser.BlendModes.ADD);
-    this.backgroundLayer.add(workshopGlow);
-
-    addProp("House_Hay_4_Purple", 11.0, 11.4, 8, style.roofTint, 0.82);
-    addProp("House_Hay_2", 30.4, 11.4, 8, 0xa9a1e8, 0.78);
-    addProp("House_Hay_3", 11.0, 34.2, 8, 0xa9a1e8, 0.78);
-    addProp("House_Hay_1", 32.8, 34.0, 8, 0xb9b0f0, 0.74);
-    addProp("Well_Hay_1", 21.8, 20.6, 8, 0xffffff, 0.78);
-    addProp("Table_Medium_1", 19.4, 25.8, 9, 0xffffff, 1.28);
-    addProp("Table_Medium_1", 25.1, 16.1, 9, 0xffffff, 1.18);
-    addProp("Bench_1", 23.5, 24.6, 9, 0xffffff, 1.05);
-    addProp("BulletinBoard_1", 28.7, 29.7, 9, 0xe0d7ff, 1.05);
-    addProp("Crate_Medium_Closed", 15.6, 24.2, 9, 0xffffff, 0.9);
-    addProp("Crate_Large_Empty", 30.8, 27.6, 9, 0xffffff, 0.7);
-
-    [
-      [8.2, 25.2],
-      [16.7, 20.0],
-      [22.2, 12.9],
-      [29.2, 20.1],
-      [35.4, 27.9],
-    ].forEach(([x, y], index) => {
-      addProp("LampPost_3", x, y, 10, 0xffffff, 0.86);
-      const glow = this.add.circle(toWorldX(x), toWorldY(y) - 54, 24, style.warmLightTint, 0.14);
-      glow.setDepth(9);
-      glow.setBlendMode(Phaser.BlendModes.ADD);
-      this.midgroundLayer.add(glow);
-      this.tweens.add({
-        targets: glow,
-        alpha: { from: 0.08, to: 0.24 },
-        scale: { from: 0.9, to: 1.16 },
-        duration: 1500 + index * 120,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
-    });
+    // One house, two lamp posts — nothing else
+    addProp("House_Hay_4_Purple", 21.0, rows / 2 - 1.5, 8, 0x8b7bd7, 1.0);
+    addProp("LampPost_3", 16.0, rows / 2 + 1.5, 9, 0xd0c8ff, 0.9);
+    addProp("LampPost_3", 26.0, rows / 2 + 1.5, 9, 0xd0c8ff, 0.9);
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  HELPER: draw a simple pixel tree (trunk + canopy)
+  //  Call after graphics is created, before setDepth
+  // ─────────────────────────────────────────────────────────────
+  private drawPixelTree(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    trunkColor: number,
+    canopyColor: number,
+    shadowColor: number,
+    size: number = 1,
+  ): void {
+    const t = 4 * size; // trunk width
+    const th = 6 * size; // trunk height
+    const cw = 14 * size; // canopy width
+    const ch = 12 * size; // canopy height
+    // Shadow under canopy
+    g.fillStyle(shadowColor, 0.35);
+    g.fillEllipse(x, y - th, cw + 4, 6 * size);
+    // Trunk
+    g.fillStyle(trunkColor, 1);
+    g.fillRect(x - t / 2, y - th, t, th);
+    // Canopy base (darker)
+    g.fillStyle(shadowColor, 0.5);
+    g.fillRect(x - cw / 2, y - th - ch + 2, cw, ch);
+    // Canopy main
+    g.fillStyle(canopyColor, 1);
+    g.fillRect(x - cw / 2 + 2, y - th - ch, cw - 4, ch - 2);
+    // Canopy highlight (top-left lighter patch)
+    g.fillStyle(0xffffff, 0.1);
+    g.fillRect(x - cw / 2 + 3, y - th - ch + 1, (cw - 6) / 2, (ch - 4) / 2);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  HELPER: draw a simple pixel rock
+  // ─────────────────────────────────────────────────────────────
+  private drawPixelRock(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    color: number,
+    size: number = 1,
+  ): void {
+    g.fillStyle(color, 0.8);
+    g.fillEllipse(x, y, 10 * size, 7 * size);
+    g.fillStyle(0xffffff, 0.12);
+    g.fillEllipse(x - 2 * size, y - 1 * size, 5 * size, 3 * size);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  HELPER: draw a fence segment (horizontal rail + posts)
+  // ─────────────────────────────────────────────────────────────
+  private drawFenceRow(
+    g: Phaser.GameObjects.Graphics,
+    startX: number,
+    y: number,
+    width: number,
+    postColor: number,
+    railColor: number,
+    postStep: number = 24,
+  ): void {
+    // Rails
+    g.fillStyle(railColor, 0.75);
+    g.fillRect(startX, y + 4, width, 2);
+    g.fillRect(startX, y + 9, width, 2);
+    // Posts
+    for (let px = startX; px < startX + width; px += postStep) {
+      g.fillStyle(postColor, 0.9);
+      g.fillRect(px - 2, y, 4, 15);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  STAGE 5 · MINE  —  Dark rocky farm + coal outpost
+  //  Ground: ash-dark soil  |  Props: dead trees, rocks, coal lumps
+  //  Fence: weathered timber  |  Path: dirt track with cart rails
+  // ─────────────────────────────────────────────────────────────
   private createMineTilePanel(
     panelX: number,
     panelOffsetY: number,
@@ -1729,68 +1603,188 @@ export class WorldMapScene extends Phaser.Scene {
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
+    const toX = (x: number) => panelX + x * tileSize;
+    const toY = (y: number) => panelOffsetY + y * tileSize;
+    const midRow = rows / 2;
+    const panelW = cols * tileSize;
+    const panelH = rows * tileSize;
+    const midY = toY(midRow);
 
-    const style = {
-      baseTint: 0x18181b,
-      shadeTint: 0x09090b,
-      pathTint: 0x27272a,
-      hillTint: 0x3f3f46,
-    };
+    // ── BASE GROUND: dark ash soil ────────────────────────────
     const ground = this.add.graphics();
-    ground.fillStyle(style.baseTint, 0.98);
-    ground.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
+    ground.fillStyle(0x1e1a14, 1);
+    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
 
-    const rockFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24];
-    const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
-
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const isPath = (row > 15 && row < 19) || (col > 15 && col < 19);
-        const isWall = col < 4 || col > cols - 5 || row < 4 || row > rows - 5;
-
-        if (isPath) {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_paths_sheet",
-            pathFrames[(col + row) % pathFrames.length],
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.pathTint);
-          tile.setDepth(3);
-          this.backgroundLayer.add(tile);
-        } else if (isWall) {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_hills_sheet",
-            rockFrames[(col + row) % rockFrames.length],
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.hillTint);
-          tile.setDepth(4);
-          this.backgroundLayer.add(tile);
-        } else {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_grass_sheet",
-            0,
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.shadeTint);
-          tile.setDepth(2);
-          this.backgroundLayer.add(tile);
-        }
+    // ── TILE TEXTURE: subtle 16×16 grid (like reference image) ──
+    const tex = this.add.graphics();
+    tex.setDepth(2);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const shade = (r + c) % 2 === 0 ? 0x221d16 : 0x1a1510;
+        tex.fillStyle(shade, 0.45);
+        tex.fillRect(toX(c), toY(r), tileSize, tileSize);
       }
     }
+    this.backgroundLayer.add(tex);
+
+    // ── DIRT PATH (horizontal band) ─────────────────────────
+    const path = this.add.graphics();
+    path.fillStyle(0x2a2218, 1);
+    path.fillRect(panelX, midY - 14, panelW, 28);
+    // Cart rail ties
+    path.fillStyle(0x3d2e1a, 0.8);
+    for (let x = panelX + 8; x < panelX + panelW; x += 20) {
+      path.fillRect(x, midY - 10, 12, 3);
+      path.fillRect(x, midY + 7, 12, 3);
+    }
+    // Rails
+    path.fillStyle(0x5a4a2a, 0.7);
+    path.fillRect(panelX, midY - 8, panelW, 2);
+    path.fillRect(panelX, midY + 6, panelW, 2);
+    path.setDepth(4);
+    this.backgroundLayer.add(path);
+
+    // ── MINE SHAFT ENTRANCE (left) ───────────────────────────
+    const shaft = this.add.graphics();
+    shaft.setDepth(5);
+    shaft.fillStyle(0x2e2418, 0.95);
+    shaft.fillRect(toX(4), toY(midRow - 5), tileSize * 5, tileSize * 4);
+    shaft.fillStyle(0x080604, 1);
+    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 3.5, tileSize * 3);
+    // timber frame
+    shaft.fillStyle(0x6b4f28, 1);
+    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 0.45, tileSize * 3);
+    shaft.fillRect(toX(7.65), toY(midRow - 4.5), tileSize * 0.45, tileSize * 3);
+    shaft.fillRect(
+      toX(4.6),
+      toY(midRow - 4.5),
+      tileSize * 3.5,
+      tileSize * 0.45,
+    );
+    this.backgroundLayer.add(shaft);
+
+    // ── TOP FENCE (above path) ───────────────────────────────
+    const fenceG = this.add.graphics();
+    fenceG.setDepth(5);
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY - 30,
+      tileSize * (cols - 6),
+      0x6b4f28,
+      0x5a3e1e,
+      24,
+    );
+    // ── BOTTOM FENCE ─────────────────────────────────────────
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY + 18,
+      tileSize * (cols - 6),
+      0x6b4f28,
+      0x5a3e1e,
+      24,
+    );
+    this.backgroundLayer.add(fenceG);
+
+    // ── SCATTERED PROPS: dead trees + rocks + coal lumps ──────
+    const props = this.add.graphics();
+    props.setDepth(6);
+
+    // Dead trees (bare trunk, grey-brown canopy)
+    const deadTreePositions = [
+      [6, midRow - 4],
+      [11, midRow - 6],
+      [18, midRow - 5],
+      [34, midRow - 4],
+      [40, midRow - 6],
+      [46, midRow - 5],
+      [8, midRow + 3],
+      [14, midRow + 4],
+      [30, midRow + 3],
+      [38, midRow + 4],
+      [44, midRow + 5],
+    ];
+    deadTreePositions.forEach(([c, r]) => {
+      this.drawPixelTree(
+        props,
+        toX(c),
+        toY(r),
+        0x4a3520,
+        0x3d3028,
+        0x1e1810,
+        scale,
+      );
+    });
+
+    // Coal/rock lumps
+    [
+      [9, midRow + 2],
+      [22, midRow - 3],
+      [28, midRow + 2],
+      [36, midRow - 4],
+      [42, midRow + 3],
+    ].forEach(([c, r]) => {
+      this.drawPixelRock(props, toX(c), toY(r), 0x2e2820, scale);
+    });
+
+    // Small coal seam glints
+    [
+      [12, midRow - 2.5],
+      [25, midRow + 1.5],
+      [39, midRow - 2],
+    ].forEach(([c, r]) => {
+      props.fillStyle(0x1a1614, 0.9);
+      props.fillRect(toX(c) - 4, toY(r) - 3, 14, 8);
+      props.fillStyle(0x3d3428, 0.4);
+      props.fillRect(toX(c) - 2, toY(r) - 2, 6, 4);
+    });
+    this.backgroundLayer.add(props);
+
+    // ── WARM EMBER GLOW near house ────────────────────────────
+    const glow = this.add.graphics();
+    glow.fillStyle(0xf97316, 0.045);
+    glow.fillEllipse(toX(21), midY - 28, 260, 130);
+    glow.setDepth(6);
+    glow.setBlendMode(Phaser.BlendModes.ADD);
+    this.backgroundLayer.add(glow);
+
+    // ── SPRITES ───────────────────────────────────────────────
+    if (this.textures.exists("House_Hay_3")) {
+      const house = this.add.sprite(toX(21), toY(midRow - 1.5), "House_Hay_3");
+      house.setOrigin(0.5, 1);
+      house.setScale(scale);
+      house.setTint(0xb0a898);
+      house.setDepth(8);
+      this.midgroundLayer.add(house);
+    }
+    if (this.textures.exists("LampPost_3")) {
+      [16, 26].forEach((cx) => {
+        const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
+        lp.setOrigin(0.5, 1);
+        lp.setScale(scale);
+        lp.setTint(0xfbbf24);
+        lp.setDepth(9);
+        this.midgroundLayer.add(lp);
+      });
+    }
+    const lampGlow = this.add.graphics();
+    lampGlow.setDepth(7);
+    lampGlow.setBlendMode(Phaser.BlendModes.ADD);
+    [16, 26].forEach((cx) => {
+      lampGlow.fillStyle(0xfbbf24, 0.07);
+      lampGlow.fillEllipse(toX(cx), midY + 16, 80, 36);
+    });
+    this.backgroundLayer.add(lampGlow);
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  STAGE 6 · HARBOUR  —  Coastal farm + fishing village
+  //  Ground: muted teal-green  |  Props: palm/coastal trees, barrels
+  //  Path: sandy boardwalk  |  Water strip at edges
+  // ─────────────────────────────────────────────────────────────
   private createHarbourTilePanel(
     panelX: number,
     panelOffsetY: number,
@@ -1801,66 +1795,263 @@ export class WorldMapScene extends Phaser.Scene {
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
+    const toX = (x: number) => panelX + x * tileSize;
+    const toY = (y: number) => panelOffsetY + y * tileSize;
+    const midRow = rows / 2;
+    const panelW = cols * tileSize;
+    const panelH = rows * tileSize;
+    const midY = toY(midRow);
 
-    const style = {
-      baseTint: 0x0284c7,
-      shadeTint: 0x0369a1,
-      dockTint: 0x78350f,
-      landTint: 0xfde047,
-    };
+    // ── BASE GROUND: coastal green-teal soil ──────────────────
     const ground = this.add.graphics();
-    ground.fillStyle(style.baseTint, 0.98);
-    ground.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
+    ground.fillStyle(0x0d3d3a, 1);
+    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
 
-    const waterFrames = [0, 1, 2, 3];
-    const pathFrames = [0, 1, 4, 5];
-
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const isLand = row < 12;
-        const isDock = col > 15 && col < 20 && row >= 12 && row < 25;
-
-        if (isLand) {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_grass_sheet",
-            0,
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.landTint);
-          tile.setDepth(2);
-          this.backgroundLayer.add(tile);
-        } else if (isDock) {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_paths_sheet",
-            pathFrames[(col + row) % pathFrames.length],
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.dockTint);
-          tile.setDepth(4);
-          this.backgroundLayer.add(tile);
-        } else {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_water_sheet",
-            waterFrames[(col + row) % waterFrames.length],
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setDepth(3);
-          this.backgroundLayer.add(tile);
-        }
+    // ── TILE TEXTURE ──────────────────────────────────────────
+    const tex = this.add.graphics();
+    tex.setDepth(2);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const shade = (r + c) % 2 === 0 ? 0x0f4440 : 0x0b3835;
+        tex.fillStyle(shade, 0.45);
+        tex.fillRect(toX(c), toY(r), tileSize, tileSize);
       }
     }
+    this.backgroundLayer.add(tex);
+
+    // ── SHALLOW WATER STRIP: top + bottom edges ───────────────
+    const water = this.add.graphics();
+    water.setDepth(3);
+    // Top water band
+    water.fillStyle(0x083344, 1);
+    water.fillRect(panelX, panelOffsetY, panelW, tileSize * 2.5);
+    // Water ripple lines
+    water.fillStyle(0x0e5a72, 0.4);
+    for (let c = 0; c < cols; c += 5) {
+      water.fillRect(
+        toX(c),
+        panelOffsetY + tileSize * 0.8,
+        tileSize * 3,
+        tileSize * 0.25,
+      );
+      water.fillRect(
+        toX(c) + tileSize * 1.5,
+        panelOffsetY + tileSize * 1.6,
+        tileSize * 3,
+        tileSize * 0.25,
+      );
+    }
+    // Bottom water band
+    water.fillStyle(0x083344, 1);
+    water.fillRect(
+      panelX,
+      panelOffsetY + panelH - tileSize * 2.5,
+      panelW,
+      tileSize * 2.5,
+    );
+    water.fillStyle(0x0e5a72, 0.4);
+    for (let c = 0; c < cols; c += 5) {
+      water.fillRect(
+        toX(c),
+        panelOffsetY + panelH - tileSize * 1.8,
+        tileSize * 3,
+        tileSize * 0.25,
+      );
+    }
+    // Sandy shore transitions
+    water.fillStyle(0x1a5c42, 0.6);
+    water.fillRect(panelX, panelOffsetY + tileSize * 2.5, panelW, tileSize * 1);
+    water.fillRect(
+      panelX,
+      panelOffsetY + panelH - tileSize * 3.5,
+      panelW,
+      tileSize * 1,
+    );
+    this.backgroundLayer.add(water);
+
+    // ── DIRT PATH: sandy boardwalk ────────────────────────────
+    const path = this.add.graphics();
+    path.fillStyle(0x1a4f48, 1);
+    path.fillRect(panelX, midY - 14, panelW, 28);
+    // Plank grain lines
+    path.fillStyle(0x1e5e56, 0.4);
+    for (let x = panelX; x < panelX + panelW; x += tileSize * 2) {
+      path.fillRect(x, midY - 14, tileSize * 0.18, 28);
+    }
+    path.fillStyle(0x38bdf8, 0.08);
+    path.fillRect(panelX, midY - 15, panelW, 2);
+    path.fillRect(panelX, midY + 13, panelW, 2);
+    path.setDepth(4);
+    this.backgroundLayer.add(path);
+
+    // ── WOODEN DOCK (left portion) ────────────────────────────
+    const dock = this.add.graphics();
+    dock.setDepth(5);
+    dock.fillStyle(0x7c4a1e, 0.85);
+    dock.fillRect(panelX, midY - 18, tileSize * 8, 36);
+    dock.fillStyle(0x5a3412, 0.4);
+    for (let c = 0; c < 8; c += 1.2) {
+      dock.fillRect(toX(c), midY - 18, tileSize * 0.1, 36);
+    }
+    // Dock posts
+    [1.5, 4, 6.5].forEach((cx) => {
+      dock.fillStyle(0x6b3d12, 1);
+      dock.fillRect(toX(cx), midY + 18, tileSize * 0.6, tileSize * 2.5);
+    });
+    this.backgroundLayer.add(dock);
+
+    // ── BOAT SILHOUETTE (right side) ─────────────────────────
+    const boat = this.add.graphics();
+    boat.setDepth(5);
+    boat.fillStyle(0x0e3a4f, 0.85);
+    boat.fillRect(toX(35), midY - 8, tileSize * 9, tileSize * 2.2);
+    // hull bottom
+    boat.fillStyle(0x082a3a, 0.9);
+    boat.fillRect(
+      toX(35.5),
+      midY + tileSize * 1.8,
+      tileSize * 8,
+      tileSize * 0.5,
+    );
+    // mast
+    boat.fillStyle(0x4a3520, 1);
+    boat.fillRect(
+      toX(39.2),
+      midY - tileSize * 6,
+      tileSize * 0.35,
+      tileSize * 6,
+    );
+    // sail
+    boat.fillStyle(0xbae6fd, 0.1);
+    boat.fillRect(
+      toX(39.55),
+      midY - tileSize * 5.5,
+      tileSize * 3.5,
+      tileSize * 4,
+    );
+    this.backgroundLayer.add(boat);
+
+    // ── TOP FENCE ─────────────────────────────────────────────
+    const fenceG = this.add.graphics();
+    fenceG.setDepth(5);
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY - 30,
+      tileSize * (cols - 6),
+      0x4a7a50,
+      0x3a6040,
+      24,
+    );
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY + 18,
+      tileSize * (cols - 6),
+      0x4a7a50,
+      0x3a6040,
+      24,
+    );
+    this.backgroundLayer.add(fenceG);
+
+    // ── SCATTERED PROPS: coastal trees + barrels ───────────────
+    const props = this.add.graphics();
+    props.setDepth(6);
+
+    // Coastal green trees
+    [
+      [5, midRow - 4],
+      [10, midRow - 6],
+      [17, midRow - 5],
+      [32, midRow - 4],
+      [39, midRow - 6],
+      [45, midRow - 4],
+      [7, midRow + 3],
+      [13, midRow + 5],
+      [29, midRow + 3],
+      [37, midRow + 4],
+      [44, midRow + 5],
+    ].forEach(([c, r]) => {
+      this.drawPixelTree(
+        props,
+        toX(c),
+        toY(r),
+        0x5c3a1a,
+        0x1a6b3a,
+        0x0f3d22,
+        scale,
+      );
+    });
+
+    // Barrels (small squat rectangles)
+    [
+      [9, midRow - 2],
+      [11, midRow - 2.5],
+      [28, midRow + 2],
+      [33, midRow - 3],
+    ].forEach(([c, r]) => {
+      props.fillStyle(0x7c4a1e, 0.9);
+      props.fillRect(toX(c) - 4, toY(r) - 8, 10, 10);
+      props.fillStyle(0xd97706, 0.5);
+      props.fillRect(toX(c) - 4, toY(r) - 5, 10, 2);
+      props.fillRect(toX(c) - 4, toY(r) - 1, 10, 2);
+    });
+
+    // Water shimmer dots
+    [
+      [8, midRow - 1.5],
+      [20, midRow + 1],
+      [35, midRow - 1],
+    ].forEach(([c, r]) => {
+      props.fillStyle(0x38bdf8, 0.18);
+      props.fillEllipse(toX(c), toY(r), 18, 6);
+    });
+    this.backgroundLayer.add(props);
+
+    // ── OCEAN GLOW ────────────────────────────────────────────
+    const glow = this.add.graphics();
+    glow.fillStyle(0x38bdf8, 0.05);
+    glow.fillEllipse(toX(21), midY - 28, 300, 150);
+    glow.setDepth(6);
+    glow.setBlendMode(Phaser.BlendModes.ADD);
+    this.backgroundLayer.add(glow);
+
+    // ── SPRITES ───────────────────────────────────────────────
+    if (this.textures.exists("House_Hay_1")) {
+      const house = this.add.sprite(toX(21), toY(midRow - 1.5), "House_Hay_1");
+      house.setOrigin(0.5, 1);
+      house.setScale(scale);
+      house.setTint(0x7dd3fc);
+      house.setDepth(8);
+      this.midgroundLayer.add(house);
+    }
+    if (this.textures.exists("LampPost_3")) {
+      [16, 26].forEach((cx) => {
+        const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
+        lp.setOrigin(0.5, 1);
+        lp.setScale(scale);
+        lp.setTint(0xbae6fd);
+        lp.setDepth(9);
+        this.midgroundLayer.add(lp);
+      });
+    }
+    const lampGlow = this.add.graphics();
+    lampGlow.setDepth(7);
+    lampGlow.setBlendMode(Phaser.BlendModes.ADD);
+    [16, 26].forEach((cx) => {
+      lampGlow.fillStyle(0x7dd3fc, 0.07);
+      lampGlow.fillEllipse(toX(cx), midY + 16, 85, 38);
+    });
+    this.backgroundLayer.add(lampGlow);
   }
+
+  // ─────────────────────────────────────────────────────────────
+  //  STAGE 7 · CROSSROADS  —  Twilight forest junction
+  //  Ground: deep violet-blue  |  Props: purple-tinted trees, fireflies
+  //  Path: moonlit dirt + vertical crossroad  |  Atmosphere: eerie glow
+  // ─────────────────────────────────────────────────────────────
 
   private createCrossroadsTilePanel(
     panelX: number,
@@ -1872,52 +2063,220 @@ export class WorldMapScene extends Phaser.Scene {
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
+    const toX = (x: number) => panelX + x * tileSize;
+    const toY = (y: number) => panelOffsetY + y * tileSize;
+    const midRow = rows / 2;
+    const midCol = cols / 2;
+    const panelW = cols * tileSize;
+    const panelH = rows * tileSize;
+    const midY = toY(midRow);
+    const midXw = toX(midCol);
 
-    const style = {
-      baseTint: 0x047857,
-      shadeTint: 0x065f46,
-      pathTint: 0xd97706,
-    };
+    // ── BASE GROUND: deep twilight violet ────────────────────
     const ground = this.add.graphics();
-    ground.fillStyle(style.baseTint, 0.98);
-    ground.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
+    ground.fillStyle(0x13082a, 1);
+    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
 
-    const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
-
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const isPath =
-          Math.abs(col - row) < 3 || Math.abs(col - (cols - row)) < 3;
-
-        if (isPath) {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_paths_sheet",
-            pathFrames[(col + row) % pathFrames.length],
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.pathTint);
-          tile.setDepth(3);
-          this.backgroundLayer.add(tile);
-        } else {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_grass_sheet",
-            0,
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.shadeTint);
-          tile.setDepth(2);
-          this.backgroundLayer.add(tile);
-        }
+    // ── TILE TEXTURE ─────────────────────────────────────────
+    const tex = this.add.graphics();
+    tex.setDepth(2);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const shade = (r + c) % 2 === 0 ? 0x180a30 : 0x110726;
+        tex.fillStyle(shade, 0.5);
+        tex.fillRect(toX(c), toY(r), tileSize, tileSize);
       }
     }
+    this.backgroundLayer.add(tex);
+
+    // ── VERTICAL CROSSROAD PATH ───────────────────────────────
+    const vpath = this.add.graphics();
+    vpath.fillStyle(0x1e0d40, 1);
+    vpath.fillRect(midXw - 14, panelOffsetY, 28, panelH);
+    vpath.fillStyle(0x7c3aed, 0.08);
+    vpath.fillRect(midXw - 14, panelOffsetY, 2, panelH);
+    vpath.fillRect(midXw + 12, panelOffsetY, 2, panelH);
+    // Centre dash
+    vpath.fillStyle(0xa78bfa, 0.1);
+    for (let r = 1; r < rows; r += 3) {
+      vpath.fillRect(midXw - 2, toY(r), 4, tileSize * 1.4);
+    }
+    vpath.setDepth(3);
+    this.backgroundLayer.add(vpath);
+
+    // ── HORIZONTAL MAIN PATH ─────────────────────────────────
+    const path = this.add.graphics();
+    path.fillStyle(0x1e0d40, 1);
+    path.fillRect(panelX, midY - 14, panelW, 28);
+    path.fillStyle(0xa78bfa, 0.08);
+    path.fillRect(panelX, midY - 15, panelW, 2);
+    path.fillRect(panelX, midY + 13, panelW, 2);
+    // Centre dash on horizontal road
+    path.fillStyle(0xa78bfa, 0.1);
+    for (let c = 2; c < cols - 2; c += 3) {
+      path.fillRect(toX(c), midY - 2, tileSize * 1.4, 4);
+    }
+    path.setDepth(4);
+    this.backgroundLayer.add(path);
+
+    // ── STONE PLINTH at intersection ─────────────────────────
+    const plinth = this.add.graphics();
+    plinth.setDepth(5);
+    plinth.fillStyle(0x3b1d6e, 0.85);
+    plinth.fillRect(midXw - 10, midY - 10, 20, 20);
+    plinth.fillStyle(0x5b2ea3, 0.4);
+    plinth.fillRect(midXw - 8, midY - 8, 16, 3);
+    this.backgroundLayer.add(plinth);
+
+    // ── FENCE LINES (both sides of both roads) ────────────────
+    const fenceG = this.add.graphics();
+    fenceG.setDepth(5);
+    // Top fence (left of vertical road)
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY - 30,
+      midXw - toX(3) - 16,
+      0x4a2880,
+      0x3a1e6a,
+      22,
+    );
+    // Top fence (right of vertical road)
+    this.drawFenceRow(
+      fenceG,
+      midXw + 16,
+      midY - 30,
+      toX(cols - 3) - midXw - 16,
+      0x4a2880,
+      0x3a1e6a,
+      22,
+    );
+    // Bottom fence (left)
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY + 18,
+      midXw - toX(3) - 16,
+      0x4a2880,
+      0x3a1e6a,
+      22,
+    );
+    // Bottom fence (right)
+    this.drawFenceRow(
+      fenceG,
+      midXw + 16,
+      midY + 18,
+      toX(cols - 3) - midXw - 16,
+      0x4a2880,
+      0x3a1e6a,
+      22,
+    );
+    this.backgroundLayer.add(fenceG);
+
+    // ── SCATTERED PROPS: twilight trees + fireflies ───────────
+    const props = this.add.graphics();
+    props.setDepth(6);
+
+    // Purple-tinted forest trees (in each quadrant)
+    [
+      // Top-left quadrant
+      [5, midRow - 4],
+      [9, midRow - 7],
+      [14, midRow - 5],
+      // Top-right quadrant
+      [cols / 2 + 3, midRow - 4],
+      [cols / 2 + 8, midRow - 7],
+      [cols / 2 + 14, midRow - 5],
+      // Bottom-left quadrant
+      [5, midRow + 3],
+      [10, midRow + 6],
+      [15, midRow + 4],
+      // Bottom-right quadrant
+      [cols / 2 + 3, midRow + 3],
+      [cols / 2 + 9, midRow + 6],
+      [cols / 2 + 15, midRow + 4],
+    ].forEach(([c, r]) => {
+      this.drawPixelTree(
+        props,
+        toX(c),
+        toY(r),
+        0x3d1d6e,
+        0x2d0f5a,
+        0x160730,
+        scale,
+      );
+    });
+
+    // Mushroom-like glowing plants (small ellipses)
+    [
+      [7, midRow - 2],
+      [12, midRow + 2],
+      [cols / 2 + 5, midRow - 2],
+      [cols / 2 + 11, midRow + 2],
+      [cols / 2 + 18, midRow - 3],
+    ].forEach(([c, r]) => {
+      props.fillStyle(0x6d28d9, 0.5);
+      props.fillEllipse(toX(c), toY(r), 10, 7);
+      props.fillStyle(0xa78bfa, 0.3);
+      props.fillEllipse(toX(c), toY(r) - 3, 6, 4);
+    });
+
+    // Firefly glow dots
+    props.setBlendMode(Phaser.BlendModes.ADD);
+    [
+      [6, midRow - 3],
+      [13, midRow + 1.5],
+      [20, midRow - 5],
+      [cols / 2 + 4, midRow - 2.5],
+      [cols / 2 + 12, midRow + 2],
+      [cols / 2 + 18, midRow - 4],
+      [8, midRow + 4],
+      [cols / 2 + 7, midRow + 4],
+    ].forEach(([c, r]) => {
+      props.fillStyle(0xa78bfa, 0.38);
+      props.fillEllipse(toX(c), toY(r), 5, 5);
+      props.fillStyle(0xddd6fe, 0.12);
+      props.fillEllipse(toX(c), toY(r), 13, 13);
+    });
+    this.backgroundLayer.add(props);
+
+    // ── MOON ATMOSPHERE GLOW ─────────────────────────────────
+    const glow = this.add.graphics();
+    glow.fillStyle(0xc4b5fd, 0.05);
+    glow.fillEllipse(toX(21), midY - 28, 330, 165);
+    glow.setDepth(6);
+    glow.setBlendMode(Phaser.BlendModes.ADD);
+    this.backgroundLayer.add(glow);
+
+    // ── SPRITES ───────────────────────────────────────────────
+    if (this.textures.exists("House_Hay_2")) {
+      const house = this.add.sprite(toX(21), toY(midRow - 1.5), "House_Hay_2");
+      house.setOrigin(0.5, 1);
+      house.setScale(scale);
+      house.setTint(0xc4b5fd);
+      house.setDepth(8);
+      this.midgroundLayer.add(house);
+    }
+    if (this.textures.exists("LampPost_3")) {
+      [16, 26].forEach((cx) => {
+        const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
+        lp.setOrigin(0.5, 1);
+        lp.setScale(scale);
+        lp.setTint(0xddd6fe);
+        lp.setDepth(9);
+        this.midgroundLayer.add(lp);
+      });
+    }
+    const lampGlow = this.add.graphics();
+    lampGlow.setDepth(7);
+    lampGlow.setBlendMode(Phaser.BlendModes.ADD);
+    [16, 26].forEach((cx) => {
+      lampGlow.fillStyle(0xc4b5fd, 0.07);
+      lampGlow.fillEllipse(toX(cx), midY + 16, 82, 38);
+    });
+    this.backgroundLayer.add(lampGlow);
   }
 
   private createCapitalTilePanel(
@@ -1930,66 +2289,264 @@ export class WorldMapScene extends Phaser.Scene {
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
+    const toX = (x: number) => panelX + x * tileSize;
+    const toY = (y: number) => panelOffsetY + y * tileSize;
+    const midRow = rows / 2;
+    const panelW = cols * tileSize;
+    const panelH = rows * tileSize;
+    const midY = toY(midRow);
 
-    const style = {
-      baseTint: 0xfef08a,
-      shadeTint: 0xfde047,
-      pathTint: 0xffffff,
-      wallTint: 0xeab308,
-    };
+    // ── BASE GROUND: warm amber kingdom earth ────────────────
     const ground = this.add.graphics();
-    ground.fillStyle(style.baseTint, 0.98);
-    ground.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
+    ground.fillStyle(0x2a1200, 1);
+    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
 
-    const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
-    const hillFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24];
-
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const isPath = row > 16 && row < 22;
-        const isWall = row === 12 || row === 26;
-
-        if (isPath) {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_paths_sheet",
-            pathFrames[(col + row) % pathFrames.length],
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.pathTint);
-          tile.setDepth(3);
-          this.backgroundLayer.add(tile);
-        } else if (isWall) {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_hills_sheet",
-            hillFrames[(col + row) % hillFrames.length],
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.wallTint);
-          tile.setDepth(4);
-          this.backgroundLayer.add(tile);
-        } else {
-          const tile = this.add.sprite(
-            panelX + col * tileSize + tileSize / 2,
-            panelOffsetY + row * tileSize + tileSize / 2,
-            "sprout_grass_sheet",
-            0,
-          );
-          tile.setOrigin(0.5);
-          tile.setScale(scale);
-          tile.setTint(style.shadeTint);
-          tile.setDepth(2);
-          this.backgroundLayer.add(tile);
-        }
+    // ── TILE TEXTURE: golden-tinted tile grid ─────────────────
+    const tex = this.add.graphics();
+    tex.setDepth(2);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const shade = (r + c) % 2 === 0 ? 0x321600 : 0x271000;
+        tex.fillStyle(shade, 0.5);
+        tex.fillRect(toX(c), toY(r), tileSize, tileSize);
       }
     }
+    this.backgroundLayer.add(tex);
+
+    // ── WHEAT CROP ROWS (fills most of the panel) ────────────
+    const wheat = this.add.graphics();
+    wheat.setDepth(3);
+
+    // Rows of wheat above path
+    for (let r = 0.5; r < midRow - 2.5; r += 1.6) {
+      // Trough (dark)
+      wheat.fillStyle(0x1a0a00, 0.85);
+      wheat.fillRect(toX(3), toY(r), tileSize * (cols - 6), tileSize * 0.5);
+      // Ridge (mid-brown)
+      wheat.fillStyle(0x3a1800, 0.65);
+      wheat.fillRect(
+        toX(3),
+        toY(r) + tileSize * 0.5,
+        tileSize * (cols - 6),
+        tileSize * 0.8,
+      );
+      // Wheat stalk tops (golden)
+      for (let c = 4; c < cols - 3; c += 1.2) {
+        // Stalk
+        wheat.fillStyle(0xb45309, 0.75);
+        wheat.fillRect(
+          toX(c) + tileSize * 0.4,
+          toY(r) - tileSize * 0.9,
+          tileSize * 0.12,
+          tileSize,
+        );
+        // Grain head
+        wheat.fillStyle(0xd97706, 0.6);
+        wheat.fillRect(
+          toX(c) + tileSize * 0.26,
+          toY(r) - tileSize * 0.9,
+          tileSize * 0.4,
+          tileSize * 0.3,
+        );
+        // Glint
+        wheat.fillStyle(0xfbbf24, 0.22);
+        wheat.fillRect(
+          toX(c) + tileSize * 0.28,
+          toY(r) - tileSize * 0.88,
+          tileSize * 0.18,
+          tileSize * 0.12,
+        );
+      }
+    }
+
+    // Rows below path
+    for (let r = midRow + 2; r < rows - 0.5; r += 1.6) {
+      wheat.fillStyle(0x1a0a00, 0.85);
+      wheat.fillRect(toX(3), toY(r), tileSize * (cols - 6), tileSize * 0.5);
+      wheat.fillStyle(0x3a1800, 0.65);
+      wheat.fillRect(
+        toX(3),
+        toY(r) + tileSize * 0.5,
+        tileSize * (cols - 6),
+        tileSize * 0.8,
+      );
+      for (let c = 4; c < cols - 3; c += 1.2) {
+        wheat.fillStyle(0xb45309, 0.75);
+        wheat.fillRect(
+          toX(c) + tileSize * 0.4,
+          toY(r) - tileSize * 0.9,
+          tileSize * 0.12,
+          tileSize,
+        );
+        wheat.fillStyle(0xd97706, 0.6);
+        wheat.fillRect(
+          toX(c) + tileSize * 0.26,
+          toY(r) - tileSize * 0.9,
+          tileSize * 0.4,
+          tileSize * 0.3,
+        );
+        wheat.fillStyle(0xfbbf24, 0.22);
+        wheat.fillRect(
+          toX(c) + tileSize * 0.28,
+          toY(r) - tileSize * 0.88,
+          tileSize * 0.18,
+          tileSize * 0.12,
+        );
+      }
+    }
+    this.backgroundLayer.add(wheat);
+
+    // ── GOLDEN TIMBER FENCE ───────────────────────────────────
+    const fenceG = this.add.graphics();
+    fenceG.setDepth(5);
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY - 30,
+      tileSize * (cols - 6),
+      0xb45309,
+      0x92400e,
+      24,
+    );
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY + 18,
+      tileSize * (cols - 6),
+      0xb45309,
+      0x92400e,
+      24,
+    );
+    this.backgroundLayer.add(fenceG);
+
+    // ── ROYAL COBBLESTONE PATH ────────────────────────────────
+    const path = this.add.graphics();
+    path.fillStyle(0x5c2800, 1);
+    path.fillRect(panelX, midY - 14, panelW, 28);
+    // Cobble segments
+    path.fillStyle(0x7c3800, 0.25);
+    for (let x = panelX; x < panelX + panelW; x += tileSize * 2) {
+      path.fillRect(x, midY - 14, tileSize * 0.22, 28);
+    }
+    path.fillRect(panelX, midY - 2, panelW, 4);
+    // Gold trim edges
+    path.fillStyle(0xfbbf24, 0.16);
+    path.fillRect(panelX, midY - 15, panelW, 3);
+    path.fillRect(panelX, midY + 13, panelW, 3);
+    path.setDepth(4);
+    this.backgroundLayer.add(path);
+
+    // ── STONE WALL (right edge, battlements) ─────────────────
+    const wall = this.add.graphics();
+    wall.setDepth(5);
+    wall.fillStyle(0x7c3a0a, 0.85);
+    wall.fillRect(toX(cols - 5), panelOffsetY, tileSize * 1.8, panelH);
+    wall.fillStyle(0x5a2800, 0.5);
+    for (let r = 0; r < rows; r += 2) {
+      wall.fillRect(toX(cols - 5), toY(r), tileSize * 1.8, tileSize * 0.1);
+    }
+    // Battlements
+    for (let r = 0.5; r < rows; r += 3) {
+      wall.fillStyle(0x9a4e10, 0.8);
+      wall.fillRect(toX(cols - 5) + 3, toY(r), tileSize * 0.75, tileSize * 1.3);
+    }
+    this.backgroundLayer.add(wall);
+
+    // ── PROPS: golden trees + haystacks ───────────────────────
+    const props = this.add.graphics();
+    props.setDepth(6);
+
+    // Autumn golden trees
+    [
+      [5, midRow - 4],
+      [10, midRow - 6],
+      [17, midRow - 4],
+      [32, midRow - 5],
+      [40, midRow - 6],
+      [6, midRow + 3],
+      [13, midRow + 5],
+      [30, midRow + 3],
+      [38, midRow + 4],
+    ].forEach(([c, r]) => {
+      this.drawPixelTree(
+        props,
+        toX(c),
+        toY(r),
+        0x7c4010,
+        0xb45309,
+        0x7c2d0a,
+        scale,
+      );
+    });
+
+    // Haystacks (small rounded rectangles)
+    [
+      [22, midRow - 3],
+      [27, midRow + 2],
+      [44, midRow - 4],
+      [48, midRow + 3],
+    ].forEach(([c, r]) => {
+      props.fillStyle(0xd97706, 0.85);
+      props.fillEllipse(toX(c), toY(r), 18, 12);
+      props.fillStyle(0xfbbf24, 0.35);
+      props.fillEllipse(toX(c) - 2, toY(r) - 2, 10, 6);
+    });
+
+    // Scarecrow silhouette
+    const sc = toX(35);
+    const scY = midY - 36;
+    props.fillStyle(0x4a2800, 0.9);
+    props.fillRect(sc - 1, scY, 3, 14); // body
+    props.fillRect(sc - 7, scY + 4, 15, 2); // arms
+    props.fillStyle(0x7c4010, 0.8);
+    props.fillEllipse(sc, scY - 2, 8, 8); // head
+    props.fillStyle(0xb45309, 0.7);
+    props.fillRect(sc - 5, scY - 6, 12, 3); // hat brim
+    props.fillRect(sc - 3, scY - 11, 7, 6); // hat top
+
+    this.backgroundLayer.add(props);
+
+    // ── GOLDEN AMBIENT GLOW ───────────────────────────────────
+    const glow = this.add.graphics();
+    glow.fillStyle(0xfbbf24, 0.055);
+    glow.fillEllipse(toX(21), midY - 28, 350, 175);
+    glow.fillStyle(0xf59e0b, 0.04);
+    glow.fillEllipse(toX(21), midY - 16, 200, 95);
+    glow.setDepth(6);
+    glow.setBlendMode(Phaser.BlendModes.ADD);
+    this.backgroundLayer.add(glow);
+
+    // ── SPRITES ───────────────────────────────────────────────
+    if (this.textures.exists("House_Hay_1")) {
+      const house = this.add.sprite(toX(21), toY(midRow - 1.5), "House_Hay_1");
+      house.setOrigin(0.5, 1);
+      house.setScale(scale);
+      house.setTint(0xfde68a);
+      house.setDepth(8);
+      this.midgroundLayer.add(house);
+    }
+    if (this.textures.exists("LampPost_3")) {
+      [16, 26].forEach((cx) => {
+        const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
+        lp.setOrigin(0.5, 1);
+        lp.setScale(scale);
+        lp.setTint(0xfef08a);
+        lp.setDepth(9);
+        this.midgroundLayer.add(lp);
+      });
+    }
+    const lampGlow = this.add.graphics();
+    lampGlow.setDepth(7);
+    lampGlow.setBlendMode(Phaser.BlendModes.ADD);
+    [16, 26].forEach((cx) => {
+      lampGlow.fillStyle(0xfbbf24, 0.09);
+      lampGlow.fillEllipse(toX(cx), midY + 16, 100, 48);
+      lampGlow.fillStyle(0xfde68a, 0.04);
+      lampGlow.fillEllipse(toX(cx), midY + 16, 160, 70);
+    });
+    this.backgroundLayer.add(lampGlow);
   }
 
   private renderMapObjects(
@@ -2339,18 +2896,10 @@ export class WorldMapScene extends Phaser.Scene {
     const centerX = (first.x + last.x) / 2;
     const centerY = (first.y + last.y) / 2;
 
+    // Only keep essential village structures - remove clutter
     this.addLandmarkSprite("House_Hay_1", centerX - 150, centerY + 150, 1.55);
     this.addLandmarkSprite("House_Hay_3", centerX + 110, centerY + 115, 1.45);
     this.addLandmarkSprite("Well_Hay_1", centerX + 250, centerY + 155, 1.05);
-    this.addLandmarkSprite("BulletinBoard_1", centerX - 20, centerY + 185, 1);
-    this.addLandmarkSprite("LampPost_3", centerX + 25, centerY + 165, 1.05);
-    this.addLandmarkSprite("HayStack_2", centerX + 175, centerY + 205, 1);
-
-    nodes.forEach((node, index) => {
-      const bushKey = `Bush_Emerald_${(index % 4) * 2 + 1}`;
-      this.addLandmarkSprite(bushKey, node.x - 70, node.y + 135, 0.82, 0.95);
-      this.addLandmarkSprite(bushKey, node.x + 76, node.y + 128, 0.76, 0.9);
-    });
   }
 
   private createVillageWoodenTrackNetwork(
@@ -2384,34 +2933,8 @@ export class WorldMapScene extends Phaser.Scene {
       );
     });
 
-    const minorRoutes = [
-      [
-        { x: nodes[0].x - 112, y: nodes[0].y + 74 },
-        { x: nodes[0].x - 38, y: nodes[0].y + 52 },
-        { x: nodes[0].x + 22, y: nodes[0].y + 88 },
-      ],
-      [
-        { x: hub.x - 12, y: hub.y + 10 },
-        { x: hub.x + 92, y: hub.y + 74 },
-        { x: hub.x + 180, y: hub.y + 62 },
-      ],
-      [
-        { x: nodes[3].x - 22, y: nodes[3].y + 34 },
-        { x: nodes[3].x + 88, y: nodes[3].y + 88 },
-        { x: nodes[3].x + 158, y: nodes[3].y + 76 },
-      ],
-    ];
-    minorRoutes.forEach((points) => {
-      this.drawVillageTrack(points, {
-        plankWidth: 26,
-        plankHeight: 7,
-        spacing: 28,
-        tint: [0x76502a, 0x8b6237, 0x5f3d20],
-        rope: false,
-      });
-    });
-
-    this.addVillageTrackStoryProps(nodes, hub);
+    // Minimal story props - only essential markers
+    this.addMinimalVillageProps(nodes);
   }
 
   private buildVillageRoutePoints(nodes: { x: number; y: number }[]): {
@@ -2446,54 +2969,62 @@ export class WorldMapScene extends Phaser.Scene {
     const sampled = this.samplePolyline(points, options.spacing);
     if (sampled.length === 0) return;
 
+    // Simple wooden track style matching the main paths
+    const woodColor = 0x8b6f47;
+    const darkWood = 0x5d4a37;
+
+    // Shadow
     const shadow = this.add.graphics();
-    shadow.lineStyle(options.plankHeight + 16, 0x000000, 0.08);
+    shadow.lineStyle(options.plankWidth + 8, 0x000000, 0.1);
     shadow.beginPath();
-    shadow.moveTo(points[0].x + 4, points[0].y + 7);
-    points.slice(1).forEach((point) => shadow.lineTo(point.x + 4, point.y + 7));
+    shadow.moveTo(points[0].x + 3, points[0].y + 5);
+    points.slice(1).forEach((point) => shadow.lineTo(point.x + 3, point.y + 5));
     shadow.strokePath();
     shadow.setDepth(3.2);
     this.midgroundLayer.add(shadow);
 
-    const groundBlend = this.add.graphics();
-    groundBlend.lineStyle(options.plankWidth + 10, 0x8b6b3d, 0.16);
-    groundBlend.beginPath();
-    groundBlend.moveTo(points[0].x, points[0].y);
-    points.slice(1).forEach((point) => groundBlend.lineTo(point.x, point.y));
-    groundBlend.strokePath();
-    groundBlend.lineStyle(options.plankWidth + 20, 0x5f8b45, 0.07);
-    groundBlend.beginPath();
-    groundBlend.moveTo(points[0].x, points[0].y);
-    points.slice(1).forEach((point) => groundBlend.lineTo(point.x, point.y));
-    groundBlend.strokePath();
-    groundBlend.setDepth(3.1);
-    this.midgroundLayer.add(groundBlend);
+    // Main wooden path
+    const path = this.add.graphics();
+    path.lineStyle(options.plankWidth, woodColor, 0.95);
+    path.beginPath();
+    path.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach((point) => path.lineTo(point.x, point.y));
+    path.strokePath();
 
-    const edge = this.add.graphics();
-    const edgeOffset = options.plankWidth * 0.34;
-    edge.lineStyle(4, 0x4c3219, 0.62);
-    this.drawOffsetPolyline(edge, points, -edgeOffset);
-    this.drawOffsetPolyline(edge, points, edgeOffset);
-    edge.setDepth(3.4);
-    this.midgroundLayer.add(edge);
+    // Highlight
+    path.lineStyle(2, 0xffffff, 0.15);
+    path.beginPath();
+    path.moveTo(points[0].x, points[0].y - options.plankWidth * 0.25);
+    points
+      .slice(1)
+      .forEach((point) =>
+        path.lineTo(point.x, point.y - options.plankWidth * 0.25),
+      );
+    path.strokePath();
 
+    // Dark edge
+    path.lineStyle(2, darkWood, 0.5);
+    path.beginPath();
+    path.moveTo(points[0].x, points[0].y + options.plankWidth * 0.3);
+    points
+      .slice(1)
+      .forEach((point) =>
+        path.lineTo(point.x, point.y + options.plankWidth * 0.3),
+      );
+    path.strokePath();
+
+    path.setDepth(3.4);
+    this.midgroundLayer.add(path);
+
+    // Optional rope details for elevated sections
     if (options.rope) {
       const rope = this.add.graphics();
-      rope.lineStyle(2, 0xd6b16c, 0.7);
-      this.drawOffsetPolyline(rope, points, -(edgeOffset + 8));
-      this.drawOffsetPolyline(rope, points, edgeOffset + 8);
+      const edgeOffset = options.plankWidth * 0.4;
+      rope.lineStyle(2, 0xd6b16c, 0.6);
+      this.drawOffsetPolyline(rope, points, -edgeOffset);
+      this.drawOffsetPolyline(rope, points, edgeOffset);
       rope.setDepth(4.1);
       this.midgroundLayer.add(rope);
-
-      this.tweens.add({
-        targets: rope,
-        alpha: { from: 0.74, to: 0.96 },
-        y: { from: -1, to: 1 },
-        duration: 2100,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
     }
 
     sampled.forEach((sample, index) => {
@@ -2608,78 +3139,31 @@ export class WorldMapScene extends Phaser.Scene {
     this.midgroundLayer.add(text);
   }
 
-  private addVillageTrackStoryProps(
-    nodes: { x: number; y: number }[],
-    hub: { x: number; y: number },
-  ): void {
+  private addMinimalVillageProps(nodes: { x: number; y: number }[]): void {
+    // Only add essential lamp posts at checkpoints for visibility
     const props: Array<[string, number, number, number]> = [
-      ["LampPost_3", nodes[0].x - 96, nodes[0].y + 102, 0.86],
-      ["Sign_1", nodes[0].x + 96, nodes[0].y + 92, 0.92],
-      ["Crate_Medium_Closed", hub.x + 70, hub.y + 82, 0.82],
-      ["Barrel_Small_Empty", hub.x + 104, hub.y + 76, 0.82],
-      ["LampPost_3", nodes[1].x + 108, nodes[1].y + 82, 0.86],
-      ["Sign_2", nodes[2].x - 104, nodes[2].y + 92, 0.9],
-      ["Crate_Large_Empty", nodes[2].x + 98, nodes[2].y + 74, 0.72],
-      ["LampPost_3", nodes[3].x - 118, nodes[3].y + 112, 0.9],
-      ["BulletinBoard_1", nodes[3].x + 122, nodes[3].y + 108, 0.82],
+      ["LampPost_3", nodes[0].x - 80, nodes[0].y + 90, 0.86],
+      ["LampPost_3", nodes[1].x + 90, nodes[1].y + 70, 0.86],
+      ["LampPost_3", nodes[2].x - 90, nodes[2].y + 80, 0.86],
+      ["LampPost_3", nodes[3].x + 100, nodes[3].y + 90, 0.9],
     ];
 
     props.forEach(([key, x, y, scale], index) => {
-      this.addLandmarkSprite(key, x, y, scale, index % 3 === 0 ? 0.96 : 0.9);
-      if (key === "LampPost_3") {
-        const glow = this.add.circle(x, y - 54, 18, 0xffd27a, 0.14);
-        glow.setDepth(16);
-        this.midgroundLayer.add(glow);
-        this.tweens.add({
-          targets: glow,
-          alpha: { from: 0.08, to: 0.22 },
-          scale: { from: 0.9, to: 1.12 },
-          duration: 1600 + index * 180,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-      }
-    });
+      this.addLandmarkSprite(key, x, y, scale, 0.92);
 
-    const detailPoints = [
-      [nodes[0].x - 42, nodes[0].y + 124, 0xfff0a5],
-      [nodes[1].x + 34, nodes[1].y + 116, 0xe86c72],
-      [hub.x - 86, hub.y + 74, 0xffffff],
-      [nodes[2].x + 54, nodes[2].y + 110, 0xded38a],
-      [nodes[3].x + 64, nodes[3].y + 126, 0xf49cc1],
-    ];
-
-    detailPoints.forEach(([x, y, color], index) => {
-      const flowers = this.add.graphics();
-      flowers.fillStyle(color as number, 0.95);
-      flowers.fillCircle(x as number, y as number, 4);
-      flowers.fillCircle((x as number) + 9, (y as number) + 3, 3);
-      flowers.fillStyle(0x5e8d3e, 0.9);
-      flowers.fillCircle((x as number) + 4, (y as number) + 7, 3);
-      flowers.setDepth(13);
-      this.midgroundLayer.add(flowers);
-
-      const pebble = this.add.ellipse(
-        (x as number) + 32,
-        (y as number) - 12,
-        10,
-        6,
-        0x6e675b,
-        0.48,
-      );
-      pebble.setDepth(13);
-      this.midgroundLayer.add(pebble);
-
-      if (index % 2 === 0) {
-        const mushroom = this.add.graphics();
-        mushroom.fillStyle(0xb8423b, 1);
-        mushroom.fillCircle((x as number) - 24, (y as number) - 8, 7);
-        mushroom.fillStyle(0xf7e0bd, 1);
-        mushroom.fillRect((x as number) - 27, (y as number) - 7, 6, 10);
-        mushroom.setDepth(13);
-        this.midgroundLayer.add(mushroom);
-      }
+      // Subtle lamp glow
+      const glow = this.add.circle(x, y - 54, 16, 0xffd27a, 0.12);
+      glow.setDepth(16);
+      this.midgroundLayer.add(glow);
+      this.tweens.add({
+        targets: glow,
+        alpha: { from: 0.08, to: 0.18 },
+        scale: { from: 0.92, to: 1.08 },
+        duration: 1800 + index * 200,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
     });
   }
 
@@ -2803,293 +3287,321 @@ export class WorldMapScene extends Phaser.Scene {
   private createArenaLandmarks(stageId: number): void {
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
+
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const centerX = (first.x + last.x) / 2;
     const centerY = (first.y + last.y) / 2;
 
-    const trialGraphics = this.add.graphics();
-    trialGraphics.lineStyle(6, 0xffd37a, 0.24);
-    trialGraphics.strokeEllipse(centerX, centerY + 110, 500, 280);
+    // One hero house above the arena center
+    this.addLandmarkSprite(
+      "House_Hay_2",
+      centerX + 20,
+      centerY + 90,
+      1.28,
+      1.0,
+    );
 
-    const addPillar = (x: number, y: number, tint: number) => {
-      trialGraphics.fillStyle(0x1b0908, 0.42);
-      trialGraphics.fillEllipse(x + 6, y + 18, 58, 20);
-      trialGraphics.fillStyle(tint, 0.82);
-      trialGraphics.fillRect(x - 18, y - 52, 36, 72);
-      trialGraphics.fillStyle(0xffd37a, 0.42);
-      trialGraphics.fillRect(x - 14, y - 44, 28, 7);
-      trialGraphics.fillRect(x - 14, y - 28, 28, 7);
-      trialGraphics.fillRect(x - 14, y - 12, 28, 7);
-    };
+    // Checkpoint pads — glowing arena-style rings
+    const pads = this.add.graphics();
+    pads.setDepth(14);
+    nodes.forEach((node) => {
+      // Outer shadow
+      pads.fillStyle(0x000000, 0.28);
+      pads.fillEllipse(node.x + 5, node.y + 82, 130, 46);
+      // Ground pad
+      pads.fillStyle(0x3d1008, 0.72);
+      pads.fillEllipse(node.x, node.y + 72, 112, 38);
+      // Bright ring
+      pads.lineStyle(4, 0xffd37a, 0.72);
+      pads.strokeEllipse(node.x, node.y + 72, 112, 38);
+      // Inner accent ring
+      pads.lineStyle(2, 0xf8c56e, 0.42);
+      pads.strokeEllipse(node.x, node.y + 72, 80, 26);
 
-    const addEvidenceBoard = (
-      x: number,
-      y: number,
-      bars: Array<[number, number, number]>,
-    ) => {
-      trialGraphics.fillStyle(0x19090a, 0.82);
-      trialGraphics.fillRect(x - 42, y - 54, 84, 58);
-      trialGraphics.lineStyle(2, 0xffd37a, 0.45);
-      trialGraphics.strokeRect(x - 42, y - 54, 84, 58);
-      bars.forEach(([offsetX, height, color]) => {
-        trialGraphics.fillStyle(color, 0.86);
-        trialGraphics.fillRect(x - 26 + offsetX, y - 8 - height, 12, height);
-      });
-    };
-
-    trialGraphics.setDepth(14);
-    this.midgroundLayer.add(trialGraphics);
-
-    this.addLandmarkSprite("Banner_Stick_1_Purple", first.x - 112, first.y + 96, 1.36);
-    this.addLandmarkSprite("Banner_Stick_1_Purple", last.x + 84, last.y + 94, 1.32);
-    this.addLandmarkSprite("Fireplace_1", centerX + 14, centerY + 162, 1.08);
-    this.addLandmarkSprite("Rock_Brown_4", centerX - 180, centerY + 190, 1.22);
-    this.addLandmarkSprite("Rock_Brown_6", centerX + 184, centerY + 186, 1.12);
-    this.addLandmarkSprite("Rock_Brown_9", centerX + 260, centerY + 138, 1.0);
-
-    nodes.forEach((node, index) => {
-      const leftSide = index % 2 === 0;
-      const markerX = node.x + (leftSide ? -82 : 84);
-      const markerY = node.y + 104;
-      if (index === 0) {
-        addPillar(markerX, markerY, 0x7c2d12);
-      } else if (index === 1) {
-        addEvidenceBoard(markerX, markerY, [
-          [0, 18, 0xef4444],
-          [18, 30, 0xf59e0b],
-          [36, 24, 0x22c55e],
-        ]);
-      } else if (index === 2) {
-        this.addLandmarkSprite("Crate_Medium_Closed", markerX - 12, markerY + 12, 0.86);
-        this.addLandmarkSprite("BulletinBoard_1", markerX + 28, markerY + 12, 0.82);
-      } else {
-        trialGraphics.lineStyle(8, 0xffd37a, 0.26);
-        trialGraphics.lineBetween(markerX - 58, markerY - 24, markerX + 16, markerY + 24);
-        trialGraphics.lineBetween(markerX + 16, markerY + 24, markerX + 90, markerY - 28);
-        this.addLandmarkSprite("Sign_2", markerX + 90, markerY + 12, 0.9);
-      }
-
-      this.addLandmarkSprite("Rock_Brown_4", node.x - 58, node.y + 124, 0.72, 0.92);
-      this.addLandmarkSprite("Rock_Brown_6", node.x + 58, node.y + 118, 0.68, 0.9);
+      // Flanking lamp posts at each checkpoint
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x - 62,
+        node.y + 118,
+        0.82,
+        0.92,
+      );
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x + 62,
+        node.y + 118,
+        0.82,
+        0.92,
+      );
     });
+    this.midgroundLayer.add(pads);
+
+    // Corner rocks for depth
+    this.addLandmarkSprite(
+      "Rock_Brown_4",
+      centerX - 190,
+      centerY + 190,
+      1.1,
+      0.9,
+    );
+    this.addLandmarkSprite(
+      "Rock_Brown_6",
+      centerX + 180,
+      centerY + 185,
+      1.0,
+      0.9,
+    );
+    this.addLandmarkSprite(
+      "Rock_Brown_1",
+      centerX - 90,
+      centerY + 210,
+      0.9,
+      0.82,
+    );
+    this.addLandmarkSprite(
+      "Rock_Brown_1",
+      centerX + 100,
+      centerY + 208,
+      0.9,
+      0.82,
+    );
   }
 
   private createArtisanLandmarks(stageId: number): void {
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
+
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const centerX = (first.x + last.x) / 2;
     const centerY = (first.y + last.y) / 2;
 
-    const studioGraphics = this.add.graphics();
-    studioGraphics.fillStyle(0x071a3f, 0.74);
-    studioGraphics.fillRect(centerX - 54, centerY + 72, 108, 70);
-    studioGraphics.lineStyle(2, 0x9ddcff, 0.54);
-    studioGraphics.strokeRect(centerX - 54, centerY + 72, 108, 70);
-    studioGraphics.lineBetween(centerX - 36, centerY + 92, centerX + 32, centerY + 92);
-    studioGraphics.lineBetween(centerX - 36, centerY + 112, centerX + 12, centerY + 130);
-    studioGraphics.strokeCircle(centerX + 32, centerY + 118, 11);
+    // One hero house — the Artisan's workshop
+    this.addLandmarkSprite(
+      "House_Hay_4_Purple",
+      centerX + 26,
+      centerY + 80,
+      1.28,
+      1.0,
+    );
 
-    [
-      [centerX - 210, centerY + 168, 0xf87171],
-      [centerX - 184, centerY + 168, 0xfbbf24],
-      [centerX - 158, centerY + 168, 0x34d399],
-      [centerX - 132, centerY + 168, 0x60a5fa],
-      [centerX - 106, centerY + 168, 0xc084fc],
-    ].forEach(([x, y, color]) => {
-      studioGraphics.fillStyle(color as number, 0.92);
-      studioGraphics.fillRect(x as number, y as number, 20, 20);
-      studioGraphics.lineStyle(1, 0xffffff, 0.35);
-      studioGraphics.strokeRect(x as number, y as number, 20, 20);
+    // Checkpoint pads — indigo glow rings
+    const pads = this.add.graphics();
+    pads.setDepth(14);
+    nodes.forEach((node) => {
+      // Outer shadow
+      pads.fillStyle(0x000000, 0.26);
+      pads.fillEllipse(node.x + 5, node.y + 80, 128, 44);
+      // Ground pad
+      pads.fillStyle(0x1a1640, 0.72);
+      pads.fillEllipse(node.x, node.y + 70, 110, 36);
+      // Bright ring
+      pads.lineStyle(4, 0x9ddcff, 0.72);
+      pads.strokeEllipse(node.x, node.y + 70, 110, 36);
+      // Inner accent ring
+      pads.lineStyle(2, 0xffd166, 0.44);
+      pads.strokeEllipse(node.x, node.y + 70, 78, 24);
+
+      // Flanking lamp posts at each checkpoint
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x - 60,
+        node.y + 116,
+        0.82,
+        0.92,
+      );
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x + 60,
+        node.y + 116,
+        0.82,
+        0.92,
+      );
     });
+    this.midgroundLayer.add(pads);
 
-    studioGraphics.setDepth(14);
-    this.midgroundLayer.add(studioGraphics);
-
-    this.addLandmarkSprite("House_Hay_4_Purple", centerX - 256, centerY + 96, 1.22);
-    this.addLandmarkSprite("House_Hay_2", centerX + 242, centerY + 90, 1.16);
-    this.addLandmarkSprite("Well_Hay_1", centerX + 134, centerY + 150, 0.86);
-    this.addLandmarkSprite("Table_Medium_1", centerX - 24, centerY + 166, 1.24);
-    this.addLandmarkSprite("Bench_1", centerX + 76, centerY + 166, 0.98);
-    this.addLandmarkSprite("Crate_Medium_Closed", centerX - 112, centerY + 198, 0.86);
-    this.addLandmarkSprite("BulletinBoard_1", centerX + 186, centerY + 160, 0.9);
-
-    nodes.forEach((node, index) => {
-      const side = index % 2 === 0 ? -1 : 1;
-      const propX = node.x + side * 78;
-      const propY = node.y + 118;
-
-      if (index === 0) {
-        this.addLandmarkSprite("Sign_1", propX, propY, 0.88, 0.92);
-      } else if (index === 1) {
-        this.addLandmarkSprite("Table_Medium_1", propX, propY, 0.92, 0.94);
-      } else if (index === 2) {
-        this.addLandmarkSprite("BulletinBoard_1", propX, propY, 0.84, 0.92);
-      } else if (index === 3) {
-        this.addLandmarkSprite("Bench_3", propX, propY, 0.9, 0.92);
-      } else {
-        this.addLandmarkSprite("Crate_Water_1", propX, propY, 0.78, 0.92);
-      }
-
-      this.addLandmarkSprite("LampPost_3", node.x - side * 68, node.y + 126, 0.76, 0.88);
-    });
+    // Supporting props around the stage
+    this.addLandmarkSprite(
+      "Well_Hay_1",
+      centerX - 130,
+      centerY + 148,
+      0.9,
+      0.92,
+    );
+    this.addLandmarkSprite("Bench_1", centerX - 28, centerY + 168, 0.96, 0.9);
+    this.addLandmarkSprite(
+      "Rock_Brown_2",
+      centerX - 200,
+      centerY + 185,
+      0.9,
+      0.8,
+    );
+    this.addLandmarkSprite(
+      "Rock_Brown_2",
+      centerX + 185,
+      centerY + 182,
+      0.9,
+      0.8,
+    );
   }
 
   private createMineLandmarks(stageId: number): void {
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
+
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const centerX = (first.x + last.x) / 2;
-    const centerY = (first.y + last.y) / 2;
+    const topY = Math.min(...nodes.map((node) => node.y));
 
-    // Mine entrance and mining props (rocks + campfire for lanterns)
-    this.addLandmarkSprite("Rock_Brown_9", centerX - 170, centerY + 110, 1.7);
-    this.addLandmarkSprite("Rock_Brown_6", centerX + 150, centerY + 105, 1.6);
-    this.addLandmarkSprite("Rock_Brown_4", centerX - 60, centerY + 170, 1.3);
-    this.addLandmarkSprite("Rock_Brown_1", centerX + 80, centerY + 175, 1.2);
-    this.addLandmarkSprite("Fireplace_1", centerX, centerY + 155, 1.0);
-    this.addLandmarkSprite("HayStack_2", centerX - 230, centerY + 155, 1.0);
-    this.addLandmarkSprite(
-      "Crate_Medium_Closed",
-      centerX + 210,
-      centerY + 160,
-      1.0,
-    );
+    // House is placed above the checkpoint cluster to avoid path overlap.
+    this.addLandmarkSprite("House_Hay_3", centerX + 12, topY - 70, 1.18, 0.98);
 
+    // Stage 5 has highest checkpoint density, so use tighter ring sizes.
+    const pads = this.add.graphics();
+    pads.setDepth(14);
     nodes.forEach((node) => {
-      this.addLandmarkSprite("Rock_Brown_1", node.x - 55, node.y + 130, 0.9);
-      this.addLandmarkSprite("Rock_Brown_4", node.x + 60, node.y + 125, 0.85);
+      pads.fillStyle(0x2a3a23, 0.24);
+      pads.fillEllipse(node.x + 4, node.y + 72, 100, 34);
+      pads.lineStyle(3, 0xb8d084, 0.34);
+      pads.strokeEllipse(node.x, node.y + 61, 76, 24);
+
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x - 52,
+        node.y + 114,
+        0.76,
+        0.88,
+      );
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x + 52,
+        node.y + 114,
+        0.76,
+        0.88,
+      );
     });
+    this.midgroundLayer.add(pads);
   }
 
   private createHarbourLandmarks(stageId: number): void {
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
+
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const centerX = (first.x + last.x) / 2;
-    const centerY = (first.y + last.y) / 2;
+    const topY = Math.min(...nodes.map((node) => node.y));
 
-    // Harbour dock props — barrels, crates, signs
-    this.addLandmarkSprite("HayStack_2", centerX - 180, centerY + 130, 1.2);
-    this.addLandmarkSprite(
-      "Crate_Medium_Closed",
-      centerX - 100,
-      centerY + 155,
-      1.1,
-    );
-    this.addLandmarkSprite(
-      "Crate_Medium_Closed",
-      centerX - 80,
-      centerY + 145,
-      1.0,
-    );
-    this.addLandmarkSprite("Sign_2", centerX + 20, centerY + 165, 1.2);
-    this.addLandmarkSprite("LampPost_3", centerX + 140, centerY + 155, 1.1);
-    this.addLandmarkSprite("Rock_Brown_1", centerX + 240, centerY + 160, 1.0);
-    this.addLandmarkSprite(
-      "BulletinBoard_1",
-      centerX - 240,
-      centerY + 165,
-      1.0,
-    );
+    this.addLandmarkSprite("House_Hay_2", centerX + 18, topY - 72, 1.18, 0.98);
 
-    nodes.forEach((node, index) => {
+    // Stage 6 has fewer checkpoints, so make pads slightly wider.
+    const pads = this.add.graphics();
+    pads.setDepth(14);
+    nodes.forEach((node) => {
+      pads.fillStyle(0x23402b, 0.24);
+      pads.fillEllipse(node.x + 4, node.y + 74, 114, 38);
+      pads.lineStyle(3, 0xddc48f, 0.34);
+      pads.strokeEllipse(node.x, node.y + 62, 88, 26);
+
       this.addLandmarkSprite(
-        "Crate_Medium_Closed",
-        node.x - 55,
-        node.y + 135,
-        0.85,
+        "LampPost_3",
+        node.x - 58,
+        node.y + 116,
+        0.78,
+        0.9,
       );
-      if (index % 2 === 0) {
-        this.addLandmarkSprite(
-          "LampPost_3",
-          node.x + 70,
-          node.y + 128,
-          0.9,
-          0.9,
-        );
-      }
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x + 58,
+        node.y + 116,
+        0.78,
+        0.9,
+      );
     });
+    this.midgroundLayer.add(pads);
   }
 
   private createCrossroadsLandmarks(stageId: number): void {
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
+
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const centerX = (first.x + last.x) / 2;
-    const centerY = (first.y + last.y) / 2;
+    const topY = Math.min(...nodes.map((node) => node.y));
 
-    // Crossroads market props — signs, benches, bulletin boards
-    this.addLandmarkSprite("Sign_2", centerX - 20, centerY + 155, 1.3);
-    this.addLandmarkSprite("Sign_2", centerX + 50, centerY + 150, 1.2);
-    this.addLandmarkSprite(
-      "BulletinBoard_1",
-      centerX - 160,
-      centerY + 145,
-      1.2,
-    );
-    this.addLandmarkSprite("Bench_1", centerX + 160, centerY + 158, 1.1);
-    this.addLandmarkSprite("Bench_1", centerX + 200, centerY + 155, 1.1);
-    this.addLandmarkSprite("Well_Hay_1", centerX - 240, centerY + 155, 1.0);
-    this.addLandmarkSprite("LampPost_3", centerX - 100, centerY + 160, 1.1);
-    this.addLandmarkSprite("LampPost_3", centerX + 100, centerY + 160, 1.1);
+    this.addLandmarkSprite("House_Hay_1", centerX + 20, topY - 74, 1.18, 0.98);
 
+    const pads = this.add.graphics();
+    pads.setDepth(14);
     nodes.forEach((node) => {
+      pads.fillStyle(0x264128, 0.24);
+      pads.fillEllipse(node.x + 4, node.y + 74, 108, 36);
+      pads.lineStyle(3, 0xd7b078, 0.34);
+      pads.strokeEllipse(node.x, node.y + 62, 82, 25);
+
       this.addLandmarkSprite(
-        "BulletinBoard_1",
-        node.x - 68,
-        node.y + 132,
-        0.85,
+        "LampPost_3",
+        node.x - 56,
+        node.y + 115,
+        0.78,
+        0.9,
+      );
+      this.addLandmarkSprite(
+        "LampPost_3",
+        node.x + 56,
+        node.y + 115,
+        0.78,
         0.9,
       );
     });
+    this.midgroundLayer.add(pads);
   }
 
   private createCapitalLandmarks(stageId: number): void {
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
+
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const centerX = (first.x + last.x) / 2;
-    const centerY = (first.y + last.y) / 2;
+    const topY = Math.min(...nodes.map((node) => node.y));
 
-    // Capital city grand architecture — gates, walls, grand buildings
-    this.addLandmarkSprite("CityWall_Gate_1", centerX, centerY + 100, 1.8);
-    this.addLandmarkSprite("House_Hay_1", centerX - 200, centerY + 125, 1.6);
-    this.addLandmarkSprite("House_Hay_3", centerX + 180, centerY + 120, 1.55);
-    this.addLandmarkSprite("LampPost_3", centerX - 80, centerY + 165, 1.3);
-    this.addLandmarkSprite("LampPost_3", centerX + 80, centerY + 165, 1.3);
-    this.addLandmarkSprite("LampPost_3", centerX - 250, centerY + 158, 1.1);
-    this.addLandmarkSprite("LampPost_3", centerX + 250, centerY + 158, 1.1);
-    this.addLandmarkSprite("Well_Hay_1", centerX - 330, centerY + 160, 1.0);
     this.addLandmarkSprite(
-      "BulletinBoard_1",
-      centerX + 310,
-      centerY + 165,
-      1.0,
+      "House_Hay_4_Purple",
+      centerX + 22,
+      topY - 78,
+      1.2,
+      0.98,
     );
 
-    nodes.forEach((node, index) => {
+    // Stage 8 has dense late-game routing, so slightly tighter rings.
+    const pads = this.add.graphics();
+    pads.setDepth(14);
+    nodes.forEach((node) => {
+      pads.fillStyle(0x2b4729, 0.24);
+      pads.fillEllipse(node.x + 4, node.y + 73, 106, 36);
+      pads.lineStyle(3, 0xe5d8aa, 0.34);
+      pads.strokeEllipse(node.x, node.y + 62, 80, 25);
+
       this.addLandmarkSprite(
         "LampPost_3",
-        node.x - 72,
-        node.y + 128,
-        1.0,
-        0.95,
+        node.x - 54,
+        node.y + 114,
+        0.76,
+        0.92,
       );
       this.addLandmarkSprite(
         "LampPost_3",
-        node.x + 76,
-        node.y + 122,
-        0.95,
+        node.x + 54,
+        node.y + 114,
+        0.76,
         0.92,
       );
     });
+    this.midgroundLayer.add(pads);
   }
 
   /**
@@ -3464,7 +3976,6 @@ export class WorldMapScene extends Phaser.Scene {
     });
 
     this.drawSnakePathConnectors(positions);
-    this.createVillageWoodenTrackNetwork(positions.slice(0, 4));
 
     // Create checkpoint nodes
     globalIndex = 0;
@@ -3504,18 +4015,10 @@ export class WorldMapScene extends Phaser.Scene {
         offset + stage.checkpoints,
       );
       const biome = BIOME_CONFIGS[stage.id - 1];
-      if (stagePositions.length > 1 && biome) {
-        this.drawStagePathConnector(stagePositions, biome.colors.path);
-      }
 
-      const nextPosition = positions[offset + stage.checkpoints];
-      const lastPosition = stagePositions[stagePositions.length - 1];
-      if (lastPosition && nextPosition) {
-        this.drawStagePathConnector(
-          [lastPosition, nextPosition],
-          biome?.colors.accent2 ?? 0x818cf8,
-          0.28,
-        );
+      // Strict per-stage path only: do NOT draw connectors to another stage.
+      if (stagePositions.length > 1 && biome) {
+        this.drawStagePathConnector(stagePositions, biome.colors.path, 0.9);
       }
 
       offset += stage.checkpoints;
@@ -3531,136 +4034,32 @@ export class WorldMapScene extends Phaser.Scene {
       fog.setDepth(90);
 
       const veil = this.add.graphics();
-      veil.fillGradientStyle(0x020617, 0x07111f, 0x050816, 0x020617, 1, 1, 1, 1);
+      veil.fillStyle(0xffffff, 0.18);
       veil.fillRect(-80, 0, this.BIOME_WIDTH + 160, this.MAP_HEIGHT);
-      veil.fillStyle(0x0f172a, 1);
-      veil.fillRect(-80, this.MAP_HEIGHT * 0.58, this.BIOME_WIDTH + 160, this.MAP_HEIGHT * 0.42);
-      veil.lineStyle(5, 0x38bdf8, 0.38);
-      veil.beginPath();
-      veil.moveTo(-24, 0);
-      veil.lineTo(-24, this.MAP_HEIGHT);
-      veil.strokePath();
-      veil.lineStyle(2, 0xfacc15, 0.32);
-      veil.beginPath();
-      veil.moveTo(16, 0);
-      veil.lineTo(16, this.MAP_HEIGHT);
-      veil.strokePath();
+      veil.fillStyle(biome.colors.accent2, 0.06);
+      veil.fillRect(-80, 0, this.BIOME_WIDTH + 160, this.MAP_HEIGHT);
+      veil.lineStyle(4, 0xffffff, 0.16);
+      veil.strokeRect(8, 28, this.BIOME_WIDTH - 16, this.MAP_HEIGHT - 56);
 
-      const distantShapes = this.add.graphics();
-      distantShapes.fillStyle(0x111827, 1);
-      for (let i = 0; i < 10; i += 1) {
-        distantShapes.fillTriangle(
-          i * 180 - 120,
-          this.MAP_HEIGHT,
-          i * 180 + 40,
-          420 + Phaser.Math.Between(-80, 70),
-          i * 180 + 230,
-          this.MAP_HEIGHT,
-        );
-      }
-      distantShapes.fillStyle(0x1e293b, 0.75);
-      for (let i = 0; i < 8; i += 1) {
-        distantShapes.fillTriangle(
-          i * 210 - 70,
-          this.MAP_HEIGHT,
-          i * 210 + 72,
-          560 + Phaser.Math.Between(-40, 90),
-          i * 210 + 260,
-          this.MAP_HEIGHT,
-        );
+      const softMist = this.add.graphics();
+      softMist.fillStyle(0xffffff, 0.12);
+      for (let i = 0; i < 7; i += 1) {
+        softMist.fillEllipse(120 + i * 190, 250 + (i % 2) * 250, 260, 78);
       }
 
-      const cloudBands = this.add.graphics();
-      cloudBands.fillStyle(0xe0f2fe, 0.1);
-      for (let i = 0; i < 12; i += 1) {
-        cloudBands.fillEllipse(
-          90 + i * 130,
-          135 + Phaser.Math.Between(-20, 36),
-          Phaser.Math.Between(170, 290),
-          Phaser.Math.Between(46, 82),
-        );
-        cloudBands.fillEllipse(
-          60 + i * 145,
-          740 + Phaser.Math.Between(-50, 60),
-          Phaser.Math.Between(210, 360),
-          Phaser.Math.Between(58, 110),
-        );
-      }
-
-      const stars = this.add.graphics();
-      stars.fillStyle(0xffffff, 0.65);
-      for (let i = 0; i < 70; i += 1) {
-        stars.fillCircle(
-          Phaser.Math.Between(70, this.BIOME_WIDTH - 70),
-          Phaser.Math.Between(44, 430),
-          Phaser.Math.Between(1, 2),
-        );
-      }
-
-      const seal = this.add.container(this.BIOME_WIDTH / 2, 270);
-      const sealGlow = this.add.circle(0, 0, 92, biome.colors.accent2, 0.1);
-      sealGlow.setStrokeStyle(5, biome.colors.accent2, 0.32);
-      const sealCore = this.add.circle(0, 0, 58, 0x0f172a, 0.98);
-      sealCore.setStrokeStyle(3, 0xfacc15, 0.65);
-      const sealBar = this.add.rectangle(0, 8, 76, 18, 0xfacc15, 0.82);
-      sealBar.setAngle(-18);
-      const sealCap = this.add.circle(0, -20, 18, 0x38bdf8, 0.86);
-      sealCap.setStrokeStyle(3, 0xdbeafe, 0.7);
-      seal.add([sealGlow, sealCore, sealBar, sealCap]);
-
-      const lockText = this.add.text(
-        this.BIOME_WIDTH / 2,
-        394,
-        `STAGE ${biome.id} SEALED`,
-        {
-          fontSize: "34px",
-          fontFamily: '"VT323", "Courier New", monospace',
-          color: "#f8fafc",
-          align: "center",
-          stroke: "#020617",
-          strokeThickness: 7,
-        },
-      );
-      lockText.setOrigin(0.5);
-
-      const hintText = this.add.text(
-        this.BIOME_WIDTH / 2,
-        438,
-        `Complete Stage ${biome.id - 1} final checkpoint to reveal the path`,
-        {
-          fontSize: "20px",
-          fontFamily: '"VT323", "Courier New", monospace',
-          color: "#93c5fd",
-          align: "center",
-          stroke: "#020617",
-          strokeThickness: 5,
-        },
-      );
-      hintText.setOrigin(0.5);
-
-      fog.add([veil, distantShapes, stars, cloudBands, seal, lockText, hintText]);
+      fog.add([veil, softMist]);
       this.animationLayer.add(fog);
       this.stageFogOverlays.set(biome.id, fog);
 
       this.tweens.add({
-        targets: cloudBands,
-        x: 42,
-        alpha: { from: 0.72, to: 1 },
-        duration: 4800,
+        targets: softMist,
+        x: 34,
+        alpha: { from: 0.52, to: 0.78 },
+        duration: 5200,
         yoyo: true,
         repeat: -1,
         ease: "Sine.easeInOut",
         delay: biome.id * 180,
-      });
-
-      this.tweens.add({
-        targets: sealGlow,
-        alpha: { from: 0.12, to: 0.28 },
-        scale: { from: 1, to: 1.12 },
-        duration: 1500,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
       });
     }
   }
@@ -3841,26 +4240,52 @@ export class WorldMapScene extends Phaser.Scene {
     color: number,
     alpha = 0.55,
   ): void {
+    // Keep wooden style, but make each stage subtly distinct using its biome tint.
+    const baseWood = Phaser.Display.Color.IntegerToColor(0x8b6f47);
+    const biomeTint = Phaser.Display.Color.IntegerToColor(color);
+
+    const mix = 0.18;
+    const woodColor = Phaser.Display.Color.GetColor(
+      Math.round(Phaser.Math.Linear(baseWood.red, biomeTint.red, mix)),
+      Math.round(Phaser.Math.Linear(baseWood.green, biomeTint.green, mix)),
+      Math.round(Phaser.Math.Linear(baseWood.blue, biomeTint.blue, mix)),
+    );
+    const darkWood = Phaser.Display.Color.GetColor(
+      Math.max(0, Math.round(baseWood.red * 0.68)),
+      Math.max(0, Math.round(baseWood.green * 0.62)),
+      Math.max(0, Math.round(baseWood.blue * 0.56)),
+    );
+
     const shadow = this.add.graphics();
-    shadow.lineStyle(24, 0x000000, 0.14);
+    shadow.lineStyle(22, 0x000000, 0.1 * alpha);
     shadow.beginPath();
-    shadow.moveTo(points[0].x + 4, points[0].y + 8);
-    points.slice(1).forEach((point) => shadow.lineTo(point.x + 4, point.y + 8));
+    shadow.moveTo(points[0].x + 2, points[0].y + 4);
+    points.slice(1).forEach((point) => shadow.lineTo(point.x + 2, point.y + 4));
     shadow.strokePath();
     shadow.setDepth(2.4);
     this.midgroundLayer.add(shadow);
 
     const path = this.add.graphics();
-    path.lineStyle(13, color, alpha);
+    path.lineStyle(16, woodColor, 0.92 * alpha + 0.08);
     path.beginPath();
     path.moveTo(points[0].x, points[0].y);
     points.slice(1).forEach((point) => path.lineTo(point.x, point.y));
     path.strokePath();
-    path.lineStyle(4, 0xffffff, 0.18);
+
+    // Subtle top highlight
+    path.lineStyle(2, 0xffffff, 0.14 * alpha);
     path.beginPath();
     path.moveTo(points[0].x, points[0].y - 3);
     points.slice(1).forEach((point) => path.lineTo(point.x, point.y - 3));
     path.strokePath();
+
+    // Lower dark edge
+    path.lineStyle(2, darkWood, 0.5 * alpha + 0.1);
+    path.beginPath();
+    path.moveTo(points[0].x, points[0].y + 5);
+    points.slice(1).forEach((point) => path.lineTo(point.x, point.y + 5));
+    path.strokePath();
+
     path.setDepth(2.7);
     this.midgroundLayer.add(path);
   }
@@ -3903,9 +4328,9 @@ export class WorldMapScene extends Phaser.Scene {
 
     const stageOneVillageAnchors = [
       { x: 154, y: 438 },
-      { x: 332, y: 366 },
+      { x: 286, y: 318 },
       { x: 486, y: 286 },
-      { x: 620, y: 350 },
+      { x: 532, y: 420 },
     ];
     if (stageId === 1) {
       const anchor =
@@ -4472,6 +4897,32 @@ export class WorldMapScene extends Phaser.Scene {
     );
   }
 
+  private getSortedCheckpointNodes(): CheckpointNode[] {
+    return Array.from(this.checkpointNodes.values()).sort(
+      (a, b) => a.globalIndex - b.globalIndex,
+    );
+  }
+
+  private getPersonaIdleFacingRight(node: CheckpointNode): boolean {
+    const ordered = this.getSortedCheckpointNodes();
+    const currentIndex = ordered.findIndex(
+      (checkpoint) => checkpoint.checkpointId === node.checkpointId,
+    );
+    if (currentIndex < 0) return true;
+
+    const nextNode = ordered[currentIndex + 1] ?? null;
+    if (nextNode) {
+      return nextNode.x >= node.x;
+    }
+
+    const previousNode = ordered[currentIndex - 1] ?? null;
+    if (previousNode) {
+      return node.x >= previousNode.x;
+    }
+
+    return true;
+  }
+
   /**
    * Position persona beside the active checkpoint on a walkable map tile.
    */
@@ -4486,6 +4937,7 @@ export class WorldMapScene extends Phaser.Scene {
         const nextCheckpointId = node.checkpointId;
         if (!this.lastPersonaCheckpointId) {
           this.persona.setPosition(pos.x, pos.y);
+          this.persona.setIdleFacingRight(this.getPersonaIdleFacingRight(node));
           this.persona.playIdle();
           this.lastPersonaCheckpointId = nextCheckpointId;
           return;
@@ -4517,6 +4969,7 @@ export class WorldMapScene extends Phaser.Scene {
         }
 
         this.persona.setPosition(pos.x, pos.y);
+        this.persona.setIdleFacingRight(this.getPersonaIdleFacingRight(node));
         this.persona.playIdle();
         return;
       }
@@ -4527,6 +4980,9 @@ export class WorldMapScene extends Phaser.Scene {
     if (firstNode) {
       const pos = this.getPersonaMarkerPosition(firstNode);
       this.persona.setPosition(pos.x, pos.y);
+      this.persona.setIdleFacingRight(
+        this.getPersonaIdleFacingRight(firstNode),
+      );
       this.persona.playIdle();
       this.lastPersonaCheckpointId = firstNode.checkpointId;
     }
@@ -4613,28 +5069,14 @@ export class WorldMapScene extends Phaser.Scene {
       node.x,
       node.y,
     );
-    const personaTarget = this.getPersonaMarkerPosition(node);
 
     if (smooth) {
-      // Camera pan animation
+      // Camera pan animation only.
+      // Persona movement is handled exclusively by positionPersonaOnActiveCheckpoint
+      // when the active checkpoint actually changes.
       this.cameras.main.pan(targetX, targetY, 800, "Sine.easeInOut", false);
-
-      // Sync persona walk animation with camera scroll
-      // Position persona 80px above checkpoint node (at character's feet)
-      if (this.persona) {
-        this.persona.moveToPosition(
-          personaTarget.x,
-          personaTarget.y,
-          this.getPersonaMoveDuration(personaTarget.x, personaTarget.y),
-        );
-      }
     } else {
       this.cameras.main.centerOn(targetX, targetY);
-
-      // Instantly position persona without animation
-      if (this.persona) {
-        this.persona.setPosition(personaTarget.x, personaTarget.y);
-      }
     }
   }
 
@@ -4644,7 +5086,9 @@ export class WorldMapScene extends Phaser.Scene {
     smooth = true,
   ): void {
     const focusStage = Phaser.Math.Clamp(stage, 1, this.currentStage);
-    const requestedNode = checkpointId ? this.getCheckpointNode(checkpointId) : null;
+    const requestedNode = checkpointId
+      ? this.getCheckpointNode(checkpointId)
+      : null;
     const node = requestedNode?.stage === focusStage ? requestedNode : null;
     const activeNode = node ?? this.getCurrentActiveCheckpointNode();
     const stageCenterX =
@@ -4657,23 +5101,13 @@ export class WorldMapScene extends Phaser.Scene {
     );
 
     if (smooth) {
+      // Camera focus only. Persona should stay idle at its checkpoint unless
+      // checkpoint progression explicitly changes the active node.
       this.cameras.main.pan(x, y, 800, "Sine.easeInOut", false);
-      if (activeNode && this.persona) {
-        const personaTarget = this.getPersonaMarkerPosition(activeNode);
-        this.persona.moveToPosition(
-          personaTarget.x,
-          personaTarget.y,
-          this.getPersonaMoveDuration(personaTarget.x, personaTarget.y),
-        );
-      }
       return;
     }
 
     this.cameras.main.centerOn(x, y);
-    if (activeNode && this.persona) {
-      const personaTarget = this.getPersonaMarkerPosition(activeNode);
-      this.persona.setPosition(personaTarget.x, personaTarget.y);
-    }
   }
 
   private getCurrentActiveCheckpointNode(): CheckpointNode | null {
@@ -4690,11 +5124,12 @@ export class WorldMapScene extends Phaser.Scene {
     stage: number,
     preferredX: number,
     preferredY: number,
+    zoom = this.cameras.main.zoom,
   ): { x: number; y: number } {
     const stageStartX = (stage - 1) * this.BIOME_WIDTH;
     const stageEndX = stageStartX + this.BIOME_WIDTH;
-    const visibleWorldWidth = this.scale.width / this.cameras.main.zoom;
-    const visibleWorldHeight = this.scale.height / this.cameras.main.zoom;
+    const visibleWorldWidth = this.scale.width / zoom;
+    const visibleWorldHeight = this.scale.height / zoom;
     const halfWidth = visibleWorldWidth / 2;
     const halfHeight = visibleWorldHeight / 2;
 

@@ -62,7 +62,8 @@ const HUDComponent = () => {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -100, opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed top-2 left-2 right-2 z-50 flex justify-center md:top-3 md:left-3 md:right-3"
+        className="fixed left-2 right-2 top-2 z-50 flex justify-center md:left-3 md:right-3 md:top-3"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
         <div
           className="w-full max-w-6xl overflow-hidden rounded-[24px] border shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
@@ -84,67 +85,80 @@ const HUDComponent = () => {
               >
                 <div className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <div
-                    className="mx-auto flex items-center justify-center gap-2 sm:gap-4 rounded-2xl border px-2 py-1.5 sm:px-4"
+                    className="no-scrollbar mx-auto flex w-full items-center justify-start gap-2 overflow-x-auto rounded-2xl border px-2 py-1.5 sm:gap-3 sm:px-3 md:justify-center"
                     style={{
                       borderColor: "rgba(255, 255, 255, 0.05)",
-                      background:
-                        "rgba(255, 255, 255, 0.02)",
+                      background: "rgba(255, 255, 255, 0.02)",
                     }}
                   >
-                    <StageInfo
-                      stageName={stageInfo.stageName}
-                      stageIcon={stageInfo.stageIcon}
-                      biomeName={stageInfo.biomeName}
-                      stage={stageInfo.stage}
-                      currentCheckpoint={stageInfo.currentCheckpoint}
-                      totalCheckpointsInStage={stageInfo.totalCheckpointsInStage}
-                      compact={true}
-                    />
-                    
-                    <div className="h-6 w-px bg-[#c8b47a]/15" />
-                    
-                    <GoldCounter compact={true} />
-                    <CheckpointProgress
-                      completed={checkpointProgress.completed}
-                      total={checkpointProgress.total}
-                      goldCount={checkpointProgress.goldCount}
-                      compact={true}
-                      onClick={() => {
-                        if (activeTask) {
-                          setSubmittingTask(activeTask);
+                    <div className="shrink-0">
+                      <StageInfo
+                        stageName={stageInfo.stageName}
+                        stageIcon={stageInfo.stageIcon}
+                        biomeName={stageInfo.biomeName}
+                        stage={stageInfo.stage}
+                        currentCheckpoint={stageInfo.currentCheckpoint}
+                        totalCheckpointsInStage={
+                          stageInfo.totalCheckpointsInStage
                         }
-                      }}
-                    />
+                        compact={true}
+                      />
+                    </div>
 
-                    <div className="h-6 w-px bg-white/5" />
+                    <div className="hidden h-6 w-px bg-[#c8b47a]/15 sm:block" />
 
-                    <CorruptionMeter
-                      level={corruptionState.level}
-                      phase={corruptionState.phase}
-                      bossName={corruptionState.bossName}
-                      bossHp={corruptionState.bossHp}
-                      bossBaseHp={corruptionState.bossBaseHp}
-                      compact={true}
-                    />
+                    <div className="shrink-0">
+                      <GoldCounter compact={true} />
+                    </div>
+                    <div className="shrink-0">
+                      <CheckpointProgress
+                        completed={checkpointProgress.completed}
+                        total={checkpointProgress.total}
+                        goldCount={checkpointProgress.goldCount}
+                        compact={true}
+                        onClick={() => {
+                          if (activeTask) {
+                            setSubmittingTask(activeTask);
+                          }
+                        }}
+                      />
+                    </div>
 
-                    <div className="h-6 w-px bg-white/5" />
+                    <div className="hidden h-6 w-px bg-white/5 lg:block" />
 
-                    <LevelDisplay
-                      level={userProgress.level}
-                      phase={userProgress.phase}
-                      compact={true}
-                      onClick={() => {
-                        if (activeTask) {
-                          setSubmittingTask(activeTask);
-                        }
-                      }}
-                    />
-                    <XPBar
-                      currentXP={userProgress.xp}
-                      maxXP={userProgress.xpToNextLevel}
-                      compact={true}
-                    />
-                    <div className="ml-1">
+                    <div className="hidden shrink-0 md:block">
+                      <CorruptionMeter
+                        level={corruptionState.level}
+                        phase={corruptionState.phase}
+                        bossName={corruptionState.bossName}
+                        bossHp={corruptionState.bossHp}
+                        bossBaseHp={corruptionState.bossBaseHp}
+                        compact={true}
+                      />
+                    </div>
+
+                    <div className="hidden h-6 w-px bg-white/5 md:block" />
+
+                    <div className="shrink-0">
+                      <LevelDisplay
+                        level={userProgress.level}
+                        phase={userProgress.phase}
+                        compact={true}
+                        onClick={() => {
+                          if (activeTask) {
+                            setSubmittingTask(activeTask);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="shrink-0">
+                      <XPBar
+                        currentXP={userProgress.xp}
+                        maxXP={userProgress.xpToNextLevel}
+                        compact={true}
+                      />
+                    </div>
+                    <div className="ml-0.5 shrink-0 sm:ml-1">
                       <AudioControls />
                     </div>
                   </div>
@@ -152,33 +166,32 @@ const HUDComponent = () => {
               </motion.div>
             )}
           </AnimatePresence>
-
-
         </div>
 
         {activeVenture && (
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="absolute left-3 top-full mt-2 flex items-center gap-2 overflow-hidden rounded-lg border px-3 py-1.5 shadow-[0_4px_15px_rgba(0,0,0,0.3)]"
+            className="absolute left-2 top-full mt-2 flex items-center gap-2 overflow-hidden rounded-lg border px-2.5 py-1.5 shadow-[0_4px_15px_rgba(0,0,0,0.3)] sm:left-3 sm:px-3"
             style={{
               borderColor: "rgba(196, 175, 120, 0.28)",
               background:
                 "linear-gradient(180deg, rgba(72, 68, 44, 0.96), rgba(58, 54, 35, 0.96))",
+              maxWidth: isMobile ? "60vw" : "280px",
             }}
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            <span className="max-w-[150px] truncate text-sm font-medium text-[#f5ead0]">
+            <span className="max-w-[170px] truncate text-xs font-medium text-[#f5ead0] sm:text-sm">
               {activeVenture.name}
             </span>
           </motion.div>
         )}
 
-        {showMentorBadge && (
+        {showMentorBadge && !isMobile && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="absolute right-3 top-full mt-2 flex items-center gap-2 rounded-lg border px-3 py-1.5 shadow-[0_4px_15px_rgba(99,102,241,0.2)]"
+            className="absolute right-3 top-full mt-2 hidden items-center gap-2 rounded-lg border px-3 py-1.5 shadow-[0_4px_15px_rgba(99,102,241,0.2)] sm:flex"
             style={{
               borderColor: "rgba(196, 175, 120, 0.28)",
               background:
@@ -193,7 +206,6 @@ const HUDComponent = () => {
 
       {/* Quest List - floating top-right panel (manages own positioning) */}
       <QuestList />
-
     </>
   );
 };

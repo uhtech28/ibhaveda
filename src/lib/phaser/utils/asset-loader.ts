@@ -1427,6 +1427,19 @@ export class AssetLoader {
     ];
     objects.forEach(obj => scene.load.image(obj, `${fanTasyPath}/${obj}.png`));
 
+    // --- Dungeon Asset Pack ---
+    const dungeonPath = "/assets/dungeon";
+    scene.load.spritesheet(
+      "dungeon_tiles",
+      `${dungeonPath}/Dungeon_Tileset_at.png`,
+      { frameWidth: 16, frameHeight: 16 }
+    );
+    scene.load.spritesheet(
+      "dungeon_chars",
+      `${dungeonPath}/Dungeon_Character_at.png`,
+      { frameWidth: 16, frameHeight: 16 }
+    );
+
     // Load main Tilemap (JSON with embedded tilesets)
     scene.load.tilemapTiledJSON("beginning_fields", `${fanTasyPath}/Beginning Fields.tmj`);
   }

@@ -20,7 +20,14 @@ const STAGE_NAMES: Record<number, string> = {
 
 // Total checkpoints per stage (for display in header)
 const STAGE_TOTAL_CHECKPOINTS: Record<number, number> = {
-  1: 4, 2: 5, 3: 4, 4: 5, 5: 6, 6: 3, 7: 4, 8: 5,
+  1: 4,
+  2: 5,
+  3: 4,
+  4: 5,
+  5: 6,
+  6: 3,
+  7: 4,
+  8: 5,
 };
 
 export function QuestList() {
@@ -36,8 +43,10 @@ export function QuestList() {
   const totalCount = currentQuest.tasks.length;
   const allDone = completedCount === totalCount;
 
-  const stageName = STAGE_NAMES[currentQuest.stage] ?? `Stage ${currentQuest.stage}`;
-  const nextStageName = STAGE_NAMES[currentQuest.stage + 1] ?? `Level ${currentQuest.stage + 1}`;
+  const stageName =
+    STAGE_NAMES[currentQuest.stage] ?? `Stage ${currentQuest.stage}`;
+  const nextStageName =
+    STAGE_NAMES[currentQuest.stage + 1] ?? `Level ${currentQuest.stage + 1}`;
   const totalInStage = STAGE_TOTAL_CHECKPOINTS[currentQuest.stage] ?? 4;
 
   return (
@@ -46,7 +55,7 @@ export function QuestList() {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 100, opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed top-20 right-4 z-40 w-80 font-sans"
+      className="fixed right-2 top-[calc(env(safe-area-inset-top)+6.25rem)] z-40 w-[min(92vw,320px)] font-sans sm:right-4 sm:top-[calc(env(safe-area-inset-top)+5.75rem)] sm:w-[min(74vw,340px)] md:right-5 md:top-[calc(env(safe-area-inset-top)+6rem)] md:w-[min(44vw,320px)] lg:top-20 lg:w-80"
     >
       {/* Modern glassmorphic panel */}
       <div className="relative bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
@@ -62,12 +71,15 @@ export function QuestList() {
                 Quest Log
               </h3>
               <p className="text-xs text-gray-400">
-                Stage {currentQuest.stage} · GP {currentQuest.checkpoint}/{totalInStage}
+                Stage {currentQuest.stage} · GP {currentQuest.checkpoint}/
+                {totalInStage}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg">
-                <span className={`text-xs font-black ${allDone ? "text-amber-400" : "text-indigo-400"}`}>
+                <span
+                  className={`text-xs font-black ${allDone ? "text-amber-400" : "text-indigo-400"}`}
+                >
                   {completedCount}/{totalCount}
                 </span>
               </div>
@@ -134,10 +146,17 @@ export function QuestList() {
                             <motion.div
                               initial={{ scale: 0 }}
                               animate={{ scale: 1 }}
-                              transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 25,
+                              }}
                               className="w-5 h-5 bg-indigo-500 border border-indigo-400 flex items-center justify-center rounded-md shadow-[0_0_10px_rgba(99,102,241,0.5)]"
                             >
-                              <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                              <Check
+                                className="w-3 h-3 text-white"
+                                strokeWidth={3}
+                              />
                             </motion.div>
                           ) : (
                             <div className="w-5 h-5 bg-slate-900/50 border border-white/20 rounded-md shadow-inner" />
@@ -166,7 +185,9 @@ export function QuestList() {
                           </div>
                           <p
                             className={`text-xs leading-relaxed ${
-                              task.done ? "text-slate-500 line-through" : "text-slate-300"
+                              task.done
+                                ? "text-slate-500 line-through"
+                                : "text-slate-300"
                             }`}
                           >
                             {task.description}

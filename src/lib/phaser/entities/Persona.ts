@@ -50,6 +50,7 @@ export class Persona extends Phaser.GameObjects.Container {
   private walkTween: Phaser.Tweens.Tween | null = null;
   private currentAnimation: "idle" | "walk" | null = null;
   private isWalking = false;
+  private idleFacingRight = true;
 
   /**
    * True while the persona is actively walking to a destination.
@@ -135,10 +136,10 @@ export class Persona extends Phaser.GameObjects.Container {
 
     this.x = x;
     this.y = y;
-    // Always face right (towards the checkpoint) when instantly positioned
-    // Safe-check because super() constructor calls setPosition before sprite is initialized
+    // Keep configured idle facing direction when instantly positioned.
+    // Safe-check because super() constructor calls setPosition before sprite is initialized.
     if (this.sprite) {
-      this.sprite.setFlipX(true);
+      this.sprite.setFlipX(this.idleFacingRight);
     }
     return this;
   }
@@ -152,6 +153,16 @@ export class Persona extends Phaser.GameObjects.Container {
    */
   moveToPosition(targetX: number, targetY: number, duration = 1000): void {
     this.playWalk(targetX, targetY, duration);
+  }
+
+  /**
+   * Sets preferred facing direction for idle state.
+   */
+  setIdleFacingRight(facingRight: boolean): void {
+    this.idleFacingRight = facingRight;
+    if (!this.isWalking && this.sprite) {
+      this.sprite.setFlipX(this.idleFacingRight);
+    }
   }
 
   moveAlongPath(points: { x: number; y: number }[], duration = 1200): void {
@@ -208,7 +219,9 @@ export class Persona extends Phaser.GameObjects.Container {
       // Flip sprite based on movement direction
       // Default sprite faces left, so flipX=true when moving right, flipX=false when moving left
       if (point.x !== this.x) {
-        this.sprite.setFlipX(point.x > this.x);
+        const facingRight = point.x > this.x;
+        this.sprite.setFlipX(facingRight);
+        this.idleFacingRight = facingRight;
       }
 
       this.walkTween = this.scene.tweens.add({
@@ -256,9 +269,9 @@ export class Persona extends Phaser.GameObjects.Container {
       this.gender === "male" ? "persona_male_idle" : "persona_female_idle";
     this.playSpriteAnimation(idleAnimKey);
 
-    // Always face right (towards next checkpoint) when idle
+    // Keep stable configured facing direction while idle
     if (this.sprite) {
-      this.sprite.setFlipX(true);
+      this.sprite.setFlipX(this.idleFacingRight);
     }
   }
 
@@ -303,7 +316,9 @@ export class Persona extends Phaser.GameObjects.Container {
 
     // Flip sprite based on movement direction
     if (targetX !== this.x) {
-      this.sprite.setFlipX(targetX > this.x);
+      const facingRight = targetX > this.x;
+      this.sprite.setFlipX(facingRight);
+      this.idleFacingRight = facingRight;
     }
 
     // Move the container
