@@ -27,7 +27,7 @@ export function ArticlePage({ article }: { article: Article }) {
       name: "Interactive Ideas",
       logo: {
         "@type": "ImageObject",
-        url: absoluteUrl("/logo.png"),
+        url: absoluteUrl("/logo.jpg"),
       },
     },
     datePublished: article.publishedAt,
