@@ -154,15 +154,21 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     this.mainSprite.setOrigin(0.5, 0.5);
     this.mainSprite.setScale(0.72);
 
-    this.numberText = new Phaser.GameObjects.Text(scene, 0, 2, `${config.checkpoint}`, {
-      fontSize: "18px",
-      fontFamily: '"VT323", "Courier New", monospace',
-      color: "#fff7e6",
-      align: "center",
-      fontStyle: "bold",
-      stroke: "#2a1c11",
-      strokeThickness: 3,
-    });
+    this.numberText = new Phaser.GameObjects.Text(
+      scene,
+      0,
+      2,
+      `${config.checkpoint}`,
+      {
+        fontSize: "18px",
+        fontFamily: '"VT323", "Courier New", monospace',
+        color: "#fff7e6",
+        align: "center",
+        fontStyle: "bold",
+        stroke: "#2a1c11",
+        strokeThickness: 3,
+      },
+    );
     this.numberText.setOrigin(0.5, 0.5);
 
     this.labelPlate = new Phaser.GameObjects.Rectangle(
@@ -296,14 +302,16 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
       this.numberText.setStyle({ color: "#fff3d6" });
-      if (typeof document !== "undefined") document.body.style.cursor = "pointer";
+      if (typeof document !== "undefined")
+        document.body.style.cursor = "pointer";
     });
 
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
       this.numberText.setStyle({
         color: this._status === "gold" ? "#3b2412" : "#fff7e6",
       });
-      if (typeof document !== "undefined") document.body.style.cursor = "default";
+      if (typeof document !== "undefined")
+        document.body.style.cursor = "default";
     });
 
     return this;
@@ -330,7 +338,9 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   private startGoldShimmer(): void {
     this.shimmerTween?.stop();
     const start = Phaser.Display.Color.IntegerToColor(CheckpointNode.C.amber);
-    const end = Phaser.Display.Color.IntegerToColor(CheckpointNode.C.amberLight);
+    const end = Phaser.Display.Color.IntegerToColor(
+      CheckpointNode.C.amberLight,
+    );
     const counter = { t: 0 };
 
     this.shimmerTween = this.scene.tweens.add({
@@ -342,8 +352,12 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       repeat: -1,
       onUpdate: () => {
         const r = Math.round(Phaser.Math.Linear(start.red, end.red, counter.t));
-        const g = Math.round(Phaser.Math.Linear(start.green, end.green, counter.t));
-        const b = Math.round(Phaser.Math.Linear(start.blue, end.blue, counter.t));
+        const g = Math.round(
+          Phaser.Math.Linear(start.green, end.green, counter.t),
+        );
+        const b = Math.round(
+          Phaser.Math.Linear(start.blue, end.blue, counter.t),
+        );
         this.mainSprite.setTint(Phaser.Display.Color.GetColor(r, g, b));
       },
     });
@@ -370,12 +384,12 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
     switch (this._status) {
       case "locked":
-        this.mainSprite.setAlpha(0.42);
+        this.mainSprite.setAlpha(0.68);
         this.mainSprite.setTint(C.slate);
-        this.numberText.setStyle({ color: "#82756a" });
-        this.stageLabel.setStyle({ color: "#ae9779" });
-        this.labelPlate.setFillStyle(C.barkDark, 0.78);
-        this.stageDot.setAlpha(0.28);
+        this.numberText.setStyle({ color: "#c9bba0" });
+        this.stageLabel.setStyle({ color: "#d0b990" });
+        this.labelPlate.setFillStyle(C.barkDark, 0.86);
+        this.stageDot.setAlpha(0.42);
         this.glowRing.setAlpha(0);
         break;
 
