@@ -99,7 +99,14 @@ export const HeroHeader = ({
                         <>
                             <Link href="/" aria-label="Home" className="shrink-0">
                                 <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#6366F1]/30 bg-[#111827] overflow-hidden">
-                                    <Image src="/logo.png" alt="" width={36} height={36} className="h-full w-full object-cover" priority />
+                                    <Image
+                                        src="/logo.png"
+                                        alt=""
+                                        width={36}
+                                        height={36}
+                                        className="h-full w-full object-cover"
+                                        priority
+                                    />
                                 </div>
                             </Link>
                             <button type="button" onClick={() => setMobileSearchOpen(true)} aria-label="Open search" className={cn(transitionBase, "flex flex-1 min-w-0 items-center gap-2 h-9 px-3 rounded-full border border-white/8 bg-[#111827]/60 text-[#9CA3AF] hover:bg-[#111827] hover:text-white")}>

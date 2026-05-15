@@ -2,12 +2,11 @@ import { Logo } from "@/components/logo";
 import Link from "next/link";
 
 const links = [
-  { title: "Discover Ideas", href: "#" },
-  { title: "Collaboration", href: "#" },
-  { title: "Success Stories", href: "#" },
-  { title: "Community", href: "#" },
-  { title: "Guidelines", href: "#" },
-  { title: "About Us", href: "#" },
+  { title: "Venture Creation", href: "/venture-creation" },
+  { title: "Startup Execution", href: "/startup-execution" },
+  { title: "Founder Collaboration", href: "/founder-collaboration" },
+  { title: "Open Innovation", href: "/open-innovation" },
+  { title: "Future of Entrepreneurship", href: "/future-of-entrepreneurship" },
 ];
 
 const X_URL = "https://x.com/aryanvawasthi";

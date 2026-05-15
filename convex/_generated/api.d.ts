@@ -11,7 +11,6 @@
 import type * as agent from "../agent.js";
 import type * as agent_actions from "../agent_actions.js";
 import type * as ai from "../ai.js";
-import type * as aiScoring from "../aiScoring.js";
 import type * as badges from "../badges.js";
 import type * as chat from "../chat.js";
 import type * as communities from "../communities.js";
@@ -46,7 +45,6 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   agent_actions: typeof agent_actions;
   ai: typeof ai;
-  aiScoring: typeof aiScoring;
   badges: typeof badges;
   chat: typeof chat;
   communities: typeof communities;

@@ -35,7 +35,7 @@ export default function ContactPage() {
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-10 flex items-center gap-3">
           <img
-                src="/logo.jpg"
+                src="/logo.png"
                 alt="Interactive Ideas"
                 className="h-12 w-12 rounded-2xl object-cover"
             />

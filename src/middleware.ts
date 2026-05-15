@@ -5,7 +5,23 @@ import { ConvexHttpClient } from 'convex/browser'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
-const isPublicRoute = createRouteMatcher(['/', '/contact', '/aryan-awasthi.vcf' , '/sign-in(.*)', '/sign-up(.*)', '/onboarding', '/profile-setup'])
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/contact',
+  '/aryan-awasthi.vcf',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/onboarding',
+  '/profile-setup',
+  '/robots.txt',
+  '/sitemap.xml',
+  '/articles',
+  '/venture-creation(.*)',
+  '/startup-execution(.*)',
+  '/founder-collaboration(.*)',
+  '/open-innovation(.*)',
+  '/future-of-entrepreneurship(.*)',
+])
 
 /** Cookie name for the profile-complete cache flag */
 const PROFILE_COMPLETE_COOKIE = 'vq_profile_complete'
