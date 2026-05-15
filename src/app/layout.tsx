@@ -45,12 +45,23 @@ export const metadata: Metadata = {
   keywords:
     "ideas, innovation, collaboration, creativity, community, startup, prototyping",
 
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/apple-icon.png",
-    other: [{ rel: "mask-icon", url: "/icon.png", color: "#6366F1" }],
-  },
+icons: {
+  icon: [
+    { url: "/favicon.ico" },
+    { url: "/icon.png", type: "image/png", sizes: "32x32" },
+    { url: "/icon.png", type: "image/png", sizes: "192x192" },
+    { url: "/icon.png", type: "image/png", sizes: "512x512" },
+  ],
+  shortcut: "/favicon.ico",
+  apple: [
+    {
+      url: "/apple-icon.png",
+      sizes: "180x180",
+      type: "image/png",
+    },
+  ],
+  other: [{ rel: "mask-icon", url: "/icon.png", color: "#6366F1" }],
+},
 
   openGraph: {
     title: "Interactive Ideas - Where Brilliant Ideas Come to Life",

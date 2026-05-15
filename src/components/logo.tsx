@@ -5,7 +5,7 @@ export const Logo = ({ className }: { className?: string; uniColor?: boolean; id
     return (
         <div className={cn('flex items-center gap-2', className)}>
             <Image
-                src="/logo.jpg"
+                src="/logo.png"
                 alt="Interactive Ideas Logo"
                 width={40}
                 height={40}
@@ -22,7 +22,7 @@ export const Logo = ({ className }: { className?: string; uniColor?: boolean; id
 export const LogoIcon = ({ className }: { className?: string; uniColor?: boolean; idSuffix?: string }) => {
     return (
         <Image
-            src="/logo.jpg"
+            src="/logo.png"
             alt="Interactive Ideas"
             width={36}
             height={36}
