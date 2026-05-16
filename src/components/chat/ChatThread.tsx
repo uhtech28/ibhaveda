@@ -4,13 +4,12 @@ import React, { memo, useEffect, useRef, useCallback, useState } from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, X, Settings, Users } from "lucide-react";
+import { ArrowLeft, X, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import { ChannelSettingsDialog } from "./ChannelSettingsDialog";
-
 
 interface ChatThreadProps {
   conversationId: Id<"conversations"> | null;
@@ -25,34 +24,34 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
   const { isAuthenticated } = useConvexAuth();
 
-  // Resolve conversation ID for direct chats if not provided
-  const directConversationId = useQuery(api.chat.getDirectConversationId, isAuthenticated && receiverId && !conversationId ? { receiverId } : "skip");
+  const directConversationId = useQuery(
+    api.chat.getDirectConversationId,
+    isAuthenticated && receiverId && !conversationId ? { receiverId } : "skip"
+  );
 
   const activeConversationId = conversationId || directConversationId;
 
-  const messages = useQuery(api.chat.getConversationMessages, isAuthenticated && activeConversationId ? { conversationId: activeConversationId } : "skip");
+  const messages = useQuery(
+    api.chat.getConversationMessages,
+    isAuthenticated && activeConversationId ? { conversationId: activeConversationId } : "skip"
+  );
   const sendMessage = useMutation(api.chat.sendMessage);
   const users = useQuery(api.chat.getAllUsers, isAuthenticated ? {} : "skip");
   const currentUserDoc = useQuery(api.chat.getUserByClerkId, isAuthenticated ? {} : "skip");
-  // For group chats — pull the idea title so the header reads "<idea title>"
   const ideaForHeader = useQuery(
     api.ideas.getIdeaById,
     isAuthenticated && ideaId ? { ideaId } : "skip"
   );
 
-  // Add loading and error states
   const [sendError, setSendError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Live member count for group chats — surfaces add/remove flow as a
-  // visible Members pill in the header rather than just a settings cog.
   const groupMembers = useQuery(
     api.chat.getGroupMembers,
     isAuthenticated && ideaId && activeConversationId ? { conversationId: activeConversationId } : "skip"
   );
 
   useEffect(() => {
-    // Auto scroll to bottom on new messages
     if (scrollAreaRef.current) {
       const element = scrollAreaRef.current;
       element.scrollTop = element.scrollHeight;
@@ -68,21 +67,18 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
     try {
       if (ideaId) {
-        // Group chat
         await sendMessage({
           content,
           conversationId: conversationId || undefined,
           ideaId: ideaId,
         });
       } else if (receiverId) {
-        // Direct chat
         await sendMessage({
           receiverId,
           content,
           conversationId: activeConversationId || undefined,
         });
       } else {
-        // Try to infer context from existing messages if no explicit context
         let recId = receiverId;
         if (!recId && messages && messages.length > 0) {
           const firstMessage = messages[0];
@@ -102,18 +98,12 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
           return;
         }
       }
-      // Message sent successfully
     } catch (error) {
       console.error("Failed to send message:", error);
       setSendError("Failed to send message. Please try again.");
-    } finally {
     }
   }, [sendMessage, messages, currentUserId, receiverId, conversationId, activeConversationId, ideaId]);
 
-  // Resolve the header — show the recipient's name for DMs, or the idea
-  // title for group/channel chats. Falls back to "Conversation" only as
-  // an absolute last resort while data loads.
-  // NOTE: api.chat.getAllUsers maps _id -> id, so we match against u.id.
   const otherUser = (() => {
     if (ideaId) return null;
     if (!users) return null;
@@ -159,24 +149,22 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
         </div>
         <div className="flex items-center gap-1">
           {ideaId && activeConversationId && (
-            <>
-              {/* Visible Members pill — primary entry point for the
-               * add/remove people flow on community channels. */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSettings(true)}
-                className="h-8 gap-1.5 px-2.5 text-xs"
-                aria-label="Manage members"
-                title="Manage members"
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span className="tabular-nums">{groupMembers?.length ?? 0}</span>
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} className="h-8 w-8 hover:bg-muted/50" aria-label="Channel settings" title="Channel settings">
-                <Settings className="w-4 h-4" />
-              </Button>
-            </>
+            /* Single Members pill — clicking the member count opens the
+             * full channel settings dialog (add/remove members, delete
+             * channel, etc.). The separate gear icon was removed because
+             * clicking the count is the more intuitive entry point and
+             * a single affordance is less visually noisy. */
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSettings(true)}
+              className="h-8 gap-1.5 px-2.5 text-xs"
+              aria-label="Channel settings"
+              title="Members & settings"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span className="tabular-nums">{groupMembers?.length ?? 0}</span>
+            </Button>
           )}
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 -mr-2 hover:bg-muted/50">
             <X className="w-4 h-4" />

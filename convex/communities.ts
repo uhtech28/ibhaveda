@@ -2,9 +2,6 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 
-// Walk parent links until we hit an idea with no parentId — that's the root.
-// Used so sub-ideas the user is part of are reported under their root idea
-// (community) instead of appearing as separate communities.
 async function findRootIdea(
   ctx: { db: { get: (id: Id<"ideas">) => Promise<Doc<"ideas"> | null> } },
   ideaId: Id<"ideas">
@@ -20,7 +17,6 @@ async function findRootIdea(
   return current;
 }
 
-// Collect all descendants (sub-ideas, sub-sub-ideas, …) of a given idea.
 async function collectDescendants(
   ctx: { db: any },
   rootId: Id<"ideas">
@@ -45,14 +41,6 @@ async function collectDescendants(
   return out;
 }
 
-// Communities = ROOT ideas the user is part of (authored or contributing to).
-// Sub-ideas don't appear as their own communities — they show up as channels
-// under their root idea once the user enters the community.
-//
-// BUG FIX (round 2b): previous version had subtle dedup holes that caused
-// the same idea to render multiple times in the chat sidebar when it had
-// multiple contributors. Now uses String() keys + a single Map so dedup is
-// bulletproof against ID-type quirks and orphaned sub-ideas.
 export const getUserCommunities = query({
   args: {},
   handler: async (ctx) => {
@@ -77,8 +65,6 @@ export const getUserCommunities = query({
       )
       .collect();
 
-    // Step 1 — collect every idea id the user is connected to (authored or
-    // accepted-contribution), deduped by stringified id.
     const relatedIdeaIdStrings = new Set<string>();
     for (const idea of authoredIdeas) {
       if (idea.isDeleted) continue;
@@ -88,25 +74,18 @@ export const getUserCommunities = query({
       relatedIdeaIdStrings.add(String(req.ideaId));
     }
 
-    // Step 2 — resolve each to its ROOT and collect into a Map keyed by the
-    // root's stringified id. Map guarantees one entry per unique root.
     const rootMap = new Map<string, Doc<"ideas">>();
     for (const idStr of relatedIdeaIdStrings) {
       const startIdea = await ctx.db.get(idStr as Id<"ideas">);
       if (!startIdea || startIdea.isDeleted) continue;
-
       const root = startIdea.parentId
         ? await findRootIdea(ctx, startIdea._id)
         : startIdea;
       if (!root || root.isDeleted) continue;
-
       const rootKey = String(root._id);
-      if (!rootMap.has(rootKey)) {
-        rootMap.set(rootKey, root);
-      }
+      if (!rootMap.has(rootKey)) rootMap.set(rootKey, root);
     }
 
-    // Step 3 — return one entry per root.
     return Array.from(rootMap.values()).map((idea) => ({
       _id: idea._id,
       name: idea.title,
@@ -115,15 +94,6 @@ export const getUserCommunities = query({
   },
 });
 
-// Channels for a community (root idea):
-//   1. Real "conversations" rows tied to the root idea or any descendant.
-//   2. A virtual channel for each descendant sub-idea that doesn't yet have
-//      a conversation, so the sub-idea is still browsable as a channel.
-//
-// `_id` here is the conversation id when one exists. For virtual entries it's
-// "virtual:<ideaId>" — the front-end detects this prefix and calls
-// `ensureSubIdeaChannel` before opening so the conversation is created on
-// demand.
 export const getChannels = query({
   args: { ideaId: v.id("ideas") },
   handler: async (ctx, args) => {
@@ -143,15 +113,32 @@ export const getChannels = query({
     };
     const out: ChannelEntry[] = [];
 
-    // Root-level conversations show up as "general", "design", … channels.
-    const rootConversations = await ctx.db
+    const rootConvos = await ctx.db
       .query("conversations")
       .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
       .collect();
-    for (const c of rootConversations) {
+
+    const rootImplicit = rootConvos.filter((c) => !c.creatorId);
+    if (rootImplicit.length > 0) {
+      const canonical = rootImplicit.reduce((oldest, c) =>
+        c.createdAt < oldest.createdAt ? c : oldest
+      );
+      out.push({
+        _id: String(canonical._id),
+        name: canonical.name || "general",
+        type: canonical.type ?? "group",
+        lastMessageAt: canonical.updatedAt,
+        unreadCount: canonical.unreadCount || 0,
+        ideaId: canonical.ideaId ?? args.ideaId,
+        virtual: false,
+      });
+    }
+
+    const rootExplicit = rootConvos.filter((c) => c.creatorId);
+    for (const c of rootExplicit) {
       out.push({
         _id: String(c._id),
-        name: c.name || "general",
+        name: c.name || "channel",
         type: c.type ?? "group",
         lastMessageAt: c.updatedAt,
         unreadCount: c.unreadCount || 0,
@@ -160,21 +147,26 @@ export const getChannels = query({
       });
     }
 
-    // Each descendant sub-idea becomes a single channel — its own
-    // conversation (if any), otherwise a virtual entry that creates the
-    // conversation on first click.
     for (const sub of descendants) {
-      const subConversation = await ctx.db
+      const subConvos = await ctx.db
         .query("conversations")
         .withIndex("by_idea", (q) => q.eq("ideaId", sub._id))
-        .first();
-      if (subConversation) {
+        .collect();
+
+      const subImplicit = subConvos.filter((c) => !c.creatorId);
+      const subCanonical = subImplicit.length > 0
+        ? subImplicit.reduce((oldest, c) =>
+            c.createdAt < oldest.createdAt ? c : oldest
+          )
+        : null;
+
+      if (subCanonical) {
         out.push({
-          _id: String(subConversation._id),
-          name: subConversation.name || sub.title,
-          type: subConversation.type ?? "group",
-          lastMessageAt: subConversation.updatedAt,
-          unreadCount: subConversation.unreadCount || 0,
+          _id: String(subCanonical._id),
+          name: subCanonical.name || sub.title,
+          type: subCanonical.type ?? "group",
+          lastMessageAt: subCanonical.updatedAt,
+          unreadCount: subCanonical.unreadCount || 0,
           ideaId: sub._id,
           virtual: false,
         });
@@ -189,15 +181,25 @@ export const getChannels = query({
           virtual: true,
         });
       }
+
+      const subExplicit = subConvos.filter((c) => c.creatorId);
+      for (const c of subExplicit) {
+        out.push({
+          _id: String(c._id),
+          name: c.name || "channel",
+          type: c.type ?? "group",
+          lastMessageAt: c.updatedAt,
+          unreadCount: c.unreadCount || 0,
+          ideaId: sub._id,
+          virtual: false,
+        });
+      }
     }
 
     return out;
   },
 });
 
-// Idempotent — make sure a default conversation exists for the given idea,
-// returning its id. Used when a user clicks a sub-idea entry under a
-// community and we want to drop them straight into a chat for it.
 export const ensureSubIdeaChannel = mutation({
   args: { ideaId: v.id("ideas") },
   handler: async (ctx, args) => {
@@ -213,35 +215,30 @@ export const ensureSubIdeaChannel = mutation({
     const idea = await ctx.db.get(args.ideaId);
     if (!idea || idea.isDeleted) throw new Error("Idea not found");
 
-    // Already has a conversation? Reuse the first one.
     const existing = await ctx.db
       .query("conversations")
       .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
-      .first();
-    if (existing) return existing._id;
+      .collect();
+    const implicit = existing.filter((c) => !c.creatorId && c.type === "group");
+    if (implicit.length > 0) {
+      const canonical = implicit.reduce((oldest, c) =>
+        c.createdAt < oldest.createdAt ? c : oldest
+      );
+      return canonical._id;
+    }
 
     const channelId = await ctx.db.insert("conversations", {
       ideaId: args.ideaId,
       name: idea.title,
       type: "group",
-      creatorId: user._id,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      participant1: user._id,
-    });
-
-    await ctx.db.insert("conversationMembers", {
-      conversationId: channelId,
-      userId: user._id,
-      role: "admin",
-      joinedAt: Date.now(),
     });
 
     return channelId;
   },
 });
 
-// Create a new (named) channel inside a community.
 export const createChannel = mutation({
   args: {
     ideaId: v.id("ideas"),
@@ -279,7 +276,6 @@ export const createChannel = mutation({
   },
 });
 
-// Send a message
 export const sendMessage = mutation({
   args: {
     conversationId: v.id("conversations"),
@@ -314,7 +310,6 @@ export const sendMessage = mutation({
   },
 });
 
-// Get messages for a channel
 export const getMessages = query({
   args: {
     conversationId: v.id("conversations"),

@@ -1,6 +1,21 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
+
+async function findRootIdea(
+  ctx: { db: { get: (id: Id<"ideas">) => Promise<Doc<"ideas"> | null> } },
+  ideaId: Id<"ideas">
+): Promise<Doc<"ideas"> | null> {
+  let current = await ctx.db.get(ideaId);
+  let safety = 0;
+  while (current && current.parentId && safety < 100) {
+    const parent = await ctx.db.get(current.parentId);
+    if (!parent) break;
+    current = parent;
+    safety += 1;
+  }
+  return current;
+}
 
 export const getUserConversations = query({
   args: {},
@@ -12,12 +27,9 @@ export const getUserConversations = query({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
-
     if (!userDoc) return [];
-
     const userId = userDoc._id;
 
-    // Get conversations where user is participant1 or participant2
     const convos1 = await ctx.db
       .query("conversations")
       .withIndex("by_participant1", (q) => q.eq("participant1", userId))
@@ -28,48 +40,27 @@ export const getUserConversations = query({
       .withIndex("by_participant2", (q) => q.eq("participant2", userId))
       .collect();
 
-    // Filter out group conversations and sort
     const allConvos = [...convos1, ...convos2]
-      .filter(c => c.type !== 'group')
+      .filter((c) => c.type !== "group")
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
-    // Enhance with last message preview
     const enhancedConvos = await Promise.all(
       allConvos.map(async (convo) => {
-        const lastMessage = convo.lastMessageId
-          ? await ctx.db.get(convo.lastMessageId)
-          : null;
-
-        const otherParticipantId =
-          convo.participant1 === userId ? convo.participant2 : convo.participant1;
-
+        const lastMessage = convo.lastMessageId ? await ctx.db.get(convo.lastMessageId) : null;
+        const otherParticipantId = convo.participant1 === userId ? convo.participant2 : convo.participant1;
         if (!otherParticipantId) return null;
-
         const otherUser = await ctx.db.get(otherParticipantId);
-
         return {
           ...convo,
-          lastMessage: lastMessage ? {
-            content: lastMessage.content,
-            createdAt: lastMessage.createdAt,
-            senderId: lastMessage.senderId,
-          } : null,
-          otherUser: otherUser ? {
-            id: otherUser._id,
-            username: otherUser.username,
-            displayName: otherUser.displayName,
-            avatar: otherUser.avatar,
-          } : null,
+          lastMessage: lastMessage ? { content: lastMessage.content, createdAt: lastMessage.createdAt, senderId: lastMessage.senderId } : null,
+          otherUser: otherUser ? { id: otherUser._id, username: otherUser.username, displayName: otherUser.displayName, avatar: otherUser.avatar } : null,
         };
       })
     );
-
-    return enhancedConvos.filter(c => c !== null);
+    return enhancedConvos.filter((c) => c !== null);
   },
 });
 
-// Get all group conversations for the user
-// UPDATED: Fetches groups where user is a member OR explicit Idea Communities
 export const getGroupConversationsList = query({
   args: {},
   handler: async (ctx) => {
@@ -80,24 +71,9 @@ export const getGroupConversationsList = query({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
-
     if (!userDoc) return [];
     const userId = userDoc._id;
 
-    // 1. Get explicit group memberships
-    const memberships = await ctx.db
-      .query("conversationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-
-    const memberGroupIds = memberships.map(m => m.conversationId);
-
-    const memberGroups = await Promise.all(
-      memberGroupIds.map(id => ctx.db.get(id))
-    );
-
-    // 2. Get "Implicit" Idea Communities (Where user is Author or Contributor)
-    // Deprecated? No, let's keep them as "General" channels for the idea.
     const authoredIdeas = await ctx.db
       .query("ideas")
       .withIndex("by_author", (q) => q.eq("authorId", userId))
@@ -108,81 +84,56 @@ export const getGroupConversationsList = query({
       .withIndex("by_contributor_status", (q) => q.eq("contributorId", userId).eq("status", "accepted"))
       .collect();
 
-    const contributedIdeaIds = contributions.map(c => c.ideaId);
-    const contributedIdeas = await Promise.all(contributedIdeaIds.map(id => ctx.db.get(id)));
+    const allRelatedIdeaIds = new Set<string>();
+    for (const idea of authoredIdeas) {
+      if (!idea.isDeleted) allRelatedIdeaIds.add(String(idea._id));
+    }
+    for (const c of contributions) {
+      allRelatedIdeaIds.add(String(c.ideaId));
+    }
 
-    const allIdeas = [...authoredIdeas, ...contributedIdeas].filter((idea): idea is NonNullable<typeof idea> => idea !== null);
-    const uniqueIdeas = Array.from(new Map(allIdeas.map(item => [item._id, item])).values());
+    const rootMap = new Map<string, Doc<"ideas">>();
+    for (const idStr of allRelatedIdeaIds) {
+      const startIdea = await ctx.db.get(idStr as Id<"ideas">);
+      if (!startIdea || startIdea.isDeleted) continue;
+      const root = startIdea.parentId ? await findRootIdea(ctx, startIdea._id) : startIdea;
+      if (!root || root.isDeleted) continue;
+      const rootKey = String(root._id);
+      if (!rootMap.has(rootKey)) rootMap.set(rootKey, root);
+    }
 
-    // Retrieve the canonical "General" conversation for each idea.
-    //
-    // BUG FIX: previously this returned EVERY implicit (creatorId-less)
-    // conversation per idea. A race in `sendMessage` could create more than
-    // one "main" convo per idea, and each one rendered as a separate
-    // community in the chat sidebar — so an idea with 3 contributions could
-    // show up as 3 communities. We now keep only the OLDEST implicit
-    // conversation per idea as the canonical "General" channel; any
-    // duplicates that already exist in the DB are silently ignored
-    // (messages stay searchable, but the sidebar shows one entry per idea).
-    const generalGroups = await Promise.all(uniqueIdeas.map(async (idea) => {
-      const convo = await ctx.db
-        .query("conversations")
-        .withIndex("by_idea", (q) => q.eq("ideaId", idea._id))
-        .filter(q => q.eq(q.field("type"), "group"))
-        .collect();
+    const groupsFormatted = await Promise.all(
+      Array.from(rootMap.values()).map(async (root) => {
+        const convos = await ctx.db
+          .query("conversations")
+          .withIndex("by_idea", (q) => q.eq("ideaId", root._id))
+          .filter((q) => q.eq(q.field("type"), "group"))
+          .collect();
 
-      const implicit = convo.filter(c => !c.creatorId);
-      if (implicit.length === 0) return [];
+        const implicit = convos.filter((c) => !c.creatorId);
+        const canonical = implicit.length > 0
+          ? implicit.reduce((oldest, c) => (c.createdAt < oldest.createdAt ? c : oldest))
+          : null;
 
-      // Oldest implicit convo wins — that's the one the rest of the app
-      // (sendMessage, ensureSubIdeaChannel) treats as canonical.
-      const canonical = implicit.reduce((oldest, c) =>
-        c.createdAt < oldest.createdAt ? c : oldest
-      );
-      return [canonical];
-    }));
+        let lastMessage: Doc<"messages"> | null = null;
+        if (canonical?.lastMessageId) {
+          lastMessage = await ctx.db.get(canonical.lastMessageId);
+        }
 
-    const flatGeneralGroups = generalGroups.flat();
-
-    // Combine Member Groups and Implicit General Groups
-    const allGroups = [...memberGroups, ...flatGeneralGroups].filter((g): g is NonNullable<typeof g> => !!g);
-
-    // Deduplicate by ID
-    const uniqueGroupMap = new Map();
-    allGroups.forEach(g => uniqueGroupMap.set(g._id, g));
-    const uniqueGroups = Array.from(uniqueGroupMap.values());
-
-    // Format for return
-    const groupsFormatted = await Promise.all(uniqueGroups.map(async (convo) => {
-      let lastMessage = null;
-      if (convo.lastMessageId) {
-        lastMessage = await ctx.db.get(convo.lastMessageId);
-      }
-
-      // Get Idea Name if missing name (for implicit groups)
-      let name = convo.name;
-      if (!name && convo.ideaId) {
-        const idea = await ctx.db.get(convo.ideaId);
-        name = (idea as any)?.title || "Unknown Idea";
-      }
-
-      return {
-        ideaId: convo.ideaId,
-        conversationId: convo._id,
-        name: name || "Group Chat",
-        avatar: null,
-        lastMessage: lastMessage ? {
-          content: (lastMessage as any).content,
-          createdAt: (lastMessage as any).createdAt,
-          senderId: (lastMessage as any).senderId,
-        } : null,
-        unreadCount: convo.unreadCount || 0,
-        isSubGroup: !!convo.creatorId,
-      };
-    }));
+        return {
+          ideaId: root._id,
+          conversationId: canonical?._id ?? null,
+          name: root.title,
+          avatar: null,
+          lastMessage: lastMessage ? { content: lastMessage.content, createdAt: lastMessage.createdAt, senderId: lastMessage.senderId } : null,
+          unreadCount: canonical?.unreadCount || 0,
+          isSubGroup: false,
+        };
+      })
+    );
 
     return groupsFormatted.sort((a, b) => (b.lastMessage?.createdAt || 0) - (a.lastMessage?.createdAt || 0));
-  }
+  },
 });
 
 export const getConversationMessages = query({
@@ -190,22 +141,14 @@ export const getConversationMessages = query({
   handler: async (ctx, args) => {
     const messages = await ctx.db
       .query("messages")
-      .withIndex("by_conversation_created", (q) =>
-        q.eq("conversationId", args.conversationId)
-      )
+      .withIndex("by_conversation_created", (q) => q.eq("conversationId", args.conversationId))
       .order("asc")
       .collect();
 
-    // Enhance messages with sender details
     const enhancedMessages = await Promise.all(messages.map(async (msg) => {
       const sender = await ctx.db.get(msg.senderId);
-      return {
-        ...msg,
-        senderName: sender?.displayName,
-        senderAvatar: sender?.avatar,
-      };
+      return { ...msg, senderName: sender?.displayName, senderAvatar: sender?.avatar };
     }));
-
     return enhancedMessages;
   },
 });
@@ -214,12 +157,7 @@ export const getAllUsers = query({
   args: {},
   handler: async (ctx) => {
     const users = await ctx.db.query("users").collect();
-    return users.map((user) => ({
-      id: user._id,
-      username: user.username,
-      displayName: user.displayName,
-      avatar: user.avatar,
-    }));
+    return users.map((user) => ({ id: user._id, username: user.username, displayName: user.displayName, avatar: user.avatar }));
   },
 });
 
@@ -228,11 +166,7 @@ export const getUserByClerkId = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-
-    return await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
+    return await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
   },
 });
 
@@ -242,80 +176,60 @@ export const sendMessage = mutation({
     content: v.string(),
     messageType: v.optional(v.string()),
     conversationId: v.optional(v.id("conversations")),
-    ideaId: v.optional(v.id("ideas")), // For creating group chat on first message
+    ideaId: v.optional(v.id("ideas")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    const userDoc = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-
+    const userDoc = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
     if (!userDoc) throw new Error("User not found");
     const userId = userDoc._id;
 
     let conversationId = args.conversationId;
 
-    // Handle Group Chat Creation/Retrieval.
-    //
-    // Always route to the OLDEST implicit (creatorId-less) conversation for
-    // the idea so messages don't fragment across duplicates created by
-    // earlier races. If none exists, create one — pairs with the dedup
-    // logic in `getGroupConversationsList` which only surfaces the oldest.
     if (args.ideaId) {
       if (!conversationId) {
-        const existingConvo = await ctx.db
+        const existing = await ctx.db
           .query("conversations")
           .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
-          .filter(q => q.eq(q.field("type"), "group"))
+          .filter((q) => q.eq(q.field("type"), "group"))
           .collect();
 
-        const implicit = existingConvo.filter(c => !c.creatorId);
+        const implicit = existing.filter((c) => !c.creatorId);
         const canonical = implicit.length > 0
-          ? implicit.reduce((oldest, c) => c.createdAt < oldest.createdAt ? c : oldest)
+          ? implicit.reduce((oldest, c) => (c.createdAt < oldest.createdAt ? c : oldest))
           : null;
 
         if (canonical) {
           conversationId = canonical._id;
         } else {
-          // No main convo yet — create one. Subsequent callers will reuse
-          // this one via the lookup above.
           conversationId = await ctx.db.insert("conversations", {
-            type: 'group',
+            type: "group",
             ideaId: args.ideaId,
             createdAt: Date.now(),
             updatedAt: Date.now(),
           });
         }
       }
-    }
-    // Handle Direct Chat Creation/Retrieval
-    else if (args.receiverId && !conversationId) {
+    } else if (args.receiverId && !conversationId) {
       let convoDoc = await ctx.db
         .query("conversations")
-        .withIndex("by_participants", (q) =>
-          q.eq("participant1", userId).eq("participant2", args.receiverId)
-        )
+        .withIndex("by_participants", (q) => q.eq("participant1", userId).eq("participant2", args.receiverId))
         .first();
-
       if (!convoDoc) {
         convoDoc = await ctx.db
           .query("conversations")
-          .withIndex("by_participants", (q) =>
-            q.eq("participant1", args.receiverId!).eq("participant2", userId)
-          )
+          .withIndex("by_participants", (q) => q.eq("participant1", args.receiverId!).eq("participant2", userId))
           .first();
       }
-
       if (convoDoc) {
         conversationId = convoDoc._id;
       } else {
         conversationId = await ctx.db.insert("conversations", {
           participant1: userId,
           participant2: args.receiverId,
-          type: 'direct',
+          type: "direct",
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
@@ -324,10 +238,9 @@ export const sendMessage = mutation({
 
     if (!conversationId) throw new Error("Could not determine conversation");
 
-    // Create message
     const messageId = await ctx.db.insert("messages", {
       senderId: userId,
-      receiverId: args.receiverId, // Optional for group
+      receiverId: args.receiverId,
       content: args.content,
       createdAt: Date.now(),
       read: false,
@@ -335,12 +248,7 @@ export const sendMessage = mutation({
       messageType: args.messageType || "text",
     });
 
-    // Update conversation
-    await ctx.db.patch(conversationId, {
-      updatedAt: Date.now(),
-      lastMessageId: messageId,
-    });
-
+    await ctx.db.patch(conversationId, { updatedAt: Date.now(), lastMessageId: messageId });
     return messageId;
   },
 });
@@ -351,42 +259,29 @@ export const createConversation = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    const userDoc = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-
+    const userDoc = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
     if (!userDoc) throw new Error("User not found");
-
     const userId = userDoc._id;
 
-    // Check if conversation already exists
     let convoDoc = await ctx.db
       .query("conversations")
       .withIndex("by_participants", (q) => q.eq("participant1", userId).eq("participant2", args.receiverId))
       .first();
-
     if (!convoDoc) {
       convoDoc = await ctx.db
         .query("conversations")
         .withIndex("by_participants", (q) => q.eq("participant1", args.receiverId).eq("participant2", userId))
         .first();
     }
+    if (convoDoc) return convoDoc._id;
 
-    if (convoDoc) {
-      return convoDoc._id;
-    }
-
-    // Create new conversation
-    const conversationId = await ctx.db.insert("conversations", {
+    return await ctx.db.insert("conversations", {
       participant1: userId,
       participant2: args.receiverId,
-      type: 'direct',
+      type: "direct",
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
-
-    return conversationId;
   },
 });
 
@@ -395,22 +290,15 @@ export const markMessagesRead = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
-
     const userId = identity.subject as Id<"users">;
 
-    // Get messages in conversation where receiver is current user and not read
-    // Note: For group chats, 'read' status is more complex (per user). 
-    // For now, we only mark direct messages as read or implement a simpler group read logic later.
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .filter((q) => q.and(q.eq("receiverId", userId as any), q.eq(q.field("read"), false)))
       .collect();
 
-    // Mark each as read
-    await Promise.all(
-      messages.map((msg) => ctx.db.patch(msg._id, { read: true }))
-    );
+    await Promise.all(messages.map((msg) => ctx.db.patch(msg._id, { read: true })));
   },
 });
 
@@ -420,11 +308,7 @@ export const getDirectConversationId = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
 
-    const userDoc = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-
+    const userDoc = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
     if (!userDoc) return null;
     const userId = userDoc._id;
 
@@ -432,59 +316,43 @@ export const getDirectConversationId = query({
       .query("conversations")
       .withIndex("by_participants", (q) => q.eq("participant1", userId).eq("participant2", args.receiverId))
       .first();
-
     if (!convoDoc) {
       convoDoc = await ctx.db
         .query("conversations")
         .withIndex("by_participants", (q) => q.eq("participant1", args.receiverId).eq("participant2", userId))
         .first();
     }
-
     return convoDoc?._id || null;
   },
 });
 
-// [NEW] Create a sub-group conversation
 export const createGroupConversation = mutation({
-  args: {
-    ideaId: v.id("ideas"),
-    name: v.string(),
-  },
+  args: { ideaId: v.id("ideas"), name: v.string() },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    const userDoc = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-
+    const userDoc = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
     if (!userDoc) throw new Error("User not found");
     const userId = userDoc._id;
 
-    // Check permissions: Must be Author or Accepted Contributor
     const idea = await ctx.db.get(args.ideaId);
     if (!idea) throw new Error("Idea not found");
 
     const isAuthor = idea.authorId === userId;
     let isContributor = false;
-
     if (!isAuthor) {
       const contribution = await ctx.db
         .query("contributionRequests")
         .withIndex("by_idea_contributor", (q) => q.eq("ideaId", args.ideaId).eq("contributorId", userId))
-        .filter(q => q.eq(q.field("status"), "accepted"))
+        .filter((q) => q.eq(q.field("status"), "accepted"))
         .first();
       isContributor = !!contribution;
     }
+    if (!isAuthor && !isContributor) throw new Error("Only contributors can create sub-groups");
 
-    if (!isAuthor && !isContributor) {
-      throw new Error("Only contributors can create sub-groups");
-    }
-
-    // Create Group
     const conversationId = await ctx.db.insert("conversations", {
-      type: 'group',
+      type: "group",
       ideaId: args.ideaId,
       name: args.name,
       creatorId: userId,
@@ -492,7 +360,6 @@ export const createGroupConversation = mutation({
       updatedAt: Date.now(),
     });
 
-    // Add Creator as Member (Admin)
     await ctx.db.insert("conversationMembers", {
       conversationId,
       userId,
@@ -501,212 +368,257 @@ export const createGroupConversation = mutation({
     });
 
     return conversationId;
-  }
+  },
 });
 
-// [NEW] Add a member to a sub-group
 export const addGroupMember = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    userId: v.id("users"),
-  },
+  args: { conversationId: v.id("conversations"), userId: v.id("users") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    const hasUser = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
+    const hasUser = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
     if (!hasUser) throw new Error("User not found");
     const currentUserId = hasUser._id;
 
     const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.type !== 'group') throw new Error("Invalid group");
+    if (!conversation || conversation.type !== "group") throw new Error("Invalid group");
 
-    // Retrieve ALL membership records for this conversation at once to check sender permission
-    // BUT we can just check if currentUser is a member
     const userMembership = await ctx.db
       .query("conversationMembers")
-      .withIndex("by_user_conversation", q => q.eq("userId", currentUserId).eq("conversationId", args.conversationId))
+      .withIndex("by_user_conversation", (q) => q.eq("userId", currentUserId).eq("conversationId", args.conversationId))
       .first();
 
-    // Permission Check: 
-    // 1. Is Creator?
-    // 2. Is Existing Member? (Assuming any member can add, based on user request "if a contributor is there he also can add")
     const isCreator = conversation.creatorId === currentUserId;
     const isMember = !!userMembership;
+    if (!isCreator && !isMember) throw new Error("You must be a member of the group to add others");
 
-    if (!isCreator && !isMember) {
-      throw new Error("You must be a member of the group to add others");
-    }
-
-    // Check if target user is already a member
     const targetMembership = await ctx.db
       .query("conversationMembers")
-      .withIndex("by_user_conversation", q => q.eq("userId", args.userId).eq("conversationId", args.conversationId))
+      .withIndex("by_user_conversation", (q) => q.eq("userId", args.userId).eq("conversationId", args.conversationId))
       .first();
-
     if (targetMembership) throw new Error("User is already a member");
 
-    // Add Member
     await ctx.db.insert("conversationMembers", {
       conversationId: args.conversationId,
       userId: args.userId,
       role: "member",
       joinedAt: Date.now(),
     });
-  }
+  },
 });
 
-// [NEW] Get potential members (contributors) to add
 export const getPotentialGroupMembers = query({
   args: { ideaId: v.id("ideas") },
   handler: async (ctx, args) => {
-    // Get Idea Author
     const idea = await ctx.db.get(args.ideaId);
     if (!idea) return [];
-
     const author = await ctx.db.get(idea.authorId);
 
-    // Get Contributors
     const contributions = await ctx.db
       .query("contributionRequests")
       .withIndex("by_idea_status_created", (q) => q.eq("ideaId", args.ideaId).eq("status", "accepted"))
       .collect();
 
-    const contributorIds = contributions.map(c => c.contributorId);
-    const contributors = await Promise.all(contributorIds.map(id => ctx.db.get(id)));
+    const contributorIds = contributions.map((c) => c.contributorId);
+    const contributors = await Promise.all(contributorIds.map((id) => ctx.db.get(id)));
 
-    const allUsers = [author, ...contributors].filter(u => u !== null);
+    const allUsers = [author, ...contributors].filter((u) => u !== null);
+    const uniqueUsers = Array.from(new Map(allUsers.map((item) => [item._id, item])).values());
 
-    // Dedupe
-    const uniqueUsers = Array.from(new Map(allUsers.map(item => [item._id, item])).values());
-
-    return uniqueUsers.map(u => ({
-      id: u._id,
-      displayName: u.displayName,
-      avatar: u.avatar
-    }));
-  }
+    return uniqueUsers.map((u) => ({ id: u._id, displayName: u.displayName, avatar: u.avatar }));
+  },
 });
 
-// [NEW] Get current members of a sub-group
+// Implicit channels (no creatorId) = community-wide membership.
+// Explicit named channels = per-channel membership in conversationMembers.
 export const getGroupMembers = query({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {
-    // 1. Get all memberships for this conversation
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) return [];
+
+    if (!conversation.creatorId) {
+      if (!conversation.ideaId) return [];
+      const idea = await ctx.db.get(conversation.ideaId);
+      if (!idea || idea.isDeleted) return [];
+
+      const synthesized: Array<{
+        id: Id<"users">;
+        username: string | undefined;
+        displayName: string | undefined;
+        avatar: string | undefined;
+        role: string;
+        joinedAt: number;
+      }> = [];
+
+      const author = await ctx.db.get(idea.authorId);
+      if (author) {
+        synthesized.push({
+          id: author._id,
+          username: author.username,
+          displayName: author.displayName,
+          avatar: author.avatar,
+          role: "admin",
+          joinedAt: idea.createdAt,
+        });
+      }
+
+      const acceptedRequests = await ctx.db
+        .query("contributionRequests")
+        .withIndex("by_idea_status_created", (q) => q.eq("ideaId", conversation.ideaId!).eq("status", "accepted"))
+        .collect();
+
+      for (const req of acceptedRequests) {
+        if (req.contributorId === idea.authorId) continue;
+        const contributor = await ctx.db.get(req.contributorId);
+        if (!contributor) continue;
+        synthesized.push({
+          id: contributor._id,
+          username: contributor.username,
+          displayName: contributor.displayName,
+          avatar: contributor.avatar,
+          role: "member",
+          joinedAt: req.updatedAt || req.createdAt,
+        });
+      }
+
+      return synthesized;
+    }
+
     const memberships = await ctx.db
       .query("conversationMembers")
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .collect();
 
-    // 2. Fetch the corresponding user documents
-    const members = await Promise.all(
-      memberships.map(async (m) => {
-        const user = await ctx.db.get(m.userId);
-        if (!user) return null;
-        return {
-          id: user._id,
-          username: user.username,
-          displayName: user.displayName,
-          avatar: user.avatar,
-          role: m.role,
-          joinedAt: m.joinedAt,
-        };
-      })
-    );
+    const members = await Promise.all(memberships.map(async (m) => {
+      const user = await ctx.db.get(m.userId);
+      if (!user) return null;
+      return { id: user._id, username: user.username, displayName: user.displayName, avatar: user.avatar, role: m.role, joinedAt: m.joinedAt };
+    }));
 
     return members.filter((m): m is NonNullable<typeof m> => m !== null);
   },
 });
 
-// [NEW] Remove a member from a sub-group
 export const removeGroupMember = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    userId: v.id("users"),
-  },
+  args: { conversationId: v.id("conversations"), userId: v.id("users") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    const hasUser = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
+    const hasUser = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
     if (!hasUser) throw new Error("User not found");
     const currentUserId = hasUser._id;
 
     const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.type !== 'group') throw new Error("Invalid group");
+    if (!conversation || conversation.type !== "group") throw new Error("Invalid group");
 
-    // Only allow Creator to remove other people, OR the person themselves to leave
     const isCreator = conversation.creatorId === currentUserId;
     const isSelfRemove = currentUserId === args.userId;
+    if (!isCreator && !isSelfRemove) throw new Error("You do not have permission to remove this user");
+    if (isCreator && isSelfRemove) throw new Error("Creator cannot leave the group. Delete the group instead.");
 
-    if (!isCreator && !isSelfRemove) {
-      throw new Error("You do not have permission to remove this user");
-    }
-
-    if (isCreator && isSelfRemove) {
-      throw new Error("Creator cannot leave the group. Delete the group instead.");
-    }
-
-    // Find the membership record
     const targetMembership = await ctx.db
       .query("conversationMembers")
-      .withIndex("by_user_conversation", q => q.eq("userId", args.userId).eq("conversationId", args.conversationId))
+      .withIndex("by_user_conversation", (q) => q.eq("userId", args.userId).eq("conversationId", args.conversationId))
       .first();
-
     if (!targetMembership) throw new Error("User is not a member");
-
-    // Remove the member
     await ctx.db.delete(targetMembership._id);
-  }
+  },
 });
 
-// [NEW] Delete a sub-group entirely
 export const deleteGroupConversation = mutation({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
-    const hasUser = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
+    const hasUser = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first();
     if (!hasUser) throw new Error("User not found");
     const currentUserId = hasUser._id;
 
     const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.type !== 'group') throw new Error("Invalid group");
-
-    // Ensure it's not the implicit "Main" conversation (no creatorId)
-    // Actually, maybe authors shouldn't be able to delete the main conversation this way, or maybe they can.
-    // For now, only let creators delete their explicitly created groups.
+    if (!conversation || conversation.type !== "group") throw new Error("Invalid group");
     if (!conversation.creatorId || conversation.creatorId !== currentUserId) {
       throw new Error("Only the creator of the group can delete it");
     }
 
-    // 1. Delete all messages
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_conversation_created", (q) => q.eq("conversationId", args.conversationId))
       .collect();
+    await Promise.all(messages.map((m) => ctx.db.delete(m._id)));
 
-    await Promise.all(messages.map(m => ctx.db.delete(m._id)));
-
-    // 2. Delete all memberships
     const memberships = await ctx.db
       .query("conversationMembers")
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .collect();
+    await Promise.all(memberships.map((m) => ctx.db.delete(m._id)));
 
-    await Promise.all(memberships.map(m => ctx.db.delete(m._id)));
-
-    // 3. Delete conversation
     await ctx.db.delete(args.conversationId);
-  }
+  },
+});
+
+// One-shot cleanup. Safe to re-run.
+export const mergeDuplicateMainConversations = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const allGroups = await ctx.db.query("conversations").filter((q) => q.eq(q.field("type"), "group")).collect();
+
+    const buckets = new Map<string, Doc<"conversations">[]>();
+    for (const c of allGroups) {
+      if (c.creatorId) continue;
+      if (!c.ideaId) continue;
+      const key = String(c.ideaId);
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key)!.push(c);
+    }
+
+    let merged = 0;
+    let deletedRows = 0;
+    let reparentedMessages = 0;
+    let reparentedMembers = 0;
+
+    for (const [ideaKey, convos] of buckets) {
+      if (convos.length <= 1) continue;
+      convos.sort((a, b) => a.createdAt - b.createdAt);
+      const canonical = convos[0];
+      const duplicates = convos.slice(1);
+
+      for (const dup of duplicates) {
+        const messages = await ctx.db.query("messages").withIndex("by_conversation_created", (q) => q.eq("conversationId", dup._id)).collect();
+        for (const msg of messages) {
+          await ctx.db.patch(msg._id, { conversationId: canonical._id });
+          reparentedMessages += 1;
+        }
+
+        const memberships = await ctx.db.query("conversationMembers").withIndex("by_conversation", (q) => q.eq("conversationId", dup._id)).collect();
+        for (const mem of memberships) {
+          const existingOnCanonical = await ctx.db
+            .query("conversationMembers")
+            .withIndex("by_user_conversation", (q) => q.eq("userId", mem.userId).eq("conversationId", canonical._id))
+            .first();
+          if (existingOnCanonical) {
+            await ctx.db.delete(mem._id);
+          } else {
+            await ctx.db.patch(mem._id, { conversationId: canonical._id });
+            reparentedMembers += 1;
+          }
+        }
+
+        if (dup.lastMessageId && (!canonical.lastMessageId || (dup.updatedAt || 0) > (canonical.updatedAt || 0))) {
+          await ctx.db.patch(canonical._id, { lastMessageId: dup.lastMessageId, updatedAt: dup.updatedAt });
+        }
+
+        await ctx.db.delete(dup._id);
+        deletedRows += 1;
+      }
+
+      merged += 1;
+      console.log(`[mergeDuplicateMainConversations] idea ${ideaKey}: kept ${canonical._id}, removed ${duplicates.length} duplicates`);
+    }
+
+    return { ideasMerged: merged, duplicatesDeleted: deletedRows, messagesReparented: reparentedMessages, membersReparented: reparentedMembers };
+  },
 });

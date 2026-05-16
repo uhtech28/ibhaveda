@@ -63,6 +63,7 @@ import { IdeaSideNav } from "@/components/IdeaSideNav";
 import { IdeaBottomBar } from "@/components/IdeaBottomBar";
 import { CreateSubIdeaDialog } from "@/components/ideas/CreateSubIdeaDialog";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
+import { IdeaBreadcrumb, IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
 
 type ConvexIdea = {
   _id: string;
@@ -180,6 +181,10 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
 
       <main className="flex-1 w-full py-12 pt-24 lg:pr-40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          {/* Breadcrumb — always shows Feed > root > ... > current so
+              the user never loses context. */}
+          <IdeaBreadcrumb ideaId={id as Id<"ideas">} className="mb-3" />
+
           {/* Desktop: persistent right rail — pulled ~3-4 cm in from the right edge */}
           <div className="hidden lg:block">
             <IdeaSideNav
@@ -256,11 +261,12 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                     <DialogTitle>Idea Hierarchy</DialogTitle>
                   </DialogHeader>
                   <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-                    <HierarchicalIdeasSection
-                      idea={ideaQuery as ConvexIdea}
-                      ideaTree={ideaTreeQuery}
-                      userRequests={userRequestsQuery || []}
-                      addSubIdeaMutation={addSubIdeaMutation}
+                    {/* Flowchart of the full idea family with "You are
+                        here" marker on the current node. Clicking any
+                        node navigates to that idea. */}
+                    <IdeaHierarchyFlowchart
+                      ideaId={id as Id<"ideas">}
+                      className="border-0 bg-transparent p-0"
                     />
                   </div>
                 </DialogContent>
