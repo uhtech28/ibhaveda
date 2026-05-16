@@ -93,7 +93,7 @@ export default function LandingIntro() {
     setClosing(true);
     const id = window.setTimeout(() => finish(), 900);
     return () => window.clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [stage]);
 
   const finish = () => {

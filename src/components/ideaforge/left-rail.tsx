@@ -7,6 +7,7 @@ import { Tag } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import {
   cardSurface,
@@ -89,7 +90,7 @@ export function IdeaForgeLeftRail({
   // Real, live backend data
   const levelProgress = useQuery(
     api.levels.getUserLevelProgress,
-    currentUser?._id ? { userId: currentUser._id } : "skip"
+    currentUser?._id ? { userId: currentUser._id as Id<"users"> } : "skip"
   );
 
   // Level / title — prefer backend, fall back to local table & XP heuristic.

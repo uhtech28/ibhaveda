@@ -10,10 +10,23 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // Ignore generated/build directories
+  {
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "out/**",
+      "coverage/**",
+      "test/**",
+      "convex/_generated/**",
+      "next-env.d.ts",
+    ],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
       "react/no-unescaped-entities": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 ];

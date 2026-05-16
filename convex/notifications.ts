@@ -61,7 +61,7 @@ export const getNotifications = query({
     }
 
     // Get notifications with pagination and sorting (newest first)
-    let notifications = await query
+    const notifications = await query
       .order("desc")
       .take(limit);
 

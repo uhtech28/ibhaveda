@@ -40,7 +40,7 @@ interface Community {
 }
 
 interface Channel {
-    _id: Id<"conversations">;
+    _id: string;
     name: string;
     lastMessageAt?: number;
 }
@@ -57,14 +57,14 @@ interface Message {
 export function ChatInterface() {
     const [currentView, setCurrentView] = useState<ViewType>(View.COMMUNITIES);
     const [selectedCommunity, setSelectedCommunity] = useState<{ _id: Id<"ideas">, name: string } | null>(null);
-    const [selectedChannel, setSelectedChannel] = useState<{ _id: Id<"conversations">, name: string } | null>(null);
+    const [selectedChannel, setSelectedChannel] = useState<{ _id: string, name: string } | null>(null);
     const [inputMessage, setInputMessage] = useState("");
     const [showSettings, setShowSettings] = useState(false);
     const { toast } = useToast();
 
     const communities = useQuery(api.communities.getUserCommunities);
     const channels = useQuery(api.communities.getChannels, selectedCommunity ? { ideaId: selectedCommunity._id } : "skip");
-    const messages = useQuery(api.communities.getMessages, selectedChannel ? { conversationId: selectedChannel._id } : "skip");
+    const messages = useQuery(api.communities.getMessages, selectedChannel ? { conversationId: selectedChannel._id as Id<"conversations"> } : "skip");
     const sendMessage = useMutation(api.communities.sendMessage);
     const createChannel = useMutation(api.communities.createChannel);
     // Live member count for the open channel — drives the visible
@@ -72,7 +72,7 @@ export function ChatInterface() {
     // add/remove flow.
     const channelMembers = useQuery(
         api.chat.getGroupMembers,
-        selectedChannel ? { conversationId: selectedChannel._id } : "skip"
+        selectedChannel ? { conversationId: selectedChannel._id as Id<"conversations"> } : "skip"
     );
 
     // Auto-scroll to bottom of chat
@@ -88,7 +88,7 @@ export function ChatInterface() {
         setCurrentView(View.CHANNELS);
     };
 
-    const handleChannelClick = (channel: { _id: Id<"conversations">, name: string }) => {
+    const handleChannelClick = (channel: { _id: string, name: string }) => {
         setSelectedChannel(channel);
         setCurrentView(View.CHAT);
     };
@@ -109,7 +109,7 @@ export function ChatInterface() {
 
         try {
             await sendMessage({
-                conversationId: selectedChannel._id,
+                conversationId: selectedChannel._id as Id<"conversations">,
                 content: inputMessage,
             });
             setInputMessage("");
@@ -366,7 +366,7 @@ export function ChatInterface() {
                 <ChannelSettingsDialog
                     isOpen={showSettings}
                     onClose={() => setShowSettings(false)}
-                    conversationId={selectedChannel._id}
+                    conversationId={selectedChannel._id as Id<"conversations">}
                     ideaId={selectedCommunity._id}
                     onChannelDeleted={handleBack}
                 />

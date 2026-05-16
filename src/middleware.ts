@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server'
 import { api } from '@convex/_generated/api'
 import { ConvexHttpClient } from 'convex/browser'
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+const convex = convexUrl ? new ConvexHttpClient(convexUrl) : null;
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -36,7 +37,7 @@ export default clerkMiddleware(async (auth, req) => {
       const isProfileSetupPage = req.nextUrl.pathname === '/profile-setup';
       const isApiRoute = req.nextUrl.pathname.startsWith('/api') || req.nextUrl.pathname.startsWith('/trpc');
       
-      if (!isProfileSetupPage && !isApiRoute) {
+      if (!isProfileSetupPage && !isApiRoute && convex) {
         const isProfileComplete = await convex.query(api.users.isProfileComplete, { clerkId: userId })
         
         if (!isProfileComplete) {

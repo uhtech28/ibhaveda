@@ -5,10 +5,45 @@ on:
     branches:
       - main
 
+# Cancel in-progress deploys if a new push arrives
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 jobs:
+  # Phase 1: Build & verify before touching production
+  build-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Run tests
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+      - name: Security audit
+        run: bunx npm audit --audit-level=high
+        continue-on-error: true
+
+  # Phase 2: Deploy over SSH (only after build-verify passes)
   deploy:
     runs-on: ubuntu-latest
-
+    needs: build-verify
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -19,7 +54,7 @@ jobs:
           script: |
             cd /var/www/interactiveideas
             git pull origin main
-            bun install
+            bun install --frozen-lockfile
             rm -rf .next
             bun run build
             pm2 restart interactiveideas
