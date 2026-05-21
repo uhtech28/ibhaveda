@@ -30,6 +30,7 @@ import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { HUD } from "@/components/hud/HUD";
 import { LevelUpSequence } from "@/components/animations/LevelUpSequence";
 import { BadgeAwardSequence } from "@/components/animations/BadgeAwardSequence";
+import { getVentureBadgeEmoji } from "@/components/user/ProfileBadges";
 import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useSearchParams } from "next/navigation";
@@ -699,8 +700,8 @@ function TaskCard({
           border: `1.5px solid ${task.done ? "#6366f1" : "rgba(255,255,255,0.15)"}`,
           color: task.done ? "#ffffff" : "transparent",
         }}
-        animate={task.done ? { scale: [0.8, 1.2, 1] } : {}}
-        transition={{ type: "spring", duration: 0.2, bounce: 0.45 }}
+        animate={task.done ? { scale: [0.8, 1.2, 1] } : { scale: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
       >
         {task.done && "✓"}
       </motion.div>
@@ -938,6 +939,11 @@ interface BadgePayload {
   description: string;
   icon: string;
   rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
+  shape?: string;
+  isProfileStyle?: boolean;
+  primaryColor?: string;
+  secondaryColor?: string;
+  tagline?: string;
 }
 
 function MapPageInner() {
@@ -1005,10 +1011,15 @@ function MapPageInner() {
 
   // ── Convex queries ─────────────────────────────────────────────────────────
   const ventures = useQuery(api.worldMap.getVenturesByUser);
+
+  // Venture resolution priority:
+  // 1. URL ?ventureId=<id>  → use ONLY that venture (idea-specific map).
+  //    Never silently fall back to another — show "no venture" UI if not found.
+  // 2. No URL param         → resume the last cached venture (e.g. nav icon tap).
+  const hasUrlVentureParam = !!searchParams.get("ventureId");
   const activeVenture =
     ventures?.find((venture) => venture._id === preferredVentureId) ??
-    ventures?.[0] ??
-    null;
+    (hasUrlVentureParam ? null : (ventures?.[0] ?? null));
 
   // Subscribe to notifications for gold checkpoint awards
   const notifications = useQuery(api.notifications.getNotifications, {
@@ -1539,13 +1550,14 @@ function MapPageInner() {
           id: b._id,
           name: b.definition!.name,
           description: b.definition!.tagline,
-          icon: b.definition!.iconDescription,
+          icon: getVentureBadgeEmoji(b.badgeId, b.definition!.name),
           rarity: b.definition!.rarity as
             | "common"
             | "uncommon"
             | "rare"
             | "epic"
             | "legendary",
+          shape: b.definition!.shape,
         }));
 
       if (payloads.length > 0) {
@@ -1925,10 +1937,68 @@ function MapPageInner() {
       checkpointId: Id<"ventureCheckpoints">;
       taskLevel: "t1" | "t2" | "t3";
     }) => {
+      // ── 1. Close the modal immediately ─────────────────────────────────
+      setSubmittingTask(null);
+
       setOptimisticCompletedTaskIds((current) => ({
         ...current,
         [taskId]: true,
       }));
+
+      // ── 2. Task badge — rarity matches corruption, profile-style card ──
+      // Gold (legendary)  : corruption < 25  — pristine execution
+      // Silver (rare)     : corruption 25–49 — solid but slightly tarnished
+      // Bronze (uncommon) : corruption >= 50  — survived, with cost
+      const taskBadgeRarity: BadgePayload["rarity"] =
+        corruptionLevel < 25
+          ? "legendary"
+          : corruptionLevel < 50
+            ? "rare"
+            : "uncommon";
+      const taskBadgeLabel =
+        corruptionLevel < 25
+          ? "Task Clear (Gold)"
+          : corruptionLevel < 50
+            ? "Task Clear (Silver)"
+            : "Task Clear (Bronze)";
+      // Icon matches the corruption tier (trophy = gold, medals = silver/bronze)
+      const taskBadgeIcon =
+        corruptionLevel < 25 ? "🏆" : corruptionLevel < 50 ? "🥈" : "🥉";
+      const taskLevelName =
+        taskLevel === "t1" ? "Easy" : taskLevel === "t2" ? "Medium" : "Stretch";
+      const taskBadgeDesc =
+        corruptionLevel < 25
+          ? `${taskLevelName} task cleared with gold-standard execution. Exceptional!`
+          : corruptionLevel < 50
+            ? `${taskLevelName} task cleared with silver integrity. Keep the corruption low!`
+            : `${taskLevelName} task cleared — bronze earned. Watch the corruption meter!`;
+
+      // Per-task-level colors: T1 green (Seedling), T2 blue (Gate Crossed), T3 indigo (First Checkpoint)
+      const taskPrimaryColor =
+        taskLevel === "t1" ? "#D1FAE5" : taskLevel === "t2" ? "#DBEAFE" : "#EEF2FF";
+      const taskSecondaryColor =
+        taskLevel === "t1" ? "#065F46" : taskLevel === "t2" ? "#1E40AF" : "#3730A3";
+      const taskTagline =
+        taskLevel === "t1"
+          ? "From the smallest seed, the tallest oak."
+          : taskLevel === "t2"
+            ? "Send your first collaboration invite."
+            : "Five gold checkpoints on any venture.";
+
+      setBadgeQueue((q) => [
+        ...q,
+        {
+          id: `task_${checkpointId}_${taskLevel}_${Date.now()}`,
+          name: taskBadgeLabel,
+          description: taskBadgeDesc,
+          icon: taskBadgeIcon,
+          rarity: taskBadgeRarity,
+          isProfileStyle: true,
+          primaryColor: taskPrimaryColor,
+          secondaryColor: taskSecondaryColor,
+          tagline: taskTagline,
+        },
+      ]);
 
       const nextLabelMap: Record<"t1" | "t2" | "t3", string> = {
         t1: "T1",
@@ -1984,26 +2054,8 @@ function MapPageInner() {
                   ? 20
                   : 35,
           });
-
-          setSubmittingTask({
-            id:
-              nextTask._taskId ??
-              `${nextTask._convexCheckpointId}_${nextTask._taskLevel}`,
-            checkpointId: nextTask._convexCheckpointId,
-            taskLevel: nextTask._taskLevel,
-            title: nextLabelMap[nextTask._taskLevel],
-            description: nextTask.description,
-            toolType: nextTask.tool,
-            points:
-              nextTask._taskLevel === "t1"
-                ? 20
-                : nextTask._taskLevel === "t2"
-                  ? 20
-                  : 35,
-          });
         } else {
           setActiveTaskAtom(null);
-          setSubmittingTask(null);
         }
 
         return {
@@ -2024,6 +2076,8 @@ function MapPageInner() {
       setCurrentQuestAtom,
       setSubmittingTask,
       setOptimisticCompletedTaskIds,
+      setBadgeQueue,
+      corruptionLevel,
     ],
   );
 
@@ -2109,6 +2163,43 @@ function MapPageInner() {
         checkpointId: cp._id as Id<"ventureCheckpoints">,
       });
 
+      // ── Level (checkpoint) badge — rarity based on corruption meter ────
+      // Gold (legendary)  : corruption < 25  — clean, visionary execution
+      // Silver (rare)     : corruption 25–49  — solid but slightly compromised
+      // Bronze (uncommon) : corruption >= 50  — survived but at a cost
+      const levelBadgeRarity: BadgePayload["rarity"] =
+        corruptionLevel < 25
+          ? "legendary"
+          : corruptionLevel < 50
+            ? "rare"
+            : "uncommon";
+      const levelBadgeLabel =
+        corruptionLevel < 25
+          ? "Stage Clear (Gold)"
+          : corruptionLevel < 50
+            ? "Stage Clear (Silver)"
+            : "Stage Clear (Bronze)";
+      // 🏆 matches the profile page trophy icon for gold-tier badges
+      const levelBadgeIcon =
+        corruptionLevel < 25 ? "🏆" : corruptionLevel < 50 ? "🥈" : "🥉";
+      const levelBadgeDesc =
+        corruptionLevel < 25
+          ? `Checkpoint ${cp.checkpoint} cleared with gold-standard purity!`
+          : corruptionLevel < 50
+            ? `Checkpoint ${cp.checkpoint} cleared with silver integrity. Keep the corruption at bay!`
+            : `Checkpoint ${cp.checkpoint} cleared — bronze earned. Watch the corruption meter!`;
+      setBadgeQueue((q) => [
+        ...q,
+        {
+          id: `level_${cp._id}_${Date.now()}`,
+          name: levelBadgeLabel,
+          description: levelBadgeDesc,
+          icon: levelBadgeIcon,
+          rarity: levelBadgeRarity,
+          shape: "trophy",
+        },
+      ]);
+
       if (isLastInStage) {
         // Stage boundary — show stage clear modal!
         const stageNames = [
@@ -2157,6 +2248,8 @@ function MapPageInner() {
     buildCheckpointDetail,
     isAdvancingCheckpoint,
     phaserReady,
+    corruptionLevel,
+    setBadgeQueue,
   ]);
 
   // ── Destroy audio on unmount ──────────────────────────────────────────────

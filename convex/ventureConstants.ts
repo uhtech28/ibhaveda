@@ -2574,3 +2574,50 @@ export const POINT_VALUES = {
   mentee_checkpoint_advance: 3,
   mentee_level_up: 50,
 } as const;
+
+export function getVentureBadgeEmoji(badgeId: number, name: string): string {
+  if (badgeId === 1) return "🕯️";
+  if (badgeId === 2) return "👤";
+  if (badgeId === 3) return "🛠️";
+  if (badgeId === 4) return "🥾";
+  if (badgeId === 5) return "💬";
+  if (badgeId === 6) return "🌱";
+  if (badgeId === 7) return "✉️";
+  if (badgeId === 8) return "🚪";
+  if (badgeId === 9) return "🎯";
+  if (badgeId === 10) return "🪙";
+  if (badgeId === 11) return "🚩";
+  if (badgeId === 12) return "🛣️";
+  if (badgeId === 13) return "❤️";
+  if (badgeId === 14) return "🚀";
+  if (badgeId === 15) return "🔄";
+  if (badgeId === 16) return "👑";
+  if (badgeId === 17) return "🎓";
+  if (badgeId === 18) return "🔬";
+  if (badgeId === 19) return "✍️";
+  if (badgeId === 20) return "💼";
+  if (badgeId === 21) return "🧠";
+  if (badgeId === 22) return "🗺️";
+  if (badgeId === 23) return "✨";
+  if (badgeId === 27) return "👂";
+  if (badgeId === 28) return "📣";
+  if (badgeId === 29) return "📝";
+  if (badgeId === 30) return "🗣️";
+  if (badgeId === 31) return "🤝";
+  if (badgeId === 32) return "👥";
+
+  const n = name.toLowerCase();
+  if (n.includes("gold") || n.includes("gilded")) return "🏆";
+  if (n.includes("silver")) return "🥈";
+  if (n.includes("bronze") || n.includes("branze")) return "🥉";
+  if (n.includes("checkpoint") || n.includes("point")) return "📍";
+  if (n.includes("stage") || n.includes("road")) return "🗺️";
+  if (n.includes("comment") || n.includes("word") || n.includes("listen")) return "💬";
+  if (n.includes("idea") || n.includes("seed") || n.includes("light")) return "💡";
+  if (n.includes("collaborat") || n.includes("ally") || n.includes("friend")) return "👥";
+  if (n.includes("boss") || n.includes("slayer") || n.includes("combat")) return "⚔️";
+  if (n.includes("streak") || n.includes("daily") || n.includes("burn")) return "🔥";
+
+  return "🏅";
+}
+

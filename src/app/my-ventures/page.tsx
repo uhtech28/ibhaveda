@@ -51,15 +51,6 @@ export default function MyVenturesPage() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Link href="/map">
-                <Button
-                  variant="outline"
-                  className="gap-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-                >
-                  <Map className="h-4 w-4" />
-                  Open World Map
-                </Button>
-              </Link>
               <Link href="/my-ideas">
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />

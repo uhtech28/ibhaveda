@@ -4981,8 +4981,8 @@ private playStageEntryWeather(
     y: number;
   } {
     return {
-      x: node.x - 54,
-      y: node.y + 38,
+      x: node.x,
+      y: node.y,
     };
   }
 
@@ -5096,11 +5096,9 @@ private playStageEntryWeather(
 
     const toMarker = this.getPersonaMarkerPosition(toNode);
     const fromNode = this.checkpointNodes.get(fromCheckpointId);
-    if (!fromNode || fromNode.stage !== 1 || toNode.stage !== 1) {
-      return [toMarker];
-    }
+    if (!fromNode) return [toMarker];
 
-    const nodes = this.getStageNodes(1);
+    const nodes = this.getSortedCheckpointNodes();
     const fromIndex = nodes.findIndex(
       (node) => node.checkpointId === fromCheckpointId,
     );
@@ -5109,7 +5107,6 @@ private playStageEntryWeather(
     );
     if (fromIndex < 0 || toIndex < 0) return [toMarker];
 
-    const fromMarker = this.getPersonaMarkerPosition(nodes[fromIndex]);
     const direction = fromIndex < toIndex ? 1 : -1;
     const route: { x: number; y: number }[] = [];
     for (
@@ -5119,16 +5116,6 @@ private playStageEntryWeather(
     ) {
       const node = nodes[index];
       const marker = this.getPersonaMarkerPosition(node);
-      const prevX = route.length > 0 ? route[route.length - 1].x : fromMarker.x;
-      const waypointX = marker.x - direction * 32;
-
-      // Only add waypoint if it doesn't cause a backtrack
-      if (direction > 0 ? waypointX > prevX : waypointX < prevX) {
-        route.push({
-          x: waypointX,
-          y: marker.y + (index % 2 === 0 ? 18 : -10),
-        });
-      }
       route.push(marker);
     }
     return route;

@@ -292,6 +292,14 @@ interface Badge {
   description: string;
   icon: string;
   rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
+  shape?: string;
+  /** When true, renders the full profile-page card style instead of the emoji box */
+  isProfileStyle?: boolean;
+  /** Used by profile-style cards for the rotating ring background */
+  primaryColor?: string;
+  secondaryColor?: string;
+  /** Short flavour line shown on the card (tagline from ventureConstants) */
+  tagline?: string;
 }
 
 interface BadgeAwardSequenceProps {
@@ -302,10 +310,10 @@ interface BadgeAwardSequenceProps {
 }
 
 const BURST_COLORS = {
-  common: "rgba(156, 163, 175, 0.8)", // gray
-  uncommon: "rgba(34, 197, 94, 0.8)", // green
-  rare: "rgba(59, 130, 246, 0.8)", // blue
-  epic: "rgba(168, 85, 247, 0.8)", // purple
+  common: "rgba(156, 163, 175, 0.8)",    // gray
+  uncommon: "rgba(205, 127, 50, 0.8)",   // bronze
+  rare: "rgba(59, 130, 246, 0.8)",       // silver-blue
+  epic: "rgba(168, 85, 247, 0.8)",       // purple
   legendary: "rgba(251, 191, 36, 0.8)", // gold
 };
 
@@ -315,32 +323,159 @@ const RARITY_COLORS = {
     border: "border-gray-500",
     text: "text-gray-400",
     glow: "shadow-gray-500/20",
+    label: "COMMON",
   },
   uncommon: {
-    bg: "bg-green-500/20",
-    border: "border-green-500",
-    text: "text-green-400",
-    glow: "shadow-green-500/20",
+    // Bronze
+    bg: "bg-amber-900/30",
+    border: "border-amber-700",
+    text: "text-amber-600",
+    glow: "shadow-amber-700/30",
+    label: "BRONZE",
   },
   rare: {
-    bg: "bg-blue-500/20",
-    border: "border-blue-500",
-    text: "text-blue-400",
-    glow: "shadow-blue-500/20",
+    // Silver
+    bg: "bg-slate-400/20",
+    border: "border-slate-400",
+    text: "text-slate-300",
+    glow: "shadow-slate-400/20",
+    label: "SILVER",
   },
   epic: {
     bg: "bg-purple-500/20",
     border: "border-purple-500",
     text: "text-purple-400",
     glow: "shadow-purple-500/20",
+    label: "EPIC",
   },
   legendary: {
+    // Gold
     bg: "bg-amber-500/20",
-    border: "border-amber-500",
+    border: "border-amber-400",
     text: "text-amber-400",
-    glow: "shadow-amber-500/20",
+    glow: "shadow-amber-500/30",
+    label: "GOLD",
   },
 };
+
+/** Trophy SVG rendered inside badge cards for Gold/Silver/Bronze tier badges */
+function TrophyIcon({ rarity }: { rarity: "legendary" | "rare" | "uncommon" }) {
+  const fill =
+    rarity === "legendary"
+      ? "#F59E0B"  // gold
+      : rarity === "rare"
+        ? "#CBD5E1" // silver
+        : "#CD7F32"; // bronze
+  const glow =
+    rarity === "legendary"
+      ? "drop-shadow(0 0 8px rgba(251,191,36,0.8))"
+      : rarity === "rare"
+        ? "drop-shadow(0 0 6px rgba(203,213,225,0.6))"
+        : "drop-shadow(0 0 6px rgba(205,127,50,0.6))";
+
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      className="w-16 h-16"
+      style={{ filter: glow }}
+      fill={fill}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Cup body */}
+      <path d="M20 6h24v20c0 8.837-5.373 16-12 16S20 34.837 20 26V6z" />
+      {/* Left handle */}
+      <path d="M20 10H12a6 6 0 0 0 0 12h8" fill={fill} />
+      {/* Right handle */}
+      <path d="M44 10h8a6 6 0 0 1 0 12h-8" fill={fill} />
+      {/* Stem */}
+      <rect x="28" y="42" width="8" height="10" rx="2" fill={fill} />
+      {/* Base */}
+      <rect x="20" y="52" width="24" height="6" rx="3" fill={fill} />
+    </svg>
+  );
+}
+/**
+ * Renders a badge card that matches the profile page design exactly:
+ * - dark card with rarity gradient border/bg
+ * - rotating diamond ring in primaryColor behind the icon
+ * - emoji icon in an inner circle styled with secondaryColor
+ * - badge name, tagline, and rarity pill
+ */
+function ProfileStyleBadgeCard({ badge, rarityStyle }: { badge: Badge; rarityStyle: typeof RARITY_COLORS[keyof typeof RARITY_COLORS] }) {
+  const PROFILE_RARITY_GRADIENTS: Record<string, string> = {
+    common: "from-slate-500/10 via-slate-600/5 to-transparent border-slate-700/50",
+    uncommon: "from-amber-800/20 via-amber-900/10 to-transparent border-amber-700/50",
+    rare: "from-slate-400/15 via-slate-500/5 to-transparent border-slate-500/60",
+    epic: "from-purple-500/20 via-purple-600/5 to-transparent border-purple-500/60",
+    legendary: "from-amber-500/25 via-yellow-600/10 to-transparent border-amber-400/80",
+  };
+  const PROFILE_RARITY_TEXTS: Record<string, string> = {
+    common: "text-slate-400 border-slate-500/20 bg-slate-500/10",
+    uncommon: "text-amber-600 border-amber-700/30 bg-amber-900/20",
+    rare: "text-slate-300 border-slate-400/20 bg-slate-400/10",
+    epic: "text-purple-400 border-purple-500/20 bg-purple-500/10",
+    legendary: "text-amber-400 border-amber-500/20 bg-amber-500/10",
+  };
+  const ringStyle = {
+    backgroundColor: badge.primaryColor || "#1E293B",
+    borderColor: badge.secondaryColor || "#475569",
+  };
+  const iconColor = badge.secondaryColor || "#94A3B8";
+
+  return (
+    <motion.div
+      initial={{ scale: 0.7, opacity: 0, y: 20 }}
+      animate={{ scale: 1, opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 220, damping: 22, delay: 0.1 }}
+      className={`relative overflow-hidden rounded-2xl border bg-[#0F1117]/90 backdrop-blur-md p-6 flex flex-col items-center text-center w-52 shadow-2xl bg-gradient-to-br ${PROFILE_RARITY_GRADIENTS[badge.rarity]}`}
+    >
+      {/* Sheen overlay for legendary/epic */}
+      {(badge.rarity === "legendary" || badge.rarity === "epic") && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
+      )}
+
+      {/* Icon canvas — mirrored from profile page */}
+      <div className="relative w-20 h-20 flex items-center justify-center mb-4">
+        {/* Rotating diamond background ring */}
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+          className="absolute inset-0 rounded-2xl border-2 opacity-30"
+          style={ringStyle}
+        />
+        <motion.div
+          animate={{ rotate: -360 }}
+          transition={{ repeat: Infinity, duration: 12, ease: "linear" }}
+          className="absolute inset-1 rounded-xl border opacity-20"
+          style={ringStyle}
+        />
+        {/* Inner icon circle */}
+        <div
+          className="relative w-14 h-14 flex items-center justify-center rounded-full bg-zinc-900/70 border border-white/10 shadow-inner z-10"
+          style={{ color: iconColor }}
+        >
+          <span className="text-3xl select-none" style={{ filter: `drop-shadow(0 0 6px ${iconColor}88)` }}>
+            {badge.icon}
+          </span>
+        </div>
+      </div>
+
+      {/* Text */}
+      <h4 className="font-bold text-base text-white mb-1 leading-tight">{badge.name}</h4>
+      <p className="text-[11px] text-slate-400 mb-3 leading-snug line-clamp-2">
+        {badge.tagline || badge.description}
+      </p>
+
+      {/* Rarity pill */}
+      <span
+        className={`text-[9px] font-bold tracking-widest uppercase rounded-full px-2.5 py-0.5 border ${PROFILE_RARITY_TEXTS[badge.rarity]}`}
+      >
+        {rarityStyle.label}
+      </span>
+    </motion.div>
+  );
+}
+
 
 export function BadgeAwardSequence({
   isVisible,
@@ -417,7 +552,7 @@ export function BadgeAwardSequence({
         if (badge.rarity !== "legendary") {
           handleDismiss();
         }
-      }, 4000);
+      }, 3000);
 
       return () => {
         clearTimeout(flashTimer);
@@ -455,6 +590,25 @@ export function BadgeAwardSequence({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
         >
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `radial-gradient(circle at 50% 42%, ${BURST_COLORS[badge.rarity]} 0%, transparent 28%), linear-gradient(180deg, rgba(15,23,42,0.58), rgba(0,0,0,0.84))`,
+            }}
+          />
+          <motion.div
+            className="absolute h-72 w-72 rounded-full border border-white/10 pointer-events-none"
+            initial={{ opacity: 0, scale: 0.82 }}
+            animate={{ opacity: [0.25, 0.55, 0.25], scale: [0.9, 1.05, 0.9] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute h-96 w-96 rounded-full border border-white/5 pointer-events-none"
+            initial={{ opacity: 0, scale: 1.04 }}
+            animate={{ opacity: [0.15, 0.38, 0.15], scale: [1.04, 0.94, 1.04] }}
+            transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+
           {/* Legendary Full-Screen Particle Burst */}
           <AnimatePresence>
             {showLegendaryBurst && <LegendaryParticleBurst />}
@@ -482,17 +636,18 @@ export function BadgeAwardSequence({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-white"
+                transition={{ duration: 0.08 }}
+                className="absolute inset-0 bg-white/80"
               />
             )}
 
             {showBadge && !showReveal && (
               <motion.div
                 key="materialize"
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
+                initial={{ scale: 0.45, rotate: -12, y: 18, opacity: 0 }}
+                animate={{ scale: 1, rotate: 0, y: 0, opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                transition={{ type: "spring", stiffness: 260, damping: 18 }}
                 className="relative"
               >
                 {/* Rare Badge Particles */}
@@ -588,9 +743,18 @@ export function BadgeAwardSequence({
                         ],
                   }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
-                  className={`w-32 h-32 rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center relative z-10`}
+                  className={`w-32 h-32 rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center relative z-10 overflow-hidden`}
                 >
-                  <span className="text-5xl">{badge.icon}</span>
+                  <motion.span
+                    className="absolute inset-y-0 -left-10 w-8 rotate-12 bg-white/40 blur-md"
+                    animate={{ x: [0, 180] }}
+                    transition={{ duration: 1.1, repeat: Infinity, repeatDelay: 0.8, ease: "easeInOut" }}
+                  />
+                  {badge.shape === "trophy" && (badge.rarity === "legendary" || badge.rarity === "rare" || badge.rarity === "uncommon") ? (
+                    <TrophyIcon rarity={badge.rarity} />
+                  ) : (
+                    <span className="relative text-5xl">{badge.icon}</span>
+                  )}
                 </motion.div>
               </motion.div>
             )}
@@ -598,54 +762,79 @@ export function BadgeAwardSequence({
             {showReveal && (
               <motion.div
                 key="reveal"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="text-center"
+                initial={{ scale: 0.92, opacity: 0, y: 16 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.92, opacity: 0, y: 12 }}
+                transition={{ type: "spring", stiffness: 220, damping: 20 }}
+                className="relative text-center"
               >
                 <motion.div
                   initial={{ y: -30, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  className="mb-2"
+                  className="mb-4"
                 >
                   <span
                     className={`text-sm font-semibold uppercase tracking-widest ${rarityStyle.text}`}
                   >
-                    Badge Earned!
+                    {rarityStyle.label} Badge Earned!
                   </span>
                 </motion.div>
 
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-                  className="relative mb-6"
-                >
-                  {isLegendary && (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{
-                        repeat: Infinity,
-                        duration: 10,
-                        ease: "linear",
-                      }}
-                      className="absolute inset-0 flex items-center justify-center"
-                    >
-                      <div className="w-40 h-40 rounded-full border-2 border-dashed border-amber-400/30" />
-                    </motion.div>
-                  )}
-
+                {badge.isProfileStyle ? (
+                  /* ── Profile-page card style (task submissions) ──── */
+                  <div className="flex justify-center mb-6 relative">
+                    {isLegendary && (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+                        className="absolute w-64 h-64 rounded-full border-2 border-dashed border-amber-400/20 pointer-events-none"
+                        style={{ top: "50%", left: "50%", transform: "translate(-50%,-50%)" }}
+                      />
+                    )}
+                    <ProfileStyleBadgeCard badge={badge} rarityStyle={rarityStyle} />
+                  </div>
+                ) : (
+                  /* ── Standard trophy/emoji card (checkpoint badges) */
                   <motion.div
-                    animate={{
-                      boxShadow: isLegendary
-                        ? "0 0 60px rgba(245,158,11,0.5)"
-                        : "0 0 30px rgba(99,102,241,0.3)",
-                    }}
-                    className={`w-32 h-32 mx-auto rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center shadow-lg ${rarityStyle.glow}`}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+                    className="relative mb-6"
                   >
-                    <span className="text-5xl">{badge.icon}</span>
+                    {isLegendary && (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+                        className="absolute inset-0 flex items-center justify-center"
+                      >
+                        <div className="w-40 h-40 rounded-full border-2 border-dashed border-amber-400/30" />
+                      </motion.div>
+                    )}
+                    <motion.div
+                      animate={{
+                        boxShadow: isLegendary
+                          ? "0 0 60px rgba(245,158,11,0.5)"
+                          : badge.rarity === "rare"
+                            ? "0 0 40px rgba(203,213,225,0.4)"
+                            : badge.rarity === "uncommon"
+                              ? "0 0 40px rgba(205,127,50,0.4)"
+                              : "0 0 30px rgba(99,102,241,0.3)",
+                      }}
+                      className={`relative w-32 h-32 mx-auto overflow-hidden rounded-2xl ${rarityStyle.bg} ${rarityStyle.border} border-2 flex items-center justify-center shadow-lg ${rarityStyle.glow}`}
+                    >
+                      <motion.span
+                        className="absolute inset-y-0 -left-10 w-8 rotate-12 bg-white/30 blur-md"
+                        animate={{ x: [0, 180] }}
+                        transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1.4, ease: "easeInOut" }}
+                      />
+                      {badge.shape === "trophy" && (badge.rarity === "legendary" || badge.rarity === "rare" || badge.rarity === "uncommon") ? (
+                        <TrophyIcon rarity={badge.rarity} />
+                      ) : (
+                        <span className="relative text-5xl">{badge.icon}</span>
+                      )}
+                    </motion.div>
                   </motion.div>
-                </motion.div>
+                )}
 
                 <motion.div
                   initial={{ y: 20, opacity: 0 }}

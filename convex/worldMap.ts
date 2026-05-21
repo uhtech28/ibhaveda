@@ -21,6 +21,7 @@ import {
   LEVEL_DEFINITIONS,
 } from "./ventureConstants";
 import { Id } from "./_generated/dataModel";
+import { recalculateAndAwardBadgesHelper } from "./badges";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -217,6 +218,9 @@ async function awardPointsAndSyncLevel(
       createdAt: args.now,
     });
   }
+
+  // Recalculate and award badges in real-time
+  await recalculateAndAwardBadgesHelper(ctx, args.userId);
 }
 
 type WorldMapVentureDoc = {

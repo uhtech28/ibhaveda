@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Lightbulb, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle } from "lucide-react"
 import { ProfileStatsDialog } from "./ProfileStatsDialog";
 import { ProfileProgress } from "./ProfileProgress";
+import { ProfileBadges } from "./ProfileBadges";
 import { Id } from "@convex/_generated/dataModel";
 import { ContributionRequest } from "@/components/requests/request-status-card"
 import { useChat } from "@/components/chat/ChatContext";
@@ -294,6 +295,9 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         </div>
 
       </div>
+
+      {/* Badges & Achievements Section */}
+      <ProfileBadges userId={profile._id} isOwner={isOwner} />
 
       {/* Contribution Requests (Only visible to owner) — single button to dedicated page */}
       {isOwner && (

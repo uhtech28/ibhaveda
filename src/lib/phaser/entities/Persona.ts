@@ -85,7 +85,7 @@ export class Persona extends Phaser.GameObjects.Container {
     this.shadowEllipse = new Phaser.GameObjects.Ellipse(
       scene,
       0,
-      66,
+      0,
       48,
       14,
       0x000000,
@@ -95,14 +95,14 @@ export class Persona extends Phaser.GameObjects.Container {
     // ── Sprite ──────────────────────────────────────────────────────────────
     // Use sprite sheets for frame-based animations
     // The sprite sheets are 32×48px per frame, rendered at 3× scale (96×144px)
-    // Origin is set to (0.5, 1.0) to allow for the character's feet to be at y=0
+    // Origin Y is set to 40 / 48 so that the visual feet row (at Y=40) aligns at y=0
     const spriteSheetKey =
       gender === "male"
         ? "persona_male_idle_sheet"
         : "persona_female_idle_sheet";
 
     this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, spriteSheetKey, 0);
-    this.sprite.setOrigin(0.5, 1.0);
+    this.sprite.setOrigin(0.5, 40 / 48);
     this.sprite.setScale(3); // 32x48px -> 96x144px (3× nearest-neighbour, per PRD §3.1)
 
     // ── Assemble container ──────────────────────────────────────────────────

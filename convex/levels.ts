@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { LEVEL_DEFINITIONS } from "./ventureConstants";
 import type { MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { recalculateAndAwardBadgesHelper } from "./badges";
 
 function deriveLevelFromTitlePoints(titlePoints: number) {
   return LEVEL_DEFINITIONS.reduce((currentLevel, def) => {
@@ -115,6 +116,9 @@ export const awardPoints = mutation({
 
       // Check for level up
       await checkLevelUp(ctx, userLevel._id);
+
+      // Recalculate and award badges in real-time
+      await recalculateAndAwardBadgesHelper(ctx, args.userId);
     }
   },
 });
