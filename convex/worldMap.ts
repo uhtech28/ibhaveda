@@ -187,11 +187,43 @@ async function awardPointsAndSyncLevel(
     });
   }
 
-  const userLevel = await ctx.db
+  let userLevel = await ctx.db
     .query("userLevels")
     .withIndex("by_user", (q) => q.eq("userId", args.userId))
     .first();
-  if (!userLevel) return;
+
+  if (!userLevel) {
+    const userLevelId = await ctx.db.insert("userLevels", {
+      userId: args.userId,
+      currentLevel: 1,
+      titlePoints: 0,
+      totalPoints: 0,
+      goldCheckpoints: 0,
+      fullLifecycles: 0,
+      helpfulFlareResponses: 0,
+      flaresResolved: 0,
+      menteesCount: 0,
+      menteeCheckpointAdvances: 0,
+      menteeLevelAchievements: 0,
+      ideasLaunched: 0,
+      ideasScaled: 0,
+      collaboratorsRecruited: 0,
+      collaboratorsJoined: 0,
+      commentsCount: 0,
+      upvotedCommentsCount: 0,
+      ideasCreated: 0,
+      ideasWithStage6: 0,
+      ideasWithStage8: 0,
+      activeIdeaTypes: [],
+      updatedAt: args.now,
+    });
+    userLevel = await ctx.db.get(userLevelId);
+  }
+
+  if (!userLevel) {
+    await recalculateAndAwardBadgesHelper(ctx, args.userId);
+    return;
+  }
 
   const titlePoints = userLevel.titlePoints + args.amount;
   const totalPoints = userLevel.totalPoints + args.amount;
@@ -203,6 +235,9 @@ async function awardPointsAndSyncLevel(
     totalPoints,
     updatedAt: args.now,
   });
+
+  // Recalculate and award badges in real-time
+  await recalculateAndAwardBadgesHelper(ctx, args.userId);
 
   if (targetLevel <= userLevel.currentLevel || !wallet) return;
 
@@ -218,9 +253,6 @@ async function awardPointsAndSyncLevel(
       createdAt: args.now,
     });
   }
-
-  // Recalculate and award badges in real-time
-  await recalculateAndAwardBadgesHelper(ctx, args.userId);
 }
 
 type WorldMapVentureDoc = {

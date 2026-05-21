@@ -208,7 +208,6 @@ export function IdeaForgeExperience({
           <IdeaForgeLeftRail
             currentUser={currentUser}
             userIdeas={userIdeas as IdeaForgeIdea[]}
-            onOpenComposer={openCategorySelector}
             onTagSelect={onSearchChange}
           />
 

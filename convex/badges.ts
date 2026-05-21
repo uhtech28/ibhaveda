@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { BADGE_DEFINITIONS, getVentureBadgeEmoji } from "./ventureConstants";
+import {
+  BADGE_DEFINITIONS,
+  VENTURE_STAGES,
+  getVentureBadgeEmoji,
+} from "./ventureConstants";
 
 const INITIAL_BADGES = [
   {
@@ -174,6 +178,52 @@ function categoryToRarity(
       return "common";
   }
 }
+
+function normalizeTemplateCategory(category: unknown) {
+  if (typeof category !== "string") return "";
+
+  const normalized = category.trim().toLowerCase();
+  if (normalized === "lab" || normalized === "experimental") {
+    return "experimental";
+  }
+  if (
+    normalized === "venture" ||
+    normalized === "academic" ||
+    normalized === "creative"
+  ) {
+    return normalized;
+  }
+
+  return normalized;
+}
+
+function checkpointTaskCount(checkpoint: {
+  t1Completed?: boolean;
+  t2Completed?: boolean;
+  t3Completed?: boolean;
+}) {
+  return [
+    checkpoint.t1Completed,
+    checkpoint.t2Completed,
+    checkpoint.t3Completed,
+  ].filter(Boolean).length;
+}
+
+function isCheckpointComplete(checkpoint: {
+  status?: string;
+  t1Completed?: boolean;
+  t2Completed?: boolean;
+  t3Completed?: boolean;
+}) {
+  return checkpoint.status === "completed" || checkpointTaskCount(checkpoint) >= 2;
+}
+
+const REQUIRED_TEMPLATE_CATEGORIES = [
+  "venture",
+  "academic",
+  "creative",
+  "experimental",
+] as const;
 
 // Internal: Award a badge if not already owned
 export const awardBadge = internalMutation({
@@ -598,22 +648,38 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
   let completedCheckpoints = 0;
   let goldCheckpoints = 0;
   let maxStage = 1;
+  let highestCompletedStage = 0;
   let completedStages = 0;
   let hasVentureStage6 = false;
-  let hasVentureStage8 = false;
   let lifecyclesCompleted = 0;
   let perfectLifecycles = 0;
 
-  const STAGE_CHECKPOINTS = [0, 3, 4, 3, 5, 6, 5, 5, 5]; // 1-indexed
+  let academicLifecycles = 0;
+  let experimentalLifecycles = 0;
+  let creativeLifecycles = 0;
+  let ventureLifecycles = 0;
+  const completedCategories = new Set<string>();
+  const allCompletedCheckpoints: any[] = [];
+  const allCheckpointIds: any[] = [];
+
+  const stageCheckpointCounts = new Map(
+    VENTURE_STAGES.map((stage) => [stage.id, stage.checkpoints]),
+  );
 
   for (const venture of ventures) {
+    if ((venture.currentStage ?? 1) > maxStage) {
+      maxStage = venture.currentStage;
+    }
+
     const cpList = await ctx.db
       .query("ventureCheckpoints")
       .withIndex("by_venture", (q: any) => q.eq("ventureId", venture._id))
       .collect();
 
-    const cpCompleted = cpList.filter((c: any) => c.status === "completed");
+    const cpCompleted = cpList.filter((c: any) => isCheckpointComplete(c));
     completedCheckpoints += cpCompleted.length;
+    allCompletedCheckpoints.push(...cpCompleted);
+    allCheckpointIds.push(...cpList.map((cp: any) => cp._id));
 
     const gpCompleted = cpList.filter((c: any) => c.goldBonusEarned || (c.t1Completed && c.t2Completed && c.t3Completed));
     goldCheckpoints += gpCompleted.length;
@@ -621,15 +687,15 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     // Check completed stages for this venture
     let completedStagesForVenture = 0;
     let perfectStagesForVenture = 0;
-    for (let s = 1; s <= 8; s++) {
+    for (const stageDef of VENTURE_STAGES) {
+      const s = stageDef.id;
       const stageCps = cpList.filter((c: any) => c.stage === s);
-      const reqCount = STAGE_CHECKPOINTS[s];
-      if (stageCps.length >= reqCount && stageCps.every((c: any) => c.status === "completed")) {
+      const reqCount = stageCheckpointCounts.get(s) ?? stageDef.checkpoints;
+      if (stageCps.length >= reqCount && stageCps.every((c: any) => isCheckpointComplete(c))) {
         completedStagesForVenture++;
         completedStages++;
-        if (s > maxStage) maxStage = s;
+        if (s > highestCompletedStage) highestCompletedStage = s;
         if (s >= 6) hasVentureStage6 = true;
-        if (s >= 8) hasVentureStage8 = true;
         
         if (stageCps.every((c: any) => c.goldBonusEarned || (c.t1Completed && c.t2Completed && c.t3Completed))) {
           perfectStagesForVenture++;
@@ -639,8 +705,185 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
 
     if (completedStagesForVenture >= 8) {
       lifecyclesCompleted++;
+      
+      const idea = await ctx.db.get(venture.ideaId);
+      const ideaCategory = normalizeTemplateCategory(idea?.category) || "venture";
+      completedCategories.add(ideaCategory);
+
+      if (ideaCategory === "academic") academicLifecycles++;
+      else if (ideaCategory === "experimental") experimentalLifecycles++;
+      else if (ideaCategory === "creative") creativeLifecycles++;
+      else if (ideaCategory === "venture") ventureLifecycles++;
+
       if (perfectStagesForVenture >= 8) {
         perfectLifecycles++;
+      }
+    }
+  }
+
+  // 1b. Additional helper calculations for remaining 62 badges
+  const postedCategories = new Set<string>(
+    ideas
+      .map((idea: any) => normalizeTemplateCategory(idea.category))
+      .filter(Boolean),
+  );
+
+  const contributionRequests = await ctx.db
+    .query("contributionRequests")
+    .withIndex("by_author_created", (q: any) => q.eq("authorId", userId))
+    .collect();
+  
+  const requestsPerIdea: Record<string, number> = {};
+  for (const req of contributionRequests) {
+    requestsPerIdea[req.ideaId] = (requestsPerIdea[req.ideaId] || 0) + 1;
+  }
+  const hasDraw = Object.values(requestsPerIdea).some((count) => count >= 10);
+
+  const acceptedCollaborations = await ctx.db
+    .query("contributionRequests")
+    .withIndex("by_contributor_status", (q: any) => q.eq("contributorId", userId).eq("status", "accepted"))
+    .collect();
+  const collaboratedAuthors = new Set(acceptedCollaborations.map((c: any) => c.authorId));
+
+  const streakRecord = await ctx.db
+    .query("userStreaks")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .first();
+  const currentStreak = streakRecord?.currentStreak ?? 0;
+  const longestStreak = streakRecord?.longestStreak ?? 0;
+
+  const wallet = await ctx.db
+    .query("wallets")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .first();
+  const userTransactions = wallet 
+    ? await ctx.db
+        .query("transactions")
+        .withIndex("by_wallet", (q: any) => q.eq("walletId", wallet._id))
+        .collect()
+    : [];
+
+  const quartersByYear: Record<number, Set<number>> = {};
+  for (const tx of userTransactions) {
+    const d = new Date(tx.createdAt);
+    const y = d.getFullYear();
+    const q = Math.floor(d.getMonth() / 3) + 1;
+    if (!quartersByYear[y]) quartersByYear[y] = new Set();
+    quartersByYear[y].add(q);
+  }
+  const hasSeasonal = Object.values(quartersByYear).some((qs) => qs.size >= 4);
+
+  const leaderboardWins = await ctx.db
+    .query("dailyLeaderboardWinners")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+
+  // Midnight Oil
+  let midnightOilCount = 0;
+  for (const cp of allCompletedCheckpoints) {
+    if (cp.completedAt) {
+      const hours = new Date(cp.completedAt).getHours();
+      if (hours >= 0 && hours < 5) {
+        midnightOilCount++;
+      }
+    }
+  }
+  const hasMidnightOil = midnightOilCount >= 3;
+
+  // Patient One
+  let hasPatientOne = false;
+  for (const cp of allCompletedCheckpoints) {
+    if (cp.partialStartedAt && cp.completedAt) {
+      const days = (cp.completedAt - cp.partialStartedAt) / (1000 * 60 * 60 * 24);
+      if (days >= 30) {
+        hasPatientOne = true;
+        break;
+      }
+    }
+  }
+
+  // Perfectionist
+  const sortedCompletedCps = [...allCompletedCheckpoints].sort((a: any, b: any) => (a.completedAt ?? 0) - (b.completedAt ?? 0));
+  let consecutiveGold = 0;
+  let hasPerfectionist = false;
+  for (const cp of sortedCompletedCps) {
+    const isGold = cp.goldBonusEarned || (cp.t1Completed && cp.t2Completed && cp.t3Completed);
+    if (isGold) {
+      consecutiveGold++;
+      if (consecutiveGold >= 3) {
+        hasPerfectionist = true;
+      }
+    } else {
+      consecutiveGold = 0;
+    }
+  }
+
+  // Contrarian
+  const allTasks: any[] = [];
+  for (const cpId of allCheckpointIds) {
+    const tasks = await ctx.db
+      .query("ventureTasks")
+      .withIndex("by_checkpoint", (q: any) => q.eq("checkpointId", cpId))
+      .collect();
+    allTasks.push(...tasks);
+  }
+
+  let hasContrarian = false;
+  for (const checkpointId of allCheckpointIds) {
+    const tasksForCp = allTasks.filter((t: any) => t.checkpointId === checkpointId);
+    const t1 = tasksForCp.find((t: any) => t.taskLevel === "t1");
+    const t2 = tasksForCp.find((t: any) => t.taskLevel === "t2");
+    const t3 = tasksForCp.find((t: any) => t.taskLevel === "t3");
+    if (t3 && t3.status === "completed" && t3.completedAt) {
+      const t1Time = t1 && t1.status === "completed" && t1.completedAt ? t1.completedAt : Infinity;
+      const t2Time = t2 && t2.status === "completed" && t2.completedAt ? t2.completedAt : Infinity;
+      if (t3.completedAt < t1Time && t3.completedAt < t2Time) {
+        hasContrarian = true;
+        break;
+      }
+    }
+  }
+
+  // Renaissance
+  const activeIdeas = ideas.filter((idea: any) => !idea.isDeleted);
+  const activeCategories = new Set(
+    activeIdeas
+      .map((idea: any) => normalizeTemplateCategory(idea.category))
+      .filter(Boolean),
+  );
+  const hasRenaissance = REQUIRED_TEMPLATE_CATEGORIES.every((category) =>
+    activeCategories.has(category),
+  );
+
+  // Ghost
+  const hasGhost = sparkCount.length >= 50 && ideas.every((idea: any) => (idea.sparkCount ?? 0) === 0);
+
+  // Full Moon
+  const activeMonths = new Set<string>();
+  for (const tx of userTransactions) {
+    const d = new Date(tx.createdAt);
+    activeMonths.add(`${d.getFullYear()}-${d.getMonth()}`);
+  }
+  const hasFullMoon = activeMonths.size >= 12;
+
+  // Comeback
+  let hasComeback = false;
+  for (const cp of allCompletedCheckpoints) {
+    if (cp.completedAt) {
+      const ventureCps = allCompletedCheckpoints.filter((c: any) => c.ventureId === cp.ventureId && c.completedAt < cp.completedAt);
+      if (ventureCps.length > 0) {
+        const lastCp = ventureCps.reduce((latest: any, current: any) => (current.completedAt > latest.completedAt ? current : latest), ventureCps[0]);
+        const diffDays = (cp.completedAt - lastCp.completedAt) / (1000 * 60 * 60 * 24);
+        if (diffDays >= 60) {
+          hasComeback = true;
+          break;
+        }
+      } else {
+        const ventureForCp = ventures.find((v: any) => v._id === cp.ventureId);
+        if (ventureForCp && cp.completedAt - ventureForCp.createdAt >= 60 * 1000 * 60 * 60 * 24) {
+          hasComeback = true;
+          break;
+        }
       }
     }
   }
@@ -696,22 +939,68 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     { id: 10, shouldAward: goldCheckpoints >= 1 }, // Gilded
     { id: 11, shouldAward: completedStages >= 1 }, // Stage Clear
     { id: 12, shouldAward: maxStage >= 4 }, // The Long Road
-    { id: 13, shouldAward: maxStage >= 5 }, // The Heartland
+    { id: 13, shouldAward: highestCompletedStage >= 5 }, // The Heartland
     { id: 14, shouldAward: hasVentureStage6 }, // The Launcher
     { id: 15, shouldAward: lifecyclesCompleted >= 1 }, // The Full Circle
     { id: 16, shouldAward: perfectLifecycles >= 1 }, // The Gilded Path
+    
+    // Templates (17-22)
+    { id: 17, shouldAward: academicLifecycles >= 1 }, // The Archaeologist
+    { id: 18, shouldAward: experimentalLifecycles >= 1 }, // The Artificer
+    { id: 19, shouldAward: creativeLifecycles >= 1 }, // The Author
+    { id: 20, shouldAward: ventureLifecycles >= 1 }, // The Founder
+    { id: 21, shouldAward: REQUIRED_TEMPLATE_CATEGORIES.every((category) => postedCategories.has(category) && completedCategories.has(category)) }, // The Polymath
+    { id: 22, shouldAward: REQUIRED_TEMPLATE_CATEGORIES.every((category) => postedCategories.has(category)) }, // The Cartographer
+    
+    // Milestones (23-26)
     { id: 23, shouldAward: lifecyclesCompleted >= 2 }, // Twice-Born
     { id: 24, shouldAward: ideasCreated >= 10 }, // The Ten
     { id: 25, shouldAward: goldCheckpoints >= 25 }, // The Gold Standard
     { id: 26, shouldAward: goldCheckpoints >= 100 }, // Century
+    
+    // Community (27-38)
     { id: 27, shouldAward: commentsCount >= 10 }, // The Listener
     { id: 28, shouldAward: sparkCount.length >= 25 }, // The Advocate
+    { id: 29, shouldAward: userLevel.upvotedCommentsCount >= 10 }, // The Critic
     { id: 30, shouldAward: userLevel.upvotedCommentsCount >= 50 }, // The Trusted Voice
     { id: 31, shouldAward: userLevel.collaboratorsJoined >= 1 }, // The Ally
-    { id: 32, shouldAward: userLevel.collaboratorsRecruited >= 5 }, // The Recruiter
-    { id: 55, shouldAward: userLevel.currentLevel >= 50 }, // Level 50+
-    { id: 56, shouldAward: lifecyclesCompleted >= 5 }, // 5 lifecycles
-    { id: 57, shouldAward: lifecyclesCompleted >= 3 }, // 3 lifecycles
+    { id: 32, shouldAward: userLevel.collaboratorsRecruited >= 5 }, // The Recruiter (Assembler)
+    { id: 33, shouldAward: userLevel.helpfulFlareResponses >= 5 }, // The Catalyst
+    { id: 34, shouldAward: (user.followersCount ?? 0) >= 10 }, // The Followed
+    { id: 35, shouldAward: ideas.some((idea: any) => idea.sparkCount >= 25) }, // The Celebrated
+    { id: 36, shouldAward: ideas.some((idea: any) => idea.sparkCount >= 50) }, // The Beloved
+    { id: 37, shouldAward: hasDraw }, // The Draw
+    { id: 38, shouldAward: collaboratedAuthors.size >= 3 }, // The Connector
+    
+    // Consistency (39-46)
+    { id: 39, shouldAward: longestStreak >= 7 || currentStreak >= 7 }, // The Regular
+    { id: 40, shouldAward: longestStreak >= 30 || currentStreak >= 30 }, // The Devoted
+    { id: 41, shouldAward: longestStreak >= 90 || currentStreak >= 90 }, // The Unbroken
+    { id: 42, shouldAward: hasSeasonal }, // The Seasonal
+    { id: 43, shouldAward: leaderboardWins.some((w: any) => w.rank <= 5) || userLevel.currentLevel >= 12 }, // The Weekly Champion
+    { id: 44, shouldAward: userLevel.currentLevel >= 5 }, // The Promoted
+    { id: 45, shouldAward: userLevel.currentLevel >= 25 }, // The Diamond
+    { id: 46, shouldAward: userLevel.currentLevel >= 35 }, // The Immovable
+    
+    // Hidden (47-54)
+    { id: 47, shouldAward: hasMidnightOil }, // The Midnight Oil
+    { id: 48, shouldAward: hasPatientOne }, // The Patient One
+    { id: 49, shouldAward: hasPerfectionist }, // The Perfectionist
+    { id: 50, shouldAward: hasContrarian }, // The Contrarian
+    { id: 51, shouldAward: hasRenaissance }, // The Renaissance
+    { id: 52, shouldAward: hasGhost }, // The Ghost
+    { id: 53, shouldAward: hasFullMoon }, // Full Moon
+    { id: 54, shouldAward: hasComeback }, // The Comeback
+    
+    // Aspirational (55-62)
+    { id: 55, shouldAward: userLevel.currentLevel >= 50 }, // The Visionary
+    { id: 56, shouldAward: lifecyclesCompleted >= 5 }, // The Lorekeeper
+    { id: 57, shouldAward: ventureLifecycles >= 3 }, // The Realm Builder
+    { id: 58, shouldAward: academicLifecycles >= 3 }, // The Elder Scholar
+    { id: 59, shouldAward: experimentalLifecycles >= 3 }, // The Grand Artificer
+    { id: 60, shouldAward: creativeLifecycles >= 3 }, // The Master
+    { id: 61, shouldAward: commentsCount >= 1000 }, // The Thousand
+    { id: 62, shouldAward: goldCheckpoints >= 50 || userLevel.currentLevel >= 45 }, // The Architect of Ages / Walled City
   ];
 
   // Find the active venture's corruption level to store at the time of award
@@ -915,4 +1204,3 @@ export const getUserProfileBadges = query({
     return allBadges.sort((a, b) => b.awardedAt - a.awardedAt);
   },
 });
-

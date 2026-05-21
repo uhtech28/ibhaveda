@@ -15,6 +15,7 @@ import {
   VENTURE_STAGES,
 } from "./ventureConstants";
 import { Id } from "./_generated/dataModel";
+import { recalculateAndAwardBadgesHelper } from "./badges";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MUTATIONS
@@ -728,6 +729,8 @@ export const submitEvidence = mutation({
         userTier: "free",
       });
     }
+
+    await recalculateAndAwardBadgesHelper(ctx, user._id);
 
     return evidenceId;
   },

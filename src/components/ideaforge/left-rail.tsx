@@ -89,7 +89,7 @@ export function IdeaForgeLeftRail({
   // Real, live backend data
   const levelProgress = useQuery(
     api.levels.getUserLevelProgress,
-    currentUser?._id ? { userId: currentUser._id } : "skip"
+    currentUser?._id ? { userId: currentUser._id as any } : "skip"
   );
 
   // Level / title — prefer backend, fall back to local table & XP heuristic.
