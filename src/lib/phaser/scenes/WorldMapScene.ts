@@ -2394,120 +2394,147 @@ export class WorldMapScene extends Phaser.Scene {
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
-    const toX = (x: number) => panelX + x * tileSize;
-    const toY = (y: number) => panelOffsetY + y * tileSize;
-    const midRow = rows / 2;
     const panelW = cols * tileSize;
     const panelH = rows * tileSize;
-    const midY = toY(midRow);
+    const midRow = rows / 2;
+    const midY = panelOffsetY + midRow * tileSize;
 
-    // ── BASE GROUND: warm amber kingdom earth ────────────────
-    const ground = this.add.graphics();
-    ground.fillStyle(0x2a1200, 1);
-    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
+    void biome;
+    void biomeIndex;
+
+    const toX = (x: number) => panelX + x * tileSize;
+    const toY = (y: number) => panelOffsetY + y * tileSize;
+
+    const makeGraphic = () => this.make.graphics({ x: 0, y: 0 }, false);
+
+    const buildGridTexture = (): string => {
+      const g = makeGraphic();
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          g.fillStyle((r + c) % 2 === 0 ? 0x321600 : 0x271000, 0.5);
+          g.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
+        }
+      }
+      const key = `capitalGrid_${cols}_${rows}_${tileSize}`;
+      g.generateTexture(key, panelW, panelH);
+      g.destroy();
+      return key;
+    };
+
+    const buildWheatTexture = (): string => {
+      const g = makeGraphic();
+      const drawBand = (startRow: number, endRow: number) => {
+        for (let r = startRow; r < endRow; r += 1.6) {
+          g.fillStyle(0x1a0a00, 0.85);
+          g.fillRect(
+            3 * tileSize,
+            r * tileSize,
+            tileSize * (cols - 6),
+            tileSize * 0.5,
+          );
+
+          g.fillStyle(0x3a1800, 0.65);
+          g.fillRect(
+            3 * tileSize,
+            r * tileSize + tileSize * 0.5,
+            tileSize * (cols - 6),
+            tileSize * 0.8,
+          );
+
+          for (let c = 4; c < cols - 3; c += 1.2) {
+            const x = c * tileSize;
+            const y = r * tileSize;
+
+            g.fillStyle(0xb45309, 0.75);
+            g.fillRect(
+              x + tileSize * 0.4,
+              y - tileSize * 0.9,
+              tileSize * 0.12,
+              tileSize,
+            );
+
+            g.fillStyle(0xd97706, 0.6);
+            g.fillRect(
+              x + tileSize * 0.26,
+              y - tileSize * 0.9,
+              tileSize * 0.4,
+              tileSize * 0.3,
+            );
+
+            g.fillStyle(0xfbbf24, 0.22);
+            g.fillRect(
+              x + tileSize * 0.28,
+              y - tileSize * 0.88,
+              tileSize * 0.18,
+              tileSize * 0.12,
+            );
+          }
+        }
+      };
+
+      drawBand(0.5, midRow - 2.5);
+      drawBand(midRow + 2, rows - 0.5);
+
+      const key = `capitalWheat_${cols}_${rows}_${tileSize}`;
+      g.generateTexture(key, panelW, panelH);
+      g.destroy();
+      return key;
+    };
+
+    const gridKey = this.textures.exists(
+      `capitalGrid_${cols}_${rows}_${tileSize}`,
+    )
+      ? `capitalGrid_${cols}_${rows}_${tileSize}`
+      : buildGridTexture();
+
+    const wheatKey = this.textures.exists(
+      `capitalWheat_${cols}_${rows}_${tileSize}`,
+    )
+      ? `capitalWheat_${cols}_${rows}_${tileSize}`
+      : buildWheatTexture();
+
+    const ground = this.add.rectangle(
+      panelX,
+      panelOffsetY,
+      panelW,
+      panelH,
+      0x2a1200,
+      1,
+    );
+    ground.setOrigin(0, 0);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
 
-    // ── TILE TEXTURE: golden-tinted tile grid ─────────────────
-    const tex = this.add.graphics();
-    tex.setDepth(2);
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const shade = (r + c) % 2 === 0 ? 0x321600 : 0x271000;
-        tex.fillStyle(shade, 0.5);
-        tex.fillRect(toX(c), toY(r), tileSize, tileSize);
-      }
-    }
-    this.backgroundLayer.add(tex);
+    const grid = this.add
+      .image(panelX, panelOffsetY, gridKey)
+      .setOrigin(0, 0)
+      .setDepth(2);
+    this.backgroundLayer.add(grid);
 
-    // ── WHEAT CROP ROWS (fills most of the panel) ────────────
-    const wheat = this.add.graphics();
-    wheat.setDepth(3);
-
-    // Rows of wheat above path
-    for (let r = 0.5; r < midRow - 2.5; r += 1.6) {
-      // Trough (dark)
-      wheat.fillStyle(0x1a0a00, 0.85);
-      wheat.fillRect(toX(3), toY(r), tileSize * (cols - 6), tileSize * 0.5);
-      // Ridge (mid-brown)
-      wheat.fillStyle(0x3a1800, 0.65);
-      wheat.fillRect(
-        toX(3),
-        toY(r) + tileSize * 0.5,
-        tileSize * (cols - 6),
-        tileSize * 0.8,
-      );
-      // Wheat stalk tops (golden)
-      for (let c = 4; c < cols - 3; c += 1.2) {
-        // Stalk
-        wheat.fillStyle(0xb45309, 0.75);
-        wheat.fillRect(
-          toX(c) + tileSize * 0.4,
-          toY(r) - tileSize * 0.9,
-          tileSize * 0.12,
-          tileSize,
-        );
-        // Grain head
-        wheat.fillStyle(0xd97706, 0.6);
-        wheat.fillRect(
-          toX(c) + tileSize * 0.26,
-          toY(r) - tileSize * 0.9,
-          tileSize * 0.4,
-          tileSize * 0.3,
-        );
-        // Glint
-        wheat.fillStyle(0xfbbf24, 0.22);
-        wheat.fillRect(
-          toX(c) + tileSize * 0.28,
-          toY(r) - tileSize * 0.88,
-          tileSize * 0.18,
-          tileSize * 0.12,
-        );
-      }
-    }
-
-    // Rows below path
-    for (let r = midRow + 2; r < rows - 0.5; r += 1.6) {
-      wheat.fillStyle(0x1a0a00, 0.85);
-      wheat.fillRect(toX(3), toY(r), tileSize * (cols - 6), tileSize * 0.5);
-      wheat.fillStyle(0x3a1800, 0.65);
-      wheat.fillRect(
-        toX(3),
-        toY(r) + tileSize * 0.5,
-        tileSize * (cols - 6),
-        tileSize * 0.8,
-      );
-      for (let c = 4; c < cols - 3; c += 1.2) {
-        wheat.fillStyle(0xb45309, 0.75);
-        wheat.fillRect(
-          toX(c) + tileSize * 0.4,
-          toY(r) - tileSize * 0.9,
-          tileSize * 0.12,
-          tileSize,
-        );
-        wheat.fillStyle(0xd97706, 0.6);
-        wheat.fillRect(
-          toX(c) + tileSize * 0.26,
-          toY(r) - tileSize * 0.9,
-          tileSize * 0.4,
-          tileSize * 0.3,
-        );
-        wheat.fillStyle(0xfbbf24, 0.22);
-        wheat.fillRect(
-          toX(c) + tileSize * 0.28,
-          toY(r) - tileSize * 0.88,
-          tileSize * 0.18,
-          tileSize * 0.12,
-        );
-      }
-    }
+    const wheat = this.add
+      .image(panelX, panelOffsetY, wheatKey)
+      .setOrigin(0, 0)
+      .setDepth(3);
     this.backgroundLayer.add(wheat);
 
-    // ── GOLDEN TIMBER FENCE ───────────────────────────────────
-    const fenceG = this.add.graphics();
-    fenceG.setDepth(5);
+    const path = this.add.graphics();
+    path.setDepth(4);
+    path.fillStyle(0x5c2800, 1);
+    path.fillRect(panelX, midY - 14, panelW, 28);
+    path.fillStyle(0x7c3800, 0.25);
+    for (let x = panelX; x < panelX + panelW; x += tileSize * 2) {
+      path.fillRect(x, midY - 14, tileSize * 0.22, 28);
+    }
+    path.fillRect(panelX, midY - 2, panelW, 4);
+    path.fillStyle(0xfbbf24, 0.16);
+    path.fillRect(panelX, midY - 15, panelW, 3);
+    path.fillRect(panelX, midY + 13, panelW, 3);
+    this.backgroundLayer.add(path);
+
+    const fence = this.add.graphics();
+    fence.setDepth(5);
     this.drawFenceRow(
-      fenceG,
+      fence,
       toX(3),
       midY - 30,
       tileSize * (cols - 6),
@@ -2516,7 +2543,7 @@ export class WorldMapScene extends Phaser.Scene {
       24,
     );
     this.drawFenceRow(
-      fenceG,
+      fence,
       toX(3),
       midY + 18,
       tileSize * (cols - 6),
@@ -2524,47 +2551,26 @@ export class WorldMapScene extends Phaser.Scene {
       0x92400e,
       24,
     );
-    this.backgroundLayer.add(fenceG);
+    this.backgroundLayer.add(fence);
 
-    // ── ROYAL COBBLESTONE PATH ────────────────────────────────
-    const path = this.add.graphics();
-    path.fillStyle(0x5c2800, 1);
-    path.fillRect(panelX, midY - 14, panelW, 28);
-    // Cobble segments
-    path.fillStyle(0x7c3800, 0.25);
-    for (let x = panelX; x < panelX + panelW; x += tileSize * 2) {
-      path.fillRect(x, midY - 14, tileSize * 0.22, 28);
-    }
-    path.fillRect(panelX, midY - 2, panelW, 4);
-    // Gold trim edges
-    path.fillStyle(0xfbbf24, 0.16);
-    path.fillRect(panelX, midY - 15, panelW, 3);
-    path.fillRect(panelX, midY + 13, panelW, 3);
-    path.setDepth(4);
-    this.backgroundLayer.add(path);
-
-    // ── STONE WALL (right edge, battlements) ─────────────────
     const wall = this.add.graphics();
-    wall.setDepth(5);
+    wall.setDepth(6);
     wall.fillStyle(0x7c3a0a, 0.85);
     wall.fillRect(toX(cols - 5), panelOffsetY, tileSize * 1.8, panelH);
     wall.fillStyle(0x5a2800, 0.5);
     for (let r = 0; r < rows; r += 2) {
       wall.fillRect(toX(cols - 5), toY(r), tileSize * 1.8, tileSize * 0.1);
     }
-    // Battlements
     for (let r = 0.5; r < rows; r += 3) {
       wall.fillStyle(0x9a4e10, 0.8);
       wall.fillRect(toX(cols - 5) + 3, toY(r), tileSize * 0.75, tileSize * 1.3);
     }
     this.backgroundLayer.add(wall);
 
-    // ── PROPS: golden trees + haystacks ───────────────────────
     const props = this.add.graphics();
-    props.setDepth(6);
+    props.setDepth(7);
 
-    // Autumn golden trees
-    [
+    const trees: Array<[number, number]> = [
       [5, midRow - 4],
       [10, midRow - 6],
       [17, midRow - 4],
@@ -2574,7 +2580,9 @@ export class WorldMapScene extends Phaser.Scene {
       [13, midRow + 5],
       [30, midRow + 3],
       [38, midRow + 4],
-    ].forEach(([c, r]) => {
+    ];
+
+    for (const [c, r] of trees) {
       this.drawPixelTree(
         props,
         toX(c),
@@ -2584,36 +2592,35 @@ export class WorldMapScene extends Phaser.Scene {
         0x7c2d0a,
         scale,
       );
-    });
+    }
 
-    // Haystacks (small rounded rectangles)
-    [
+    const haystacks: Array<[number, number]> = [
       [22, midRow - 3],
       [27, midRow + 2],
       [44, midRow - 4],
       [48, midRow + 3],
-    ].forEach(([c, r]) => {
+    ];
+
+    for (const [c, r] of haystacks) {
       props.fillStyle(0xd97706, 0.85);
       props.fillEllipse(toX(c), toY(r), 18, 12);
       props.fillStyle(0xfbbf24, 0.35);
       props.fillEllipse(toX(c) - 2, toY(r) - 2, 10, 6);
-    });
+    }
 
-    // Scarecrow silhouette
-    const sc = toX(35);
+    const scX = toX(35);
     const scY = midY - 36;
     props.fillStyle(0x4a2800, 0.9);
-    props.fillRect(sc - 1, scY, 3, 14); // body
-    props.fillRect(sc - 7, scY + 4, 15, 2); // arms
+    props.fillRect(scX - 1, scY, 3, 14);
+    props.fillRect(scX - 7, scY + 4, 15, 2);
     props.fillStyle(0x7c4010, 0.8);
-    props.fillEllipse(sc, scY - 2, 8, 8); // head
+    props.fillEllipse(scX, scY - 2, 8, 8);
     props.fillStyle(0xb45309, 0.7);
-    props.fillRect(sc - 5, scY - 6, 12, 3); // hat brim
-    props.fillRect(sc - 3, scY - 11, 7, 6); // hat top
+    props.fillRect(scX - 5, scY - 6, 12, 3);
+    props.fillRect(scX - 3, scY - 11, 7, 6);
 
     this.backgroundLayer.add(props);
 
-    // ── SPRITES ───────────────────────────────────────────────
     if (this.textures.exists("House_Hay_1")) {
       const house = this.add.sprite(toX(21), toY(midRow - 5.2), "House_Hay_1");
       house.setOrigin(0.5, 1);
@@ -2622,17 +2629,19 @@ export class WorldMapScene extends Phaser.Scene {
       house.setDepth(8);
       this.midgroundLayer.add(house);
     }
+
     if (this.textures.exists("LampPost_3")) {
-      [16, 26].forEach((cx) => {
+      for (const cx of [16, 26]) {
         const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
         lp.setOrigin(0.5, 1);
         lp.setScale(scale);
         lp.setTint(0xfef08a);
         lp.setDepth(9);
         this.midgroundLayer.add(lp);
-      });
+      }
     }
   }
+
 
   private renderMapObjects(
     objects: Phaser.Types.Tilemaps.TiledObject[],
