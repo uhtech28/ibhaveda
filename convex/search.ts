@@ -205,7 +205,7 @@ export const searchIdeas = query({
 
     // Filter for search term, not deleted, and root level
     const searchTerm = args.query.toLowerCase().trim();
-    let results = ideas.filter((idea: any) => {
+    const results = ideas.filter((idea: any) => {
       // Skip deleted ideas
       if (idea.isDeleted) return false;
 

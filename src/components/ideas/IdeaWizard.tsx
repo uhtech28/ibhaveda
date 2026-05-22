@@ -1,17 +1,5 @@
 "use client";
 
-// 3-step idea-creation wizard:
-//   1. Outline       — user writes a few sentences
-//   2. Generating    — calls OpenAI (gpt-4o-mini) to draft the full form
-//   3. Preview       — editable form pre-filled by AI, user posts
-//
-// Falls back gracefully: if the AI call fails or the user clicks
-// "Skip AI", step 3 still opens with the outline as the description so
-// nothing blocks them from posting manually.
-//
-// Submit path is identical to /create-idea — uses createIdea +
-// generateUploadUrl + attachFileToIdea, then routes to the new idea.
-
 import React, { useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
@@ -80,8 +68,6 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
 
   const close = () => {
     onOpenChange(false);
-    // Wait for the dialog close animation before clearing state so the
-    // form doesn't visibly reset under the user's fingers.
     setTimeout(reset, 300);
   };
 
@@ -100,15 +86,15 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
     } catch (err) {
       console.error("AI generation failed:", err);
       setAiHadError(true);
-      // Drop into the form with the outline as a description starter so
-      // the user is never blocked.
       setDescription(outline);
       setStep("preview");
     }
   };
 
   const handleSkipAI = () => {
-    setDescription(outline);
+    // Pre-fill description with whatever the user has typed (may be empty).
+    // The Review step's required-field validation catches empties on submit.
+    setDescription(outline.trim());
     setStep("preview");
   };
 
@@ -129,8 +115,6 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
       const res = await createIdea({
         title: title.trim(),
         description: description.trim(),
-        // JSON-encoded so multi-word tags containing commas survive
-        // the round-trip; parseTags() in shared.ts reads JSON first.
         category: skills.length > 0 ? JSON.stringify(skills) : "",
         industries: industries.length > 0 ? JSON.stringify(industries) : undefined,
         visibility,
@@ -216,7 +200,6 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                 type="button"
                 onClick={handleSkipAI}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
-                disabled={!outline.trim()}
               >
                 Skip AI, fill manually →
               </button>
@@ -321,7 +304,6 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                 </div>
               </div>
 
-              {/* Visibility — same Public/Private cards as /create-idea */}
               <div className="space-y-1.5">
                 <Label className="sr-only">Visibility</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -335,14 +317,7 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                         : "border-border/60 bg-muted/20 hover:border-border"
                     )}
                   >
-                    <div
-                      className={cn(
-                        "mt-0.5 grid h-8 w-8 place-items-center rounded-lg",
-                        visibility === "public"
-                          ? "bg-primary/15 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
+                    <div className={cn("mt-0.5 grid h-8 w-8 place-items-center rounded-lg", visibility === "public" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
                       <Globe className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -363,14 +338,7 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                         : "border-border/60 bg-muted/20 hover:border-border"
                     )}
                   >
-                    <div
-                      className={cn(
-                        "mt-0.5 grid h-8 w-8 place-items-center rounded-lg",
-                        visibility === "private"
-                          ? "bg-amber-500/15 text-amber-500"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
+                    <div className={cn("mt-0.5 grid h-8 w-8 place-items-center rounded-lg", visibility === "private" ? "bg-amber-500/15 text-amber-500" : "bg-muted text-muted-foreground")}>
                       <Lock className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -390,9 +358,7 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                 <CardUpload
                   maxFiles={1}
                   maxSize={50 * 1024 * 1024}
-                  accept={
-                    "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"
-                  }
+                  accept={"application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"}
                   multiple={false}
                   onChange={(f) => setFiles(f)}
                 />

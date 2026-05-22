@@ -20,6 +20,7 @@ import type * as crons from "../crons.js";
 import type * as debug from "../debug.js";
 import type * as flares from "../flares.js";
 import type * as gamification from "../gamification.js";
+import type * as hierarchy from "../hierarchy.js";
 import type * as ideas from "../ideas.js";
 import type * as invitations from "../invitations.js";
 import type * as leaderboard from "../leaderboard.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   debug: typeof debug;
   flares: typeof flares;
   gamification: typeof gamification;
+  hierarchy: typeof hierarchy;
   ideas: typeof ideas;
   invitations: typeof invitations;
   leaderboard: typeof leaderboard;

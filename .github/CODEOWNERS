@@ -1,0 +1,13 @@
+# These owners will be the default reviewers for changes
+# https://docs.github.com/codeowners
+
+* @Saunakghosh10
+
+# Convex backend changes
+convex/ @Saunakghosh10
+
+# Frontend/UI components
+src/components/ @Saunakghosh10
+
+# CI/CD workflow changes
+.github/ @Saunakghosh10

@@ -967,6 +967,7 @@ export const getTodosForCalendar = query({
           name: todo.title,
           startAt: todo.deadline!,
           endAt: todo.deadline!,
+          ideaId: todo.ideaId,
           status: {
             id: todo.status,
             name: todo.status === "todo" ? "Todo" : todo.status === "in_progress" ? "In Progress" : "Done",
