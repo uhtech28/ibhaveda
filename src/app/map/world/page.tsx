@@ -861,11 +861,7 @@ function StageResetNotice({
 }
 
 /** Tour replay button */
-function TourToggle({
-  onToggle,
-}: {
-  onToggle: () => void;
-}) {
+function TourToggle({ onToggle }: { onToggle: () => void }) {
   return (
     <motion.button
       initial={{ opacity: 0, scale: 0.8 }}
@@ -973,6 +969,8 @@ interface BadgePayload {
   primaryColor?: string;
   secondaryColor?: string;
   tagline?: string;
+  category?: string;
+  awardedAt?: number;
 }
 
 function MapPageInner() {
@@ -1561,6 +1559,7 @@ function MapPageInner() {
         description: b.description,
         icon: b.icon,
         rarity: b.rarity,
+        awardedAt: b.awardedAt,
       }));
       console.log(`[MapPage] 🎖️ New badge(s) detected: ${newCount}`, payloads);
       setBadgeQueue((q) => [...q, ...payloads]);
@@ -1599,7 +1598,12 @@ function MapPageInner() {
             | "rare"
             | "epic"
             | "legendary",
+          category: b.definition!.category,
           shape: b.definition!.shape,
+          primaryColor: b.definition!.primaryColor,
+          secondaryColor: b.definition!.secondaryColor,
+          tagline: b.definition!.tagline,
+          awardedAt: b.awardedAt,
         }));
 
       if (payloads.length > 0) {
@@ -2002,22 +2006,28 @@ function MapPageInner() {
       const matchedCheckpoint = checkpoints.find((c) => c._id === checkpointId);
       const cpTitle = matchedCheckpoint?.checkpointName || "Task";
       const matchedTask = matchedCheckpoint?.tasks?.find(
-        (t) => t._id === taskId || t.taskLevel === taskLevel
+        (t) => t._id === taskId || t.taskLevel === taskLevel,
       );
       const toolType = matchedTask?.toolType || "write";
 
       // Dynamic Emojis based on Tool
       const getToolEmoji = (tool: string, rarity: string) => {
         const t = tool.toLowerCase();
-        if (t.includes("write") || t.includes("journal") || t.includes("self_report")) return "✍️";
-        if (t.includes("table") || t.includes("poll") || t.includes("chart")) return "📊";
+        if (
+          t.includes("write") ||
+          t.includes("journal") ||
+          t.includes("self_report")
+        )
+          return "✍️";
+        if (t.includes("table") || t.includes("poll") || t.includes("chart"))
+          return "📊";
         if (t.includes("map") || t.includes("roadmap")) return "🗺️";
         if (t.includes("survey") || t.includes("checklist")) return "📋";
         if (t.includes("link")) return "🔗";
         if (t.includes("upload")) return "📤";
         if (t.includes("kanban") || t.includes("board")) return "🗂️";
         if (t.includes("calendar") || t.includes("date")) return "📅";
-        
+
         if (rarity === "legendary") return "🏆";
         if (rarity === "rare") return "🥈";
         return "🥉";
@@ -2025,7 +2035,12 @@ function MapPageInner() {
 
       const taskBadgeIcon = getToolEmoji(toolType, taskBadgeRarity);
       const levelName = taskLevel.toUpperCase();
-      const statusText = corruptionLevel < 25 ? "Gold" : corruptionLevel < 50 ? "Silver" : "Bronze";
+      const statusText =
+        corruptionLevel < 25
+          ? "Gold"
+          : corruptionLevel < 50
+            ? "Silver"
+            : "Bronze";
       const taskBadgeLabel = `${cpTitle} (${levelName}) — ${statusText}`;
 
       const taskLevelName =
@@ -2039,19 +2054,31 @@ function MapPageInner() {
       let taskTagline = "Every small milestone brings the vision closer.";
 
       const toolLower = toolType.toLowerCase();
-      if (toolLower.includes("write") || toolLower.includes("journal") || toolLower.includes("self_report")) {
+      if (
+        toolLower.includes("write") ||
+        toolLower.includes("journal") ||
+        toolLower.includes("self_report")
+      ) {
         taskPrimaryColor = "#F5F3FF"; // light violet
         taskSecondaryColor = "#7C3AED"; // violet
         taskTagline = "The pen is mightier than the sword.";
-      } else if (toolLower.includes("table") || toolLower.includes("poll") || toolLower.includes("chart")) {
+      } else if (
+        toolLower.includes("table") ||
+        toolLower.includes("poll") ||
+        toolLower.includes("chart")
+      ) {
         taskPrimaryColor = "#ECFDF5"; // light emerald
         taskSecondaryColor = "#059669"; // emerald
         taskTagline = "In God we trust; all others must bring data.";
       } else if (toolLower.includes("map") || toolLower.includes("roadmap")) {
         taskPrimaryColor = "#EFF6FF"; // light blue
         taskSecondaryColor = "#2563EB"; // blue
-        taskTagline = "A map shows us where we are; a roadmap shows where we go.";
-      } else if (toolLower.includes("survey") || toolLower.includes("checklist")) {
+        taskTagline =
+          "A map shows us where we are; a roadmap shows where we go.";
+      } else if (
+        toolLower.includes("survey") ||
+        toolLower.includes("checklist")
+      ) {
         taskPrimaryColor = "#FFF7ED"; // light orange
         taskSecondaryColor = "#EA580C"; // orange
         taskTagline = "Listen to your market, and the market will reward you.";
@@ -2077,10 +2104,12 @@ function MapPageInner() {
           description: taskBadgeDesc,
           icon: taskBadgeIcon,
           rarity: taskBadgeRarity,
+          category: "idea_milestones",
           isProfileStyle: true,
           primaryColor: taskPrimaryColor,
           secondaryColor: taskSecondaryColor,
           tagline: taskTagline,
+          awardedAt: Date.now(),
         },
       ]);
 
@@ -2257,8 +2286,13 @@ function MapPageInner() {
           : corruptionLevel < 50
             ? "rare"
             : "uncommon";
-      
-      const statusTextCP = corruptionLevel < 25 ? "Gold" : corruptionLevel < 50 ? "Silver" : "Bronze";
+
+      const statusTextCP =
+        corruptionLevel < 25
+          ? "Gold"
+          : corruptionLevel < 50
+            ? "Silver"
+            : "Bronze";
       const levelBadgeLabel = `${cp.checkpointName} — ${statusTextCP}`;
 
       // Dynamic Stage-based Checkpoint Icon
@@ -2271,7 +2305,7 @@ function MapPageInner() {
         if (stageNum === 6) return "🚀"; // Launch
         if (stageNum === 7) return "🔄"; // Iteration
         if (stageNum === 8) return "👑"; // Scale
-        
+
         return rarity === "legendary" ? "🏆" : rarity === "rare" ? "🥈" : "🥉";
       };
 
@@ -2282,6 +2316,18 @@ function MapPageInner() {
           : corruptionLevel < 50
             ? `Checkpoint "${cp.checkpointName}" cleared with silver integrity. Keep the corruption at bay!`
             : `Checkpoint "${cp.checkpointName}" cleared — bronze earned. Watch the corruption meter!`;
+      const checkpointBadgePrimary =
+        levelBadgeRarity === "legendary"
+          ? "#FBBF24"
+          : levelBadgeRarity === "rare"
+            ? "#E2E8F0"
+            : "#FFF7ED";
+      const checkpointBadgeSecondary =
+        levelBadgeRarity === "legendary"
+          ? "#92400E"
+          : levelBadgeRarity === "rare"
+            ? "#64748B"
+            : "#B45309";
 
       setBadgeQueue((q) => [
         ...q,
@@ -2291,7 +2337,12 @@ function MapPageInner() {
           description: levelBadgeDesc,
           icon: levelBadgeIcon,
           rarity: levelBadgeRarity,
+          category: "idea_milestones",
           shape: "trophy",
+          primaryColor: checkpointBadgePrimary,
+          secondaryColor: checkpointBadgeSecondary,
+          tagline: levelBadgeDesc,
+          awardedAt: Date.now(),
         },
       ]);
 
@@ -2320,10 +2371,28 @@ function MapPageInner() {
             : corruptionLevel <= 70
               ? "rare"
               : "uncommon";
-        const stageMedalText = corruptionLevel <= 30 ? "Gold" : corruptionLevel <= 70 ? "Silver" : "Bronze";
+        const stageMedalText =
+          corruptionLevel <= 30
+            ? "Gold"
+            : corruptionLevel <= 70
+              ? "Silver"
+              : "Bronze";
         const stageBadgeName = `Stage ${cp.stage}: ${stageNames[cp.stage - 1]} Clear — ${stageMedalText}`;
-        const stageBadgeIcon = corruptionLevel <= 30 ? "🥇" : corruptionLevel <= 70 ? "🥈" : "🥉";
+        const stageBadgeIcon =
+          corruptionLevel <= 30 ? "🥇" : corruptionLevel <= 70 ? "🥈" : "🥉";
         const stageBadgeDesc = `Completed Stage ${cp.stage} with ${stageMedalText.toLowerCase()} prestige status!`;
+        const stageBadgePrimary =
+          stageBadgeRarity === "legendary"
+            ? "#FBBF24"
+            : stageBadgeRarity === "rare"
+              ? "#E2E8F0"
+              : "#FFF7ED";
+        const stageBadgeSecondary =
+          stageBadgeRarity === "legendary"
+            ? "#92400E"
+            : stageBadgeRarity === "rare"
+              ? "#64748B"
+              : "#B45309";
 
         setBadgeQueue((q) => [
           ...q,
@@ -2333,7 +2402,12 @@ function MapPageInner() {
             description: stageBadgeDesc,
             icon: stageBadgeIcon,
             rarity: stageBadgeRarity,
+            category: "idea_milestones",
             shape: "medal",
+            primaryColor: stageBadgePrimary,
+            secondaryColor: stageBadgeSecondary,
+            tagline: stageBadgeDesc,
+            awardedAt: Date.now(),
           },
         ]);
 

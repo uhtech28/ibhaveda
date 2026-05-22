@@ -353,9 +353,10 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
         >
           <span
             className={cn(
-              "text-3.5xl select-none filter drop-shadow-md",
+              "select-none filter drop-shadow-md",
               !isLocked && "group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
             )}
+            style={{ fontSize: "1.85rem" }}
           >
             {isLocked ? "❓" : iconEmoji}
           </span>

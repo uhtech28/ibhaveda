@@ -150,29 +150,20 @@ const AUDIO_PATHS = {
       "/audio/sfx/ward_placement_gold.mp3",
       "/audio/sfx/ward_placement_gold.ogg",
     ],
-    level_up: ["/audio/sfx/level_up.mp3", "/audio/sfx/level_up.ogg"],
-    badge_common: [
-      "/audio/sfx/badge_common.mp3",
-      "/audio/sfx/badge_common.ogg",
-    ],
-    badge_uncommon: [
-      "/audio/sfx/badge_uncommon.mp3",
-      "/audio/sfx/badge_uncommon.ogg",
-    ],
-    badge_rare: ["/audio/sfx/badge_rare.mp3", "/audio/sfx/badge_rare.ogg"],
-    badge_epic: ["/audio/sfx/badge_epic.mp3", "/audio/sfx/badge_epic.ogg"],
-    badge_legendary: [
-      "/audio/sfx/badge_legendary.mp3",
-      "/audio/sfx/badge_legendary.ogg",
-    ],
+    level_up: ["/audio/sfx/level_up.mp3"],
+    badge_common: ["/audio/sfx/badge_common.mp3"],
+    badge_uncommon: ["/audio/sfx/badge_uncommon.mp3"],
+    badge_rare: ["/audio/sfx/badge_rare.mp3"],
+    badge_epic: ["/audio/sfx/badge_epic.mp3"],
+    badge_legendary: ["/audio/sfx/badge_legendary.mp3"],
     gold_gain: ["/audio/sfx/gold_gain.mp3"],
   } as Record<string, string[]>,
 
   ui: {
-    click: ["/audio/ui/click.mp3", "/audio/ui/click.ogg"],
-    confirm: ["/audio/ui/confirm.mp3", "/audio/ui/confirm.ogg"],
-    error: ["/audio/ui/error.mp3", "/audio/ui/error.ogg"],
-    hover: ["/audio/ui/hover.mp3", "/audio/ui/hover.ogg"],
+    click: ["/audio/ui/click.mp3"],
+    confirm: ["/audio/ui/confirm.mp3"],
+    error: ["/audio/ui/error.mp3"],
+    hover: ["/audio/ui/hover.mp3"],
   } as Record<UISound, string[]>,
 
   music: {

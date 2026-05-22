@@ -2,18 +2,21 @@
 
 import React from "react";
 import { AchievementUnlockModal } from "../badges/AchievementUnlockModal";
+import type { BadgeItem } from "../badges/BadgeCard";
 
 interface Badge {
   id: string;
   name: string;
   description: string;
   icon: string;
-  rarity: "common" | "uncommon" | "rare" | "epic" | "legendary" | "hidden";
+  rarity: BadgeItem["rarity"];
+  category?: string;
   shape?: string;
   isProfileStyle?: boolean;
   primaryColor?: string;
   secondaryColor?: string;
   tagline?: string;
+  awardedAt?: number;
 }
 
 interface BadgeAwardSequenceProps {
@@ -47,10 +50,16 @@ export function BadgeAwardSequence({
               name: badge.name,
               description: badge.description,
               icon: badge.icon,
-              rarity: badge.rarity as any,
-              category: "venture",
+              rarity: badge.rarity,
+              category:
+                badge.category ??
+                (badge.isProfileStyle ? "idea_milestones" : "venture"),
+              shape: badge.shape,
+              primaryColor: badge.primaryColor,
+              secondaryColor: badge.secondaryColor,
               tagline: badge.tagline || badge.description,
               requirement: badge.description,
+              awardedAt: badge.awardedAt,
             }
           : null
       }
