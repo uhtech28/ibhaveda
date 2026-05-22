@@ -43,8 +43,9 @@ function StandaloneChat() {
           {venture?.ideaId ? (
             <ChatThread 
               ideaId={venture.ideaId}
-              conversationId={activeConversationId || null}
+              conversationId={(activeConversationId as Id<"conversations">) || null}
               onClose={() => {}} // No-op in standalone mode
+              onBack={() => {}} // No-op in standalone mode
             />
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground">

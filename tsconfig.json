@@ -27,6 +27,7 @@
   "exclude": [
     "node_modules",
     "public/assets/fan-tasy/**/*.tsx",
-    "The Fan-tasy Tileset (Free) 1.5.7/**/*.tsx"
+    "The Fan-tasy Tileset (Free) 1.5.7/**/*.tsx",
+    "QUEST_SYSTEM_INTEGRATION_EXAMPLE.tsx"
   ]
 }

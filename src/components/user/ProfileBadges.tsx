@@ -66,13 +66,13 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
       const newBadges = earnedBadges.slice(0, newCount);
       
       const payloads = newBadges.map((b) => {
-        let emoji = b.icon || "🏅";
+        let emoji = (b as any).icon || "🏅";
         if (b.type === "general") {
           const matched = GENERAL_BADGES_DEFS.find((g) => g.slug === b.category);
           emoji = matched?.icon || emoji;
         } else if (b.type === "venture") {
           const matchedVenture = ventureBadgeProgress?.find((vp) => vp.name === b.name);
-          emoji = b.icon || (matchedVenture ? getVentureBadgeEmoji(matchedVenture.id.toString(), b.name) : emoji);
+          emoji = (b as any).icon || (matchedVenture ? getVentureBadgeEmoji(matchedVenture.id.toString(), b.name) : emoji);
         } else if (b.type === "skill") {
           emoji = "⭐";
         }

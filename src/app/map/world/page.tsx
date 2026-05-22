@@ -2582,7 +2582,7 @@ function MapPageInner() {
           <WorldMapTour
             show={showTour}
             onClose={() => setShowTour(false)}
-            ventureName={activeVenture?.ventureName || ideaTitle}
+            ventureName={ideaTitle}
           />
 
           {/* Tour replay toggle */}

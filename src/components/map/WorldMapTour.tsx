@@ -36,7 +36,7 @@ export function WorldMapTour({ show, onClose, ventureName }: WorldMapTourProps) 
   useEffect(() => {
     if (show) {
       setCurrentStep(0);
-      audioManager.playUI("levelUp");
+      audioManager.playLevelUp();
     }
   }, [show]);
 

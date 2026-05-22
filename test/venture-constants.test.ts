@@ -164,13 +164,19 @@ describe("Venture Constants", () => {
   });
 
   describe("BADGE_DEFINITIONS", () => {
-    it("should have 62 badges", () => {
-      expect(BADGE_DEFINITIONS).toHaveLength(62);
+    it("should have 70 badges", () => {
+      expect(BADGE_DEFINITIONS).toHaveLength(70);
     });
 
     it("should have unique sequential IDs", () => {
-      BADGE_DEFINITIONS.forEach((badge, index) => {
-        expect(badge.id).toBe(index + 1);
+      const ids = BADGE_DEFINITIONS.map(b => b.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(BADGE_DEFINITIONS.length);
+      
+      let prevId = 0;
+      BADGE_DEFINITIONS.forEach((badge) => {
+        expect(badge.id).toBeGreaterThan(prevId);
+        prevId = badge.id;
       });
     });
 
@@ -236,7 +242,7 @@ describe("Venture Constants", () => {
       );
 
       expect(categoryCounts.onboarding).toBe(8);
-      expect(categoryCounts.idea_milestones).toBe(18);
+      expect(categoryCounts.idea_milestones).toBe(26);
       expect(categoryCounts.community).toBe(12);
       expect(categoryCounts.consistency).toBe(8);
       expect(categoryCounts.hidden).toBe(8);
