@@ -1,18 +1,22 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Star, Users, User, PlusCircle } from "lucide-react";
+import { Home, Star, Users, User, Map } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
-export const MobileBottomNav = () => {
+function MobileBottomNavContent() {
   const pathname = usePathname();
   const currentUser = useQuery(api.users.getCurrentUser);
 
-  if (pathname === '/' || pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')) {
+  if (
+    pathname === "/" ||
+    pathname?.startsWith("/sign-in") ||
+    pathname?.startsWith("/sign-up")
+  ) {
     return null;
   }
 
@@ -26,6 +30,11 @@ export const MobileBottomNav = () => {
       name: "My Ideas",
       href: "/my-ideas",
       icon: Star,
+    },
+    {
+      name: "World Map",
+      href: "/map",
+      icon: Map,
     },
     {
       name: "Community",
@@ -43,7 +52,9 @@ export const MobileBottomNav = () => {
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 lg:hidden pb-safe">
       <nav className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/feed' && pathname?.startsWith(item.href));
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/feed" && pathname?.startsWith(item.href));
           const Icon = item.icon;
 
           return (
@@ -54,7 +65,7 @@ export const MobileBottomNav = () => {
                 "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200",
                 isActive
                   ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Icon className={cn("w-6 h-6", isActive && "fill-current")} />
@@ -65,5 +76,12 @@ export const MobileBottomNav = () => {
       </nav>
     </div>
   );
-};
+}
 
+export function MobileBottomNav() {
+  return (
+    <Suspense fallback={null}>
+      <MobileBottomNavContent />
+    </Suspense>
+  );
+}

@@ -1,26 +1,22 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from "vitest/config";
+import path from "path";
 
 export default defineConfig({
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    include: [
-      'test/**/*.test.{ts,tsx}',
-      'src/**/*.test.{ts,tsx}',
-    ],
-    setupFiles: ['./test/setup.ts'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      include: ['convex/**/*.ts', 'src/**/*.ts'],
-      exclude: [
-        '**/*.d.ts',
-        '**/*.config.ts',
-        '**/.next/**',
-        '**/node_modules/**',
-        'convex/_generated/**',
-        'src/app/**',
-      ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      phaser3spectorjs: path.resolve(
+        __dirname,
+        "./test/__mocks__/phaser3spectorjs.js",
+      ),
     },
   },
-})
+  define: {
+    WEBGL_DEBUG: false,
+  },
+  test: {
+    environment: "jsdom",
+    include: ["test/**/*.test.{ts,tsx}"],
+    setupFiles: ["./test/setup/canvas-mock.ts"],
+  },
+});

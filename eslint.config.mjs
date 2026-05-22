@@ -20,6 +20,8 @@ const eslintConfig = [
       "test/**",
       "convex/_generated/**",
       "next-env.d.ts",
+      "public/assets/fan-tasy/**",
+      "The Fan-tasy Tileset (Free) 1.5.7/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),

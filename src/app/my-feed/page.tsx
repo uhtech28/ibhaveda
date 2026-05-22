@@ -85,7 +85,7 @@ export default function MyFeedPage() {
         onSpark={async (ideaId) => {
           await toggleSpark({ ideaId: ideaId as Id<"ideas"> });
         }}
-        onIdeaClick={(ideaId) => router.push(`/idea/${ideaId}`)}
+        onIdeaClick={(ideaId) => router.push(`/map?ideaId=${ideaId}`)}
         onCommentClick={(ideaId) => {
           const idea = ideas.find((entry) => entry._id === ideaId);
           if (idea) setActiveCommentIdea(idea);

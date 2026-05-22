@@ -21,7 +21,7 @@ export const getNotifications = query({
     // Get authenticated user
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     // Find user by Clerk ID

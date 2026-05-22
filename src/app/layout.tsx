@@ -106,6 +106,11 @@ icons: {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 5,
+  minimumScale: 0.5,
+  userScalable: true,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({
@@ -116,9 +121,9 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <ConvexClientProvider>
-        <html lang="en" className="dark" suppressHydrationWarning>
+        <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
           <body
-            className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} font-sans antialiased`}
+            className="font-sans antialiased"
           >
             <ThemeProvider>
               <ChatProvider>

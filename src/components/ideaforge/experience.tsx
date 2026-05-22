@@ -17,11 +17,14 @@ import {
   Trash2,
   Trophy,
   Users,
+  Plus,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { ComposerModal } from "@/components/ideaforge/composer-modal";
+import { CategorySelectorModal } from "@/components/ideaforge/category-selector-modal";
 import {
   EmptyState,
   FilterTabs,
@@ -107,15 +110,22 @@ export function IdeaForgeExperience({
 }) {
   const userIdeas = useQuery(api.ideas.getUserIdeas) || [];
   const publicIdeas = useQuery(api.ideas.getPublicIdeas, { limit: 60 }) || [];
-  // Real backend signals for the Analytics tab.
+  
+  // Real backend signals for the Analytics tab (Co-dev change)
   const wallet = useQuery(api.gamification.getWallet);
   const streak = useQuery(api.gamification.getStreak);
+
+  // User UI Components state
+  const [categorySelectorOpen, setCategorySelectorOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerDraft, setComposerDraft] = useState<Partial<ComposerDraft>>({});
+  
   const [feedTab, setFeedTab] = useState<FeedTabKey>("for-you");
   const [myIdeasTab, setMyIdeasTab] = useState<MyIdeasTabKey>("public");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [savedIdeaIds, setSavedIdeaIds] = usePersistentIds(SAVED_STORAGE_KEY);
-  // 3-step AI wizard for the + button. /create-idea remains as a
-  // direct route for power users who want the full single-page form.
+  
+  // Co-dev Wizard state
   const [showIdeaWizard, setShowIdeaWizard] = useState(false);
 
   const filteredFeedIdeas = useMemo(() => {
@@ -162,18 +172,38 @@ export function IdeaForgeExperience({
     setSavedIdeaIds([...savedIdeaIds, ideaId]);
   };
 
-  const openComposerWithDraft = (_draft?: Partial<ComposerDraft>) => {
-    // The + button now opens the 3-step AI wizard (outline → AI preview
-    // → review & post). The legacy /create-idea full-page form is still
-    // reachable via direct URL for users who want the long form layout.
-    setShowIdeaWizard(true);
+  const openCategorySelector = () => {
+    setCategorySelectorOpen(true);
+  };
+
+  const handleCategorySelect = (category: string) => {
+    setCategorySelectorOpen(false);
+    // Capitalize first letter to match the format
+    const formattedCategory = category.charAt(0).toUpperCase() + category.slice(1);
+    setComposerDraft({ category: formattedCategory });
+    setComposerOpen(true);
+  };
+
+  const openComposerWithDraft = (draft?: Partial<ComposerDraft>) => {
+    // We allow both: opening the wizard for new sparks, or the composer for specific drafts
+    if (draft && Object.keys(draft).length > 0) {
+      setComposerDraft(draft);
+      setComposerOpen(true);
+    } else {
+      setShowIdeaWizard(true);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#0A0D12] pb-28 text-[#F9FAFB]">
-      <IdeaForgeNavbar currentUser={currentUser} searchQuery={searchQuery} onSearchChange={onSearchChange} onOpenComposer={() => openComposerWithDraft()} />
+      <IdeaForgeNavbar 
+        currentUser={currentUser} 
+        searchQuery={searchQuery} 
+        onSearchChange={onSearchChange} 
+        onOpenComposer={openCategorySelector} 
+      />
 
-      <main className={cn(shellMax, "px-4 pb-12 pt-16 sm:px-6 lg:pt-28 xl:px-8") }>
+      <main className={cn(shellMax, "px-4 pb-12 pt-16 sm:px-6 lg:pt-28 xl:px-8")}>
         <div className="flex items-stretch gap-8">
           <IdeaForgeLeftRail
             currentUser={currentUser}
@@ -202,15 +232,11 @@ export function IdeaForgeExperience({
                 </>
               ) : (
                 <>
-                  {/* My Ideas page-level header — minimal, no duplicate profile card */}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h1 className={cn(displayFontClass, "text-2xl font-semibold text-white")}>My Ideas</h1>
                       <p className="text-sm text-[#9CA3AF]">Your posted ideas, drafts, and saved concepts.</p>
                     </div>
-                    {/* Grid / List view toggle — desktop only.
-                     * On mobile users only need the Public/Private/Analytics
-                     * tabs below. */}
                     <div className="hidden md:flex items-center gap-2">
                       <button type="button" onClick={() => setViewMode("grid")} className={cn(transitionBase, "rounded-[10px] p-2", viewMode === "grid" ? "bg-[#6366F1]/14 text-[#C7D2FE]" : "text-[#9CA3AF] hover:bg-white/[0.04] hover:text-white")} aria-label="Grid view">
                         <Grid2X2 className="h-4 w-4" />
@@ -220,8 +246,6 @@ export function IdeaForgeExperience({
                       </button>
                     </div>
                   </div>
-                  {/* Public / Private / Analytics tabs — visible on every
-                   * viewport so mobile users can switch between them. */}
                   <FilterTabs tabs={myIdeaTabs} activeKey={myIdeasTab} onChange={setMyIdeasTab} />
                 </>
               )}
@@ -246,8 +270,6 @@ export function IdeaForgeExperience({
                           onOpenIdea={onIdeaClick}
                           onSpark={onSpark}
                           onComment={onCommentClick}
-                          // Only allow Collaborate on ideas the user does NOT own —
-                          // server rejects self-requests so the button is meaningless on own ideas.
                           onContribute={isMyIdea ? undefined : onContributeClick}
                           onRepost={openComposerWithDraft}
                           onSelectTag={onSearchChange}
@@ -260,7 +282,7 @@ export function IdeaForgeExperience({
                     title="Nothing matched this feed yet"
                     description="Try another search, switch to a different feed tab, or post the spark that should exist here."
                     actionLabel="+ Post an Idea"
-                    onAction={() => openComposerWithDraft()}
+                    onAction={openCategorySelector}
                   />
                 )
               ) : myIdeasTab === "analytics" ? (
@@ -271,9 +293,6 @@ export function IdeaForgeExperience({
                   onOpenIdea={onIdeaClick}
                 />
               ) : (() => {
-                // Filter user's ideas by the active visibility tab. Both
-                // public and private branches use the same card grid so the
-                // layout stays predictable as the user toggles tabs.
                 const visibleIdeas = currentIdeas.filter((idea) =>
                   myIdeasTab === "private"
                     ? idea.visibility === "private"
@@ -294,7 +313,7 @@ export function IdeaForgeExperience({
                           : "Publish your first concept and it will show up here for the rest of the network to discover."
                       }
                       actionLabel="+ Post an Idea"
-                      onAction={() => openComposerWithDraft()}
+                      onAction={openCategorySelector}
                     />
                   );
                 }
@@ -354,20 +373,27 @@ export function IdeaForgeExperience({
         </div>
       </main>
 
-      {/* Floating chat button — same as Community page. */}
-      <FloatingChatButton />
+      <button
+        type="button"
+        onClick={openCategorySelector}
+        aria-label="Post idea"
+        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#6366F1] text-white shadow-[0_18px_42px_rgba(99,102,241,0.3)] transition-all duration-200 hover:scale-[1.02] hover:bg-[#8B5CF6] md:bottom-8 md:right-8"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
 
-      {/* AI-powered 3-step idea wizard — opens from any + button. */}
+      <CategorySelectorModal
+        open={categorySelectorOpen}
+        onOpenChange={setCategorySelectorOpen}
+        onSelectCategory={handleCategorySelect}
+      />
+      <ComposerModal open={composerOpen} onOpenChange={setComposerOpen} initialDraft={composerDraft} />
+      
+      <FloatingChatButton />
       <IdeaWizard isOpen={showIdeaWizard} onOpenChange={setShowIdeaWizard} />
     </div>
   );
 }
-
-/* =========================================================
-   Analytics tab — every number below is computed from the
-   user's actual ideas + live wallet/streak queries. Nothing
-   is hard-coded.
-   ========================================================= */
 
 function MyIdeasAnalytics({
   ideas,
@@ -418,7 +444,6 @@ function MyIdeasAnalytics({
 
   return (
     <div className="space-y-5">
-      {/* Headline tiles */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <StatTile
           icon={<Lightbulb className="h-4 w-4 text-[#C7D2FE]" />}
@@ -452,7 +477,6 @@ function MyIdeasAnalytics({
         />
       </div>
 
-      {/* Visibility split + sparks banked */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className={cn(cardSurface, "p-5")}>
           <div className="flex items-center gap-2 text-[#C7D2FE]">
@@ -498,7 +522,6 @@ function MyIdeasAnalytics({
         </div>
       </div>
 
-      {/* Top idea */}
       <div className={cn(cardSurface, "p-5")}>
         <div className="flex items-center gap-2 text-[#C7D2FE]">
           <Sparkles className="h-4 w-4" />

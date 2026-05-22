@@ -232,6 +232,7 @@ export const updateUserProfile = mutation({
     skills: v.optional(v.array(v.string())),
     industry: v.optional(v.string()),
     industries: v.optional(v.array(v.string())),
+    equippedBadges: v.optional(v.array(v.string())),
   }),
   handler: async ({ db, auth }, args): Promise<string> => {
     console.log('🔄 Updating user profile:', {
@@ -805,3 +806,45 @@ export const generateUsernameSuggestions = query({
     return suggestions.slice(0, count)
   },
 })
+
+// Update user persona gender - one-time selection
+export const updatePersonaGender = mutation({
+  args: {
+    gender: v.union(v.literal("male"), v.literal("female")),
+  },
+  handler: async ({ db, auth }, args) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!profile) throw new Error("User profile not found");
+
+    // Update gender
+    await db.patch(profile._id, {
+      personaGender: args.gender,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Get current user's persona gender
+export const getPersonaGender = query({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+
+    return profile?.personaGender ?? null;
+  },
+});

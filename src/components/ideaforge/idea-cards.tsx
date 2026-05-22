@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, Users } from "lucide-react";
+import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, Users, Repeat2, Bookmark } from "lucide-react";
 import { useQuery } from "convex/react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -531,31 +531,40 @@ export function CompactIdeaCard({
         <button type="button" onClick={() => onOpenIdea(idea._id)} className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" aria-label="Edit idea">
           <PencilLine className="h-4 w-4" />
         </button>
+        <button 
+          type="button" 
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            const tags = parseTags(idea.category);
+            onRepost?.({ title: idea.title, description: idea.description, tags, category: tags[0] || "SaaS", stage: getIdeaStage(idea) }); 
+          }} 
+          className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" 
+          aria-label="Repost idea"
+        >
+          <Repeat2 className="h-4 w-4" />
+        </button>
         {onDelete && (
-          <button type="button" onClick={() => onDelete(idea._id)} className="rounded-full border border-red-500/25 bg-red-500/10 p-2 text-red-200 hover:bg-red-500/16" aria-label="Delete idea">
+          <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(idea._id); }} className="rounded-full border border-red-500/25 bg-red-500/10 p-2 text-red-200 hover:bg-red-500/16" aria-label="Delete idea">
             <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>
 
       <div className="relative z-0">
-        {bannerImage && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setLightboxOpen(true);
-            }}
-            className="block w-full"
-            aria-label="View full-size image"
-          >
-            <img src={bannerImage} alt={idea.title} className="aspect-[16/9] w-full rounded-[16px] border border-white/8 object-cover cursor-zoom-in" />
-          </button>
-        )}
-        <div className={cn("hidden items-center justify-between gap-3 lg:flex", bannerImage && "mt-4")}>
+        <button type="button" onClick={() => onOpenIdea(idea._id)} className="block w-full text-left">
+          {bannerImage ? (
+            <img src={bannerImage} alt={idea.title} className="aspect-[16/9] w-full rounded-[16px] border border-white/8 object-cover" />
+          ) : (
+            <MeshBanner title={idea.title} />
+          )}
+        </button>
+        <div className={cn("hidden items-center justify-between gap-3 lg:flex", (bannerImage || true) && "mt-4")}>
           <span className={cn("rounded-full border px-3 py-1 text-[11px]", status.className)}>{status.label}</span>
+          <button type="button" onClick={() => onToggleSave(idea._id)} className={cn(transitionBase, "rounded-full p-2", saved ? "bg-[#6366F1]/14 text-[#C7D2FE]" : "text-[#9CA3AF] hover:bg-[#6366F1]/10 hover:text-[#C7D2FE]")} aria-label="Save idea">
+            <Bookmark className="h-4 w-4" />
+          </button>
         </div>
-        <button type="button" onClick={() => onOpenIdea(idea._id)} className={cn("text-left", bannerImage ? "mt-4" : "mt-1")}>
+        <button type="button" onClick={() => onOpenIdea(idea._id)} className={cn("text-left", (bannerImage || true) ? "mt-4" : "mt-1")}>
           <h3 className={cn(displayFontClass, "text-lg font-semibold text-[#F9FAFB]")}>{idea.title}</h3>
         </button>
         <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#9CA3AF]">{idea.description}</p>
