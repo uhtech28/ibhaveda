@@ -36,6 +36,7 @@ import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPo
 import { useSearchParams } from "next/navigation";
 import { TaskSubmissionModal } from "@/components/map/TaskSubmissionModal";
 import { StageClearModal } from "@/components/map/StageClearModal";
+import { WorldMapTour } from "@/components/map/WorldMapTour";
 import { LeftSidebar } from "@/components/map/LeftSidebar";
 import { ToolsPanel } from "@/components/map/ToolsPanel";
 import {
@@ -859,6 +860,34 @@ function StageResetNotice({
   );
 }
 
+/** Tour replay button */
+function TourToggle({
+  onToggle,
+}: {
+  onToggle: () => void;
+}) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 1 }}
+      onClick={onToggle}
+      onMouseEnter={() => audioManager.playUI("hover")}
+      className="absolute bottom-52 right-2 z-20 flex h-9 w-9 items-center justify-center rounded-full text-[14px] shadow-lg backdrop-blur-xl sm:bottom-32 sm:right-4 sm:h-10 sm:w-10 sm:text-[16px] md:bottom-26 md:right-5 lg:bottom-24"
+      style={{
+        background: "rgba(15, 23, 42, 0.6)",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        color: "#e2e8f0",
+      }}
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.9 }}
+      title="Replay World Map Tour"
+    >
+      🗺️
+    </motion.button>
+  );
+}
+
 /** Audio mute toggle */
 function AudioToggle({
   muted,
@@ -1132,6 +1161,19 @@ function MapPageInner() {
     stageName: string;
     isGold: boolean;
   }>({ show: false, stageNumber: 1, stageName: "", isGold: false });
+
+  // Tour walkthrough state
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    if (!activeVenture) return;
+    const tourCompletedKey = `worldMapTourCompleted_${activeVenture._id}`;
+    const isCompleted = localStorage.getItem(tourCompletedKey);
+    if (isCompleted !== "true") {
+      setShowTour(true);
+      localStorage.setItem(tourCompletedKey, "true");
+    }
+  }, [activeVenture]);
 
   // Task submission state (now using Jotai atom for global access)
   const [submittingTask, setSubmittingTask] = useAtom(submittingTaskAtom);
@@ -2535,6 +2577,16 @@ function MapPageInner() {
               setAudioSettings((prev) => ({ ...prev, muted: !prev.muted }));
             }}
           />
+
+          {/* World Map Tour Walkthrough */}
+          <WorldMapTour
+            show={showTour}
+            onClose={() => setShowTour(false)}
+            ventureName={activeVenture?.ventureName || ideaTitle}
+          />
+
+          {/* Tour replay toggle */}
+          <TourToggle onToggle={() => setShowTour(true)} />
 
           <CrossingFlash trigger={flashTrigger} />
 
