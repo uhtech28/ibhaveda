@@ -24,15 +24,15 @@ interface BiomeConfig {
   name: string;
   theme: string;
   visualTheme:
-    | "village"
-    | "forest"
-    | "arena"
-    | "artisan"
-    | "mine"
-    | "harbour"
-    | "crossroads"
-    | "capital"
-    | "dungeon";
+  | "village"
+  | "forest"
+  | "arena"
+  | "artisan"
+  | "mine"
+  | "harbour"
+  | "crossroads"
+  | "capital"
+  | "dungeon";
   colors: {
     sky: number;
     ground: number;
@@ -677,33 +677,33 @@ export class WorldMapScene extends Phaser.Scene {
     const style =
       biome.id === 2
         ? {
-            baseTint: 0xc2ea7b,
-            shadeTint: 0x7dbb49,
-            canopyTint: 0x21532f,
-            mistTint: 0xe9ffd8,
-            waterTint: 0x83d7e5,
-            pathTint: 0xb78b5a,
-            hillTint: 0xffffff,
-          }
+          baseTint: 0xc2ea7b,
+          shadeTint: 0x7dbb49,
+          canopyTint: 0x21532f,
+          mistTint: 0xe9ffd8,
+          waterTint: 0x83d7e5,
+          pathTint: 0xb78b5a,
+          hillTint: 0xffffff,
+        }
         : biome.id === 5
           ? {
-              baseTint: 0xa5c56d,
-              shadeTint: 0x6c8748,
-              canopyTint: 0x2f2a22,
-              mistTint: 0xf4efd9,
-              waterTint: 0x6fb7cb,
-              pathTint: 0x9a7a53,
-              hillTint: 0xf3efe0,
-            }
+            baseTint: 0xa5c56d,
+            shadeTint: 0x6c8748,
+            canopyTint: 0x2f2a22,
+            mistTint: 0xf4efd9,
+            waterTint: 0x6fb7cb,
+            pathTint: 0x9a7a53,
+            hillTint: 0xf3efe0,
+          }
           : {
-              baseTint: 0xb8de7c,
-              shadeTint: 0x6d9157,
-              canopyTint: 0x39455a,
-              mistTint: 0xf2f7fb,
-              waterTint: 0x74aeca,
-              pathTint: 0xaa7d60,
-              hillTint: 0xf6f1e9,
-            };
+            baseTint: 0xb8de7c,
+            shadeTint: 0x6d9157,
+            canopyTint: 0x39455a,
+            mistTint: 0xf2f7fb,
+            waterTint: 0x74aeca,
+            pathTint: 0xaa7d60,
+            hillTint: 0xf6f1e9,
+          };
     const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
     const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
     const hillFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24, 33, 34, 35, 88, 89];
@@ -740,7 +740,7 @@ export class WorldMapScene extends Phaser.Scene {
       radiusY: number,
     ) =>
       ((x - centerX) * (x - centerX)) / (radiusX * radiusX) +
-        ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
+      ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
       1;
 
     const addFrameSprite = (
@@ -882,7 +882,7 @@ export class WorldMapScene extends Phaser.Scene {
           addFrameSprite(
             "sprout_grass_sheet",
             grassAccentFrames[
-              (col + row + biome.id) % grassAccentFrames.length
+            (col + row + biome.id) % grassAccentFrames.length
             ],
             col,
             row,
@@ -1656,266 +1656,266 @@ export class WorldMapScene extends Phaser.Scene {
     }
   }
 
-// ─────────────────────────────────────────────────────────────
-   //  STAGE 5 · MINE  —  Enhanced Dark Rocky Mine + Coal Outpost
-   //  Ground: Ash-dark soil with coal seams  |  Props: Dead trees, mining carts, pickaxes, lanterns
-   //  Mine shaft: Detailed timber frame  |  Atmosphere: Ember sparks, fog, warm lamplight
-   // ─────────────────────────────────────────────────────────────
-   private createMineTilePanel(
-     panelX: number,
-     panelOffsetY: number,
-     scale: number,
-     biome: BiomeConfig,
-     biomeIndex: number,
-   ): void {
-     const tileSize = 16 * scale;
-     const cols = this.map.width;
-     const rows = this.map.height;
-     const toX = (x: number) => panelX + x * tileSize;
-     const toY = (y: number) => panelOffsetY + y * tileSize;
-     const midRow = rows / 2;
-     const panelW = cols * tileSize;
-     const panelH = rows * tileSize;
-     const midY = toY(midRow);
+  // ─────────────────────────────────────────────────────────────
+  //  STAGE 5 · MINE  —  Enhanced Dark Rocky Mine + Coal Outpost
+  //  Ground: Ash-dark soil with coal seams  |  Props: Dead trees, mining carts, pickaxes, lanterns
+  //  Mine shaft: Detailed timber frame  |  Atmosphere: Ember sparks, fog, warm lamplight
+  // ─────────────────────────────────────────────────────────────
+  private createMineTilePanel(
+    panelX: number,
+    panelOffsetY: number,
+    scale: number,
+    biome: BiomeConfig,
+    biomeIndex: number,
+  ): void {
+    const tileSize = 16 * scale;
+    const cols = this.map.width;
+    const rows = this.map.height;
+    const toX = (x: number) => panelX + x * tileSize;
+    const toY = (y: number) => panelOffsetY + y * tileSize;
+    const midRow = rows / 2;
+    const panelW = cols * tileSize;
+    const panelH = rows * tileSize;
+    const midY = toY(midRow);
 
-     // ── BASE GROUND: Dark ash soil with subtle coal streaking ────────────────────
-     const ground = this.add.graphics();
-     ground.fillStyle(0x1a1510, 1);
-     ground.fillRect(panelX, panelOffsetY, panelW, panelH);
-     // Add coal seam streaks
-     ground.fillStyle(0x0d0a08, 0.7);
-     for (let x = panelX; x < panelX + panelW; x += tileSize * 3) {
-       ground.fillRect(x, panelOffsetY, tileSize * 1.5, panelH);
-     }
-     ground.setDepth(1);
-     this.backgroundLayer.add(ground);
+    // ── BASE GROUND: Dark ash soil with subtle coal streaking ────────────────────
+    const ground = this.add.graphics();
+    ground.fillStyle(0x1a1510, 1);
+    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
+    // Add coal seam streaks
+    ground.fillStyle(0x0d0a08, 0.7);
+    for (let x = panelX; x < panelX + panelW; x += tileSize * 3) {
+      ground.fillRect(x, panelOffsetY, tileSize * 1.5, panelH);
+    }
+    ground.setDepth(1);
+    this.backgroundLayer.add(ground);
 
-     // ── TILE TEXTURE: Subtle 16×16 grid with ore glints ──
-     const tex = this.add.graphics();
-     tex.setDepth(2);
-     for (let r = 0; r < rows; r++) {
-       for (let c = 0; c < cols; c++) {
-         const shade = (r + c) % 2 === 0 ? 0x221d16 : 0x1a1510;
-         tex.fillStyle(shade, 0.45);
-         tex.fillRect(toX(c), toY(r), tileSize, tileSize);
-     }
-     }
-     this.backgroundLayer.add(tex);
+    // ── TILE TEXTURE: Subtle 16×16 grid with ore glints ──
+    const tex = this.add.graphics();
+    tex.setDepth(2);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const shade = (r + c) % 2 === 0 ? 0x221d16 : 0x1a1510;
+        tex.fillStyle(shade, 0.45);
+        tex.fillRect(toX(c), toY(r), tileSize, tileSize);
+      }
+    }
+    this.backgroundLayer.add(tex);
 
-     // ── DIRT PATH (horizontal band) with mining cart rails ─────────────────────────
-     const path = this.add.graphics();
-     path.fillStyle(0x2a2218, 1);
-     path.fillRect(panelX, midY - 14, panelW, 28);
-     // Cart rail ties with metallic shine
-     path.fillStyle(0x3d2e1a, 0.8);
-     for (let x = panelX + 8; x < panelX + panelW; x += 22) {
-       path.fillRect(x, midY - 10, 14, 4);
-       path.fillRect(x, midY + 6, 14, 4);
-       // Metallic highlights on ties
-       path.fillStyle(0xf59e0b, 0.4);
-       path.fillRect(x + 2, midY - 9, 4, 2);
-       path.fillRect(x + 2, midY + 7, 4, 2);
-     }
-     // Rails with metallic gradient
-     const railGradient = [0x5a4a2a, 0x7a6a4a, 0x5a4a2a];
-     railGradient.forEach((color, i) => {
-       path.fillStyle(color, 0.7 - i * 0.1);
-       path.fillRect(panelX, midY - 8 + i * 2, panelW, 2);
-       path.fillRect(panelX, midY + 6 - i * 2, panelW, 2);
-     });
-     path.setDepth(4);
-     this.backgroundLayer.add(path);
+    // ── DIRT PATH (horizontal band) with mining cart rails ─────────────────────────
+    const path = this.add.graphics();
+    path.fillStyle(0x2a2218, 1);
+    path.fillRect(panelX, midY - 14, panelW, 28);
+    // Cart rail ties with metallic shine
+    path.fillStyle(0x3d2e1a, 0.8);
+    for (let x = panelX + 8; x < panelX + panelW; x += 22) {
+      path.fillRect(x, midY - 10, 14, 4);
+      path.fillRect(x, midY + 6, 14, 4);
+      // Metallic highlights on ties
+      path.fillStyle(0xf59e0b, 0.4);
+      path.fillRect(x + 2, midY - 9, 4, 2);
+      path.fillRect(x + 2, midY + 7, 4, 2);
+    }
+    // Rails with metallic gradient
+    const railGradient = [0x5a4a2a, 0x7a6a4a, 0x5a4a2a];
+    railGradient.forEach((color, i) => {
+      path.fillStyle(color, 0.7 - i * 0.1);
+      path.fillRect(panelX, midY - 8 + i * 2, panelW, 2);
+      path.fillRect(panelX, midY + 6 - i * 2, panelW, 2);
+    });
+    path.setDepth(4);
+    this.backgroundLayer.add(path);
 
-     // ── MINE SHAFT ENTRANCE (left) with detailed timber frame and lanterns ───────────────────
-     const shaft = this.add.graphics();
-     shaft.setDepth(5);
-     // Main shaft structure
-     shaft.fillStyle(0x2e2418, 0.95);
-     shaft.fillRect(toX(4), toY(midRow - 5), tileSize * 5, tileSize * 4);
-     // Dark interior
-     shaft.fillStyle(0x080604, 0.95);
-     shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 3.5, tileSize * 3);
-     // Timber frame - darker wood
-     shaft.fillStyle(0x5a4220, 1);
-     shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 0.5, tileSize * 3);
-     shaft.fillRect(toX(7.6), toY(midRow - 4.5), tileSize * 0.5, tileSize * 3);
-     shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 3.5, tileSize * 0.5);
-     // Roof support beam
-     shaft.fillRect(toX(5.8), toY(midRow - 5), tileSize * 1.9, tileSize * 0.6);
-     // Lantern on shaft entrance
-     const lanternX = toX(6.5);
-     const lanternY = toY(midRow - 6);
-     shaft.fillStyle(0xf59e0b, 0.8);
-     shaft.fillRect(lanternX - 3, lanternY, 6, 4);
-     shaft.fillStyle(0xfbbf24, 0.9);
-     shaft.fillCircle(lanternX, lanternY + 2, 2);
-     // Lantern glow
-     const glow = this.add.circle(lanternX, lanternY - 8, 20, 0xf59e0b, 0.15);
-     glow.setDepth(4.5);
-     this.midgroundLayer.add(glow);
-     this.tweens.add({
-       targets: glow,
-       alpha: { from: 0.1, to: 0.25 },
-       duration: 1500,
-       yoyo: true,
-       repeat: -1,
-       ease: "Sine.easeInOut",
-     });
-     this.backgroundLayer.add(shaft);
+    // ── MINE SHAFT ENTRANCE (left) with detailed timber frame and lanterns ───────────────────
+    const shaft = this.add.graphics();
+    shaft.setDepth(5);
+    // Main shaft structure
+    shaft.fillStyle(0x2e2418, 0.95);
+    shaft.fillRect(toX(4), toY(midRow - 5), tileSize * 5, tileSize * 4);
+    // Dark interior
+    shaft.fillStyle(0x080604, 0.95);
+    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 3.5, tileSize * 3);
+    // Timber frame - darker wood
+    shaft.fillStyle(0x5a4220, 1);
+    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 0.5, tileSize * 3);
+    shaft.fillRect(toX(7.6), toY(midRow - 4.5), tileSize * 0.5, tileSize * 3);
+    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 3.5, tileSize * 0.5);
+    // Roof support beam
+    shaft.fillRect(toX(5.8), toY(midRow - 5), tileSize * 1.9, tileSize * 0.6);
+    // Lantern on shaft entrance
+    const lanternX = toX(6.5);
+    const lanternY = toY(midRow - 6);
+    shaft.fillStyle(0xf59e0b, 0.8);
+    shaft.fillRect(lanternX - 3, lanternY, 6, 4);
+    shaft.fillStyle(0xfbbf24, 0.9);
+    shaft.fillCircle(lanternX, lanternY + 2, 2);
+    // Lantern glow
+    const glow = this.add.circle(lanternX, lanternY - 8, 20, 0xf59e0b, 0.15);
+    glow.setDepth(4.5);
+    this.midgroundLayer.add(glow);
+    this.tweens.add({
+      targets: glow,
+      alpha: { from: 0.1, to: 0.25 },
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+    this.backgroundLayer.add(shaft);
 
-     // ── TOP FENCE (above path) ───────────────────────────────
-     const fenceG = this.add.graphics();
-     fenceG.setDepth(5);
-     this.drawFenceRow(
-       fenceG,
-       toX(3),
-       midY - 30,
-       tileSize * (cols - 6),
-       0x6b4f28,
-       0x5a3e1e,
-       24,
-     );
-     // ── BOTTOM FENCE ─────────────────────────────────────────
-     this.drawFenceRow(
-       fenceG,
-       toX(3),
-       midY + 18,
-       tileSize * (cols - 6),
-       0x6b4f28,
-       0x5a3e1e,
-       24,
-     );
-     this.backgroundLayer.add(fenceG);
+    // ── TOP FENCE (above path) ───────────────────────────────
+    const fenceG = this.add.graphics();
+    fenceG.setDepth(5);
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY - 30,
+      tileSize * (cols - 6),
+      0x6b4f28,
+      0x5a3e1e,
+      24,
+    );
+    // ── BOTTOM FENCE ─────────────────────────────────────────
+    this.drawFenceRow(
+      fenceG,
+      toX(3),
+      midY + 18,
+      tileSize * (cols - 6),
+      0x6b4f28,
+      0x5a3e1e,
+      24,
+    );
+    this.backgroundLayer.add(fenceG);
 
-     // ── SCATTERED PROPS: Dead trees + rocks + coal lumps + mining equipment ──────
-     const props = this.add.graphics();
-     props.setDepth(6);
+    // ── SCATTERED PROPS: Dead trees + rocks + coal lumps + mining equipment ──────
+    const props = this.add.graphics();
+    props.setDepth(6);
 
-     // Dead trees (bare trunk, grey-brown canopy)
-     const deadTreePositions = [
-       [6, midRow - 4],
-       [11, midRow - 6],
-       [18, midRow - 5],
-       [34, midRow - 4],
-       [40, midRow - 6],
-       [46, midRow - 5],
-       [8, midRow + 3],
-       [14, midRow + 4],
-       [30, midRow + 3],
-       [38, midRow + 4],
-       [44, midRow + 5],
-     ];
-     deadTreePositions.forEach(([c, r]) => {
-       this.drawPixelTree(
-         props,
-         toX(c),
-         toY(r),
-         0x4a3520,
-         0x3d3028,
-         0x1e1810,
-         scale,
-       );
-     });
+    // Dead trees (bare trunk, grey-brown canopy)
+    const deadTreePositions = [
+      [6, midRow - 4],
+      [11, midRow - 6],
+      [18, midRow - 5],
+      [34, midRow - 4],
+      [40, midRow - 6],
+      [46, midRow - 5],
+      [8, midRow + 3],
+      [14, midRow + 4],
+      [30, midRow + 3],
+      [38, midRow + 4],
+      [44, midRow + 5],
+    ];
+    deadTreePositions.forEach(([c, r]) => {
+      this.drawPixelTree(
+        props,
+        toX(c),
+        toY(r),
+        0x4a3520,
+        0x3d3028,
+        0x1e1810,
+        scale,
+      );
+    });
 
-     // Mining equipment - pickaxes stuck in ground
-     [12, 25, 37].forEach((c) => {
-       props.fillStyle(0x8b7355, 0.9);
-       props.fillRect(toX(c) - 2, toY(midRow - 2), 4, 12);
-       props.fillStyle(0xc2b280, 0.9);
-       props.fillRect(toX(c) - 8, toY(midRow - 1), 12, 4);
-     });
+    // Mining equipment - pickaxes stuck in ground
+    [12, 25, 37].forEach((c) => {
+      props.fillStyle(0x8b7355, 0.9);
+      props.fillRect(toX(c) - 2, toY(midRow - 2), 4, 12);
+      props.fillStyle(0xc2b280, 0.9);
+      props.fillRect(toX(c) - 8, toY(midRow - 1), 12, 4);
+    });
 
-     // Coal/rock lumps
-     [
-       [9, midRow + 2],
-       [22, midRow - 3],
-       [28, midRow + 2],
-       [36, midRow - 4],
-       [42, midRow + 3],
-     ].forEach(([c, r]) => {
-       this.drawPixelRock(props, toX(c), toY(r), 0x2e2820, scale);
-     });
+    // Coal/rock lumps
+    [
+      [9, midRow + 2],
+      [22, midRow - 3],
+      [28, midRow + 2],
+      [36, midRow - 4],
+      [42, midRow + 3],
+    ].forEach(([c, r]) => {
+      this.drawPixelRock(props, toX(c), toY(r), 0x2e2820, scale);
+    });
 
-     // Small coal seam glints with animated sparkle
-     [
-       [12, midRow - 2.5],
-       [25, midRow + 1.5],
-       [39, midRow - 2],
-     ].forEach(([c, r]) => {
-       props.fillStyle(0x1a1614, 0.9);
-       props.fillRect(toX(c) - 4, toY(r) - 3, 14, 8);
-       props.fillStyle(0x3d3428, 0.4);
-       props.fillRect(toX(c) - 2, toY(r) - 2, 6, 4);
-       // Animated sparkle
-       const sparkle = this.add.rectangle(
-         toX(c), toY(r) - 6, 3, 3, 0xf59e0b, 0.7
-       );
-       sparkle.setDepth(7);
-       this.animationLayer.add(sparkle);
-       this.tweens.add({
-         targets: sparkle,
-         alpha: { from: 0.3, to: 0.9 },
-         duration: 800 + Math.random() * 400,
-         yoyo: true,
-         repeat: -1,
-         ease: "Sine.easeInOut",
-       });
-     });
+    // Small coal seam glints with animated sparkle
+    [
+      [12, midRow - 2.5],
+      [25, midRow + 1.5],
+      [39, midRow - 2],
+    ].forEach(([c, r]) => {
+      props.fillStyle(0x1a1614, 0.9);
+      props.fillRect(toX(c) - 4, toY(r) - 3, 14, 8);
+      props.fillStyle(0x3d3428, 0.4);
+      props.fillRect(toX(c) - 2, toY(r) - 2, 6, 4);
+      // Animated sparkle
+      const sparkle = this.add.rectangle(
+        toX(c), toY(r) - 6, 3, 3, 0xf59e0b, 0.7
+      );
+      sparkle.setDepth(7);
+      this.animationLayer.add(sparkle);
+      this.tweens.add({
+        targets: sparkle,
+        alpha: { from: 0.3, to: 0.9 },
+        duration: 800 + Math.random() * 400,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+    });
 
-     // Lantern posts along the path
-     [10, 22, 34, 46].forEach((c) => {
-       const lx = toX(c);
-       const ly = midY + 4;
-       props.fillStyle(0x5a4a3a, 1);
-       props.fillRect(lx - 1, ly, 2, 12);
-       props.fillStyle(0xf59e0b, 0.8);
-       props.fillCircle(lx, ly + 2, 3);
-     });
+    // Lantern posts along the path
+    [10, 22, 34, 46].forEach((c) => {
+      const lx = toX(c);
+      const ly = midY + 4;
+      props.fillStyle(0x5a4a3a, 1);
+      props.fillRect(lx - 1, ly, 2, 12);
+      props.fillStyle(0xf59e0b, 0.8);
+      props.fillCircle(lx, ly + 2, 3);
+    });
 
-     this.backgroundLayer.add(props);
+    this.backgroundLayer.add(props);
 
-     // ── SPRITES ───────────────────────────────────────────────
-     if (this.textures.exists("House_Hay_3")) {
-       const house = this.add.sprite(toX(21), toY(midRow - 5.2), "House_Hay_3");
-       house.setOrigin(0.5, 1);
-       house.setScale(scale);
-       house.setTint(0x9a8870);
-       house.setDepth(8);
-       this.midgroundLayer.add(house);
-     }
+    // ── SPRITES ───────────────────────────────────────────────
+    if (this.textures.exists("House_Hay_3")) {
+      const house = this.add.sprite(toX(21), toY(midRow - 5.2), "House_Hay_3");
+      house.setOrigin(0.5, 1);
+      house.setScale(scale);
+      house.setTint(0x9a8870);
+      house.setDepth(8);
+      this.midgroundLayer.add(house);
+    }
 
-     // Mining cart sprite
-     if (this.textures.exists("Barrel_Small_Empty")) {
-       const cart = this.add.sprite(toX(8), toY(midRow - 1.5), "Barrel_Small_Empty");
-       cart.setOrigin(0.5, 1);
-       cart.setScale(scale * 0.8);
-       cart.setTint(0x5a4a30);
-       cart.setAngle(-5);
-       cart.setDepth(9);
-       this.midgroundLayer.add(cart);
-     }
+    // Mining cart sprite
+    if (this.textures.exists("Barrel_Small_Empty")) {
+      const cart = this.add.sprite(toX(8), toY(midRow - 1.5), "Barrel_Small_Empty");
+      cart.setOrigin(0.5, 1);
+      cart.setScale(scale * 0.8);
+      cart.setTint(0x5a4a30);
+      cart.setAngle(-5);
+      cart.setDepth(9);
+      this.midgroundLayer.add(cart);
+    }
 
-     if (this.textures.exists("LampPost_3")) {
-       [16, 26].forEach((cx) => {
-         const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
-         lp.setOrigin(0.5, 1);
-         lp.setScale(scale);
-         lp.setTint(0xf59e0b);
-         lp.setDepth(9);
-         this.midgroundLayer.add(lp);
-       });
-     }
+    if (this.textures.exists("LampPost_3")) {
+      [16, 26].forEach((cx) => {
+        const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
+        lp.setOrigin(0.5, 1);
+        lp.setScale(scale);
+        lp.setTint(0xf59e0b);
+        lp.setDepth(9);
+        this.midgroundLayer.add(lp);
+      });
+    }
 
-     // Mine cart tracks extending from shaft
-     const tracks = this.add.graphics();
-     tracks.setDepth(3.5);
-     tracks.lineStyle(3, 0x5a4a2a, 0.8);
-     tracks.beginPath();
-     tracks.moveTo(toX(9), midY - 10);
-     tracks.lineTo(toX(18), midY - 5);
-     tracks.strokePath();
-     this.midgroundLayer.add(tracks);
-   }
+    // Mine cart tracks extending from shaft
+    const tracks = this.add.graphics();
+    tracks.setDepth(3.5);
+    tracks.lineStyle(3, 0x5a4a2a, 0.8);
+    tracks.beginPath();
+    tracks.moveTo(toX(9), midY - 10);
+    tracks.lineTo(toX(18), midY - 5);
+    tracks.strokePath();
+    this.midgroundLayer.add(tracks);
+  }
 
   // ─────────────────────────────────────────────────────────────
   //  STAGE 6 · HARBOUR  —  Coastal farm + fishing village
@@ -3452,58 +3452,58 @@ export class WorldMapScene extends Phaser.Scene {
     );
   }
 
-private createMineLandmarks(stageId: number): void {
-     const nodes = this.getStageNodes(stageId);
-     if (nodes.length === 0) return;
+  private createMineLandmarks(stageId: number): void {
+    const nodes = this.getStageNodes(stageId);
+    if (nodes.length === 0) return;
 
-     // Stage 5 has highest checkpoint density, so use tighter ring sizes.
-     const pads = this.add.graphics();
-     pads.setDepth(14);
-     nodes.forEach((node) => {
-       pads.fillStyle(0x2a3a23, 0.24);
-       pads.fillEllipse(node.x + 4, node.y + 72, 100, 34);
-       pads.lineStyle(3, 0xb8d084, 0.34);
-       pads.strokeEllipse(node.x, node.y + 61, 76, 24);
+    // Stage 5 has highest checkpoint density, so use tighter ring sizes.
+    const pads = this.add.graphics();
+    pads.setDepth(14);
+    nodes.forEach((node) => {
+      pads.fillStyle(0x2a3a23, 0.24);
+      pads.fillEllipse(node.x + 4, node.y + 72, 100, 34);
+      pads.lineStyle(3, 0xb8d084, 0.34);
+      pads.strokeEllipse(node.x, node.y + 61, 76, 24);
 
-       // Enhanced lantern posts with warm glow
-       [0, 1].forEach((offset, i) => {
-         const lampX = node.x + (offset === 0 ? -52 : 52);
-         const lampSprite = this.addLandmarkSprite(
-           "LampPost_3",
-           lampX,
-           node.y + 114,
-           0.76,
-           0.88,
-         );
-         // Add warm lantern glow
-         const glow = this.add.circle(lampX, node.y + 60, 18, 0xf59e0b, 0.18);
-         glow.setDepth(16);
-         this.midgroundLayer.add(glow);
-         this.tweens.add({
-           targets: glow,
-           alpha: { from: 0.1, to: 0.25 },
-           duration: 1600 + i * 200,
-           yoyo: true,
-           repeat: -1,
-           ease: "Sine.easeInOut",
-         });
-       });
-     });
-     this.midgroundLayer.add(pads);
+      // Enhanced lantern posts with warm glow
+      [0, 1].forEach((offset, i) => {
+        const lampX = node.x + (offset === 0 ? -52 : 52);
+        const lampSprite = this.addLandmarkSprite(
+          "LampPost_3",
+          lampX,
+          node.y + 114,
+          0.76,
+          0.88,
+        );
+        // Add warm lantern glow
+        const glow = this.add.circle(lampX, node.y + 60, 18, 0xf59e0b, 0.18);
+        glow.setDepth(16);
+        this.midgroundLayer.add(glow);
+        this.tweens.add({
+          targets: glow,
+          alpha: { from: 0.1, to: 0.25 },
+          duration: 1600 + i * 200,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+      });
+    });
+    this.midgroundLayer.add(pads);
 
-     // Add mining support beams near checkpoints
-     nodes.forEach((node, index) => {
-       if (index % 2 === 0) {
-         const beam = this.add.graphics();
-         beam.fillStyle(0x5a4220, 0.8);
-         beam.fillRect(node.x - 2, node.y + 30, 4, 30);
-         beam.lineStyle(1, 0x8b6f47, 0.6);
-         beam.strokeRect(node.x - 2, node.y + 30, 4, 30);
-         beam.setDepth(15);
-         this.midgroundLayer.add(beam);
-       }
-     });
-   }
+    // Add mining support beams near checkpoints
+    nodes.forEach((node, index) => {
+      if (index % 2 === 0) {
+        const beam = this.add.graphics();
+        beam.fillStyle(0x5a4220, 0.8);
+        beam.fillRect(node.x - 2, node.y + 30, 4, 30);
+        beam.lineStyle(1, 0x8b6f47, 0.6);
+        beam.strokeRect(node.x - 2, node.y + 30, 4, 30);
+        beam.setDepth(15);
+        this.midgroundLayer.add(beam);
+      }
+    });
+  }
 
   private createHarbourLandmarks(stageId: number): void {
     const nodes = this.getStageNodes(stageId);
@@ -3714,20 +3714,20 @@ private createMineLandmarks(stageId: number): void {
             blendMode: "ADD",
           };
           break;
-case 5: // Mine - Floating sparks/embers with fog overlay
-           particleConfig = {
-             x: { min: biomeX, max: biomeX + this.BIOME_WIDTH },
-             y: { min: 400, max: 1000 },
-             speedY: { min: -20, max: -40 },
-             speedX: { min: -10, max: 10 },
-             scale: { start: 0.1, end: 0 },
-             alpha: { start: 0.8, end: 0 },
-             lifespan: 3000,
-             frequency: 100,
-             tint: [0xf59e0b, 0xef4444, 0xfab005, 0xffd37a],
-             blendMode: "ADD",
-           };
-           break;
+        case 5: // Mine - Floating sparks/embers with fog overlay
+          particleConfig = {
+            x: { min: biomeX, max: biomeX + this.BIOME_WIDTH },
+            y: { min: 400, max: 1000 },
+            speedY: { min: -20, max: -40 },
+            speedX: { min: -10, max: 10 },
+            scale: { start: 0.1, end: 0 },
+            alpha: { start: 0.8, end: 0 },
+            lifespan: 3000,
+            frequency: 100,
+            tint: [0xf59e0b, 0xef4444, 0xfab005, 0xffd37a],
+            blendMode: "ADD",
+          };
+          break;
         case 8: // Scaling - Glowing petals/magic
           particleConfig = {
             x: { min: biomeX, max: biomeX + this.BIOME_WIDTH },
@@ -4141,131 +4141,131 @@ case 5: // Mine - Floating sparks/embers with fog overlay
     });
   }
 
-private playStageEntryWeather(
-     centerX: number,
-     centerY: number,
-     stage: number,
-     accent: number,
-   ): void {
-     const stageX = (stage - 1) * this.BIOME_WIDTH;
+  private playStageEntryWeather(
+    centerX: number,
+    centerY: number,
+    stage: number,
+    accent: number,
+  ): void {
+    const stageX = (stage - 1) * this.BIOME_WIDTH;
 
-     // Stage 5 (Mine) has special ember/fog effects
-     if (stage === 5) {
-       // Dark fog particles that swirl and dissipate
-       for (let i = 0; i < 25; i += 1) {
-         const fog = this.add.circle(
-           stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
-           Phaser.Math.Between(100, 500),
-           Phaser.Math.Between(30, 60),
-           0x1a1510,
-           0.4,
-         );
-         fog.setDepth(124);
-         this.animationLayer.add(fog);
+    // Stage 5 (Mine) has special ember/fog effects
+    if (stage === 5) {
+      // Dark fog particles that swirl and dissipate
+      for (let i = 0; i < 25; i += 1) {
+        const fog = this.add.circle(
+          stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
+          Phaser.Math.Between(100, 500),
+          Phaser.Math.Between(30, 60),
+          0x1a1510,
+          0.4,
+        );
+        fog.setDepth(124);
+        this.animationLayer.add(fog);
 
-         this.tweens.add({
-           targets: fog,
-           x: fog.x + Phaser.Math.Between(-50, 50),
-           y: fog.y + Phaser.Math.Between(-80, 80),
-           alpha: 0,
-           scale: { from: 1, to: 2 },
-           duration: Phaser.Math.Between(2000, 3000),
-           ease: "Cubic.easeOut",
-           onComplete: () => fog.destroy(),
-         });
-       }
+        this.tweens.add({
+          targets: fog,
+          x: fog.x + Phaser.Math.Between(-50, 50),
+          y: fog.y + Phaser.Math.Between(-80, 80),
+          alpha: 0,
+          scale: { from: 1, to: 2 },
+          duration: Phaser.Math.Between(2000, 3000),
+          ease: "Cubic.easeOut",
+          onComplete: () => fog.destroy(),
+        });
+      }
 
-       // Glowing embers rising from the ground
-       for (let i = 0; i < 40; i += 1) {
-         const ember = this.add.circle(
-           stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
-           600,
-           Phaser.Math.Between(2, 4),
-           Phaser.Math.Between(0, 2) === 0 ? 0xf59e0b : 0xef4444,
-           0.8,
-         );
-         ember.setDepth(125);
-         this.animationLayer.add(ember);
+      // Glowing embers rising from the ground
+      for (let i = 0; i < 40; i += 1) {
+        const ember = this.add.circle(
+          stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
+          600,
+          Phaser.Math.Between(2, 4),
+          Phaser.Math.Between(0, 2) === 0 ? 0xf59e0b : 0xef4444,
+          0.8,
+        );
+        ember.setDepth(125);
+        this.animationLayer.add(ember);
 
-         this.tweens.add({
-           targets: ember,
-           y: ember.y - Phaser.Math.Between(200, 400),
-           alpha: 0,
-           scale: 0.3,
-           duration: Phaser.Math.Between(1500, 2500),
-           ease: "Sine.easeIn",
-           onComplete: () => ember.destroy(),
-         });
-       }
-     } else {
-       // Default weather effect for other stages (clouds)
-       for (let i = 0; i < 18; i += 1) {
-         const cloud = this.add.container(
-           stageX + Phaser.Math.Between(80, this.BIOME_WIDTH - 80),
-           Phaser.Math.Between(120, 360),
-         );
-         cloud.setDepth(124);
+        this.tweens.add({
+          targets: ember,
+          y: ember.y - Phaser.Math.Between(200, 400),
+          alpha: 0,
+          scale: 0.3,
+          duration: Phaser.Math.Between(1500, 2500),
+          ease: "Sine.easeIn",
+          onComplete: () => ember.destroy(),
+        });
+      }
+    } else {
+      // Default weather effect for other stages (clouds)
+      for (let i = 0; i < 18; i += 1) {
+        const cloud = this.add.container(
+          stageX + Phaser.Math.Between(80, this.BIOME_WIDTH - 80),
+          Phaser.Math.Between(120, 360),
+        );
+        cloud.setDepth(124);
 
-         const puff = this.add.graphics();
-         puff.fillStyle(0xffffff, 0.2);
-         puff.fillCircle(-38, 4, 36);
-         puff.fillCircle(0, -8, 48);
-         puff.fillCircle(44, 6, 34);
-         puff.fillEllipse(4, 18, 132, 44);
-         cloud.add(puff);
-         cloud.setScale(0.72 + Math.random() * 0.46);
-         this.animationLayer.add(cloud);
+        const puff = this.add.graphics();
+        puff.fillStyle(0xffffff, 0.2);
+        puff.fillCircle(-38, 4, 36);
+        puff.fillCircle(0, -8, 48);
+        puff.fillCircle(44, 6, 34);
+        puff.fillEllipse(4, 18, 132, 44);
+        cloud.add(puff);
+        cloud.setScale(0.72 + Math.random() * 0.46);
+        this.animationLayer.add(cloud);
 
-         this.tweens.add({
-           targets: cloud,
-           x: cloud.x + Phaser.Math.Between(90, 180),
-           y: cloud.y + Phaser.Math.Between(-16, 28),
-           alpha: 0,
-           duration: Phaser.Math.Between(1300, 2100),
-           ease: "Sine.easeOut",
-           onComplete: () => cloud.destroy(),
-         });
-       }
-     }
+        this.tweens.add({
+          targets: cloud,
+          x: cloud.x + Phaser.Math.Between(90, 180),
+          y: cloud.y + Phaser.Math.Between(-16, 28),
+          alpha: 0,
+          duration: Phaser.Math.Between(1300, 2100),
+          ease: "Sine.easeOut",
+          onComplete: () => cloud.destroy(),
+        });
+      }
+    }
 
-     // Common flake effect
-     for (let i = 0; i < 90; i += 1) {
-       const flake = this.add.circle(
-         stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
-         Phaser.Math.Between(80, 420),
-         Phaser.Math.Between(2, 5),
-         i % 5 === 0 ? accent : 0xffffff,
-         0.9,
-       );
-       flake.setDepth(126);
-       this.animationLayer.add(flake);
+    // Common flake effect
+    for (let i = 0; i < 90; i += 1) {
+      const flake = this.add.circle(
+        stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
+        Phaser.Math.Between(80, 420),
+        Phaser.Math.Between(2, 5),
+        i % 5 === 0 ? accent : 0xffffff,
+        0.9,
+      );
+      flake.setDepth(126);
+      this.animationLayer.add(flake);
 
-       this.tweens.add({
-         targets: flake,
-         x: flake.x + Phaser.Math.Between(-90, 90),
-         y: flake.y + Phaser.Math.Between(180, 360),
-         alpha: 0,
-         scale: 0.35,
-         duration: Phaser.Math.Between(1200, 2400),
-         ease: "Sine.easeIn",
-         onComplete: () => flake.destroy(),
-       });
-     }
+      this.tweens.add({
+        targets: flake,
+        x: flake.x + Phaser.Math.Between(-90, 90),
+        y: flake.y + Phaser.Math.Between(180, 360),
+        alpha: 0,
+        scale: 0.35,
+        duration: Phaser.Math.Between(1200, 2400),
+        ease: "Sine.easeIn",
+        onComplete: () => flake.destroy(),
+      });
+    }
 
-     const ring = this.add.circle(centerX, centerY, 80, accent, 0.16);
-     ring.setStrokeStyle(5, 0xffffff, 0.42);
-     ring.setDepth(123);
-     this.animationLayer.add(ring);
+    const ring = this.add.circle(centerX, centerY, 80, accent, 0.16);
+    ring.setStrokeStyle(5, 0xffffff, 0.42);
+    ring.setDepth(123);
+    this.animationLayer.add(ring);
 
-     this.tweens.add({
-       targets: ring,
-       scale: 5,
-       alpha: 0,
-       duration: 1350,
-       ease: "Cubic.easeOut",
-       onComplete: () => ring.destroy(),
-     });
-   }
+    this.tweens.add({
+      targets: ring,
+      scale: 5,
+      alpha: 0,
+      duration: 1350,
+      ease: "Cubic.easeOut",
+      onComplete: () => ring.destroy(),
+    });
+  }
 
   private drawStagePathConnector(
     points: { x: number; y: number }[],
@@ -4367,7 +4367,7 @@ private playStageEntryWeather(
     if (stageId === 1) {
       const anchor =
         stageOneVillageAnchors[
-          Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
+        Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
         ];
       return {
         x: biomeOffsetX + anchor.x * this.MAP_PANEL_SCALE,
@@ -5223,10 +5223,10 @@ private playStageEntryWeather(
       visibleWorldWidth >= this.BIOME_WIDTH
         ? stageStartX + this.BIOME_WIDTH / 2
         : Phaser.Math.Clamp(
-            preferredX,
-            stageStartX + halfWidth,
-            stageEndX - halfWidth,
-          );
+          preferredX,
+          stageStartX + halfWidth,
+          stageEndX - halfWidth,
+        );
     const y = Phaser.Math.Clamp(
       preferredY,
       halfHeight,

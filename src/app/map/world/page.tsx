@@ -30,7 +30,7 @@ import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { HUD } from "@/components/hud/HUD";
 import { LevelUpSequence } from "@/components/animations/LevelUpSequence";
 import { BadgeAwardSequence } from "@/components/animations/BadgeAwardSequence";
-import { getVentureBadgeEmoji } from "@/components/user/ProfileBadges";
+import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useSearchParams } from "next/navigation";
@@ -1955,35 +1955,77 @@ function MapPageInner() {
           : corruptionLevel < 50
             ? "rare"
             : "uncommon";
-      const taskBadgeLabel =
-        corruptionLevel < 25
-          ? "Task Clear (Gold)"
-          : corruptionLevel < 50
-            ? "Task Clear (Silver)"
-            : "Task Clear (Bronze)";
-      // Icon matches the corruption tier (trophy = gold, medals = silver/bronze)
-      const taskBadgeIcon =
-        corruptionLevel < 25 ? "🏆" : corruptionLevel < 50 ? "🥈" : "🥉";
+
+      // Look up target checkpoint and task details dynamically
+      const matchedCheckpoint = checkpoints.find((c) => c._id === checkpointId);
+      const cpTitle = matchedCheckpoint?.checkpointName || "Task";
+      const matchedTask = matchedCheckpoint?.tasks?.find(
+        (t) => t._id === taskId || t.taskLevel === taskLevel
+      );
+      const toolType = matchedTask?.toolType || "write";
+
+      // Dynamic Emojis based on Tool
+      const getToolEmoji = (tool: string, rarity: string) => {
+        const t = tool.toLowerCase();
+        if (t.includes("write") || t.includes("journal") || t.includes("self_report")) return "✍️";
+        if (t.includes("table") || t.includes("poll") || t.includes("chart")) return "📊";
+        if (t.includes("map") || t.includes("roadmap")) return "🗺️";
+        if (t.includes("survey") || t.includes("checklist")) return "📋";
+        if (t.includes("link")) return "🔗";
+        if (t.includes("upload")) return "📤";
+        if (t.includes("kanban") || t.includes("board")) return "🗂️";
+        if (t.includes("calendar") || t.includes("date")) return "📅";
+        
+        if (rarity === "legendary") return "🏆";
+        if (rarity === "rare") return "🥈";
+        return "🥉";
+      };
+
+      const taskBadgeIcon = getToolEmoji(toolType, taskBadgeRarity);
+      const levelName = taskLevel.toUpperCase();
+      const statusText = corruptionLevel < 25 ? "Gold" : corruptionLevel < 50 ? "Silver" : "Bronze";
+      const taskBadgeLabel = `${cpTitle} (${levelName}) — ${statusText}`;
+
       const taskLevelName =
         taskLevel === "t1" ? "Easy" : taskLevel === "t2" ? "Medium" : "Stretch";
-      const taskBadgeDesc =
-        corruptionLevel < 25
-          ? `${taskLevelName} task cleared with gold-standard execution. Exceptional!`
-          : corruptionLevel < 50
-            ? `${taskLevelName} task cleared with silver integrity. Keep the corruption low!`
-            : `${taskLevelName} task cleared — bronze earned. Watch the corruption meter!`;
+      const promptText = matchedTask?.prompt || "Task completed successfully.";
+      const taskBadgeDesc = `Completed ${taskLevelName} Task: "${promptText}"`;
 
-      // Per-task-level colors: T1 green (Seedling), T2 blue (Gate Crossed), T3 indigo (First Checkpoint)
-      const taskPrimaryColor =
-        taskLevel === "t1" ? "#D1FAE5" : taskLevel === "t2" ? "#DBEAFE" : "#EEF2FF";
-      const taskSecondaryColor =
-        taskLevel === "t1" ? "#065F46" : taskLevel === "t2" ? "#1E40AF" : "#3730A3";
-      const taskTagline =
-        taskLevel === "t1"
-          ? "From the smallest seed, the tallest oak."
-          : taskLevel === "t2"
-            ? "Send your first collaboration invite."
-            : "Five gold checkpoints on any venture.";
+      // Dynamic Theme based on Tool Type
+      let taskPrimaryColor = "#EEF2FF";
+      let taskSecondaryColor = "#3730A3";
+      let taskTagline = "Every small milestone brings the vision closer.";
+
+      const toolLower = toolType.toLowerCase();
+      if (toolLower.includes("write") || toolLower.includes("journal") || toolLower.includes("self_report")) {
+        taskPrimaryColor = "#F5F3FF"; // light violet
+        taskSecondaryColor = "#7C3AED"; // violet
+        taskTagline = "The pen is mightier than the sword.";
+      } else if (toolLower.includes("table") || toolLower.includes("poll") || toolLower.includes("chart")) {
+        taskPrimaryColor = "#ECFDF5"; // light emerald
+        taskSecondaryColor = "#059669"; // emerald
+        taskTagline = "In God we trust; all others must bring data.";
+      } else if (toolLower.includes("map") || toolLower.includes("roadmap")) {
+        taskPrimaryColor = "#EFF6FF"; // light blue
+        taskSecondaryColor = "#2563EB"; // blue
+        taskTagline = "A map shows us where we are; a roadmap shows where we go.";
+      } else if (toolLower.includes("survey") || toolLower.includes("checklist")) {
+        taskPrimaryColor = "#FFF7ED"; // light orange
+        taskSecondaryColor = "#EA580C"; // orange
+        taskTagline = "Listen to your market, and the market will reward you.";
+      } else if (toolLower.includes("link") || toolLower.includes("upload")) {
+        taskPrimaryColor = "#FDF2F8"; // light pink
+        taskSecondaryColor = "#DB2777"; // pink
+        taskTagline = "Connected and validated. The network is the computer.";
+      } else if (toolLower.includes("kanban") || toolLower.includes("board")) {
+        taskPrimaryColor = "#FFF1F2"; // light rose
+        taskSecondaryColor = "#E11D48"; // rose
+        taskTagline = "Keep your tasks moving and clear the path ahead.";
+      } else if (toolLower.includes("calendar")) {
+        taskPrimaryColor = "#F0FDF4"; // light green
+        taskSecondaryColor = "#16A34A"; // green
+        taskTagline = "Manage your time wisely and build consistency.";
+      }
 
       setBadgeQueue((q) => [
         ...q,
@@ -2173,21 +2215,32 @@ function MapPageInner() {
           : corruptionLevel < 50
             ? "rare"
             : "uncommon";
-      const levelBadgeLabel =
-        corruptionLevel < 25
-          ? "Stage Clear (Gold)"
-          : corruptionLevel < 50
-            ? "Stage Clear (Silver)"
-            : "Stage Clear (Bronze)";
-      // 🏆 matches the profile page trophy icon for gold-tier badges
-      const levelBadgeIcon =
-        corruptionLevel < 25 ? "🏆" : corruptionLevel < 50 ? "🥈" : "🥉";
+      
+      const statusTextCP = corruptionLevel < 25 ? "Gold" : corruptionLevel < 50 ? "Silver" : "Bronze";
+      const levelBadgeLabel = `${cp.checkpointName} — ${statusTextCP}`;
+
+      // Dynamic Stage-based Checkpoint Icon
+      const getStageEmoji = (stageNum: number, rarity: string) => {
+        if (stageNum === 1) return "💡"; // Ideation
+        if (stageNum === 2) return "🔬"; // Research
+        if (stageNum === 3) return "✅"; // Validation
+        if (stageNum === 4) return "🎨"; // Offer Design
+        if (stageNum === 5) return "⚙️"; // Build & Deliver
+        if (stageNum === 6) return "🚀"; // Launch
+        if (stageNum === 7) return "🔄"; // Iteration
+        if (stageNum === 8) return "👑"; // Scale
+        
+        return rarity === "legendary" ? "🏆" : rarity === "rare" ? "🥈" : "🥉";
+      };
+
+      const levelBadgeIcon = getStageEmoji(cp.stage, levelBadgeRarity);
       const levelBadgeDesc =
         corruptionLevel < 25
-          ? `Checkpoint ${cp.checkpoint} cleared with gold-standard purity!`
+          ? `Checkpoint "${cp.checkpointName}" cleared with gold-standard purity!`
           : corruptionLevel < 50
-            ? `Checkpoint ${cp.checkpoint} cleared with silver integrity. Keep the corruption at bay!`
-            : `Checkpoint ${cp.checkpoint} cleared — bronze earned. Watch the corruption meter!`;
+            ? `Checkpoint "${cp.checkpointName}" cleared with silver integrity. Keep the corruption at bay!`
+            : `Checkpoint "${cp.checkpointName}" cleared — bronze earned. Watch the corruption meter!`;
+
       setBadgeQueue((q) => [
         ...q,
         {
@@ -2218,6 +2271,29 @@ function MapPageInner() {
           stageName: stageNames[cp.stage - 1] || "Stage",
           isGold,
         });
+
+        const stageBadgeRarity: BadgePayload["rarity"] =
+          corruptionLevel <= 30
+            ? "legendary"
+            : corruptionLevel <= 70
+              ? "rare"
+              : "uncommon";
+        const stageMedalText = corruptionLevel <= 30 ? "Gold" : corruptionLevel <= 70 ? "Silver" : "Bronze";
+        const stageBadgeName = `Stage ${cp.stage}: ${stageNames[cp.stage - 1]} Clear — ${stageMedalText}`;
+        const stageBadgeIcon = corruptionLevel <= 30 ? "🥇" : corruptionLevel <= 70 ? "🥈" : "🥉";
+        const stageBadgeDesc = `Completed Stage ${cp.stage} with ${stageMedalText.toLowerCase()} prestige status!`;
+
+        setBadgeQueue((q) => [
+          ...q,
+          {
+            id: `stage_clear_${cp.stage}_${Date.now()}`,
+            name: stageBadgeName,
+            description: stageBadgeDesc,
+            icon: stageBadgeIcon,
+            rarity: stageBadgeRarity,
+            shape: "medal",
+          },
+        ]);
 
         // Close the panel. Convex will update venture.currentStage
         // and the useEffect at line ~1038 will auto-open the new active checkpoint.

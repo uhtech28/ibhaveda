@@ -30,28 +30,65 @@ export function StageClearModal({
   isGold,
   onComplete,
 }: StageClearModalProps) {
-  const [particles, setParticles] = useState<Array<{ id: number; x: number; delay: number }>>([]);
+  const [particles, setParticles] = useState<
+    Array<{ id: number; x: number; delay: number; char: string; scale: number; rotation: number; speed: number }>
+  >([]);
 
   const colors = STAGE_COLORS[stageNumber as keyof typeof STAGE_COLORS] || STAGE_COLORS[1];
 
   useEffect(() => {
     if (show) {
-      // Generate random particles
-      const newParticles = Array.from({ length: 30 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        delay: Math.random() * 0.5,
-      }));
+      // Generate random stage-themed particles
+      const newParticles = Array.from({ length: 45 }, (_, i) => {
+        let char = "✨";
+        if (isGold) {
+          char = Math.random() > 0.5 ? "👑" : "✨";
+        } else {
+          switch (stageNumber) {
+            case 1:
+            case 2:
+              char = ["🍃", "🌿", "🌱", "🍁"][Math.floor(Math.random() * 4)];
+              break;
+            case 3:
+              char = "⚔️";
+              break;
+            case 4:
+              char = "🎨";
+              break;
+            case 5:
+              char = "💎";
+              break;
+            case 6:
+              char = "🫧";
+              break;
+            case 7:
+              char = "📍";
+              break;
+            case 8:
+              char = "🌟";
+              break;
+          }
+        }
+        return {
+          id: i,
+          x: Math.random() * 100,
+          delay: Math.random() * 0.8,
+          char,
+          scale: 0.6 + Math.random() * 0.8,
+          rotation: Math.random() * 360,
+          speed: 2.2 + Math.random() * 1.8,
+        };
+      });
       setParticles(newParticles);
 
-      // Auto-dismiss after 3 seconds
+      // Auto-dismiss after 3.5 seconds to let animations resolve beautifully
       const timer = setTimeout(() => {
         onComplete?.();
-      }, 3000);
+      }, 3500);
 
       return () => clearTimeout(timer);
     }
-  }, [show, onComplete]);
+  }, [show, onComplete, stageNumber, isGold]);
 
   return (
     <AnimatePresence>
@@ -72,28 +109,27 @@ export function StageClearModal({
           {particles.map((particle) => (
             <motion.div
               key={particle.id}
-              initial={{ y: -100, opacity: 0, scale: 0 }}
+              initial={{ y: -50, x: `${particle.x}%`, opacity: 0, scale: 0, rotate: particle.rotation }}
               animate={{
-                y: window.innerHeight + 100,
+                y: typeof window !== "undefined" ? window.innerHeight + 100 : 800,
+                x: [
+                  `${particle.x}%`,
+                  `${particle.x + Math.sin(particle.id) * 8}%`,
+                  `${particle.x - Math.cos(particle.id) * 8}%`,
+                  `${particle.x}%`,
+                ],
                 opacity: [0, 1, 1, 0],
-                scale: [0, 1, 1, 0],
+                scale: [0, particle.scale, particle.scale, 0],
+                rotate: particle.rotation + 360,
               }}
               transition={{
-                duration: 2,
+                duration: particle.speed,
                 delay: particle.delay,
-                ease: "easeOut",
+                ease: "linear",
               }}
-              className="absolute"
-              style={{
-                left: `${particle.x}%`,
-                top: 0,
-              }}
+              className="absolute text-xl pointer-events-none select-none"
             >
-              {isGold ? (
-                <Crown className="h-4 w-4 text-yellow-400" />
-              ) : (
-                <Sparkles className="h-3 w-3" style={{ color: colors.glow }} />
-              )}
+              {particle.char}
             </motion.div>
           ))}
 

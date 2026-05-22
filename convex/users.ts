@@ -232,6 +232,7 @@ export const updateUserProfile = mutation({
     skills: v.optional(v.array(v.string())),
     industry: v.optional(v.string()),
     industries: v.optional(v.array(v.string())),
+    equippedBadges: v.optional(v.array(v.string())),
   }),
   handler: async ({ db, auth }, args): Promise<string> => {
     console.log('🔄 Updating user profile:', {

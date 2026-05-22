@@ -434,7 +434,7 @@ export const getVentureBadges = query({
       const def = BADGE_DEFINITIONS.find((b) => b.id === badge.badgeId);
       if (!def) return { ...badge, definition: undefined };
 
-      const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(badge.badgeId);
+      const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 71, 72, 73, 74, 75, 76, 77, 78].includes(badge.badgeId);
       const isTaskBadge = def.category === "idea_milestones" && !isLevelBadge;
 
       let shape = def.shape;
@@ -506,7 +506,7 @@ export const getVentureBadgeProgress = query({
     const fallbackCorruption = activeVenture ? (activeVenture.corruptionLevel ?? 0) : 0;
 
     return BADGE_DEFINITIONS.map((def) => {
-      const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(def.id);
+      const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 71, 72, 73, 74, 75, 76, 77, 78].includes(def.id);
       const isTaskBadge = def.category === "idea_milestones" && !isLevelBadge;
       const earned = earnedIds.has(def.id);
       const record = earnedBadges.find((b) => b.badgeId === def.id);
@@ -529,7 +529,7 @@ export const getVentureBadgeProgress = query({
           rarity = "legendary";
           primaryColor = "#FBBF24";
           secondaryColor = "#92400E";
-          icon = "🏆";
+          icon = "🥇";
         } else if (corr <= 70) {
           name = `${def.name} (Silver)`;
           rarity = "rare";
@@ -661,6 +661,7 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
   const completedCategories = new Set<string>();
   const allCompletedCheckpoints: any[] = [];
   const allCheckpointIds: any[] = [];
+  const completedStageNumbers = new Set<number>();
 
   const stageCheckpointCounts = new Map(
     VENTURE_STAGES.map((stage) => [stage.id, stage.checkpoints]),
@@ -694,6 +695,7 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
       if (stageCps.length >= reqCount && stageCps.every((c: any) => isCheckpointComplete(c))) {
         completedStagesForVenture++;
         completedStages++;
+        completedStageNumbers.add(s);
         if (s > highestCompletedStage) highestCompletedStage = s;
         if (s >= 6) hasVentureStage6 = true;
         
@@ -950,6 +952,16 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     { id: 15, shouldAward: lifecyclesCompleted >= 1 }, // The Full Circle
     { id: 16, shouldAward: perfectLifecycles >= 1 }, // The Gilded Path
     
+    // Stage-specific completion medals (71-78)
+    { id: 71, shouldAward: completedStageNumbers.has(1) },
+    { id: 72, shouldAward: completedStageNumbers.has(2) },
+    { id: 73, shouldAward: completedStageNumbers.has(3) },
+    { id: 74, shouldAward: completedStageNumbers.has(4) },
+    { id: 75, shouldAward: completedStageNumbers.has(5) },
+    { id: 76, shouldAward: completedStageNumbers.has(6) },
+    { id: 77, shouldAward: completedStageNumbers.has(7) },
+    { id: 78, shouldAward: completedStageNumbers.has(8) },
+    
     // Templates (17-22)
     { id: 17, shouldAward: academicLifecycles >= 1 }, // The Archaeologist
     { id: 18, shouldAward: experimentalLifecycles >= 1 }, // The Artificer
@@ -1110,7 +1122,7 @@ export const getUserProfileBadges = query({
         const def = BADGE_DEFINITIONS.find((b) => b.id === vb.badgeId);
         if (!def) return null;
 
-        const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(vb.badgeId);
+        const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 71, 72, 73, 74, 75, 76, 77, 78].includes(vb.badgeId);
         const isTaskBadge = (def.category === "idea_milestones" || def.category === "onboarding") && !isLevelBadge;
 
         let shape = def.shape;
@@ -1131,7 +1143,7 @@ export const getUserProfileBadges = query({
             rarity = "legendary";
             primaryColor = "#FBBF24";
             secondaryColor = "#92400E";
-            icon = "🏆";
+            icon = "🥇";
           } else if (corr <= 70) {
             name = `${def.name} (Silver)`;
             rarity = "rare";

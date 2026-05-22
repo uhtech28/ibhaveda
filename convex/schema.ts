@@ -26,6 +26,7 @@ export default defineSchema({
     xp: v.optional(v.number()), // Experience points
     level: v.optional(v.number()), // User level
     lastLoginAt: v.optional(v.number()), // Last login timestamp
+    equippedBadges: v.optional(v.array(v.string())), // Array of equipped badge IDs (e.g. "venture_1", "general_chatterbox")
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
   })
