@@ -1158,6 +1158,10 @@ function MapPageInner() {
     stageNumber: number;
     stageName: string;
     isGold: boolean;
+    medalTier?: "gold" | "silver" | "bronze";
+    fromBiome?: string;
+    nextStageName?: string;
+    nextBiome?: string;
   }>({ show: false, stageNumber: 1, stageName: "", isGold: false });
 
   // Tour walkthrough state
@@ -2191,6 +2195,7 @@ function MapPageInner() {
       setOptimisticCompletedTaskIds,
       setBadgeQueue,
       corruptionLevel,
+      checkpoints,
     ],
   );
 
@@ -2358,23 +2363,36 @@ function MapPageInner() {
           "Iteration",
           "Scale",
         ];
+        const stageMedalTier: "gold" | "silver" | "bronze" =
+          corruptionLevel <= 30
+            ? "gold"
+            : corruptionLevel <= 70
+              ? "silver"
+              : "bronze";
+        const currentStageMeta = STAGES[cp.stage - 1];
+        const nextStageMeta = STAGES[cp.stage];
+
         setStageClearModal({
           show: true,
           stageNumber: cp.stage,
           stageName: stageNames[cp.stage - 1] || "Stage",
           isGold,
+          medalTier: stageMedalTier,
+          fromBiome: currentStageMeta?.biome,
+          nextStageName: nextStageMeta?.name,
+          nextBiome: nextStageMeta?.biome,
         });
 
         const stageBadgeRarity: BadgePayload["rarity"] =
-          corruptionLevel <= 30
+          stageMedalTier === "gold"
             ? "legendary"
-            : corruptionLevel <= 70
+            : stageMedalTier === "silver"
               ? "rare"
               : "uncommon";
         const stageMedalText =
-          corruptionLevel <= 30
+          stageMedalTier === "gold"
             ? "Gold"
-            : corruptionLevel <= 70
+            : stageMedalTier === "silver"
               ? "Silver"
               : "Bronze";
         const stageBadgeName = `Stage ${cp.stage}: ${stageNames[cp.stage - 1]} Clear — ${stageMedalText}`;
@@ -2771,6 +2789,10 @@ function MapPageInner() {
             stageNumber={stageClearModal.stageNumber}
             stageName={stageClearModal.stageName}
             isGold={stageClearModal.isGold}
+            medalTier={stageClearModal.medalTier}
+            fromBiome={stageClearModal.fromBiome}
+            nextStageName={stageClearModal.nextStageName}
+            nextBiome={stageClearModal.nextBiome}
             onComplete={() =>
               setStageClearModal({ ...stageClearModal, show: false })
             }
