@@ -17,7 +17,6 @@ import {
   Trash2,
   Trophy,
   Users,
-  Plus,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -357,15 +356,6 @@ export function IdeaForgeExperience({
           <IdeaForgeRightRail currentUser={currentUser} publicIdeas={publicIdeas as IdeaForgeIdea[]} />
         </div>
       </main>
-
-      <button
-        type="button"
-        onClick={openWizard}
-        aria-label="Post idea"
-        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#6366F1] text-white shadow-[0_18px_42px_rgba(99,102,241,0.3)] transition-all duration-200 hover:scale-[1.02] hover:bg-[#8B5CF6] md:bottom-8 md:right-8"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
 
       <FloatingChatButton />
       <IdeaWizard
