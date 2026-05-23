@@ -629,6 +629,25 @@ export default defineSchema({
     .index("by_awarded", ["isAwarded"]),
 
   // ─────────────────────────────────────────────────────────────────────────
+  // RE-ENGAGEMENT EMAIL TRACKING
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Tracks every re-engagement email dispatched so the cron can stagger sends,
+  // enforce the 14-day resend window, and ensure the farewell email fires exactly once.
+  //
+  // type "reengagement" — standard re-engagement email (subject to 14-day stagger)
+  // type "farewell"     — one-time goodbye email sent when user crosses the churn threshold;
+  //                       after this the user is permanently excluded from all email runs.
+  reengagementLog: defineTable({
+    userId: v.id("users"),
+    sentAt: v.number(),
+    type: v.union(v.literal("reengagement"), v.literal("farewell")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_sent_at", ["sentAt"])
+    // Compound index: supports q.eq("userId", id).eq("type", t) → order("desc") → .first()
+    .index("by_user_type_sent", ["userId", "type", "sentAt"]),
+
   // AI QUALITY SCORING  (Week 4 — Day 18)
   // ─────────────────────────────────────────────────────────────────────────
 
