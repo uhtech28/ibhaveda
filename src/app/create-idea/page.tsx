@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Loader2, X, AlertCircle, Sparkles, Globe, Lock } from "lucide-react";
@@ -79,10 +79,28 @@ export default function CreateIdeaPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const createIdea = useMutation(api.ideas.createIdea);
+  const createVenture = useMutation(api.ventures.createVenture);
   const generateUploadUrl = useMutation(api.ideas.generateUploadUrl);
   const attachFileToIdea = useMutation(api.ideas.attachFileToIdea);
 
-  React.useEffect(() => {
+  // Load drafts from storage (User Change)
+  useEffect(() => {
+    try {
+      const rawDraft = window.sessionStorage.getItem("ideaforge-composer-publish") || window.localStorage.getItem("ideaforge-composer-draft");
+      if (!rawDraft) return;
+
+      const parsed = JSON.parse(rawDraft);
+      setTitle(parsed.title || "");
+      setDescription(parsed.description || "");
+      setSkills(Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5) : []);
+
+      window.sessionStorage.removeItem("ideaforge-composer-publish");
+    } catch {
+      // Ignore invalid local draft payloads.
+    }
+  }, []);
+
+  useEffect(() => {
     if (isLoaded && !userId) router.push("/");
   }, [isLoaded, userId, router]);
 
@@ -135,21 +153,29 @@ export default function CreateIdeaPage() {
     if (!description.trim()) { setSubmitError("Description is required."); return; }
     if (title.length > 100) { setSubmitError("Title must be 100 characters or less."); return; }
     if (description.length > 1200) { setSubmitError("Description must be 1200 characters or less."); return; }
+    if (skills.length === 0) { setSubmitError("Please select at least one skill."); return; }
+    if (industries.length === 0) { setSubmitError("Please select at least one industry."); return; }
 
     setIsSubmitting(true);
     try {
+      // 1. Create the Idea
       const res = await createIdea({
         title: title.trim(),
         description: description.trim(),
-        // Save as JSON arrays so multi-word industry/skill names that contain
-        // commas (e.g. "Automobiles, Two Wheelers and Other Private Transportation")
-        // are preserved as single tags. parseTags() in shared.ts reads JSON first.
         category: skills.length > 0 ? JSON.stringify(skills) : "",
         industries: industries.length > 0 ? JSON.stringify(industries) : undefined,
         visibility,
       });
       const newIdeaId = res.ideaId;
 
+      // 2. Automated Venture Creation (User Logic)
+      const ventureId = await createVenture({
+        ideaId: newIdeaId as any,
+        skills,
+        industries,
+      });
+
+      // 3. Handle Image Upload if present
       if (imageFile) {
         try {
           const { uploadUrl } = await generateUploadUrl({});
@@ -179,10 +205,12 @@ export default function CreateIdeaPage() {
       toast({
         title: visibility === "public" ? "Idea published!" : "Idea saved as private",
         description: visibility === "public"
-          ? "Taking you to your idea."
+          ? "Taking you to your world map."
           : "Only you can see this idea — toggle to Public any time.",
       });
-      router.push(`/idea/${newIdeaId}`);
+
+      // Redirect to world map (User Logic)
+      router.push(`/map/world?ventureId=${ventureId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to post idea.";
       setSubmitError(message);
@@ -228,7 +256,7 @@ export default function CreateIdeaPage() {
         <Card className="shadow-sm border-border/50">
           <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Title — placeholder doubles as label to save vertical space */}
+              {/* Title */}
               <div className="space-y-1">
                 <Label htmlFor="title" className="sr-only">Title (required)</Label>
                 <Input
@@ -242,7 +270,7 @@ export default function CreateIdeaPage() {
                 <div className="text-right text-xs text-muted-foreground">{titleCount}/100</div>
               </div>
 
-              {/* Description — placeholder doubles as label */}
+              {/* Description */}
               <div className="space-y-1">
                 <Label htmlFor="description" className="sr-only">Description (required)</Label>
                 <Textarea
@@ -256,7 +284,7 @@ export default function CreateIdeaPage() {
                 <div className="text-right text-xs text-muted-foreground">{descCount}/1200</div>
               </div>
 
-              {/* Industries — placeholder doubles as label (optional) */}
+              {/* Industries */}
               <div>
                 <Label className="sr-only">Industries (optional)</Label>
                 <IndustriesMultiSelect
@@ -267,7 +295,7 @@ export default function CreateIdeaPage() {
                 />
               </div>
 
-              {/* Skills — placeholder doubles as label (optional) */}
+              {/* Skills */}
               <div>
                 <Label className="sr-only">Skills (optional)</Label>
                 <SkillsMultiSelect
@@ -278,7 +306,7 @@ export default function CreateIdeaPage() {
                 />
               </div>
 
-              {/* Visibility — label inlined into the option cards */}
+              {/* Visibility */}
               <div className="space-y-1.5">
                 <Label className="sr-only">Visibility</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -338,7 +366,7 @@ export default function CreateIdeaPage() {
                 </div>
               </div>
 
-              {/* Image upload — label inlined into the upload tile below */}
+              {/* Image upload */}
               <div className="space-y-1.5">
                 <Label className="sr-only">Image (optional)</Label>
 

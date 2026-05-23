@@ -3,17 +3,25 @@
 import { Reuleaux } from 'ldrs/react'
 import 'ldrs/react/Reuleaux.css'
 
-// LDRS Reuleaux Spinner (user-requested)
 export function Spinner({ size = 40, className }: { size?: number; className?: string }) {
   return (
-    <div className={className}>
+    <div
+      className={`relative inline-flex items-center justify-center text-foreground ${className || ""}`}
+      style={{ width: size, height: size }}
+      role="status"
+      aria-label="Loading"
+    >
+      <span
+        className="absolute inset-0 rounded-full bg-primary/15 blur-md motion-safe:animate-pulse"
+        aria-hidden="true"
+      />
       <Reuleaux
         size={size}
         stroke={5}
         strokeLength={0.15}
-        bgOpacity={0.1}
-        speed={1.2}
-        color="hsl(var(--foreground))"
+        bgOpacity={0.14}
+        speed={1.05}
+        color="currentColor"
       />
     </div>
   )

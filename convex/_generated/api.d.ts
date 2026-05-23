@@ -11,6 +11,7 @@
 import type * as agent from "../agent.js";
 import type * as agent_actions from "../agent_actions.js";
 import type * as ai from "../ai.js";
+import type * as aiScoring from "../aiScoring.js";
 import type * as badges from "../badges.js";
 import type * as chat from "../chat.js";
 import type * as communities from "../communities.js";
@@ -33,10 +34,12 @@ import type * as notifications from "../notifications.js";
 import type * as resend from "../resend.js";
 import type * as search from "../search.js";
 import type * as skillBadges from "../skillBadges.js";
+import type * as socialFeed from "../socialFeed.js";
 import type * as todos from "../todos.js";
 import type * as users from "../users.js";
 import type * as ventureConstants from "../ventureConstants.js";
 import type * as ventures from "../ventures.js";
+import type * as worldMap from "../worldMap.js";
 
 import type {
   ApiFromModules,
@@ -48,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   agent_actions: typeof agent_actions;
   ai: typeof ai;
+  aiScoring: typeof aiScoring;
   badges: typeof badges;
   chat: typeof chat;
   communities: typeof communities;
@@ -70,10 +74,12 @@ declare const fullApi: ApiFromModules<{
   resend: typeof resend;
   search: typeof search;
   skillBadges: typeof skillBadges;
+  socialFeed: typeof socialFeed;
   todos: typeof todos;
   users: typeof users;
   ventureConstants: typeof ventureConstants;
   ventures: typeof ventures;
+  worldMap: typeof worldMap;
 }>;
 
 /**

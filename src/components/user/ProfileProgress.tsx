@@ -119,6 +119,7 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
   const { isAuthenticated } = useConvexAuth();
   const levelProgress = useQuery(api.levels.getUserLevelProgress, { userId });
   const streak = useQuery(api.gamification.getUserStreak, { userId });
+  const ventureSummaries = useQuery(api.ventures.getUserVentureSummaries, { userId });
 
   // Silently tick the *viewer's* streak once auth is ready. Idempotent on the
   // server — only counts the day if not already counted. Retries on auth ready
@@ -142,18 +143,15 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
     ? levelProgress.title
     : localTitle;
 
-  const points = levelProgress?.titlePoints ?? 0;
-
-  // Smart bar target: walk forward to the FIRST level threshold strictly
-  // greater than current points. This keeps the bar meaningful even when a
-  // task-gate (Lv 1–6) holds the user at a level whose points threshold is
-  // already met. (74 pts at Lv 3 → bar targets Lv 5 at 150 pts.)
-  const targetLevel = (() => {
-    for (let lv = level + 1; lv <= 50; lv++) {
-      const def = LEVEL_TABLE.find((l) => l.level === lv);
-      if (def && def.pts > points) return def;
-    }
-    return null;
+  // Calculate average progress across all user ideas/ventures
+  const averageProgress = (() => {
+    if (!ventureSummaries || ventureSummaries.length === 0) return 0;
+    const totalPercentage = ventureSummaries.reduce((sum, v) => {
+      const total = v.totalCheckpoints || 36;
+      const completed = v.completedCheckpoints || 0;
+      return sum + (completed / total) * 100;
+    }, 0);
+    return Math.round(totalPercentage / ventureSummaries.length);
   })();
 
   const currentStreak = streak?.currentStreak ?? 0;
@@ -167,22 +165,16 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
     streakDetail = isAuthenticated ? "Starts on your first sign-in today" : "Sign in to start";
   }
 
-  // XP-style label so the bar reads like a game progression bar.
-  const isApex = targetLevel === null || level >= 50;
-  const xpDetail = isApex
-    ? `Apex`
-    : `${points.toLocaleString()} / ${targetLevel!.pts.toLocaleString()} XP`;
-
   return (
     <div className="pt-3 space-y-4">
-      {/* Level — single combined bar with real XP progress to the next level */}
+      {/* Level — single combined bar with average progress of all ideas */}
       <ProgressBar
         icon={<Trophy className="w-3.5 h-3.5 text-amber-400" />}
         iconBgClass="bg-amber-500/15 ring-1 ring-amber-500/30"
         label={`Lv ${level} — ${title}`}
-        detail={xpDetail}
-        value={points}
-        max={targetLevel?.pts ?? Math.max(points, 1)}
+        detail={`${averageProgress}% Avg Progress`}
+        value={averageProgress}
+        max={100}
         fillClass="bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.45)]"
       />
 

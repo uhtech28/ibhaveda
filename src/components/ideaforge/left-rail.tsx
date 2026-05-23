@@ -7,7 +7,6 @@ import { Tag } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import {
   cardSurface,
@@ -90,7 +89,12 @@ export function IdeaForgeLeftRail({
   // Real, live backend data
   const levelProgress = useQuery(
     api.levels.getUserLevelProgress,
-    currentUser?._id ? { userId: currentUser._id as Id<"users"> } : "skip"
+    currentUser?._id ? { userId: currentUser._id as any } : "skip"
+  );
+
+  const ventureSummaries = useQuery(
+    api.ventures.getUserVentureSummaries,
+    currentUser?._id ? { userId: currentUser._id as any } : "skip"
   );
 
   // Level / title — prefer backend, fall back to local table & XP heuristic.
@@ -100,23 +104,16 @@ export function IdeaForgeLeftRail({
     ? levelProgress.title
     : titleFor(level);
 
-  // Smart bar target: walk the level table forward to find the FIRST threshold
-  // strictly greater than the user's current points. The bar always represents
-  // a real, achievable next milestone — never stuck "full". (Lv 4 needs 50 pts
-  // but also a task gate; if a user with 74 pts is still at Lv 3 because of
-  // the gate, we show "74 / 150 XP" toward Lv 5 instead.)
-  const titlePoints = levelProgress?.titlePoints ?? xp;
-  const targetLevel = (() => {
-    for (let lv = level + 1; lv <= 50; lv++) {
-      const def = LEVEL_TABLE.find((l) => l.level === lv);
-      if (def && def.pts > titlePoints) return def;
-    }
-    return null;
+  // Calculate average progress across all user ideas/ventures
+  const averageProgress = (() => {
+    if (!ventureSummaries || ventureSummaries.length === 0) return 0;
+    const totalPercentage = ventureSummaries.reduce((sum, v) => {
+      const total = v.totalCheckpoints || 36;
+      const completed = v.completedCheckpoints || 0;
+      return sum + (completed / total) * 100;
+    }, 0);
+    return Math.round(totalPercentage / ventureSummaries.length);
   })();
-  const isApex = targetLevel === null;
-  const progress = isApex
-    ? 100
-    : Math.min(100, Math.round((titlePoints / targetLevel!.pts) * 100));
 
   const activeTags = Array.from(
     new Set(
@@ -171,14 +168,12 @@ export function IdeaForgeLeftRail({
                     {title}
                   </span>
                 </span>
-                <span className="text-[#9CA3AF] tabular-nums text-xs">
-                  {isApex
-                    ? `${titlePoints.toLocaleString()} XP · Apex`
-                    : `${titlePoints.toLocaleString()} / ${targetLevel!.pts.toLocaleString()} XP`}
+                <span className="text-[#9CA3AF] tabular-nums text-xs font-medium">
+                  {averageProgress}% Avg Progress
                 </span>
               </div>
               <Progress
-                value={progress}
+                value={averageProgress}
                 className="mt-3 h-2 bg-[#20293B] [&>div]:bg-[linear-gradient(90deg,#6366F1,#8B5CF6)]"
               />
             </div>

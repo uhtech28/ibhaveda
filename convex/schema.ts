@@ -1,5 +1,5 @@
-import { defineSchema, defineTable } from "convex/server"
-import { v } from "convex/values"
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 
 export default defineSchema({
   // Users table - stores user profiles and settings
@@ -17,6 +17,7 @@ export default defineSchema({
     skills: v.optional(v.array(v.string())), // Array of user skills (handled via userSkills table)
     industry: v.optional(v.string()), // Primary industry (kept for backward compatibility)
     industries: v.optional(v.array(v.string())), // Multiple industries
+    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))), // Character gender selection
     completedOnboarding: v.boolean(), // Onboarding status
     isActive: v.optional(v.boolean()), // Account status for user management
     role: v.optional(v.string()), // User role (user, moderator, admin)
@@ -25,6 +26,7 @@ export default defineSchema({
     xp: v.optional(v.number()), // Experience points
     level: v.optional(v.number()), // User level
     lastLoginAt: v.optional(v.number()), // Last login timestamp
+    equippedBadges: v.optional(v.array(v.string())), // Array of equipped badge IDs (e.g. "venture_1", "general_chatterbox")
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
   })
@@ -69,13 +71,17 @@ export default defineSchema({
     industries: v.optional(v.string()), // Industries as comma-separated string
     visibility: v.string(), // 'public' or 'private'
     // File attachment URLs (stored in Convex storage)
-    attachments: v.optional(v.array(v.object({
-      name: v.string(),
-      type: v.string(),
-      size: v.number(),
-      url: v.string(),
-      fileId: v.string(), // Convex storage ID
-    }))),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          type: v.string(),
+          size: v.number(),
+          url: v.string(),
+          fileId: v.string(), // Convex storage ID
+        }),
+      ),
+    ),
     sparkCount: v.number(), // Number of spark/like actions
     commentCount: v.number(), // Number of comments
     contributionRequestCount: v.optional(v.number()), // Number of contribution requests
@@ -124,7 +130,11 @@ export default defineSchema({
     contributorId: v.id("users"),
     authorId: v.id("users"),
     message: v.string(),
-    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("rejected"),
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -133,14 +143,17 @@ export default defineSchema({
     .index("by_contributor_status", ["contributorId", "status"])
     .index("by_author_created", ["authorId", "createdAt"]),
 
-
   // Todos table - tracks todo items for ideas
   todos: defineTable({
     ideaId: v.id("ideas"), // Reference to the idea
     authorId: v.id("users"), // User who created the todo
     assignedTo: v.optional(v.id("users")), // User assigned to the todo (reference to users table)
     title: v.string(), // Todo title/description
-    status: v.union(v.literal("todo"), v.literal("in_progress"), v.literal("done")), // Status of the todo
+    status: v.union(
+      v.literal("todo"),
+      v.literal("in_progress"),
+      v.literal("done"),
+    ), // Status of the todo
     order: v.optional(v.number()), // Order for sorting/display
     deadline: v.optional(v.number()), // Deadline as Unix timestamp
     completionTarget: v.optional(v.string()), // Target description for completion
@@ -195,14 +208,20 @@ export default defineSchema({
     senderId: v.id("users"), // User who triggered the notification
     type: v.string(), // Notification type (new_idea, comment, spark, etc.)
     message: v.string(), // Notification message text
-    relatedId: v.optional(v.union(
-      v.id("ideas"),
-      v.id("comments"),
-      v.id("contributionRequests"),
-      v.id("todos"),
-      v.id("invitations"),
-      v.id("badges")
-    )), // ID of related item
+    relatedId: v.optional(
+      v.union(
+        v.id("ideas"),
+        v.id("comments"),
+        v.id("contributionRequests"),
+        v.id("todos"),
+        v.id("invitations"),
+        v.id("badges"),
+        v.id("ventures"),
+        v.id("ventureCheckpoints"),
+        v.id("ventureTasks"),
+        v.id("ventureEvidence"),
+      ),
+    ), // ID of related item
     isRead: v.boolean(), // Read status
     createdAt: v.number(), // Unix timestamp
   })
@@ -218,7 +237,12 @@ export default defineSchema({
     ideaId: v.id("ideas"), // Reference to ideas table
     inviterId: v.id("users"), // User sending invitation
     inviteeId: v.id("users"), // User receiving invitation
-    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected"), v.literal("cancelled")), // Invitation status
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("rejected"),
+      v.literal("cancelled"),
+    ), // Invitation status
     message: v.optional(v.string()), // Optional invitation message
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
@@ -273,8 +297,7 @@ export default defineSchema({
     lastLoginDate: v.string(), // ISO date string "YYYY-MM-DD"
     lastStreakUpdate: v.number(),
     recoveryAvailable: v.optional(v.boolean()),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   // Badges Definitions
   badges: defineTable({
@@ -284,8 +307,7 @@ export default defineSchema({
     icon: v.string(), // Icon name
     category: v.string(), // 'creation', 'social', etc.
     criteria: v.any(), // Flexible criteria object
-  })
-    .index("by_slug", ["slug"]),
+  }).index("by_slug", ["slug"]),
 
   // User Badges (Earned)
   userBadges: defineTable({
@@ -305,8 +327,7 @@ export default defineSchema({
     tasksCompletedCount: v.number(),
     meetingsHostedCount: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_user_idea_skill", ["userId", "ideaId", "skill"]),
+  }).index("by_user_idea_skill", ["userId", "ideaId", "skill"]),
 
   // User Skill Badges (Earned per Idea/Skill)
   userSkillBadges: defineTable({
@@ -356,8 +377,7 @@ export default defineSchema({
     rank: v.number(),
     points: v.number(),
     awardedAt: v.number(),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   // ─────────────────────────────────────────────────────────────────────────
   // VENTURE PROGRESSION SYSTEM
@@ -367,10 +387,19 @@ export default defineSchema({
   ventures: defineTable({
     ideaId: v.id("ideas"),
     userId: v.id("users"),
-    currentStage: v.number(),    // 1-8
+    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))),
+    currentStage: v.number(), // 1-8
     currentCheckpoint: v.number(), // 1-N within current stage
-    status: v.union(v.literal("active"), v.literal("completed"), v.literal("archived")),
+    corruptionLevel: v.optional(v.number()), // Backward-compatible for legacy venture rows
+    lastActivityAt: v.optional(v.number()), // Backward-compatible for legacy venture rows
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("archived"),
+    ),
     assignedBosses: v.array(v.number()), // boss IDs 1-12
+    skills: v.optional(v.array(v.string())), // Selected skill tags (max 5)
+    industries: v.optional(v.array(v.string())), // Selected industry tags (max 4)
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -382,13 +411,20 @@ export default defineSchema({
   // Venture checkpoints — tracks completion per checkpoint within a stage
   ventureCheckpoints: defineTable({
     ventureId: v.id("ventures"),
-    stage: v.number(),           // 1-8
-    checkpoint: v.number(),      // 1-N within stage
-    status: v.union(v.literal("not_started"), v.literal("in_progress"), v.literal("completed"), v.literal("skipped")),
+    stage: v.number(), // 1-8
+    checkpoint: v.number(), // 1-N within stage
+    status: v.union(
+      v.literal("not_started"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("skipped"),
+    ),
     t1Completed: v.boolean(),
     t2Completed: v.boolean(),
     t3Completed: v.boolean(),
     goldBonusEarned: v.boolean(),
+    partialStartedAt: v.optional(v.number()),
+    partialDecayAppliedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
   })
     .index("by_venture", ["ventureId"])
@@ -400,11 +436,26 @@ export default defineSchema({
     checkpointId: v.id("ventureCheckpoints"),
     taskLevel: v.union(v.literal("t1"), v.literal("t2"), v.literal("t3")),
     toolType: v.union(
-      v.literal("write"), v.literal("table"), v.literal("map"),
-      v.literal("survey"), v.literal("poll"), v.literal("link"),
-      v.literal("upload"), v.literal("oauth"), v.literal("self_report")
+      v.literal("write"),
+      v.literal("table"),
+      v.literal("map"),
+      v.literal("survey"),
+      v.literal("poll"),
+      v.literal("link"),
+      v.literal("upload"),
+      // Legacy database value only. Do not add this back to TOOL_TYPES;
+      // existing rows may still contain "oauth" and must validate until migrated.
+      v.literal("oauth"),
+      v.literal("self_report"),
+      v.literal("journal"),
+      v.literal("kanban"),
+      v.literal("calendar"),
     ),
-    status: v.union(v.literal("not_started"), v.literal("in_progress"), v.literal("completed")),
+    status: v.union(
+      v.literal("not_started"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+    ),
     evidenceId: v.optional(v.id("ventureEvidence")),
     completedAt: v.optional(v.number()),
   })
@@ -416,7 +467,7 @@ export default defineSchema({
     taskId: v.id("ventureTasks"),
     userId: v.id("users"),
     toolType: v.string(),
-    content: v.any(),            // Tool-specific evidence structure
+    content: v.any(), // Tool-specific evidence structure
     storageId: v.optional(v.id("_storage")), // For file uploads
     createdAt: v.number(),
   })
@@ -426,8 +477,12 @@ export default defineSchema({
   // Venture bosses — tracks boss encounters per venture
   ventureBosses: defineTable({
     ventureId: v.id("ventures"),
-    bossId: v.number(),          // 1-12
-    status: v.union(v.literal("active"), v.literal("retreated"), v.literal("slain")),
+    bossId: v.number(), // 1-12
+    status: v.union(
+      v.literal("active"),
+      v.literal("retreated"),
+      v.literal("slain"),
+    ),
     corruptionLevel: v.number(), // 0-100
     bossSpecificCounters: v.any(), // Boss-specific tracking data
     assignedAt: v.number(),
@@ -436,6 +491,16 @@ export default defineSchema({
     .index("by_venture", ["ventureId"])
     .index("by_venture_status", ["ventureId", "status"]),
 
+  // Venture tools — stores JSON blobs for generic world-map tools (Kanban, Calendar, etc.)
+  ventureTools: defineTable({
+    ventureId: v.id("ventures"),
+    toolType: v.string(), // "kanban", "calendar", etc.
+    data: v.any(), // Tool-specific JSON state
+    updatedAt: v.number(),
+  })
+    .index("by_venture", ["ventureId"])
+    .index("by_venture_tool", ["ventureId", "toolType"]),
+
   // ─────────────────────────────────────────────────────────────────────────
   // LEVEL PROGRESSION SYSTEM
   // ─────────────────────────────────────────────────────────────────────────
@@ -443,11 +508,11 @@ export default defineSchema({
   // User level progression tracking
   userLevels: defineTable({
     userId: v.id("users"),
-    currentLevel: v.number(),    // 1-50
-    titlePoints: v.number(),     // Points toward next level
-    totalPoints: v.number(),     // All-time points earned
+    currentLevel: v.number(), // 1-50
+    titlePoints: v.number(), // Points toward next level
+    totalPoints: v.number(), // All-time points earned
     goldCheckpoints: v.number(), // Total gold checkpoints earned
-    fullLifecycles: v.number(),  // Stage 1→8 completions
+    fullLifecycles: v.number(), // Stage 1→8 completions
     helpfulFlareResponses: v.number(),
     flaresResolved: v.number(),
     menteesCount: v.number(),
@@ -475,11 +540,15 @@ export default defineSchema({
 
   // Flares — help requests fired by users
   flares: defineTable({
-    userId: v.id("users"),       // Who fired the flare
+    userId: v.id("users"), // Who fired the flare
     ventureId: v.optional(v.id("ventures")),
     checkpointId: v.optional(v.id("ventureCheckpoints")),
-    description: v.string(),     // What they need help with
-    status: v.union(v.literal("open"), v.literal("resolved"), v.literal("closed")),
+    description: v.string(), // What they need help with
+    status: v.union(
+      v.literal("open"),
+      v.literal("resolved"),
+      v.literal("closed"),
+    ),
     createdAt: v.number(),
     resolvedAt: v.optional(v.number()),
   })
@@ -491,7 +560,7 @@ export default defineSchema({
   // Flare responses — community responses to flares
   flareResponses: defineTable({
     flareId: v.id("flares"),
-    userId: v.id("users"),       // Who responded
+    userId: v.id("users"), // Who responded
     content: v.string(),
     isHelpful: v.optional(v.boolean()), // Marked by flare sender
     createdAt: v.number(),
@@ -508,7 +577,11 @@ export default defineSchema({
   mentorships: defineTable({
     mentorId: v.id("users"),
     menteeId: v.id("users"),
-    status: v.union(v.literal("active"), v.literal("completed"), v.literal("ended")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("ended"),
+    ),
     startedAt: v.number(),
     endedAt: v.optional(v.number()),
   })
@@ -524,10 +597,10 @@ export default defineSchema({
   // Venture badges — tracks which badges a user has earned (extends existing userBadges)
   ventureBadges: defineTable({
     userId: v.id("users"),
-    badgeId: v.number(),         // 1-62 (references BADGE_DEFINITIONS)
+    badgeId: v.number(), // 1-62 (references BADGE_DEFINITIONS)
     awardedAt: v.number(),
-    isHidden: v.boolean(),       // Hidden until earned
-    metadata: v.any(),           // Context for award
+    isHidden: v.boolean(), // Hidden until earned
+    metadata: v.any(), // Context for award
   })
     .index("by_user", ["userId"])
     .index("by_user_badge", ["userId", "badgeId"])
@@ -535,9 +608,9 @@ export default defineSchema({
 
   // Badge evaluation tracking — avoids re-evaluating everything
   badgeEvaluations: defineTable({
-    badgeId: v.number(),         // 1-62
+    badgeId: v.number(), // 1-62
     userId: v.id("users"),
-    condition: v.string(),       // Condition being tracked
+    condition: v.string(), // Condition being tracked
     lastChecked: v.number(),
     isAwarded: v.boolean(),
     awardedAt: v.optional(v.number()),
@@ -565,4 +638,67 @@ export default defineSchema({
     .index("by_sent_at", ["sentAt"])
     // Compound index: supports q.eq("userId", id).eq("type", t) → order("desc") → .first()
     .index("by_user_type_sent", ["userId", "type", "sentAt"]),
-})
+
+  // AI QUALITY SCORING  (Week 4 — Day 18)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Per-stage aggregate quality score for a venture.
+   * Updated each time a task submission is evaluated by the AI scorer.
+   */
+  qualityScores: defineTable({
+    ventureId: v.id("ventures"),
+    stageNumber: v.number(), // 1–8
+    completeness: v.number(), // 0–3
+    specificity: v.number(), // 0–3
+    evidence: v.number(), // 0–3
+    originality: v.number(), // 0–3
+    totalScore: v.number(), // 0–12
+    qualityTier: v.string(), // "low" | "standard" | "high"
+    valuationScore: v.number(), // mapped to user-visible ₹ valuation
+    evaluatedAt: v.number(), // timestamp
+  })
+    .index("by_venture", ["ventureId"])
+    .index("by_venture_stage", ["ventureId", "stageNumber"]),
+
+  /**
+   * Individual task-level AI evaluation record.
+   * One row per task submission that has been scored.
+   */
+  aiEvaluations: defineTable({
+    taskId: v.id("ventureTasks"),
+    checkpointId: v.id("ventureCheckpoints"),
+    content: v.string(), // submitted text content
+    completeness: v.number(), // 0–3
+    specificity: v.number(), // 0–3
+    evidence: v.number(), // 0–3
+    originality: v.number(), // 0–3
+    totalScore: v.number(), // 0–12
+    feedback: v.optional(v.string()), // AI-generated feedback text
+    modelUsed: v.string(), // e.g. "gpt-4o" | "llama-3" | "mock"
+    evaluatedAt: v.number(),
+  })
+    .index("by_task", ["taskId"])
+    .index("by_checkpoint", ["checkpointId"]),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FEATURE FLAGS  (Week 4 — Day 20)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Feature flags for phased rollout.
+   * All new V1 features are gated behind flags until 100% rollout.
+   *
+   * V1 flags:
+   *   phaser_world_map | ai_quality_scoring | persona_system | audio_system
+   */
+  featureFlags: defineTable({
+    flag: v.string(), // unique flag name
+    enabled: v.boolean(), // global on/off
+    rolloutPercentage: v.number(), // 0–100 (percentage of users)
+    enabledForUsers: v.array(v.id("users")), // explicit user overrides
+    description: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_flag", ["flag"]),
+});
