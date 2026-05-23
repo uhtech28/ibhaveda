@@ -4487,8 +4487,13 @@ export class WorldMapScene extends Phaser.Scene {
       Math.max(0, Math.round(baseWood.blue * 0.56)),
     );
 
+    const plankWidth = 28;
+    const plankHeight = 7;
+    const spacing = 16;
+
+    // Shadow
     const shadow = this.add.graphics();
-    shadow.lineStyle(22, 0x000000, 0.1 * alpha);
+    shadow.lineStyle(plankWidth + 6, 0x000000, 0.08 * alpha);
     shadow.beginPath();
     shadow.moveTo(points[0].x + 2, points[0].y + 4);
     points.slice(1).forEach((point) => shadow.lineTo(point.x + 2, point.y + 4));
@@ -4496,29 +4501,57 @@ export class WorldMapScene extends Phaser.Scene {
     shadow.setDepth(2.4);
     this.midgroundLayer.add(shadow);
 
-    const path = this.add.graphics();
-    path.lineStyle(16, woodColor, 0.92 * alpha + 0.08);
-    path.beginPath();
-    path.moveTo(points[0].x, points[0].y);
-    points.slice(1).forEach((point) => path.lineTo(point.x, point.y));
-    path.strokePath();
+    // Support rails underneath the planks
+    const rails = this.add.graphics();
+    rails.lineStyle(plankWidth, darkWood, 0.8 * alpha + 0.1);
+    rails.beginPath();
+    rails.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach((point) => rails.lineTo(point.x, point.y));
+    rails.strokePath();
+    rails.setDepth(2.5);
+    this.midgroundLayer.add(rails);
 
-    // Subtle top highlight
-    path.lineStyle(2, 0xffffff, 0.14 * alpha);
-    path.beginPath();
-    path.moveTo(points[0].x, points[0].y - 3);
-    points.slice(1).forEach((point) => path.lineTo(point.x, point.y - 3));
-    path.strokePath();
+    // Optional rope details
+    const rope = this.add.graphics();
+    const edgeOffset = plankWidth * 0.42;
+    rope.lineStyle(1.5, 0xd6b16c, 0.5 * alpha);
+    this.drawOffsetPolyline(rope, points, -edgeOffset);
+    this.drawOffsetPolyline(rope, points, edgeOffset);
+    rope.setDepth(2.8);
+    this.midgroundLayer.add(rope);
 
-    // Lower dark edge
-    path.lineStyle(2, darkWood, 0.5 * alpha + 0.1);
-    path.beginPath();
-    path.moveTo(points[0].x, points[0].y + 5);
-    points.slice(1).forEach((point) => path.lineTo(point.x, point.y + 5));
-    path.strokePath();
+    // Sample the path to place planks
+    const sampled = this.samplePolyline(points, spacing);
+    const plankPalette = [woodColor, woodColor, darkWood];
 
-    path.setDepth(2.7);
-    this.midgroundLayer.add(path);
+    sampled.forEach((sample, index) => {
+      const plank = this.add.rectangle(
+        sample.x,
+        sample.y,
+        plankWidth + ((index % 3) - 1) * 3,
+        plankHeight,
+        plankPalette[index % plankPalette.length],
+        1,
+      );
+      plank.setRotation(sample.angle + (index % 2 === 0 ? 0.04 : -0.03));
+      plank.setStrokeStyle(1, 0x3a2412, 0.5 * alpha);
+      plank.setAlpha(0.92);
+      plank.setDepth(2.6 + index * 0.0001);
+      this.midgroundLayer.add(plank);
+
+      const grain = this.add.rectangle(
+        sample.x,
+        sample.y - 2,
+        plankWidth * 0.68,
+        1.5,
+        0xd5a15f,
+        0.18 * alpha,
+      );
+      grain.setRotation(plank.rotation);
+      grain.setDepth(plank.depth + 0.01);
+      grain.setAlpha(0.6);
+      this.midgroundLayer.add(grain);
+    });
   }
 
   /**

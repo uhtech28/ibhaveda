@@ -2727,44 +2727,7 @@ function MapPageInner() {
       </AnimatePresence>
 
       {/* No venture state */}
-      {!isLoading && !activeVenture && phaserReady && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-md">
-          <div
-            className="text-center px-10 py-12 rounded-3xl"
-            style={{
-              background: "rgba(10, 15, 30, 0.8)",
-              border: "1px solid rgba(255, 255, 255, 0.05)",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
-            }}
-          >
-            <p
-              className="text-xs tracking-[0.2em] uppercase font-black mb-4"
-              style={{ color: "#6366f1" }}
-            >
-              No Active Venture
-            </p>
-            <p
-              className="text-sm font-medium mb-8"
-              style={{ color: "#94a3b8" }}
-            >
-              Create a venture to begin your journey
-            </p>
-            <Link
-              href="/venture/create"
-              className="px-6 py-3 rounded-xl text-xs tracking-wider font-bold uppercase transition-all duration-300 hover:scale-105"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(79, 70, 229, 0.1))",
-                border: "1px solid rgba(99, 102, 241, 0.4)",
-                color: "#818cf8",
-                boxShadow: "0 4px 20px rgba(99, 102, 241, 0.15)",
-              }}
-            >
-              Create Venture →
-            </Link>
-          </div>
-        </div>
-      )}
+
 
       {phaserReady && activeVenture && (
         <>

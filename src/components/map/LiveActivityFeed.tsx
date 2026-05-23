@@ -13,6 +13,7 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Activity } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface ActivityEvent {
   id: string;
@@ -25,6 +26,8 @@ interface ActivityEvent {
 }
 
 export function LiveActivityFeed() {
+  const router = useRouter();
+  
   // Fetch real active users (users who posted ideas recently)
   const recentIdeas = useQuery(api.ideas.getPublicIdeas, { 
     limit: 10
@@ -32,6 +35,7 @@ export function LiveActivityFeed() {
   
   const [activeUsers, setActiveUsers] = useState<Array<{name: string, avatar: string, color: string}>>([]);
   const [feed, setFeed] = useState<ActivityEvent[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<{ show: boolean; ideaId: string; title: string } | null>(null);
 
   // Extract unique active users from recent ideas
   useEffect(() => {
@@ -46,7 +50,7 @@ export function LiveActivityFeed() {
       "from-blue-500 to-indigo-500",
     ];
     
-    recentIdeas.forEach((idea, idx) => {
+    recentIdeas.forEach((idea) => {
       if (idea.author && !uniqueUsers.has(idea.author._id)) {
         uniqueUsers.set(idea.author._id, {
           name: idea.author.name || "Anonymous",
@@ -79,6 +83,21 @@ export function LiveActivityFeed() {
     
     setFeed(activities);
   }, [recentIdeas]);
+
+  const handleActivityClick = (ideaId: string, title: string) => {
+    setConfirmDialog({ show: true, ideaId, title });
+  };
+
+  const handleConfirm = () => {
+    if (confirmDialog) {
+      router.push(`/idea/${confirmDialog.ideaId}`);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleCancel = () => {
+    setConfirmDialog(null);
+  };
 
   return (
     <div className="fixed bottom-3 right-3 z-40 flex flex-col gap-2 pointer-events-auto w-[280px]">
@@ -141,7 +160,8 @@ export function LiveActivityFeed() {
                   animate={{ opacity: 1, x: 0, height: "auto" }}
                   exit={{ opacity: 0, x: -20, height: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="flex items-start gap-1.5 text-[9px] text-white/90"
+                  onClick={() => handleActivityClick(event.id, event.detail)}
+                  className="flex items-start gap-1.5 text-[9px] text-white/90 cursor-pointer hover:bg-white/5 rounded p-1 -m-1 transition-colors"
                 >
                   <span className="text-[10px] select-none mt-0.5 w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-white shrink-0">
                     {event.avatar}
@@ -162,6 +182,47 @@ export function LiveActivityFeed() {
           </AnimatePresence>
         </div>
       </motion.div>
+
+      {/* Confirmation Dialog */}
+      <AnimatePresence>
+        {confirmDialog?.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={handleCancel}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border border-white/10 rounded-xl p-4 shadow-2xl max-w-[280px] w-full mx-4"
+            >
+              <h3 className="text-white font-semibold text-sm mb-2">View Idea?</h3>
+              <p className="text-white/60 text-xs mb-4 line-clamp-2">
+                {confirmDialog.title}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-xs font-medium transition-colors border border-white/10"
+                >
+                  No
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  className="flex-1 px-3 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium transition-colors"
+                >
+                  Yes
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -280,7 +280,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     _t2: boolean,
     _t3: boolean,
     _isGold = false,
-  ): void {}
+  ): void { }
 
   getWorldPosition(): { x: number; y: number } {
     return { x: this.x, y: this.y };
