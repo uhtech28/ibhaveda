@@ -49,6 +49,13 @@ crons.daily(
     api.crons.dailyStreakUpdate
 );
 
+// Schedule: Daily Re-engagement Emails at 9:00 AM IST (3:30 AM UTC)
+crons.daily(
+    "Daily Re-engagement Emails",
+    { hourUTC: 3, minuteUTC: 30 },
+    api.emailReengagement.sendReengagementEmails
+);
+
 export default crons;
 
 // ─────────────────────────────────────────────────────────────────────────────
