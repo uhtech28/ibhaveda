@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
@@ -17,6 +17,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { Sparkles, ArrowLeft, AlertCircle, Globe, Lock } from "lucide-react";
+import { displayFontClass, transitionBase } from "@/components/ideaforge/shared";
 
 type Step = "outline" | "generating" | "preview";
 type Visibility = "public" | "private";
@@ -24,9 +25,18 @@ type Visibility = "public" | "private";
 interface IdeaWizardProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  initialDraft?: {
+    title?: string;
+    description?: string;
+    skills?: string[];
+    tags?: string[];
+    category?: string;
+    industries?: string[];
+    visibility?: "public" | "private";
+  };
 }
 
-export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
+export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardProps) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -51,6 +61,7 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [aiHadError, setAiHadError] = useState(false);
+  const [isGeneratingTags, setIsGeneratingTags] = useState(false);
 
   const reset = () => {
     setStep("outline");
@@ -64,6 +75,7 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
     setIsSubmitting(false);
     setSubmitError("");
     setAiHadError(false);
+    setIsGeneratingTags(false);
   };
 
   const close = () => {
@@ -71,32 +83,115 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
     setTimeout(reset, 300);
   };
 
+  // Populate/reset fields based on isOpen and initialDraft
+  useEffect(() => {
+    if (isOpen) {
+      if (initialDraft && Object.keys(initialDraft).length > 0) {
+        setTitle(initialDraft.title || "");
+        setDescription(initialDraft.description || "");
+        setVisibility(initialDraft.visibility || "public");
+
+        // Map skills/tags
+        let mappedSkills: string[] = [];
+        if (initialDraft.skills && initialDraft.skills.length > 0) {
+          mappedSkills = initialDraft.skills;
+        } else if (initialDraft.tags && initialDraft.tags.length > 0) {
+          mappedSkills = initialDraft.tags;
+        } else if (initialDraft.category) {
+          try {
+            const parsed = JSON.parse(initialDraft.category);
+            mappedSkills = Array.isArray(parsed) ? parsed : [initialDraft.category];
+          } catch {
+            mappedSkills = [initialDraft.category];
+          }
+        }
+        setSkills(mappedSkills);
+
+        // Map industries
+        let mappedIndustries: string[] = [];
+        if (initialDraft.industries && initialDraft.industries.length > 0) {
+          mappedIndustries = initialDraft.industries;
+        } else if (initialDraft.industries) {
+          // If it's a stringified JSON array
+          try {
+            const parsed = JSON.parse(initialDraft.industries as any);
+            mappedIndustries = Array.isArray(parsed) ? parsed : [initialDraft.industries as any];
+          } catch {
+            mappedIndustries = [initialDraft.industries as any];
+          }
+        }
+        setIndustries(mappedIndustries);
+
+        setStep("preview");
+      } else {
+        reset();
+      }
+    }
+  }, [isOpen, initialDraft]);
+
   const handleGenerate = async () => {
     if (!outline.trim()) return;
     setAiHadError(false);
     setStep("generating");
     try {
       const result = await generateFromOutline({ outline: outline.trim() });
-      setTitle(result.title);
-      setDescription(result.description);
-      setIndustries(result.industries);
-      setSkills(result.skills);
-      setVisibility(result.visibility);
+      
+      // Log what AI returned for debugging
+      console.log("AI generated result:", result);
+      
+      // Ensure we have at least a title and description
+      if (!result.title || !result.title.trim()) {
+        console.warn("AI returned empty title, using fallback");
+        setAiHadError(true);
+        setTitle("");
+        setDescription(result.description || outline);
+        setIndustries(result.industries || []);
+        setSkills(result.skills || []);
+        setVisibility(result.visibility || "public");
+      } else {
+        setTitle(result.title);
+        setDescription(result.description);
+        setIndustries(result.industries || []);
+        setSkills(result.skills || []);
+        setVisibility(result.visibility);
+      }
+      
       setStep("preview");
     } catch (err) {
       console.error("AI generation failed:", err);
       setAiHadError(true);
+      setTitle("");
       setDescription(outline);
+      setIndustries([]);
+      setSkills([]);
+      setVisibility("public");
       setStep("preview");
     }
   };
 
   const handleSkipAI = () => {
-    // Pre-fill description with whatever the user has typed (may be empty).
-    // The Review step's required-field validation catches empties on submit.
     setDescription(outline.trim());
     setStep("preview");
   };
+
+  // Auto-generate tags when title and description are filled (only if user skipped AI)
+  useEffect(() => {
+    const generateTags = async () => {
+      if (step === "preview" && title.trim() && description.trim() && industries.length === 0 && skills.length === 0 && !isGeneratingTags && aiHadError) {
+        setIsGeneratingTags(true);
+        try {
+          const result = await generateFromOutline({ outline: `${title}\n\n${description}` });
+          setIndustries(result.industries);
+          setSkills(result.skills);
+        } catch (err) {
+          console.error("Tag generation failed:", err);
+        } finally {
+          setIsGeneratingTags(false);
+        }
+      }
+    };
+    generateTags();
+  }, [step, title, description, industries.length, skills.length, isGeneratingTags, aiHadError, generateFromOutline]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,53 +262,62 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[min(100%-2rem,600px)] max-w-[600px] h-auto max-h-[85vh] gap-0 flex flex-col rounded-[16px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)]">
         {/* Step 1 — Outline */}
         {step === "outline" && (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Describe your idea
-              </DialogTitle>
-              <DialogDescription>
-                Write a few sentences. We&apos;ll draft the full form for you — you can edit everything in the next step.
+            <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="h-5 w-5 text-[#8B5CF6] animate-pulse" />
+                <DialogTitle className={cn(displayFontClass, "text-lg font-semibold text-white")}>
+                  Describe your idea
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-xs text-[#9CA3AF] mt-1">
+                Briefly describe your idea. AI will generate the full form.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-2 py-4">
-              <Textarea
-                value={outline}
-                onChange={(e) => setOutline(e.target.value)}
-                placeholder="e.g. An app that helps remote teams pick a meet-up city based on flight cost and weather. Built for distributed startup teams that retreat 2-3 times a year."
-                className="min-h-[160px] resize-none"
-                maxLength={500}
-                autoFocus
-              />
-              <div className="text-xs text-muted-foreground text-right">
-                {outline.length}/500
+            <div className="flex-1 flex flex-col px-5 py-4 min-h-0">
+              <div className="relative flex-1">
+                <Textarea
+                  value={outline}
+                  onChange={(e) => setOutline(e.target.value)}
+                  placeholder="e.g. An app that helps remote teams pick a meet-up city based on flight cost and weather. Built for distributed startup teams that retreat 2-3 times a year."
+                  className="h-full resize-none rounded-[12px] border-white/5 bg-[#0D1117] text-sm text-white placeholder:text-[#6B7280] focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-0 focus-visible:border-transparent p-4"
+                  maxLength={500}
+                  autoFocus
+                />
+                <div className="absolute bottom-3 right-4 text-xs text-[#6B7280]">
+                  {outline.length}/500
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-3 pt-2">
+            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3 bg-[#0D1117] shrink-0">
               <button
                 type="button"
                 onClick={handleSkipAI}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
+                className="text-xs font-medium text-[#C7D2FE] hover:text-white transition-colors"
               >
                 Skip AI, fill manually →
               </button>
-              <div className="flex gap-2 sm:justify-end">
-                <Button type="button" variant="outline" onClick={close}>
+              <div className="flex gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={close}
+                  className="h-9 rounded-[10px] border-white/5 bg-[#0D1117] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
+                >
                   Cancel
                 </Button>
                 <Button
                   type="button"
                   onClick={handleGenerate}
                   disabled={!outline.trim()}
-                  className="gap-2"
+                  className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4 mr-2" />
                   Generate
                 </Button>
               </div>
@@ -224,17 +328,18 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
         {/* Step 2 — Generating */}
         {step === "generating" && (
           <>
-            <DialogHeader>
-              <DialogTitle className="sr-only">Generating</DialogTitle>
-              <DialogDescription className="sr-only">
-                AI is drafting your idea form.
-              </DialogDescription>
+            <DialogHeader className="sr-only">
+              <DialogTitle>Generating</DialogTitle>
+              <DialogDescription>AI is drafting your idea form.</DialogDescription>
             </DialogHeader>
-            <div className="py-16 flex flex-col items-center justify-center gap-4 text-center">
-              <Spinner size={36} />
+            <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center bg-[#0D1117]">
+              <div className="relative">
+                <div className="h-12 w-12 animate-spin rounded-full border-2 border-[#6366F1]/20 border-t-[#8B5CF6]" />
+                <Sparkles className="absolute inset-0 m-auto h-5 w-5 text-[#C7D2FE] animate-pulse" />
+              </div>
               <div>
-                <p className="font-medium">Drafting your idea…</p>
-                <p className="text-xs text-muted-foreground mt-1">This usually takes 1–2 seconds.</p>
+                <p className="text-base font-semibold text-white">Drafting your idea…</p>
+                <p className="text-xs text-[#9CA3AF] mt-1.5">This usually takes 1–2 seconds.</p>
               </div>
             </div>
           </>
@@ -242,19 +347,23 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
 
         {/* Step 3 — Preview & post */}
         {step === "preview" && (
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>Review and post</DialogTitle>
-              <DialogDescription>
+          <form onSubmit={handleSubmit} className="flex flex-col h-full">
+            <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
+              <DialogTitle className={cn(displayFontClass, "text-lg font-semibold text-white")}>
+                Review and post
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[#9CA3AF] mt-1">
                 {aiHadError
                   ? "AI couldn't fill the form this time — please fill it in below."
+                  : !aiHadError && title && description
+                  ? "✨ AI filled the form for you. Review and edit as needed."
                   : "Edit anything you want, then post."}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="wiz-title" className="text-sm font-medium">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 min-h-0">
+              <div className="space-y-1">
+                <Label htmlFor="wiz-title" className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
                   Title <span className="text-destructive">*</span>
                 </Label>
                 <Input
@@ -263,66 +372,76 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="A short, specific title"
                   maxLength={100}
+                  className="h-9 rounded-[10px] border-white/5 bg-[#0D1117] text-sm text-white placeholder:text-[#6B7280] focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0 focus-visible:border-transparent px-3"
                   required
+                  autoFocus
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="wiz-description" className="text-sm font-medium">
-                  Description <span className="text-destructive">*</span>
-                </Label>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="wiz-description" className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
+                    Description <span className="text-destructive">*</span>
+                  </Label>
+                  <span className="text-[10px] text-[#6B7280]">
+                    {description.length}/1200
+                  </span>
+                </div>
                 <Textarea
                   id="wiz-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="What's the idea? Who is it for?"
-                  className="min-h-[120px]"
+                  className="min-h-[70px] max-h-[100px] rounded-[10px] border-white/5 bg-[#0D1117] text-sm text-white placeholder:text-[#6B7280] focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0 focus-visible:border-transparent p-3"
                   maxLength={1200}
                   required
                 />
-                <div className="text-[10px] text-muted-foreground text-right">
-                  {description.length}/1200
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Industries</Label>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider flex items-center gap-1.5">
+                    Industries
+                    {isGeneratingTags && <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />}
+                  </Label>
                   <IndustriesMultiSelect
                     selectedIndustries={industries}
                     onChange={setIndustries}
-                    placeholder="Select industries..."
+                    placeholder={isGeneratingTags ? "AI is selecting..." : "Select industries..."}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Skills needed</Label>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider flex items-center gap-1.5">
+                    Skills needed
+                    {isGeneratingTags && <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />}
+                  </Label>
                   <SkillsMultiSelect
                     selectedSkills={skills}
                     onChange={setSkills}
-                    placeholder="Select skills..."
+                    placeholder={isGeneratingTags ? "AI is selecting..." : "Select skills..."}
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="sr-only">Visibility</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">Visibility <span className="text-destructive">*</span></Label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setVisibility("public")}
                     className={cn(
-                      "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                      "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
                       visibility === "public"
-                        ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
-                        : "border-border/60 bg-muted/20 hover:border-border"
+                        ? "border-[#6366F1]/50 bg-[#6366F1]/10 ring-1 ring-[#6366F1]/30"
+                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]"
                     )}
                   >
-                    <div className={cn("mt-0.5 grid h-8 w-8 place-items-center rounded-lg", visibility === "public" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
-                      <Globe className="h-4 w-4" />
+                    <div className={cn("mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0", visibility === "public" ? "bg-[#6366F1]/20 text-[#C7D2FE]" : "bg-white/[0.05] text-[#9CA3AF]")}>
+                      <Globe className="h-3 w-3" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-semibold">Public</span>
-                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      <span className="text-xs font-semibold text-white">Public</span>
+                      <p className="mt-0.5 text-[10px] leading-tight text-[#9CA3AF]">
                         Anyone can spark, comment, and ask to collaborate.
                       </p>
                     </div>
@@ -332,18 +451,18 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                     type="button"
                     onClick={() => setVisibility("private")}
                     className={cn(
-                      "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                      "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
                       visibility === "private"
-                        ? "border-amber-500/50 bg-amber-500/5 ring-1 ring-amber-500/30"
-                        : "border-border/60 bg-muted/20 hover:border-border"
+                        ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/30"
+                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]"
                     )}
                   >
-                    <div className={cn("mt-0.5 grid h-8 w-8 place-items-center rounded-lg", visibility === "private" ? "bg-amber-500/15 text-amber-500" : "bg-muted text-muted-foreground")}>
-                      <Lock className="h-4 w-4" />
+                    <div className={cn("mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0", visibility === "private" ? "bg-amber-500/20 text-amber-400" : "bg-white/[0.05] text-[#9CA3AF]")}>
+                      <Lock className="h-3 w-3" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-semibold">Private</span>
-                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      <span className="text-xs font-semibold text-white">Private</span>
+                      <p className="mt-0.5 text-[10px] leading-tight text-[#9CA3AF]">
                         Only you can see it. Use as a draft.
                       </p>
                     </div>
@@ -351,9 +470,9 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">
-                  Attachment <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
+                  Attachment <span className="text-[11px] text-[#6B7280] font-normal lowercase">(optional)</span>
                 </Label>
                 <CardUpload
                   maxFiles={1}
@@ -362,37 +481,44 @@ export function IdeaWizard({ isOpen, onOpenChange }: IdeaWizardProps) {
                   multiple={false}
                   onChange={(f) => setFiles(f)}
                 />
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[10px] text-[#6B7280]">
                   PDF, DOCX, PPTX, XLSX, JPG, PNG, GIF, MP4 (≤50MB)
                 </p>
               </div>
 
               {submitError && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
-                  <p className="text-sm text-destructive">{submitError}</p>
+                <div className="flex items-center gap-2 p-2.5 rounded-[10px] bg-red-500/10 border border-red-500/20">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <p className="text-xs text-red-200">{submitError}</p>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-3 pt-2 border-t border-border/40 mt-2">
+            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3 bg-[#0D1117] shrink-0">
               <button
                 type="button"
                 onClick={() => setStep("outline")}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                className="text-xs text-[#9CA3AF] hover:text-white transition-colors flex items-center gap-1.5"
                 disabled={isSubmitting}
               >
-                <ArrowLeft className="h-4 w-4" /> Back to outline
+                <ArrowLeft className="h-3.5 w-3.5" /> Back to outline
               </button>
-              <div className="flex gap-2 sm:justify-end">
-                <Button type="button" variant="outline" onClick={close} disabled={isSubmitting}>
+              <div className="flex gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={close}
+                  disabled={isSubmitting}
+                  className="h-9 rounded-[10px] border-white/5 bg-[#0A0E1A] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
+                >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={isSubmitting || !title.trim() || !description.trim()}
+                  className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? <Spinner size={16} className="mr-2" /> : null}
+                  {isSubmitting ? <Spinner size={14} className="mr-2" /> : null}
                   Post Idea
                 </Button>
               </div>

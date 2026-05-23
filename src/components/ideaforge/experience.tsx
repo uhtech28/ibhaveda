@@ -23,8 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { api } from "@convex/_generated/api";
 import { cn } from "@/lib/utils";
-import { ComposerModal } from "@/components/ideaforge/composer-modal";
-import { CategorySelectorModal } from "@/components/ideaforge/category-selector-modal";
+
 import {
   EmptyState,
   FilterTabs,
@@ -116,9 +115,7 @@ export function IdeaForgeExperience({
   const streak = useQuery(api.gamification.getStreak);
 
   // User UI Components state
-  const [categorySelectorOpen, setCategorySelectorOpen] = useState(false);
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [composerDraft, setComposerDraft] = useState<Partial<ComposerDraft>>({});
+  const [wizardDraft, setWizardDraft] = useState<Partial<ComposerDraft> | undefined>(undefined);
   
   const [feedTab, setFeedTab] = useState<FeedTabKey>("for-you");
   const [myIdeasTab, setMyIdeasTab] = useState<MyIdeasTabKey>("public");
@@ -172,26 +169,14 @@ export function IdeaForgeExperience({
     setSavedIdeaIds([...savedIdeaIds, ideaId]);
   };
 
-  const openCategorySelector = () => {
-    setCategorySelectorOpen(true);
-  };
-
-  const handleCategorySelect = (category: string) => {
-    setCategorySelectorOpen(false);
-    // Capitalize first letter to match the format
-    const formattedCategory = category.charAt(0).toUpperCase() + category.slice(1);
-    setComposerDraft({ category: formattedCategory });
-    setComposerOpen(true);
+  const openWizard = () => {
+    setWizardDraft(undefined);
+    setShowIdeaWizard(true);
   };
 
   const openComposerWithDraft = (draft?: Partial<ComposerDraft>) => {
-    // We allow both: opening the wizard for new sparks, or the composer for specific drafts
-    if (draft && Object.keys(draft).length > 0) {
-      setComposerDraft(draft);
-      setComposerOpen(true);
-    } else {
-      setShowIdeaWizard(true);
-    }
+    setWizardDraft(draft);
+    setShowIdeaWizard(true);
   };
 
   return (
@@ -200,7 +185,7 @@ export function IdeaForgeExperience({
         currentUser={currentUser} 
         searchQuery={searchQuery} 
         onSearchChange={onSearchChange} 
-        onOpenComposer={openCategorySelector} 
+        onOpenComposer={openWizard} 
       />
 
       <main className={cn(shellMax, "px-4 pb-12 pt-16 sm:px-6 lg:pt-28 xl:px-8")}>
@@ -282,7 +267,7 @@ export function IdeaForgeExperience({
                     title="Nothing matched this feed yet"
                     description="Try another search, switch to a different feed tab, or post the spark that should exist here."
                     actionLabel="+ Post an Idea"
-                    onAction={openCategorySelector}
+                    onAction={openWizard}
                   />
                 )
               ) : myIdeasTab === "analytics" ? (
@@ -313,7 +298,7 @@ export function IdeaForgeExperience({
                           : "Publish your first concept and it will show up here for the rest of the network to discover."
                       }
                       actionLabel="+ Post an Idea"
-                      onAction={openCategorySelector}
+                      onAction={openWizard}
                     />
                   );
                 }
@@ -375,22 +360,22 @@ export function IdeaForgeExperience({
 
       <button
         type="button"
-        onClick={openCategorySelector}
+        onClick={openWizard}
         aria-label="Post idea"
         className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#6366F1] text-white shadow-[0_18px_42px_rgba(99,102,241,0.3)] transition-all duration-200 hover:scale-[1.02] hover:bg-[#8B5CF6] md:bottom-8 md:right-8"
       >
         <Plus className="h-6 w-6" />
       </button>
 
-      <CategorySelectorModal
-        open={categorySelectorOpen}
-        onOpenChange={setCategorySelectorOpen}
-        onSelectCategory={handleCategorySelect}
-      />
-      <ComposerModal open={composerOpen} onOpenChange={setComposerOpen} initialDraft={composerDraft} />
-      
       <FloatingChatButton />
-      <IdeaWizard isOpen={showIdeaWizard} onOpenChange={setShowIdeaWizard} />
+      <IdeaWizard
+        isOpen={showIdeaWizard}
+        onOpenChange={(open) => {
+          setShowIdeaWizard(open);
+          if (!open) setWizardDraft(undefined);
+        }}
+        initialDraft={wizardDraft}
+      />
     </div>
   );
 }

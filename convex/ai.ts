@@ -29,45 +29,76 @@ type GeneratedDraft = {
   visibility: "public" | "private";
 };
 
-const fallback = (outline: string): GeneratedDraft => ({
-  title: "",
-  description: outline,
-  industries: [],
-  skills: [],
-  visibility: "public",
-});
+const fallback = (outline: string): GeneratedDraft => {
+  // Extract a basic title from the outline (first sentence or first 60 chars)
+  const firstSentence = outline.split(/[.!?]/)[0].trim();
+  const basicTitle = firstSentence.length > 0 && firstSentence.length <= 80 
+    ? firstSentence 
+    : outline.slice(0, 60).trim() + (outline.length > 60 ? "..." : "");
+  
+  return {
+    title: basicTitle || "New Idea",
+    description: outline,
+    industries: [],
+    skills: [],
+    visibility: "public",
+  };
+};
 
 // Shared prompt used by both providers — keeps output consistent
 // regardless of which one runs.
-const buildPrompt = (outline: string) => `You help builders post ideas on a startup-collaboration platform.
+const buildPrompt = (outline: string) => `You are an AI assistant helping builders post ideas on a startup-collaboration platform.
 
-Given this free-text outline from a user, generate a structured JSON object that EXPANDS on what they wrote — don't just copy it back. Add a real catchy title, rewrite the description so it's clearer and more concrete, and infer the most relevant industry + skill tags from the content.
+Your task: Generate a structured JSON object based on the user's outline. EXPAND and IMPROVE their idea - don't just copy it.
 
-Return ONLY a JSON object in this exact shape (no markdown, no code fences, no prose around it):
+CRITICAL REQUIREMENTS:
+1. Title MUST be catchy, specific, and 5-80 characters (NEVER empty)
+2. Description MUST be 2-4 clear sentences that expand on the outline
+3. Industries MUST include 1-3 relevant tags
+4. Skills MUST include 1-4 relevant tags
+
+Return ONLY valid JSON (no markdown, no code fences, no extra text):
 
 {
-  "title": "Catchy, specific title (e.g. 'AI Recipe Generator for Diabetics'). MUST be present, <= 80 chars, NOT empty.",
-  "description": "2-4 sentences. Concrete and clear. Expand on the outline — describe what the idea does, who it helps, and what makes it different. Do NOT copy the outline verbatim.",
-  "industries": ["1 to 3 short industry tags. Examples: Software, Healthcare, Education, Fintech, AI/ML, Consumer, Climate"],
-  "skills": ["1 to 4 short skill tags. Examples: Design, Backend, Frontend, Product Management, Marketing, Mobile, Data Science"],
+  "title": "Catchy Title Here (5-80 chars, REQUIRED)",
+  "description": "Expanded description here. 2-4 sentences. Clear and concrete.",
+  "industries": ["Industry1", "Industry2"],
+  "skills": ["Skill1", "Skill2", "Skill3"],
   "visibility": "public"
 }
+
+Industry examples: Software, Healthcare, Education, Fintech, AI/ML, Consumer, Climate, Food & Beverage, E-commerce, SaaS
+Skill examples: Design, Backend, Frontend, Product Management, Marketing, Mobile, Data Science, DevOps, UI/UX
 
 User's outline:
 """
 ${outline}
-"""`;
+"""
+
+Generate the JSON now:`;
 
 // Defensive parser — strips markdown fences and validates types/sizes.
 function parseDraft(raw: string, outline: string): GeneratedDraft | null {
-  const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
-  if (!cleaned) return null;
+  // Remove markdown code fences and extra whitespace
+  let cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+  
+  // Try to extract JSON if there's extra text around it
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[0];
+  }
+  
+  if (!cleaned) {
+    console.error("[ai] Empty response after cleaning");
+    return null;
+  }
 
   let parsed: Partial<GeneratedDraft>;
   try {
     parsed = JSON.parse(cleaned) as Partial<GeneratedDraft>;
   } catch (e) {
-    console.error(`[ai] JSON parse failed. Cleaned text was: ${cleaned.slice(0, 500)}`);
+    console.error(`[ai] JSON parse failed. Raw response: ${raw.slice(0, 300)}`);
+    console.error(`[ai] Cleaned text: ${cleaned.slice(0, 300)}`);
     return null;
   }
 
@@ -78,9 +109,19 @@ function parseDraft(raw: string, outline: string): GeneratedDraft | null {
           .map((s) => s.trim())
       : [];
 
+  // Validate that we have a proper title
+  const title = typeof parsed.title === "string" && parsed.title.trim().length > 0
+    ? parsed.title.slice(0, 100).trim()
+    : "";
+    
+  // If no title, this is an invalid response
+  if (!title) {
+    console.error("[ai] Parsed JSON has no valid title:", parsed);
+    return null;
+  }
+
   return {
-    title:
-      typeof parsed.title === "string" ? parsed.title.slice(0, 100).trim() : "",
+    title,
     description:
       typeof parsed.description === "string" &&
       parsed.description.trim().length > 0
