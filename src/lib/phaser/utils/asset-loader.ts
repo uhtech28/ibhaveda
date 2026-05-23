@@ -1440,8 +1440,113 @@ export class AssetLoader {
       { frameWidth: 16, frameHeight: 16 }
     );
 
+    // --- Kenney Sketch Desert Assets ---
+    const desertPath = "/assets/kenney_sketchdesert/Tiles";
+    const desertDirections = ["N", "E", "S", "W"] as const;
+    const desertTileGroups = [
+      "building_center",
+      "building_dark_center",
+      "building_dark_center_door",
+      "building_dark_center_windows",
+      "building_dark_sides",
+      "building_dark_sides_door",
+      "building_dark_sides_windows",
+      "building_sides",
+      "dirt_center",
+      "dirt_low",
+      "dome",
+      "dome_small",
+      "grass_center",
+      "grass_corner",
+      "grass_path",
+      "grass_pathBend",
+      "grass_pathCorner",
+      "grass_pathCrossing",
+      "grass_pathEnd",
+      "grass_pathEndSquare",
+      "grass_pathSlope",
+      "grass_pathSplit",
+      "grass_river",
+      "grass_riverBend",
+      "grass_riverBridge",
+      "grass_riverCorner",
+      "grass_riverCrossing",
+      "grass_riverEnd",
+      "grass_riverEndSquare",
+      "grass_riverSlope",
+      "grass_riverSplit",
+      "grass_slope",
+      "grass_slopeConcave",
+      "grass_slopeConvex",
+      "grass_water",
+      "grass_waterConcave",
+      "grass_waterConvex",
+      "grass_waterRiver",
+      "overhang",
+      "overhang_small",
+      "rocks",
+      "stairs_full",
+      "stairs_left",
+      "stairs_right",
+      "structure_tent",
+      "structure_tentSlant",
+      "tiles",
+      "tiles_crumbled",
+      "tiles_decorated",
+      "tiles_steps",
+      "tree",
+      "trees",
+      "walls_broken",
+      "walls_corner",
+      "walls_end",
+      "walls_left",
+      "walls_right",
+      "walls_sides",
+      "walls_square",
+      "water_center",
+      "water_fall",
+    ];
+    const desertTiles = desertTileGroups.flatMap((tile) =>
+      desertDirections.map((direction) => `${tile}_${direction}`),
+    );
+    desertTiles.forEach(tile => {
+      scene.load.image(`desert_${tile}`, `${desertPath}/${tile}.png`);
+    });
+
     // Load main Tilemap (JSON with embedded tilesets)
     scene.load.tilemapTiledJSON("beginning_fields", `${fanTasyPath}/Beginning Fields.tmj`);
+
+    // --- Tropical Medieval City Tileset (Stage 8) ---
+    const tropicalPath = "/assets/tropical-city";
+    
+    // Load buildings
+    for (let i = 1; i <= 18; i++) {
+      scene.load.image(`tropical_building_${i}`, `${tropicalPath}/buildings/building_${i}/building_1.png`);
+    }
+    
+    // Load decorations
+    for (let i = 1; i <= 18; i++) {
+      scene.load.image(`tropical_decor_${i}`, `${tropicalPath}/decor/decor_${i}.png`);
+    }
+    
+    // Load greenery
+    for (let i = 1; i <= 5; i++) {
+      scene.load.image(`tropical_greenery_${i}`, `${tropicalPath}/decor/greenery_${i}.png`);
+    }
+    
+    // Load trees
+    scene.load.image("tropical_tree_1", `${tropicalPath}/decor/tree_1.png`);
+    scene.load.image("tropical_tree_2", `${tropicalPath}/decor/tree_2.png`);
+    
+    // Load land tiles
+    for (let i = 1; i <= 26; i++) {
+      scene.load.image(`tropical_land_${i}`, `${tropicalPath}/land/land_${i}.png`);
+    }
+    
+    // Load road tiles
+    for (let i = 1; i <= 17; i++) {
+      scene.load.image(`tropical_road_${i}`, `${tropicalPath}/road/road_${i}.png`);
+    }
   }
 
   // ── Persona sprite sheets ─────────────────────────────────────────────────

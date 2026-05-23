@@ -15,7 +15,8 @@ function MobileBottomNavContent() {
   if (
     pathname === "/" ||
     pathname?.startsWith("/sign-in") ||
-    pathname?.startsWith("/sign-up")
+    pathname?.startsWith("/sign-up") ||
+    pathname?.startsWith("/map")
   ) {
     return null;
   }

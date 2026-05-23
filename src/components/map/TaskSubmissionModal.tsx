@@ -311,11 +311,11 @@ export function TaskSubmissionModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-[101] overflow-y-auto sm:grid sm:place-items-center sm:p-4"
+            className="fixed inset-0 z-[101] overflow-y-auto sm:grid sm:place-items-center sm:p-4 pt-12 sm:pt-4"
           >
-            <div className="bg-[#111827] border-0 sm:border-2 border-white/10 rounded-none sm:rounded-xl shadow-2xl flex min-h-full flex-col sm:min-h-0 sm:w-[min(92vw,800px)] sm:max-h-[calc(100vh-2rem)] sm:overflow-hidden">
+            <div className="bg-[#111827] border-0 sm:border-2 border-white/10 rounded-none sm:rounded-xl shadow-2xl flex min-h-full flex-col sm:min-h-0 sm:w-[min(92vw,800px)] sm:max-h-[calc(100vh-2rem)] sm:overflow-hidden mt-12 sm:mt-0">
               {/* Header - Compact */}
-              <div className="p-3 sm:px-4 sm:py-3 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20 flex-shrink-0 safe-top">
+              <div className="p-3 sm:px-4 sm:py-3 pt-16 sm:pt-20 md:pt-6 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20 flex-shrink-0 safe-top">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <h2 className="text-base sm:text-lg font-bold text-white mb-1 truncate sm:whitespace-normal">

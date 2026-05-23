@@ -93,10 +93,10 @@ const StageInfoComponent = ({
               {stageName}
             </span>
           </div>
-          <span className="truncate text-[12px] font-black uppercase tracking-tight text-white">
+          <span className="hidden sm:block truncate text-[12px] font-black uppercase tracking-tight text-white">
             {biomeName}
           </span>
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="hidden sm:flex items-center gap-1.5 mt-0.5">
              <div className="flex items-center gap-1">
               {Array.from({ length: visibleCheckpoints }).map((_, index) => {
                 const checkpointNumber = index + 1;

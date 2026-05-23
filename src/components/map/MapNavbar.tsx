@@ -117,7 +117,7 @@ export function MapNavbar() {
   const templateMetric = useAtomValue(templateMetricAtom);
   const corruption = useAtomValue(corruptionStateAtom);
 
-  const isTemplateVenture = activeVenture?.templateId && activeVenture.templateId !== "venture";
+  const isTemplateVenture = (activeVenture as any)?.templateId && (activeVenture as any).templateId !== "venture";
   const template = isTemplateVenture ? getTemplate(templateId) : null;
   const colors = isTemplateVenture ? TEMPLATE_COLORS[templateId] : null;
 
@@ -138,31 +138,31 @@ export function MapNavbar() {
   if (!hudVisible) return null;
 
   return (
-    <header className="fixed inset-x-0 top-0 z-[70] h-14 lg:h-16 border-b border-white/7 bg-[#0A0D12]/92 backdrop-blur-xl overflow-hidden select-none">
-      <div className="flex h-full items-center justify-between px-3 md:px-4 lg:px-6">
+    <header className="fixed inset-x-0 top-0 z-[70] h-12 sm:h-14 md:h-16 lg:h-18 border-b border-white/7 bg-[#0A0D12]/92 backdrop-blur-xl overflow-hidden select-none">
+      <div className="flex h-full items-center justify-between px-2 sm:px-3 md:px-4 lg:px-6 xl:px-8">
         
         {/* LEFT: Branding/Logo */}
-        <Link href="/" className="flex items-center gap-2.5 rounded-full text-white shrink-0 hover:opacity-90 transition-opacity">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#6366F1]/30 bg-[#111827] shadow-[0_0_0_1px_rgba(255,255,255,0.03)] overflow-hidden lg:h-11 lg:w-11 lg:rounded-2xl">
+        <Link href="/" className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 rounded-full text-white shrink-0 hover:opacity-90 transition-opacity">
+          <div className="flex h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 lg:h-10 lg:w-10 xl:h-11 xl:w-11 items-center justify-center rounded-lg sm:rounded-xl border border-[#6366F1]/30 bg-[#111827] shadow-[0_0_0_1px_rgba(255,255,255,0.03)] overflow-hidden lg:rounded-2xl">
             <Image src="/logo.png" alt="" width={44} height={44} className="h-full w-full object-cover" priority />
           </div>
           <div className="hidden sm:block text-left">
-            <div className={`${displayFontClass} text-xs font-semibold tracking-wide text-white lg:text-sm`}>InteractiveIdeas</div>
-            <div className="text-[9px] uppercase tracking-[0.18em] text-[#7C86A2] lg:text-[10px]">Builder Network</div>
+            <div className={`${displayFontClass} text-[10px] sm:text-xs md:text-sm font-semibold tracking-wide text-white`}>InteractiveIdeas</div>
+            <div className="text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-[0.18em] text-[#7C86A2]">Builder Network</div>
           </div>
         </Link>
 
         {/* CENTER: HUD Tools Integrated directly into Navbar */}
-        <div className="flex-1 max-w-3xl mx-3 md:mx-6 overflow-hidden">
+        <div className="flex-1 max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl mx-2 sm:mx-3 md:mx-4 lg:mx-6 overflow-hidden">
           <div 
-            className="no-scrollbar flex w-full items-center justify-start gap-3 overflow-x-auto rounded-xl border border-white/5 bg-white/[0.01] px-3 py-1 md:justify-center lg:gap-4 lg:px-4 lg:py-1.5"
+            className="no-scrollbar flex w-full items-center justify-start gap-2 sm:gap-3 md:gap-4 overflow-x-auto rounded-lg sm:rounded-xl border border-white/5 bg-white/[0.01] px-2 py-0.5 sm:px-3 sm:py-1 md:justify-center lg:px-4 lg:py-1.5"
           >
             {isTemplateVenture && template && colors ? (
               // ── Template HUD variant ──
-              <div className="flex items-center gap-4 shrink-0 font-sans">
+              <div className="flex items-center gap-2 sm:gap-3 md:gap-4 shrink-0 font-sans">
                 {/* Template badge */}
                 <span
-                  className="text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border shrink-0"
+                  className="hidden sm:inline-block text-[7px] sm:text-[8px] md:text-[9px] font-bold uppercase tracking-widest px-1.5 sm:px-2 py-0.5 rounded-full border shrink-0"
                   style={{
                     background: `${colors.primary}15`,
                     color: colors.primary,
@@ -172,31 +172,31 @@ export function MapNavbar() {
                   {template.name}
                 </span>
 
-                <div className="h-5 w-px bg-white/10 shrink-0" />
+                <div className="hidden sm:block h-4 sm:h-5 w-px bg-white/10 shrink-0" />
 
                 {/* Stage Info */}
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                   <span className="text-white shrink-0">
-                    <PremiumIcon name={stageInfo.stageIcon} className="w-4 h-4" strokeWidth={1.5} />
+                    <PremiumIcon name={stageInfo.stageIcon} className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" strokeWidth={1.5} />
                   </span>
                   <div className="flex flex-col text-left">
-                    <span className="text-[8px] text-white/50 uppercase tracking-widest font-mono leading-none">
+                    <span className="text-[7px] sm:text-[8px] text-white/50 uppercase tracking-widest font-mono leading-none">
                       Stage {stageInfo.stage}
                     </span>
-                    <span className="text-[10px] font-semibold text-white leading-tight">
+                    <span className="text-[9px] sm:text-[10px] md:text-[11px] font-semibold text-white leading-tight">
                       {stageInfo.stageName}
                     </span>
                   </div>
                 </div>
 
-                <div className="h-5 w-px bg-white/10 shrink-0" />
+                <div className="h-4 sm:h-5 w-px bg-white/10 shrink-0" />
 
                 {/* Checkpoint Progress */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[8px] text-white/40 font-mono">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  <span className="text-[7px] sm:text-[8px] text-white/40 font-mono">
                     CP {stageInfo.currentCheckpoint}/{stageInfo.totalCheckpointsInStage}
                   </span>
-                  <div className="relative h-1 w-12 rounded-full overflow-hidden bg-white/10">
+                  <div className="relative h-0.5 sm:h-1 w-8 sm:w-10 md:w-12 rounded-full overflow-hidden bg-white/10">
                     <div 
                       className="h-full rounded-full"
                       style={{ 
@@ -205,23 +205,23 @@ export function MapNavbar() {
                       }}
                     />
                   </div>
-                  <span className="text-[9px] font-mono font-bold" style={{ color: colors.primary }}>
+                  <span className="text-[8px] sm:text-[9px] font-mono font-bold" style={{ color: colors.primary }}>
                     {checkpointProgress.completed}/{checkpointProgress.total}
                   </span>
                 </div>
 
-                <div className="h-5 w-px bg-white/10 shrink-0" />
+                <div className="h-4 sm:h-5 w-px bg-white/10 shrink-0" />
 
                 {/* Quality Metric */}
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                   <span className="text-white shrink-0">
-                    <PremiumIcon name={templateMetric.icon} className="w-4 h-4" strokeWidth={1.5} />
+                    <PremiumIcon name={templateMetric.icon} className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" strokeWidth={1.5} />
                   </span>
                   <div className="flex flex-col text-left">
-                    <span className="text-[8px] font-medium uppercase tracking-widest leading-none text-white/50">
+                    <span className="text-[7px] sm:text-[8px] font-medium uppercase tracking-widest leading-none text-white/50">
                       {templateMetric.label}
                     </span>
-                    <span className="text-[10px] font-bold leading-tight" style={{ color: colors.primary }}>
+                    <span className="text-[9px] sm:text-[10px] md:text-[11px] font-bold leading-tight" style={{ color: colors.primary }}>
                       {templateMetric.displayValue}
                     </span>
                   </div>
@@ -230,12 +230,12 @@ export function MapNavbar() {
                 {/* Corruption Meter if > 0 */}
                 {corruption.level > 0 && (
                   <>
-                    <div className="h-5 w-px bg-white/10 shrink-0" />
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[8px] font-medium uppercase tracking-widest text-red-400/80 leading-none">
+                    <div className="h-4 sm:h-5 w-px bg-white/10 shrink-0" />
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <span className="text-[7px] sm:text-[8px] font-medium uppercase tracking-widest text-red-400/80 leading-none">
                         ☠ Corruption
                       </span>
-                      <span className="text-[9px] font-mono text-red-400 font-bold leading-none">
+                      <span className="text-[8px] sm:text-[9px] font-mono text-red-400 font-bold leading-none">
                         {corruption.level}%
                       </span>
                     </div>
@@ -295,8 +295,8 @@ export function MapNavbar() {
         </div>
 
         {/* RIGHT: Menu Items, Notification Bell & User Dropdown */}
-        <div className="flex items-center gap-2 lg:gap-3 shrink-0">
-          <nav className="hidden md:flex items-center gap-1">
+        <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 lg:gap-3 shrink-0">
+          <nav className="hidden md:flex items-center gap-0.5 lg:gap-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
@@ -307,11 +307,11 @@ export function MapNavbar() {
                   aria-label={item.name} 
                   title={item.name} 
                   className={cn(
-                    "relative flex items-center justify-center w-8 h-8 rounded-lg transition-colors duration-200 lg:w-10 lg:h-10", 
+                    "relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 lg:w-10 lg:h-10 rounded-lg transition-colors duration-200", 
                     active ? "text-white bg-white/[0.06]" : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
                   )}
                 >
-                  <Icon className="h-4.5 w-4.5 lg:h-5 lg:w-5" />
+                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4.5 md:w-4.5 lg:h-5 lg:w-5" />
                   {active && (
                     <span aria-hidden className="absolute left-2 right-2 -bottom-px h-px bg-gradient-to-r from-transparent via-[#8B5CF6] to-transparent shadow-[0_0_10px_rgba(139,92,246,0.7)]" />
                   )}
@@ -320,35 +320,35 @@ export function MapNavbar() {
             })}
           </nav>
 
-          <div className="h-5 w-px bg-white/10 hidden md:block" />
+          <div className="h-4 sm:h-5 w-px bg-white/10 hidden md:block" />
 
           <SignedOut>
-            <div className="flex gap-1.5">
-              <SignInButton><Button variant="ghost" size="sm" className="text-slate-300 hover:text-white text-xs px-2 h-8">Login</Button></SignInButton>
-              <SignUpButton><Button size="sm" className="text-xs px-2.5 h-8">Sign Up</Button></SignUpButton>
+            <div className="flex gap-1 sm:gap-1.5">
+              <SignInButton><Button variant="ghost" size="sm" className="text-slate-300 hover:text-white text-[10px] sm:text-xs px-1.5 sm:px-2 h-7 sm:h-8">Login</Button></SignInButton>
+              <SignUpButton><Button size="sm" className="text-[10px] sm:text-xs px-2 sm:px-2.5 h-7 sm:h-8">Sign Up</Button></SignUpButton>
             </div>
           </SignedOut>
           
           <SignedIn>
-            <div className="shrink-0 flex items-center gap-1.5 lg:gap-2.5">
+            <div className="shrink-0 flex items-center gap-1 sm:gap-1.5 lg:gap-2.5">
               <NotificationBell />
               <Popover>
                 <PopoverTrigger asChild>
                   <button type="button" className="rounded-full transition-transform hover:scale-105 active:scale-95 shrink-0" aria-label="Open profile menu">
-                    <Avatar className="h-8 w-8 ring-2 ring-[#6366F1]/45 ring-offset-2 ring-offset-[#0A0D12] lg:h-10 lg:w-10">
+                    <Avatar className="h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 lg:h-10 lg:w-10 ring-2 ring-[#6366F1]/45 ring-offset-1 sm:ring-offset-2 ring-offset-[#0A0D12]">
                       <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
-                      <AvatarFallback className="bg-[#1B2440] text-xs font-semibold text-white">{initials}</AvatarFallback>
+                      <AvatarFallback className="bg-[#1B2440] text-[10px] sm:text-xs font-semibold text-white">{initials}</AvatarFallback>
                     </Avatar>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-52" align="end" forceMount>
+                <PopoverContent className="w-48 sm:w-52" align="end" forceMount>
                   <div className="grid gap-2 font-sans text-left">
-                    <Link href={`/profile/${currentUser?.username}`} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors text-sm">
+                    <Link href={`/profile/${currentUser?.username}`} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors text-xs sm:text-sm">
                       {currentUser?.displayName}
-                      <p className="text-[11px] text-muted-foreground font-normal truncate">@{currentUser?.username}</p>
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground font-normal truncate">@{currentUser?.username}</p>
                     </Link>
-                    <Button variant="ghost" size="sm" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50 text-xs h-9" onClick={() => signOut()}>
-                      <LogOut className="h-3.5 w-3.5" />
+                    <Button variant="ghost" size="sm" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50 text-[10px] sm:text-xs h-8 sm:h-9" onClick={() => signOut()}>
+                      <LogOut className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       <span>Sign Out</span>
                     </Button>
                   </div>

@@ -104,28 +104,28 @@ export function LiveActivityFeed() {
   };
 
   return (
-    <div className="fixed bottom-3 right-3 z-40 flex flex-col gap-2 pointer-events-auto w-[280px]">
-      {/* Collaborators list */}
+    <div className="fixed bottom-3 left-3 z-40 hidden sm:flex flex-col gap-2 pointer-events-auto sm:w-[260px]">
+      {/* Collaborators list - Compact */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-900/90 border border-white/10 backdrop-blur-md shadow-xl">
-        <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1.5">
-          <div className="flex items-center gap-1 text-white/80 font-semibold text-[9px] uppercase tracking-wider">
+        className="flex flex-col gap-1 p-2 rounded-lg bg-slate-900/95 border border-white/10 backdrop-blur-xl shadow-xl">
+        <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1">
+          <div className="flex items-center gap-1 text-white/80 font-semibold text-[8px] uppercase tracking-wider">
             <Users className="w-2.5 h-2.5 text-indigo-400" />
-            <span>Active Collaborators</span>
+            <span>Active</span>
           </div>
-          <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8px] font-mono font-bold">
+          <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[7px] font-mono font-bold">
             <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
             LIVE
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {activeUsers.length > 0 ? (
             activeUsers.map((user, idx) => (
               <div key={idx} className="flex items-center group relative">
-                <div className={`w-6 h-6 rounded-full bg-gradient-to-tr ${user.color} flex items-center justify-center text-[10px] shadow-md border border-white/20 font-semibold text-white`}>
+                <div className={`w-5 h-5 rounded-full bg-gradient-to-tr ${user.color} flex items-center justify-center text-[9px] shadow-md border border-white/20 font-semibold text-white`}>
                   {user.avatar}
                 </div>
                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block whitespace-nowrap bg-slate-950 text-white text-[8px] px-1.5 py-0.5 rounded border border-white/10 shadow-lg z-50">
@@ -134,51 +134,49 @@ export function LiveActivityFeed() {
               </div>
             ))
           ) : (
-            <div className="text-white/40 text-[9px] py-0.5">No active users</div>
+            <div className="text-white/40 text-[8px] py-0.5">No active users</div>
           )}
         </div>
       </motion.div>
 
-      {/* Activity Feed */}
+      {/* Activity Feed - Compact, No Scrollbar */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.1 }}
-        className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-900/90 border border-white/10 backdrop-blur-md shadow-xl max-h-[200px] overflow-hidden">
-        <div className="flex items-center gap-1 text-white/80 font-semibold text-[9px] uppercase tracking-wider border-b border-white/5 pb-1.5">
+        className="flex flex-col gap-1 p-2 rounded-lg bg-slate-900/95 border border-white/10 backdrop-blur-xl shadow-xl">
+        <div className="flex items-center gap-1 text-white/80 font-semibold text-[8px] uppercase tracking-wider border-b border-white/5 pb-1">
           <Activity className="w-2.5 h-2.5 text-rose-400" />
-          <span>Real-time Activity</span>
+          <span>Activity</span>
         </div>
 
-        <div className="flex flex-col gap-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent pr-0.5">
+        {/* Show only 3 most recent activities - no scroll needed */}
+        <div className="flex flex-col gap-1">
           <AnimatePresence initial={false}>
             {feed.length === 0 ? (
-              <div className="text-white/40 text-[9px] py-2 text-center font-mono">
+              <div className="text-white/40 text-[8px] py-1.5 text-center font-mono">
                 No recent activity...
               </div>
             ) : (
-              feed.map((event) => (
+              feed.slice(0, 3).map((event) => (
                 <motion.div
                   key={event.id}
-                  initial={{ opacity: 0, x: 20, height: 0 }}
-                  animate={{ opacity: 1, x: 0, height: "auto" }}
-                  exit={{ opacity: 0, x: -20, height: 0 }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
                   onClick={() => handleActivityClick(event.id, event.detail)}
-                  className="flex items-start gap-1.5 text-[9px] text-white/90 cursor-pointer hover:bg-white/5 rounded p-1 -m-1 transition-colors"
+                  className="flex items-start gap-1.5 text-[8px] text-white/90 cursor-pointer hover:bg-white/5 rounded p-1 -m-1 transition-colors"
                 >
-                  <span className="text-[10px] select-none mt-0.5 w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-white shrink-0">
+                  <span className="text-[9px] select-none mt-0.5 w-4 h-4 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-white shrink-0">
                     {event.avatar}
                   </span>
                   <div className="flex flex-col leading-tight flex-1 min-w-0">
-                    <p className="font-semibold text-white/95 truncate text-[10px]">{event.user}</p>
-                    <p className="text-white/60 text-[9px] mt-0.5">
-                      {event.action}
-                    </p>
-                    <p className="text-indigo-300 font-medium truncate text-[9px]">
+                    <p className="font-semibold text-white/95 truncate text-[9px]">{event.user}</p>
+                    <p className="text-indigo-300 font-medium truncate text-[8px]">
                       {event.detail}
                     </p>
-                    <p className="text-white/40 text-[8px] mt-0.5">{event.timestamp}</p>
+                    <p className="text-white/40 text-[7px] mt-0.5">{event.timestamp}</p>
                   </div>
                 </motion.div>
               ))
@@ -203,7 +201,7 @@ export function LiveActivityFeed() {
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", duration: 0.3 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-slate-900 border border-white/10 rounded-xl p-4 shadow-2xl max-w-[280px] w-full mx-4"
+              className="bg-slate-900 border border-white/10 rounded-xl p-4 shadow-2xl max-w-[260px] w-full mx-4"
             >
               <h3 className="text-white font-semibold text-sm mb-2">View Idea?</h3>
               <p className="text-white/60 text-xs mb-4 line-clamp-2">
@@ -214,13 +212,13 @@ export function LiveActivityFeed() {
                   onClick={handleCancel}
                   className="flex-1 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-xs font-medium transition-colors border border-white/10"
                 >
-                  No
+                  Cancel
                 </button>
                 <button
                   onClick={handleConfirm}
                   className="flex-1 px-3 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium transition-colors"
                 >
-                  Yes
+                  View
                 </button>
               </div>
             </motion.div>

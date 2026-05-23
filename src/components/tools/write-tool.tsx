@@ -236,36 +236,37 @@ export function WriteTool({
       <CardContent className="space-y-4">
         <div className={`grid gap-4 ${layout === "compact" ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]"}`}>
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("## ")}>
-            <Heading2 className="h-4 w-4" />
-            Heading
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("**", "**")}>
-            <Bold className="h-4 w-4" />
-            Bold
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("*", "*")}>
-            <Italic className="h-4 w-4" />
-            Italic
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("- ")}>
-            <List className="h-4 w-4" />
-            List
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("> ")}>
-            <MessageSquareQuote className="h-4 w-4" />
-            Quote
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => insertAroundSelection("[label](", ")")}
-          >
-            <Link2 className="h-4 w-4" />
-            Link
-          </Button>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("## ")} className="h-8 px-2 sm:px-3">
+                <Heading2 className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1.5">Heading</span>
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("**", "**")} className="h-8 px-2 sm:px-3">
+                <Bold className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1.5">Bold</span>
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("*", "*")} className="h-8 px-2 sm:px-3">
+                <Italic className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1.5">Italic</span>
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("- ")} className="h-8 px-2 sm:px-3">
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1.5">List</span>
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => insertAroundSelection("> ")} className="h-8 px-2 sm:px-3">
+                <MessageSquareQuote className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1.5">Quote</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => insertAroundSelection("[label](", ")")}
+                className="h-8 px-2 sm:px-3"
+              >
+                <Link2 className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1.5">Link</span>
+              </Button>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -354,13 +355,14 @@ export function WriteTool({
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => handleAssist("outline")}
                 disabled={assistMode !== null}
+                className="w-full justify-center"
               >
                 {assistMode === "outline" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -375,6 +377,7 @@ export function WriteTool({
                 size="sm"
                 onClick={() => handleAssist("strengthen")}
                 disabled={assistMode !== null}
+                className="w-full justify-center"
               >
                 {assistMode === "strengthen" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -389,6 +392,7 @@ export function WriteTool({
                 size="sm"
                 onClick={() => handleAssist("sharpen")}
                 disabled={assistMode !== null}
+                className="w-full justify-center"
               >
                 {assistMode === "sharpen" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

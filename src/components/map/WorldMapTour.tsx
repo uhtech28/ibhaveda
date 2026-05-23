@@ -184,7 +184,7 @@ export function WorldMapTour({ show, onClose, ventureName }: WorldMapTourProps) 
           {/* Close button */}
           <button
             onClick={handleSkip}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="absolute top-4 right-4 z-50 w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -194,7 +194,7 @@ export function WorldMapTour({ show, onClose, ventureName }: WorldMapTourProps) 
             <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-inner">
               {step.icon}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-8">
               <h2 className="text-xl font-extrabold text-white leading-tight drop-shadow-md">
                 {step.title}
               </h2>

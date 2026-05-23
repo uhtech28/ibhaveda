@@ -74,7 +74,7 @@ const LevelDisplayComponent = ({ level, phase, compact = false, onClick }: Level
             {level}
           </span>
         </div>
-        <div className="flex flex-col">
+        <div className="hidden sm:flex flex-col">
           <span className="text-[7px] text-zinc-500 uppercase tracking-widest font-black leading-none mb-0.5">
             Level
           </span>

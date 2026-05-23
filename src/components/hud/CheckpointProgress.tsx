@@ -35,14 +35,14 @@ export function CheckpointProgress({
           </div>
         </div>
 
-        <div className="relative h-1.5 w-16 overflow-hidden rounded-full border border-white/5 bg-black/40">
+        <div className="hidden sm:block relative h-1.5 w-16 overflow-hidden rounded-full border border-white/5 bg-black/40">
           <motion.div
-            className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${percentage}%` }}
-            transition={{ duration: 0.8 }}
-          />
-        </div>
+             className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"
+             initial={{ width: 0 }}
+             animate={{ width: `${percentage}%` }}
+             transition={{ duration: 0.8 }}
+           />
+         </div>
 
         <AnimatePresence>
           {goldCount > 0 && (

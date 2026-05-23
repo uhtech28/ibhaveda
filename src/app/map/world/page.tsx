@@ -330,7 +330,7 @@ function StageStrip({
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.5, duration: 0.5 }}
-      className="no-scrollbar absolute bottom-24 left-1/2 z-20 flex max-w-[calc(100vw-0.75rem)] -translate-x-1/2 gap-1.5 overflow-x-auto rounded-full border border-white/5 bg-[#0a0d14]/60 p-1.5 shadow-[0_0_20px_rgba(30,20,50,0.5)] backdrop-blur-md sm:bottom-10 sm:gap-2 sm:p-2 md:bottom-9 lg:bottom-8"
+      className="no-scrollbar fixed bottom-4 left-1/2 z-20 flex w-[calc(100vw-1rem)] max-w-full -translate-x-1/2 gap-1.5 overflow-x-auto rounded-full border border-white/10 bg-[#0a0d14]/85 p-2 shadow-[0_0_30px_rgba(30,20,50,0.6)] backdrop-blur-xl sm:bottom-6 sm:w-auto sm:max-w-[calc(100vw-2rem)] sm:gap-2 sm:p-2.5 md:bottom-8 md:max-w-3xl lg:bottom-8 lg:max-w-4xl xl:max-w-5xl"
     >
       {stages.map((st, i) => {
         const isDone = i + 1 < activeStage;
@@ -346,46 +346,112 @@ function StageStrip({
             onMouseEnter={() => {
               if (isUnlocked) audioManager.playUI("hover");
             }}
-            whileHover={isUnlocked ? { scaleY: 1.6, scaleX: 1.1 } : {}}
+            whileHover={isUnlocked ? { scaleY: 1.8, scaleX: 1.15 } : {}}
             whileTap={isUnlocked ? { scale: 0.95 } : {}}
-            className="relative group"
+            className="relative group flex-shrink-0"
             title={
               isUnlocked
-                ? st.name
+                ? `${st.name} - ${st.biome}`
                 : `Complete Stage ${st.id - 1} to unlock ${st.name}`
             }
           >
+            {/* Stage indicator pill */}
             <motion.div
-              className="h-[8px] rounded-full"
+              className="h-[10px] rounded-full relative overflow-hidden"
               style={{
-                width: isCurrent ? "48px" : "28px",
+                width: isCurrent ? "56px" : "32px",
                 background: isDone
-                  ? "#4f46e5"
+                  ? "linear-gradient(135deg, #4f46e5, #6366f1)"
                   : isCurrent
                     ? st.glow
-                    : "rgba(255,255,255,0.05)",
-                border: `1px solid ${isDone
+                    : "rgba(255,255,255,0.06)",
+                border: `1.5px solid ${isDone
                     ? "#6366f1"
                     : isCurrent
                       ? st.glow
-                      : "rgba(255,255,255,0.1)"
+                      : "rgba(255,255,255,0.12)"
                   }`,
-                boxShadow: isCurrent ? `0 0 15px ${st.glow}` : "none",
+                boxShadow: isCurrent 
+                  ? `0 0 20px ${st.glow}, 0 0 40px ${st.glow}40` 
+                  : isDone 
+                    ? "0 0 10px rgba(99, 102, 241, 0.5)"
+                    : "none",
                 cursor: isUnlocked ? "pointer" : "not-allowed",
-                transition:
-                  "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease",
-              }}
-            />
-            <span
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap text-[10px] tracking-[0.15em] font-semibold uppercase px-3 py-1.5 rounded-lg pointer-events-none shadow-lg backdrop-blur-xl"
-              style={{
-                fontFamily: "var(--font-sans)",
-                color: "#e2e8f0",
-                background: "rgba(15, 23, 42, 0.8)",
-                border: "1px solid rgba(99, 102, 241, 0.3)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
-              {st.name}
+              {/* Shimmer effect for current stage */}
+              {isCurrent && (
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  animate={{
+                    x: ["-100%", "200%"],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                />
+              )}
+              
+              {/* Completion checkmark */}
+              {isDone && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute inset-0 flex items-center justify-center text-white text-[8px]"
+                >
+                  ✓
+                </motion.div>
+              )}
+            </motion.div>
+
+            {/* Tooltip on hover */}
+            <div
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10"
+            >
+              <div
+                className="whitespace-nowrap text-[10px] sm:text-xs tracking-wide font-semibold px-3 py-2 rounded-xl shadow-2xl backdrop-blur-xl border"
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  color: "#e2e8f0",
+                  background: "rgba(15, 23, 42, 0.95)",
+                  borderColor: isCurrent ? st.glow : "rgba(99, 102, 241, 0.3)",
+                  boxShadow: isCurrent 
+                    ? `0 0 20px ${st.glow}40` 
+                    : "0 10px 30px rgba(0, 0, 0, 0.5)",
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{st.icon}</span>
+                  <div className="text-left">
+                    <div className="font-bold">{st.name}</div>
+                    <div className="text-[9px] sm:text-[10px] text-white/60 font-normal">
+                      {st.biome}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Tooltip arrow */}
+              <div
+                className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-0 h-0"
+                style={{
+                  borderLeft: "6px solid transparent",
+                  borderRight: "6px solid transparent",
+                  borderTop: `6px solid ${isCurrent ? st.glow : "rgba(99, 102, 241, 0.3)"}`,
+                }}
+              />
+            </div>
+
+            {/* Stage number label (shows on hover) */}
+            <span
+              className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-[9px] font-bold tracking-wider"
+              style={{
+                color: isCurrent ? st.glow : isDone ? "#6366f1" : "#64748b",
+              }}
+            >
+              {st.id}
             </span>
           </motion.button>
         );
@@ -439,7 +505,7 @@ function CheckpointPanel({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 32 }}
-        className="absolute right-0 top-0 bottom-0 z-[60] flex flex-col font-sans w-full sm:w-[360px] max-w-full sm:max-w-[360px]"
+        className="absolute right-0 top-0 bottom-0 z-[75] flex flex-col font-sans w-full sm:w-[380px] md:w-[420px] lg:w-[460px] xl:w-[500px] max-w-full"
         style={{
           background:
             "linear-gradient(180deg, rgba(11, 15, 25, 0.85), rgba(7, 10, 18, 0.95))",
@@ -454,7 +520,7 @@ function CheckpointPanel({
             audioManager.playTouch("click");
             onClose();
           }}
-          className="absolute top-3 right-3 sm:top-4 sm:right-4 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[13px] sm:text-[14px] transition-all duration-200 bg-white/5 hover:bg-white/10"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 md:top-5 md:right-5 w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center text-[13px] sm:text-[14px] md:text-[15px] lg:text-[16px] transition-all duration-200 bg-white/5 hover:bg-white/10"
           style={{
             border: "1px solid rgba(255,255,255,0.1)",
             color: "#cbd5e1",
@@ -474,16 +540,16 @@ function CheckpointPanel({
           ✕
         </button>
 
-        <div className="flex flex-col gap-3 sm:gap-3.5 p-3 sm:p-5 flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-3 sm:gap-3.5 md:gap-4 p-3 sm:p-5 md:p-6 lg:p-7 pt-16 sm:pt-20 md:pt-24 flex-1 overflow-y-auto">
           {/* Stage label */}
           <div>
             <p
-              className="text-[9px] sm:text-[10px] tracking-[0.2em] font-bold uppercase mb-1 sm:mb-1.5"
+              className="text-[9px] sm:text-[10px] md:text-[11px] lg:text-xs tracking-[0.2em] font-bold uppercase mb-1 sm:mb-1.5 md:mb-2"
               style={{ color: detail.stageGlow }}
             >
               Stage {detail.stage} · {detail.stageName}
             </p>
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight leading-tight text-white mb-1.5 sm:mb-2">
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight leading-tight text-white mb-1.5 sm:mb-2 md:mb-3">
               {detail.title}
             </h2>
           </div>
@@ -509,7 +575,7 @@ function CheckpointPanel({
 
           {/* Outcome */}
           <div
-            className="text-[12px] sm:text-[13px] leading-relaxed font-medium px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl backdrop-blur-md"
+            className="text-[12px] sm:text-[13px] md:text-sm lg:text-base leading-relaxed font-medium px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-3.5 lg:py-4 rounded-lg sm:rounded-xl backdrop-blur-md"
             style={{
               color: "#cbd5e1",
               borderLeft: `3px solid ${detail.stageGlow}`,
@@ -522,7 +588,7 @@ function CheckpointPanel({
           </div>
 
           {/* Tasks */}
-          <div className="flex flex-col gap-1.5 sm:gap-2">
+          <div className="flex flex-col gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3">
             {detail.tasks.map((task, i) => (
               <TaskCard
                 key={i}
@@ -541,11 +607,11 @@ function CheckpointPanel({
           </div>
 
           {/* Progress dots */}
-          <div className="flex items-center gap-1.5 sm:gap-2 px-0.5 sm:px-1 mt-1.5 sm:mt-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 px-0.5 sm:px-1 md:px-1.5 mt-1.5 sm:mt-2 md:mt-3">
             {detail.tasks.map((t, i) => (
               <div
                 key={i}
-                className="h-1.5 sm:h-2 flex-1 rounded-full transition-all duration-300 relative overflow-hidden bg-white/5"
+                className="h-1.5 sm:h-2 md:h-2.5 lg:h-3 flex-1 rounded-full transition-all duration-300 relative overflow-hidden bg-white/5"
               >
                 <motion.div
                   className="absolute inset-y-0 left-0"
@@ -561,7 +627,7 @@ function CheckpointPanel({
               </div>
             ))}
           </div>
-          <p className="text-[10px] sm:text-[11px] font-medium tracking-wide text-slate-400">
+          <p className="text-[10px] sm:text-[11px] md:text-xs lg:text-sm font-medium tracking-wide text-slate-400">
             {doneTasks}/3 tasks ·{" "}
             {2 - doneTasks > 0 && !canAdvance
               ? `${2 - doneTasks} more to advance`
@@ -570,11 +636,11 @@ function CheckpointPanel({
                 : ""}
           </p>
 
-          <div className="rounded-lg sm:rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 sm:px-4 py-2.5 sm:py-3">
-            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+          <div className="rounded-lg sm:rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-3.5 lg:py-4">
+            <p className="text-[9px] sm:text-[10px] md:text-[11px] lg:text-xs font-black uppercase tracking-[0.18em] text-amber-300">
               Gold Checkpoint
             </p>
-            <p className="mt-1 text-[11px] sm:text-[12px] leading-relaxed text-slate-300">
+            <p className="mt-1 text-[11px] sm:text-[12px] md:text-sm lg:text-base leading-relaxed text-slate-300">
               {isGold
                 ? "All 3 tasks are complete. This checkpoint will advance as gold."
                 : doneTasks === 2
@@ -584,12 +650,12 @@ function CheckpointPanel({
           </div>
 
           {/* Crossing animation label */}
-          <div className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl border border-white/5 bg-white/[0.02] mt-auto">
-            <span className="text-[9px] sm:text-[10px] tracking-[0.15em] font-semibold uppercase text-slate-500">
+          <div className="flex items-center gap-2 px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 lg:py-3.5 rounded-lg sm:rounded-xl border border-white/5 bg-white/[0.02] mt-auto">
+            <span className="text-[9px] sm:text-[10px] md:text-[11px] lg:text-xs tracking-[0.15em] font-semibold uppercase text-slate-500">
               Crossing:
             </span>
             <span
-              className="text-[10px] sm:text-[11px] font-bold tracking-wide"
+              className="text-[10px] sm:text-[11px] md:text-xs lg:text-sm font-bold tracking-wide"
               style={{ color: detail.stageGlow }}
             >
               {STAGE_ANIMATION[detail.stage]}
@@ -601,7 +667,7 @@ function CheckpointPanel({
         {!isLocked &&
           (detail.status !== "completed" || isActiveNode) &&
           (detail.status !== "gold" || isActiveNode) && (
-            <div className="p-3 sm:p-4 pt-0">
+            <div className="p-3 sm:p-4 md:p-5 lg:p-6 pt-0">
               <motion.button
                 onClick={() => {
                   audioManager.playTouch(canAdvance ? "confirm" : "error");
@@ -616,7 +682,7 @@ function CheckpointPanel({
                   canAdvance && !isAdvancing ? { scale: 1.02, y: -2 } : {}
                 }
                 whileTap={canAdvance && !isAdvancing ? { scale: 0.98 } : {}}
-                className="w-full py-3 sm:py-3.5 rounded-lg sm:rounded-xl text-[11px] sm:text-[12px] tracking-[0.1em] uppercase font-black transition-all duration-300 relative overflow-hidden"
+                className="w-full py-3 sm:py-3.5 md:py-4 lg:py-4.5 rounded-lg sm:rounded-xl text-[11px] sm:text-[12px] md:text-sm lg:text-base tracking-[0.1em] uppercase font-black transition-all duration-300 relative overflow-hidden"
                 style={{
                   background: isGold
                     ? "linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.1))"
@@ -730,7 +796,7 @@ function TaskCard({
       }}
       whileHover={locked || task.done ? {} : { x: 4 }}
       whileTap={locked || task.done ? {} : { scale: 0.98 }}
-      className="flex items-start gap-2.5 sm:gap-3.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl relative overflow-hidden cursor-pointer group/task transition-colors"
+      className="flex items-start gap-2.5 sm:gap-3.5 md:gap-4 px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-3.5 lg:py-4 rounded-lg sm:rounded-xl relative overflow-hidden cursor-pointer group/task transition-colors"
       style={{
         background: task.done
           ? "rgba(99, 102, 241, 0.05)"
@@ -889,7 +955,7 @@ function StageResetNotice({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
-      className="absolute bottom-28 left-1/2 z-40 w-[min(92vw,520px)] -translate-x-1/2"
+      className="absolute bottom-16 left-1/2 z-40 w-[min(92vw,520px)] -translate-x-1/2 sm:bottom-28"
     >
       <div className="rounded-2xl border border-indigo-400/20 bg-slate-950/85 p-4 text-center shadow-2xl backdrop-blur-xl relative group">
         <motion.button
@@ -929,7 +995,7 @@ function TourToggle({ onToggle }: { onToggle: () => void }) {
       transition={{ delay: 1 }}
       onClick={onToggle}
       onMouseEnter={() => audioManager.playUI("hover")}
-      className="absolute bottom-52 right-2 z-20 flex h-9 w-9 items-center justify-center rounded-full text-[14px] shadow-lg backdrop-blur-xl sm:bottom-32 sm:right-4 sm:h-10 sm:w-10 sm:text-[16px] md:bottom-26 md:right-5 lg:bottom-24"
+      className="absolute bottom-20 right-2 z-20 flex h-9 w-9 items-center justify-center rounded-full text-[14px] shadow-lg backdrop-blur-xl sm:bottom-24 sm:right-4 sm:h-10 sm:w-10 sm:text-[16px] md:bottom-26 md:right-5 lg:bottom-24"
       style={{
         background: "rgba(15, 23, 42, 0.6)",
         border: "1px solid rgba(255, 255, 255, 0.1)",
@@ -944,35 +1010,7 @@ function TourToggle({ onToggle }: { onToggle: () => void }) {
   );
 }
 
-/** Audio mute toggle */
-function AudioToggle({
-  muted,
-  onToggle,
-}: {
-  muted: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <motion.button
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 1 }}
-      onClick={onToggle}
-      onMouseEnter={() => audioManager.playUI("hover")}
-      className="absolute bottom-40 right-2 z-20 flex h-9 w-9 items-center justify-center rounded-full text-[14px] shadow-lg backdrop-blur-xl sm:bottom-20 sm:right-4 sm:h-10 sm:w-10 sm:text-[16px] md:bottom-14 md:right-5 lg:bottom-12"
-      style={{
-        background: "rgba(15, 23, 42, 0.6)",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        color: muted ? "#64748b" : "#e2e8f0",
-      }}
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
-      title={muted ? "Unmute" : "Mute"}
-    >
-      {muted ? "🔇" : "🔊"}
-    </motion.button>
-  );
-}
+
 
 /** Loading screen */
 function LoadingScreen() {
@@ -2796,21 +2834,7 @@ function MapPageInner() {
             stages={templateStages}
           />
 
-          {/* Audio toggle — syncs Jotai atom AND audioManager */}
-          <AudioToggle
-            muted={audioSettings.muted}
-            onToggle={() => {
-              audioManager.unlock();
-              if (audioSettings.muted) {
-                audioManager.setMuted(false);
-                audioManager.playUI("click");
-              } else {
-                audioManager.playUI("click");
-                audioManager.setMuted(true);
-              }
-              setAudioSettings((prev) => ({ ...prev, muted: !prev.muted }));
-            }}
-          />
+
 
           {/* World Map Tour Walkthrough */}
           <WorldMapTour
@@ -2876,8 +2900,8 @@ function MapPageInner() {
             />
           )}
 
-          {/* Left Sidebar Trigger — sits below the navbar (top-20 = 80px on sm+) */}
-          <div className="absolute left-2 bottom-24 z-50 sm:bottom-auto sm:left-4 sm:top-20 md:left-3 lg:left-4">
+          {/* Left Sidebar Trigger — responsive positioning */}
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 z-50 sm:left-3 md:left-4 lg:left-5">
             <LeftSidebar
               ventureName={ideaTitle}
               onOpenPanel={(tab) => {

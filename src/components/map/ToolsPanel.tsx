@@ -179,14 +179,30 @@ export function ToolsPanel({
     });
   };
 
-  const tabs = [
-    { id: "tools", label: "Tools", icon: Grid },
-    { id: "calendar", label: "Calendar", icon: CalendarIcon },
-    { id: "kanban", label: "Kanban", icon: LayoutDashboard },
-    { id: "roadmap", label: "Roadmap", icon: Map },
-    { id: "settings", label: "Settings", icon: SettingsIcon },
-    { id: "help", label: "Help", icon: HelpIcon },
-  ] as const;
+  const allTabs = {
+    tools: { id: "tools" as TabType, label: "Tools", icon: Grid },
+    calendar: { id: "calendar" as TabType, label: "Calendar", icon: CalendarIcon },
+    kanban: { id: "kanban" as TabType, label: "Kanban", icon: LayoutDashboard },
+    roadmap: { id: "roadmap" as TabType, label: "Roadmap", icon: Map },
+    write: { id: "write" as TabType, label: "Write", icon: FileText },
+    map: { id: "map" as TabType, label: "Canvas", icon: Files },
+    journal: { id: "journal" as TabType, label: "Journal", icon: Scroll },
+    survey: { id: "survey" as TabType, label: "Survey", icon: MessageSquare },
+    settings: { id: "settings" as TabType, label: "Settings", icon: SettingsIcon },
+    help: { id: "help" as TabType, label: "Help", icon: HelpIcon },
+  };
+
+  const displayedTabs = [
+    allTabs.tools,
+    allTabs.calendar,
+    allTabs.kanban,
+    allTabs.roadmap,
+    ...( ["write", "map", "journal", "survey"].includes(activeTab)
+      ? [allTabs[activeTab as "write" | "map" | "journal" | "survey"]]
+      : [] ),
+    allTabs.settings,
+    allTabs.help,
+  ];
 
   return (
     <AnimatePresence>
@@ -235,8 +251,8 @@ export function ToolsPanel({
           </div>
 
           {/* Tab Navigation */}
-          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto p-2 bg-black/20 border-b border-white/5">
-            {tabs.map((tab) => (
+          <div className="no-scrollbar flex items-center gap-0.5 sm:gap-1 overflow-x-auto p-1.5 sm:p-2 bg-black/20 border-b border-white/5">
+            {displayedTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => {
@@ -245,7 +261,7 @@ export function ToolsPanel({
                 }}
                 onMouseEnter={() => audioManager.playUI("hover")}
                 className={cn(
-                  "min-w-[64px] flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all duration-300",
+                  "min-w-[50px] sm:min-w-[64px] flex-1 flex flex-col items-center gap-1 py-2 sm:py-3 rounded-xl transition-all duration-300",
                   activeTab === tab.id
                     ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                     : "text-slate-500 hover:text-slate-300 hover:bg-white/5",
@@ -253,11 +269,11 @@ export function ToolsPanel({
               >
                 <tab.icon
                   className={cn(
-                    "w-5 h-5",
+                    "w-4 h-4 sm:w-5 sm:h-5",
                     activeTab === tab.id ? "animate-pulse" : "",
                   )}
                 />
-                <span className="text-[9px] font-black uppercase tracking-widest">
+                <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-widest">
                   {tab.label}
                 </span>
               </button>

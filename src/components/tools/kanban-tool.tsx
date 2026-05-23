@@ -36,6 +36,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils";
 
 interface KanbanCard {
   id: string;
@@ -63,9 +64,11 @@ interface KanbanToolProps {
 function DraggableCard({
   card,
   onDelete,
+  onMove,
 }: {
   card: KanbanCard;
   onDelete: (id: string) => void;
+  onMove?: (id: string, newColumn: "todo" | "inprogress" | "done") => void;
 }) {
   const {
     attributes,
@@ -97,18 +100,42 @@ function DraggableCard({
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 cursor-grab" />
-          <div className="text-sm flex-1">{card.title}</div>
+          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 cursor-grab shrink-0" />
+          <div className="text-sm flex-1 leading-snug">{card.title}</div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-          onClick={() => onDelete(card.id)}
-          title="Delete card"
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {card.column !== "todo" && onMove && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-white"
+              onClick={() => onMove(card.id, card.column === "done" ? "inprogress" : "todo")}
+              title="Move left"
+            >
+              <span className="text-xs">←</span>
+            </Button>
+          )}
+          {card.column !== "done" && onMove && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-white"
+              onClick={() => onMove(card.id, card.column === "todo" ? "inprogress" : "done")}
+              title="Move right"
+            >
+              <span className="text-xs">→</span>
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+            onClick={() => onDelete(card.id)}
+            title="Delete card"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -119,10 +146,12 @@ function DroppableColumn({
   column,
   cards,
   onDelete,
+  onMove,
 }: {
   column: { id: "todo" | "inprogress" | "done"; label: string; color: string };
   cards: KanbanCard[];
   onDelete: (id: string) => void;
+  onMove?: (id: string, newColumn: "todo" | "inprogress" | "done") => void;
 }) {
   return (
     <div className="space-y-2">
@@ -143,7 +172,7 @@ function DroppableColumn({
             </div>
           ) : (
             cards.map((card) => (
-              <DraggableCard key={card.id} card={card} onDelete={onDelete} />
+              <DraggableCard key={card.id} card={card} onDelete={onDelete} onMove={onMove} />
             ))
           )}
         </div>
@@ -165,6 +194,15 @@ export function KanbanTool({
     "todo" | "inprogress" | "done"
   >("todo");
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
+  const [activeColTab, setActiveColTab] = useState<"todo" | "inprogress" | "done">("todo");
+
+  const handleMoveCard = (cardId: string, newColumn: "todo" | "inprogress" | "done") => {
+    setCards((prevCards) =>
+      prevCards.map((card) =>
+        card.id === cardId ? { ...card, column: newColumn } : card
+      )
+    );
+  };
 
   useEffect(() => {
     if (initialContent?.cards) {
@@ -345,16 +383,40 @@ export function KanbanTool({
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="w-full overflow-x-auto scrollbar-thin">
-            <div className="grid grid-cols-3 gap-3 min-w-[600px] pb-2">
-              {columns.map((column) => (
-                <DroppableColumn
-                  key={column.id}
-                  column={column}
-                  cards={getCardsForColumn(column.id)}
-                  onDelete={deleteCard}
-                />
-              ))}
+          {/* Column selector for small screens / drawers */}
+          <div className="flex md:hidden gap-1 mb-3 bg-black/20 p-1 rounded-xl border border-white/5">
+            {columns.map((col) => (
+              <button
+                key={col.id}
+                type="button"
+                onClick={() => setActiveColTab(col.id)}
+                className={cn(
+                  "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all uppercase tracking-widest text-center",
+                  activeColTab === col.id
+                    ? "bg-indigo-500 text-white shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                )}
+              >
+                {col.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pb-2">
+              {columns.map((column) => {
+                const isVisible = activeColTab === column.id;
+                return (
+                  <div key={column.id} className={cn("md:block", isVisible ? "block" : "hidden")}>
+                    <DroppableColumn
+                      column={column}
+                      cards={getCardsForColumn(column.id)}
+                      onDelete={deleteCard}
+                      onMove={handleMoveCard}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 
