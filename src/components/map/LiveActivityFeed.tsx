@@ -3,18 +3,16 @@
 /**
  * LiveActivityFeed.tsx
  *
- * Phase 30 — Real-Time Presence
- *
- * Implements a template-aware real-time collaborator presence dashboard
- * and live activity feed. Periodically generates immersive RPG-style progress
- * feed events matching the current template's biome and checkpoint themes.
+ * Real-time presence and activity feed showing actual user activity
+ * from the database (ideas posted, sparks, comments, etc.)
+ * Fully responsive for mobile, tablet, and desktop
  */
 
 import { useEffect, useState } from "react";
-import { useAtomValue } from "jotai";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { templateIdAtom } from "@/lib/stores/hudStore";
-import { Users, Sparkles, Activity } from "lucide-react";
+import { Users, Activity } from "lucide-react";
 
 interface ActivityEvent {
   id: string;
@@ -23,113 +21,117 @@ interface ActivityEvent {
   action: string;
   detail: string;
   timestamp: string;
+  color: string;
 }
 
-const COLLABORATORS_POOL = [
-  { name: "Elena Rostova", avatar: "👩‍💻", color: "from-pink-500 to-rose-500" },
-  { name: "Marcus Thorne", avatar: "👨‍🎓", color: "from-amber-500 to-yellow-500" },
-  { name: "Dr. Kenji Tanaka", avatar: "👨‍🔬", color: "from-emerald-500 to-teal-500" },
-  { name: "Sarah Jenkins", avatar: "👩‍🎨", color: "from-violet-500 to-purple-500" },
-  { name: "Alex Mercer", avatar: "👨‍💻", color: "from-blue-500 to-indigo-500" },
-];
-
-const TEMPLATE_UPDATES: Record<
-  string,
-  { actions: string[]; details: string[] }
-> = {
-  venture: {
-    actions: ["validated target user", "submitted pitch slide", "completed market sizing", "slayed competition risk", "earned gold standard on"],
-    details: ["Landing Page MVP", "Competitor Matrix", "Customer Interviews", "Financial Projections", "Pitch Deck Draft"],
-  },
-  academic: {
-    actions: ["completed citation review", "drafted abstract", "reviewed methodology", "slayed thesis block on", "earned gold standard on"],
-    details: ["Literature Review", "Research Question Definition", "Data Source Isolation", "Statistical Modeling", "Draft Introduction"],
-  },
-  lab: {
-    actions: ["calibrated spectrometer", "isolated compound", "published test data", "slayed anomaly on", "earned gold standard on"],
-    details: ["Replication Run #3", "Gel Electrophoresis", "Clean Room Protocol", "Spectroscopy Output", "Methodology Writeup"],
-  },
-  creative: {
-    actions: ["sketched composition", "selected color palette", "finalized rough cut", "slayed creative block on", "earned gold standard on"],
-    details: ["Concept Moodboard", "Storyboard Sequence", "Character Turnaround", "Acoustic Theme Track", "Post-production Grading"],
-  },
-};
-
 export function LiveActivityFeed() {
-  const templateId = useAtomValue(templateIdAtom);
-  const [activeUsers, setActiveUsers] = useState<typeof COLLABORATORS_POOL>([]);
+  // Fetch real active users (users who posted ideas recently)
+  const recentIdeas = useQuery(api.ideas.getPublicIdeas, { 
+    limit: 10
+  });
+  
+  const [activeUsers, setActiveUsers] = useState<Array<{name: string, avatar: string, color: string}>>([]);
   const [feed, setFeed] = useState<ActivityEvent[]>([]);
 
-  // Initialize active users
+  // Extract unique active users from recent ideas
   useEffect(() => {
-    // Select 3 random collaborators
-    const shuffled = [...COLLABORATORS_POOL].sort(() => 0.5 - Math.random());
-    setActiveUsers(shuffled.slice(0, 3));
-  }, []);
+    if (!recentIdeas) return;
+    
+    const uniqueUsers = new Map();
+    const colors = [
+      "from-pink-500 to-rose-500",
+      "from-amber-500 to-yellow-500", 
+      "from-emerald-500 to-teal-500",
+      "from-violet-500 to-purple-500",
+      "from-blue-500 to-indigo-500",
+    ];
+    
+    recentIdeas.forEach((idea, idx) => {
+      if (idea.author && !uniqueUsers.has(idea.author._id)) {
+        uniqueUsers.set(idea.author._id, {
+          name: idea.author.name || "Anonymous",
+          avatar: idea.author.name?.charAt(0).toUpperCase() || "👤",
+          color: colors[uniqueUsers.size % colors.length],
+        });
+      }
+    });
+    
+    setActiveUsers(Array.from(uniqueUsers.values()).slice(0, 3));
+  }, [recentIdeas]);
 
-  // Generate periodic updates matching active template
+  // Convert recent ideas to activity feed
   useEffect(() => {
-    const generator = setInterval(() => {
-      const user = COLLABORATORS_POOL[Math.floor(Math.random() * COLLABORATORS_POOL.length)];
-      const pool = TEMPLATE_UPDATES[templateId] ?? TEMPLATE_UPDATES.venture;
-      const action = pool.actions[Math.floor(Math.random() * pool.actions.length)];
-      const detail = pool.details[Math.floor(Math.random() * pool.details.length)];
-
-      const newEvent: ActivityEvent = {
-        id: Math.random().toString(),
-        user: user.name,
-        avatar: user.avatar,
-        action,
-        detail,
-        timestamp: "Just now",
+    if (!recentIdeas) return;
+    
+    const activities: ActivityEvent[] = recentIdeas.slice(0, 5).map((idea) => {
+      const timeAgo = getTimeAgo(idea._creationTime);
+      
+      return {
+        id: idea._id,
+        user: idea.author?.name || "Anonymous",
+        avatar: idea.author?.name?.charAt(0).toUpperCase() || "👤",
+        action: "posted idea",
+        detail: idea.title,
+        timestamp: timeAgo,
+        color: "from-indigo-500 to-purple-500",
       };
-
-      setFeed((prev) => [newEvent, ...prev.slice(0, 4)]);
-    }, 9000); // New event every 9 seconds
-
-    return () => clearInterval(generator);
-  }, [templateId]);
+    });
+    
+    setFeed(activities);
+  }, [recentIdeas]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-3 max-w-sm pointer-events-auto">
+    <div className="fixed bottom-3 right-3 z-40 flex flex-col gap-2 pointer-events-auto w-[280px]">
       {/* Collaborators list */}
-      <div className="flex flex-col gap-2 p-3 rounded-xl bg-slate-900/85 border border-white/10 backdrop-blur-md shadow-lg">
-        <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
-          <div className="flex items-center gap-1.5 text-white/80 font-semibold text-xs uppercase tracking-wider">
-            <Users className="w-3.5 h-3.5 text-indigo-400" />
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-900/90 border border-white/10 backdrop-blur-md shadow-xl">
+        <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1.5">
+          <div className="flex items-center gap-1 text-white/80 font-semibold text-[9px] uppercase tracking-wider">
+            <Users className="w-2.5 h-2.5 text-indigo-400" />
             <span>Active Collaborators</span>
           </div>
-          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8px] font-mono font-bold">
+            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
             LIVE
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          {activeUsers.map((user, idx) => (
-            <div key={idx} className="flex items-center gap-1.5 group relative">
-              <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${user.color} flex items-center justify-center text-sm shadow-md border border-white/20`}>
-                {user.avatar}
+        <div className="flex items-center gap-1.5">
+          {activeUsers.length > 0 ? (
+            activeUsers.map((user, idx) => (
+              <div key={idx} className="flex items-center group relative">
+                <div className={`w-6 h-6 rounded-full bg-gradient-to-tr ${user.color} flex items-center justify-center text-[10px] shadow-md border border-white/20 font-semibold text-white`}>
+                  {user.avatar}
+                </div>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block whitespace-nowrap bg-slate-950 text-white text-[8px] px-1.5 py-0.5 rounded border border-white/10 shadow-lg z-50">
+                  {user.name}
+                </span>
               </div>
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-slate-950 text-white text-[10px] px-2 py-0.5 rounded border border-white/10 shadow-lg">
-                {user.name}
-              </span>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-white/40 text-[9px] py-0.5">No active users</div>
+          )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Activity Feed */}
-      <div className="flex flex-col gap-2 p-3 rounded-xl bg-slate-900/85 border border-white/10 backdrop-blur-md shadow-lg min-h-[140px]">
-        <div className="flex items-center gap-1.5 text-white/80 font-semibold text-xs uppercase tracking-wider border-b border-white/5 pb-2">
-          <Activity className="w-3.5 h-3.5 text-rose-400" />
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-900/90 border border-white/10 backdrop-blur-md shadow-xl max-h-[200px] overflow-hidden">
+        <div className="flex items-center gap-1 text-white/80 font-semibold text-[9px] uppercase tracking-wider border-b border-white/5 pb-1.5">
+          <Activity className="w-2.5 h-2.5 text-rose-400" />
           <span>Real-time Activity</span>
         </div>
 
-        <div className="flex flex-col gap-2.5 overflow-hidden">
+        <div className="flex flex-col gap-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent pr-0.5">
           <AnimatePresence initial={false}>
             {feed.length === 0 ? (
-              <div className="text-white/40 text-xs py-4 text-center font-mono">
-                Monitoring world activity...
+              <div className="text-white/40 text-[9px] py-2 text-center font-mono">
+                No recent activity...
               </div>
             ) : (
               feed.map((event) => (
@@ -139,24 +141,37 @@ export function LiveActivityFeed() {
                   animate={{ opacity: 1, x: 0, height: "auto" }}
                   exit={{ opacity: 0, x: -20, height: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="flex items-start gap-2.5 text-xs text-white/90"
+                  className="flex items-start gap-1.5 text-[9px] text-white/90"
                 >
-                  <span className="text-sm select-none mt-0.5">{event.avatar}</span>
-                  <div className="flex flex-col leading-tight">
-                    <p className="font-semibold text-white/95">{event.user}</p>
-                    <p className="text-white/60 text-[11px] mt-0.5">
-                      {event.action}{" "}
-                      <span className="text-indigo-300 font-medium">
-                        {event.detail}
-                      </span>
+                  <span className="text-[10px] select-none mt-0.5 w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-white shrink-0">
+                    {event.avatar}
+                  </span>
+                  <div className="flex flex-col leading-tight flex-1 min-w-0">
+                    <p className="font-semibold text-white/95 truncate text-[10px]">{event.user}</p>
+                    <p className="text-white/60 text-[9px] mt-0.5">
+                      {event.action}
                     </p>
+                    <p className="text-indigo-300 font-medium truncate text-[9px]">
+                      {event.detail}
+                    </p>
+                    <p className="text-white/40 text-[8px] mt-0.5">{event.timestamp}</p>
                   </div>
                 </motion.div>
               ))
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
+}
+
+// Helper function to convert timestamp to "time ago" format
+function getTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  
+  if (seconds < 60) return "Just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
 }

@@ -1095,6 +1095,30 @@ function MapPageInner() {
   const setTemplateMetricAtom = useSetAtom(templateMetricAtom);
   const [audioSettings, setAudioSettings] = useAtom(audioSettingsAtom);
 
+  // ── Initialize audio settings from audioManager on first load ──────────────
+  useEffect(() => {
+    // Force reset to 100% volume if user has old localStorage values
+    const VOLUME_VERSION = "v2"; // Increment this to force reset
+    const savedVersion = localStorage.getItem("audioVolumeVersion");
+    
+    if (savedVersion !== VOLUME_VERSION) {
+      // Clear old audio settings and set new defaults
+      localStorage.removeItem("audioVolumes");
+      localStorage.setItem("audioVolumeVersion", VOLUME_VERSION);
+      console.log("[Audio] Resetting to 100% volume defaults");
+    }
+    
+    // Sync atom with audioManager's localStorage values (or defaults)
+    const volumes = audioManager.getVolumes();
+    setAudioSettings({
+      masterVolume: volumes.master,
+      musicVolume: volumes.music,
+      sfxVolume: volumes.sfx,
+      uiVolume: volumes.ui,
+      muted: volumes.muted,
+    });
+  }, []); // Run once on mount
+
   // ── Convex queries ─────────────────────────────────────────────────────────
   const ventures = useQuery(api.worldMap.getVenturesByUser);
 

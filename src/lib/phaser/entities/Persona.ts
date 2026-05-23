@@ -202,6 +202,8 @@ export class Persona extends Phaser.GameObjects.Container {
     const walkNextSegment = () => {
       const point = route[index];
       if (!point) {
+        // Reached end of path - ensure we're in idle state
+        this.isWalking = false;
         this.currentAnimation = "idle";
         this.playIdle();
         return;
@@ -242,9 +244,8 @@ export class Persona extends Phaser.GameObjects.Container {
 
   /**
    * Resume idle state — persona stands perfectly still at current checkpoint.
-   * All movement and floating tweens are stopped; sprite plays idle animation
-   * loop (breathing/blinking frames if available) but the container does NOT
-   * drift or translate.
+   * All movement and floating tweens are stopped; sprite shows static frame 0
+   * with NO animation cycling, creating a completely still standing position.
    */
   playIdle(): void {
     this.currentAnimation = "idle";
@@ -264,10 +265,18 @@ export class Persona extends Phaser.GameObjects.Container {
     // Reset shadow to its natural scale (no drift)
     this.shadowEllipse.setScale(1, 1);
 
-    // ── Play idle sprite animation (visual only, no container movement) ──────
-    const idleAnimKey =
-      this.gender === "male" ? "persona_male_idle" : "persona_female_idle";
-    this.playSpriteAnimation(idleAnimKey);
+    // ── Stop any playing animation and show static frame 0 ──────────────────
+    // This prevents the "glitchy" appearance from animation frame cycling
+    if (this.sprite && this.sprite.anims) {
+      this.sprite.anims.stop();
+      
+      // Set to frame 0 of the idle sprite sheet for true static idle
+      const spriteSheetKey =
+        this.gender === "male"
+          ? "persona_male_idle_sheet"
+          : "persona_female_idle_sheet";
+      this.sprite.setTexture(spriteSheetKey, 0);
+    }
 
     // Keep stable configured facing direction while idle
     if (this.sprite) {

@@ -92,12 +92,13 @@ const CROSSFADE_DURATION = 1000; // ms — PRD §10 specifies 1s crossfade on st
 /**
  * Default volume levels.
  * All values are 0–1 floats; master is applied as a multiplier.
+ * Set to 100% (1.0) by default for maximum audio output.
  */
 const DEFAULT_VOLUME: VolumeSettings = {
-  master: 0.8,
-  music: 0.7,
-  sfx: 0.9,
-  ui: 0.6,
+  master: 1.0,
+  music: 1.0,
+  sfx: 1.0,
+  ui: 1.0,
   muted: false,
 };
 
@@ -405,23 +406,31 @@ class AudioManager {
    * Safe to call before init — the biome is queued and plays once unlocked.
    */
   playAmbience(biome: BiomeId): void {
+    console.log(`[AudioManager] playAmbience called for biome: ${biome}, initialized: ${this.initialized}`);
+    
     if (!this.initialized) {
       this.pendingBiome = biome;
+      console.log(`[AudioManager] Audio not initialized yet, queuing biome: ${biome}`);
       return;
     }
 
     // Already playing this biome
     if (this.currentAmbienceId === biome && this.currentAmbience?.playing()) {
+      console.log(`[AudioManager] Biome ${biome} already playing`);
       return;
     }
 
     const incoming = this.getAmbience(biome);
-    if (!incoming) return;
+    if (!incoming) {
+      console.warn(`[AudioManager] Could not load ambience for biome: ${biome}`);
+      return;
+    }
 
     const outgoing = this.currentAmbience;
 
     // Fade out outgoing
     if (outgoing && outgoing.playing()) {
+      console.log(`[AudioManager] Fading out previous ambience`);
       outgoing.fade(outgoing.volume(), 0, CROSSFADE_DURATION);
       this.crossfadeTimer = setTimeout(() => {
         outgoing.stop();
@@ -430,6 +439,7 @@ class AudioManager {
 
     // Fade in incoming
     const targetVol = this.musicEffectiveVolume();
+    console.log(`[AudioManager] Playing biome ${biome} with target volume: ${targetVol}`);
     incoming.volume(0);
     incoming.play();
     incoming.fade(0, targetVol, CROSSFADE_DURATION);
