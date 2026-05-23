@@ -21,18 +21,7 @@ import * as Phaser from "phaser";
 // Exported types
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * All eight mini-boss types corresponding to venture stages (PRD-compliant)
- */
-export type MiniBossType =
-  | "Fog of Vagueness"
-  | "Pathwarden Wraith"
-  | "Advocate of Comfortable Lies"
-  | "Unfinished Golem"
-  | "Collapse Specter"
-  | "Harbourmaster of Hesitation"
-  | "Babel Merchant"
-  | "Iron Bureaucrat";
+export type MiniBossType = string;
 
 /**
  * Configuration data required to construct a {@link MiniBoss}.

@@ -19,12 +19,16 @@ import type { Id } from "@convex/_generated/dataModel";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 import { Label } from "@/components/ui/label";
+import { TemplateSelector } from "@/components/venture/TemplateSelector";
+import type { TemplateId } from "@/config/templates";
 
 export default function VentureCreatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ideaId = searchParams.get("ideaId");
   const [creating, setCreating] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<TemplateId>("venture");
   const [selectedGender, setSelectedGender] = useState<
     "male" | "female" | null
   >(null);
@@ -42,6 +46,7 @@ export default function VentureCreatePage() {
     try {
       const ventureId = await createVenture({
         ideaId: ideaId as Id<"ideas">,
+        templateId: selectedTemplate,
         skills: selectedSkills.length > 0 ? selectedSkills : undefined,
         industries:
           selectedIndustries.length > 0 ? selectedIndustries : undefined,
@@ -243,6 +248,22 @@ export default function VentureCreatePage() {
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Choose Your Template</CardTitle>
+                <CardDescription>
+                  Select the project type that best matches your goals
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TemplateSelector
+                  selected={selectedTemplate}
+                  onSelect={setSelectedTemplate}
+                  disabled={creating}
+                />
               </CardContent>
             </Card>
 

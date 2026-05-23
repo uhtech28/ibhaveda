@@ -155,12 +155,45 @@ export function getVentureBadgeEmoji(id: string | number, name: string): string 
   if (badgeId === 21) return "🧠";
   if (badgeId === 22) return "🗺️";
   if (badgeId === 23) return "✨";
+  if (badgeId === 24) return "🔟";
+  if (badgeId === 25) return "⚖️";
+  if (badgeId === 26) return "🛡️";
   if (badgeId === 27) return "👂";
   if (badgeId === 28) return "📣";
   if (badgeId === 29) return "📝";
   if (badgeId === 30) return "🗣️";
   if (badgeId === 31) return "🤝";
   if (badgeId === 32) return "👥";
+  if (badgeId === 33) return "⚡";
+  if (badgeId === 34) return "👣";
+  if (badgeId === 35) return "🏆";
+  if (badgeId === 36) return "💖";
+  if (badgeId === 37) return "🧲";
+  if (badgeId === 38) return "🌉";
+  if (badgeId === 39) return "📅";
+  if (badgeId === 40) return "🔥";
+  if (badgeId === 41) return "🔗";
+  if (badgeId === 42) return "🌀";
+  if (badgeId === 43) return "🏆";
+  if (badgeId === 44) return "📈";
+  if (badgeId === 45) return "💎";
+  if (badgeId === 46) return "⚓";
+  if (badgeId === 47) return "🏮";
+  if (badgeId === 48) return "⏳";
+  if (badgeId === 49) return "⭐";
+  if (badgeId === 50) return "📐";
+  if (badgeId === 51) return "🌐";
+  if (badgeId === 52) return "👻";
+  if (badgeId === 53) return "🌕";
+  if (badgeId === 54) return "🩹";
+  if (badgeId === 55) return "👁️";
+  if (badgeId === 56) return "📖";
+  if (badgeId === 57) return "🏰";
+  if (badgeId === 58) return "📚";
+  if (badgeId === 59) return "⚙️";
+  if (badgeId === 60) return "✒️";
+  if (badgeId === 61) return "🔤";
+  if (badgeId === 62) return "🏛️";
 
   if (badgeId === 71) return "💡";
   if (badgeId === 72) return "🔬";
@@ -320,9 +353,10 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
         >
           <span
             className={cn(
-              "text-3.5xl select-none filter drop-shadow-md",
+              "select-none filter drop-shadow-md",
               !isLocked && "group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
             )}
+            style={{ fontSize: "1.85rem" }}
           >
             {isLocked ? "❓" : iconEmoji}
           </span>

@@ -14,6 +14,8 @@ import {
   type BaseCheckpointAnimation,
 } from "./animations";
 import { brightnessToPhaser } from "../utils/brightness-calculator";
+import { gameplayIntegration } from "../integration/gameplayIntegration";
+import { getTemplate, type TemplateId } from "@/config/templates";
 
 /**
  * Biome configuration for the 8 venture stages
@@ -24,15 +26,15 @@ interface BiomeConfig {
   name: string;
   theme: string;
   visualTheme:
-  | "village"
-  | "forest"
-  | "arena"
-  | "artisan"
-  | "mine"
-  | "harbour"
-  | "crossroads"
-  | "capital"
-  | "dungeon";
+    | "village"
+    | "forest"
+    | "arena"
+    | "artisan"
+    | "mine"
+    | "harbour"
+    | "crossroads"
+    | "capital"
+    | "dungeon";
   colors: {
     sky: number;
     ground: number;
@@ -40,6 +42,94 @@ interface BiomeConfig {
     accent2: number;
     path: number;
   };
+}
+
+interface StageLayout {
+  id: number;
+  name: string;
+  checkpoints: number;
+  monsterName?: string;
+}
+
+const VENTURE_STAGE_LAYOUTS: StageLayout[] = VENTURE_STAGES.map((stage) => ({
+  id: stage.id,
+  name: stage.name,
+  checkpoints: stage.checkpoints,
+}));
+
+const TEMPLATE_VISUAL_THEME_MAP: Record<
+  Exclude<TemplateId, "venture">,
+  Array<BiomeConfig["visualTheme"]>
+> = {
+  academic: ["village", "forest", "mine", "artisan", "crossroads", "capital"],
+  lab: [
+    "arena",
+    "forest",
+    "artisan",
+    "mine",
+    "crossroads",
+    "village",
+    "capital",
+  ],
+  creative: ["forest", "village", "arena", "crossroads", "artisan", "harbour"],
+};
+
+function hexToColorNumber(hex: string): number {
+  return Number.parseInt(hex.replace("#", ""), 16);
+}
+
+function buildTemplateBiomeConfigs(templateId: TemplateId): BiomeConfig[] {
+  if (templateId === "venture") {
+    return BIOME_CONFIGS;
+  }
+
+  const template = getTemplate(templateId);
+  const visualThemes = TEMPLATE_VISUAL_THEME_MAP[templateId];
+
+  return template.stages.map((stage, index) => {
+    const visualTheme = visualThemes[index] ?? "village";
+    const background = hexToColorNumber(stage.biomeTheme.bgColor);
+
+    return {
+      id: stage.id,
+      name: stage.biomeName,
+      theme: stage.name,
+      visualTheme,
+      colors: {
+        sky: background,
+        ground: stage.biomeTheme.secondaryColor,
+        accent1: stage.biomeTheme.primaryColor,
+        accent2: stage.biomeTheme.secondaryColor,
+        path: stage.biomeTheme.secondaryColor,
+      },
+    };
+  });
+}
+
+function buildTemplateStageLayouts(templateId: TemplateId): StageLayout[] {
+  if (templateId === "venture") {
+    const miniBossNames = [
+      "Fog of Vagueness",
+      "Pathwarden Wraith",
+      "Advocate of Comfortable Lies",
+      "Unfinished Golem",
+      "Collapse Specter",
+      "Harbourmaster of Hesitation",
+      "Babel Merchant",
+      "Iron Bureaucrat",
+    ];
+    return VENTURE_STAGE_LAYOUTS.map((layout, idx) => ({
+      ...layout,
+      monsterName: miniBossNames[idx] || "Fog of Vagueness",
+    }));
+  }
+
+  return getTemplate(templateId).stages.map((stage) => ({
+    id: stage.id,
+    name: stage.name,
+    checkpoints: stage.checkpoints,
+    monsterName: stage.monster?.name ?? "Anomaly",
+  }));
 }
 
 const BIOME_CONFIGS: BiomeConfig[] = [
@@ -186,6 +276,7 @@ export class WorldMapScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap;
   private backgroundLayer!: Phaser.GameObjects.Container;
   private midgroundLayer!: Phaser.GameObjects.Container;
+  private environmentalCracksGraphics!: Phaser.GameObjects.Graphics;
   private gameLayer!: Phaser.GameObjects.Container;
   private animationLayer!: Phaser.GameObjects.Container;
 
@@ -199,11 +290,14 @@ export class WorldMapScene extends Phaser.Scene {
 
   // Venture state
   private currentVentureId: string | null;
+  private currentTemplateId: TemplateId = "venture";
   private currentStage: number = 1;
   private currentCorruptionLevel: number = 0;
   private completedStages: number = 0;
   private stageTasksCompleted: number = 0;
   private stageTasksTotal: number = 0;
+  private activeStages: StageLayout[] = VENTURE_STAGE_LAYOUTS;
+  private activeBiomeConfigs: BiomeConfig[] = BIOME_CONFIGS;
 
   // Event handlers
   private boundHandlers: {
@@ -211,6 +305,7 @@ export class WorldMapScene extends Phaser.Scene {
     updateCheckpoints?: (event: { checkpoints: CheckpointState[] }) => void;
     setActiveVenture?: (event: {
       ventureId: string;
+      templateId?: TemplateId;
       personaGender: "male" | "female";
       assignedBosses?: string[];
       currentStage?: number;
@@ -233,9 +328,9 @@ export class WorldMapScene extends Phaser.Scene {
   };
 
   // Map dimensions
-  private readonly TOTAL_CHECKPOINTS = 36;
+  private TOTAL_CHECKPOINTS = 36;
   private readonly BIOME_WIDTH = 1400;
-  private readonly MAP_WIDTH = this.BIOME_WIDTH * 8;
+  private MAP_WIDTH = this.BIOME_WIDTH * 8;
   private readonly MAP_HEIGHT = 1200;
   private readonly MAP_PANEL_SCALE = 2;
 
@@ -253,6 +348,7 @@ export class WorldMapScene extends Phaser.Scene {
   private stageEntryInProgress: Set<number> = new Set();
 
   private particleEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  private updateHandlers: Array<() => void> = [];
   private resizeHandler?: (
     gameSize: Phaser.Structs.Size,
     baseSize: Phaser.Structs.Size,
@@ -268,6 +364,78 @@ export class WorldMapScene extends Phaser.Scene {
     this.miniBosses = new Map();
     this.currentVentureId = null;
     this.boundHandlers = {};
+    this.configureTemplateWorld("venture");
+  }
+
+  private configureTemplateWorld(templateId: TemplateId): void {
+    this.currentTemplateId = templateId;
+    this.activeStages = buildTemplateStageLayouts(templateId);
+    this.activeBiomeConfigs = buildTemplateBiomeConfigs(templateId);
+    this.TOTAL_CHECKPOINTS = this.activeStages.reduce(
+      (sum, stage) => sum + stage.checkpoints,
+      0,
+    );
+    this.MAP_WIDTH = this.BIOME_WIDTH * this.activeBiomeConfigs.length;
+  }
+
+  private initializeWorldLayers(): void {
+    this.backgroundLayer = this.add.container(0, 0);
+    this.midgroundLayer = this.add.container(0, 0);
+    this.environmentalCracksGraphics = this.add.graphics();
+    this.gameLayer = this.add.container(0, 0);
+    this.animationLayer = this.add.container(0, 0);
+
+    this.backgroundLayer.setDepth(0);
+    this.midgroundLayer.setDepth(10);
+    this.environmentalCracksGraphics.setDepth(15);
+    this.gameLayer.setDepth(20);
+    this.animationLayer.setDepth(100);
+  }
+
+  private buildWorldForCurrentTemplate(): void {
+    this.cameras.main.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
+    this.physics.world.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
+
+    this.createBiomeZones();
+    this.createTilemap();
+    this.createSnakePath();
+    this.createBiomeLandmarks();
+    this.createSuperBoss();
+    this.createMiniBosses();
+    this.createAtmosphericEffects();
+    this.createStageFogOverlays();
+    this.updateStageVisibility(this.currentStage, false);
+  }
+
+  private rebuildWorldForTemplate(): void {
+    this.selectionGlow?.destroy();
+    this.selectionGlow = null;
+    this.currentAnimation = null;
+    this.persona = null;
+
+    this.updateHandlers.forEach((handler) =>
+      this.events.off("update", handler),
+    );
+    this.updateHandlers = [];
+
+    this.backgroundLayer?.destroy(true);
+    this.midgroundLayer?.destroy(true);
+    this.environmentalCracksGraphics?.destroy();
+    this.gameLayer?.destroy(true);
+    this.animationLayer?.destroy(true);
+
+    this.checkpointNodes.clear();
+    this.bosses.clear();
+    this.miniBosses.clear();
+    this.biomeContainers.clear();
+    this.stageFogOverlays.clear();
+    this.residualMarkers.clear();
+    this.particleEmitters = [];
+
+    this.initializeWorldLayers();
+    this.buildWorldForCurrentTemplate();
+    this.applyResponsiveCamera(true);
+    this.updateGamepadSelection();
   }
 
   preload(): void {
@@ -279,36 +447,19 @@ export class WorldMapScene extends Phaser.Scene {
     // Initialize audio
     audioManager.init();
 
-    // Set up world bounds
-    this.cameras.main.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
-    this.physics.world.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT);
+    // Initialize gameplay integration audio
+    gameplayIntegration.initializeAudio();
 
     // Create scene layers
-    this.backgroundLayer = this.add.container(0, 0);
-    this.midgroundLayer = this.add.container(0, 0);
-    this.gameLayer = this.add.container(0, 0);
-    this.animationLayer = this.add.container(0, 0);
-
-    this.backgroundLayer.setDepth(0);
-    this.midgroundLayer.setDepth(10);
-    this.gameLayer.setDepth(20);
-    this.animationLayer.setDepth(100);
+    this.initializeWorldLayers();
 
     // Create brightness filter
     const camera = this.cameras.main;
     this.brightnessFilter = camera.postFX.addColorMatrix();
     AssetLoader.createPersonaAnimations(this);
 
-    // Build world
-    this.createBiomeZones();
-    this.createTilemap();
-    this.createSnakePath();
-    this.createBiomeLandmarks();
-    this.createSuperBoss();
-    this.createMiniBosses();
-    this.createAtmosphericEffects();
-    this.createStageFogOverlays();
-    this.updateStageVisibility(1, false);
+    // Build world for current template (defaults to Venture until venture data arrives)
+    this.buildWorldForCurrentTemplate();
 
     this.setupGamepadListeners();
 
@@ -610,8 +761,8 @@ export class WorldMapScene extends Phaser.Scene {
     const panelOffsetY = this.MAP_HEIGHT - panelHeight + 120;
     const objectLayer = this.map.getObjectLayer("Object Layer 1");
 
-    for (let i = 0; i < BIOME_CONFIGS.length; i++) {
-      const biome = BIOME_CONFIGS[i];
+    for (let i = 0; i < this.activeBiomeConfigs.length; i++) {
+      const biome = this.activeBiomeConfigs[i];
       const panelX = i * this.BIOME_WIDTH + panelOffsetX;
       if (biome.visualTheme === "forest") {
         this.createForestTilePanel(panelX, panelOffsetY, scale, biome, i);
@@ -677,33 +828,33 @@ export class WorldMapScene extends Phaser.Scene {
     const style =
       biome.id === 2
         ? {
-          baseTint: 0xc2ea7b,
-          shadeTint: 0x7dbb49,
-          canopyTint: 0x21532f,
-          mistTint: 0xe9ffd8,
-          waterTint: 0x83d7e5,
-          pathTint: 0xb78b5a,
-          hillTint: 0xffffff,
-        }
+            baseTint: 0xc2ea7b,
+            shadeTint: 0x7dbb49,
+            canopyTint: 0x21532f,
+            mistTint: 0xe9ffd8,
+            waterTint: 0x83d7e5,
+            pathTint: 0xb78b5a,
+            hillTint: 0xffffff,
+          }
         : biome.id === 5
           ? {
-            baseTint: 0xa5c56d,
-            shadeTint: 0x6c8748,
-            canopyTint: 0x2f2a22,
-            mistTint: 0xf4efd9,
-            waterTint: 0x6fb7cb,
-            pathTint: 0x9a7a53,
-            hillTint: 0xf3efe0,
-          }
+              baseTint: 0xa5c56d,
+              shadeTint: 0x6c8748,
+              canopyTint: 0x2f2a22,
+              mistTint: 0xf4efd9,
+              waterTint: 0x6fb7cb,
+              pathTint: 0x9a7a53,
+              hillTint: 0xf3efe0,
+            }
           : {
-            baseTint: 0xb8de7c,
-            shadeTint: 0x6d9157,
-            canopyTint: 0x39455a,
-            mistTint: 0xf2f7fb,
-            waterTint: 0x74aeca,
-            pathTint: 0xaa7d60,
-            hillTint: 0xf6f1e9,
-          };
+              baseTint: 0xb8de7c,
+              shadeTint: 0x6d9157,
+              canopyTint: 0x39455a,
+              mistTint: 0xf2f7fb,
+              waterTint: 0x74aeca,
+              pathTint: 0xaa7d60,
+              hillTint: 0xf6f1e9,
+            };
     const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
     const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
     const hillFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24, 33, 34, 35, 88, 89];
@@ -740,7 +891,7 @@ export class WorldMapScene extends Phaser.Scene {
       radiusY: number,
     ) =>
       ((x - centerX) * (x - centerX)) / (radiusX * radiusX) +
-      ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
+        ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
       1;
 
     const addFrameSprite = (
@@ -882,7 +1033,7 @@ export class WorldMapScene extends Phaser.Scene {
           addFrameSprite(
             "sprout_grass_sheet",
             grassAccentFrames[
-            (col + row + biome.id) % grassAccentFrames.length
+              (col + row + biome.id) % grassAccentFrames.length
             ],
             col,
             row,
@@ -1848,7 +1999,12 @@ export class WorldMapScene extends Phaser.Scene {
       props.fillRect(toX(c) - 2, toY(r) - 2, 6, 4);
       // Animated sparkle
       const sparkle = this.add.rectangle(
-        toX(c), toY(r) - 6, 3, 3, 0xf59e0b, 0.7
+        toX(c),
+        toY(r) - 6,
+        3,
+        3,
+        0xf59e0b,
+        0.7,
       );
       sparkle.setDepth(7);
       this.animationLayer.add(sparkle);
@@ -1886,7 +2042,11 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Mining cart sprite
     if (this.textures.exists("Barrel_Small_Empty")) {
-      const cart = this.add.sprite(toX(8), toY(midRow - 1.5), "Barrel_Small_Empty");
+      const cart = this.add.sprite(
+        toX(8),
+        toY(midRow - 1.5),
+        "Barrel_Small_Empty",
+      );
       cart.setOrigin(0.5, 1);
       cart.setScale(scale * 0.8);
       cart.setTint(0x5a4a30);
@@ -2642,7 +2802,6 @@ export class WorldMapScene extends Phaser.Scene {
     }
   }
 
-
   private renderMapObjects(
     objects: Phaser.Types.Tilemaps.TiledObject[],
     panelX: number,
@@ -2755,7 +2914,7 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private createBiomeZones(): void {
-    BIOME_CONFIGS.forEach((biome, index) => {
+    this.activeBiomeConfigs.forEach((biome, index) => {
       const container = this.add.container(index * this.BIOME_WIDTH, 0);
       this.biomeContainers.set(biome.id, container);
       this.backgroundLayer.add(container);
@@ -2893,14 +3052,46 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private createBiomeLandmarks(): void {
-    this.createVillageLandmarks(1); // Stage 1: The Village ✅
-    this.createForestLandmarks(2); // Stage 2: The Forest ✅
-    this.createArenaLandmarks(3); // Stage 3: The Arena
-    this.createArtisanLandmarks(4); // Stage 4: The Artisan's Quarter
-    this.createMineLandmarks(5); // Stage 5: The Mine
-    this.createHarbourLandmarks(6); // Stage 6: The Harbour
-    this.createCrossroadsLandmarks(7); // Stage 7: The Crossroads Town
-    this.createCapitalLandmarks(8); // Stage 8: The Capital
+    if (this.currentTemplateId === "venture") {
+      this.createVillageLandmarks(1); // Stage 1: The Village ✅
+      this.createForestLandmarks(2); // Stage 2: The Forest ✅
+      this.createArenaLandmarks(3); // Stage 3: The Arena
+      this.createArtisanLandmarks(4); // Stage 4: The Artisan's Quarter
+      this.createMineLandmarks(5); // Stage 5: The Mine
+      this.createHarbourLandmarks(6); // Stage 6: The Harbour
+      this.createCrossroadsLandmarks(7); // Stage 7: The Crossroads Town
+      this.createCapitalLandmarks(8); // Stage 8: The Capital
+      return;
+    }
+
+    this.activeBiomeConfigs.forEach((biome) => {
+      switch (biome.visualTheme) {
+        case "forest":
+          this.createForestLandmarks(biome.id);
+          break;
+        case "arena":
+          this.createArenaLandmarks(biome.id);
+          break;
+        case "artisan":
+          this.createArtisanLandmarks(biome.id);
+          break;
+        case "mine":
+          this.createMineLandmarks(biome.id);
+          break;
+        case "harbour":
+          this.createHarbourLandmarks(biome.id);
+          break;
+        case "crossroads":
+          this.createCrossroadsLandmarks(biome.id);
+          break;
+        case "capital":
+          this.createCapitalLandmarks(biome.id);
+          break;
+        default:
+          this.createVillageLandmarks(biome.id);
+          break;
+      }
+    });
   }
 
   private getStageNodes(stageId: number): CheckpointNode[] {
@@ -3665,14 +3856,14 @@ export class WorldMapScene extends Phaser.Scene {
     }
 
     // Biome-specific particle systems
-    BIOME_CONFIGS.forEach((biome, index) => {
+    this.activeBiomeConfigs.forEach((biome, index) => {
       const biomeX = index * this.BIOME_WIDTH;
 
       let particleConfig: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig | null =
         null;
 
-      switch (biome.id) {
-        case 2: // Forest - Falling leaves
+      switch (biome.visualTheme) {
+        case "forest":
           particleConfig = {
             x: { min: biomeX, max: biomeX + this.BIOME_WIDTH },
             y: -50,
@@ -3682,11 +3873,11 @@ export class WorldMapScene extends Phaser.Scene {
             alpha: { start: 0.6, end: 0 },
             lifespan: 12000,
             frequency: 150,
-            tint: [0x4ade80, 0x14532d, 0x22c55e],
+            tint: [biome.colors.accent2, biome.colors.accent1, 0xffffff],
             rotate: { min: 0, max: 360 },
           };
           break;
-        case 3: // Arena - ember sparks and chalk dust from validation trials
+        case "arena":
           particleConfig = {
             x: { min: biomeX + 160, max: biomeX + this.BIOME_WIDTH - 120 },
             y: { min: 420, max: 980 },
@@ -3696,11 +3887,11 @@ export class WorldMapScene extends Phaser.Scene {
             alpha: { start: 0.72, end: 0 },
             lifespan: 2600,
             frequency: 130,
-            tint: [0xf59e0b, 0xffd37a, 0xef4444],
+            tint: [biome.colors.accent1, biome.colors.accent2, 0xffd37a],
             blendMode: "ADD",
           };
           break;
-        case 4: // Artisan - blueprint glints and warm workshop motes
+        case "artisan":
           particleConfig = {
             x: { min: biomeX + 120, max: biomeX + this.BIOME_WIDTH - 120 },
             y: { min: 360, max: 930 },
@@ -3710,11 +3901,11 @@ export class WorldMapScene extends Phaser.Scene {
             alpha: { start: 0.42, end: 0 },
             lifespan: 4200,
             frequency: 170,
-            tint: [0x9ddcff, 0xffd166, 0xc4b5fd],
+            tint: [biome.colors.accent1, biome.colors.accent2, 0xffffff],
             blendMode: "ADD",
           };
           break;
-        case 5: // Mine - Floating sparks/embers with fog overlay
+        case "mine":
           particleConfig = {
             x: { min: biomeX, max: biomeX + this.BIOME_WIDTH },
             y: { min: 400, max: 1000 },
@@ -3724,11 +3915,11 @@ export class WorldMapScene extends Phaser.Scene {
             alpha: { start: 0.8, end: 0 },
             lifespan: 3000,
             frequency: 100,
-            tint: [0xf59e0b, 0xef4444, 0xfab005, 0xffd37a],
+            tint: [biome.colors.accent1, biome.colors.accent2, 0xffd37a],
             blendMode: "ADD",
           };
           break;
-        case 8: // Scaling - Glowing petals/magic
+        case "capital":
           particleConfig = {
             x: { min: biomeX, max: biomeX + this.BIOME_WIDTH },
             y: { min: 200, max: 800 },
@@ -3738,7 +3929,7 @@ export class WorldMapScene extends Phaser.Scene {
             alpha: { start: 0.4, end: 0 },
             lifespan: 5000,
             frequency: 120,
-            tint: [0xffffff, 0xfde68a, 0x6366f1],
+            tint: [0xffffff, biome.colors.accent1, biome.colors.accent2],
             blendMode: "ADD",
           };
           break;
@@ -3899,10 +4090,12 @@ export class WorldMapScene extends Phaser.Scene {
       this.backgroundLayer.add(g);
 
       // Parallax scroll effect (slow drift)
-      this.events.on("update", () => {
+      const mountainUpdate = () => {
         g.x -= speed;
         if (g.x < -200) g.x = 0; // Simple loop
-      });
+      };
+      this.events.on("update", mountainUpdate);
+      this.updateHandlers.push(mountainUpdate);
     }
 
     const cloudCount = 12;
@@ -3928,12 +4121,14 @@ export class WorldMapScene extends Phaser.Scene {
 
       // Drifting animation
       const speed = 0.05 + Math.random() * 0.1;
-      this.events.on("update", () => {
+      const cloudUpdate = () => {
         cloud.x += speed;
         if (cloud.x > this.MAP_WIDTH + 200) {
           cloud.x = -200;
         }
-      });
+      };
+      this.events.on("update", cloudUpdate);
+      this.updateHandlers.push(cloudUpdate);
 
       // Subtle float up/down
       this.tweens.add({
@@ -3957,7 +4152,7 @@ export class WorldMapScene extends Phaser.Scene {
     let globalIndex = 0;
 
     // Calculate positions for all checkpoints
-    VENTURE_STAGES.forEach((stage) => {
+    this.activeStages.forEach((stage) => {
       for (let cp = 0; cp < stage.checkpoints; cp++) {
         const pos = this.calculateSnakePosition(
           globalIndex,
@@ -3972,7 +4167,7 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Create checkpoint nodes
     globalIndex = 0;
-    VENTURE_STAGES.forEach((stage) => {
+    this.activeStages.forEach((stage) => {
       for (let cp = 0; cp < stage.checkpoints; cp++) {
         const pos = positions[globalIndex];
         const checkpointId = `${stage.id}-${cp + 1}`;
@@ -4002,17 +4197,19 @@ export class WorldMapScene extends Phaser.Scene {
   private drawSnakePathConnectors(positions: { x: number; y: number }[]): void {
     let offset = 0;
 
-    VENTURE_STAGES.forEach((stage) => {
+    this.activeStages.forEach((stage) => {
       const stagePositions = positions.slice(
         offset,
         offset + stage.checkpoints,
       );
-      const biome = BIOME_CONFIGS[stage.id - 1];
+      const biome = this.activeBiomeConfigs[stage.id - 1];
 
       // Strict per-stage path only: do NOT draw connectors to another stage.
-      // Stages 3 and 4 use custom premium plaza layouts, so skip the generic
-      // wooden connector there to keep those maps clean and readable.
-      if (![3, 4].includes(stage.id) && stagePositions.length > 1 && biome) {
+      // Venture stages 3 and 4 use bespoke plaza layouts, so skip the generic
+      // wooden connector there. Other templates should still get connectors.
+      const shouldSkipGenericConnector =
+        this.currentTemplateId === "venture" && [3, 4].includes(stage.id);
+      if (!shouldSkipGenericConnector && stagePositions.length > 1 && biome) {
         this.drawStagePathConnector(stagePositions, biome.colors.path, 0.9);
       }
 
@@ -4021,7 +4218,7 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private createStageFogOverlays(): void {
-    for (const biome of BIOME_CONFIGS) {
+    for (const biome of this.activeBiomeConfigs) {
       if (biome.id === 1) continue;
 
       const x = (biome.id - 1) * this.BIOME_WIDTH;
@@ -4049,7 +4246,7 @@ export class WorldMapScene extends Phaser.Scene {
     const maxVisibleStage = Phaser.Math.Clamp(
       activeStage,
       1,
-      BIOME_CONFIGS.length,
+      this.activeBiomeConfigs.length,
     );
 
     for (const node of this.checkpointNodes.values()) {
@@ -4095,7 +4292,7 @@ export class WorldMapScene extends Phaser.Scene {
     const stageX = (stage - 1) * this.BIOME_WIDTH;
     const centerX = stageX + this.BIOME_WIDTH / 2;
     const centerY = this.MAP_HEIGHT / 2;
-    const biome = BIOME_CONFIGS[stage - 1];
+    const biome = this.activeBiomeConfigs[stage - 1];
     const accent = biome?.colors.accent2 ?? 0xdff5ff;
 
     const sweep = this.add.rectangle(
@@ -4332,7 +4529,7 @@ export class WorldMapScene extends Phaser.Scene {
   ): { x: number; y: number } {
     let stageStartIndex = 0;
 
-    for (const stage of VENTURE_STAGES) {
+    for (const stage of this.activeStages) {
       const stageEndIndex = stageStartIndex + stage.checkpoints;
       if (index < stageEndIndex) {
         return this.calculateStageCheckpointPosition(
@@ -4367,7 +4564,7 @@ export class WorldMapScene extends Phaser.Scene {
     if (stageId === 1) {
       const anchor =
         stageOneVillageAnchors[
-        Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
+          Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
         ];
       return {
         x: biomeOffsetX + anchor.x * this.MAP_PANEL_SCALE,
@@ -4547,22 +4744,11 @@ export class WorldMapScene extends Phaser.Scene {
    * Creates 8 mini-bosses, one for each stage
    */
   private createMiniBosses(): void {
-    const miniBossNames = [
-      "Fog of Vagueness",
-      "Pathwarden Wraith",
-      "Advocate of Comfortable Lies",
-      "Unfinished Golem",
-      "Collapse Specter",
-      "Harbourmaster of Hesitation",
-      "Babel Merchant",
-      "Iron Bureaucrat",
-    ];
-
-    VENTURE_STAGES.forEach((stage, index) => {
+    this.activeStages.forEach((stage) => {
       // Place mini-boss at the end of each stage
       let globalIndex = 0;
       for (let s = 0; s < stage.id - 1; s++) {
-        globalIndex += VENTURE_STAGES[s].checkpoints;
+        globalIndex += this.activeStages[s].checkpoints;
       }
       globalIndex += stage.checkpoints - 1;
 
@@ -4575,7 +4761,7 @@ export class WorldMapScene extends Phaser.Scene {
 
       const miniBoss = new MiniBoss(this, {
         bossId: `mini_boss_${stage.id}`,
-        bossType: (miniBossNames[index] || "Fog of Vagueness") as MiniBossType,
+        bossType: (stage.monsterName || "Fog of Vagueness") as MiniBossType,
         stage: stage.id,
         x: pos.x + offsetX,
         y: pos.y + offsetY,
@@ -4741,10 +4927,24 @@ export class WorldMapScene extends Phaser.Scene {
     if (activeCheckpoint) {
       const previousStage = this.currentStage;
       this.currentStage = activeCheckpoint.stage;
-      this.updateStageVisibility(
-        this.currentStage,
-        previousStage !== this.currentStage,
-      );
+
+      // ── Phase 17: Biome integration ─────────────────────────────────────
+      const stageChanged = previousStage !== this.currentStage;
+      if (stageChanged) {
+        gameplayIntegration.updateBiomeState(
+          this,
+          this.currentTemplateId,
+          this.currentStage,
+          this.currentCorruptionLevel,
+        );
+        gameplayIntegration.applyBiomeParticles(
+          this,
+          this.currentTemplateId,
+          this.currentStage,
+        );
+      }
+
+      this.updateStageVisibility(this.currentStage, stageChanged);
 
       // Count completed stages (all stages before current)
       this.completedStages = this.currentStage - 1;
@@ -4783,6 +4983,9 @@ export class WorldMapScene extends Phaser.Scene {
       { completed: number; total: number }
     >();
 
+    let totalCompleted = 0;
+    let totalCheckpoints = 0;
+
     checkpoints.forEach((cp) => {
       const stage = cp.stage;
       if (!stageProgress.has(stage)) {
@@ -4791,12 +4994,20 @@ export class WorldMapScene extends Phaser.Scene {
 
       const progress = stageProgress.get(stage)!;
       progress.total++;
+      totalCheckpoints++;
 
       // Count as completed if status is 'completed' or 'gold'
       if (cp.status === "completed" || cp.status === "gold") {
         progress.completed++;
+        totalCompleted++;
       }
     });
+
+    const superBossObj = this.bosses.get("super_boss");
+    if (superBossObj) {
+      superBossObj.weaken(totalCompleted, totalCheckpoints);
+      superBossObj.updateCorruptionAura(this.currentCorruptionLevel);
+    }
 
     // Update all mini-bosses
     for (const [stage, miniBoss] of this.miniBosses.entries()) {
@@ -4859,6 +5070,41 @@ export class WorldMapScene extends Phaser.Scene {
         }
       }
     }
+
+    this.drawEnvironmentalCracks(this.currentCorruptionLevel);
+  }
+
+  private drawEnvironmentalCracks(level: number): void {
+    if (!this.environmentalCracksGraphics) return;
+    this.environmentalCracksGraphics.clear();
+
+    if (level < 20) return; // Only show cracks if corruption is at least 20%
+
+    // Draw branching cracks across the biomes
+    const numCracks = Math.floor(level / 10);
+    this.environmentalCracksGraphics.lineStyle(2 + (level / 100) * 3, 0x11081a, 0.45 + (level / 100) * 0.4);
+
+    for (let i = 0; i < numCracks; i++) {
+      // Seeded random positions across the map based on index i to keep them stable
+      const seedX = (Math.sin(i * 12345.67) * 0.5 + 0.5) * this.MAP_WIDTH;
+      const seedY = (Math.cos(i * 98765.43) * 0.5 + 0.5) * this.MAP_HEIGHT;
+
+      this.environmentalCracksGraphics.beginPath();
+      this.environmentalCracksGraphics.moveTo(seedX, seedY);
+
+      // Create a branching jagged crack path
+      let currX = seedX;
+      let currY = seedY;
+      const segments = 4 + Math.floor((level / 100) * 4);
+      for (let s = 0; s < segments; s++) {
+        const angle = Math.sin(i * 10 + s) * Math.PI * 2;
+        const length = 20 + Math.floor(Math.cos(i * 5 + s) * 15) + (level / 10);
+        currX += Math.cos(angle) * length;
+        currY += Math.sin(angle) * length;
+        this.environmentalCracksGraphics.lineTo(currX, currY);
+      }
+      this.environmentalCracksGraphics.strokePath();
+    }
   }
 
   /**
@@ -4866,6 +5112,7 @@ export class WorldMapScene extends Phaser.Scene {
    */
   private handleSetActiveVenture(event: {
     ventureId: string;
+    templateId?: TemplateId;
     personaGender: "male" | "female";
     assignedBosses?: string[];
     currentStage?: number;
@@ -4880,8 +5127,26 @@ export class WorldMapScene extends Phaser.Scene {
   }): void {
     try {
       const ventureChanged = this.currentVentureId !== event.ventureId;
+      const nextTemplateId = event.templateId ?? "venture";
+      const templateChanged = this.currentTemplateId !== nextTemplateId;
       this.currentVentureId = event.ventureId;
+      const previousCorruption = this.currentCorruptionLevel;
       this.currentCorruptionLevel = event.corruptionLevel ?? 0;
+
+      if (templateChanged) {
+        this.configureTemplateWorld(nextTemplateId);
+        this.rebuildWorldForTemplate();
+      }
+
+      // ── Phase 17: Update corruption visuals ────────────────────────────────
+      if (Math.abs(previousCorruption - this.currentCorruptionLevel) > 5) {
+        gameplayIntegration.updateBiomeState(
+          this,
+          this.currentTemplateId,
+          this.currentStage,
+          this.currentCorruptionLevel,
+        );
+      }
 
       if (ventureChanged) {
         this.retreatedStages.clear();
@@ -4913,10 +5178,13 @@ export class WorldMapScene extends Phaser.Scene {
         this.currentStage = event.currentStage;
         this.updateStageVisibility(event.currentStage, !ventureChanged);
 
-        // Play ambience for the current stage
-        audioManager.playAmbienceForStage(event.currentStage);
+        // Play ambience for the current stage + template
+        audioManager.playAmbienceForTemplate(
+          this.currentTemplateId,
+          event.currentStage,
+        );
         console.log(
-          `[WorldMapScene] Playing ambience for stage ${event.currentStage}`,
+          `[WorldMapScene] Playing ambience for ${this.currentTemplateId} stage ${event.currentStage}`,
         );
       }
 
@@ -5060,7 +5328,8 @@ export class WorldMapScene extends Phaser.Scene {
               node.x,
               node.y - 120,
               node.stage,
-              BIOME_CONFIGS[node.stage - 1]?.colors.accent2 ?? 0xdff5ff,
+              this.activeBiomeConfigs[node.stage - 1]?.colors.accent2 ??
+                0xdff5ff,
             );
           }
           this.lastPersonaCheckpointId = nextCheckpointId;
@@ -5223,10 +5492,10 @@ export class WorldMapScene extends Phaser.Scene {
       visibleWorldWidth >= this.BIOME_WIDTH
         ? stageStartX + this.BIOME_WIDTH / 2
         : Phaser.Math.Clamp(
-          preferredX,
-          stageStartX + halfWidth,
-          stageEndX - halfWidth,
-        );
+            preferredX,
+            stageStartX + halfWidth,
+            stageEndX - halfWidth,
+          );
     const y = Phaser.Math.Clamp(
       preferredY,
       halfHeight,
@@ -5352,8 +5621,26 @@ export class WorldMapScene extends Phaser.Scene {
    * Update loop - handles parallax scrolling
    */
   update(): void {
-    // Intentionally left blank: all map layers stay in world space so the HUD
-    // overlay, checkpoint interactions, and the tiled backdrop remain aligned.
+    this.emitTutorialPulsePosition();
+  }
+
+  /**
+   * Emit the current screen position of Stage 1, Checkpoint 1 to React
+   */
+  private emitTutorialPulsePosition(): void {
+    const firstNode = this.checkpointNodes.get("1-1");
+    if (!firstNode) return;
+
+    const camera = this.cameras.main;
+    const screenX = (firstNode.x - camera.worldView.x) * camera.zoom;
+    const screenY = (firstNode.y - camera.worldView.y) * camera.zoom;
+
+    eventBridge.dispatchToReact({
+      type: "TUTORIAL_PULSE_POSITION",
+      x: screenX,
+      y: screenY,
+      visible: this.currentStage === 1 && firstNode.status === "active",
+    });
   }
 
   /**
@@ -5410,6 +5697,10 @@ export class WorldMapScene extends Phaser.Scene {
       this.resizeHandler = undefined;
     }
 
+    this.updateHandlers.forEach((handler) =>
+      this.events.off("update", handler),
+    );
+    this.updateHandlers = [];
     this.boundHandlers = {};
   }
 
@@ -5510,7 +5801,7 @@ export class WorldMapScene extends Phaser.Scene {
     const positions: { x: number; y: number }[] = [];
     let globalIndex = 0;
 
-    VENTURE_STAGES.forEach((stage) => {
+    this.activeStages.forEach((stage) => {
       for (let cp = 0; cp < stage.checkpoints; cp++) {
         const pos = this.calculateSnakePosition(
           globalIndex,
@@ -5528,7 +5819,7 @@ export class WorldMapScene extends Phaser.Scene {
    * Transform biome with gold completion effects - color floods, particles, elevation
    */
   private transformBiomeGold(stage: number): void {
-    const stageBiome = BIOME_CONFIGS[stage - 1];
+    const stageBiome = this.activeBiomeConfigs[stage - 1];
     if (!stageBiome) return;
 
     // Get stage bounds
@@ -5639,7 +5930,7 @@ export class WorldMapScene extends Phaser.Scene {
    * Restore biome visually after standard stage completion
    */
   private restoreBiome(stage: number): void {
-    const stageBiome = BIOME_CONFIGS[stage - 1];
+    const stageBiome = this.activeBiomeConfigs[stage - 1];
     if (!stageBiome) return;
 
     // Get stage bounds

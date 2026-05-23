@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { MousePointer2 } from "lucide-react";
+import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 
 interface FirstCheckpointPulseProps {
   onCheckpointClick: () => void;
@@ -10,6 +12,21 @@ interface FirstCheckpointPulseProps {
 export function FirstCheckpointPulse({
   onCheckpointClick,
 }: FirstCheckpointPulseProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handlePosition = (e: { x: number; y: number; visible: boolean }) => {
+      if (containerRef.current) {
+        containerRef.current.style.left = `${e.x}px`;
+        containerRef.current.style.top = `${e.y}px`;
+        containerRef.current.style.display = e.visible ? "block" : "none";
+      }
+    };
+
+    const unsub = eventBridge.onReact("TUTORIAL_PULSE_POSITION", handlePosition);
+    return unsub;
+  }, []);
+
   return (
     <>
       {/* CSS Keyframes */}
@@ -80,11 +97,13 @@ export function FirstCheckpointPulse({
 
       {/* Positioned overlay for Checkpoint 1 */}
       <div
+        ref={containerRef}
         className="fixed z-40 pointer-events-none"
         style={{
           left: "50%",
           top: "50%",
           transform: "translate(-50%, -50%)",
+          display: "none",
         }}
       >
         {/* Pulsing Rings */}

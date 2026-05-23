@@ -20,6 +20,12 @@ import {
   CHECKPOINT_DEFINITIONS,
   LEVEL_DEFINITIONS,
 } from "./ventureConstants";
+import {
+  getCheckpointDef,
+  getCheckpointDefinitions,
+  getStageDefinitions,
+  type TemplateId,
+} from "./templateEngine";
 import { Id } from "./_generated/dataModel";
 import { recalculateAndAwardBadgesHelper } from "./badges";
 
@@ -81,11 +87,13 @@ function computeBrightness(
     t3Completed: boolean;
   }>,
   currentStage: number,
+  templateId: TemplateId,
 ): BrightnessResult {
+  const stages = getStageDefinitions(templateId);
   // ── 1. Count fully-completed prior stages ──────────────────────────────────
   let completedStages = 0;
 
-  for (const stageDef of VENTURE_STAGES) {
+  for (const stageDef of stages) {
     if (stageDef.id >= currentStage) break; // only look at stages before current
 
     const stageCheckpoints = checkpoints.filter(
@@ -105,7 +113,7 @@ function computeBrightness(
   }
 
   // ── 2. Count tasks done/total in the current stage ────────────────────────
-  const currentStageDef = VENTURE_STAGES.find((s) => s.id === currentStage);
+  const currentStageDef = stages.find((s) => s.id === currentStage);
   const totalTasksInCurrentStage = (currentStageDef?.checkpoints ?? 0) * 3; // 3 tasks per checkpoint
 
   const currentStageCheckpoints = checkpoints.filter(
@@ -258,6 +266,7 @@ async function awardPointsAndSyncLevel(
 type WorldMapVentureDoc = {
   _id: Id<"ventures">;
   userId: Id<"users">;
+  templateId?: TemplateId;
   currentStage: number;
   currentCheckpoint: number;
   ideaId: Id<"ideas">;
@@ -344,7 +353,7 @@ async function adjustVentureCorruption(
     corruptionLevel: nextLevel,
     lastActivityAt: options?.touchActivity
       ? now
-      : venture.lastActivityAt ?? venture.updatedAt ?? now,
+      : (venture.lastActivityAt ?? venture.updatedAt ?? now),
     updatedAt: now,
   });
   await syncBossCorruptionMirror(ctx, venture._id, nextLevel);
@@ -379,7 +388,8 @@ async function applyCheckpointCorruptionDelta(
     !!previousCheckpoint.goldBonusEarned ||
     getCompletedTaskCount(previousCheckpoint) === 3;
   const nextGold =
-    !!nextCheckpoint.goldBonusEarned || getCompletedTaskCount(nextCheckpoint) === 3;
+    !!nextCheckpoint.goldBonusEarned ||
+    getCompletedTaskCount(nextCheckpoint) === 3;
 
   let reduction = 0;
   if (!previousCompleted && nextGold) {
@@ -499,8 +509,9 @@ function buildStageStates(
     status: string;
     goldBonusEarned?: boolean;
   }>,
+  templateId: TemplateId,
 ) {
-  return VENTURE_STAGES.map((stage) => {
+  return getStageDefinitions(templateId).map((stage) => {
     const stageOutcome = getStageOutcome(stage.id, checkpoints);
     return {
       stage: stage.id,
@@ -519,6 +530,8 @@ async function tryAdvanceWorldMapStage(
   currentStage: number,
   now: number,
 ) {
+  const templateId = venture.templateId ?? "venture";
+  const stages = getStageDefinitions(templateId);
   const stageCheckpoints = await ctx.db
     .query("ventureCheckpoints")
     .withIndex("by_venture_stage", (q) =>
@@ -539,8 +552,7 @@ async function tryAdvanceWorldMapStage(
   });
 
   const idea = await ctx.db.get(venture.ideaId);
-  const stageName =
-    VENTURE_STAGES[currentStage - 1]?.name || `Stage ${currentStage}`;
+  const stageName = stages[currentStage - 1]?.name || `Stage ${currentStage}`;
   const ventureName = idea?.title || "Your Venture";
 
   await ctx.db.insert("notifications", {
@@ -553,7 +565,7 @@ async function tryAdvanceWorldMapStage(
     createdAt: now,
   });
 
-  if (currentStage < 8) {
+  if (currentStage < stages.length) {
     const nextStage = currentStage + 1;
     const firstCheckpointOfNextStage = await ctx.db
       .query("ventureCheckpoints")
@@ -579,7 +591,7 @@ async function tryAdvanceWorldMapStage(
     .query("ventureCheckpoints")
     .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
     .collect();
-  const stageStates = buildStageStates(allCheckpoints);
+  const stageStates = buildStageStates(allCheckpoints, templateId);
   const projectOutcome = getProjectOutcome(stageStates, "completed");
 
   await ctx.db.patch(venture._id, {
@@ -634,15 +646,10 @@ async function syncCheckpointCompletion(
   checkpoint: WorldMapCheckpointDoc,
   now: number,
 ) {
+  // Sync the checkpoint's completion status (e.g. marking it as completed if 2 tasks are done)
+  // But do NOT prematurely advance the venture's currentCheckpoint pointer here.
+  // The venture pointer is advanced explicitly when the user clicks "Advance" in the map UI.
   await syncCheckpointProgressState(ctx, checkpoint, now);
-  const refreshedCheckpoint = await ctx.db.get(checkpoint._id);
-  if (!refreshedCheckpoint) return;
-  await advanceWorldMapPointerAfterCheckpoint(
-    ctx,
-    venture,
-    refreshedCheckpoint as WorldMapCheckpointDoc,
-    now,
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -706,8 +713,10 @@ export const getWorldMapData = query({
     // Attach task rows to each checkpoint, enriched with real prompt text
     // from CHECKPOINT_DEFINITIONS so the map panel shows the actual task prompt.
     const checkpointsWithTasks = checkpoints.map((cp) => {
-      const cpDef = CHECKPOINT_DEFINITIONS.find(
-        (d) => d.stage === cp.stage && d.checkpoint === cp.checkpoint,
+      const cpDef = getCheckpointDef(
+        (venture.templateId ?? "venture") as TemplateId,
+        cp.stage,
+        cp.checkpoint,
       );
 
       const tasks = (tasksByCheckpoint.get(cp._id as string) ?? [])
@@ -732,10 +741,18 @@ export const getWorldMapData = query({
     });
 
     // ── Brightness ────────────────────────────────────────────────────────────
-    const brightness = computeBrightness(checkpoints, venture.currentStage);
+    const templateId = (venture.templateId ?? "venture") as TemplateId;
+    const brightness = computeBrightness(
+      checkpoints,
+      venture.currentStage,
+      templateId,
+    );
     const superBoss = await buildSuperBossState(ctx, normalizedVenture);
-    const stageStates = buildStageStates(checkpoints);
-    const projectState = getProjectOutcome(stageStates, normalizedVenture.status);
+    const stageStates = buildStageStates(checkpoints, templateId);
+    const projectState = getProjectOutcome(
+      stageStates,
+      normalizedVenture.status,
+    );
 
     return {
       venture: normalizedVenture,
@@ -871,13 +888,14 @@ export const markTaskComplete = mutation({
 
       // Create social feed notification for gold checkpoint
       const idea = await ctx.db.get(venture.ideaId);
+      const templateId = (venture.templateId ?? "venture") as TemplateId;
       const stageName =
-        VENTURE_STAGES[checkpoint.stage - 1]?.name ||
+        getStageDefinitions(templateId)[checkpoint.stage - 1]?.name ||
         `Stage ${checkpoint.stage}`;
-      const checkpointDef = CHECKPOINT_DEFINITIONS.find(
-        (cp) =>
-          cp.stage === checkpoint.stage &&
-          cp.checkpoint === checkpoint.checkpoint,
+      const checkpointDef = getCheckpointDef(
+        templateId,
+        checkpoint.stage,
+        checkpoint.checkpoint,
       );
       const checkpointName =
         checkpointDef?.name || `Checkpoint ${checkpoint.checkpoint}`;
@@ -930,9 +948,10 @@ export const markTaskComplete = mutation({
     }
 
     // ── Trigger AI quality scoring (async, non-blocking) ──────────────────────
-    const checkpointDef = CHECKPOINT_DEFINITIONS.find(
-      (d) =>
-        d.stage === checkpoint.stage && d.checkpoint === checkpoint.checkpoint,
+    const checkpointDef = getCheckpointDef(
+      (venture.templateId ?? "venture") as TemplateId,
+      checkpoint.stage,
+      checkpoint.checkpoint,
     );
     await ctx.scheduler.runAfter(0, api.aiScoring.evaluateTaskSubmission, {
       taskId: task._id,
@@ -1457,13 +1476,14 @@ export const submitTaskContent = mutation({
 
       // Create notification
       const idea = await ctx.db.get(venture.ideaId);
+      const templateId = (venture.templateId ?? "venture") as TemplateId;
       const stageName =
-        VENTURE_STAGES[checkpoint.stage - 1]?.name ||
+        getStageDefinitions(templateId)[checkpoint.stage - 1]?.name ||
         `Stage ${checkpoint.stage}`;
-      const checkpointDef = CHECKPOINT_DEFINITIONS.find(
-        (cp) =>
-          cp.stage === checkpoint.stage &&
-          cp.checkpoint === checkpoint.checkpoint,
+      const checkpointDef = getCheckpointDef(
+        templateId,
+        checkpoint.stage,
+        checkpoint.checkpoint,
       );
       const checkpointName =
         checkpointDef?.name || `Checkpoint ${checkpoint.checkpoint}`;
@@ -1516,9 +1536,10 @@ export const submitTaskContent = mutation({
     }
 
     // ── Trigger AI quality scoring (async, non-blocking) ──────────────────────
-    const checkpointDefForScore = CHECKPOINT_DEFINITIONS.find(
-      (d) =>
-        d.stage === checkpoint.stage && d.checkpoint === checkpoint.checkpoint,
+    const checkpointDefForScore = getCheckpointDef(
+      (venture.templateId ?? "venture") as TemplateId,
+      checkpoint.stage,
+      checkpoint.checkpoint,
     );
     const contentForScore =
       typeof args.content === "string"

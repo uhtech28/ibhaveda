@@ -229,7 +229,7 @@ export class Persona extends Phaser.GameObjects.Container {
         x: point.x,
         y: point.y,
         duration: segmentDuration,
-        ease: "Linear", // Linear ease for smooth path segments
+        ease: "Quad.easeOut", // Quad easeOut for smooth path segments
         onComplete: () => {
           index += 1;
           walkNextSegment();

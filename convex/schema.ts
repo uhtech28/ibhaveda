@@ -383,12 +383,21 @@ export default defineSchema({
   // VENTURE PROGRESSION SYSTEM
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Ventures — wraps an existing idea with 8-stage progression tracking
+  // Ventures — wraps an existing idea with stage-progression tracking
+  // Supports all four templates: venture | academic | lab | creative
   ventures: defineTable({
     ideaId: v.id("ideas"),
     userId: v.id("users"),
+    // Template driving this venture's stages, monsters, and metric
+    // Defaults to "venture" for all legacy rows
+    templateId: v.optional(v.union(
+      v.literal("venture"),
+      v.literal("academic"),
+      v.literal("lab"),
+      v.literal("creative"),
+    )),
     personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))),
-    currentStage: v.number(), // 1-8
+    currentStage: v.number(), // 1-N (varies by template: Venture=8, Academic=6, Lab=7, Creative=6)
     currentCheckpoint: v.number(), // 1-N within current stage
     corruptionLevel: v.optional(v.number()), // Backward-compatible for legacy venture rows
     lastActivityAt: v.optional(v.number()), // Backward-compatible for legacy venture rows
@@ -648,14 +657,20 @@ export default defineSchema({
    */
   qualityScores: defineTable({
     ventureId: v.id("ventures"),
-    stageNumber: v.number(), // 1–8
+    stageNumber: v.number(), // 1–N
     completeness: v.number(), // 0–3
     specificity: v.number(), // 0–3
     evidence: v.number(), // 0–3
     originality: v.number(), // 0–3
     totalScore: v.number(), // 0–12
     qualityTier: v.string(), // "low" | "standard" | "high"
-    valuationScore: v.number(), // mapped to user-visible ₹ valuation
+    valuationScore: v.number(), // template metric value (₹ for venture, JIF for academic, p for lab, fans for creative)
+    // Template-aware fields (optional for backward compatibility)
+    templateId: v.optional(v.string()), // "venture" | "academic" | "lab" | "creative"
+    metricDirection: v.optional(v.union(
+      v.literal("higher_is_better"),
+      v.literal("lower_is_better"),
+    )),
     evaluatedAt: v.number(), // timestamp
   })
     .index("by_venture", ["ventureId"])
@@ -676,6 +691,12 @@ export default defineSchema({
     totalScore: v.number(), // 0–12
     feedback: v.optional(v.string()), // AI-generated feedback text
     modelUsed: v.string(), // e.g. "gpt-4o" | "llama-3" | "mock"
+    // Template-aware fields (optional for backward compatibility)
+    templateId: v.optional(v.string()), // "venture" | "academic" | "lab" | "creative"
+    dimension1Label: v.optional(v.string()), // First scoring dimension label
+    dimension2Label: v.optional(v.string()), // Second scoring dimension label
+    dimension3Label: v.optional(v.string()), // Third scoring dimension label
+    dimension4Label: v.optional(v.string()), // Fourth scoring dimension label
     evaluatedAt: v.number(),
   })
     .index("by_task", ["taskId"])
@@ -701,4 +722,38 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_flag", ["flag"]),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // INTER-CHECKPOINT GAMEPLAY  (Phase 10)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Tracks inter-checkpoint event outcomes per venture/stage/checkpoint.
+   * Events: henchman encounter, treasure chest, corruption shield, insight fragment.
+   * All template-agnostic — the monster name is stored per-row.
+   */
+  interCheckpointStates: defineTable({
+    ventureId: v.id("ventures"),
+    stage: v.number(),
+    checkpoint: v.number(),
+    // Henchman encounter
+    henchmanOutcome: v.optional(v.union(
+      v.literal("victory"),
+      v.literal("retreat"),
+      v.literal("skipped"),
+    )),
+    henchmanName: v.optional(v.string()),
+    henchmanVictories: v.optional(v.number()),
+    // Treasure chest
+    treasuresFound: v.optional(v.number()),
+    // Corruption shields
+    shieldsEarned: v.optional(v.number()),
+    shieldsUsed: v.optional(v.number()),
+    // Insight fragments
+    insightFragments: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_venture", ["ventureId"])
+    .index("by_venture_stage_cp", ["ventureId", "stage", "checkpoint"]),
 });

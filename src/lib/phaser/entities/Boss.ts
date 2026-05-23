@@ -78,7 +78,11 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
   private status: BossStatus;
   private config: BossConfig;
   private silhouetteGraphics: Phaser.GameObjects.Graphics;
+  private cracksGraphics: Phaser.GameObjects.Graphics;
+  private auraGraphics: Phaser.GameObjects.Graphics;
   private namePlate: Phaser.GameObjects.Text;
+  private corruptionLevel: number = 0;
+  private currentWeakness: number = 0;
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
@@ -93,8 +97,15 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
     this.config = config;
     this.status = config.status;
 
+    // ── Aura graphics (behind the silhouette) ───────────────────────────────
+    this.auraGraphics = scene.add.graphics();
+
     // ── Silhouette graphics ─────────────────────────────────────────────────
     this.silhouetteGraphics = this.drawSilhouette(scene);
+
+    // ── Cracks/damage overlay ───────────────────────────────────────────────
+    this.cracksGraphics = scene.add.graphics();
+    this.cracksGraphics.setAlpha(0);
 
     // ── Nameplate ───────────────────────────────────────────────────────────
     const displayName = config.bossName ?? "???";
@@ -109,10 +120,21 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
     this.namePlate.setOrigin(0.5, 0);
 
     // ── Assemble container ──────────────────────────────────────────────────
-    this.add([this.silhouetteGraphics, this.namePlate]);
+    this.add([this.auraGraphics, this.silhouetteGraphics, this.cracksGraphics, this.namePlate]);
 
     // Register with scene
     scene.add.existing(this);
+
+    // Breathing/floating animation to feel alive
+    scene.tweens.add({
+      targets: this.silhouetteGraphics,
+      y: { from: 0, to: -8 },
+      scaleY: { from: 1.0, to: 1.03 },
+      duration: 1800 + Math.random() * 400,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
 
     // Apply initial alpha based on status
     this.updateStatus(this.status, false);
@@ -707,6 +729,130 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
       case "foreground": return 1.0;
       case "slain":
       case "retreated":  return 0;
+    }
+  }
+
+  /**
+   * Updates the menacing boss aura based on the current corruption level (0-100)
+   */
+  updateCorruptionAura(level: number): void {
+    this.corruptionLevel = level;
+    if (!this.auraGraphics || !this.scene) return;
+
+    this.auraGraphics.clear();
+    if (level <= 0) return;
+
+    const auraColor = level > 50 ? 0xdc2626 : 0x4f46e5;
+    const maxRadius = 60 + (level / 100) * 40;
+    const alpha = 0.15 + (level / 100) * 0.35;
+
+    // Draw a radial gradient-like aura using multiple semi-transparent shapes
+    this.auraGraphics.fillStyle(auraColor, alpha * 0.4);
+    this.auraGraphics.fillCircle(0, 0, maxRadius);
+    this.auraGraphics.fillStyle(auraColor, alpha * 0.7);
+    this.auraGraphics.fillCircle(0, 0, maxRadius * 0.6);
+    this.auraGraphics.fillStyle(0x000000, 0.2);
+    this.auraGraphics.fillCircle(0, 0, maxRadius * 0.3);
+
+    // Add a pulsing effect to the aura
+    this.scene.tweens.killTweensOf(this.auraGraphics);
+    this.scene.tweens.add({
+      targets: this.auraGraphics,
+      scaleX: 1.15,
+      scaleY: 1.15,
+      alpha: alpha * 0.5,
+      duration: 1000 + (100 - level) * 10,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  /**
+   * Progressively weaken the super boss based on progress / insight fragments.
+   * Renders glowing energy cracks on the dark silhouette.
+   */
+  weaken(completed: number, total: number): void {
+    if (total === 0 || !this.scene) return;
+    const weakness = completed / total;
+    this.currentWeakness = Phaser.Math.Clamp(weakness, 0, 1);
+
+    this.drawCracks(this.currentWeakness);
+    
+    this.scene.tweens.add({
+      targets: this.cracksGraphics,
+      alpha: this.currentWeakness,
+      duration: 600,
+      ease: "Sine.easeOut",
+    });
+
+    // When weakened, dim the corruption aura
+    if (this.auraGraphics) {
+      this.scene.tweens.add({
+        targets: this.auraGraphics,
+        scaleX: 1 - this.currentWeakness * 0.3,
+        scaleY: 1 - this.currentWeakness * 0.3,
+        alpha: (0.15 + (this.corruptionLevel / 100) * 0.35) * (1 - this.currentWeakness * 0.5),
+        duration: 800,
+        ease: "Sine.easeOut",
+      });
+    }
+  }
+
+  private drawCracks(weakness: number): void {
+    if (!this.cracksGraphics) return;
+    this.cracksGraphics.clear();
+    if (weakness <= 0) return;
+
+    const offsetX = -48;
+    const offsetY = -64;
+
+    // Glowing purple/cyan cracks for super boss
+    const crackColor = 0xc084fc; // Light purple
+    this.cracksGraphics.lineStyle(2, crackColor, 0.95);
+
+    // Main crack down the head/torso (starts at 20% weakness)
+    if (weakness >= 0.2) {
+      this.cracksGraphics.beginPath();
+      this.cracksGraphics.moveTo(offsetX + 48, offsetY + 15);
+      this.cracksGraphics.lineTo(offsetX + 48, offsetY + 40);
+      this.cracksGraphics.lineTo(offsetX + 40, offsetY + 60);
+      this.cracksGraphics.strokePath();
+    }
+
+    // Branching crack to left shoulder (starts at 40% weakness)
+    if (weakness >= 0.4) {
+      this.cracksGraphics.beginPath();
+      this.cracksGraphics.moveTo(offsetX + 48, offsetY + 30);
+      this.cracksGraphics.lineTo(offsetX + 30, offsetY + 25);
+      this.cracksGraphics.lineTo(offsetX + 15, offsetY + 10);
+      this.cracksGraphics.strokePath();
+    }
+
+    // Branching crack to right shoulder (starts at 60% weakness)
+    if (weakness >= 0.6) {
+      this.cracksGraphics.beginPath();
+      this.cracksGraphics.moveTo(offsetX + 48, offsetY + 35);
+      this.cracksGraphics.lineTo(offsetX + 65, offsetY + 30);
+      this.cracksGraphics.lineTo(offsetX + 80, offsetY + 10);
+      this.cracksGraphics.strokePath();
+    }
+
+    // Cracks spreading to the legs (starts at 80% weakness)
+    if (weakness >= 0.8) {
+      this.cracksGraphics.beginPath();
+      this.cracksGraphics.moveTo(offsetX + 40, offsetY + 60);
+      // Left leg
+      this.cracksGraphics.lineTo(offsetX + 30, offsetY + 80);
+      this.cracksGraphics.lineTo(offsetX + 25, offsetY + 105);
+      this.cracksGraphics.strokePath();
+
+      this.cracksGraphics.beginPath();
+      this.cracksGraphics.moveTo(offsetX + 40, offsetY + 60);
+      // Right leg
+      this.cracksGraphics.lineTo(offsetX + 55, offsetY + 80);
+      this.cracksGraphics.lineTo(offsetX + 65, offsetY + 105);
+      this.cracksGraphics.strokePath();
     }
   }
 }

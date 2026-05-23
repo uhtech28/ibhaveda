@@ -11,6 +11,7 @@ import { AudioControls } from "./AudioControls";
 import { QuestList } from "./QuestList";
 import { GoldCounter } from "./GoldCounter";
 import { CorruptionMeter } from "./CorruptionMeter";
+import { BossHPBar } from "./BossHPBar";
 
 import {
   hudVisibleAtom,
@@ -53,15 +54,34 @@ const HUDComponent = () => {
     [userProgress.level],
   );
 
+  const isHighCorruption = corruptionState.level >= 75;
+
+  const glitchAnimation = isHighCorruption
+    ? {
+        y: [0, 1.5, -1.5, 0, 3, -3, 0],
+        x: [0, -3, 3, 0, -1.5, 1.5, 0],
+        opacity: [1, 0.75, 1, 0.9, 1, 0.85, 1],
+      }
+    : { y: 0, opacity: 1 };
+
+  const glitchTransition = isHighCorruption
+    ? {
+        repeat: Infinity,
+        duration: 0.35,
+        ease: "easeInOut",
+        repeatDelay: Math.random() * 2.5 + 0.8,
+      }
+    : { type: "spring", stiffness: 300, damping: 30 };
+
   if (!hudVisible) return null;
 
   return (
     <>
       <motion.div
         initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
+        animate={glitchAnimation}
         exit={{ y: -100, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        transition={glitchTransition as any}
         className="fixed left-2 right-2 top-2 z-50 flex justify-center md:left-3 md:right-3 md:top-3"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
@@ -206,6 +226,9 @@ const HUDComponent = () => {
 
       {/* Quest List - floating top-right panel (manages own positioning) */}
       <QuestList />
+
+      {/* Boss HP Bar - shows when corruption > 60% */}
+      <BossHPBar />
     </>
   );
 };

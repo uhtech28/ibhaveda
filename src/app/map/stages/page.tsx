@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
+import { getTemplate, type TemplateId } from "@/config/templates";
 
 // ── Stage definitions ──────────────────────────────────────────────────────
 const STAGES = [
@@ -105,6 +106,61 @@ const STAGES = [
     borderColor: "rgba(192,132,252,0.25)",
   },
 ];
+
+function getStageCards(templateId: TemplateId) {
+  if (templateId === "venture") {
+    return STAGES;
+  }
+
+  const template = getTemplate(templateId);
+  const colors: Record<Exclude<TemplateId, "venture">, string[]> = {
+    academic: [
+      "#d4a853",
+      "#7c8c5e",
+      "#4a7c9a",
+      "#c87941",
+      "#8e44ad",
+      "#f0c040",
+    ],
+    lab: [
+      "#1a6b8a",
+      "#2d6a4f",
+      "#4361ee",
+      "#d62828",
+      "#7209b7",
+      "#f77f00",
+      "#06d6a0",
+    ],
+    creative: [
+      "#90e0a0",
+      "#e8b4d0",
+      "#ffd166",
+      "#ff6b6b",
+      "#a8dadc",
+      "#f4a261",
+    ],
+  };
+
+  return template.stages.map((stage, index) => {
+    const glowColor = colors[templateId][index] ?? "#818cf8";
+    const rgb =
+      glowColor.startsWith("#") && glowColor.length === 7
+        ? `${Number.parseInt(glowColor.slice(1, 3), 16)},${Number.parseInt(glowColor.slice(3, 5), 16)},${Number.parseInt(glowColor.slice(5, 7), 16)}`
+        : "99,102,241";
+
+    return {
+      id: stage.id,
+      name: stage.name,
+      subtitle: `Stage ${stage.id}`,
+      description: stage.subtitle,
+      icon: stage.icon,
+      checkpoints: stage.checkpoints,
+      glowColor,
+      bgColor: `rgba(${rgb},0.08)`,
+      borderColor: `rgba(${rgb},0.25)`,
+    };
+  });
+}
 
 // ── Progress bar ───────────────────────────────────────────────────────────
 function ProgressBar({
@@ -216,9 +272,7 @@ function StageCard({
       className="group relative w-full text-left rounded-3xl overflow-hidden transition-all duration-500 border"
       style={{
         background: stage.bgColor,
-        borderColor: isActive
-          ? stage.glowColor + "55"
-          : stage.borderColor,
+        borderColor: isActive ? stage.glowColor + "55" : stage.borderColor,
         boxShadow: isActive
           ? `0 0 32px ${stage.glowColor}22, 0 8px 32px rgba(0,0,0,0.3)`
           : "0 4px 24px rgba(0,0,0,0.2)",
@@ -251,7 +305,10 @@ function StageCard({
           {/* Icon */}
           <div
             className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl flex-shrink-0 relative transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
-            style={{ background: `${stage.glowColor}15`, border: `1px solid ${stage.glowColor}30` }}
+            style={{
+              background: `${stage.glowColor}15`,
+              border: `1px solid ${stage.glowColor}30`,
+            }}
           >
             <span className="relative z-10">{stage.icon}</span>
             <div
@@ -263,9 +320,7 @@ function StageCard({
           {/* Right side badges */}
           <div className="flex flex-col items-end gap-2">
             <StatusBadge status={status} color={stage.glowColor} />
-            <span
-              className="text-[10px] sm:text-xs font-black tracking-[0.25em] uppercase px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-white/50"
-            >
+            <span className="text-[10px] sm:text-xs font-black tracking-[0.25em] uppercase px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-white/50">
               {stage.checkpoints} Levels
             </span>
           </div>
@@ -311,7 +366,11 @@ function StageCard({
               className="text-lg"
               style={{ color: stage.glowColor }}
               animate={{ x: [0, 5, 0] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+              transition={{
+                duration: 1.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
             >
               →
             </motion.span>
@@ -327,8 +386,12 @@ export default function MapStagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
-  const [preferredVentureId, setPreferredVentureId] = useState<string | null>(null);
-  const ensureVentureStructure = useMutation(api.ventures.ensureVentureStructure);
+  const [preferredVentureId, setPreferredVentureId] = useState<string | null>(
+    null,
+  );
+  const ensureVentureStructure = useMutation(
+    api.ventures.ensureVentureStructure,
+  );
   const [ensuredVentureId, setEnsuredVentureId] = useState<string | null>(null);
 
   // ── Real-time Convex queries ─────────────────────────────────────────────
@@ -365,7 +428,10 @@ export default function MapStagesPage() {
 
     setEnsuredVentureId(activeVenture._id);
     ensureVentureStructure({ ventureId: activeVenture._id }).catch((error) => {
-      console.error("[MapStagesPage] Failed to ensure venture structure:", error);
+      console.error(
+        "[MapStagesPage] Failed to ensure venture structure:",
+        error,
+      );
       setEnsuredVentureId(null);
     });
   }, [activeVenture?._id, ensuredVentureId, ensureVentureStructure]);
@@ -373,6 +439,12 @@ export default function MapStagesPage() {
   // Derived values from live DB
   const currentStage = activeVenture?.currentStage ?? 1;
   const checkpoints = worldMapData?.checkpoints ?? [];
+  const templateId = (activeVenture?.templateId ?? "venture") as TemplateId;
+  const stageCards = getStageCards(templateId);
+  const totalCheckpoints = stageCards.reduce(
+    (sum, stage) => sum + stage.checkpoints,
+    0,
+  );
 
   // Count completed checkpoints per stage from DB
   const completedByStage = (stageId: number): number => {
@@ -389,9 +461,7 @@ export default function MapStagesPage() {
       localStorage.setItem("selectedStage", stageId.toString());
     }
     const ventureId = activeVenture?._id;
-    router.push(
-      ventureId ? `/map/world?ventureId=${ventureId}` : "/map/world",
-    );
+    router.push(ventureId ? `/map/world?ventureId=${ventureId}` : "/map/world");
   };
 
   const handleBack = () => {
@@ -469,7 +539,7 @@ export default function MapStagesPage() {
             className="text-[10px] tracking-[0.4em] uppercase font-black text-indigo-400/60 mb-4"
           >
             {activeVenture
-              ? worldMapData?.ideaTitle ?? "Your Venture"
+              ? (worldMapData?.ideaTitle ?? "Your Venture")
               : "Select your path"}
           </motion.div>
 
@@ -515,12 +585,14 @@ export default function MapStagesPage() {
                 </span>
                 <div className="w-[1px] h-3 bg-white/10" />
                 <span className="text-[10px] tracking-[0.15em] uppercase font-bold text-white/40">
-                  {checkpoints.filter(
-                    (c) =>
-                      c.status === "completed" ||
-                      (c.t1Completed && c.t2Completed && c.t3Completed),
-                  ).length}
-                  /8 done
+                  {
+                    checkpoints.filter(
+                      (c) =>
+                        c.status === "completed" ||
+                        (c.t1Completed && c.t2Completed && c.t3Completed),
+                    ).length
+                  }
+                  /{stageCards.length} done
                 </span>
               </motion.div>
             )}
@@ -534,7 +606,10 @@ export default function MapStagesPage() {
               <div
                 key={i}
                 className="h-72 rounded-3xl animate-pulse"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
               />
             ))}
           </div>
@@ -543,7 +618,7 @@ export default function MapStagesPage() {
         {/* Stage cards */}
         {!isLoading && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 w-full">
-            {STAGES.map((stage, index) => {
+            {stageCards.map((stage, index) => {
               const completed = completedByStage(stage.id);
               const isActive = stage.id === currentStage;
               return (
@@ -575,7 +650,8 @@ export default function MapStagesPage() {
               onClick={() => router.push("/venture/create")}
               className="px-7 py-3 rounded-xl text-xs font-black tracking-[0.2em] uppercase transition-all hover:scale-105"
               style={{
-                background: "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(79,70,229,0.1))",
+                background:
+                  "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(79,70,229,0.1))",
                 border: "1px solid rgba(99,102,241,0.4)",
                 color: "#818cf8",
               }}
@@ -589,7 +665,7 @@ export default function MapStagesPage() {
         <div className="mt-auto pt-14 flex items-center justify-center gap-4 opacity-30">
           <div className="h-[1px] w-20 bg-gradient-to-r from-transparent to-indigo-500/50" />
           <span className="text-[9px] tracking-[0.3em] uppercase font-black text-white/40">
-            8 Stages · 36 Checkpoints
+            {stageCards.length} Stages · {totalCheckpoints} Checkpoints
           </span>
           <div className="h-[1px] w-20 bg-gradient-to-l from-transparent to-indigo-500/50" />
         </div>

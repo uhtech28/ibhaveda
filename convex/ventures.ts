@@ -14,6 +14,11 @@ import {
   POINT_VALUES,
   VENTURE_STAGES,
 } from "./ventureConstants";
+import {
+  getCheckpointDefinitions,
+  getStageDefinitions,
+} from "./templateEngine";
+import type { TemplateId } from "./templateEngine";
 import { Id } from "./_generated/dataModel";
 import { recalculateAndAwardBadgesHelper } from "./badges";
 
@@ -39,6 +44,14 @@ export const generateUploadUrl = mutation({
 export const createVenture = mutation({
   args: {
     ideaId: v.id("ideas"),
+    templateId: v.optional(
+      v.union(
+        v.literal("venture"),
+        v.literal("academic"),
+        v.literal("lab"),
+        v.literal("creative"),
+      ),
+    ),
     skills: v.optional(v.array(v.string())),
     industries: v.optional(v.array(v.string())),
   },
@@ -73,10 +86,15 @@ export const createVenture = mutation({
 
     const now = Date.now();
 
+    // Use template-specific checkpoint definitions
+    const templateId: TemplateId = args.templateId ?? "venture";
+    const checkpointDefs = getCheckpointDefinitions(templateId);
+
     // Create the venture
     const ventureId = await ctx.db.insert("ventures", {
       ideaId: args.ideaId,
       userId: user._id,
+      templateId,
       currentStage: 1,
       currentCheckpoint: 1,
       corruptionLevel: 0,
@@ -89,8 +107,8 @@ export const createVenture = mutation({
       updatedAt: now,
     });
 
-    // Initialize all checkpoints and tasks for all 8 stages
-    for (const cpDef of CHECKPOINT_DEFINITIONS) {
+    // Initialize all checkpoints and tasks for this template
+    for (const cpDef of checkpointDefs) {
       const checkpointId = await ctx.db.insert("ventureCheckpoints", {
         ventureId,
         stage: cpDef.stage,
@@ -108,7 +126,7 @@ export const createVenture = mutation({
       await ctx.db.insert("ventureTasks", {
         checkpointId,
         taskLevel: "t1",
-        toolType: cpDef.t1.tool,
+        toolType: cpDef.t1.tool as any,
         status: "not_started",
       });
 
@@ -116,7 +134,7 @@ export const createVenture = mutation({
       await ctx.db.insert("ventureTasks", {
         checkpointId,
         taskLevel: "t2",
-        toolType: cpDef.t2.tool,
+        toolType: cpDef.t2.tool as any,
         status: "not_started",
       });
 
@@ -124,12 +142,20 @@ export const createVenture = mutation({
       await ctx.db.insert("ventureTasks", {
         checkpointId,
         taskLevel: "t3",
-        toolType: cpDef.t3.tool,
+        toolType: cpDef.t3.tool as any,
         status: "not_started",
       });
     }
 
-    const bossIds = shuffle(BOSS_DEFINITIONS.map((b) => b.id)).slice(0, 1);
+    const bossAffinities: Record<string, number[]> = {
+      venture: [1, 2, 3, 4, 5, 6, 7, 8],
+      academic: [9, 2],
+      lab: [10],
+      creative: [11, 12, 2],
+    };
+    const affinities = bossAffinities[templateId] ?? [1, 2, 3, 4, 5, 6, 7, 8];
+    const availableBosses = BOSS_DEFINITIONS.filter((b) => affinities.includes(b.id));
+    const bossIds = shuffle(availableBosses.map((b) => b.id)).slice(0, 1);
     const assignedBossId = bossIds[0];
 
     if (assignedBossId === undefined) {
@@ -301,37 +327,11 @@ export const ensureVentureStructure = mutation({
       return a.checkpoint - b.checkpoint;
     });
 
-    // Find the first checkpoint that still needs work.
-    const nextCheckpoint =
-      orderedCheckpoints.find(
-        (checkpoint) => checkpoint.status !== "completed",
-      ) ?? null;
+    const allCheckpointsCompleted = orderedCheckpoints.every(
+      (checkpoint) => checkpoint.status === "completed"
+    );
 
-    if (nextCheckpoint) {
-      // ── ANTI-REGRESSION GUARD ─────────────────────────────────────────────
-      // Only advance the venture pointer — never move it backward.
-      // "backward" means nextCheckpoint is earlier than the current DB position.
-      const currentIsAhead =
-        nextCheckpoint.stage < venture.currentStage ||
-        (nextCheckpoint.stage === venture.currentStage &&
-          nextCheckpoint.checkpoint < venture.currentCheckpoint);
-
-      if (!currentIsAhead) {
-        // Safe to update — only moves forward or stays on the same CP.
-        if (
-          venture.currentStage !== nextCheckpoint.stage ||
-          venture.currentCheckpoint !== nextCheckpoint.checkpoint
-        ) {
-          await ctx.db.patch(venture._id, {
-            currentStage: nextCheckpoint.stage,
-            currentCheckpoint: nextCheckpoint.checkpoint,
-            updatedAt: now,
-          });
-        }
-      }
-      // If currentIsAhead: the DB pointer is already past this checkpoint.
-      // Leave the venture pointer where it is — do NOT regress it.
-    } else if (venture.status !== "completed") {
+    if (allCheckpointsCompleted && venture.status !== "completed") {
       await ctx.db.patch(venture._id, {
         status: "completed",
         updatedAt: now,
@@ -436,8 +436,15 @@ function validateContributionRequirement(
       content && typeof content === "object"
         ? (content as { questions?: unknown; responses?: unknown })
         : null;
-    if (!survey || !Array.isArray(survey.questions) || survey.questions.length === 0) {
-      return { valid: false, reason: "Survey must include at least one question." };
+    if (
+      !survey ||
+      !Array.isArray(survey.questions) ||
+      survey.questions.length === 0
+    ) {
+      return {
+        valid: false,
+        reason: "Survey must include at least one question.",
+      };
     }
     if (!Array.isArray(survey.responses) || survey.responses.length === 0) {
       return {
@@ -464,7 +471,10 @@ function validateContributionRequirement(
       return { valid: false, reason: "Poll must have at least two options." };
     }
     if (poll.published !== true) {
-      return { valid: false, reason: "Poll must be published before submission." };
+      return {
+        valid: false,
+        reason: "Poll must be published before submission.",
+      };
     }
     return { valid: true };
   }
@@ -646,13 +656,23 @@ export const submitEvidence = mutation({
 
       // Trigger feed post on regular checkpoint completion (2 tasks done)
       if (
-        [checkpointBeforeUpdate.t1Completed, checkpointBeforeUpdate.t2Completed, checkpointBeforeUpdate.t3Completed].filter(Boolean).length < 2 &&
-        [refreshedCheckpoint.t1Completed, refreshedCheckpoint.t2Completed, refreshedCheckpoint.t3Completed].filter(Boolean).length >= 2
+        [
+          checkpointBeforeUpdate.t1Completed,
+          checkpointBeforeUpdate.t2Completed,
+          checkpointBeforeUpdate.t3Completed,
+        ].filter(Boolean).length < 2 &&
+        [
+          refreshedCheckpoint.t1Completed,
+          refreshedCheckpoint.t2Completed,
+          refreshedCheckpoint.t3Completed,
+        ].filter(Boolean).length >= 2
       ) {
         const idea = await ctx.db.get(venture.ideaId);
-        const stageName = VENTURE_STAGES[checkpoint.stage - 1]?.name || `Stage ${checkpoint.stage}`;
+        const stageName =
+          VENTURE_STAGES[checkpoint.stage - 1]?.name ||
+          `Stage ${checkpoint.stage}`;
         const ventureName = idea?.title || "Your Venture";
-        
+
         await ctx.db.insert("notifications", {
           recipientId: user._id,
           senderId: user._id,
@@ -899,9 +919,16 @@ export const getVenture = query({
         definition: def,
       };
     });
-    const superBoss = await buildSuperBossState(ctx, normalizedVenture, bosses[0] ?? null);
+    const superBoss = await buildSuperBossState(
+      ctx,
+      normalizedVenture,
+      bosses[0] ?? null,
+    );
     const stageStates = buildStageStates(checkpoints);
-    const projectState = getProjectOutcome(stageStates, normalizedVenture.status);
+    const projectState = getProjectOutcome(
+      stageStates,
+      normalizedVenture.status,
+    );
 
     return {
       ...normalizedVenture,
@@ -952,9 +979,16 @@ export const getVentureSummary = query({
         definition: def,
       };
     });
-    const superBoss = await buildSuperBossState(ctx, normalizedVenture, bosses[0] ?? null);
+    const superBoss = await buildSuperBossState(
+      ctx,
+      normalizedVenture,
+      bosses[0] ?? null,
+    );
     const stageStates = buildStageStates(checkpoints);
-    const projectState = getProjectOutcome(stageStates, normalizedVenture.status);
+    const projectState = getProjectOutcome(
+      stageStates,
+      normalizedVenture.status,
+    );
 
     // Calculate summary stats
     const completedCheckpoints = checkpoints.filter(
@@ -1186,7 +1220,10 @@ export const getVentureProgress = query({
       lastActivityAt: venture.lastActivityAt ?? venture.updatedAt,
     };
     const superBoss = await buildSuperBossState(ctx, normalizedVenture);
-    const projectState = getProjectOutcome(stageProgress, normalizedVenture.status);
+    const projectState = getProjectOutcome(
+      stageProgress,
+      normalizedVenture.status,
+    );
 
     return {
       venture: normalizedVenture,
@@ -1285,7 +1322,8 @@ async function syncBossCorruptionMirror(
 
     if (status) {
       patch.status = status;
-      patch.defeatedAt = status === "slain" || status === "retreated" ? now : undefined;
+      patch.defeatedAt =
+        status === "slain" || status === "retreated" ? now : undefined;
     }
 
     await ctx.db.patch(boss._id, patch);
@@ -1312,7 +1350,7 @@ async function setVentureCorruptionLevel(
     corruptionLevel: nextLevel,
     lastActivityAt: options?.touchActivity
       ? now
-      : venture.lastActivityAt ?? venture.updatedAt ?? now,
+      : (venture.lastActivityAt ?? venture.updatedAt ?? now),
     updatedAt: now,
   });
 
@@ -1323,7 +1361,7 @@ async function setVentureCorruptionLevel(
     corruptionLevel: nextLevel,
     lastActivityAt: options?.touchActivity
       ? now
-      : venture.lastActivityAt ?? venture.updatedAt ?? now,
+      : (venture.lastActivityAt ?? venture.updatedAt ?? now),
     updatedAt: now,
   };
 }
@@ -1377,7 +1415,8 @@ async function applyCheckpointCorruptionDelta(
     !!previousCheckpoint.goldBonusEarned ||
     getCompletedTaskCount(previousCheckpoint) === 3;
   const nextGold =
-    !!nextCheckpoint.goldBonusEarned || getCompletedTaskCount(nextCheckpoint) === 3;
+    !!nextCheckpoint.goldBonusEarned ||
+    getCompletedTaskCount(nextCheckpoint) === 3;
 
   let reduction = 0;
 
@@ -1484,10 +1523,13 @@ async function buildSuperBossState(
 
   if (!bossRow) return null;
 
-  const definition = BOSS_DEFINITIONS.find((entry) => entry.id === bossRow.bossId);
+  const definition = BOSS_DEFINITIONS.find(
+    (entry) => entry.id === bossRow.bossId,
+  );
   const averageQualityScore = await getAverageQualityScore(ctx, venture._id);
   const hp = getBossHpFromQuality(averageQualityScore);
-  const corruptionLevel = venture.corruptionLevel ?? bossRow.corruptionLevel ?? 0;
+  const corruptionLevel =
+    venture.corruptionLevel ?? bossRow.corruptionLevel ?? 0;
 
   return {
     ...bossRow,
@@ -1532,15 +1574,18 @@ function buildSlainBosses(
   return bosses
     .filter((boss) => boss.status === "slain" || boss.status === "retreated")
     .map((boss) => {
-      const definition = BOSS_DEFINITIONS.find((entry) => entry.id === boss.bossId);
+      const definition = BOSS_DEFINITIONS.find(
+        (entry) => entry.id === boss.bossId,
+      );
       return {
         bossId: boss.bossId,
         name: definition?.name ?? `Boss ${boss.bossId}`,
         slayOutcome:
           boss.status === "slain"
-            ? definition?.slayOutcome ??
-              "The monument stands as proof of completion."
-            : definition?.retreatOutcome ?? "A cracked monument remains behind.",
+            ? (definition?.slayOutcome ??
+              "The monument stands as proof of completion.")
+            : (definition?.retreatOutcome ??
+              "A cracked monument remains behind."),
         status: boss.status,
       };
     });
@@ -1680,15 +1725,10 @@ async function syncCheckpointCompletionAfterSubmission(
   checkpoint: CheckpointProgressDoc,
   now: number,
 ) {
+  // Sync the checkpoint's completion status (e.g. marking it as completed if 2 tasks are done)
+  // But do NOT prematurely advance the venture's currentCheckpoint pointer here.
+  // The venture pointer is advanced explicitly when the user clicks "Advance" in the map UI.
   await syncCheckpointProgressState(ctx, checkpoint, now);
-  const refreshedCheckpoint = await ctx.db.get(checkpoint._id);
-  if (!refreshedCheckpoint) return;
-  await advanceVenturePointerAfterCheckpoint(
-    ctx,
-    venture,
-    refreshedCheckpoint as CheckpointProgressDoc,
-    now,
-  );
 }
 
 /**

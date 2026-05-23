@@ -102,6 +102,7 @@ export type ReactToPhaserEvent =
   | {
       type: "SET_ACTIVE_VENTURE";
       ventureId: string;
+      templateId?: "venture" | "academic" | "lab" | "creative";
       personaGender: "male" | "female";
       assignedBosses?: string[];
       currentStage?: number;
@@ -161,6 +162,13 @@ export type PhaserToReactEvent =
     }
   /** A Phaser scene has finished its `create()` lifecycle. */
   | { type: "SCENE_LOADED"; scene: string }
+  /** Position update for the tutorial first-checkpoint pulse overlay */
+  | {
+      type: "TUTORIAL_PULSE_POSITION";
+      x: number;
+      y: number;
+      visible: boolean;
+    }
   /** Periodic frame-rate report from the game loop (throttled to ~1 Hz). */
   | { type: "FPS_UPDATE"; fps: number }
   /** An unrecoverable error occurred inside the game; React may show a fallback UI. */

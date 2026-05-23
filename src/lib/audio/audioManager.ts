@@ -32,6 +32,7 @@ export interface VolumeSettings {
 }
 
 export type BiomeId =
+  // ── Venture template biomes (existing — unchanged)
   | "village"
   | "forest"
   | "arena"
@@ -39,7 +40,29 @@ export type BiomeId =
   | "mine"
   | "harbour"
   | "crossroads"
-  | "capital";
+  | "capital"
+  // ── Academic template biomes (Phase 16)
+  | "reading_room"       // Stage 1: Literature Review
+  | "archive_hall"       // Stage 2: Research Design
+  | "monastery_scriptorium"  // Stage 3: Data Collection
+  | "cartographers_den"  // Stage 4: Analysis
+  | "council_chamber"    // Stage 5: Writing & Synthesis
+  | "grand_archive"      // Stage 6: Publication
+  // ── Lab template biomes (Phase 16)
+  | "circuit_nexus"      // Stage 1: Hypothesis
+  | "clean_room"         // Stage 2: Protocol Design
+  | "field_station"      // Stage 3: Experimentation
+  | "data_vault"         // Stage 4: Analysis
+  | "review_chamber"     // Stage 5: Peer Review
+  | "publishing_reactor" // Stage 6: Publication
+  | "replication_engine" // Stage 7: Replication & Impact
+  // ── Creative template biomes (Phase 16)
+  | "sacred_grove"       // Stage 1: Concept
+  | "dreamscape"         // Stage 2: Creation
+  | "artisan_market"     // Stage 3: Craft & Iteration
+  | "gallery_entrance"   // Stage 4: Release
+  | "audience_sea"       // Stage 5: Engagement
+  | "festival_pinnacle"; // Stage 6: Legacy
 
 export type CheckpointSFXId =
   | "seal_break_standard"
@@ -88,17 +111,37 @@ const DEFAULT_VOLUME: VolumeSettings = {
  */
 const AUDIO_PATHS = {
   ambience: {
+    // ── Venture biomes (existing paths)
     village: ["/audio/ambience/village.mp3", "/audio/ambience/village.ogg"],
     forest: ["/audio/ambience/forest.mp3", "/audio/ambience/forest.ogg"],
     arena: ["/audio/ambience/arena.mp3", "/audio/ambience/arena.ogg"],
     artisan: ["/audio/ambience/artisan.mp3", "/audio/ambience/artisan.ogg"],
     mine: ["/audio/ambience/mine.mp3", "/audio/ambience/mine.ogg"],
     harbour: ["/audio/ambience/harbour.mp3", "/audio/ambience/harbour.ogg"],
-    crossroads: [
-      "/audio/ambience/crossroads.mp3",
-      "/audio/ambience/crossroads.ogg",
-    ],
+    crossroads: ["/audio/ambience/crossroads.mp3", "/audio/ambience/crossroads.ogg"],
     capital: ["/audio/ambience/capital.mp3", "/audio/ambience/capital.ogg"],
+    // ── Academic template biomes
+    reading_room: ["/audio/ambience/academic/reading_room.mp3", "/audio/ambience/forest.ogg"],
+    archive_hall: ["/audio/ambience/academic/archive_hall.mp3", "/audio/ambience/artisan.ogg"],
+    monastery_scriptorium: ["/audio/ambience/academic/monastery_scriptorium.mp3", "/audio/ambience/mine.ogg"],
+    cartographers_den: ["/audio/ambience/academic/cartographers_den.mp3", "/audio/ambience/harbour.ogg"],
+    council_chamber: ["/audio/ambience/academic/council_chamber.mp3", "/audio/ambience/crossroads.ogg"],
+    grand_archive: ["/audio/ambience/academic/grand_archive.mp3", "/audio/ambience/capital.ogg"],
+    // ── Lab template biomes
+    circuit_nexus: ["/audio/ambience/lab/circuit_nexus.mp3", "/audio/ambience/village.ogg"],
+    clean_room: ["/audio/ambience/lab/clean_room.mp3", "/audio/ambience/arena.ogg"],
+    field_station: ["/audio/ambience/lab/field_station.mp3", "/audio/ambience/forest.ogg"],
+    data_vault: ["/audio/ambience/lab/data_vault.mp3", "/audio/ambience/mine.ogg"],
+    review_chamber: ["/audio/ambience/lab/review_chamber.mp3", "/audio/ambience/harbour.ogg"],
+    publishing_reactor: ["/audio/ambience/lab/publishing_reactor.mp3", "/audio/ambience/crossroads.ogg"],
+    replication_engine: ["/audio/ambience/lab/replication_engine.mp3", "/audio/ambience/capital.ogg"],
+    // ── Creative template biomes
+    sacred_grove: ["/audio/ambience/creative/sacred_grove.mp3", "/audio/ambience/forest.ogg"],
+    dreamscape: ["/audio/ambience/creative/dreamscape.mp3", "/audio/ambience/artisan.ogg"],
+    artisan_market: ["/audio/ambience/creative/artisan_market.mp3", "/audio/ambience/harbour.ogg"],
+    gallery_entrance: ["/audio/ambience/creative/gallery_entrance.mp3", "/audio/ambience/capital.ogg"],
+    audience_sea: ["/audio/ambience/creative/audience_sea.mp3", "/audio/ambience/arena.ogg"],
+    festival_pinnacle: ["/audio/ambience/creative/festival_pinnacle.mp3", "/audio/ambience/crossroads.ogg"],
   } as Record<BiomeId, string[]>,
 
   sfx: {
@@ -150,29 +193,20 @@ const AUDIO_PATHS = {
       "/audio/sfx/ward_placement_gold.mp3",
       "/audio/sfx/ward_placement_gold.ogg",
     ],
-    level_up: ["/audio/sfx/level_up.mp3", "/audio/sfx/level_up.ogg"],
-    badge_common: [
-      "/audio/sfx/badge_common.mp3",
-      "/audio/sfx/badge_common.ogg",
-    ],
-    badge_uncommon: [
-      "/audio/sfx/badge_uncommon.mp3",
-      "/audio/sfx/badge_uncommon.ogg",
-    ],
-    badge_rare: ["/audio/sfx/badge_rare.mp3", "/audio/sfx/badge_rare.ogg"],
-    badge_epic: ["/audio/sfx/badge_epic.mp3", "/audio/sfx/badge_epic.ogg"],
-    badge_legendary: [
-      "/audio/sfx/badge_legendary.mp3",
-      "/audio/sfx/badge_legendary.ogg",
-    ],
+    level_up: ["/audio/sfx/level_up.mp3"],
+    badge_common: ["/audio/sfx/badge_common.mp3"],
+    badge_uncommon: ["/audio/sfx/badge_uncommon.mp3"],
+    badge_rare: ["/audio/sfx/badge_rare.mp3"],
+    badge_epic: ["/audio/sfx/badge_epic.mp3"],
+    badge_legendary: ["/audio/sfx/badge_legendary.mp3"],
     gold_gain: ["/audio/sfx/gold_gain.mp3"],
   } as Record<string, string[]>,
 
   ui: {
-    click: ["/audio/ui/click.mp3", "/audio/ui/click.ogg"],
-    confirm: ["/audio/ui/confirm.mp3", "/audio/ui/confirm.ogg"],
-    error: ["/audio/ui/error.mp3", "/audio/ui/error.ogg"],
-    hover: ["/audio/ui/hover.mp3", "/audio/ui/hover.ogg"],
+    click: ["/audio/ui/click.mp3"],
+    confirm: ["/audio/ui/confirm.mp3"],
+    error: ["/audio/ui/error.mp3"],
+    hover: ["/audio/ui/hover.mp3"],
   } as Record<UISound, string[]>,
 
   music: {
@@ -259,6 +293,14 @@ class AudioManager {
   private pendingBiome: BiomeId | null = null;
   private pendingMusicTrack: string | null = null;
   private pendingMusicVolumeScale = 1;
+
+  // Boss / heartbeat state
+  private lastStageNum = 1;
+  private lastTemplateId: "venture" | "academic" | "lab" | "creative" = "venture";
+  private playingBossTheme = false;
+  private lastCorruptionLevel = 0;
+  private heartbeatGain: GainNode | null = null;
+  private heartbeatInterval: any = null;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -487,14 +529,126 @@ class AudioManager {
     this.playSFX("gold_gain");
   }
 
-  /** Play stage music track (stage_1 … stage_8) */
+  /** Play stage music track (stage_1 … stage_N, template-specific tracks) */
   playStageMusic(stage: number): void {
+    this.lastStageNum = stage;
+    if (this.playingBossTheme) return; // Don't interrupt boss theme with stage theme
     this.playMiniBossStageTheme(stage);
   }
 
   /** Play the mini-boss stage theme track for the given venture stage. */
   playMiniBossStageTheme(stage: number): void {
     this.playMusic(`stage_${stage}`, 0.42);
+  }
+
+  /**
+   * Play the template-specific ambience for a given template + stage.
+   * Falls back to the Venture biome if the template audio file is missing.
+   * Use this instead of playAmbienceForStage() on non-Venture templates.
+   */
+  playAmbienceForTemplate(templateId: "venture" | "academic" | "lab" | "creative", stage: number): void {
+    this.lastTemplateId = templateId;
+    const templateBiomeMap: Record<string, Record<number, BiomeId>> = {
+      venture: { 1: "village", 2: "forest", 3: "arena", 4: "artisan", 5: "mine", 6: "harbour", 7: "crossroads", 8: "capital" },
+      academic: { 1: "reading_room", 2: "archive_hall", 3: "monastery_scriptorium", 4: "cartographers_den", 5: "council_chamber", 6: "grand_archive" },
+      lab: { 1: "circuit_nexus", 2: "clean_room", 3: "field_station", 4: "data_vault", 5: "review_chamber", 6: "publishing_reactor", 7: "replication_engine" },
+      creative: { 1: "sacred_grove", 2: "dreamscape", 3: "artisan_market", 4: "gallery_entrance", 5: "audience_sea", 6: "festival_pinnacle" },
+    };
+    const biome = templateBiomeMap[templateId]?.[stage] ?? "village";
+    this.playAmbience(biome);
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatInterval) return;
+
+    try {
+      const ctx = (Howler as any).ctx;
+      if (!ctx || ctx.state === "suspended") return;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.connect(ctx.destination);
+      this.heartbeatGain = gain;
+
+      // Pulse the volume periodically to simulate a heartbeat
+      this.heartbeatInterval = setInterval(() => {
+        if (this.volumes.muted || this.volumes.sfx === 0) return;
+
+        const now = ctx.currentTime;
+        const levelFactor = (this.lastCorruptionLevel - 60) / 40; // 0 to 1
+        const maxGain = 0.08 * levelFactor * this.volumes.sfx;
+
+        // First thud (Lub)
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(maxGain, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        // Second thud (Dub)
+        const delay = 0.22;
+        gain.gain.setValueAtTime(0, now + delay);
+        gain.gain.linearRampToValueAtTime(maxGain * 0.7, now + delay + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.18);
+
+        // Low frequency thud oscillator
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(55, now); // low bass frequency
+        osc.connect(gain);
+        osc.start(now);
+        osc.stop(now + 0.5);
+      }, 1000);
+    } catch (e) {
+      console.warn("[AudioManager] Heartbeat synth initialization failed:", e);
+    }
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    if (this.heartbeatGain) {
+      try {
+        this.heartbeatGain.disconnect();
+      } catch (e) {}
+      this.heartbeatGain = null;
+    }
+  }
+
+  /**
+   * Play a corruption-state-aware audio layer.
+   * At critical corruption, lowers ambience and adds a tension layer.
+   */
+  setCorruptionAudioState(corruptionLevel: number): void {
+    this.lastCorruptionLevel = corruptionLevel;
+    const musicVol = corruptionLevel >= 80 ? 0.25 : corruptionLevel >= 60 ? 0.5 : corruptionLevel >= 40 ? 0.75 : 1.0;
+    this.setMusicVolume(this.volumes.music * musicVol);
+
+    // Dynamic Boss Music activation based on corruption level
+    if (corruptionLevel >= 75) {
+      if (!this.playingBossTheme) {
+        this.playingBossTheme = true;
+        let bossTheme = "boss_unraveller";
+        if (this.lastTemplateId === "academic" || this.lastTemplateId === "creative") {
+          bossTheme = "boss_pale_architect";
+        } else if (this.lastTemplateId === "lab") {
+          bossTheme = "boss_gravemind";
+        }
+        this.playMusic(bossTheme, 0.55);
+      }
+    } else {
+      if (this.playingBossTheme) {
+        this.playingBossTheme = false;
+        this.playMiniBossStageTheme(this.lastStageNum);
+      }
+    }
+
+    // Play synthesized heartbeat sound layer if corruption is threatening/critical (>= 60%)
+    if (corruptionLevel >= 60) {
+      this.startHeartbeat();
+    } else {
+      this.stopHeartbeat();
+    }
   }
 
   // ── UI SFX ────────────────────────────────────────────────────────────────
