@@ -1544,8 +1544,13 @@ export const submitTaskContent = mutation({
     const contentForScore =
       typeof args.content === "string"
         ? args.content
-        : JSON.stringify(args.content ?? "");
-    if (contentForScore.trim().split(/\s+/).length >= 10) {
+        : JSON.stringify(args.content ?? "", null, 2);
+    
+    const isTextTool = task.toolType === "write" || task.toolType === "journal";
+    const wordCount = contentForScore.trim().split(/\s+/).filter(Boolean).length;
+    
+    // Always score structured tools, and text tools if they meet word count
+    if (!isTextTool || wordCount >= 10) {
       await ctx.scheduler.runAfter(0, api.aiScoring.evaluateTaskSubmission, {
         taskId: task._id,
         checkpointId: args.checkpointId,
@@ -1562,5 +1567,89 @@ export const submitTaskContent = mutation({
       goldEarned: allThreeDone && !checkpoint.goldBonusEarned,
       pointsAwarded: pts || 0,
     };
+  },
+});
+
+/**
+ * Backfill any tasks that are marked completed but do not have an AI evaluation.
+ * Schedules them for evaluation asynchronously.
+ */
+export const backfillPendingEvaluations = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) throw new Error("User not found");
+
+    const ventures = await ctx.db
+      .query("ventures")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    let scheduledCount = 0;
+
+    for (const venture of ventures) {
+      const checkpoints = await ctx.db
+        .query("ventureCheckpoints")
+        .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
+        .collect();
+
+      for (const checkpoint of checkpoints) {
+        const tasks = await ctx.db
+          .query("ventureTasks")
+          .withIndex("by_checkpoint", (q) => q.eq("checkpointId", checkpoint._id))
+          .collect();
+
+        const completedTasks = tasks.filter((t) => t.status === "completed");
+
+        for (const task of completedTasks) {
+          const existingEval = await ctx.db
+            .query("aiEvaluations")
+            .withIndex("by_task", (q) => q.eq("taskId", task._id))
+            .first();
+
+          if (!existingEval) {
+            let content = "";
+            if (task.evidenceId) {
+              const evidence = await ctx.db.get(task.evidenceId);
+              if (evidence) {
+                content =
+                  typeof evidence.content === "string"
+                    ? evidence.content
+                    : JSON.stringify(evidence.content ?? "", null, 2);
+              }
+            }
+
+            if (!content) {
+              content = `Self-report backfill: Task ${task.taskLevel.toUpperCase()} complete.`;
+            }
+
+            const checkpointDef = getCheckpointDef(
+              (venture.templateId ?? "venture") as TemplateId,
+              checkpoint.stage,
+              checkpoint.checkpoint,
+            );
+
+            await ctx.scheduler.runAfter(0, api.aiScoring.evaluateTaskSubmission, {
+              taskId: task._id,
+              checkpointId: checkpoint._id,
+              ventureId: venture._id,
+              stageNumber: checkpoint.stage,
+              content,
+              checkpointOutcome: checkpointDef?.outcome ?? "",
+              userTier: "free",
+            });
+            scheduledCount++;
+          }
+        }
+      }
+    }
+
+    return { success: true, scheduledCount };
   },
 });

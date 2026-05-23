@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getNormalizedRarity, getVentureBadgeEmoji, BadgeItem } from "./BadgeCard";
 import { cn } from "@/lib/utils";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
 interface BadgeDetailModalProps {
   badge: BadgeItem | null;
@@ -87,8 +88,8 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
                 borderColor: !isLocked ? `${accentColor}40` : undefined
               }}
             >
-              <span className={cn("text-5xl select-none filter drop-shadow-md", isLocked && "opacity-30")}>
-                {isLocked ? "❓" : emoji}
+              <span className={cn("text-5xl select-none filter drop-shadow-md flex items-center justify-center text-white", isLocked && "opacity-30")}>
+                {isLocked ? "❓" : <PremiumIcon name={emoji} className="w-12 h-12" strokeWidth={1.5} />}
               </span>
             </div>
             

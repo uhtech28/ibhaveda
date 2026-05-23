@@ -297,42 +297,42 @@ export function TaskSubmissionModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - Closable */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm cursor-pointer"
           />
 
-          {/* Modal - Full responsive */}
+          {/* Modal - Compact responsive */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-[101] overflow-y-auto sm:grid sm:place-items-center sm:p-6"
+            className="fixed inset-0 z-[101] overflow-y-auto sm:grid sm:place-items-center sm:p-4"
           >
-            <div className="bg-[#111827] border-0 sm:border-2 border-white/10 rounded-none sm:rounded-2xl shadow-2xl flex min-h-full flex-col sm:min-h-0 sm:w-[min(96vw,1120px)] sm:max-h-[calc(100vh-3rem)] sm:overflow-hidden">
-              {/* Header */}
-              <div className="p-4 sm:px-5 sm:py-4 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20 flex-shrink-0 safe-top">
-                <div className="flex items-start justify-between gap-4">
+            <div className="bg-[#111827] border-0 sm:border-2 border-white/10 rounded-none sm:rounded-xl shadow-2xl flex min-h-full flex-col sm:min-h-0 sm:w-[min(92vw,800px)] sm:max-h-[calc(100vh-2rem)] sm:overflow-hidden">
+              {/* Header - Compact */}
+              <div className="p-3 sm:px-4 sm:py-3 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/20 to-[#8B5CF6]/20 flex-shrink-0 safe-top">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-lg sm:text-xl font-bold text-white mb-1 truncate sm:whitespace-normal">
+                    <h2 className="text-base sm:text-lg font-bold text-white mb-1 truncate sm:whitespace-normal">
                       {task.title}
                     </h2>
-                    <p className="text-xs sm:text-sm text-gray-400 line-clamp-2">
+                    <p className="text-xs text-gray-400 line-clamp-1 sm:line-clamp-2 mb-2">
                       {task.description}
                     </p>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <span className="text-xs text-indigo-400 font-semibold uppercase tracking-wider">
-                        Tool: {task.toolType.replace(/_/g, " ")}
+                    <div className="flex items-center gap-3 flex-wrap text-xs">
+                      <span className="text-indigo-400 font-semibold uppercase tracking-wide">
+                        {task.toolType.replace(/_/g, " ")}
                       </span>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-gray-400">
                         {getMinRequirementLabel(task.toolType)}
                       </span>
-                      <span className="text-xs text-[#6366F1] font-bold">
-                        +{task.points} points
+                      <span className="text-[#6366F1] font-bold">
+                        +{task.points} pts
                       </span>
                     </div>
                   </div>
@@ -341,16 +341,16 @@ export function TaskSubmissionModal({
                       audioManager.playUI("click");
                       onClose();
                     }}
-                    className="p-2 sm:p-2 rounded-lg bg-black/20 hover:bg-black/40 active:bg-black/60 transition-colors flex-shrink-0 touch-manipulation"
+                    className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/40 active:bg-red-500/60 border border-red-500/30 transition-all flex-shrink-0 touch-manipulation group"
                     aria-label="Close modal"
                   >
-                    <X className="w-6 h-6 sm:w-5 sm:h-5 text-white" />
+                    <X className="w-5 h-5 text-red-400 group-hover:text-red-300" />
                   </button>
                 </div>
               </div>
 
-              {/* Content Area */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 min-h-0 safe-bottom">
+              {/* Content Area - Compact */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0 safe-bottom">
                 {!isOnline && (
                   <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
                     Offline mode detected. Your draft will stay on this device

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Lock, Check, ShieldAlert, Award, Star, Compass, Code, Flame, Users, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
 export type BadgeRarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | "hidden" | "bronze" | "silver" | "gold" | "diamond" | "mythic";
 
@@ -235,6 +236,37 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
   const norm = getNormalizedRarity(badge.rarity);
   const iconEmoji = badge.icon || getVentureBadgeEmoji(badge.id, badge.name);
 
+  const [rotateX, setRotateX] = React.useState(0);
+  const [rotateY, setRotateY] = React.useState(0);
+  const [glareX, setGlareX] = React.useState(50);
+  const [glareY, setGlareY] = React.useState(50);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLocked) return;
+    const card = e.currentTarget;
+    const box = card.getBoundingClientRect();
+    const x = e.clientX - box.left;
+    const y = e.clientY - box.top;
+    const halfWidth = box.width / 2;
+    const halfHeight = box.height / 2;
+    
+    // Smooth 3D tilt calculation
+    const rX = -(y - halfHeight) / 6;
+    const rY = (x - halfWidth) / 6;
+    
+    setRotateX(rX);
+    setRotateY(rY);
+    setGlareX((x / box.width) * 100);
+    setGlareY((y / box.height) * 100);
+  };
+
+  const handleMouseLeave = () => {
+    setRotateX(0);
+    setRotateY(0);
+    setGlareX(50);
+    setGlareY(50);
+  };
+
   // Background style based on rarity and state
   const bgStyle = isLocked
     ? "bg-slate-950/20 border-slate-900/60 opacity-30 grayscale cursor-not-allowed"
@@ -248,10 +280,21 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={{
+        opacity: 1,
+        rotateX,
+        rotateY,
+        scale: rotateX !== 0 ? 1.04 : 1,
+      }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.3 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
       onClick={isLocked ? undefined : onClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        transformStyle: "preserve-3d",
+        perspective: 1000,
+      }}
       className={cn(
         "group relative flex flex-col items-center justify-between text-center p-5 rounded-2xl border transition-all duration-300 h-full w-full overflow-hidden select-none",
         bgStyle,
@@ -259,6 +302,15 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
         className
       )}
     >
+      {/* 3D Reflection Glare Overlay */}
+      {!isLocked && (
+        <div
+          className="absolute inset-0 pointer-events-none z-20 mix-blend-color-dodge transition-opacity duration-300 opacity-0 group-hover:opacity-60"
+          style={{
+            background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255, 255, 255, 0.15) 0%, transparent 60%)`,
+          }}
+        />
+      )}
       {/* 1. Mythic / Founder Cosmic Space Particle Effect */}
       {!isLocked && isMythic && (
         <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
@@ -353,12 +405,12 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
         >
           <span
             className={cn(
-              "select-none filter drop-shadow-md",
+              "select-none filter drop-shadow-md flex items-center justify-center",
               !isLocked && "group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
             )}
             style={{ fontSize: "1.85rem" }}
           >
-            {isLocked ? "❓" : iconEmoji}
+            {isLocked ? "❓" : <PremiumIcon name={iconEmoji} className="w-8 h-8" strokeWidth={1.5} />}
           </span>
         </div>
       </div>

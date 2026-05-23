@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { getTemplate, type TemplateId } from "@/config/templates";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
 // ── Stage definitions ──────────────────────────────────────────────────────
 const STAGES = [
@@ -304,13 +305,13 @@ function StageCard({
         <div className="flex items-start justify-between gap-4">
           {/* Icon */}
           <div
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl flex-shrink-0 relative transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center flex-shrink-0 relative transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
             style={{
               background: `${stage.glowColor}15`,
               border: `1px solid ${stage.glowColor}30`,
             }}
           >
-            <span className="relative z-10">{stage.icon}</span>
+            <PremiumIcon name={stage.icon} className="w-10 h-10 relative z-10 text-white" strokeWidth={1.5} />
             <div
               className="absolute inset-0 rounded-2xl blur-lg opacity-30 group-hover:opacity-60 transition-opacity"
               style={{ background: stage.glowColor }}

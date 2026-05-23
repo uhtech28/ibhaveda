@@ -299,7 +299,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
           </div>
 
           {/* Badge Display Stage */}
-          <div className="relative w-72 h-72 flex items-center justify-center my-6">
+          <div className="relative w-72 h-72 flex items-center justify-center my-6" style={{ perspective: 1200 }}>
             {/* Ambient Radial Backlight Glow */}
             <motion.div
               animate={
@@ -336,29 +336,40 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
 
             {/* Same profile badge card used by the collection grid */}
             <motion.div
-              initial={{ scale: 0, rotate: -35 }}
+              initial={{ scale: 0, rotateY: 180, z: -200 }}
               animate={
                 activeStep === "silhouette"
                   ? {
-                      scale: [0.95, 0.98, 0.95],
-                      rotate: 0,
-                      y: 0,
+                      scale: 0.95,
+                      rotateY: 180,
+                      y: [0, -6, 0],
+                      z: 0,
                     }
                   : ["burst", "show"].includes(activeStep)
                     ? {
-                        scale: [0.2, 1.18, 0.9, 1.04, 0.98, 1],
-                        rotate: [0, -10, 5, -2, 0],
-                        y: [30, -22, 8, -4, 0],
+                        scale: [0.3, 1.05, 1],
+                        rotateY: [180, 0],
+                        rotateZ: [0, -5, 0],
+                        y: 0,
+                        z: 0,
                       }
-                    : { scale: 0, rotate: -35 }
+                    : { scale: 0, rotateY: 180 }
               }
               transition={
                 activeStep === "silhouette"
-                  ? { repeat: Infinity, duration: 2, ease: "easeInOut" }
-                  : { duration: 0.85, ease: "easeOut" }
+                  ? { 
+                      y: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                      scale: { duration: 0.4 }
+                    }
+                  : { 
+                      scale: { duration: 0.8, ease: "easeOut" },
+                      rotateY: { duration: 1.2, ease: [0.34, 1.56, 0.64, 1] }, // spring flip effect
+                      rotateZ: { duration: 1.0, ease: "easeOut" }
+                    }
               }
               className="relative z-10 h-64 w-52 sm:h-[17rem] sm:w-56"
               style={{
+                transformStyle: "preserve-3d",
                 filter: ["burst", "show"].includes(activeStep)
                   ? `drop-shadow(0 0 34px ${badgeColor}65)`
                   : undefined,

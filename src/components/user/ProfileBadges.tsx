@@ -14,6 +14,7 @@ import { BadgeCard, BadgeItem, getNormalizedRarity, getVentureBadgeEmoji } from 
 import { BadgeDetailModal } from "../badges/BadgeDetailModal";
 import { AchievementUnlockModal } from "../badges/AchievementUnlockModal";
 import { cn } from "@/lib/utils";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
 interface ProfileBadgesProps {
   userId: Id<"users">;
@@ -382,8 +383,8 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                     <div className="absolute top-0 bottom-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-yellow-400/10 to-transparent skew-x-12 animate-[shine_3s_infinite]" />
                   </div>
 
-                  <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center text-3xl shrink-0 z-10 group-hover:scale-105 transition-transform duration-200">
-                    {b.icon || getVentureBadgeEmoji(b.id, b.name)}
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center shrink-0 z-10 group-hover:scale-105 transition-transform duration-200 text-white">
+                    <PremiumIcon name={b.icon || getVentureBadgeEmoji(b.id, b.name)} className="w-7 h-7" strokeWidth={1.5} />
                   </div>
                   <div className="flex-1 min-w-0 z-10">
                     <h4 className="font-extrabold text-xs text-white truncate leading-tight group-hover:text-yellow-400 transition-colors">

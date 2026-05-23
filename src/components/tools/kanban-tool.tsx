@@ -345,15 +345,17 @@ export function KanbanTool({
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid grid-cols-3 gap-3">
-            {columns.map((column) => (
-              <DroppableColumn
-                key={column.id}
-                column={column}
-                cards={getCardsForColumn(column.id)}
-                onDelete={deleteCard}
-              />
-            ))}
+          <div className="w-full overflow-x-auto scrollbar-thin">
+            <div className="grid grid-cols-3 gap-3 min-w-[600px] pb-2">
+              {columns.map((column) => (
+                <DroppableColumn
+                  key={column.id}
+                  column={column}
+                  cards={getCardsForColumn(column.id)}
+                  onDelete={deleteCard}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Drag Overlay - Shows the card being dragged */}

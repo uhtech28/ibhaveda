@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ArrowLeft } from "lucide-react";
-import { BadgeShowcase } from "@/components/badges/badge-showcase";
+import { ProfileBadges } from "@/components/user/ProfileBadges";
 
 export default function ProfileBadgesPage() {
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
 
+  const currentUser = useQuery(api.users.getCurrentUser);
   const profile = useQuery(api.users.getUserProfile, { username });
 
   if (profile === undefined) {
@@ -56,6 +57,9 @@ export default function ProfileBadgesPage() {
     );
   }
 
+  const isCurrentUser = !!(currentUser && profile && currentUser._id === profile._id);
+  const profileData = { ...profile, skills: profile.skills || [], industries: profile.industries || [] };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <HeroHeader />
@@ -71,7 +75,7 @@ export default function ProfileBadgesPage() {
           </div>
         </div>
 
-        <BadgeShowcase userId={profile._id as string} />
+        <ProfileBadges userId={profile._id} isOwner={isCurrentUser} profile={profileData} />
       </main>
 
       <FooterSection />

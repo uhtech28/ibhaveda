@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { Sparkles, ArrowLeft, AlertCircle, Globe, Lock } from "lucide-react";
 import { displayFontClass, transitionBase } from "@/components/ideaforge/shared";
+import { audioManager } from "@/lib/audio/audioManager";
 
 type Step = "outline" | "generating" | "preview";
 type Visibility = "public" | "private";
@@ -297,7 +298,10 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
             <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3 bg-[#0D1117] shrink-0">
               <button
                 type="button"
-                onClick={handleSkipAI}
+                onClick={() => {
+                  audioManager.playTouch("click");
+                  handleSkipAI();
+                }}
                 className="text-xs font-medium text-[#C7D2FE] hover:text-white transition-colors"
               >
                 Skip AI, fill manually →
@@ -306,14 +310,20 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={close}
+                  onClick={() => {
+                    audioManager.playTouch("click");
+                    close();
+                  }}
                   className="h-9 rounded-[10px] border-white/5 bg-[#0D1117] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="button"
-                  onClick={handleGenerate}
+                  onClick={() => {
+                    audioManager.playTouch(outline.trim() ? "confirm" : "error");
+                    if (outline.trim()) handleGenerate();
+                  }}
                   disabled={!outline.trim()}
                   className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -428,7 +438,10 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setVisibility("public")}
+                    onClick={() => {
+                      audioManager.playTouch("click");
+                      setVisibility("public");
+                    }}
                     className={cn(
                       "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
                       visibility === "public"
@@ -449,7 +462,10 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
 
                   <button
                     type="button"
-                    onClick={() => setVisibility("private")}
+                    onClick={() => {
+                      audioManager.playTouch("click");
+                      setVisibility("private");
+                    }}
                     className={cn(
                       "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
                       visibility === "private"
@@ -497,7 +513,10 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
             <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3 bg-[#0D1117] shrink-0">
               <button
                 type="button"
-                onClick={() => setStep("outline")}
+                onClick={() => {
+                  audioManager.playTouch("click");
+                  setStep("outline");
+                }}
                 className="text-xs text-[#9CA3AF] hover:text-white transition-colors flex items-center gap-1.5"
                 disabled={isSubmitting}
               >
@@ -507,7 +526,10 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={close}
+                  onClick={() => {
+                    audioManager.playTouch("click");
+                    close();
+                  }}
                   disabled={isSubmitting}
                   className="h-9 rounded-[10px] border-white/5 bg-[#0A0E1A] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
                 >

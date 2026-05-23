@@ -6,15 +6,15 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Lightbulb, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle } from "lucide-react"
+import { Lightbulb, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle, Trophy } from "lucide-react"
 import { ProfileStatsDialog } from "./ProfileStatsDialog";
 import { ProfileProgress } from "./ProfileProgress";
-import { ProfileBadges } from "./ProfileBadges";
 import { Id } from "@convex/_generated/dataModel";
 import { ContributionRequest } from "@/components/requests/request-status-card"
 import { useChat } from "@/components/chat/ChatContext";
 import { InvitationButton } from "@/components/requests/invitation-button";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
@@ -147,7 +147,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                           className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
                           style={{ animationDuration: "3s" }}
                         >
-                          {(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)}
+                          <PremiumIcon name={(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)} className="w-3.5 h-3.5" strokeWidth={1.5} />
                         </span>
                       ))}
                     </h1>
@@ -314,15 +314,39 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
 
       </div>
 
-      {/* Badges & Achievements Section */}
-      <ProfileBadges userId={profile._id} isOwner={isOwner} profile={profile} />
+      {/* Buttons & Actions (Badges and Awards + Contribution Requests) */}
+      <div className="mt-6 pt-6 border-t lg:mt-10 lg:pt-8 flex flex-col md:flex-row gap-4">
+        {/* Badges and Awards button (Visible to everyone) */}
+        <Link
+          href={`/profile/${profile.username}/badges`}
+          className="block max-w-md w-full"
+          aria-label="Open badges and awards"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            className="h-14 w-full justify-between gap-3 rounded-xl px-4"
+          >
+            <span className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/10 text-yellow-500">
+                <Trophy className="h-4 w-4" />
+              </span>
+              <span className="flex flex-col items-start leading-tight">
+                <span className="text-sm font-semibold">Badges and awards</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {earnedBadges ? `${earnedBadges.length} earned — View Showcase` : "Loading badges..."}
+                </span>
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </Link>
 
-      {/* Contribution Requests (Only visible to owner) — single button to dedicated page */}
-      {isOwner && (
-        <div className="mt-6 pt-6 border-t lg:mt-10 lg:pt-8">
+        {/* Contribution Requests (Only visible to owner) — single button to dedicated page */}
+        {isOwner && (
           <Link
             href="/profile/contribution-requests"
-            className="block max-w-md"
+            className="block max-w-md w-full"
             aria-label="Open contribution requests"
           >
             <Button
@@ -346,8 +370,8 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Button>
           </Link>
-        </div>
-      )}
+        )}
+      </div>
 
       <ProfileStatsDialog
         userId={profile._id as Id<"users">}

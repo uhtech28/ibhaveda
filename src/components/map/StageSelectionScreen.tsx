@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
 interface StageSelectionScreenProps {
   onSelectStage: (stageId: number) => void;
@@ -142,7 +143,9 @@ export function StageSelectionScreen({ onSelectStage, onBack }: StageSelectionSc
                       className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl border border-white/10 shadow-lg relative transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
                       style={{ backgroundColor: `${stage.glowColor}10` }}
                     >
-                      <span className="relative z-10">{stage.icon}</span>
+                      <span className="relative z-10 flex items-center justify-center text-white">
+                        <PremiumIcon name={stage.icon} className="w-10 h-10" strokeWidth={1.5} />
+                      </span>
                       <div className="absolute inset-0 rounded-2xl opacity-40 blur-lg transition-opacity duration-500 group-hover:opacity-80" style={{ backgroundColor: stage.glowColor }} />
                     </div>
                     <span className="text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase px-4 py-2 rounded-full border border-white/10 bg-white/5 text-white/50 group-hover:text-white/80 group-hover:border-white/20 transition-all">

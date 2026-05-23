@@ -6,3 +6,5 @@ export { CheckpointProgress } from "./CheckpointProgress";
 export { StreakCounter } from "./StreakCounter";
 export { QualityScore } from "./QualityScore";
 export { AudioControls } from "./AudioControls";
+export { QuestList } from "./QuestList";
+export { BossHPBar } from "./BossHPBar";

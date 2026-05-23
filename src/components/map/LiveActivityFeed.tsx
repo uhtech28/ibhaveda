@@ -14,6 +14,7 @@ import { api } from "@convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Activity } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { audioManager } from "@/lib/audio/audioManager";
 
 interface ActivityEvent {
   id: string;
@@ -85,10 +86,12 @@ export function LiveActivityFeed() {
   }, [recentIdeas]);
 
   const handleActivityClick = (ideaId: string, title: string) => {
+    audioManager.playUI("click");
     setConfirmDialog({ show: true, ideaId, title });
   };
 
   const handleConfirm = () => {
+    audioManager.playUI("confirm");
     if (confirmDialog) {
       router.push(`/idea/${confirmDialog.ideaId}`);
       setConfirmDialog(null);
@@ -96,6 +99,7 @@ export function LiveActivityFeed() {
   };
 
   const handleCancel = () => {
+    audioManager.playUI("click");
     setConfirmDialog(null);
   };
 

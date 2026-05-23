@@ -27,8 +27,7 @@ import { LEVEL_DEFINITIONS } from "@convex/ventureConstants";
 import type { Id } from "@convex/_generated/dataModel";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
-import { HUD } from "@/components/hud/HUD";
-import { TemplateHUD } from "@/components/hud/TemplateHUD";
+import { QuestList, BossHPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { LiveActivityFeed } from "@/components/map/LiveActivityFeed";
 import { getTemplate, type TemplateId } from "@/config/templates";
@@ -43,6 +42,7 @@ import { StageClearModal } from "@/components/map/StageClearModal";
 import { WorldMapTour } from "@/components/map/WorldMapTour";
 import { LeftSidebar } from "@/components/map/LeftSidebar";
 import { ToolsPanel } from "@/components/map/ToolsPanel";
+import { MapNavbar } from "@/components/map/MapNavbar";
 import {
   activeVentureAtom,
   userProgressAtom,
@@ -364,13 +364,12 @@ function StageStrip({
                   : isCurrent
                     ? st.glow
                     : "rgba(255,255,255,0.05)",
-                border: `1px solid ${
-                  isDone
+                border: `1px solid ${isDone
                     ? "#6366f1"
                     : isCurrent
                       ? st.glow
                       : "rgba(255,255,255,0.1)"
-                }`,
+                  }`,
                 boxShadow: isCurrent ? `0 0 15px ${st.glow}` : "none",
                 cursor: isUnlocked ? "pointer" : "not-allowed",
                 transition:
@@ -1104,14 +1103,14 @@ function MapPageInner() {
     // Force reset to 100% volume if user has old localStorage values
     const VOLUME_VERSION = "v2"; // Increment this to force reset
     const savedVersion = localStorage.getItem("audioVolumeVersion");
-    
+
     if (savedVersion !== VOLUME_VERSION) {
       // Clear old audio settings and set new defaults
       localStorage.removeItem("audioVolumes");
       localStorage.setItem("audioVolumeVersion", VOLUME_VERSION);
       console.log("[Audio] Resetting to 100% volume defaults");
     }
-    
+
     // Sync atom with audioManager's localStorage values (or defaults)
     const volumes = audioManager.getVolumes();
     setAudioSettings({
@@ -1173,9 +1172,9 @@ function MapPageInner() {
     api.aiScoring.getStageQualityScore,
     activeVenture && worldMapData?.venture
       ? {
-          ventureId: activeVenture._id,
-          stageNumber: worldMapData.venture.currentStage,
-        }
+        ventureId: activeVenture._id,
+        stageNumber: worldMapData.venture.currentStage,
+      }
       : "skip",
   );
 
@@ -1189,6 +1188,9 @@ function MapPageInner() {
   const advanceCheckpoint = useMutation(api.ventures.advanceCheckpoint);
   const ensureVentureStructure = useMutation(
     api.ventures.ensureVentureStructure,
+  );
+  const backfillPendingEvaluations = useMutation(
+    api.worldMap.backfillPendingEvaluations,
   );
   const seedFlags = useMutation(api.aiScoring.seedFeatureFlags);
   const savePersonaGender = useMutation(api.worldMap.savePersonaGender);
@@ -1268,10 +1270,10 @@ function MapPageInner() {
     api.interCheckpoint.getInterCheckpointEvents,
     activeVenture
       ? {
-          ventureId: activeVenture._id,
-          currentStage: activeVenture.currentStage,
-          currentCheckpoint: activeVenture.currentCheckpoint,
-        }
+        ventureId: activeVenture._id,
+        currentStage: activeVenture.currentStage,
+        currentCheckpoint: activeVenture.currentCheckpoint,
+      }
       : "skip"
   );
 
@@ -1376,6 +1378,13 @@ function MapPageInner() {
       structureEnsuredForRef.current = null;
     });
   }, [activeVenture?._id, ensureVentureStructure]);
+
+  useEffect(() => {
+    if (!activeVenture?._id) return;
+    backfillPendingEvaluations().catch((error) => {
+      console.error("[MapPage] Failed to backfill pending evaluations:", error);
+    });
+  }, [activeVenture?._id, backfillPendingEvaluations]);
 
   // ── Detect gold checkpoint notifications ──────────────────────────────────
   useEffect(() => {
@@ -1599,7 +1608,7 @@ function MapPageInner() {
       savePersonaGender({
         ventureId: activeVenture._id,
         gender: selectedGender,
-      }).catch(() => {});
+      }).catch(() => { });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVenture?._id, selectedGender]);
@@ -1643,13 +1652,13 @@ function MapPageInner() {
   const xpPercent = levelData?.progress ?? 0;
   const levelPhase = levelData?.phase
     ? (() => {
-        const p = levelData.phase as string;
-        if (p === "tutorial") return 1;
-        if (p === "early") return 2;
-        if (p === "mid") return 3;
-        if (p === "senior") return 4;
-        return 5; // mentor
-      })()
+      const p = levelData.phase as string;
+      if (p === "tutorial") return 1;
+      if (p === "early") return 2;
+      if (p === "mid") return 3;
+      if (p === "senior") return 4;
+      return 5; // mentor
+    })()
     : 1;
 
   // Streak from Convex
@@ -1974,11 +1983,11 @@ function MapPageInner() {
       templateId: venture.templateId ?? "venture",
       personaGender: selectedGender,
       userName: currentUser?.displayName || currentUser?.username || "User",
-      userImageUrl: currentUser?.displayName 
+      userImageUrl: currentUser?.displayName
         ? `https://api.dicebear.com/7.x/adventurer/png?seed=${encodeURIComponent(currentUser.displayName)}&size=128&backgroundColor=transparent`
         : currentUser?.username
-        ? `https://api.dicebear.com/7.x/adventurer/png?seed=${encodeURIComponent(currentUser.username)}&size=128&backgroundColor=transparent`
-        : "https://api.dicebear.com/7.x/adventurer/png?seed=User&size=128&backgroundColor=transparent",
+          ? `https://api.dicebear.com/7.x/adventurer/png?seed=${encodeURIComponent(currentUser.username)}&size=128&backgroundColor=transparent`
+          : "https://api.dicebear.com/7.x/adventurer/png?seed=User&size=128&backgroundColor=transparent",
       assignedBosses: Array.isArray(venture.assignedBosses)
         ? venture.assignedBosses.map(String)
         : [],
@@ -1986,18 +1995,18 @@ function MapPageInner() {
       corruptionLevel,
       superBoss: superBoss
         ? {
-            bossSlug: superBoss.bossSlug,
-            bossName:
-              superBoss.definition?.name ??
-              superBoss.bossName ??
-              "Unknown Boss",
-            visualStatus: superBoss.visualStatus,
-            status: superBoss.status,
-            defeatVariant:
-              worldMapData?.projectState === "project_perfect"
-                ? "gold"
-                : "standard",
-          }
+          bossSlug: superBoss.bossSlug,
+          bossName:
+            superBoss.definition?.name ??
+            superBoss.bossName ??
+            "Unknown Boss",
+          visualStatus: superBoss.visualStatus,
+          status: superBoss.status,
+          defeatVariant:
+            worldMapData?.projectState === "project_perfect"
+              ? "gold"
+              : "standard",
+        }
         : undefined,
     } as Parameters<typeof eventBridge.dispatchToPhaser>[0]);
 
@@ -2117,7 +2126,7 @@ function MapPageInner() {
 
   // Stable ref so handleTaskSubmissionSuccess can call handleAdvance
   // without creating a circular useCallback dependency.
-  const handleAdvanceRef = useRef<(forceBypass?: boolean) => void>(() => {});
+  const handleAdvanceRef = useRef<(forceBypass?: boolean) => void>(() => { });
 
   const handleTaskSubmissionSuccess = useCallback(
     ({
@@ -2686,6 +2695,11 @@ function MapPageInner() {
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
       `}</style>
 
+      {/* ── Custom Map Navbar ─────────────────────────────────────────────────── */}
+      <div className="absolute inset-x-0 top-0 z-[70] pointer-events-auto">
+        <MapNavbar />
+      </div>
+
       {/* Phaser canvas - Fully responsive */}
       <div
         ref={containerRef}
@@ -2766,12 +2780,11 @@ function MapPageInner() {
             )}
           </AnimatePresence>
 
-          {/* Primary HUD — reads from Jotai atoms populated by Convex data */}
-          {activeVenture?.templateId && activeVenture.templateId !== "venture" ? (
-            <TemplateHUD />
-          ) : (
-            <HUD />
-          )}
+          {/* Quest List - floating top-right panel (manages own positioning) */}
+          <QuestList />
+
+          {/* Boss HP Bar - shows when corruption > 60% */}
+          <BossHPBar />
 
           {/* Real-time Presence & Activity Feed Overlay */}
           <LiveActivityFeed />
@@ -2831,7 +2844,7 @@ function MapPageInner() {
             onSkip={() => setBadgeQueue((q) => q.slice(1))}
           />
 
-           {/* Gold checkpoint notification popup */}
+          {/* Gold checkpoint notification popup */}
           <GoldCheckpointPopup
             isVisible={!!goldCheckpointNotification}
             ventureName={goldCheckpointNotification?.ventureName ?? ""}
@@ -2863,9 +2876,10 @@ function MapPageInner() {
             />
           )}
 
-          {/* Left Sidebar Trigger */}
-          <div className="absolute left-2 bottom-24 z-50 sm:bottom-auto sm:left-4 sm:top-1/2 sm:-translate-y-1/2 md:left-3 lg:left-4">
+          {/* Left Sidebar Trigger — sits below the navbar (top-20 = 80px on sm+) */}
+          <div className="absolute left-2 bottom-24 z-50 sm:bottom-auto sm:left-4 sm:top-20 md:left-3 lg:left-4">
             <LeftSidebar
+              ventureName={ideaTitle}
               onOpenPanel={(tab) => {
                 setActiveToolsTab(tab);
                 setIsToolsPanelOpen(true);

@@ -349,6 +349,37 @@ class AudioManager {
     if (this.unlocked) return;
     this.unlocked = true;
     this.init();
+
+    // Ensure volume is unmuted if previously muted, to help user hear it immediately
+    if (this.volumes.muted) {
+      this.setMuted(false);
+    }
+    if (this.volumes.master === 0) {
+      this.setMasterVolume(1.0);
+    }
+    if (this.volumes.music === 0) {
+      this.setMusicVolume(0.7);
+    }
+    if (this.volumes.sfx === 0) {
+      this.setSFXVolume(0.9);
+    }
+    if (this.volumes.ui === 0) {
+      this.setUIVolume(1.0);
+    }
+
+    // Explicitly resume the AudioContext to bypass browser autoplay policies
+    try {
+      const ctx = (Howler as any).ctx || (Howler as any).context;
+      if (ctx && typeof ctx.resume === "function") {
+        ctx.resume().then(() => {
+          console.info("[AudioManager] AudioContext resumed successfully.");
+        }).catch((err: any) => {
+          console.warn("[AudioManager] Failed to resume AudioContext:", err);
+        });
+      }
+    } catch (e) {
+      console.warn("[AudioManager] Error resuming AudioContext:", e);
+    }
   }
 
   // ── Volume Controls ────────────────────────────────────────────────────────
@@ -745,7 +776,7 @@ class AudioManager {
       src: paths,
       loop: true,
       volume: 0, // starts silent; crossfade handles the fade-in
-      html5: true, // stream long audio files
+      html5: false, // use Web Audio API for small files to avoid HTML5 Audio pool exhaustion
       preload: true,
       onloaderror: (id, err) => {
         console.warn(`[AudioManager] Ambience load error (${biome}):`, err);
@@ -887,8 +918,12 @@ if (typeof window !== "undefined") {
     window.removeEventListener("click", unlockOnce);
     window.removeEventListener("keydown", unlockOnce);
     window.removeEventListener("touchstart", unlockOnce);
+    window.removeEventListener("pointerdown", unlockOnce);
+    window.removeEventListener("mousedown", unlockOnce);
   };
   window.addEventListener("click", unlockOnce);
   window.addEventListener("keydown", unlockOnce);
   window.addEventListener("touchstart", unlockOnce);
+  window.addEventListener("pointerdown", unlockOnce);
+  window.addEventListener("mousedown", unlockOnce);
 }

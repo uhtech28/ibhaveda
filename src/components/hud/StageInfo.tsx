@@ -2,6 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
 interface StageInfoProps {
   stageName: string;
@@ -44,8 +45,8 @@ const StageInfoComponent = ({
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               className="w-20 h-20 bg-zinc-900/90 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_30px_rgba(0,0,0,0.5)]"
             >
-              <span className="text-4xl drop-shadow-[0_0_12px_rgba(255,255,255,0.4)]">
-                {stageIcon}
+              <span className="text-4xl drop-shadow-[0_0_12px_rgba(255,255,255,0.4)] flex items-center justify-center text-white">
+                <PremiumIcon name={stageIcon} className="w-12 h-12" strokeWidth={1.5} />
               </span>
             </motion.div>
             <div className="absolute inset-0 rounded-full bg-indigo-500/30 blur-xl -z-10 animate-pulse" />
@@ -77,8 +78,8 @@ const StageInfoComponent = ({
         animate={{ x: 0, opacity: 1 }}
       >
         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-800 shadow-md">
-          <span className="text-[18px]">
-            {stageIcon}
+          <span className="text-[18px] flex items-center justify-center text-white">
+            <PremiumIcon name={stageIcon} className="w-5 h-5" strokeWidth={1.5} />
           </span>
           <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         </div>
@@ -130,8 +131,8 @@ const StageInfoComponent = ({
       transition={{ delay: 0.1 }}
     >
       <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#d1bd89]/20 bg-[#3d3a24] shadow-lg transition-transform group-hover:scale-105">
-        <span className="text-[22px] drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-          {stageIcon}
+        <span className="text-[22px] drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] flex items-center justify-center text-white">
+          <PremiumIcon name={stageIcon} className="w-6 h-6" strokeWidth={1.5} />
         </span>
         <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#f7e7b0]/10 to-transparent pointer-events-none" />
       </div>

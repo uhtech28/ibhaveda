@@ -24,6 +24,7 @@ import {
 } from "@/lib/stores/hudStore";
 import { getTemplate } from "@/config/templates";
 import type { TemplateId } from "@/config/templates";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TEMPLATE COLOR SCHEMES
@@ -87,10 +88,10 @@ function MetricDisplay() {
   return (
     <div className="flex items-center gap-1.5">
       <div
-        className="text-xl select-none"
+        className="text-xl select-none flex items-center justify-center text-white"
         style={{ filter: isHighCorruption ? "drop-shadow(0 0 10px rgba(239, 68, 68, 0.6))" : `drop-shadow(${colors.metricGlow})` }}
       >
-        {isHighCorruption ? "☠" : metric.icon}
+        {isHighCorruption ? "☠" : <PremiumIcon name={metric.icon} className="w-5 h-5" strokeWidth={1.5} />}
       </div>
       <div className="flex flex-col">
         <span
@@ -126,7 +127,7 @@ function MetricDisplay() {
           style={{
             color: metric.qualityTier === "high" ? "#fbbf24"
               : metric.qualityTier === "standard" ? colors.primary
-              : "#6b7280",
+                : "#6b7280",
           }}
         >
           {metric.qualityTier === "high" ? "✦ High" : metric.qualityTier === "standard" ? "Standard" : "Dev"}
@@ -165,8 +166,8 @@ function CorruptionMeter() {
             background: isCritical
               ? "linear-gradient(90deg, #7f1d1d, #ef4444)"
               : isWarning
-              ? "linear-gradient(90deg, #78350f, #f59e0b)"
-              : "linear-gradient(90deg, #3b0060, #8b5cf6)",
+                ? "linear-gradient(90deg, #78350f, #f59e0b)"
+                : "linear-gradient(90deg, #3b0060, #8b5cf6)",
           }}
           animate={isCritical ? {
             opacity: [1, 0.7, 1],
@@ -202,7 +203,9 @@ function StageInfo() {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
-        <span className="text-base">{stageInfo.stageIcon}</span>
+        <span className="text-base flex items-center justify-center text-white">
+          <PremiumIcon name={stageInfo.stageIcon} className="w-5 h-5" strokeWidth={1.5} />
+        </span>
         <div className="flex flex-col">
           <span className="text-[9px] text-white/50 uppercase tracking-widest font-mono">
             Stage {stageInfo.stage}
@@ -264,20 +267,20 @@ export function TemplateHUD() {
   // Glitch motion animation for container when corruption is high
   const glitchAnimation = isHighCorruption
     ? {
-        x: [0, -3, 3, 0, -1.5, 1.5, 0],
-        y: [0, 1.5, -1.5, 0, 3, -3, 0],
-        skewX: [0, -4, 4, 0, -2, 2, 0],
-        opacity: [1, 0.75, 1, 0.9, 1, 0.85, 1],
-      }
+      x: [0, -3, 3, 0, -1.5, 1.5, 0],
+      y: [0, 1.5, -1.5, 0, 3, -3, 0],
+      skewX: [0, -4, 4, 0, -2, 2, 0],
+      opacity: [1, 0.75, 1, 0.9, 1, 0.85, 1],
+    }
     : { opacity: 1, x: 0, y: 0 };
 
   const glitchTransition = isHighCorruption
     ? {
-        repeat: Infinity,
-        duration: 0.35,
-        ease: "easeInOut",
-        repeatDelay: Math.random() * 2.5 + 0.8,
-      }
+      repeat: Infinity,
+      duration: 0.35,
+      ease: "easeInOut",
+      repeatDelay: Math.random() * 2.5 + 0.8,
+    }
     : { duration: 0.4, ease: "easeOut" };
 
   return (

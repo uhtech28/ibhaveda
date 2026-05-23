@@ -434,14 +434,15 @@ export function MapTool({
         </div>
 
         {/* Canvas */}
-        <div
-          ref={canvasRef}
-          className="relative w-full h-[400px] border-2 rounded-lg bg-white dark:bg-slate-950 overflow-hidden cursor-crosshair"
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onMouseDown={handleCanvasMouseDown}
-        >
+        <div className="w-full overflow-x-auto border-2 rounded-lg bg-white dark:bg-slate-950 scrollbar-thin">
+          <div
+            ref={canvasRef}
+            className="relative w-[800px] h-[400px] overflow-hidden cursor-crosshair select-none"
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onMouseDown={handleCanvasMouseDown}
+          >
           {/* SVG Layer for shapes and arrows */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             {/* Render arrows */}
@@ -657,6 +658,7 @@ export function MapTool({
             return null;
           })}
         </div>
+      </div>
 
         {/* Instructions */}
         <div className="text-xs text-muted-foreground space-y-1 p-2 bg-muted/30 rounded">
