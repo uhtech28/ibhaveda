@@ -116,6 +116,7 @@ interface ToolsPanelProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
   activeVentureId?: Id<"ventures">;
+  onOpenGroupChat?: () => void;
 }
 
 export function ToolsPanel({
@@ -124,6 +125,7 @@ export function ToolsPanel({
   activeTab,
   onTabChange,
   activeVentureId,
+  onOpenGroupChat,
 }: ToolsPanelProps) {
   const [stageInfo] = useAtom(stageInfoAtom);
   const [searchQuery, setSearchQuery] = useState("");
@@ -196,10 +198,9 @@ export function ToolsPanel({
     allTabs.tools,
     allTabs.calendar,
     allTabs.kanban,
-    allTabs.roadmap,
-    ...( ["write", "map", "journal", "survey"].includes(activeTab)
+    ...(["write", "map", "journal", "survey"].includes(activeTab)
       ? [allTabs[activeTab as "write" | "map" | "journal" | "survey"]]
-      : [] ),
+      : []),
     allTabs.settings,
     allTabs.help,
   ];
@@ -209,31 +210,30 @@ export function ToolsPanel({
       {isOpen && (
         <motion.div
           key="tools-panel"
-          initial={{ x: "-100%", opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: "-100%", opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 32 }}
-          className="absolute bottom-0 left-0 top-0 z-[60] flex flex-col font-sans"
+          initial={{ opacity: 0, scale: 0.92, x: -15 }}
+          animate={{ opacity: 1, scale: 1, x: 0 }}
+          exit={{ opacity: 0, scale: 0.92, x: -15 }}
+          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+          className="fixed inset-x-4 mx-auto top-1/2 -translate-y-1/2 md:relative md:inset-auto md:mx-0 md:translate-y-0 z-[60] flex flex-col font-sans rounded-2xl border border-white/10 overflow-hidden shadow-2xl w-full max-w-[380px] md:w-[380px]"
           style={{
-            width: "min(92vw, 420px)",
+            height: "min(85vh, 600px)",
             background:
-              "linear-gradient(180deg, rgba(11, 15, 25, 0.9), rgba(7, 10, 18, 0.98))",
-            backdropFilter: "blur(20px)",
-            borderRight: "1px solid rgba(255,255,255,0.05)",
-            boxShadow: "10px 0 50px rgba(0,0,0,0.5)",
+              "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+            backdropFilter: "blur(24px)",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-white/5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                <Grid className="w-5 h-5 text-indigo-400" />
+          <div className="flex items-center justify-between p-3 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                <Grid className="w-4 h-4 text-indigo-400" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-white uppercase tracking-wider">
+                <h2 className="text-sm font-black text-white uppercase tracking-wider">
                   Venture Tools
                 </h2>
-                <p className="text-[10px] text-indigo-300/60 font-bold uppercase tracking-widest">
+                <p className="text-[8px] text-indigo-300/60 font-bold uppercase tracking-widest leading-none">
                   Workspace v1.0
                 </p>
               </div>
@@ -244,14 +244,14 @@ export function ToolsPanel({
                 onClose();
               }}
               onMouseEnter={() => audioManager.playUI("hover")}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[14px] transition-all duration-200 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] transition-all duration-200 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Tab Navigation */}
-          <div className="no-scrollbar flex items-center gap-0.5 sm:gap-1 overflow-x-auto p-1.5 sm:p-2 bg-black/20 border-b border-white/5">
+          <div className="no-scrollbar flex items-center gap-0.5 overflow-x-auto p-1 bg-black/20 border-b border-white/5">
             {displayedTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -261,7 +261,7 @@ export function ToolsPanel({
                 }}
                 onMouseEnter={() => audioManager.playUI("hover")}
                 className={cn(
-                  "min-w-[50px] sm:min-w-[64px] flex-1 flex flex-col items-center gap-1 py-2 sm:py-3 rounded-xl transition-all duration-300",
+                  "min-w-[42px] flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-all duration-300",
                   activeTab === tab.id
                     ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                     : "text-slate-500 hover:text-slate-300 hover:bg-white/5",
@@ -269,11 +269,11 @@ export function ToolsPanel({
               >
                 <tab.icon
                   className={cn(
-                    "w-4 h-4 sm:w-5 sm:h-5",
+                    "w-3.5 h-3.5",
                     activeTab === tab.id ? "animate-pulse" : "",
                   )}
                 />
-                <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-widest">
+                <span className="text-[7.5px] font-black uppercase tracking-wider leading-none">
                   {tab.label}
                 </span>
               </button>
@@ -282,12 +282,12 @@ export function ToolsPanel({
 
           {/* Search Bar (Only for Tools) */}
           {activeTab === "tools" && (
-            <div className="p-4">
+            <div className="p-3 pb-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                 <Input
                   placeholder="Search tools..."
-                  className="pl-10 bg-white/5 border-white/10 rounded-xl text-xs h-10 focus:border-indigo-500/50 focus:ring-0 transition-all"
+                  className="pl-8 bg-white/5 border-white/10 rounded-lg text-[11px] h-8 focus:border-indigo-500/50 focus:ring-0 transition-all"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -296,7 +296,7 @@ export function ToolsPanel({
           )}
 
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-3 no-scrollbar">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -311,6 +311,7 @@ export function ToolsPanel({
                     searchQuery={searchQuery}
                     onToolSelect={onTabChange}
                     activeVentureId={activeVentureId}
+                    onOpenGroupChat={onOpenGroupChat}
                   />
                 )}
 
@@ -397,10 +398,12 @@ function AllToolsGrid({
   searchQuery,
   onToolSelect,
   activeVentureId,
+  onOpenGroupChat,
 }: {
   searchQuery: string;
   onToolSelect: (id: TabType) => void;
   activeVentureId?: Id<"ventures">;
+  onOpenGroupChat?: () => void;
 }) {
   const router = useRouter();
   const tools = [
@@ -421,15 +424,6 @@ function AllToolsGrid({
       color: "#3b82f6",
       isExternal: true,
       path: "chat",
-    },
-    {
-      id: "video",
-      name: "Video Call",
-      desc: "Live session",
-      icon: Video,
-      color: "#f43f5e",
-      isExternal: true,
-      path: "video-call",
     },
     {
       id: "write",
@@ -482,34 +476,37 @@ function AllToolsGrid({
   );
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-2">
       {filteredTools.map((tool) => (
         <motion.button
           key={tool.id}
           onClick={() => {
-            if (tool.isExternal && activeVentureId) {
+            if (tool.id === "chat" && onOpenGroupChat) {
+              onOpenGroupChat();
+            } else if (tool.isExternal && activeVentureId) {
               window.open(`/venture/${activeVentureId}/${tool.path}`, "_blank");
             } else {
               onToolSelect(tool.id as TabType);
             }
           }}
-          whileHover={{ y: -4, scale: 1.02 }}
+          whileHover={{ y: -2, scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 transition-all text-left group"
+          className="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all text-left group"
         >
           <div
-            className="w-10 h-10 rounded-xl mb-3 flex items-center justify-center transition-transform group-hover:rotate-12"
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
             style={{
-              backgroundColor: `${tool.color}15`,
-              border: `1px solid ${tool.color}30`,
+              backgroundColor: `${tool.color}12`,
+              border: `1px solid ${tool.color}25`,
             }}
           >
-            <tool.icon className="w-5 h-5" style={{ color: tool.color }} />
+            <tool.icon className="w-4 h-4" style={{ color: tool.color }} />
           </div>
-          <h3 className="text-sm font-bold text-white mb-1">{tool.name}</h3>
-          <p className="text-[10px] text-slate-500 leading-relaxed">
-            {tool.desc}
-          </p>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xs font-bold text-white truncate leading-tight group-hover:text-indigo-300 transition-colors">
+              {tool.name}
+            </h3>
+          </div>
         </motion.button>
       ))}
     </div>

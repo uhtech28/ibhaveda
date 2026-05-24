@@ -270,6 +270,10 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   }
 
   updateStatus(status: CheckpointStatus): void {
+    // Safety check: ensure scene is still valid
+    if (!this.scene || !this.scene.sys) {
+      return;
+    }
     if (this._status === status) return;
     this._status = status;
     this.applyStatusVisuals();
@@ -288,7 +292,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
   override setInteractive(): this {
     super.setInteractive(
-      new Phaser.Geom.Circle(0, 0, 32),
+      new Phaser.Geom.Circle(0, 0, 60),
       Phaser.Geom.Circle.Contains,
     );
 
@@ -375,6 +379,11 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   }
 
   private applyStatusVisuals(): void {
+    // Safety check: ensure scene and sprites are still valid
+    if (!this.scene || !this.scene.sys || !this.mainSprite || !this.mainSprite.scene) {
+      return;
+    }
+    
     this.stopAnimations();
     this.mainSprite.setTexture(
       `cp_${this._status === "partial" ? "in_progress" : this._status}`,

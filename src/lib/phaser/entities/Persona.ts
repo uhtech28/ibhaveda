@@ -51,9 +51,12 @@ export class Persona extends Phaser.GameObjects.Container {
   private currentAnimation: "idle" | "walk" | null = null;
   private isWalking = false;
   private idleFacingRight = true;
-  
+
   // User avatar and speech bubble
   private userAvatar: Phaser.GameObjects.Image | null = null;
+  private avatarContainer: Phaser.GameObjects.Container | null = null;
+  private avatarBobTween: Phaser.Tweens.Tween | null = null;
+  private avatarWalkTween: Phaser.Tweens.Tween | null = null;
   private speechBubble: Phaser.GameObjects.Container | null = null;
   private userName: string = "";
   private userImageUrl: string = "";
@@ -101,79 +104,19 @@ export class Persona extends Phaser.GameObjects.Container {
       0.25,
     );
 
-    // ── User Avatar (Real profile picture) ─────────────────────────────────
-    if (this.userImageUrl) {
-      // Create full-body character avatar with modern styling
-      const avatarSize = 128; // Larger for full body
-      const avatarContainer = scene.add.container(0, -100); // Adjusted position
-      
-      // Outer glow/shadow
-      const outerGlow = scene.add.ellipse(0, avatarSize / 2, avatarSize / 2 + 6, 20, 0x000000, 0.15);
-      avatarContainer.add(outerGlow);
-      
-      // Add loading placeholder
-      const placeholder = scene.add.rectangle(0, 0, avatarSize, avatarSize, 0xE0E0E0, 0.3);
-      placeholder.setOrigin(0.5, 0);
-      avatarContainer.add(placeholder);
-      
-      // Load avatar image with CORS handling
-      const avatarKey = `user_avatar_${Date.now()}`;
-      
-      // Use HTML Image element to bypass CORS for display
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          // Create texture from loaded image
-          if (!scene.textures.exists(avatarKey)) {
-            scene.textures.addImage(avatarKey, img);
-          }
-          
-          this.userAvatar = scene.add.image(0, 0, avatarKey);
-          this.userAvatar.setDisplaySize(avatarSize, avatarSize);
-          this.userAvatar.setOrigin(0.5, 0); // Origin at top center for full body
-          
-          // Remove placeholder
-          placeholder.destroy();
-          
-          avatarContainer.add(this.userAvatar);
-          
-          // Add subtle pulse animation to avatar
-          scene.tweens.add({
-            targets: avatarContainer,
-            scale: { from: 1, to: 1.03 },
-            duration: 2000,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1,
-          });
-        } catch (error) {
-          console.warn('[Persona] Failed to create avatar texture:', error);
-          this.createFallbackAvatar(scene, placeholder, avatarContainer);
-        }
-      };
-      
-      img.onerror = () => {
-        console.warn('[Persona] Failed to load avatar image, using fallback');
-        this.createFallbackAvatar(scene, placeholder, avatarContainer);
-      };
-      
-      // Start loading
-      img.src = this.userImageUrl;
-      
-      this.add(avatarContainer);
-    } else {
-      // ── Fallback Sprite (if no user image) ─────────────────────────────────
-      const spriteSheetKey =
-        gender === "male"
-          ? "persona_male_idle_sheet"
-          : "persona_female_idle_sheet";
+    // ── Pixel-Art Sprite (Always loaded for maximum RPG aesthetics!) ───────────────────────────
+    const spriteSheetKey =
+      gender === "male"
+        ? "persona_male_idle_sheet"
+        : "persona_female_idle_sheet";
 
-      this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, spriteSheetKey, 0);
-      this.sprite.setOrigin(0.5, 40 / 48);
-      this.sprite.setScale(3);
-      this.add(this.sprite);
-    }
+    this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, spriteSheetKey, 0);
+    this.sprite.setOrigin(0.5, 40 / 48);
+    this.sprite.setScale(3);
+    this.add(this.sprite);
+
+    // ── Integrated User Avatar Badge (Mini gold circular crown floating above head) ────────────
+    // Disabled at user request to remove the circular avatar floating icon above the character.
 
     // ── Assemble container ──────────────────────────────────────────────────
     this.add(this.shadowEllipse);
@@ -230,15 +173,26 @@ export class Persona extends Phaser.GameObjects.Container {
    */
   setIdleFacingRight(facingRight: boolean): void {
     this.idleFacingRight = facingRight;
-    if (!this.isWalking && this.sprite) {
-      this.sprite.setFlipX(this.idleFacingRight);
+    if (!this.isWalking) {
+      if (this.sprite) {
+        this.sprite.setFlipX(this.idleFacingRight);
+      }
+      if (this.avatarContainer) {
+        this.avatarContainer.scaleX = this.idleFacingRight ? 1 : -1;
+        // Re-align the bob tween parameters if running
+        if (this.avatarBobTween) {
+          this.playIdle();
+        }
+      }
     }
   }
 
   moveAlongPath(points: { x: number; y: number }[], duration = 1200): void {
+    if (!this.scene) return;
+
     // Hide speech bubble when walking
     this.hideSpeechBubble();
-    
+
     const route = points.filter((point) => {
       if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
       return (
@@ -271,7 +225,40 @@ export class Persona extends Phaser.GameObjects.Container {
     }
     this.startWalkShadowPulse();
 
-    const segmentDuration = Math.max(120, duration / route.length);
+    // ── Start dynamic waddle/bounce walking loop on Memoji avatarContainer ────
+    if (this.avatarBobTween) {
+      this.avatarBobTween.stop();
+      this.avatarBobTween = null;
+    }
+    if (this.avatarContainer && this.scene) {
+      if (this.avatarWalkTween) {
+        this.avatarWalkTween.stop();
+        this.avatarWalkTween = null;
+      }
+      this.avatarContainer.y = -100;
+      this.avatarWalkTween = this.scene.tweens.add({
+        targets: this.avatarContainer,
+        y: { from: -100, to: -112 },
+        angle: { from: -6, to: 6 },
+        duration: 350,
+        ease: 'Quad.easeInOut',
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+
+    // Calculate total path distance to ensure uniform constant velocity
+    let totalPathDistance = 0;
+    let prevX = this.x;
+    let prevY = this.y;
+    for (const point of route) {
+      totalPathDistance += Phaser.Math.Distance.Between(prevX, prevY, point.x, point.y);
+      prevX = point.x;
+      prevY = point.y;
+    }
+
+    // Time factor in ms per pixel (e.g. at 8ms per pixel, speed is ~125px/sec)
+    const timeFactor = totalPathDistance > 0 ? (duration / totalPathDistance) : 8.0;
     let index = 0;
 
     const walkNextSegment = () => {
@@ -284,10 +271,8 @@ export class Persona extends Phaser.GameObjects.Container {
         return;
       }
 
-      if (
-        Phaser.Math.Distance.Between(this.x, this.y, point.x, point.y) <=
-        Persona.ARRIVAL_EPSILON
-      ) {
+      const segmentDistance = Phaser.Math.Distance.Between(this.x, this.y, point.x, point.y);
+      if (segmentDistance <= Persona.ARRIVAL_EPSILON) {
         index += 1;
         walkNextSegment();
         return;
@@ -300,12 +285,22 @@ export class Persona extends Phaser.GameObjects.Container {
         this.idleFacingRight = facingRight;
       }
 
+      // Flip Memoji container scale horizontally to face the walking direction!
+      if (this.avatarContainer && point.x !== this.x) {
+        const facingRight = point.x > this.x;
+        this.avatarContainer.scaleX = facingRight ? 1 : -1;
+        this.idleFacingRight = facingRight;
+      }
+
+      // Calculate exact duration for this segment to preserve constant linear speed
+      const segmentDuration = segmentDistance * timeFactor;
+
       this.walkTween = this.scene.tweens.add({
         targets: this,
         x: point.x,
         y: point.y,
-        duration: segmentDuration,
-        ease: "Quad.easeOut",
+        duration: Math.max(16, segmentDuration),
+        ease: "Linear", // Linear ease avoids easing stutters on segment transitions
         onComplete: () => {
           index += 1;
           walkNextSegment();
@@ -323,6 +318,9 @@ export class Persona extends Phaser.GameObjects.Container {
    * Shows speech bubble with greeting when idle.
    */
   playIdle(): void {
+    if (this.currentAnimation === "idle" && !this.isWalking && this.avatarBobTween) {
+      return;
+    }
     this.currentAnimation = "idle";
     this.isWalking = false;
 
@@ -340,11 +338,41 @@ export class Persona extends Phaser.GameObjects.Container {
     // Reset shadow to its natural scale (no drift)
     this.shadowEllipse.setScale(1, 1);
 
+    // ── Stop walk waddle tween on avatar container and reset ───────────────────
+    if (this.avatarWalkTween) {
+      this.avatarWalkTween.stop();
+      this.avatarWalkTween = null;
+    }
+    if (this.avatarContainer) {
+      this.avatarContainer.setAngle(0);
+      this.avatarContainer.y = -100;
+      this.avatarContainer.scaleX = this.idleFacingRight ? 1 : -1;
+      this.avatarContainer.scaleY = 1;
+    }
+
+    // ── Start gorgeous breathing bob/pulse loop on avatarContainer ──────────
+    if (this.avatarContainer && this.scene) {
+      if (this.avatarBobTween) {
+        this.avatarBobTween.stop();
+        this.avatarBobTween = null;
+      }
+      this.avatarBobTween = this.scene.tweens.add({
+        targets: this.avatarContainer,
+        y: -104,
+        scaleY: 1.03,
+        scaleX: this.idleFacingRight ? 1.03 : -1.03,
+        duration: 1500,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+
     // ── Stop any playing animation and show static frame 0 ──────────────────
     // This prevents the "glitchy" appearance from animation frame cycling
     if (this.sprite && this.sprite.anims) {
       this.sprite.anims.stop();
-      
+
       // Set to frame 0 of the idle sprite sheet for true static idle
       const spriteSheetKey =
         this.gender === "male"
@@ -357,7 +385,7 @@ export class Persona extends Phaser.GameObjects.Container {
     if (this.sprite) {
       this.sprite.setFlipX(this.idleFacingRight);
     }
-    
+
     // Show speech bubble with greeting
     this.showSpeechBubble();
   }
@@ -366,6 +394,8 @@ export class Persona extends Phaser.GameObjects.Container {
    * Show a speech bubble with "Hi [Username]!" message
    */
   private showSpeechBubble(): void {
+    if (!this.scene) return;
+
     // Remove existing speech bubble
     if (this.speechBubble) {
       this.speechBubble.destroy();
@@ -378,7 +408,7 @@ export class Persona extends Phaser.GameObjects.Container {
     const bubbleWidth = Math.max(140, message.length * 9 + 40);
     const bubbleHeight = 48;
     const bubbleX = 0;
-    const bubbleY = this.userImageUrl ? -140 : -160; // Adjusted for full body character
+    const bubbleY = -160; // Adjusted for full body character (avatar badge removed)
 
     // Create speech bubble container
     this.speechBubble = this.scene.add.container(bubbleX, bubbleY);
@@ -399,15 +429,15 @@ export class Persona extends Phaser.GameObjects.Container {
     const bubble = this.scene.add.graphics();
     bubble.fillStyle(0xFFFFFF, 1);
     bubble.fillRoundedRect(-bubbleWidth / 2, 0, bubbleWidth, bubbleHeight, 14);
-    
+
     // Subtle inner highlight for depth
     bubble.fillStyle(0xFFFFFF, 0.5);
     bubble.fillRoundedRect(-bubbleWidth / 2 + 4, 4, bubbleWidth - 8, 12, 8);
-    
+
     // Bubble border (very subtle)
     bubble.lineStyle(1.5, 0xE8E8E8, 1);
     bubble.strokeRoundedRect(-bubbleWidth / 2, 0, bubbleWidth, bubbleHeight, 14);
-    
+
     this.speechBubble.add(bubble);
 
     // Speech bubble tail (pointing down to avatar)
@@ -419,7 +449,7 @@ export class Persona extends Phaser.GameObjects.Container {
     tail.lineTo(0, bubbleHeight + 12);
     tail.closePath();
     tail.fillPath();
-    
+
     // Tail border
     tail.lineStyle(1.5, 0xE8E8E8, 1);
     tail.beginPath();
@@ -427,7 +457,7 @@ export class Persona extends Phaser.GameObjects.Container {
     tail.lineTo(0, bubbleHeight + 12);
     tail.lineTo(10, bubbleHeight);
     tail.strokePath();
-    
+
     this.speechBubble.add(tail);
 
     // Message text with better styling
@@ -447,7 +477,7 @@ export class Persona extends Phaser.GameObjects.Container {
     });
     wave.setOrigin(0.5);
     this.speechBubble.add(wave);
-    
+
     // Animate wave emoji
     this.scene.tweens.add({
       targets: wave,
@@ -512,9 +542,11 @@ export class Persona extends Phaser.GameObjects.Container {
    * @param duration Movement duration in milliseconds (default: 1000ms).
    */
   playWalk(targetX: number, targetY: number, duration = 1000): void {
+    if (!this.scene) return;
+
     // Hide speech bubble when walking
     this.hideSpeechBubble();
-    
+
     if (
       Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY) <=
       Persona.ARRIVAL_EPSILON
@@ -577,6 +609,8 @@ export class Persona extends Phaser.GameObjects.Container {
    * Only active while the persona is walking; automatically stopped on idle.
    */
   private startWalkShadowPulse(): void {
+    if (!this.scene) return;
+
     if (this.shadowTween) {
       this.shadowTween.stop();
     }
@@ -586,7 +620,7 @@ export class Persona extends Phaser.GameObjects.Container {
       targets: this.shadowEllipse,
       scaleX: { from: 1, to: 0.75 },
       scaleY: { from: 1, to: 0.75 },
-      duration: 220,
+      duration: 350,
       ease: Phaser.Math.Easing.Sine.InOut,
       yoyo: true,
       repeat: -1,
@@ -594,7 +628,7 @@ export class Persona extends Phaser.GameObjects.Container {
   }
 
   private playSpriteAnimation(animationKey: string): void {
-    if (!this.sprite || !this.sprite.active) return;
+    if (!this.scene || !this.sprite || !this.sprite.active) return;
 
     const animState = this.sprite.anims;
     if (!animState) return;
@@ -629,9 +663,9 @@ export class Persona extends Phaser.GameObjects.Container {
     ];
     const charCode = this.userName.charCodeAt(0) || 65;
     const colorIndex = charCode % colors.length;
-    
+
     placeholder.setFillStyle(colors[colorIndex]);
-    
+
     const fallbackText = scene.add.text(0, 0, this.userName.charAt(0).toUpperCase(), {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
       fontSize: '48px',
@@ -640,7 +674,7 @@ export class Persona extends Phaser.GameObjects.Container {
     });
     fallbackText.setOrigin(0.5);
     container.add(fallbackText);
-    
+
     // Add pulse animation to fallback too
     scene.tweens.add({
       targets: container,
