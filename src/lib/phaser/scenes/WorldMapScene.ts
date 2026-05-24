@@ -621,70 +621,73 @@ export class WorldMapScene extends Phaser.Scene {
     const height = this.scale.height;
     const aspectRatio = width / height;
     const isPortrait = height > width;
+    const devicePixelRatio = window?.devicePixelRatio ?? 1;
 
-    // Device categories
-    const isSmallMobile = width < 480;
-    const isMobile = width >= 480 && width < 768;
-    const isTabletPortrait = width >= 768 && width < 1024 && isPortrait;
-    const isTabletLandscape = width >= 768 && width < 1024 && !isPortrait;
-    const isSmallDesktop = width >= 1024 && width < 1440;
-    const isMediumDesktop = width >= 1440 && width < 1920;
-    const isLargeDesktop = width >= 1920;
+    // ── Device categories ────────────────────────────────────────────────────
+    const isSmallMobile     = width < 480;
+    const isMobile          = width >= 480  && width < 768;
+    const isTabletPortrait  = width >= 768  && width < 1024 && isPortrait;
+    const isTabletLandscape = width >= 768  && width < 1024 && !isPortrait;
+    const isSmallDesktop    = width >= 1024 && width < 1440;
+    const isMediumDesktop   = width >= 1440 && width < 1920;
+    const isLargeDesktop    = width >= 1920 && width < 2560;
+    const is4KDisplay       = width >= 2560;
 
-    let zoom = 1;
+    // ── Step 1 — Compute the "perfect fit" zoom for width AND height ─────────
+    // Fit one stage (BIOME_WIDTH) horizontally with a comfortable side margin.
+    const hMargin = isSmallMobile ? 0.88 : isMobile ? 0.90 : 0.93;
+    const fitZoomW = (width * hMargin) / this.BIOME_WIDTH;
 
-    // Responsive zoom calculation
-    if (isSmallMobile) {
-      zoom = isPortrait ? 0.35 : 0.55;
-    } else if (isMobile) {
-      zoom = isPortrait ? 0.45 : 0.65;
-    } else if (isTabletPortrait) {
-      zoom = 0.6;
-    } else if (isTabletLandscape) {
-      zoom = 0.75;
-    } else if (isSmallDesktop) {
-      zoom = 0.8;
-    } else if (isMediumDesktop) {
-      zoom = 0.9;
+    // Fit the full rendered panel height (tiles * scale) vertically with margin.
+    const panelH   = this.map.heightInPixels * this.MAP_PANEL_SCALE;
+    const vMargin  = isSmallMobile ? 0.82 : isMobile ? 0.85 : isPortrait ? 0.88 : 0.92;
+    const fitZoomH = (height * vMargin) / panelH;
+
+    // The base zoom is the smaller of the two fits — guarantees nothing is cut.
+    let zoom = Math.min(fitZoomW, fitZoomH);
+
+    // ── Step 2 — Per-device fine-tuning nudges ───────────────────────────────
+    if (is4KDisplay) {
+      // 4 K / ultra-HD monitors — map can afford to be slightly larger.
+      zoom *= 1.10;
     } else if (isLargeDesktop) {
-      zoom = 1;
-    }
-
-    // Height adjustments for short screens
-    if (height < 500) {
-      zoom *= 0.8;
-    } else if (height < 600) {
-      zoom *= 0.85;
-    } else if (height < 700) {
-      zoom *= 0.9;
-    }
-
-    // Aspect ratio adjustments
-    if (aspectRatio < 0.6) {
-      // Very tall screens (narrow portrait)
-      zoom *= 0.9;
-    } else if (aspectRatio > 2.5) {
-      // Ultra-wide screens
       zoom *= 1.05;
+    } else if (isMediumDesktop) {
+      zoom *= 1.00;  // perfect fit, no nudge
+    } else if (isSmallDesktop) {
+      zoom *= 0.97;  // tiny inset so stage label is visible
+    } else if (isTabletLandscape) {
+      zoom *= 0.95;
+    } else if (isTabletPortrait) {
+      zoom *= 0.90;
+    } else if (isMobile) {
+      zoom *= isPortrait ? 0.88 : 0.92;
+    } else if (isSmallMobile) {
+      zoom *= isPortrait ? 0.82 : 0.86;
     }
 
-    // Keep one full stage comfortably framed on tablet/desktop screens
-    if (width >= 768) {
-      const stageFillZoom = width / this.BIOME_WIDTH;
-      zoom = Math.max(zoom, stageFillZoom * 0.92);
+    // ── Step 3 — Aspect-ratio corrections ───────────────────────────────────
+    if (aspectRatio < 0.55) {
+      // Very narrow portrait (phone held upright) — compress a touch more.
+      zoom *= 0.88;
+    } else if (aspectRatio > 2.2) {
+      // Ultra-wide monitors — a bit of extra zoom looks great.
+      zoom *= 1.06;
     }
 
-    // Ensure the entire height of the panel fits responsively on the screen without vertical cutting
-    const panelH = this.map.heightInPixels * this.MAP_PANEL_SCALE; // ~912px
-    const totalContentHeight = panelH + 200; // ~1112px
-    const stageHeightFillZoom = height / totalContentHeight;
-    zoom = Math.min(zoom, stageHeightFillZoom * 0.98);
+    // ── Step 4 — HiDPI / Retina correction ──────────────────────────────────
+    // On retina screens CSS pixels are already doubled, so no extra scaling is
+    // needed. But if somehow the game renders at physical resolution, pull back.
+    if (devicePixelRatio >= 3) {
+      zoom *= 0.95;
+    }
 
-    zoom = Phaser.Math.Clamp(zoom, 0.32, 1.25);
+    // ── Step 5 — Hard clamp to safe range ───────────────────────────────────
+    zoom = Phaser.Math.Clamp(zoom, 0.28, 1.40);
 
-    const activeNode = this.getCurrentActiveCheckpointNode();
-    const stageCenterX =
-      (this.currentStage - 1) * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
+    // ── Step 6 — Compute camera target ──────────────────────────────────────
+    const activeNode  = this.getCurrentActiveCheckpointNode();
+    const stageCenterX = (this.currentStage - 1) * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
     const stageCenterY = this.MAP_HEIGHT / 2;
     const { x: targetX, y: targetY } = this.getStageCameraTarget(
       this.currentStage,
@@ -693,7 +696,7 @@ export class WorldMapScene extends Phaser.Scene {
       zoom,
     );
 
-    // Apply zoom + keep the current stage centered after resize
+    // ── Step 7 — Apply zoom + center on current stage ────────────────────────
     if (initial) {
       this.cameras.main.setZoom(zoom);
       this.cameras.main.centerOn(targetX, targetY);
@@ -708,14 +711,11 @@ export class WorldMapScene extends Phaser.Scene {
       this.cameras.main.pan(targetX, targetY, 320, "Sine.easeInOut", false);
     }
 
-    // Store values for UI scaling
+    // ── Step 8 — Publish values for React UI ────────────────────────────────
     this.registry.set("cameraZoom", zoom);
-    this.registry.set("isMobile", isSmallMobile || isMobile);
-    this.registry.set("isTablet", isTabletPortrait || isTabletLandscape);
-    this.registry.set(
-      "isDesktop",
-      isSmallDesktop || isMediumDesktop || isLargeDesktop,
-    );
+    this.registry.set("isMobile",  isSmallMobile || isMobile);
+    this.registry.set("isTablet",  isTabletPortrait || isTabletLandscape);
+    this.registry.set("isDesktop", isSmallDesktop || isMediumDesktop || isLargeDesktop || is4KDisplay);
   }
 
   /**
@@ -5237,12 +5237,13 @@ export class WorldMapScene extends Phaser.Scene {
         { x: 356, y: 330 },
         { x: 594, y: 500 },
       ],
-      // Crossroads: nodes sit on each branch of the junction, not off-map.
+      // Crossroads: CP1 & CP4 at bottom corners, CP2 directly in front of House 6 (col 15),
+      // CP3 directly in front of House 7 (col 27). tile=16px, so col*16+8 = centre of tile column.
       7: [
-        { x: 112, y: 500 },
-        { x: 302, y: 354 },
-        { x: 430, y: 354 },
-        { x: 528, y: 500 },
+        { x: 112, y: 500 },   // CP1 — bottom-left corner (House 5)
+        { x: 248, y: 370 },   // CP2 — col 15 centre (15*16+8=248), row 23 (23*16+2=370)
+        { x: 440, y: 370 },   // CP3 — col 27 centre (27*16+8=440), row 23
+        { x: 528, y: 500 },   // CP4 — bottom-right corner (House 8)
       ],
       // Capital: a ceremonial approach up to the citadel, then back to the gate.
       8: [

@@ -1109,6 +1109,15 @@ function MapPageInner() {
     }
   }, [searchParams]);
 
+  // Mark the body so map-specific CSS (overscroll-behavior, overflow:hidden) applies
+  // only here and never bleeds into other pages like the feed.
+  useEffect(() => {
+    document.body.setAttribute("data-page", "map");
+    return () => {
+      document.body.removeAttribute("data-page");
+    };
+  }, []);
+
   // ── Audio unlock on first interaction ─────────────────────────────────────
   // audioManager already attaches window listeners for click/keydown/touchstart
   // but we also call unlock() explicitly once the map mounts to be safe.

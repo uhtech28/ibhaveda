@@ -139,7 +139,7 @@ export function LiveActivityFeed() {
         </div>
       </motion.div>
 
-      {/* Activity Feed - Compact, No Scrollbar */}
+      {/* Activity Feed - Compact */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -149,8 +149,6 @@ export function LiveActivityFeed() {
           <Activity className="w-2.5 h-2.5 text-rose-400" />
           <span>Activity</span>
         </div>
-
-        {/* Show only 3 most recent activities - no scroll needed */}
         <div className="flex flex-col gap-1">
           <AnimatePresence initial={false}>
             {feed.length === 0 ? (
@@ -185,41 +183,120 @@ export function LiveActivityFeed() {
         </div>
       </motion.div>
 
-      {/* Confirmation Dialog */}
+      {/* ── Premium Confirmation Dialog ── */}
       <AnimatePresence>
         {confirmDialog?.show && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center"
+            style={{ backdropFilter: "blur(14px)", background: "rgba(5,8,20,0.72)" }}
             onClick={handleCancel}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", duration: 0.3 }}
+              initial={{ scale: 0.88, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.88, opacity: 0, y: 16 }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-slate-900 border border-white/10 rounded-xl p-4 shadow-2xl max-w-[260px] w-full mx-4"
+              className="relative w-[320px] mx-4 rounded-2xl overflow-hidden"
+              style={{
+                background: "linear-gradient(145deg, rgba(15,18,35,0.98) 0%, rgba(10,13,25,0.99) 100%)",
+                border: "1px solid rgba(99,102,241,0.25)",
+                boxShadow: "0 0 0 1px rgba(99,102,241,0.08), 0 25px 60px rgba(0,0,0,0.7), 0 0 80px rgba(99,102,241,0.08)",
+              }}
             >
-              <h3 className="text-white font-semibold text-sm mb-2">View Idea?</h3>
-              <p className="text-white/60 text-xs mb-4 line-clamp-2">
-                {confirmDialog.title}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCancel}
-                  className="flex-1 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-xs font-medium transition-colors border border-white/10"
+              {/* Top gradient accent bar */}
+              <div
+                className="absolute inset-x-0 top-0 h-[2px]"
+                style={{ background: "linear-gradient(90deg, #6366f1, #a855f7, #6366f1)" }}
+              />
+
+              {/* Glow orb behind icon */}
+              <div
+                className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 75%)" }}
+              />
+
+              <div className="relative px-6 pt-7 pb-6 flex flex-col items-center text-center gap-4">
+                {/* Icon */}
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.18))",
+                    border: "1px solid rgba(99,102,241,0.3)",
+                    boxShadow: "0 4px 20px rgba(99,102,241,0.2)",
+                  }}
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirm}
-                  className="flex-1 px-3 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium transition-colors"
-                >
-                  View
-                </button>
+                  💡
+                </div>
+
+                {/* Heading */}
+                <div className="flex flex-col gap-1">
+                  <h3
+                    className="text-white font-bold text-base tracking-tight leading-snug"
+                    style={{ fontFamily: "var(--font-sans)" }}
+                  >
+                    View this Idea?
+                  </h3>
+                  <p
+                    className="text-sm leading-relaxed font-medium line-clamp-2"
+                    style={{ color: "rgba(148,163,184,0.9)" }}
+                  >
+                    {confirmDialog.title}
+                  </p>
+                  <p className="text-[11px] mt-1" style={{ color: "rgba(99,102,241,0.8)" }}>
+                    You&apos;ll leave the world map temporarily
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="w-full h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+
+                {/* Buttons */}
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={handleCancel}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200"
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      color: "rgba(148,163,184,0.9)",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)";
+                      (e.currentTarget as HTMLElement).style.color = "#fff";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)";
+                      (e.currentTarget as HTMLElement).style.color = "rgba(148,163,184,0.9)";
+                    }}
+                  >
+                    Stay
+                  </button>
+                  <button
+                    onClick={handleConfirm}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold tracking-wide transition-all duration-200 relative overflow-hidden"
+                    style={{
+                      background: "linear-gradient(135deg, #6366f1, #7c3aed)",
+                      border: "1px solid rgba(99,102,241,0.5)",
+                      color: "#fff",
+                      boxShadow: "0 4px 16px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(99,102,241,0.55), inset 0 1px 0 rgba(255,255,255,0.15)";
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                    }}
+                  >
+                    View Idea →
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

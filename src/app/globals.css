@@ -125,11 +125,18 @@
   body {
     @apply bg-background text-foreground;
     overflow-x: hidden;
+    overflow-y: auto;
     width: 100%;
     background-image:
       radial-gradient(circle at top, rgba(99, 102, 241, 0.14), transparent 28%),
       linear-gradient(180deg, rgba(10, 13, 18, 0.98), rgba(10, 13, 18, 1));
+    /* overscroll-behavior intentionally NOT set here so trackpad momentum scroll works everywhere */
+  }
+
+  /* Only freeze overscroll on the map page (body gets data-page="map" attribute) */
+  body[data-page="map"] {
     overscroll-behavior: none;
+    overflow: hidden;
   }
 
   @media (max-width: 640px) {
@@ -538,7 +545,7 @@
    MAP RESPONSIVE STYLES
    ───────────────────────────────────────────────────────────────────────────── */
 
-/* Phaser canvas container - ensure proper scaling */
+/* Phaser canvas container - only active on the world map page */
 #phaser-game-container {
   position: fixed !important;
   inset: 0 !important;
@@ -546,6 +553,8 @@
   height: 100vh !important;
   overflow: hidden !important;
   z-index: 1 !important;
+  /* Capture touch/pointer events inside map only */
+  touch-action: none;
 }
 
 #phaser-game-container canvas {
