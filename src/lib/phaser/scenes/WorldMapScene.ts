@@ -674,6 +674,12 @@ export class WorldMapScene extends Phaser.Scene {
       zoom = Math.max(zoom, stageFillZoom * 0.92);
     }
 
+    // Ensure the entire height of the panel fits responsively on the screen without vertical cutting
+    const panelH = this.map.heightInPixels * this.MAP_PANEL_SCALE; // ~912px
+    const totalContentHeight = panelH + 200; // ~1112px
+    const stageHeightFillZoom = height / totalContentHeight;
+    zoom = Math.min(zoom, stageHeightFillZoom * 0.98);
+
     zoom = Phaser.Math.Clamp(zoom, 0.32, 1.25);
 
     const activeNode = this.getCurrentActiveCheckpointNode();
@@ -5236,7 +5242,7 @@ export class WorldMapScene extends Phaser.Scene {
         { x: 112, y: 500 },
         { x: 302, y: 354 },
         { x: 430, y: 354 },
-        { x: 612, y: 500 },
+        { x: 528, y: 500 },
       ],
       // Capital: a ceremonial approach up to the citadel, then back to the gate.
       8: [
@@ -6132,7 +6138,7 @@ export class WorldMapScene extends Phaser.Scene {
     const y = Phaser.Math.Clamp(
       preferredY,
       halfHeight,
-      this.MAP_HEIGHT - halfHeight,
+      (this.MAP_HEIGHT + 160) - halfHeight,
     );
 
     return { x, y };
