@@ -1031,14 +1031,25 @@ function LoadingScreen() {
         Entering the World…
       </div>
       <div
-        className="mt-6 h-[3px] w-40 rounded-full overflow-hidden"
+        className="mt-6 h-[3px] w-40 rounded-full overflow-hidden relative"
         style={{ background: "rgba(255,255,255,0.05)" }}
       >
         <div
-          className="h-full w-1/2 rounded-full"
-          style={{ background: "linear-gradient(90deg, #4f46e5, #818cf8)" }}
+          className="absolute inset-y-0 left-0 w-full rounded-full"
+          style={{
+            background: "linear-gradient(90deg, #4f46e5, #818cf8)",
+            animation: "smooth-load 2s infinite ease-in-out",
+            transform: "translate3d(-100%, 0, 0)",
+          }}
         />
       </div>
+      <style>{`
+        @keyframes smooth-load {
+          0% { transform: translate3d(-100%, 0, 0); }
+          50% { transform: translate3d(-30%, 0, 0); }
+          100% { transform: translate3d(100%, 0, 0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -2900,7 +2911,7 @@ function MapPageInner() {
                       ? 0.26
                       : corruptionPhase === "creeping"
                         ? 0.16
-                        : 0,
+                        : 0.06,
               background:
                 corruptionPhase === "critical"
                   ? "radial-gradient(circle at center, rgba(140, 40, 40, 0.05), rgba(76, 0, 94, 0.52))"

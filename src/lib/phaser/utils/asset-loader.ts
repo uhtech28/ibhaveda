@@ -192,156 +192,8 @@
 //     );
 //   }
 
-//   // ── Persona sprite sheets ──────────────────────────────────────────────────
+//   // ── Persona sprite sheets ─────────────────────────────────────────────────
 
-//   /**
-//    * Creates placeholder persona sprite sheets for idle and walk animations.
-//    * These are used when external sprite sheet assets are not available.
-//    *
-//    * Generates 4 sprite sheets:
-//    * - persona_male_idle_sheet (4 frames, 128×48px)
-//    * - persona_male_walk_sheet (6 frames, 192×48px)
-//    * - persona_female_idle_sheet (4 frames, 128×48px)
-//    * - persona_female_walk_sheet (6 frames, 192×48px)
-//    */
-//   static createPersonaSpriteSheets(scene: Phaser.Scene): void {
-//     const FRAME_WIDTH = 32;
-//     const FRAME_HEIGHT = 48;
-
-//     // Only create if external assets failed to load
-//     const sheetsToCreate = [
-//       { key: "persona_male_idle_sheet", frames: 4, color: 0x4a90e2 },
-//       { key: "persona_male_walk_sheet", frames: 6, color: 0x4a90e2 },
-//       { key: "persona_female_idle_sheet", frames: 4, color: 0xe94b9c },
-//       { key: "persona_female_walk_sheet", frames: 6, color: 0xe94b9c },
-//     ];
-
-//     for (const sheet of sheetsToCreate) {
-//       // Skip if already loaded from file
-//       if (scene.textures.exists(sheet.key)) {
-//         continue;
-//       }
-
-//       const width = FRAME_WIDTH * sheet.frames;
-//       const height = FRAME_HEIGHT;
-//       const gfx = scene.add.graphics();
-
-//       // Draw each frame
-//       for (let i = 0; i < sheet.frames; i++) {
-//         const x = i * FRAME_WIDTH;
-
-//         // Frame background
-//         gfx.fillStyle(sheet.color, 1);
-//         gfx.fillRoundedRect(x + 2, 2, FRAME_WIDTH - 4, FRAME_HEIGHT - 4, 4);
-
-//         // Frame border
-//         gfx.lineStyle(1, 0xffffff, 0.5);
-//         gfx.strokeRoundedRect(x + 2, 2, FRAME_WIDTH - 4, FRAME_HEIGHT - 4, 4);
-
-//         // Head (circle at top)
-//         const headX = x + FRAME_WIDTH / 2;
-//         const headY = 12;
-//         const headRadius = 6;
-//         gfx.fillStyle(0xffd4a3, 1);
-//         gfx.fillCircle(headX, headY, headRadius);
-//         gfx.lineStyle(1, 0x000000, 0.3);
-//         gfx.strokeCircle(headX, headY, headRadius);
-
-//         // Body (rectangle)
-//         const bodyX = x + FRAME_WIDTH / 2 - 4;
-//         const bodyY = 18;
-//         const bodyWidth = 8;
-//         const bodyHeight = 14;
-//         gfx.fillStyle(sheet.color, 1);
-//         gfx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
-
-//         // Legs (position varies slightly per frame for walk animation)
-//         const legOffset =
-//           sheet.frames === 6
-//             ? Math.sin((i / sheet.frames) * Math.PI * 2) * 2
-//             : 0;
-//         gfx.fillStyle(0x333333, 1);
-//         gfx.fillRect(bodyX + 1, bodyY + bodyHeight, 2, 8 + legOffset);
-//         gfx.fillRect(bodyX + 5, bodyY + bodyHeight, 2, 8 - legOffset);
-//       }
-
-//       // Generate a plain canvas texture
-//       gfx.generateTexture(sheet.key, width, height);
-//       gfx.destroy();
-
-//       // Add numbered frame data so generateFrameNumbers() works on the
-//       // placeholder. Without this Phaser cannot slice the canvas into frames.
-//       const texture = scene.textures.get(sheet.key);
-//       for (let f = 0; f < sheet.frames; f++) {
-//         // texture.add(name, sourceIndex, x, y, width, height)
-//         texture.add(f, 0, f * FRAME_WIDTH, 0, FRAME_WIDTH, FRAME_HEIGHT);
-//       }
-//     }
-
-//     // Create animations if they don't exist
-//     AssetLoader.createPersonaAnimations(scene);
-//   }
-
-//   /**
-//    * Creates Phaser animations for persona sprite sheets.
-//    * Should be called after sprite sheets are loaded/generated.
-//    */
-//   static createPersonaAnimations(scene: Phaser.Scene): void {
-//     const anims = [
-//       {
-//         key: "persona_male_idle",
-//         sheet: "persona_male_idle_sheet",
-//         frames: 4,
-//         frameRate: 4,
-//         repeat: -1,
-//       },
-//       {
-//         key: "persona_male_walk",
-//         sheet: "persona_male_walk_sheet",
-//         frames: 6,
-//         frameRate: 8,
-//         repeat: -1,
-//       },
-//       {
-//         key: "persona_female_idle",
-//         sheet: "persona_female_idle_sheet",
-//         frames: 4,
-//         frameRate: 4,
-//         repeat: -1,
-//       },
-//       {
-//         key: "persona_female_walk",
-//         sheet: "persona_female_walk_sheet",
-//         frames: 6,
-//         frameRate: 8,
-//         repeat: -1,
-//       },
-//     ];
-
-//     for (const anim of anims) {
-//       // Skip if animation already exists
-//       if (scene.anims.exists(anim.key)) {
-//         continue;
-//       }
-
-//       // Skip if sprite sheet doesn't exist
-//       if (!scene.textures.exists(anim.sheet)) {
-//         continue;
-//       }
-
-//       scene.anims.create({
-//         key: anim.key,
-//         frames: scene.anims.generateFrameNumbers(anim.sheet, {
-//           start: 0,
-//           end: anim.frames - 1,
-//         }),
-//         frameRate: anim.frameRate,
-//         repeat: anim.repeat,
-//       });
-//     }
-//   }
-
-//   // ── Checkpoint textures ────────────────────────────────────────────────────
 
 //   /**
 //    * Creates five 80×80 checkpoint node textures (pirate island glossy buttons):
@@ -1427,91 +1279,7 @@ export class AssetLoader {
     ];
     objects.forEach(obj => scene.load.image(obj, `${fanTasyPath}/${obj}.png`));
 
-    // --- Dungeon Asset Pack ---
-    const dungeonPath = "/assets/dungeon";
-    scene.load.spritesheet(
-      "dungeon_tiles",
-      `${dungeonPath}/Dungeon_Tileset_at.png`,
-      { frameWidth: 16, frameHeight: 16 }
-    );
-    scene.load.spritesheet(
-      "dungeon_chars",
-      `${dungeonPath}/Dungeon_Character_at.png`,
-      { frameWidth: 16, frameHeight: 16 }
-    );
 
-    // --- Kenney Sketch Desert Assets ---
-    const desertPath = "/assets/kenney_sketchdesert/Tiles";
-    const desertDirections = ["N", "E", "S", "W"] as const;
-    const desertTileGroups = [
-      "building_center",
-      "building_dark_center",
-      "building_dark_center_door",
-      "building_dark_center_windows",
-      "building_dark_sides",
-      "building_dark_sides_door",
-      "building_dark_sides_windows",
-      "building_sides",
-      "dirt_center",
-      "dirt_low",
-      "dome",
-      "dome_small",
-      "grass_center",
-      "grass_corner",
-      "grass_path",
-      "grass_pathBend",
-      "grass_pathCorner",
-      "grass_pathCrossing",
-      "grass_pathEnd",
-      "grass_pathEndSquare",
-      "grass_pathSlope",
-      "grass_pathSplit",
-      "grass_river",
-      "grass_riverBend",
-      "grass_riverBridge",
-      "grass_riverCorner",
-      "grass_riverCrossing",
-      "grass_riverEnd",
-      "grass_riverEndSquare",
-      "grass_riverSlope",
-      "grass_riverSplit",
-      "grass_slope",
-      "grass_slopeConcave",
-      "grass_slopeConvex",
-      "grass_water",
-      "grass_waterConcave",
-      "grass_waterConvex",
-      "grass_waterRiver",
-      "overhang",
-      "overhang_small",
-      "rocks",
-      "stairs_full",
-      "stairs_left",
-      "stairs_right",
-      "structure_tent",
-      "structure_tentSlant",
-      "tiles",
-      "tiles_crumbled",
-      "tiles_decorated",
-      "tiles_steps",
-      "tree",
-      "trees",
-      "walls_broken",
-      "walls_corner",
-      "walls_end",
-      "walls_left",
-      "walls_right",
-      "walls_sides",
-      "walls_square",
-      "water_center",
-      "water_fall",
-    ];
-    const desertTiles = desertTileGroups.flatMap((tile) =>
-      desertDirections.map((direction) => `${tile}_${direction}`),
-    );
-    desertTiles.forEach(tile => {
-      scene.load.image(`desert_${tile}`, `${desertPath}/${tile}.png`);
-    });
 
     // Load main Tilemap (JSON with embedded tilesets)
     scene.load.tilemapTiledJSON("beginning_fields", `${fanTasyPath}/Beginning Fields.tmj`);
@@ -1551,255 +1319,136 @@ export class AssetLoader {
 
   // ── Persona sprite sheets ─────────────────────────────────────────────────
 
+  /**
+   * Generates procedural persona sprite sheets: 32×48 px per frame, 1px/pixel.
+   *  - idle: 4 frames, gentle breathing bob
+   *  - walk: 8 frames, full leg+arm swing cycle
+   */
   static createPersonaSpriteSheets(scene: Phaser.Scene): void {
-    const FRAME_WIDTH = 32;
-    const FRAME_HEIGHT = 48;
-
+    const FW = 32, FH = 48;
     const sheets = [
-      { 
-        key: "persona_male_idle_sheet", 
-        frames: 4, 
-        gender: "male",
-        isWalk: false
-      },
-      { 
-        key: "persona_male_walk_sheet", 
-        frames: 6, 
-        gender: "male",
-        isWalk: true
-      },
-      { 
-        key: "persona_female_idle_sheet", 
-        frames: 4, 
-        gender: "female",
-        isWalk: false
-      },
-      { 
-        key: "persona_female_walk_sheet", 
-        frames: 6, 
-        gender: "female",
-        isWalk: true
-      },
+      { key: 'persona_male_idle_sheet',   frames: 4, gender: 'male',   isWalk: false },
+      { key: 'persona_male_walk_sheet',   frames: 8, gender: 'male',   isWalk: true  },
+      { key: 'persona_female_idle_sheet', frames: 4, gender: 'female', isWalk: false },
+      { key: 'persona_female_walk_sheet', frames: 8, gender: 'female', isWalk: true  },
     ];
-
     for (const sheet of sheets) {
-      // Robust check for existing textures or pending loads to avoid "key already in use" errors
-      const isPending = (scene.load.list as any)?.some?.((f: any) => f.key === sheet.key);
-      if (scene.textures.exists(sheet.key) || isPending) continue;
-
-      const width = FRAME_WIDTH * sheet.frames;
+      const pending = (scene.load.list as any)?.some?.((f: any) => f.key === sheet.key);
+      if (scene.textures.exists(sheet.key) || pending) continue;
+      const male = sheet.gender === 'male';
+      const W = FW * sheet.frames;
       const gfx = scene.add.graphics();
-
-      // Apple Memoji-style colors
-      const isMale = sheet.gender === "male";
-      const skinTone = 0xFFDFC4;
-      const skinShadow = 0xF0C9A8;
-      const skinHighlight = 0xFFF5E8;
-      const hairColor = isMale ? 0x3D2817 : 0x8B4513;
-      const hairHighlight = isMale ? 0x5C4033 : 0xA0522D;
-      const shirtColor = isMale ? 0x4A90E2 : 0xE94B9C;
-      const shirtShadow = isMale ? 0x357ABD : 0xC93A7D;
-      const shirtHighlight = isMale ? 0x6BA3E8 : 0xF06BA8;
-      const pantsColor = isMale ? 0x2C3E50 : 0x8E44AD;
-      const eyeColor = 0x2C3E50;
-      const eyeShine = 0xFFFFFF;
-
-      for (let i = 0; i < sheet.frames; i++) {
-        const x = i * FRAME_WIDTH;
-        const centerX = x + FRAME_WIDTH / 2;
-        
-        // Animation offsets for smooth movement
-        const bobOffset = sheet.isWalk 
-          ? Math.sin((i / sheet.frames) * Math.PI * 2) * 1.5
-          : Math.sin((i / sheet.frames) * Math.PI * 2) * 0.5;
-        
-        const legOffset = sheet.isWalk
-          ? Math.sin((i / sheet.frames) * Math.PI * 2) * 3
-          : 0;
-
-        // ── HAIR (Apple Memoji style - rounded, smooth) ──────────────────
-        const hairY = 8 + bobOffset;
-        
-        // Hair shadow (depth)
-        gfx.fillStyle(hairColor, 0.3);
-        gfx.fillEllipse(centerX + 1, hairY + 1, 7, 8);
-        
-        // Main hair
-        gfx.fillStyle(hairColor, 1);
-        gfx.fillEllipse(centerX, hairY, 7, 8);
-        
-        // Hair highlight (glossy effect)
-        gfx.fillStyle(hairHighlight, 0.6);
-        gfx.fillEllipse(centerX - 2, hairY - 2, 3, 4);
-
-        // ── HEAD (Large, rounded - Memoji proportions) ──────────────────
-        const headY = 14 + bobOffset;
-        
-        // Head shadow
-        gfx.fillStyle(skinShadow, 0.4);
-        gfx.fillCircle(centerX + 0.5, headY + 0.5, 7);
-        
-        // Main head
-        gfx.fillStyle(skinTone, 1);
-        gfx.fillCircle(centerX, headY, 7);
-        
-        // Face highlight (3D effect)
-        gfx.fillStyle(skinHighlight, 0.5);
-        gfx.fillCircle(centerX - 2, headY - 2, 3);
-        
-        // Cheek blush (Apple style)
-        gfx.fillStyle(0xFFB6C1, 0.3);
-        gfx.fillCircle(centerX - 4, headY + 2, 2);
-        gfx.fillCircle(centerX + 4, headY + 2, 2);
-
-        // ── EYES (Simple, expressive) ────────────────────────────────────
-        const eyeY = headY;
-        
-        // Left eye
-        gfx.fillStyle(eyeColor, 1);
-        gfx.fillCircle(centerX - 3, eyeY, 1.5);
-        gfx.fillStyle(eyeShine, 1);
-        gfx.fillCircle(centerX - 2.5, eyeY - 0.5, 0.5);
-        
-        // Right eye
-        gfx.fillStyle(eyeColor, 1);
-        gfx.fillCircle(centerX + 3, eyeY, 1.5);
-        gfx.fillStyle(eyeShine, 1);
-        gfx.fillCircle(centerX + 3.5, eyeY - 0.5, 0.5);
-
-        // ── SMILE (Subtle, friendly) ─────────────────────────────────────
-        gfx.lineStyle(1, skinShadow, 0.6);
-        gfx.beginPath();
-        gfx.arc(centerX, headY + 2, 2, 0.2, Math.PI - 0.2);
-        gfx.strokePath();
-
-        // ── NECK ─────────────────────────────────────────────────────────
-        const neckY = 22 + bobOffset;
-        gfx.fillStyle(skinTone, 1);
-        gfx.fillRect(centerX - 2.5, neckY, 5, 3);
-        
-        // Neck shadow
-        gfx.fillStyle(skinShadow, 0.3);
-        gfx.fillRect(centerX - 2.5, neckY + 2, 5, 1);
-
-        // ── SHIRT (Rounded, modern) ──────────────────────────────────────
-        const shirtY = 25 + bobOffset;
-        
-        // Shirt shadow
-        gfx.fillStyle(shirtShadow, 1);
-        gfx.fillRoundedRect(centerX - 6, shirtY + 1, 12, 10, 2);
-        
-        // Main shirt
-        gfx.fillStyle(shirtColor, 1);
-        gfx.fillRoundedRect(centerX - 6, shirtY, 12, 10, 2);
-        
-        // Shirt highlight (fabric shine)
-        gfx.fillStyle(shirtHighlight, 0.4);
-        gfx.fillRoundedRect(centerX - 5, shirtY + 1, 10, 3, 1);
-        
-        // Collar detail
-        gfx.fillStyle(skinHighlight, 0.8);
-        gfx.fillTriangle(
-          centerX - 1, shirtY,
-          centerX + 1, shirtY,
-          centerX, shirtY + 2
-        );
-
-        // ── ARMS (Simplified, clean) ─────────────────────────────────────
-        const armY = shirtY + 2;
-        
-        // Left arm
-        gfx.fillStyle(shirtShadow, 1);
-        gfx.fillRoundedRect(centerX - 8, armY, 2, 8, 1);
-        
-        // Right arm
-        gfx.fillStyle(shirtShadow, 1);
-        gfx.fillRoundedRect(centerX + 6, armY, 2, 8, 1);
-
-        // ── PANTS (Clean, modern) ────────────────────────────────────────
-        const pantsY = 35 + bobOffset;
-        
-        // Left leg
-        gfx.fillStyle(pantsColor, 1);
-        gfx.fillRoundedRect(centerX - 5, pantsY, 4, 8 + legOffset, 1);
-        
-        // Right leg
-        gfx.fillStyle(pantsColor, 1);
-        gfx.fillRoundedRect(centerX + 1, pantsY, 4, 8 - legOffset, 1);
-        
-        // Pants highlights
-        gfx.fillStyle(0xFFFFFF, 0.15);
-        gfx.fillRect(centerX - 4.5, pantsY + 1, 1, 3);
-        gfx.fillRect(centerX + 1.5, pantsY + 1, 1, 3);
-
-        // ── SHOES (Simple, rounded) ──────────────────────────────────────
-        const shoeY = 43 + bobOffset;
-        
-        // Left shoe
-        gfx.fillStyle(0x34495E, 1);
-        gfx.fillEllipse(centerX - 3, shoeY + legOffset, 2.5, 1.5);
-        
-        // Right shoe
-        gfx.fillStyle(0x34495E, 1);
-        gfx.fillEllipse(centerX + 3, shoeY - legOffset, 2.5, 1.5);
+      const SKIN = 0xF5C9A0, SKIN_SH = 0xD9975E, SKIN_HL = 0xFFF0DC;
+      const HAIR = male ? 0x3B1F6E : 0x7B3415;
+      const HMID = male ? 0x5C3499 : 0xA0522D;
+      const HHL  = male ? 0x8B62CC : 0xC87941;
+      const EW = 0xFFFFFF, EP = male ? 0x3B1F6E : 0x5C3499;
+      const ESH = 0x111111, ESHINE = 0xFFFFFF;
+      const SHIRT = male ? 0x4A90D9 : 0xE06BA8;
+      const SSH   = male ? 0x2B5F9E : 0xA83E77;
+      const SHL   = male ? 0x82BBEF : 0xF09BC8;
+      const COL = 0xF0F0F0, BELT = 0x3B2A1A, BK = 0xF0C040;
+      const PANTS = male ? 0x2C3E60 : 0x7B4F9E;
+      const PSH   = male ? 0x1A2540 : 0x5B2F7E;
+      const PHL   = male ? 0x4A6080 : 0x9B6FBE;
+      const SHOE = 0x2A1A0A, SHO = 0x4A3020, SOLE = 0x1A0A00;
+      const OUT = 0x0A0408, BLUSH = 0xFF8090;
+      const p = (c: number, a: number, x: number, y: number, w = 1, h = 1) => {
+        const rx=Math.round(x),ry=Math.round(y),rw=Math.max(1,Math.round(w)),rh=Math.max(1,Math.round(h));
+        if(rx<0||ry<0||rx+rw>W||ry+rh>FH) return;
+        gfx.fillStyle(c,a); gfx.fillRect(rx,ry,rw,rh);
+      };
+      for (let fi = 0; fi < sheet.frames; fi++) {
+        const ox = fi * FW, t = fi / sheet.frames;
+        let bob=0,llY=0,rlY=0,llX=0,rlX=0,lA=0,rA=0,lF=0,rF=0;
+        if (!sheet.isWalk) {
+          bob = Math.round(Math.sin((fi/4)*Math.PI*2)*0.8);
+        } else {
+          const ph = t*Math.PI*2;
+          bob=Math.round(Math.abs(Math.sin(ph*2))*-1.5);
+          llY=Math.round(Math.sin(ph)*4);   rlY=Math.round(-Math.sin(ph)*4);
+          llX=Math.round(Math.sin(ph)*1);   rlX=Math.round(-Math.sin(ph)*1);
+          lA =Math.round(-Math.sin(ph)*2);  rA =Math.round(Math.sin(ph)*2);
+          lF =Math.round(Math.sin(ph)*1);   rF =Math.round(-Math.sin(ph)*1);
+        }
+        const ht=3+bob;
+        // Hair (curly)
+        p(OUT,1,ox+8,ht-1,16,1); p(HAIR,1,ox+9,ht-1,14,1);
+        p(OUT,1,ox+6,ht,2,1);   p(OUT,1,ox+24,ht,2,1);
+        p(HAIR,1,ox+7,ht,18,5); p(HMID,1,ox+10,ht,8,2); p(HHL,0.8,ox+12,ht,4,2);
+        p(HAIR,1,ox+7,ht-3,4,3); p(HAIR,1,ox+13,ht-4,6,4); p(HAIR,1,ox+21,ht-3,4,3);
+        p(HMID,1,ox+14,ht-3,4,2); p(HHL,0.7,ox+15,ht-3,2,1);
+        p(HAIR,1,ox+7,ht+5,2,4); p(HAIR,1,ox+23,ht+5,2,4);
+        // Head
+        const hy=ht+5;
+        p(OUT,1,ox+8,hy,16,1); p(OUT,1,ox+7,hy+1,1,9); p(OUT,1,ox+24,hy+1,1,9); p(OUT,1,ox+8,hy+10,16,1);
+        p(SKIN,1,ox+8,hy+1,16,9); p(SKIN_SH,0.4,ox+8,hy+1,2,8); p(SKIN_SH,0.4,ox+22,hy+1,2,8);
+        p(SKIN_HL,0.4,ox+11,hy+1,9,3);
+        // Eyes
+        const ey=hy+3;
+        p(OUT,1,ox+9,ey-1,6,1); p(OUT,1,ox+9,ey+3,6,1); p(OUT,1,ox+9,ey,1,3); p(OUT,1,ox+14,ey,1,3);
+        p(EW,1,ox+10,ey,4,3); p(EP,1,ox+11,ey+1,2,2); p(ESH,1,ox+11,ey+1,1,1); p(ESHINE,0.9,ox+12,ey+1,1,1);
+        p(OUT,1,ox+17,ey-1,6,1); p(OUT,1,ox+17,ey+3,6,1); p(OUT,1,ox+17,ey,1,3); p(OUT,1,ox+22,ey,1,3);
+        p(EW,1,ox+18,ey,4,3); p(EP,1,ox+19,ey+1,2,2); p(ESH,1,ox+19,ey+1,1,1); p(ESHINE,0.9,ox+20,ey+1,1,1);
+        p(BLUSH,0.3,ox+9,ey+4,3,2); p(BLUSH,0.3,ox+20,ey+4,3,2);
+        p(SKIN_SH,0.55,ox+15,ey+5,2,1);
+        p(SKIN_SH,0.7,ox+12,ey+7,1,1); p(SKIN_SH,0.7,ox+13,ey+8,4,1); p(SKIN_SH,0.7,ox+17,ey+7,1,1);
+        // Neck
+        const ny=hy+11;
+        p(OUT,1,ox+12,ny,1,3); p(OUT,1,ox+19,ny,1,3);
+        p(SKIN,1,ox+13,ny,6,3); p(SKIN_SH,0.4,ox+13,ny+2,6,1);
+        // Torso
+        const ty=ny+3;
+        p(COL,1,ox+12,ty,8,2); p(COL,1,ox+14,ty+1,4,1);
+        p(SHIRT,1,ox+8,ty+2,16,9); p(SSH,1,ox+8,ty+2,3,9); p(SSH,1,ox+21,ty+2,3,9);
+        p(SHL,0.5,ox+13,ty+2,5,4); p(OUT,1,ox+7,ty+2,1,9); p(OUT,1,ox+24,ty+2,1,9); p(OUT,1,ox+8,ty+11,16,1);
+        // Arms
+        const ay=ty+2;
+        const lax=ox+5+lA; p(SSH,1,lax,ay,3,7); p(SKIN,1,lax,ay+7,3,3); p(OUT,1,lax-1,ay,1,10); p(OUT,1,lax+3,ay,1,10);
+        const rax=ox+24+rA; p(SSH,1,rax,ay,3,7); p(SKIN,1,rax,ay+7,3,3); p(OUT,1,rax-1,ay,1,10); p(OUT,1,rax+3,ay,1,10);
+        // Belt
+        const bly=ty+11;
+        p(OUT,1,ox+7,bly,18,1); p(BELT,1,ox+8,bly+1,16,2); p(BK,1,ox+14,bly+1,4,2); p(OUT,1,ox+7,bly+3,18,1);
+        // Legs
+        const lgt=bly+3;
+        const llx=ox+9+llX, lll=Math.max(3,9+llY);
+        p(PANTS,1,llx,lgt,6,lll); p(PSH,1,llx,lgt,2,lll); p(PHL,0.5,llx+3,lgt+1,2,4);
+        p(OUT,1,llx-1,lgt,1,lll); p(OUT,1,llx+6,lgt,1,lll);
+        const rlx=ox+17+rlX, rll=Math.max(3,9+rlY);
+        p(PANTS,1,rlx,lgt,6,rll); p(PSH,1,rlx,lgt,2,rll); p(PHL,0.5,rlx+3,lgt+1,2,4);
+        p(OUT,1,rlx-1,lgt,1,rll); p(OUT,1,rlx+6,lgt,1,rll);
+        p(OUT,1,ox+15,lgt,2,5);
+        // Shoes
+        const sby=lgt+9;
+        const lsx=ox+8+llX+lF, lsy=sby+llY;
+        p(SHOE,1,lsx,lsy,8,3); p(SHO,0.6,lsx+1,lsy,4,1); p(SOLE,1,lsx,lsy+3,8,1);
+        p(OUT,1,lsx-1,lsy,1,4); p(OUT,1,lsx+8,lsy,1,4); p(OUT,1,lsx,lsy-1,8,1); p(OUT,1,lsx,lsy+4,8,1);
+        const rsx=ox+16+rlX+rF, rsy=sby+rlY;
+        p(SHOE,1,rsx,rsy,8,3); p(SHO,0.6,rsx+1,rsy,4,1); p(SOLE,1,rsx,rsy+3,8,1);
+        p(OUT,1,rsx-1,rsy,1,4); p(OUT,1,rsx+8,rsy,1,4); p(OUT,1,rsx,rsy-1,8,1); p(OUT,1,rsx,rsy+4,8,1);
       }
-
-      gfx.generateTexture(sheet.key, width, FRAME_HEIGHT);
+      gfx.generateTexture(sheet.key, W, FH);
       gfx.destroy();
-
-      const texture = scene.textures.get(sheet.key);
-      for (let f = 0; f < sheet.frames; f++) {
-        texture.add(f, 0, f * FRAME_WIDTH, 0, FRAME_WIDTH, FRAME_HEIGHT);
-      }
+      const tex = scene.textures.get(sheet.key);
+      for (let f = 0; f < sheet.frames; f++) tex.add(f, 0, f*FW, 0, FW, FH);
     }
-
     AssetLoader.createPersonaAnimations(scene);
   }
 
   static createPersonaAnimations(scene: Phaser.Scene): void {
     const anims = [
-      {
-        key: "persona_male_idle",
-        sheet: "persona_male_idle_sheet",
-        frames: 4,
-        frameRate: 8,
-        repeat: -1,
-      },
-      {
-        key: "persona_male_walk",
-        sheet: "persona_male_walk_sheet",
-        frames: 6,
-        frameRate: 12,
-        repeat: -1,
-      },
-      {
-        key: "persona_female_idle",
-        sheet: "persona_female_idle_sheet",
-        frames: 4,
-        frameRate: 8,
-        repeat: -1,
-      },
-      {
-        key: "persona_female_walk",
-        sheet: "persona_female_walk_sheet",
-        frames: 6,
-        frameRate: 12,
-        repeat: -1,
-      },
+      { key: 'persona_male_idle',   sheet: 'persona_male_idle_sheet',   frames: 4, fps: 5  },
+      { key: 'persona_male_walk',   sheet: 'persona_male_walk_sheet',   frames: 8, fps: 10 },
+      { key: 'persona_female_idle', sheet: 'persona_female_idle_sheet', frames: 4, fps: 5  },
+      { key: 'persona_female_walk', sheet: 'persona_female_walk_sheet', frames: 8, fps: 10 },
     ];
-
     for (const anim of anims) {
-      if (scene.anims.exists(anim.key) || !scene.textures.exists(anim.sheet))
-        continue;
-      const isWalk = anim.key.includes("walk");
+      if (scene.anims.exists(anim.key) || !scene.textures.exists(anim.sheet)) continue;
       scene.anims.create({
         key: anim.key,
-        frames: scene.anims.generateFrameNumbers(anim.sheet, {
-          start: isWalk ? anim.frames - 1 : 0,
-          end: isWalk ? 0 : anim.frames - 1,
-        }),
-        frameRate: anim.frameRate,
-        repeat: anim.repeat,
+        frames: scene.anims.generateFrameNumbers(anim.sheet, { start: 0, end: anim.frames-1 }),
+        frameRate: anim.fps,
+        repeat: -1,
       });
     }
   }

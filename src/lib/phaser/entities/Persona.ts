@@ -236,6 +236,8 @@ export class Persona extends Phaser.GameObjects.Container {
   }
 
   moveAlongPath(points: { x: number; y: number }[], duration = 1200): void {
+    if (!this.scene) return;
+
     // Hide speech bubble when walking
     this.hideSpeechBubble();
     
@@ -366,6 +368,8 @@ export class Persona extends Phaser.GameObjects.Container {
    * Show a speech bubble with "Hi [Username]!" message
    */
   private showSpeechBubble(): void {
+    if (!this.scene) return;
+
     // Remove existing speech bubble
     if (this.speechBubble) {
       this.speechBubble.destroy();
@@ -512,6 +516,8 @@ export class Persona extends Phaser.GameObjects.Container {
    * @param duration Movement duration in milliseconds (default: 1000ms).
    */
   playWalk(targetX: number, targetY: number, duration = 1000): void {
+    if (!this.scene) return;
+
     // Hide speech bubble when walking
     this.hideSpeechBubble();
     
@@ -577,6 +583,8 @@ export class Persona extends Phaser.GameObjects.Container {
    * Only active while the persona is walking; automatically stopped on idle.
    */
   private startWalkShadowPulse(): void {
+    if (!this.scene) return;
+
     if (this.shadowTween) {
       this.shadowTween.stop();
     }
@@ -594,7 +602,7 @@ export class Persona extends Phaser.GameObjects.Container {
   }
 
   private playSpriteAnimation(animationKey: string): void {
-    if (!this.sprite || !this.sprite.active) return;
+    if (!this.scene || !this.sprite || !this.sprite.active) return;
 
     const animState = this.sprite.anims;
     if (!animState) return;

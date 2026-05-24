@@ -288,7 +288,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
   override setInteractive(): this {
     super.setInteractive(
-      new Phaser.Geom.Circle(0, 0, 32),
+      new Phaser.Geom.Circle(0, 0, 50),
       Phaser.Geom.Circle.Contains,
     );
 
