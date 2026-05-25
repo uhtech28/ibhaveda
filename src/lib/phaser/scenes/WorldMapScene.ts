@@ -2,7 +2,10 @@ import * as Phaser from "phaser";
 import { AssetLoader } from "../utils/asset-loader";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender } from "../entities/Persona";
-import { ContributorCompanion, type ContributorData } from "../entities/ContributorCompanion";
+import {
+  ContributorCompanion,
+  type ContributorData,
+} from "../entities/ContributorCompanion";
 import { BossSilhouette } from "../entities/Boss";
 import { MiniBoss, type MiniBossType } from "../entities/MiniBoss";
 import { audioManager, type CheckpointSFXId } from "../../audio/audioManager";
@@ -27,15 +30,15 @@ interface BiomeConfig {
   name: string;
   theme: string;
   visualTheme:
-  | "village"
-  | "forest"
-  | "arena"
-  | "artisan"
-  | "mine"
-  | "harbour"
-  | "crossroads"
-  | "capital"
-  | "dungeon";
+    | "village"
+    | "forest"
+    | "arena"
+    | "artisan"
+    | "mine"
+    | "harbour"
+    | "crossroads"
+    | "capital"
+    | "dungeon";
   colors: {
     sky: number;
     ground: number;
@@ -261,6 +264,8 @@ export class WorldMapScene extends Phaser.Scene {
   private retreatedStages: Set<number> = new Set();
   /** Stages whose mini-boss defeat animation has already started this session */
   private slainMiniBossStages: Set<number> = new Set();
+  /** Wheel scroll handler reference for cleanup */
+  private wheelHandler: ((e: WheelEvent) => void) | null = null;
   /** Residual path markers for partially completed stages */
   private residualMarkers: Map<number, Phaser.GameObjects.Container> =
     new Map();
@@ -479,24 +484,28 @@ export class WorldMapScene extends Phaser.Scene {
     };
     this.scale.on("resize", this.resizeHandler);
 
-    // Detect mobile/touch device
-    const isTouchDevice =
-      "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    // Device capabilities
+    // NOTE: navigator.maxTouchPoints > 0 is unreliable — Chrome/Edge on Windows
+    // reports 5 even on non-touch desktops. Use only "ontouchstart" in window for
+    // real touch detection (pinch-to-zoom). Drag and wheel work on ALL devices.
+    const hasTouchScreen = "ontouchstart" in window;
     const isMobile = this.scale.width < 768;
     const isTablet = this.scale.width >= 768 && this.scale.width < 1024;
 
-    // Enhanced camera drag with smooth momentum
+    // ── 1. Audio unlock on first pointer interaction ──────────────────────────
+    this.input.on("pointerdown", () => {
+      audioManager.unlock();
+    });
+
+    // ── 2. Click-and-drag scroll (mouse OR touch — all devices) ──────────────
     let isDragging = false;
     let dragVelocityX = 0;
     let dragVelocityY = 0;
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      audioManager.unlock();
       isDragging = true;
       dragVelocityX = 0;
       dragVelocityY = 0;
-
-      // Store initial camera position for drag
       this.registry.set("dragStartX", this.cameras.main.scrollX);
       this.registry.set("dragStartY", this.cameras.main.scrollY);
       this.registry.set("pointerStartX", pointer.x);
@@ -516,11 +525,7 @@ export class WorldMapScene extends Phaser.Scene {
         const lastPointerX = this.registry.get("lastPointerX") || pointer.x;
         const lastPointerY = this.registry.get("lastPointerY") || pointer.y;
 
-        // Adaptive drag sensitivity based on device
-        let dragSensitivity = 1.0;
-        if (isMobile) dragSensitivity = 1.15;
-        else if (isTablet) dragSensitivity = 1.05;
-
+        const dragSensitivity = isMobile ? 1.15 : isTablet ? 1.05 : 1.0;
         const deltaX =
           ((pointerStartX - pointer.x) / this.cameras.main.zoom) *
           dragSensitivity;
@@ -528,7 +533,6 @@ export class WorldMapScene extends Phaser.Scene {
           ((pointerStartY - pointer.y) / this.cameras.main.zoom) *
           dragSensitivity;
 
-        // Calculate velocity for momentum
         dragVelocityX = (lastPointerX - pointer.x) * dragSensitivity;
         dragVelocityY = (lastPointerY - pointer.y) * dragSensitivity;
 
@@ -542,42 +546,52 @@ export class WorldMapScene extends Phaser.Scene {
 
     this.input.on("pointerup", () => {
       isDragging = false;
-
-      // Apply momentum on release (mobile/tablet only)
+      // Momentum on mobile / tablet only (feels unnatural on desktop mouse)
       if (
         (isMobile || isTablet) &&
         (Math.abs(dragVelocityX) > 2 || Math.abs(dragVelocityY) > 2)
       ) {
-        const momentumDuration = 400;
-        const momentumDistance = 3;
-
         this.tweens.add({
           targets: this.cameras.main,
-          scrollX: this.cameras.main.scrollX + dragVelocityX * momentumDistance,
-          scrollY: this.cameras.main.scrollY + dragVelocityY * momentumDistance,
-          duration: momentumDuration,
+          scrollX: this.cameras.main.scrollX + dragVelocityX * 3,
+          scrollY: this.cameras.main.scrollY + dragVelocityY * 3,
+          duration: 400,
           ease: "Cubic.easeOut",
         });
       }
     });
 
-    // Enhanced pinch-to-zoom for touch devices
-    if (isTouchDevice) {
+    // ── 3. Mouse-wheel / trackpad scroll (all devices) ────────────────────────
+    //   • Vertical wheel   → scrolls map LEFT / RIGHT (primary axis)
+    //   • Horizontal swipe → scrolls map LEFT / RIGHT (trackpad two-finger)
+    //   • Shift + wheel    → scrolls map UP / DOWN
+    this.wheelHandler = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoom = this.cameras.main.zoom;
+      const scrollSpeed = 1.5;
+
+      if (e.shiftKey) {
+        this.cameras.main.scrollY += (e.deltaY / zoom) * scrollSpeed;
+      } else {
+        this.cameras.main.scrollX +=
+          ((e.deltaX + e.deltaY) / zoom) * scrollSpeed;
+      }
+    };
+    this.game.canvas.addEventListener("wheel", this.wheelHandler, {
+      passive: false,
+    });
+
+    // ── 4. Pinch-to-zoom (real touchscreens only) ─────────────────────────────
+    if (hasTouchScreen) {
       let initialDistance = 0;
       let initialZoom = 1;
-      let initialCenterX = 0;
-      let initialCenterY = 0;
 
-      this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      this.input.on("pointerdown", () => {
         if (this.input.pointer2.isDown) {
           const dx = this.input.pointer1.x - this.input.pointer2.x;
           const dy = this.input.pointer1.y - this.input.pointer2.y;
           initialDistance = Math.sqrt(dx * dx + dy * dy);
           initialZoom = this.cameras.main.zoom;
-
-          // Calculate center point for zoom
-          initialCenterX = (this.input.pointer1.x + this.input.pointer2.x) / 2;
-          initialCenterY = (this.input.pointer1.y + this.input.pointer2.y) / 2;
         }
       });
 
@@ -586,7 +600,6 @@ export class WorldMapScene extends Phaser.Scene {
           const dx = this.input.pointer1.x - this.input.pointer2.x;
           const dy = this.input.pointer1.y - this.input.pointer2.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-
           if (initialDistance > 0) {
             const scale = distance / initialDistance;
             const newZoom = Phaser.Math.Clamp(initialZoom * scale, 0.25, 1.8);
@@ -631,12 +644,18 @@ export class WorldMapScene extends Phaser.Scene {
 
     // ── Step 1 — Compute the "perfect fit" zoom for width AND height ─────────
     // Fit one stage (BIOME_WIDTH) horizontally with a comfortable side margin.
-    const hMargin = isSmallMobile ? 0.88 : isMobile ? 0.90 : 0.93;
+    const hMargin = isSmallMobile ? 0.88 : isMobile ? 0.9 : 0.93;
     const fitZoomW = (width * hMargin) / this.BIOME_WIDTH;
 
     // Fit the full rendered panel height (tiles * scale) vertically with margin.
     const panelH = this.map.heightInPixels * this.MAP_PANEL_SCALE;
-    const vMargin = isSmallMobile ? 0.82 : isMobile ? 0.85 : isPortrait ? 0.88 : 0.92;
+    const vMargin = isSmallMobile
+      ? 0.82
+      : isMobile
+        ? 0.85
+        : isPortrait
+          ? 0.88
+          : 0.92;
     const fitZoomH = (height * vMargin) / panelH;
 
     // The base zoom is the smaller of the two fits — guarantees nothing is cut.
@@ -645,17 +664,17 @@ export class WorldMapScene extends Phaser.Scene {
     // ── Step 2 — Per-device fine-tuning nudges ───────────────────────────────
     if (is4KDisplay) {
       // 4 K / ultra-HD monitors — map can afford to be slightly larger.
-      zoom *= 1.10;
+      zoom *= 1.1;
     } else if (isLargeDesktop) {
       zoom *= 1.05;
     } else if (isMediumDesktop) {
-      zoom *= 1.00;  // perfect fit, no nudge
+      zoom *= 1.0; // perfect fit, no nudge
     } else if (isSmallDesktop) {
-      zoom *= 0.97;  // tiny inset so stage label is visible
+      zoom *= 0.97; // tiny inset so stage label is visible
     } else if (isTabletLandscape) {
       zoom *= 0.95;
     } else if (isTabletPortrait) {
-      zoom *= 0.90;
+      zoom *= 0.9;
     } else if (isMobile) {
       zoom *= isPortrait ? 0.88 : 0.92;
     } else if (isSmallMobile) {
@@ -689,7 +708,8 @@ export class WorldMapScene extends Phaser.Scene {
 
     // ── Step 6 — Compute camera target ──────────────────────────────────────
     const activeNode = this.getCurrentActiveCheckpointNode();
-    const stageCenterX = (this.currentStage - 1) * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
+    const stageCenterX =
+      (this.currentStage - 1) * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
     const stageCenterY = this.MAP_HEIGHT / 2;
 
     // Apply bounds for the current stage
@@ -721,7 +741,10 @@ export class WorldMapScene extends Phaser.Scene {
     this.registry.set("cameraZoom", zoom);
     this.registry.set("isMobile", isSmallMobile || isMobile);
     this.registry.set("isTablet", isTabletPortrait || isTabletLandscape);
-    this.registry.set("isDesktop", isSmallDesktop || isMediumDesktop || isLargeDesktop || is4KDisplay);
+    this.registry.set(
+      "isDesktop",
+      isSmallDesktop || isMediumDesktop || isLargeDesktop || is4KDisplay,
+    );
   }
 
   /**
@@ -843,33 +866,33 @@ export class WorldMapScene extends Phaser.Scene {
     const style =
       biome.id === 2
         ? {
-          baseTint: 0xc2ea7b,
-          shadeTint: 0x7dbb49,
-          canopyTint: 0x21532f,
-          mistTint: 0xe9ffd8,
-          waterTint: 0x83d7e5,
-          pathTint: 0xb78b5a,
-          hillTint: 0xffffff,
-        }
+            baseTint: 0xc2ea7b,
+            shadeTint: 0x7dbb49,
+            canopyTint: 0x21532f,
+            mistTint: 0xe9ffd8,
+            waterTint: 0x83d7e5,
+            pathTint: 0xb78b5a,
+            hillTint: 0xffffff,
+          }
         : biome.id === 5
           ? {
-            baseTint: 0xa5c56d,
-            shadeTint: 0x6c8748,
-            canopyTint: 0x2f2a22,
-            mistTint: 0xf4efd9,
-            waterTint: 0x6fb7cb,
-            pathTint: 0x9a7a53,
-            hillTint: 0xf3efe0,
-          }
+              baseTint: 0xa5c56d,
+              shadeTint: 0x6c8748,
+              canopyTint: 0x2f2a22,
+              mistTint: 0xf4efd9,
+              waterTint: 0x6fb7cb,
+              pathTint: 0x9a7a53,
+              hillTint: 0xf3efe0,
+            }
           : {
-            baseTint: 0xb8de7c,
-            shadeTint: 0x6d9157,
-            canopyTint: 0x39455a,
-            mistTint: 0xf2f7fb,
-            waterTint: 0x74aeca,
-            pathTint: 0xaa7d60,
-            hillTint: 0xf6f1e9,
-          };
+              baseTint: 0xb8de7c,
+              shadeTint: 0x6d9157,
+              canopyTint: 0x39455a,
+              mistTint: 0xf2f7fb,
+              waterTint: 0x74aeca,
+              pathTint: 0xaa7d60,
+              hillTint: 0xf6f1e9,
+            };
     const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
     const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
     const hillFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24, 33, 34, 35, 88, 89];
@@ -906,7 +929,7 @@ export class WorldMapScene extends Phaser.Scene {
       radiusY: number,
     ) =>
       ((x - centerX) * (x - centerX)) / (radiusX * radiusX) +
-      ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
+        ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
       1;
 
     const addFrameSprite = (
@@ -1048,7 +1071,7 @@ export class WorldMapScene extends Phaser.Scene {
           addFrameSprite(
             "sprout_grass_sheet",
             grassAccentFrames[
-            (col + row + biome.id) % grassAccentFrames.length
+              (col + row + biome.id) % grassAccentFrames.length
             ],
             col,
             row,
@@ -2364,30 +2387,48 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Spectacular warm sunset orange & golden autumn theme
     const COLORS = {
-      sky: 0x240f03,          // Deepest velvety rich dark amber/chocolate
-      ground: 0x2d1304,        // Warm amber-brown ground
-      groundAlt: 0x291103,     // Slightly darker amber-brown
-      grass: 0x451a03,         // Warm autumn auburn/dark orange grass
-      grassDark: 0x1c0700,     // Deep autumn grass shadow
-      path: 0x4a2708,          // Sophisticated dark golden paths
-      pathEdge: 0xb45309,      // Glowing amber edges for paths
-      accent: 0xd97706,        // Vibrant amber/orange highlight
-      highlight: 0xf59e0b,     // Soft golden/orange glows
-      glow: 0xfef08a,          // Soft warm gold ambient light
-      tree: 0x5c2b03,          // Mystical dark redwood canopy
-      treeDark: 0x271000,      // Deep redwood shadow
-      flower: 0xf97316,        // Vibrant orange sunset flower
-      flowerGlow: 0xffedd5,    // Soft warm cream/peach glow
+      sky: 0x240f03, // Deepest velvety rich dark amber/chocolate
+      ground: 0x2d1304, // Warm amber-brown ground
+      groundAlt: 0x291103, // Slightly darker amber-brown
+      grass: 0x451a03, // Warm autumn auburn/dark orange grass
+      grassDark: 0x1c0700, // Deep autumn grass shadow
+      path: 0x4a2708, // Sophisticated dark golden paths
+      pathEdge: 0xb45309, // Glowing amber edges for paths
+      accent: 0xd97706, // Vibrant amber/orange highlight
+      highlight: 0xf59e0b, // Soft golden/orange glows
+      glow: 0xfef08a, // Soft warm gold ambient light
+      tree: 0x5c2b03, // Mystical dark redwood canopy
+      treeDark: 0x271000, // Deep redwood shadow
+      flower: 0xf97316, // Vibrant orange sunset flower
+      flowerGlow: 0xffedd5, // Soft warm cream/peach glow
     };
 
     // Check if external tileset is loaded (optional enhancement)
-    const hasExternalTileset = this.textures.exists('stage7-tileset');
+    const hasExternalTileset = this.textures.exists("stage7-tileset");
 
     if (hasExternalTileset) {
-      this.createCrossroadsWithExternalTileset(panelX, panelOffsetY, scale, TILE_SIZE, COLS, ROWS, COLORS);
+      this.createCrossroadsWithExternalTileset(
+        panelX,
+        panelOffsetY,
+        scale,
+        TILE_SIZE,
+        COLS,
+        ROWS,
+        COLORS,
+      );
     } else {
       // Enhanced version with more details
-      this.createEnhancedCrossroadsTown(panelX, panelOffsetY, scale, TILE_SIZE, COLS, ROWS, midRow, midCol, COLORS);
+      this.createEnhancedCrossroadsTown(
+        panelX,
+        panelOffsetY,
+        scale,
+        TILE_SIZE,
+        COLS,
+        ROWS,
+        midRow,
+        midCol,
+        COLORS,
+      );
     }
   }
 
@@ -2406,7 +2447,7 @@ export class WorldMapScene extends Phaser.Scene {
       panelOffsetY,
       cols * tileSize,
       rows * tileSize,
-      'stage7-tileset'
+      "stage7-tileset",
     );
     tilemap.setOrigin(0, 0);
     tilemap.setTint(colors.glow);
@@ -2424,7 +2465,7 @@ export class WorldMapScene extends Phaser.Scene {
       cols * tileSize,
       tileSize * 3,
       colors.ground,
-      1
+      1,
     );
     hRoad.setDepth(2);
     this.backgroundLayer.add(hRoad);
@@ -2436,24 +2477,24 @@ export class WorldMapScene extends Phaser.Scene {
       tileSize * 3,
       rows * tileSize,
       colors.ground,
-      1
+      1,
     );
     vRoad.setDepth(2);
     this.backgroundLayer.add(vRoad);
 
     // Add buildings if available
-    if (this.textures.exists('stage7-buildings')) {
+    if (this.textures.exists("stage7-buildings")) {
       const buildingPositions = [
         { x: 5, y: 10 },
         { x: 15, y: 8 },
         { x: 25, y: 12 },
       ];
 
-      buildingPositions.forEach(pos => {
+      buildingPositions.forEach((pos) => {
         const building = this.add.sprite(
           panelX + pos.x * tileSize,
           panelOffsetY + pos.y * tileSize,
-          'stage7-buildings'
+          "stage7-buildings",
         );
         building.setOrigin(0.5, 1);
         building.setScale(scale);
@@ -2469,7 +2510,7 @@ export class WorldMapScene extends Phaser.Scene {
       panelOffsetY + midRow * tileSize,
       tileSize * 0.8,
       colors.accent,
-      0.5
+      0.5,
     );
     marker.setDepth(3);
     this.backgroundLayer.add(marker);
@@ -2513,8 +2554,12 @@ export class WorldMapScene extends Phaser.Scene {
       const y = panelOffsetY + i * stepH;
 
       // Interpolate from deep dark space amber/black (0x140701) to rich glowing warm sunset orange (0x5a2003)
-      const rStart = 20, gStart = 7, bStart = 1;
-      const rEnd = 90, gEnd = 32, bEnd = 3;
+      const rStart = 20,
+        gStart = 7,
+        bStart = 1;
+      const rEnd = 90,
+        gEnd = 32,
+        bEnd = 3;
 
       const r = Math.floor(rStart + (rEnd - rStart) * t);
       const g = Math.floor(gStart + (gEnd - gStart) * t);
@@ -2547,7 +2592,7 @@ export class WorldMapScene extends Phaser.Scene {
         duration: 2000 + Math.random() * 2000,
         yoyo: true,
         repeat: -1,
-        ease: "Sine.easeInOut"
+        ease: "Sine.easeInOut",
       });
     }
 
@@ -2555,63 +2600,127 @@ export class WorldMapScene extends Phaser.Scene {
     const estates = [
       // --- TOP-LEFT QUADRANT (2 houses) ---
       {
-        houseRow: 5, houseCol: 5,
-        trees: [[4, 4], [4, 6]],
+        houseRow: 5,
+        houseCol: 5,
+        trees: [
+          [4, 4],
+          [4, 6],
+        ],
         lawn: { minR: 3, maxR: 7, minC: 3, maxC: 7 },
-        walkway: [[6, 5], [7, 5], [8, 5]]
+        walkway: [
+          [6, 5],
+          [7, 5],
+          [8, 5],
+        ],
       },
       {
-        houseRow: 5, houseCol: 12,
-        trees: [[4, 11], [4, 13]],
+        houseRow: 5,
+        houseCol: 12,
+        trees: [
+          [4, 11],
+          [4, 13],
+        ],
         lawn: { minR: 3, maxR: 7, minC: 10, maxC: 14 },
-        walkway: [[6, 12], [7, 12], [8, 12]]
+        walkway: [
+          [6, 12],
+          [7, 12],
+          [8, 12],
+        ],
       },
 
       // --- TOP-RIGHT QUADRANT (2 houses) ---
       {
-        houseRow: 5, houseCol: 27,
-        trees: [[4, 26], [4, 28]],
+        houseRow: 5,
+        houseCol: 27,
+        trees: [
+          [4, 26],
+          [4, 28],
+        ],
         lawn: { minR: 3, maxR: 7, minC: 25, maxC: 29 },
-        walkway: [[6, 27], [7, 27], [8, 27]]
+        walkway: [
+          [6, 27],
+          [7, 27],
+          [8, 27],
+        ],
       },
       {
-        houseRow: 5, houseCol: 34,
-        trees: [[4, 33], [4, 35]],
+        houseRow: 5,
+        houseCol: 34,
+        trees: [
+          [4, 33],
+          [4, 35],
+        ],
         lawn: { minR: 3, maxR: 7, minC: 32, maxC: 36 },
-        walkway: [[6, 34], [7, 34], [8, 34]]
+        walkway: [
+          [6, 34],
+          [7, 34],
+          [8, 34],
+        ],
       },
 
       // --- BOTTOM-LEFT QUADRANT (2 houses) ---
       // House 5: Aligns directly with Checkpoint 1 at (col 7, row 31)
       {
-        houseRow: 29, houseCol: 7,
-        trees: [[28, 6], [28, 8]],
+        houseRow: 29,
+        houseCol: 7,
+        trees: [
+          [28, 6],
+          [28, 8],
+        ],
         lawn: { minR: 27, maxR: 31, minC: 5, maxC: 9 },
-        walkway: [[30, 7], [31, 7], [32, 7]]
+        walkway: [
+          [30, 7],
+          [31, 7],
+          [32, 7],
+        ],
       },
       // House 6: Perfectly positioned near the checkpoints with visible background trees
       {
-        houseRow: 19, houseCol: 15,
-        trees: [[16, 14], [16, 16]],
+        houseRow: 19,
+        houseCol: 15,
+        trees: [
+          [16, 14],
+          [16, 16],
+        ],
         lawn: { minR: 17, maxR: 21, minC: 13, maxC: 17 },
-        walkway: [[20, 15], [21, 15], [22, 15]]
+        walkway: [
+          [20, 15],
+          [21, 15],
+          [22, 15],
+        ],
       },
 
       // --- BOTTOM-RIGHT QUADRANT (2 houses) ---
       // House 7: Perfectly positioned near the checkpoints with visible background trees
       {
-        houseRow: 19, houseCol: 27,
-        trees: [[16, 26], [16, 28]],
+        houseRow: 19,
+        houseCol: 27,
+        trees: [
+          [16, 26],
+          [16, 28],
+        ],
         lawn: { minR: 17, maxR: 21, minC: 25, maxC: 29 },
-        walkway: [[20, 27], [21, 27], [22, 27]]
+        walkway: [
+          [20, 27],
+          [21, 27],
+          [22, 27],
+        ],
       },
       // House 8: Moved left to col 33 so Checkpoint 4 is completely visible and the house does not overlap
       {
-        houseRow: 29, houseCol: 33,
-        trees: [[26, 32], [26, 34]],
+        houseRow: 29,
+        houseCol: 33,
+        trees: [
+          [26, 32],
+          [26, 34],
+        ],
         lawn: { minR: 27, maxR: 31, minC: 31, maxC: 35 },
-        walkway: [[30, 33], [31, 33], [32, 33]]
-      }
+        walkway: [
+          [30, 33],
+          [31, 33],
+          [32, 33],
+        ],
+      },
     ];
 
     // Generate enhanced tilemap with beautiful town layout
@@ -2632,8 +2741,12 @@ export class WorldMapScene extends Phaser.Scene {
               return PATH_H; // paved stone walkway to main streets
             }
           }
-          if (row >= est.lawn.minR && row <= est.lawn.maxR &&
-            col >= est.lawn.minC && col <= est.lawn.maxC) {
+          if (
+            row >= est.lawn.minR &&
+            row <= est.lawn.maxR &&
+            col >= est.lawn.minC &&
+            col <= est.lawn.maxC
+          ) {
             return GRASS;
           }
         }
@@ -2674,7 +2787,7 @@ export class WorldMapScene extends Phaser.Scene {
 
         // Default to a perfectly clean background ground
         return GROUND;
-      })
+      }),
     );
 
     // Render tiles from enhanced 2D array
@@ -2695,12 +2808,25 @@ export class WorldMapScene extends Phaser.Scene {
 
           case GRASS: {
             // Semi-transparent grass to blend with the glowing background gradient
-            const tile = this.add.rectangle(x, y, tileSize, tileSize, colors.grass, 0.75);
+            const tile = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.grass,
+              0.75,
+            );
             tile.setDepth(1);
             this.backgroundLayer.add(tile);
 
             // Add grass texture
-            const grassDot = this.add.circle(x + (row % 3) - 1, y + (col % 3) - 1, 1, colors.grassDark, 0.5);
+            const grassDot = this.add.circle(
+              x + (row % 3) - 1,
+              y + (col % 3) - 1,
+              1,
+              colors.grassDark,
+              0.5,
+            );
             grassDot.setDepth(2);
             this.backgroundLayer.add(grassDot);
             break;
@@ -2708,13 +2834,30 @@ export class WorldMapScene extends Phaser.Scene {
 
           case PATH_H:
           case PATH_V: {
-            const tile = this.add.rectangle(x, y, tileSize, tileSize, colors.path, 1);
+            const tile = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.path,
+              1,
+            );
             tile.setDepth(2);
             this.backgroundLayer.add(tile);
 
             // Path edge highlights
-            if (tileType === PATH_H && (row === midRow - 1 || row === midRow + 1)) {
-              const edge = this.add.rectangle(x, y, tileSize, 2, colors.pathEdge, 0.4);
+            if (
+              tileType === PATH_H &&
+              (row === midRow - 1 || row === midRow + 1)
+            ) {
+              const edge = this.add.rectangle(
+                x,
+                y,
+                tileSize,
+                2,
+                colors.pathEdge,
+                0.4,
+              );
               edge.setDepth(3);
               this.backgroundLayer.add(edge);
             }
@@ -2722,13 +2865,24 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case HOUSE: {
-            const ground = this.add.rectangle(x, y, tileSize, tileSize, colors.grass, 1);
+            const ground = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.grass,
+              1,
+            );
             ground.setDepth(1);
             this.backgroundLayer.add(ground);
 
             // Use existing house sprites if available
-            if (this.textures.exists('House_Hay_1') || this.textures.exists('House_Hay_2')) {
-              const houseKey = (row + col) % 2 === 0 ? 'House_Hay_1' : 'House_Hay_2';
+            if (
+              this.textures.exists("House_Hay_1") ||
+              this.textures.exists("House_Hay_2")
+            ) {
+              const houseKey =
+                (row + col) % 2 === 0 ? "House_Hay_1" : "House_Hay_2";
               if (this.textures.exists(houseKey)) {
                 const house = this.add.sprite(x, y + tileSize / 2, houseKey);
                 house.setOrigin(0.5, 1);
@@ -2738,22 +2892,53 @@ export class WorldMapScene extends Phaser.Scene {
                 this.midgroundLayer.add(house);
 
                 // Add shadow
-                const shadow = this.add.ellipse(x, y + tileSize / 2, tileSize * 0.8, tileSize * 0.3, 0x000000, 0.3);
+                const shadow = this.add.ellipse(
+                  x,
+                  y + tileSize / 2,
+                  tileSize * 0.8,
+                  tileSize * 0.3,
+                  0x000000,
+                  0.3,
+                );
                 shadow.setDepth(7);
                 this.midgroundLayer.add(shadow);
               }
             } else {
               // Fallback: simple house shape
-              const houseBody = this.add.rectangle(x, y, tileSize * 0.8, tileSize * 0.8, 0x8b7355, 1);
+              const houseBody = this.add.rectangle(
+                x,
+                y,
+                tileSize * 0.8,
+                tileSize * 0.8,
+                0x8b7355,
+                1,
+              );
               houseBody.setDepth(8);
               this.midgroundLayer.add(houseBody);
 
-              const roof = this.add.triangle(x, y - tileSize * 0.4, 0, tileSize * 0.4, tileSize * 0.5, -tileSize * 0.2, -tileSize * 0.5, -tileSize * 0.2, 0xd4a574);
+              const roof = this.add.triangle(
+                x,
+                y - tileSize * 0.4,
+                0,
+                tileSize * 0.4,
+                tileSize * 0.5,
+                -tileSize * 0.2,
+                -tileSize * 0.5,
+                -tileSize * 0.2,
+                0xd4a574,
+              );
               roof.setDepth(9);
               this.midgroundLayer.add(roof);
 
               // Window glow
-              const window1 = this.add.rectangle(x - 4, y, 3, 3, colors.highlight, 0.8);
+              const window1 = this.add.rectangle(
+                x - 4,
+                y,
+                3,
+                3,
+                colors.highlight,
+                0.8,
+              );
               window1.setDepth(10);
               this.midgroundLayer.add(window1);
             }
@@ -2761,12 +2946,23 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case GARDEN: {
-            const tile = this.add.rectangle(x, y, tileSize, tileSize, colors.grass, 1);
+            const tile = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.grass,
+              1,
+            );
             tile.setDepth(1);
             this.backgroundLayer.add(tile);
 
             // Garden flowers
-            const flowerColors = [colors.flower, colors.flowerGlow, colors.highlight];
+            const flowerColors = [
+              colors.flower,
+              colors.flowerGlow,
+              colors.highlight,
+            ];
             const flowerColor = flowerColors[(row + col) % 3];
             const flower = this.add.circle(x, y, 2, flowerColor, 0.7);
             flower.setDepth(4);
@@ -2775,13 +2971,24 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case TREE: {
-            const ground = this.add.rectangle(x, y, tileSize, tileSize, colors.grass, 1);
+            const ground = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.grass,
+              1,
+            );
             ground.setDepth(1);
             this.backgroundLayer.add(ground);
 
             // Use existing tree sprites if available
-            if (this.textures.exists('Tree_Emerald_1')) {
-              const tree = this.add.sprite(x, y + tileSize / 2, 'Tree_Emerald_1');
+            if (this.textures.exists("Tree_Emerald_1")) {
+              const tree = this.add.sprite(
+                x,
+                y + tileSize / 2,
+                "Tree_Emerald_1",
+              );
               tree.setOrigin(0.5, 1);
               tree.setScale(scale * 0.8);
               tree.setTint(colors.tree);
@@ -2789,16 +2996,37 @@ export class WorldMapScene extends Phaser.Scene {
               this.midgroundLayer.add(tree);
 
               // Shadow
-              const shadow = this.add.ellipse(x, y + tileSize / 2, tileSize * 0.6, tileSize * 0.2, 0x000000, 0.3);
+              const shadow = this.add.ellipse(
+                x,
+                y + tileSize / 2,
+                tileSize * 0.6,
+                tileSize * 0.2,
+                0x000000,
+                0.3,
+              );
               shadow.setDepth(5);
               this.midgroundLayer.add(shadow);
             } else {
               // Fallback tree
-              const canopy = this.add.ellipse(x, y - 4, 14, 18, colors.tree, 0.9);
+              const canopy = this.add.ellipse(
+                x,
+                y - 4,
+                14,
+                18,
+                colors.tree,
+                0.9,
+              );
               canopy.setDepth(6);
               this.backgroundLayer.add(canopy);
 
-              const trunk = this.add.rectangle(x, y + 4, 4, 10, colors.treeDark, 1);
+              const trunk = this.add.rectangle(
+                x,
+                y + 4,
+                4,
+                10,
+                colors.treeDark,
+                1,
+              );
               trunk.setDepth(5);
               this.backgroundLayer.add(trunk);
             }
@@ -2806,7 +3034,14 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case FLOWER: {
-            const ground = this.add.rectangle(x, y, tileSize, tileSize, colors.grass, 1);
+            const ground = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.grass,
+              1,
+            );
             ground.setDepth(1);
             this.backgroundLayer.add(ground);
 
@@ -2824,13 +3059,20 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case LAMP: {
-            const ground = this.add.rectangle(x, y, tileSize, tileSize, colors.path, 1);
+            const ground = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.path,
+              1,
+            );
             ground.setDepth(2);
             this.backgroundLayer.add(ground);
 
             // Use existing lamp post if available
-            if (this.textures.exists('LampPost_3')) {
-              const lamp = this.add.sprite(x, y + tileSize / 2, 'LampPost_3');
+            if (this.textures.exists("LampPost_3")) {
+              const lamp = this.add.sprite(x, y + tileSize / 2, "LampPost_3");
               lamp.setOrigin(0.5, 1);
               lamp.setScale(scale);
               lamp.setTint(colors.glow);
@@ -2838,7 +3080,13 @@ export class WorldMapScene extends Phaser.Scene {
               this.midgroundLayer.add(lamp);
 
               // Lamp glow
-              const lampGlow = this.add.circle(x, y - tileSize / 2, 12, colors.highlight, 0.3);
+              const lampGlow = this.add.circle(
+                x,
+                y - tileSize / 2,
+                12,
+                colors.highlight,
+                0.3,
+              );
               lampGlow.setDepth(10);
               lampGlow.setBlendMode(Phaser.BlendModes.ADD);
               this.midgroundLayer.add(lampGlow);
@@ -2848,7 +3096,13 @@ export class WorldMapScene extends Phaser.Scene {
               post.setDepth(9);
               this.midgroundLayer.add(post);
 
-              const light = this.add.circle(x, y - tileSize / 2, 4, colors.highlight, 0.9);
+              const light = this.add.circle(
+                x,
+                y - tileSize / 2,
+                4,
+                colors.highlight,
+                0.9,
+              );
               light.setDepth(10);
               light.setBlendMode(Phaser.BlendModes.ADD);
               this.midgroundLayer.add(light);
@@ -2857,7 +3111,14 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case BUSH: {
-            const ground = this.add.rectangle(x, y, tileSize, tileSize, colors.grass, 1);
+            const ground = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.grass,
+              1,
+            );
             ground.setDepth(1);
             this.backgroundLayer.add(ground);
 
@@ -2866,20 +3127,34 @@ export class WorldMapScene extends Phaser.Scene {
             bush.setDepth(4);
             this.backgroundLayer.add(bush);
 
-            const bushHighlight = this.add.ellipse(x - 2, y - 2, 4, 3, colors.grass, 0.6);
+            const bushHighlight = this.add.ellipse(
+              x - 2,
+              y - 2,
+              4,
+              3,
+              colors.grass,
+              0.6,
+            );
             bushHighlight.setDepth(5);
             this.backgroundLayer.add(bushHighlight);
             break;
           }
 
           case ROCK: {
-            const ground = this.add.rectangle(x, y, tileSize, tileSize, colors.grass, 1);
+            const ground = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.grass,
+              1,
+            );
             ground.setDepth(1);
             this.backgroundLayer.add(ground);
 
             // Use existing rock sprite if available
-            if (this.textures.exists('Rock_Brown_1')) {
-              const rock = this.add.sprite(x, y, 'Rock_Brown_1');
+            if (this.textures.exists("Rock_Brown_1")) {
+              const rock = this.add.sprite(x, y, "Rock_Brown_1");
               rock.setOrigin(0.5, 0.5);
               rock.setScale(scale * 0.6);
               rock.setTint(0x6a5a8a);
@@ -2895,7 +3170,14 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case WELL: {
-            const ground = this.add.rectangle(x, y, tileSize, tileSize, colors.path, 1);
+            const ground = this.add.rectangle(
+              x,
+              y,
+              tileSize,
+              tileSize,
+              colors.path,
+              1,
+            );
             ground.setDepth(2);
             this.backgroundLayer.add(ground);
 
@@ -2904,12 +3186,24 @@ export class WorldMapScene extends Phaser.Scene {
             wellBase.setDepth(7);
             this.backgroundLayer.add(wellBase);
 
-            const wellTop = this.add.circle(x, y, tileSize * 0.4, colors.accent, 0.8);
+            const wellTop = this.add.circle(
+              x,
+              y,
+              tileSize * 0.4,
+              colors.accent,
+              0.8,
+            );
             wellTop.setDepth(8);
             this.backgroundLayer.add(wellTop);
 
             // Water glow
-            const waterGlow = this.add.circle(x, y, tileSize * 0.5, colors.highlight, 0.3);
+            const waterGlow = this.add.circle(
+              x,
+              y,
+              tileSize * 0.5,
+              colors.highlight,
+              0.3,
+            );
             waterGlow.setDepth(9);
             waterGlow.setBlendMode(Phaser.BlendModes.ADD);
             this.backgroundLayer.add(waterGlow);
@@ -2928,7 +3222,7 @@ export class WorldMapScene extends Phaser.Scene {
       toY(midRow),
       plazaSize / 2,
       colors.accent,
-      0.2
+      0.2,
     );
     plazaOuter.setDepth(3);
     this.backgroundLayer.add(plazaOuter);
@@ -2939,7 +3233,7 @@ export class WorldMapScene extends Phaser.Scene {
       toY(midRow),
       plazaSize / 3,
       colors.highlight,
-      0.3
+      0.3,
     );
     plazaMiddle.setDepth(4);
     this.backgroundLayer.add(plazaMiddle);
@@ -2950,7 +3244,7 @@ export class WorldMapScene extends Phaser.Scene {
       toY(midRow),
       tileSize * 0.8,
       0x6a5a4a,
-      1
+      1,
     );
     monumentBase.setDepth(7);
     this.backgroundLayer.add(monumentBase);
@@ -2960,7 +3254,7 @@ export class WorldMapScene extends Phaser.Scene {
       toY(midRow),
       tileSize * 0.6,
       colors.highlight,
-      0.8
+      0.8,
     );
     monument.setDepth(8);
     this.backgroundLayer.add(monument);
@@ -2971,7 +3265,7 @@ export class WorldMapScene extends Phaser.Scene {
       toY(midRow),
       tileSize * 1.2,
       colors.glow,
-      0.3
+      0.3,
     );
     monumentGlow.setDepth(6);
     monumentGlow.setBlendMode(Phaser.BlendModes.ADD);
@@ -3064,7 +3358,7 @@ export class WorldMapScene extends Phaser.Scene {
           landTiles.fillCircle(
             c * tileSize + tileSize * 0.5,
             r * tileSize + tileSize * 0.5,
-            tileSize * 0.3
+            tileSize * 0.3,
           );
         }
       }
@@ -3088,7 +3382,13 @@ export class WorldMapScene extends Phaser.Scene {
         const offsetY = (Math.random() - 0.5) * tileSize * 0.3;
 
         road.fillStyle(0x9d7d54, 0.35);
-        road.fillRoundedRect(x + offsetX, y + offsetY, stoneSize, stoneSize * 0.8, 2);
+        road.fillRoundedRect(
+          x + offsetX,
+          y + offsetY,
+          stoneSize,
+          stoneSize * 0.8,
+          2,
+        );
 
         // Stone highlights
         road.fillStyle(0xb89968, 0.15);
@@ -3252,9 +3552,11 @@ export class WorldMapScene extends Phaser.Scene {
       const x = panelX + Math.random() * panelW;
       const y = panelOffsetY + Math.random() * panelH;
 
-      if (Math.abs(y - midY) > 30) { // Avoid road
+      if (Math.abs(y - midY) > 30) {
+        // Avoid road
         const flowerColors = [0xff6b9d, 0xfbbf24, 0x7bc99c, 0xe85d3a];
-        const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+        const color =
+          flowerColors[Math.floor(Math.random() * flowerColors.length)];
         ambient.fillStyle(color, 0.4);
         ambient.fillCircle(x, y, 2);
       }
@@ -4273,7 +4575,7 @@ export class WorldMapScene extends Phaser.Scene {
       }
 
       // Add tropical greenery clusters
-      const greeneryType = ((index % 5) + 1);
+      const greeneryType = (index % 5) + 1;
       const greeneryKey = `tropical_greenery_${greeneryType}`;
 
       if (this.textures.exists(greeneryKey)) {
@@ -4290,7 +4592,7 @@ export class WorldMapScene extends Phaser.Scene {
           const greenery = this.add.sprite(
             node.x + offsetX,
             node.y + offsetY,
-            greeneryKey
+            greeneryKey,
           );
           greenery.setOrigin(0.5, 1);
           greenery.setScale(scale);
@@ -4301,7 +4603,7 @@ export class WorldMapScene extends Phaser.Scene {
       }
 
       // Add decorative elements
-      const decorType = ((index % 18) + 1);
+      const decorType = (index % 18) + 1;
       const decorKey = `tropical_decor_${decorType}`;
 
       if (this.textures.exists(decorKey)) {
@@ -4744,7 +5046,10 @@ export class WorldMapScene extends Phaser.Scene {
       // Venture stages 3 and 4 use bespoke plaza layouts, so skip the generic
       // wooden connector there. Stage 7 Crossroads does not need the wooden plank overlay.
       const shouldSkipGenericConnector =
-        (this.currentTemplateId === "venture" && [1, 3, 4].includes(stage.id)) || stage.id === 1 || stage.id === 7;
+        (this.currentTemplateId === "venture" &&
+          [1, 3, 4].includes(stage.id)) ||
+        stage.id === 1 ||
+        stage.id === 7;
       if (!shouldSkipGenericConnector && stagePositions.length > 1 && biome) {
         this.drawStagePathConnector(stagePositions, biome.colors.path, 0.9);
       }
@@ -5061,7 +5366,7 @@ export class WorldMapScene extends Phaser.Scene {
     if (stageId === 1) {
       const anchor =
         stageOneVillageAnchors[
-        Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
+          Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
         ];
       return {
         x: biomeOffsetX + anchor.x * this.MAP_PANEL_SCALE,
@@ -5148,10 +5453,10 @@ export class WorldMapScene extends Phaser.Scene {
       // Crossroads: CP1 & CP4 at bottom corners, CP2 directly in front of House 6 (col 15),
       // CP3 directly in front of House 7 (col 27). tile=16px, so col*16+8 = centre of tile column.
       7: [
-        { x: 112, y: 500 },   // CP1 — bottom-left corner (House 5)
-        { x: 248, y: 370 },   // CP2 — col 15 centre (15*16+8=248), row 23 (23*16+2=370)
-        { x: 440, y: 370 },   // CP3 — col 27 centre (27*16+8=440), row 23
-        { x: 528, y: 500 },   // CP4 — bottom-right corner (House 8)
+        { x: 112, y: 500 }, // CP1 — bottom-left corner (House 5)
+        { x: 248, y: 370 }, // CP2 — col 15 centre (15*16+8=248), row 23 (23*16+2=370)
+        { x: 440, y: 370 }, // CP3 — col 27 centre (27*16+8=440), row 23
+        { x: 528, y: 500 }, // CP4 — bottom-right corner (House 8)
       ],
       // Capital: a ceremonial approach up to the citadel, then back to the gate.
       8: [
@@ -5340,13 +5645,15 @@ export class WorldMapScene extends Phaser.Scene {
   /**
    * Updates contributor sprite personas orbiting the main player
    */
-  private handleUpdateContributors(event?: { contributors: ContributorData[] }): void {
+  private handleUpdateContributors(event?: {
+    contributors: ContributorData[];
+  }): void {
     if (!event || !event.contributors) return;
     console.log("[Phaser] Received UPDATE_CONTRIBUTORS:", event.contributors);
 
     // Limit to maximum 5 contributors visible at once
     const allowedContributors = event.contributors.slice(0, 5);
-    const activeIds = new Set(allowedContributors.map(c => c.userId));
+    const activeIds = new Set(allowedContributors.map((c) => c.userId));
 
     // 1. Remove companions that are no longer in the active list
     for (const [userId, companion] of this.companions.entries()) {
@@ -5365,12 +5672,12 @@ export class WorldMapScene extends Phaser.Scene {
         const startY = this.persona ? this.persona.y : 0;
 
         companion = new ContributorCompanion(this, startX, startY, contributor);
-        
+
         // Add to the main gameLayer (same z-index context as player)
         if (this.gameLayer) {
           this.gameLayer.add(companion);
         }
-        
+
         this.companions.set(contributor.userId, companion);
       } else {
         // Update its data reference
@@ -5604,7 +5911,11 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Draw branching cracks across the biomes
     const numCracks = Math.floor(level / 10);
-    this.environmentalCracksGraphics.lineStyle(2 + (level / 100) * 3, 0x11081a, 0.45 + (level / 100) * 0.4);
+    this.environmentalCracksGraphics.lineStyle(
+      2 + (level / 100) * 3,
+      0x11081a,
+      0.45 + (level / 100) * 0.4,
+    );
 
     for (let i = 0; i < numCracks; i++) {
       // Seeded random positions across the map based on index i to keep them stable
@@ -5620,7 +5931,7 @@ export class WorldMapScene extends Phaser.Scene {
       const segments = 4 + Math.floor((level / 100) * 4);
       for (let s = 0; s < segments; s++) {
         const angle = Math.sin(i * 10 + s) * Math.PI * 2;
-        const length = 20 + Math.floor(Math.cos(i * 5 + s) * 15) + (level / 10);
+        const length = 20 + Math.floor(Math.cos(i * 5 + s) * 15) + level / 10;
         currX += Math.cos(angle) * length;
         currY += Math.sin(angle) * length;
         this.environmentalCracksGraphics.lineTo(currX, currY);
@@ -5694,7 +6005,8 @@ export class WorldMapScene extends Phaser.Scene {
           0,
           event.personaGender as PersonaGender,
           event.userName ?? "User",
-          event.userImageUrl ?? "https://api.dicebear.com/7.x/adventurer/png?seed=User&size=128&backgroundColor=transparent",
+          event.userImageUrl ??
+            "https://api.dicebear.com/7.x/adventurer/png?seed=User&size=128&backgroundColor=transparent",
         );
         this.gameLayer.add(this.persona);
       }
@@ -5835,9 +6147,10 @@ export class WorldMapScene extends Phaser.Scene {
     const allNodes = Array.from(this.checkpointNodes.values());
 
     // ── 1. Find the furthest-forward active/in_progress node ──────────────
-    const frontierNode = allNodes
-      .filter((n) => n.status === "active" || n.status === "in_progress")
-      .sort((a, b) => b.globalIndex - a.globalIndex)[0] ?? null;
+    const frontierNode =
+      allNodes
+        .filter((n) => n.status === "active" || n.status === "in_progress")
+        .sort((a, b) => b.globalIndex - a.globalIndex)[0] ?? null;
 
     // ── 2. Determine target node ───────────────────────────────────────────
     let targetNode: CheckpointNode | null = frontierNode;
@@ -5893,8 +6206,10 @@ export class WorldMapScene extends Phaser.Scene {
     const lastNode = previousNode;
     if (lastNode && targetNode.globalIndex < lastNode.globalIndex) {
       console.warn(
-        '[WorldMapScene] ⚠️ Prevented backward persona movement from',
-        lastNode.globalIndex, '→', targetNode.globalIndex,
+        "[WorldMapScene] ⚠️ Prevented backward persona movement from",
+        lastNode.globalIndex,
+        "→",
+        targetNode.globalIndex,
       );
       this.persona.setPosition(pos.x, pos.y);
       this.persona.setIdleFacingRight(
@@ -5923,7 +6238,7 @@ export class WorldMapScene extends Phaser.Scene {
         targetNode.y - 120,
         targetNode.stage,
         this.activeBiomeConfigs[targetNode.stage - 1]?.colors.accent2 ??
-        0xdff5ff,
+          0xdff5ff,
       );
     }
 
@@ -6044,12 +6359,27 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private updateCameraBoundsForStage(stageId: number): void {
-    if (!this.cameras || !this.cameras.main || !this.physics || !this.physics.world) {
+    if (
+      !this.cameras ||
+      !this.cameras.main ||
+      !this.physics ||
+      !this.physics.world
+    ) {
       return; // Scene not fully initialized or being destroyed
     }
     const stageStartX = (stageId - 1) * this.BIOME_WIDTH;
-    this.cameras.main.setBounds(stageStartX, 0, this.BIOME_WIDTH, this.MAP_HEIGHT + 160);
-    this.physics.world.setBounds(stageStartX, 0, this.BIOME_WIDTH, this.MAP_HEIGHT + 160);
+    this.cameras.main.setBounds(
+      stageStartX,
+      0,
+      this.BIOME_WIDTH,
+      this.MAP_HEIGHT + 160,
+    );
+    this.physics.world.setBounds(
+      stageStartX,
+      0,
+      this.BIOME_WIDTH,
+      this.MAP_HEIGHT + 160,
+    );
   }
 
   private getCurrentActiveCheckpointNode(): CheckpointNode | null {
@@ -6079,14 +6409,14 @@ export class WorldMapScene extends Phaser.Scene {
       visibleWorldWidth >= this.BIOME_WIDTH
         ? stageStartX + this.BIOME_WIDTH / 2
         : Phaser.Math.Clamp(
-          preferredX,
-          stageStartX + halfWidth,
-          stageEndX - halfWidth,
-        );
+            preferredX,
+            stageStartX + halfWidth,
+            stageEndX - halfWidth,
+          );
     const y = Phaser.Math.Clamp(
       preferredY,
       halfHeight,
-      (this.MAP_HEIGHT + 160) - halfHeight,
+      this.MAP_HEIGHT + 160 - halfHeight,
     );
 
     return { x, y };
@@ -6216,7 +6546,12 @@ export class WorldMapScene extends Phaser.Scene {
     if (this.persona && this.companions && this.companions.size > 0) {
       const companionsArray = Array.from(this.companions.values());
       companionsArray.forEach((companion, index) => {
-        companion.updateCompanion(this.persona!.x, this.persona!.y, index, companionsArray.length);
+        companion.updateCompanion(
+          this.persona!.x,
+          this.persona!.y,
+          index,
+          companionsArray.length,
+        );
       });
     }
   }
@@ -6226,7 +6561,8 @@ export class WorldMapScene extends Phaser.Scene {
     if (!firstNode) return;
 
     // Check if Stage 1 Checkpoint 1 pulse is active
-    const isPulseActive = this.currentStage === 1 && firstNode.status === "active";
+    const isPulseActive =
+      this.currentStage === 1 && firstNode.status === "active";
     if (!isPulseActive && !this.lastEmitVisible) {
       return;
     }
@@ -6324,6 +6660,12 @@ export class WorldMapScene extends Phaser.Scene {
     if (this.resizeHandler) {
       this.scale.off("resize", this.resizeHandler);
       this.resizeHandler = undefined;
+    }
+
+    // Remove wheel listener (desktop scroll)
+    if (this.wheelHandler && this.game?.canvas) {
+      this.game.canvas.removeEventListener("wheel", this.wheelHandler);
+      this.wheelHandler = null;
     }
 
     this.updateHandlers.forEach((handler) =>

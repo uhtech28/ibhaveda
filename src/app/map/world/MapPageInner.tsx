@@ -30,7 +30,14 @@ import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { MessageSquare, X, Lock, Users } from "lucide-react";
-import { QuestList, BossHPBar, StageInfo, CheckpointProgress, LevelDisplay, XPBar } from "@/components/hud";
+import {
+  QuestList,
+  BossHPBar,
+  StageInfo,
+  CheckpointProgress,
+  LevelDisplay,
+  XPBar,
+} from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
@@ -46,12 +53,41 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContributorPreviewDialog } from "@/components/user/ContributorPreviewDialog";
 
 // Dynamic/lazy loaded overlay components for faster page loading performance
-const LevelUpSequence = dynamic(() => import("@/components/animations/LevelUpSequence").then(mod => mod.LevelUpSequence), { ssr: false });
-const BadgeAwardSequence = dynamic(() => import("@/components/animations/BadgeAwardSequence").then(mod => mod.BadgeAwardSequence), { ssr: false });
-const TaskSubmissionModal = dynamic(() => import("@/components/map/TaskSubmissionModal").then(mod => mod.TaskSubmissionModal), { ssr: false });
-const StageClearModal = dynamic(() => import("@/components/map/StageClearModal").then(mod => mod.StageClearModal), { ssr: false });
-const WorldMapTour = dynamic(() => import("@/components/map/WorldMapTour").then(mod => mod.WorldMapTour), { ssr: false });
-const ChatThread = dynamic(() => import("@/components/chat/ChatThread"), { ssr: false });
+const LevelUpSequence = dynamic(
+  () =>
+    import("@/components/animations/LevelUpSequence").then(
+      (mod) => mod.LevelUpSequence,
+    ),
+  { ssr: false },
+);
+const BadgeAwardSequence = dynamic(
+  () =>
+    import("@/components/animations/BadgeAwardSequence").then(
+      (mod) => mod.BadgeAwardSequence,
+    ),
+  { ssr: false },
+);
+const TaskSubmissionModal = dynamic(
+  () =>
+    import("@/components/map/TaskSubmissionModal").then(
+      (mod) => mod.TaskSubmissionModal,
+    ),
+  { ssr: false },
+);
+const StageClearModal = dynamic(
+  () =>
+    import("@/components/map/StageClearModal").then(
+      (mod) => mod.StageClearModal,
+    ),
+  { ssr: false },
+);
+const WorldMapTour = dynamic(
+  () => import("@/components/map/WorldMapTour").then((mod) => mod.WorldMapTour),
+  { ssr: false },
+);
+const ChatThread = dynamic(() => import("@/components/chat/ChatThread"), {
+  ssr: false,
+});
 import {
   activeVentureAtom,
   userProgressAtom,
@@ -307,7 +343,9 @@ function deriveCheckpointStatus(
     // If all 3 tasks are done, it's gold but still active
     if (cp.t1Completed && cp.t2Completed && cp.t3Completed) return "gold";
     // If some tasks are done, it's partial
-    return (cp.t1Completed || cp.t2Completed || cp.t3Completed) ? "partial" : "active";
+    return cp.t1Completed || cp.t2Completed || cp.t3Completed
+      ? "partial"
+      : "active";
   }
 
   // For non-active checkpoints, check if they're gold (completed with all 3 tasks)
@@ -374,12 +412,13 @@ function StageStrip({
                   : isCurrent
                     ? st.glow
                     : "rgba(255,255,255,0.06)",
-                border: `1.5px solid ${isDone
-                  ? "#6366f1"
-                  : isCurrent
-                    ? st.glow
-                    : "rgba(255,255,255,0.12)"
-                  }`,
+                border: `1.5px solid ${
+                  isDone
+                    ? "#6366f1"
+                    : isCurrent
+                      ? st.glow
+                      : "rgba(255,255,255,0.12)"
+                }`,
                 boxShadow: isCurrent
                   ? `0 0 20px ${st.glow}, 0 0 40px ${st.glow}40`
                   : isDone
@@ -417,9 +456,7 @@ function StageStrip({
             </motion.div>
 
             {/* Tooltip on hover */}
-            <div
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10"
-            >
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
               <div
                 className="whitespace-nowrap text-[10px] sm:text-xs tracking-wide font-semibold px-3 py-2 rounded-xl shadow-2xl backdrop-blur-xl border"
                 style={{
@@ -504,7 +541,8 @@ function CheckpointPanel({
   const canAdvance = doneTasks >= 2;
   const isGold = doneTasks >= 3;
   const isLocked = detail.status === "locked";
-  const isActiveNode = detail.stage === activeStage && detail.checkpointIndex === activeCheckpoint;
+  const isActiveNode =
+    detail.stage === activeStage && detail.checkpointIndex === activeCheckpoint;
 
   return (
     <AnimatePresence>
@@ -829,21 +867,33 @@ function TaskCard({
       {/* Left accent bar */}
       <div
         className="absolute left-0 top-0 bottom-0 w-[3px] sm:w-[4px] rounded-l-lg sm:rounded-l-xl"
-        style={{ background: task.done ? "#818cf8" : locked ? "#475569" : accentColor }}
+        style={{
+          background: task.done ? "#818cf8" : locked ? "#475569" : accentColor,
+        }}
       />
 
       {/* Check circle */}
       <motion.div
         className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] sm:text-[11px] font-bold"
         style={{
-          background: task.done ? "#6366f1" : locked ? "rgba(255,255,255,0.01)" : "rgba(255,255,255,0.05)",
+          background: task.done
+            ? "#6366f1"
+            : locked
+              ? "rgba(255,255,255,0.01)"
+              : "rgba(255,255,255,0.05)",
           border: `1.5px solid ${task.done ? "#6366f1" : locked ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.15)"}`,
           color: task.done ? "#ffffff" : locked ? "#64748b" : "transparent",
         }}
         animate={task.done ? { scale: [0.8, 1.2, 1] } : { scale: 1 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
-        {task.done ? "✓" : locked ? <Lock className="h-2.5 w-2.5 text-slate-500" /> : ""}
+        {task.done ? (
+          "✓"
+        ) : locked ? (
+          <Lock className="h-2.5 w-2.5 text-slate-500" />
+        ) : (
+          ""
+        )}
       </motion.div>
 
       <div className="flex-1 min-w-0 relative z-10">
@@ -1023,8 +1073,6 @@ function TourToggle({ onToggle }: { onToggle: () => void }) {
   );
 }
 
-
-
 /** Loading screen */
 function LoadingScreen() {
   return (
@@ -1125,7 +1173,9 @@ function MapPageInner() {
   const [selectedGender, setSelectedGender] = useState<"male" | "female">(
     "male",
   );
-  const [clickedContributor, setClickedContributor] = useState<any | null>(null);
+  const [clickedContributor, setClickedContributor] = useState<any | null>(
+    null,
+  );
   const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
   const [preferredVentureId, setPreferredVentureId] = useState<string | null>(
     null,
@@ -1294,9 +1344,9 @@ function MapPageInner() {
     api.aiScoring.getStageQualityScore,
     activeVenture && worldMapData?.venture
       ? {
-        ventureId: activeVenture._id,
-        stageNumber: worldMapData.venture.currentStage,
-      }
+          ventureId: activeVenture._id,
+          stageNumber: worldMapData.venture.currentStage,
+        }
       : "skip",
   );
 
@@ -1389,18 +1439,20 @@ function MapPageInner() {
   const [showTour, setShowTour] = useState(false);
 
   // Inter-checkpoint events state
-  const [interCheckpointQueue, setInterCheckpointQueue] = useState<Array<"henchman" | "treasure" | "shield" | "insight" | "clear">>([]);
+  const [interCheckpointQueue, setInterCheckpointQueue] = useState<
+    Array<"henchman" | "treasure" | "shield" | "insight" | "clear">
+  >([]);
   const [bypassInterCheckpoint, setBypassInterCheckpoint] = useState(false);
 
   const interCheckpointData = useQuery(
     api.interCheckpoint.getInterCheckpointEvents,
     activeVenture
       ? {
-        ventureId: activeVenture._id,
-        currentStage: activeVenture.currentStage,
-        currentCheckpoint: activeVenture.currentCheckpoint,
-      }
-      : "skip"
+          ventureId: activeVenture._id,
+          currentStage: activeVenture.currentStage,
+          currentCheckpoint: activeVenture.currentCheckpoint,
+        }
+      : "skip",
   );
 
   useEffect(() => {
@@ -1660,7 +1712,13 @@ function MapPageInner() {
     } else {
       setIsToolsPanelOpen(false);
     }
-  }, [paramCheckpointId, paramPanel, paramTab, checkpoints, buildCheckpointDetail]);
+  }, [
+    paramCheckpointId,
+    paramPanel,
+    paramTab,
+    checkpoints,
+    buildCheckpointDetail,
+  ]);
 
   useEffect(() => {
     const previousActive = previousActiveRef.current;
@@ -1706,13 +1764,7 @@ function MapPageInner() {
     }
 
     previousActiveRef.current = { stage: activeStage, checkpoint: activeCP };
-  }, [
-    activeStage,
-    activeCP,
-    checkpoints,
-    selectedDetail,
-    updateUrlParams,
-  ]);
+  }, [activeStage, activeCP, checkpoints, selectedDetail, updateUrlParams]);
 
   // ── Persist gender to DB whenever venture + gender are known ─────────────
   useEffect(() => {
@@ -1720,7 +1772,7 @@ function MapPageInner() {
       savePersonaGender({
         ventureId: activeVenture._id,
         gender: selectedGender,
-      }).catch(() => { });
+      }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVenture?._id, selectedGender]);
@@ -1764,13 +1816,13 @@ function MapPageInner() {
   const xpPercent = levelData?.progress ?? 0;
   const levelPhase = levelData?.phase
     ? (() => {
-      const p = levelData.phase as string;
-      if (p === "tutorial") return 1;
-      if (p === "early") return 2;
-      if (p === "mid") return 3;
-      if (p === "senior") return 4;
-      return 5; // mentor
-    })()
+        const p = levelData.phase as string;
+        if (p === "tutorial") return 1;
+        if (p === "early") return 2;
+        if (p === "mid") return 3;
+        if (p === "senior") return 4;
+        return 5; // mentor
+      })()
     : 1;
 
   // Streak from Convex
@@ -1870,7 +1922,11 @@ function MapPageInner() {
   // ── Play biome ambience + stage music whenever active stage changes ─────────
   useEffect(() => {
     if (!phaserReady) return;
-    const templateId = (activeVenture?.templateId ?? "venture") as "venture" | "academic" | "lab" | "creative";
+    const templateId = (activeVenture?.templateId ?? "venture") as
+      | "venture"
+      | "academic"
+      | "lab"
+      | "creative";
     // Layer 1: Atmospheric ambience loop (always on)
     audioManager.playAmbienceForTemplate(templateId, activeStage);
     // Layer 2: Stage thematic music (crossfades in)
@@ -2109,18 +2165,18 @@ function MapPageInner() {
       corruptionLevel,
       superBoss: superBoss
         ? {
-          bossSlug: superBoss.bossSlug,
-          bossName:
-            superBoss.definition?.name ??
-            superBoss.bossName ??
-            "Unknown Boss",
-          visualStatus: superBoss.visualStatus,
-          status: superBoss.status,
-          defeatVariant:
-            worldMapData?.projectState === "project_perfect"
-              ? "gold"
-              : "standard",
-        }
+            bossSlug: superBoss.bossSlug,
+            bossName:
+              superBoss.definition?.name ??
+              superBoss.bossName ??
+              "Unknown Boss",
+            visualStatus: superBoss.visualStatus,
+            status: superBoss.status,
+            defeatVariant:
+              worldMapData?.projectState === "project_perfect"
+                ? "gold"
+                : "standard",
+          }
         : undefined,
     } as Parameters<typeof eventBridge.dispatchToPhaser>[0]);
 
@@ -2149,13 +2205,16 @@ function MapPageInner() {
   // ── Sync Convex accepted contributors → Phaser ──────────────────────────────
   const contributors = useQuery(
     api.contributionRequests.getAcceptedContributors,
-    activeVenture?.ideaId ? { ideaId: activeVenture.ideaId } : "skip"
+    activeVenture?.ideaId ? { ideaId: activeVenture.ideaId } : "skip",
   );
 
   useEffect(() => {
     if (!phaserReady || !contributors) return;
 
-    console.log("[React] Syncing accepted contributors to Phaser:", contributors);
+    console.log(
+      "[React] Syncing accepted contributors to Phaser:",
+      contributors,
+    );
     eventBridge.dispatchToPhaser({
       type: "UPDATE_CONTRIBUTORS",
       contributors: contributors.map((c) => ({
@@ -2179,7 +2238,8 @@ function MapPageInner() {
       setClickedContributor(e.contributor);
     };
     eventBridge.onReact("CONTRIBUTOR_SPRITE_CLICKED", handleContributorClick);
-    return () => eventBridge.off("CONTRIBUTOR_SPRITE_CLICKED", handleContributorClick);
+    return () =>
+      eventBridge.off("CONTRIBUTOR_SPRITE_CLICKED", handleContributorClick);
   }, []);
 
   // ── Checkpoint click from Phaser ───────────────────────────────────────────
@@ -2277,7 +2337,7 @@ function MapPageInner() {
 
   // Stable ref so handleTaskSubmissionSuccess can call handleAdvance
   // without creating a circular useCallback dependency.
-  const handleAdvanceRef = useRef<(forceBypass?: boolean) => void>(() => { });
+  const handleAdvanceRef = useRef<(forceBypass?: boolean) => void>(() => {});
 
   const handleTaskSubmissionSuccess = useCallback(
     ({
@@ -2510,280 +2570,307 @@ function MapPageInner() {
   );
 
   // ── Advance checkpoint → Convex mutation ──────────────────────────────────
-  const handleAdvance = useCallback(async (forceBypass = false) => {
-    if (!selectedDetail || !venture || isAdvancingCheckpoint) return;
+  const handleAdvance = useCallback(
+    async (forceBypass = false) => {
+      if (!selectedDetail || !venture || isAdvancingCheckpoint) return;
 
-    // Find the real Convex checkpoint document
-    const cp = checkpoints.find((c) => c._id === selectedDetail.id);
-    if (!cp) return;
+      // Find the real Convex checkpoint document
+      const cp = checkpoints.find((c) => c._id === selectedDetail.id);
+      if (!cp) return;
 
-    const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
-      Boolean,
-    ).length;
-    if (doneTasks < 2) return;
+      const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
+        Boolean,
+      ).length;
+      if (doneTasks < 2) return;
 
-    // Check for unresolved inter-checkpoint events
-    const unresolvedEvents = interCheckpointData?.events.filter((evt) => {
-      if (evt === "clear") return false;
-      const state = interCheckpointData.existingState;
-      if (!state) return true;
-      if (evt === "henchman" && state.henchmanOutcome) return false;
-      if (evt === "treasure" && state.treasuresFound && state.treasuresFound > 0) return false;
-      if (evt === "shield" && state.shieldsEarned && state.shieldsEarned > 0) return false;
-      if (evt === "insight" && state.insightFragments && state.insightFragments > 0) return false;
-      return true;
-    }) ?? [];
+      // Check for unresolved inter-checkpoint events
+      const unresolvedEvents =
+        interCheckpointData?.events.filter((evt) => {
+          if (evt === "clear") return false;
+          const state = interCheckpointData.existingState;
+          if (!state) return true;
+          if (evt === "henchman" && state.henchmanOutcome) return false;
+          if (
+            evt === "treasure" &&
+            state.treasuresFound &&
+            state.treasuresFound > 0
+          )
+            return false;
+          if (
+            evt === "shield" &&
+            state.shieldsEarned &&
+            state.shieldsEarned > 0
+          )
+            return false;
+          if (
+            evt === "insight" &&
+            state.insightFragments &&
+            state.insightFragments > 0
+          )
+            return false;
+          return true;
+        }) ?? [];
 
-    if (unresolvedEvents.length > 0 && !bypassInterCheckpoint && !forceBypass) {
-      setInterCheckpointQueue(unresolvedEvents as any);
-      return;
-    }
-
-    const isGold = doneTasks >= 3;
-
-    // Determine if this is the last checkpoint in the stage (stage boundary)
-    const isLastInStage = !checkpoints.find(
-      (c) => c.stage === cp.stage && c.checkpoint === cp.checkpoint + 1,
-    );
-
-    // Find next checkpoint client-side for UI hint only (not used for state)
-    const nextCpSameStage = checkpoints.find(
-      (c) => c.stage === cp.stage && c.checkpoint === cp.checkpoint + 1,
-    );
-    const nextCpNextStage = checkpoints.find(
-      (c) => c.stage === cp.stage + 1 && c.checkpoint === 1,
-    );
-    const nextCp = nextCpSameStage ?? nextCpNextStage ?? null;
-
-    const animVariant = isGold ? "gold" : "standard";
-    setFlashTrigger((n) => n + 1);
-    setIsAdvancingCheckpoint(true);
-
-    try {
-      if (phaserReady) {
-        await new Promise<void>((resolve) => {
-          let settled = false;
-
-          const handleAnimationDone = (event: {
-            checkpointId: string;
-            stage: number;
-          }) => {
-            if (settled) return;
-            if (event.checkpointId !== cp._id || event.stage !== cp.stage)
-              return;
-
-            settled = true;
-            window.clearTimeout(timeout);
-            eventBridge.off(
-              "CHECKPOINT_ANIMATION_COMPLETE",
-              handleAnimationDone,
-            );
-            resolve();
-          };
-
-          const timeout = window.setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            eventBridge.off(
-              "CHECKPOINT_ANIMATION_COMPLETE",
-              handleAnimationDone,
-            );
-            resolve();
-          }, 4000);
-
-          eventBridge.onReact(
-            "CHECKPOINT_ANIMATION_COMPLETE",
-            handleAnimationDone,
-          );
-          eventBridge.dispatchToPhaser({
-            type: "PLAY_CHECKPOINT_ANIMATION",
-            checkpointId: cp._id,
-            stage: cp.stage,
-            variant: animVariant,
-          });
-        });
+      if (
+        unresolvedEvents.length > 0 &&
+        !bypassInterCheckpoint &&
+        !forceBypass
+      ) {
+        setInterCheckpointQueue(unresolvedEvents as any);
+        return;
       }
 
-      await advanceCheckpoint({
-        checkpointId: cp._id as Id<"ventureCheckpoints">,
-      });
+      const isGold = doneTasks >= 3;
 
-      // Reset bypass flag AFTER successful advance
-      setBypassInterCheckpoint(false);
+      // Determine if this is the last checkpoint in the stage (stage boundary)
+      const isLastInStage = !checkpoints.find(
+        (c) => c.stage === cp.stage && c.checkpoint === cp.checkpoint + 1,
+      );
 
-      // ── Level (checkpoint) badge — rarity based on corruption meter ────
-      // Gold (legendary)  : corruption < 25  — clean, visionary execution
-      // Silver (rare)     : corruption 25–49  — solid but slightly compromised
-      // Bronze (uncommon) : corruption >= 50  — survived but at a cost
-      const levelBadgeRarity: BadgePayload["rarity"] =
-        corruptionLevel < 25
-          ? "legendary"
-          : corruptionLevel < 50
-            ? "rare"
-            : "uncommon";
+      // Find next checkpoint client-side for UI hint only (not used for state)
+      const nextCpSameStage = checkpoints.find(
+        (c) => c.stage === cp.stage && c.checkpoint === cp.checkpoint + 1,
+      );
+      const nextCpNextStage = checkpoints.find(
+        (c) => c.stage === cp.stage + 1 && c.checkpoint === 1,
+      );
+      const nextCp = nextCpSameStage ?? nextCpNextStage ?? null;
 
-      const statusTextCP =
-        corruptionLevel < 25
-          ? "Gold"
-          : corruptionLevel < 50
-            ? "Silver"
-            : "Bronze";
-      const levelBadgeLabel = `${cp.checkpointName} — ${statusTextCP}`;
+      const animVariant = isGold ? "gold" : "standard";
+      setFlashTrigger((n) => n + 1);
+      setIsAdvancingCheckpoint(true);
 
-      // Dynamic Stage-based Checkpoint Icon
-      const getStageEmoji = (stageNum: number, rarity: string) => {
-        if (stageNum === 1) return "💡"; // Ideation
-        if (stageNum === 2) return "🔬"; // Research
-        if (stageNum === 3) return "✅"; // Validation
-        if (stageNum === 4) return "🎨"; // Offer Design
-        if (stageNum === 5) return "⚙️"; // Build & Deliver
-        if (stageNum === 6) return "🚀"; // Launch
-        if (stageNum === 7) return "🔄"; // Iteration
-        if (stageNum === 8) return "👑"; // Scale
+      try {
+        if (phaserReady) {
+          await new Promise<void>((resolve) => {
+            let settled = false;
 
-        return rarity === "legendary" ? "🏆" : rarity === "rare" ? "🥈" : "🥉";
-      };
+            const handleAnimationDone = (event: {
+              checkpointId: string;
+              stage: number;
+            }) => {
+              if (settled) return;
+              if (event.checkpointId !== cp._id || event.stage !== cp.stage)
+                return;
 
-      const levelBadgeIcon = getStageEmoji(cp.stage, levelBadgeRarity);
-      const levelBadgeDesc =
-        corruptionLevel < 25
-          ? `Checkpoint "${cp.checkpointName}" cleared with gold-standard purity!`
-          : corruptionLevel < 50
-            ? `Checkpoint "${cp.checkpointName}" cleared with silver integrity. Keep the corruption at bay!`
-            : `Checkpoint "${cp.checkpointName}" cleared — bronze earned. Watch the corruption meter!`;
-      const checkpointBadgePrimary =
-        levelBadgeRarity === "legendary"
-          ? "#FBBF24"
-          : levelBadgeRarity === "rare"
-            ? "#E2E8F0"
-            : "#FFF7ED";
-      const checkpointBadgeSecondary =
-        levelBadgeRarity === "legendary"
-          ? "#92400E"
-          : levelBadgeRarity === "rare"
-            ? "#64748B"
-            : "#B45309";
+              settled = true;
+              window.clearTimeout(timeout);
+              eventBridge.off(
+                "CHECKPOINT_ANIMATION_COMPLETE",
+                handleAnimationDone,
+              );
+              resolve();
+            };
 
-      setBadgeQueue((q) => [
-        ...q,
-        {
-          id: `level_${cp._id}_${Date.now()}`,
-          name: levelBadgeLabel,
-          description: levelBadgeDesc,
-          icon: levelBadgeIcon,
-          rarity: levelBadgeRarity,
-          category: "idea_milestones",
-          shape: "trophy",
-          primaryColor: checkpointBadgePrimary,
-          secondaryColor: checkpointBadgeSecondary,
-          tagline: levelBadgeDesc,
-          awardedAt: Date.now(),
-        },
-      ]);
+            const timeout = window.setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              eventBridge.off(
+                "CHECKPOINT_ANIMATION_COMPLETE",
+                handleAnimationDone,
+              );
+              resolve();
+            }, 4000);
 
-      if (isLastInStage) {
-        // Stage boundary — show stage clear modal!
-        const stageNames = templateStages.map((stage) => stage.name);
-        const stageMedalTier: "gold" | "silver" | "bronze" =
-          corruptionLevel <= 30
-            ? "gold"
-            : corruptionLevel <= 70
-              ? "silver"
-              : "bronze";
-        const currentStageMeta = templateStages[cp.stage - 1];
-        const nextStageMeta = templateStages[cp.stage];
+            eventBridge.onReact(
+              "CHECKPOINT_ANIMATION_COMPLETE",
+              handleAnimationDone,
+            );
+            eventBridge.dispatchToPhaser({
+              type: "PLAY_CHECKPOINT_ANIMATION",
+              checkpointId: cp._id,
+              stage: cp.stage,
+              variant: animVariant,
+            });
+          });
+        }
 
-        setStageClearModal({
-          show: true,
-          stageNumber: cp.stage,
-          stageName: stageNames[cp.stage - 1] || "Stage",
-          isGold,
-          medalTier: stageMedalTier,
-          fromBiome: currentStageMeta?.biome,
-          nextStageName: nextStageMeta?.name,
-          nextBiome: nextStageMeta?.biome,
+        await advanceCheckpoint({
+          checkpointId: cp._id as Id<"ventureCheckpoints">,
         });
 
-        const stageBadgeRarity: BadgePayload["rarity"] =
-          stageMedalTier === "gold"
+        // Reset bypass flag AFTER successful advance
+        setBypassInterCheckpoint(false);
+
+        // ── Level (checkpoint) badge — rarity based on corruption meter ────
+        // Gold (legendary)  : corruption < 25  — clean, visionary execution
+        // Silver (rare)     : corruption 25–49  — solid but slightly compromised
+        // Bronze (uncommon) : corruption >= 50  — survived but at a cost
+        const levelBadgeRarity: BadgePayload["rarity"] =
+          corruptionLevel < 25
             ? "legendary"
-            : stageMedalTier === "silver"
+            : corruptionLevel < 50
               ? "rare"
               : "uncommon";
-        const stageMedalText =
-          stageMedalTier === "gold"
+
+        const statusTextCP =
+          corruptionLevel < 25
             ? "Gold"
-            : stageMedalTier === "silver"
+            : corruptionLevel < 50
               ? "Silver"
               : "Bronze";
-        const stageBadgeName = `Stage ${cp.stage}: ${stageNames[cp.stage - 1]} Clear — ${stageMedalText}`;
-        const stageBadgeIcon =
-          corruptionLevel <= 30 ? "🥇" : corruptionLevel <= 70 ? "🥈" : "🥉";
-        const stageBadgeDesc = `Completed Stage ${cp.stage} with ${stageMedalText.toLowerCase()} prestige status!`;
-        const stageBadgePrimary =
-          stageBadgeRarity === "legendary"
+        const levelBadgeLabel = `${cp.checkpointName} — ${statusTextCP}`;
+
+        // Dynamic Stage-based Checkpoint Icon
+        const getStageEmoji = (stageNum: number, rarity: string) => {
+          if (stageNum === 1) return "💡"; // Ideation
+          if (stageNum === 2) return "🔬"; // Research
+          if (stageNum === 3) return "✅"; // Validation
+          if (stageNum === 4) return "🎨"; // Offer Design
+          if (stageNum === 5) return "⚙️"; // Build & Deliver
+          if (stageNum === 6) return "🚀"; // Launch
+          if (stageNum === 7) return "🔄"; // Iteration
+          if (stageNum === 8) return "👑"; // Scale
+
+          return rarity === "legendary"
+            ? "🏆"
+            : rarity === "rare"
+              ? "🥈"
+              : "🥉";
+        };
+
+        const levelBadgeIcon = getStageEmoji(cp.stage, levelBadgeRarity);
+        const levelBadgeDesc =
+          corruptionLevel < 25
+            ? `Checkpoint "${cp.checkpointName}" cleared with gold-standard purity!`
+            : corruptionLevel < 50
+              ? `Checkpoint "${cp.checkpointName}" cleared with silver integrity. Keep the corruption at bay!`
+              : `Checkpoint "${cp.checkpointName}" cleared — bronze earned. Watch the corruption meter!`;
+        const checkpointBadgePrimary =
+          levelBadgeRarity === "legendary"
             ? "#FBBF24"
-            : stageBadgeRarity === "rare"
+            : levelBadgeRarity === "rare"
               ? "#E2E8F0"
               : "#FFF7ED";
-        const stageBadgeSecondary =
-          stageBadgeRarity === "legendary"
+        const checkpointBadgeSecondary =
+          levelBadgeRarity === "legendary"
             ? "#92400E"
-            : stageBadgeRarity === "rare"
+            : levelBadgeRarity === "rare"
               ? "#64748B"
               : "#B45309";
 
         setBadgeQueue((q) => [
           ...q,
           {
-            id: `stage_clear_${cp.stage}_${Date.now()}`,
-            name: stageBadgeName,
-            description: stageBadgeDesc,
-            icon: stageBadgeIcon,
-            rarity: stageBadgeRarity,
+            id: `level_${cp._id}_${Date.now()}`,
+            name: levelBadgeLabel,
+            description: levelBadgeDesc,
+            icon: levelBadgeIcon,
+            rarity: levelBadgeRarity,
             category: "idea_milestones",
-            shape: "medal",
-            primaryColor: stageBadgePrimary,
-            secondaryColor: stageBadgeSecondary,
-            tagline: stageBadgeDesc,
+            shape: "trophy",
+            primaryColor: checkpointBadgePrimary,
+            secondaryColor: checkpointBadgeSecondary,
+            tagline: levelBadgeDesc,
             awardedAt: Date.now(),
           },
         ]);
 
-        // Close the panel. Convex will update venture.currentStage
-        // and the useEffect at line ~1038 will auto-open the new active checkpoint.
-        setSelectedDetail(null);
-      } else if (nextCp) {
-        // Same-stage advance — open the next checkpoint panel immediately.
-        // Build the detail now: Convex hasn't updated yet, but the next checkpoint
-        // is still in the same stage so activeStage/activeCP will be correct
-        // once Convex propagates. We optimistically show it.
-        setSelectedDetail(buildCheckpointDetail(nextCp));
-        eventBridge.dispatchToPhaser({
-          type: "SCROLL_TO_CHECKPOINT",
-          checkpointId: nextCp._id,
-        });
-      } else {
-        setSelectedDetail(null);
+        if (isLastInStage) {
+          // Stage boundary — show stage clear modal!
+          const stageNames = templateStages.map((stage) => stage.name);
+          const stageMedalTier: "gold" | "silver" | "bronze" =
+            corruptionLevel <= 30
+              ? "gold"
+              : corruptionLevel <= 70
+                ? "silver"
+                : "bronze";
+          const currentStageMeta = templateStages[cp.stage - 1];
+          const nextStageMeta = templateStages[cp.stage];
+
+          setStageClearModal({
+            show: true,
+            stageNumber: cp.stage,
+            stageName: stageNames[cp.stage - 1] || "Stage",
+            isGold,
+            medalTier: stageMedalTier,
+            fromBiome: currentStageMeta?.biome,
+            nextStageName: nextStageMeta?.name,
+            nextBiome: nextStageMeta?.biome,
+          });
+
+          const stageBadgeRarity: BadgePayload["rarity"] =
+            stageMedalTier === "gold"
+              ? "legendary"
+              : stageMedalTier === "silver"
+                ? "rare"
+                : "uncommon";
+          const stageMedalText =
+            stageMedalTier === "gold"
+              ? "Gold"
+              : stageMedalTier === "silver"
+                ? "Silver"
+                : "Bronze";
+          const stageBadgeName = `Stage ${cp.stage}: ${stageNames[cp.stage - 1]} Clear — ${stageMedalText}`;
+          const stageBadgeIcon =
+            corruptionLevel <= 30 ? "🥇" : corruptionLevel <= 70 ? "🥈" : "🥉";
+          const stageBadgeDesc = `Completed Stage ${cp.stage} with ${stageMedalText.toLowerCase()} prestige status!`;
+          const stageBadgePrimary =
+            stageBadgeRarity === "legendary"
+              ? "#FBBF24"
+              : stageBadgeRarity === "rare"
+                ? "#E2E8F0"
+                : "#FFF7ED";
+          const stageBadgeSecondary =
+            stageBadgeRarity === "legendary"
+              ? "#92400E"
+              : stageBadgeRarity === "rare"
+                ? "#64748B"
+                : "#B45309";
+
+          setBadgeQueue((q) => [
+            ...q,
+            {
+              id: `stage_clear_${cp.stage}_${Date.now()}`,
+              name: stageBadgeName,
+              description: stageBadgeDesc,
+              icon: stageBadgeIcon,
+              rarity: stageBadgeRarity,
+              category: "idea_milestones",
+              shape: "medal",
+              primaryColor: stageBadgePrimary,
+              secondaryColor: stageBadgeSecondary,
+              tagline: stageBadgeDesc,
+              awardedAt: Date.now(),
+            },
+          ]);
+
+          // Close the panel. Convex will update venture.currentStage
+          // and the useEffect at line ~1038 will auto-open the new active checkpoint.
+          setSelectedDetail(null);
+        } else if (nextCp) {
+          // Same-stage advance — open the next checkpoint panel immediately.
+          // Build the detail now: Convex hasn't updated yet, but the next checkpoint
+          // is still in the same stage so activeStage/activeCP will be correct
+          // once Convex propagates. We optimistically show it.
+          setSelectedDetail(buildCheckpointDetail(nextCp));
+          eventBridge.dispatchToPhaser({
+            type: "SCROLL_TO_CHECKPOINT",
+            checkpointId: nextCp._id,
+          });
+        } else {
+          setSelectedDetail(null);
+        }
+      } catch (err) {
+        console.error("advanceCheckpoint failed:", err);
+      } finally {
+        setIsAdvancingCheckpoint(false);
       }
-    } catch (err) {
-      console.error("advanceCheckpoint failed:", err);
-    } finally {
-      setIsAdvancingCheckpoint(false);
-    }
-  }, [
-    selectedDetail,
-    venture,
-    checkpoints,
-    advanceCheckpoint,
-    buildCheckpointDetail,
-    isAdvancingCheckpoint,
-    phaserReady,
-    corruptionLevel,
-    setBadgeQueue,
-    bypassInterCheckpoint,
-    interCheckpointData,
-  ]);
+    },
+    [
+      selectedDetail,
+      venture,
+      checkpoints,
+      advanceCheckpoint,
+      buildCheckpointDetail,
+      isAdvancingCheckpoint,
+      phaserReady,
+      corruptionLevel,
+      setBadgeQueue,
+      bypassInterCheckpoint,
+      interCheckpointData,
+    ],
+  );
 
   // Keep handleAdvanceRef always pointing at the latest handleAdvance
   handleAdvanceRef.current = handleAdvance;
@@ -2856,14 +2943,17 @@ function MapPageInner() {
       <IdeaForgeNavbar
         currentUser={currentUser}
         searchQuery=""
-        onSearchChange={() => { }}
-        onOpenComposer={() => { }}
+        onSearchChange={() => {}}
+        onOpenComposer={() => {}}
         backHref="/my-ideas"
       />
 
       {/* HUD at bottom - Stage Info, Progress, Level, XP */}
       <div className="absolute inset-x-0 bottom-4 z-[70] pointer-events-none flex justify-center">
-        <div id="bottom-hud-control" className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl">
+        <div
+          id="bottom-hud-control"
+          className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl"
+        >
           <div className="shrink-0">
             <StageInfo
               stageName={stageInfo.stageName}
@@ -2905,8 +2995,6 @@ function MapPageInner() {
               bossName={corruption.bossName}
             />
           </div>
-
-
         </div>
       </div>
 
@@ -2915,10 +3003,13 @@ function MapPageInner() {
         ref={containerRef}
         className="phaser-canvas-wrapper absolute inset-0 z-0 [image-rendering:pixelated] overflow-hidden"
         style={{
+          /* touchAction:none keeps Phaser in full control on mobile/touch.
+             On desktop, mouse wheel is used for scrolling — no drag needed. */
           touchAction: "none",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           userSelect: "none",
+          cursor: "default",
           width: "100%",
           height: "100%",
         }}
@@ -2951,7 +3042,6 @@ function MapPageInner() {
       </AnimatePresence>
 
       {/* No venture state */}
-
 
       {phaserReady && activeVenture && (
         <>
@@ -3072,7 +3162,10 @@ function MapPageInner() {
           )}
 
           {/* Left Sidebar & Floating Popup Tools Panel Wrapper */}
-          <div id="left-control-panel" className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
+          <div
+            id="left-control-panel"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3"
+          >
             <LeftSidebar
               ventureName={ideaTitle}
               onOpenPanel={(tab) => {
@@ -3179,7 +3272,8 @@ function MapPageInner() {
                   transition={{ type: "spring", duration: 0.5 }}
                   className="relative w-full max-w-[600px] h-[650px] max-h-[85vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
                   style={{
-                    background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+                    background:
+                      "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
                     boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
                   }}
                 >
@@ -3201,15 +3295,28 @@ function MapPageInner() {
                         ideaForContributors.isAuthor ? (
                           <Tabs defaultValue="incoming" className="w-full">
                             <TabsList className="grid w-full grid-cols-2 bg-white/5 border border-white/10 rounded-xl p-1 mb-3">
-                              <TabsTrigger value="incoming" className="data-[state=active]:bg-white/10 rounded-lg text-xs">Incoming Requests</TabsTrigger>
-                              <TabsTrigger value="invite" className="data-[state=active]:bg-white/10 rounded-lg text-xs">Invite Contributors</TabsTrigger>
+                              <TabsTrigger
+                                value="incoming"
+                                className="data-[state=active]:bg-white/10 rounded-lg text-xs"
+                              >
+                                Incoming Requests
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="invite"
+                                className="data-[state=active]:bg-white/10 rounded-lg text-xs"
+                              >
+                                Invite Contributors
+                              </TabsTrigger>
                             </TabsList>
                             <TabsContent value="incoming">
                               <ContributionDashboard
                                 ideaId={ideaForContributors._id as Id<"ideas">}
                                 ideaTitle={ideaForContributors.title}
                                 authorId={ideaForContributors.authorId}
-                                authorName={ideaForContributors.author?.name || ideaForContributors.author?.username}
+                                authorName={
+                                  ideaForContributors.author?.name ||
+                                  ideaForContributors.author?.username
+                                }
                                 isAuthor
                                 onClose={() => setIsContributorsOpen(false)}
                                 embedded
@@ -3217,7 +3324,10 @@ function MapPageInner() {
                             </TabsContent>
                             <TabsContent value="invite">
                               <InvitationSection
-                                idea={{ _id: ideaForContributors._id as Id<"ideas">, isAuthor: true }}
+                                idea={{
+                                  _id: ideaForContributors._id as Id<"ideas">,
+                                  isAuthor: true,
+                                }}
                                 embedded
                               />
                             </TabsContent>
@@ -3228,17 +3338,27 @@ function MapPageInner() {
                               ideaId={ideaForContributors._id as Id<"ideas">}
                               ideaTitle={ideaForContributors.title}
                               authorId={ideaForContributors.authorId}
-                              authorName={ideaForContributors.author?.name || ideaForContributors.author?.username}
+                              authorName={
+                                ideaForContributors.author?.name ||
+                                ideaForContributors.author?.username
+                              }
                               isAuthor={false}
                               onClose={() => setIsContributorsOpen(false)}
                             />
-                            <InvitationSection idea={{ _id: ideaForContributors._id as Id<"ideas">, isAuthor: false }} />
+                            <InvitationSection
+                              idea={{
+                                _id: ideaForContributors._id as Id<"ideas">,
+                                isAuthor: false,
+                              }}
+                            />
                           </div>
                         )
                       ) : (
                         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
                           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                          <span className="text-sm text-slate-400">Loading team dashboard...</span>
+                          <span className="text-sm text-slate-400">
+                            Loading team dashboard...
+                          </span>
                         </div>
                       )}
                     </div>
@@ -3269,7 +3389,8 @@ function MapPageInner() {
                   transition={{ type: "spring", duration: 0.5 }}
                   className="relative w-full max-w-[550px] h-[650px] max-h-[85vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
                   style={{
-                    background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+                    background:
+                      "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
                     boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
                   }}
                 >
@@ -3290,7 +3411,10 @@ function MapPageInner() {
                         </button>
                       </div>
                       <div className="flex-1 min-h-0">
-                        <CommentsSection ideaId={activeVenture.ideaId} commentCount={0} />
+                        <CommentsSection
+                          ideaId={activeVenture.ideaId}
+                          commentCount={0}
+                        />
                       </div>
                     </div>
                   ) : (
@@ -3298,7 +3422,9 @@ function MapPageInner() {
                       <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center animate-spin">
                         <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full" />
                       </div>
-                      <p className="text-slate-400 text-sm font-semibold">Initializing group chat...</p>
+                      <p className="text-slate-400 text-sm font-semibold">
+                        Initializing group chat...
+                      </p>
                     </div>
                   )}
                 </motion.div>
