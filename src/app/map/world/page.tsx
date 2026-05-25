@@ -1216,6 +1216,10 @@ function MapPageInner() {
       sfxVolume: volumes.sfx,
       uiVolume: volumes.ui,
       muted: volumes.muted,
+      _backupMaster: volumes.master,
+      _backupMusic: volumes.music,
+      _backupSFX: volumes.sfx,
+      _backupUI: volumes.ui,
     });
   }, []); // Run once on mount
 
@@ -3011,7 +3015,7 @@ function MapPageInner() {
           )}
 
           {/* Left Sidebar & Floating Popup Tools Panel Wrapper */}
-          <div className="absolute left-2 top-1/2 -translate-y-1/2 z-50 sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
             <LeftSidebar
               ventureName={ideaTitle}
               onOpenPanel={(tab) => {
@@ -3052,7 +3056,7 @@ function MapPageInner() {
           {/* Click-away backdrop (left of panel) */}
           {selectedDetail && (
             <div
-              className="absolute inset-0 z-[55] hidden sm:block"
+              className="absolute inset-0 z-[50] hidden sm:block"
               style={{ right: "min(92vw, 360px)" }}
               onClick={() => updateUrlParams({ checkpointId: null })}
             />
@@ -3061,7 +3065,7 @@ function MapPageInner() {
           {/* Click-away backdrop (right of tools panel) */}
           {isToolsPanelOpen && (
             <div
-              className="absolute inset-0 z-[55]"
+              className="absolute inset-0 z-[50]"
               style={{ left: "min(92vw, 420px)" }}
               onClick={() => updateUrlParams({ panel: null, tab: null })}
             />

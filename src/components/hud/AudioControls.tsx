@@ -20,6 +20,18 @@ export function AudioControls() {
     audioManager.setMasterVolume(audioSettings.masterVolume);
   }, [audioSettings.masterVolume]);
 
+  useEffect(() => {
+    audioManager.setMusicVolume(audioSettings.musicVolume);
+  }, [audioSettings.musicVolume]);
+
+  useEffect(() => {
+    audioManager.setSFXVolume(audioSettings.sfxVolume);
+  }, [audioSettings.sfxVolume]);
+
+  useEffect(() => {
+    audioManager.setUIVolume(audioSettings.uiVolume);
+  }, [audioSettings.uiVolume]);
+
   // Check system mute state on mount and periodically
   useEffect(() => {
     const checkSystemMute = async () => {

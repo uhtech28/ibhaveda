@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserProfile } from "./CompactProfileView";
@@ -14,7 +14,8 @@ import { RequestStatusCard, ContributionRequest } from "@/components/requests/re
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
-import { getVentureBadgeEmoji } from "../badges/BadgeCard";
+import { getVentureBadgeEmoji, BadgeItem } from "../badges/BadgeCard";
+import { BadgeDetailModal } from "@/components/badges/BadgeDetailModal";
 
 interface DetailedProfileViewProps {
   profile: UserProfile;
@@ -62,6 +63,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
   incomingRequests
 }) => {
   const router = useRouter();
+  const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
   const equippedBadgeIds = profile.equippedBadges || [];
@@ -99,7 +101,11 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                         {equippedBadgesList.slice(0, 3).map((badge) => (
                           <span
                             key={badge.id}
-                            title={`${badge.name}: ${badge.description}`}
+                            title={`${badge.name}: ${badge.description} (Click to view details)`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedBadge(badge as any);
+                            }}
                             className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
                             style={{ animationDuration: "3s" }}
                           >
@@ -281,6 +287,14 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
             </div>
         </div>
       </div>
+
+      <BadgeDetailModal
+        badge={selectedBadge}
+        isOpen={selectedBadge !== null}
+        onClose={() => setSelectedBadge(null)}
+        isOwner={false} // Inline viewer header is read-only detail view
+        isEquipped={selectedBadge ? equippedBadgeIds.includes(selectedBadge.id) : false}
+      />
     </TooltipProvider>
   )
 }

@@ -136,6 +136,22 @@ export type ReactToPhaserEvent =
       checkpointId: string;
       stage: number;
       variant: "standard" | "gold";
+    }
+  /** Sync list of active accepted contributors to Phaser */
+  | {
+      type: "UPDATE_CONTRIBUTORS";
+      contributors: {
+        requestId: string;
+        userId: string;
+        displayName: string;
+        username: string;
+        avatar: string;
+        personaGender: "male" | "female";
+        role: string;
+        level: number;
+        xp: number;
+        isOnline: boolean;
+      }[];
     };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -201,6 +217,22 @@ export type PhaserToReactEvent =
       type: "CHECKPOINT_ANIMATION_COMPLETE";
       checkpointId: string;
       stage: number;
+    }
+  /** A contributor sprite on the map was clicked */
+  | {
+      type: "CONTRIBUTOR_SPRITE_CLICKED";
+      contributor: {
+        requestId: string;
+        userId: string;
+        displayName: string;
+        username: string;
+        avatar: string;
+        personaGender: "male" | "female";
+        role: string;
+        level: number;
+        xp: number;
+        isOnline: boolean;
+      };
     };
 
 // ─────────────────────────────────────────────────────────────────────────────

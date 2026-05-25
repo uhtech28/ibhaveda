@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { Trophy, Flame } from "lucide-react";
+import { Trophy, Flame, Award } from "lucide-react";
 
 // Mirrors convex/ventureConstants.ts and the official "level_table_with_flare"
 // spec — single source of truth for level → title / threshold / phase. Lv 1-3
@@ -120,6 +120,8 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
   const levelProgress = useQuery(api.levels.getUserLevelProgress, { userId });
   const streak = useQuery(api.gamification.getUserStreak, { userId });
   const ventureSummaries = useQuery(api.ventures.getUserVentureSummaries, { userId });
+  const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId });
+  const ventureBadgeProgress = useQuery(api.badges.getVentureBadgeProgress, { userId });
 
   // Silently tick the *viewer's* streak once auth is ready. Idempotent on the
   // server — only counts the day if not already counted. Retries on auth ready
@@ -165,6 +167,37 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
     streakDetail = isAuthenticated ? "Starts on your first sign-in today" : "Sign in to start";
   }
 
+  // Calculate dynamic Prestige Score totals
+  const totalEarnedCount = (() => {
+    if (!earnedBadges || !ventureBadgeProgress) return 0;
+    
+    // 1. General badges earned count
+    const GENERAL_BADGES_NAMES = ["First Spark", "Idea Machine", "Trendsetter", "Collaborator", "Chatterbox", "Legendary Completion"];
+    const generalEarned = earnedBadges.filter(
+      (eb) => eb.type === "general" && GENERAL_BADGES_NAMES.some(n => n.toLowerCase() === eb.name.toLowerCase())
+    ).length;
+    
+    // 2. Venture badges earned count
+    const ventureEarned = ventureBadgeProgress.filter((vp) => vp.awardedAt).length;
+    
+    // 3. Skill badges earned count
+    const skillEarned = earnedBadges.filter((eb) => eb.type === "skill").length;
+    
+    return generalEarned + ventureEarned + skillEarned;
+  })();
+
+  const totalPossibleCount = (() => {
+    if (!ventureBadgeProgress) return 76; // Fallback to 76 if loading
+    
+    const generalCount = 6;
+    const ventureCount = ventureBadgeProgress.length;
+    const skillCount = earnedBadges ? earnedBadges.filter((eb) => eb.type === "skill").length : 0;
+    
+    return generalCount + ventureCount + skillCount;
+  })();
+
+  const percentageValue = totalPossibleCount > 0 ? Math.round((totalEarnedCount / totalPossibleCount) * 100) : 0;
+
   return (
     <div className="pt-3 space-y-4">
       {/* Level — single combined bar with average progress of all ideas */}
@@ -189,6 +222,55 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
         <span className="text-sm font-semibold text-orange-200 tabular-nums shrink-0">
           {streakDetail}
         </span>
+      </div>
+
+      {/* Futuristic Prestige Score & Badge Progress Card */}
+      <div className="mt-4 bg-slate-900/60 border border-white/5 rounded-2xl px-5 py-3 flex items-center gap-4 self-start backdrop-blur-md shadow-lg hover:bg-slate-900/70 hover:border-yellow-500/25 transition-all duration-300 group w-fit">
+        <Award className="w-6 h-6 text-yellow-400 group-hover:scale-105 transition-transform duration-300 animate-[bounce_3s_infinite]" />
+        <div className="flex flex-col">
+          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest leading-none">
+            Prestige Score
+          </span>
+          <span className="text-2xl font-black text-white leading-tight mt-1">
+            {totalEarnedCount}{" "}
+            <span className="text-xs font-semibold text-slate-500">
+              / {totalPossibleCount}
+            </span>
+          </span>
+        </div>
+
+        {/* Circular Progress Gauge */}
+        <div className="relative w-11 h-11 flex items-center justify-center shrink-0 ml-1">
+          <svg className="w-full h-full transform -rotate-90">
+            <circle
+              cx="22"
+              cy="22"
+              r="18"
+              fill="transparent"
+              stroke="rgba(255,255,255,0.03)"
+              strokeWidth="4"
+            />
+            <circle
+              cx="22"
+              cy="22"
+              r="18"
+              fill="transparent"
+              stroke="currentColor"
+              strokeWidth="4"
+              className="text-yellow-400 drop-shadow-[0_0_6px_rgba(234,179,8,0.4)]"
+              strokeDasharray={2 * Math.PI * 18}
+              strokeDashoffset={
+                totalPossibleCount > 0
+                  ? 2 * Math.PI * 18 * (1 - totalEarnedCount / totalPossibleCount)
+                  : 2 * Math.PI * 18
+              }
+              style={{ transition: "stroke-dashoffset 0.8s ease-out" }}
+            />
+          </svg>
+          <span className="absolute text-[10px] font-extrabold text-white">
+            {percentageValue}%
+          </span>
+        </div>
       </div>
     </div>
   );

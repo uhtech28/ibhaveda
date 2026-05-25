@@ -103,6 +103,10 @@ export const audioSettingsAtom = atom({
   sfxVolume: 1.0,
   uiVolume: 1.0,
   muted: false,
+  _backupMaster: 1.0,
+  _backupMusic: 1.0,
+  _backupSFX: 1.0,
+  _backupUI: 1.0,
 });
 
 export const corruptionStateAtom = atom<CorruptionState>({

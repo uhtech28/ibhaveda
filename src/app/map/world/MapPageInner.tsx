@@ -43,6 +43,7 @@ import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { ContributionDashboard } from "@/components/requests/ContributionDashboard";
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ContributorPreviewDialog } from "@/components/user/ContributorPreviewDialog";
 
 // Dynamic/lazy loaded overlay components for faster page loading performance
 const LevelUpSequence = dynamic(() => import("@/components/animations/LevelUpSequence").then(mod => mod.LevelUpSequence), { ssr: false });
@@ -1124,6 +1125,7 @@ function MapPageInner() {
   const [selectedGender, setSelectedGender] = useState<"male" | "female">(
     "male",
   );
+  const [clickedContributor, setClickedContributor] = useState<any | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
   const [preferredVentureId, setPreferredVentureId] = useState<string | null>(
     null,
@@ -1228,6 +1230,10 @@ function MapPageInner() {
       sfxVolume: volumes.sfx,
       uiVolume: volumes.ui,
       muted: volumes.muted,
+      _backupMaster: volumes.master,
+      _backupMusic: volumes.music,
+      _backupSFX: volumes.sfx,
+      _backupUI: volumes.ui,
     });
   }, []); // Run once on mount
 
@@ -2140,6 +2146,42 @@ function MapPageInner() {
     worldMapData?.projectState,
   ]);
 
+  // ── Sync Convex accepted contributors → Phaser ──────────────────────────────
+  const contributors = useQuery(
+    api.contributionRequests.getAcceptedContributors,
+    activeVenture?.ideaId ? { ideaId: activeVenture.ideaId } : "skip"
+  );
+
+  useEffect(() => {
+    if (!phaserReady || !contributors) return;
+
+    console.log("[React] Syncing accepted contributors to Phaser:", contributors);
+    eventBridge.dispatchToPhaser({
+      type: "UPDATE_CONTRIBUTORS",
+      contributors: contributors.map((c) => ({
+        requestId: c.requestId,
+        userId: c.userId,
+        displayName: c.displayName,
+        username: c.username,
+        avatar: c.avatar,
+        personaGender: c.personaGender as "male" | "female",
+        role: c.role,
+        level: c.level,
+        xp: c.xp,
+        isOnline: c.isOnline,
+      })),
+    });
+  }, [phaserReady, contributors]);
+
+  useEffect(() => {
+    const handleContributorClick = (e: { contributor: any }) => {
+      console.log("[React] Contributor sprite clicked:", e.contributor);
+      setClickedContributor(e.contributor);
+    };
+    eventBridge.onReact("CONTRIBUTOR_SPRITE_CLICKED", handleContributorClick);
+    return () => eventBridge.off("CONTRIBUTOR_SPRITE_CLICKED", handleContributorClick);
+  }, []);
+
   // ── Checkpoint click from Phaser ───────────────────────────────────────────
   useEffect(() => {
     const handleClick = (e: {
@@ -2997,6 +3039,15 @@ function MapPageInner() {
             onDismiss={() => setGoldCheckpointNotification(null)}
           />
 
+          {/* Contributor preview card modal popup */}
+          <ContributorPreviewDialog
+            contributor={clickedContributor}
+            isOpen={clickedContributor !== null}
+            onOpenChange={(open) => {
+              if (!open) setClickedContributor(null);
+            }}
+          />
+
           {/* Inter-checkpoint passage events overlay */}
           {activeVenture && (
             <InterCheckpointOverlay
@@ -3021,7 +3072,7 @@ function MapPageInner() {
           )}
 
           {/* Left Sidebar & Floating Popup Tools Panel Wrapper */}
-          <div className="absolute left-2 top-1/2 -translate-y-1/2 z-50 sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
             <LeftSidebar
               ventureName={ideaTitle}
               onOpenPanel={(tab) => {
@@ -3060,7 +3111,7 @@ function MapPageInner() {
           {/* Click-away backdrop (left of panel) */}
           {selectedDetail && (
             <div
-              className="absolute inset-0 z-[55] hidden sm:block"
+              className="absolute inset-0 z-[50] hidden sm:block"
               style={{ right: "min(92vw, 360px)" }}
               onClick={() => updateUrlParams({ checkpointId: null })}
             />
@@ -3069,7 +3120,7 @@ function MapPageInner() {
           {/* Click-away backdrop (right of tools panel) */}
           {isToolsPanelOpen && (
             <div
-              className="absolute inset-0 z-[55]"
+              className="absolute inset-0 z-[50]"
               style={{ left: "min(92vw, 420px)" }}
               onClick={() => updateUrlParams({ panel: null, tab: null })}
             />

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Calendar, Lock, CheckCircle2, ShieldCheck, Star } from "lucide-react";
+import { X, Calendar, Lock, CheckCircle2, ShieldCheck, Star, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getNormalizedRarity, getVentureBadgeEmoji, BadgeItem } from "./BadgeCard";
@@ -133,13 +133,25 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
           {/* Details / Unlock Requirements List */}
           <div className="w-full bg-slate-900/65 border border-white/5 rounded-2xl p-4 text-left space-y-3 mb-6">
             
-            <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-0.5">
-                Category
-              </span>
-              <span className="text-xs font-semibold text-slate-200 capitalize">
-                {badge.category.replace("_", " ")}
-              </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-0.5">
+                  Category
+                </span>
+                <span className="text-xs font-semibold text-slate-200 capitalize block">
+                  {badge.category.replace("_", " ")}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-0.5">
+                  Progression Reward
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-400">
+                  <Award className="w-3.5 h-3.5" />
+                  +{norm.prestigeBonus} Prestige XP
+                </span>
+              </div>
             </div>
 
             <div>

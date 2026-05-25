@@ -389,16 +389,7 @@ export function ToolsPanel({
             </AnimatePresence>
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-white/5 bg-black/40">
-            <div className="flex items-center justify-between text-[9px] text-slate-500 font-bold uppercase tracking-[0.15em] sm:text-[10px] sm:tracking-[0.2em]">
-              <span>System Status</span>
-              <div className="flex items-center gap-2 text-emerald-500">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Operational</span>
-              </div>
-            </div>
-          </div>
+
         </motion.div>
       )}
     </AnimatePresence>
@@ -643,18 +634,64 @@ function SettingsPanel() {
   const [audioSettings, setAudioSettings] = useAtom(audioSettingsAtom);
 
   const updateVolume = (key: keyof typeof audioSettings, value: number) => {
-    setAudioSettings((prev) => ({ ...prev, [key]: value }));
+    setAudioSettings((prev) => {
+      // If we are modifying standard volume, make sure we turn off muted state if we raise it above 0
+      const isMuteField = key === "muted";
+      const newMuteState = isMuteField ? value === 1 : prev.muted;
+      return {
+        ...prev,
+        [key]: value,
+        muted: newMuteState,
+      };
+    });
   };
 
   const toggleMute = () => {
-    setAudioSettings((prev) => ({ ...prev, muted: !prev.muted }));
+    setAudioSettings((prev) => {
+      const newMuted = !prev.muted;
+      if (newMuted) {
+        // Toggle ON (mute): store previous volumes + set master to 0
+        return {
+          ...prev,
+          muted: true,
+          _backupMaster: prev.masterVolume,
+          _backupMusic: prev.musicVolume,
+          _backupSFX: prev.sfxVolume,
+          _backupUI: prev.uiVolume,
+          masterVolume: 0,
+        };
+      } else {
+        // Toggle OFF (unmute): restore volumes from backups
+        return {
+          ...prev,
+          muted: false,
+          masterVolume: prev._backupMaster !== undefined ? prev._backupMaster : 1.0,
+          musicVolume: prev._backupMusic !== undefined ? prev._backupMusic : 1.0,
+          sfxVolume: prev._backupSFX !== undefined ? prev._backupSFX : 1.0,
+          uiVolume: prev._backupUI !== undefined ? prev._backupUI : 1.0,
+        };
+      }
+    });
+    audioManager.playUI("confirm");
   };
 
+  const isMuted = audioSettings.muted || audioSettings.masterVolume === 0;
+
   return (
-    <div className="space-y-6">
+    <div 
+      className="space-y-6 select-none" 
+      onClick={(e) => e.stopPropagation()} 
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+    >
       <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-5">
-        <h3 className="text-lg font-black text-white uppercase tracking-wider">
-          Audio Settings
+        <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <span>Audio Console</span>
+          {isMuted && (
+            <span className="text-[10px] bg-rose-500/20 border border-rose-500/40 text-rose-400 font-extrabold uppercase px-2 py-0.5 rounded-full animate-pulse">
+              MUTED
+            </span>
+          )}
         </h3>
         <p className="text-[10px] text-indigo-300/60 font-bold uppercase tracking-widest mt-1">
           Configure your sound experience
@@ -663,106 +700,178 @@ function SettingsPanel() {
 
       <div className="space-y-6 px-1">
         {/* Mute Toggle */}
-        <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
+        <div 
+          onClick={toggleMute}
+          className={cn(
+            "flex items-center justify-between p-4 rounded-xl border transition-all duration-300 cursor-pointer hover:bg-white/[0.05] group",
+            isMuted 
+              ? "bg-rose-500/5 border-rose-500/25 shadow-[0_0_15px_rgba(239,68,68,0.05)]" 
+              : "bg-white/[0.03] border-white/5"
+          )}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-              {audioSettings.muted ? (
-                <VolumeX className="w-4 h-4 text-rose-400" />
+            <div 
+              className={cn(
+                "w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300",
+                isMuted ? "bg-rose-500/10 text-rose-400" : "bg-emerald-500/10 text-emerald-400"
+              )}
+            >
+              {isMuted ? (
+                <motion.div
+                  animate={{ scale: [1, 1.15, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                >
+                  <VolumeX className="w-4.5 h-4.5" />
+                </motion.div>
               ) : (
-                <Volume2 className="w-4 h-4 text-emerald-400" />
+                <Volume2 className="w-4.5 h-4.5" />
               )}
             </div>
             <div>
-              <p className="text-sm font-bold text-white">Mute All Sounds</p>
+              <p className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">Mute All Sounds</p>
               <p className="text-[10px] text-slate-500 uppercase tracking-widest">
                 Global silence
               </p>
             </div>
           </div>
-          <Switch checked={audioSettings.muted} onCheckedChange={toggleMute} />
+          <Switch 
+            checked={audioSettings.muted} 
+            onCheckedChange={(val) => {
+              toggleMute();
+            }} 
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
 
         {/* Volume Sliders */}
         <div className="space-y-6">
-          <div className="space-y-3">
+          {/* Master Volume */}
+          <div className={cn("space-y-3 transition-opacity duration-300", isMuted && "opacity-50")}>
             <div className="flex justify-between items-center px-1">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
                 Master Volume
               </label>
-              <span className="text-xs font-bold text-indigo-400">
-                {Math.round(audioSettings.masterVolume * 100)}%
+              <span className={cn("text-xs font-bold", isMuted ? "text-slate-500" : "text-indigo-400")}>
+                {isMuted ? "0%" : `${Math.round(audioSettings.masterVolume * 100)}%`}
               </span>
             </div>
             <Slider
-              value={[audioSettings.masterVolume * 100]}
+              value={[isMuted ? 0 : audioSettings.masterVolume * 100]}
               max={100}
               step={1}
+              disabled={isMuted}
               onValueChange={([val]) => updateVolume("masterVolume", val / 100)}
-              className="py-2"
+              className={cn(
+                "py-2",
+                !isMuted && "shadow-[0_0_15px_rgba(99,102,241,0.15)] rounded-full"
+              )}
+              style={{
+                color: isMuted ? "#64748b" : "#6366f1"
+              }}
             />
           </div>
 
-          <div className="space-y-3">
+          {/* Music Volume */}
+          <div className={cn("space-y-3 transition-opacity duration-300", isMuted && "opacity-50")}>
             <div className="flex justify-between items-center px-1">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                Music
+                Music & Ambience
               </label>
-              <span className="text-xs font-bold text-amber-400">
-                {Math.round(audioSettings.musicVolume * 100)}%
+              <span className={cn("text-xs font-bold", isMuted ? "text-slate-500" : "text-amber-400")}>
+                {isMuted ? "0%" : `${Math.round(audioSettings.musicVolume * 100)}%`}
               </span>
             </div>
             <Slider
-              value={[audioSettings.musicVolume * 100]}
+              value={[isMuted ? 0 : audioSettings.musicVolume * 100]}
               max={100}
               step={1}
+              disabled={isMuted}
               onValueChange={([val]) => updateVolume("musicVolume", val / 100)}
-              className="py-2"
+              className={cn(
+                "py-2",
+                !isMuted && "shadow-[0_0_15px_rgba(245,158,11,0.15)] rounded-full"
+              )}
+              style={{
+                color: isMuted ? "#64748b" : "#f59e0b"
+              }}
             />
           </div>
 
-          <div className="space-y-3">
+          {/* SFX Volume */}
+          <div className={cn("space-y-3 transition-opacity duration-300", isMuted && "opacity-50")}>
             <div className="flex justify-between items-center px-1">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                SFX
+                SFX & Combat
               </label>
-              <span className="text-xs font-bold text-emerald-400">
-                {Math.round(audioSettings.sfxVolume * 100)}%
+              <span className={cn("text-xs font-bold", isMuted ? "text-slate-500" : "text-emerald-400")}>
+                {isMuted ? "0%" : `${Math.round(audioSettings.sfxVolume * 100)}%`}
               </span>
             </div>
             <Slider
-              value={[audioSettings.sfxVolume * 100]}
+              value={[isMuted ? 0 : audioSettings.sfxVolume * 100]}
               max={100}
               step={1}
+              disabled={isMuted}
               onValueChange={([val]) => updateVolume("sfxVolume", val / 100)}
-              className="py-2"
+              className={cn(
+                "py-2",
+                !isMuted && "shadow-[0_0_15px_rgba(16,185,129,0.15)] rounded-full"
+              )}
+              style={{
+                color: isMuted ? "#64748b" : "#10b981"
+              }}
             />
           </div>
 
-          <div className="space-y-3">
+          {/* UI Sounds */}
+          <div className={cn("space-y-3 transition-opacity duration-300", isMuted && "opacity-50")}>
             <div className="flex justify-between items-center px-1">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                UI Sounds
+                UI & Clicks
               </label>
-              <span className="text-xs font-bold text-cyan-400">
-                {Math.round(audioSettings.uiVolume * 100)}%
+              <span className={cn("text-xs font-bold", isMuted ? "text-slate-500" : "text-cyan-400")}>
+                {isMuted ? "0%" : `${Math.round(audioSettings.uiVolume * 100)}%`}
               </span>
             </div>
             <Slider
-              value={[audioSettings.uiVolume * 100]}
+              value={[isMuted ? 0 : audioSettings.uiVolume * 100]}
               max={100}
               step={1}
+              disabled={isMuted}
               onValueChange={([val]) => updateVolume("uiVolume", val / 100)}
-              className="py-2"
+              className={cn(
+                "py-2",
+                !isMuted && "shadow-[0_0_15px_rgba(6,182,212,0.15)] rounded-full"
+              )}
+              style={{
+                color: isMuted ? "#64748b" : "#06b6d4"
+              }}
             />
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center">
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-          App Version 1.2.0-beta
-        </p>
-      </div>
+      <button
+        onClick={() => {
+          setAudioSettings({
+            masterVolume: 1.0,
+            musicVolume: 1.0,
+            sfxVolume: 1.0,
+            uiVolume: 1.0,
+            muted: false,
+            _backupMaster: 1.0,
+            _backupMusic: 1.0,
+            _backupSFX: 1.0,
+            _backupUI: 1.0,
+          });
+          audioManager.playUI("confirm");
+        }}
+        className="w-full py-2.5 rounded-xl border border-white/10 hover:border-indigo-500/30 hover:bg-indigo-500/10 text-xs font-bold text-slate-400 hover:text-white transition-all duration-300 uppercase tracking-wider bg-white/[0.02] flex items-center justify-center gap-2"
+      >
+        <span>Reset to Defaults</span>
+      </button>
+
+
     </div>
   );
 }

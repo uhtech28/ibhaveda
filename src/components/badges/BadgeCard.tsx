@@ -34,6 +34,7 @@ interface BadgeCardProps {
 }
 
 // Map database/legacy rarities to the 6 premium tiers
+// Map database/legacy rarities to the 6 premium tiers
 export function getNormalizedRarity(rarity: BadgeRarity): {
   key: string;
   label: string;
@@ -43,80 +44,66 @@ export function getNormalizedRarity(rarity: BadgeRarity): {
   pillClass: string;
   glowClass: string;
   accentColor: string;
+  prestigeBonus: number;
 } {
   const r = rarity.toLowerCase();
   
-  if (r === "common" || r === "bronze") {
+  if (r === "common" || r === "bronze" || r === "uncommon" || r === "silver") {
+    // 1. Common / Gray
     return {
-      key: "bronze",
-      label: "🥉 Bronze",
-      bgClass: "from-amber-900/20 via-amber-800/5 to-transparent",
-      borderClass: "border-amber-700/40 group-hover:border-amber-600/70",
-      textClass: "text-amber-500",
-      pillClass: "text-amber-400 border-amber-500/20 bg-amber-500/10",
-      glowClass: "shadow-[0_0_15px_-3px_rgba(217,119,6,0.15)] group-hover:shadow-[0_0_20px_-3px_rgba(217,119,6,0.3)]",
-      accentColor: "#D97706"
-    };
-  }
-  if (r === "uncommon" || r === "silver") {
-    return {
-      key: "silver",
-      label: "🥈 Silver",
-      bgClass: "from-slate-500/15 via-slate-600/5 to-transparent",
-      borderClass: "border-slate-500/40 group-hover:border-slate-400/70",
-      textClass: "text-slate-300",
-      pillClass: "text-slate-300 border-slate-500/20 bg-slate-500/10",
+      key: "common",
+      label: "🛡️ Common",
+      bgClass: "from-slate-800/15 via-slate-900/5 to-transparent",
+      borderClass: "border-slate-800/80 group-hover:border-slate-600/70",
+      textClass: "text-slate-400",
+      pillClass: "text-slate-400 border-slate-500/20 bg-slate-500/10",
       glowClass: "shadow-[0_0_15px_-3px_rgba(148,163,184,0.15)] group-hover:shadow-[0_0_20px_-3px_rgba(148,163,184,0.3)]",
-      accentColor: "#94A3B8"
-    };
-  }
-  if (r === "rare" || r === "gold") {
-    return {
-      key: "gold",
-      label: "🥇 Gold",
-      bgClass: "from-yellow-600/20 via-amber-500/5 to-transparent",
-      borderClass: "border-yellow-500/50 group-hover:border-yellow-400/80",
-      textClass: "text-yellow-400",
-      pillClass: "text-yellow-400 border-yellow-500/20 bg-yellow-500/10",
-      glowClass: "shadow-[0_0_20px_-3px_rgba(234,179,8,0.25)] group-hover:shadow-[0_0_25px_-3px_rgba(234,179,8,0.45)]",
-      accentColor: "#EAB308"
-    };
-  }
-  if (r === "epic" || r === "diamond") {
-    return {
-      key: "diamond",
-      label: "💎 Diamond",
-      bgClass: "from-cyan-500/20 via-blue-600/5 to-transparent",
-      borderClass: "border-cyan-500/60 group-hover:border-cyan-400/90",
-      textClass: "text-cyan-400",
-      pillClass: "text-cyan-400 border-cyan-500/20 bg-cyan-500/10",
-      glowClass: "shadow-[0_0_25px_-3px_rgba(6,182,212,0.35)] group-hover:shadow-[0_0_30px_-3px_rgba(6,182,212,0.55)]",
-      accentColor: "#06B6D4"
-    };
-  }
-  if (r === "legendary" || r === "hidden") {
-    return {
-      key: "legendary",
-      label: "👑 Legendary",
-      bgClass: "from-purple-600/25 via-fuchsia-700/5 to-transparent",
-      borderClass: "border-purple-500/60 group-hover:border-purple-400/90",
-      textClass: "text-purple-400",
-      pillClass: "text-purple-400 border-purple-500/30 bg-purple-500/15",
-      glowClass: "shadow-[0_0_30px_-5px_rgba(168,85,247,0.45)] group-hover:shadow-[0_0_35px_-5px_rgba(168,85,247,0.65)]",
-      accentColor: "#A855F7"
+      accentColor: "#94A3B8",
+      prestigeBonus: 10
     };
   }
   
-  // Default to Mythic / Founder
+  if (r === "rare" || r === "gold") {
+    // 2. Rare / Blue
+    return {
+      key: "rare",
+      label: "✨ Rare",
+      bgClass: "from-blue-900/15 via-slate-950/5 to-transparent",
+      borderClass: "border-blue-800/40 group-hover:border-blue-600/70",
+      textClass: "text-blue-400",
+      pillClass: "text-blue-400 border-blue-500/20 bg-blue-500/10",
+      glowClass: "shadow-[0_0_20px_-3px_rgba(59,130,246,0.25)] group-hover:shadow-[0_0_25px_-3px_rgba(59,130,246,0.45)]",
+      accentColor: "#3B82F6",
+      prestigeBonus: 20
+    };
+  }
+  
+  if (r === "epic" || r === "diamond") {
+    // 3. Epic / Purple
+    return {
+      key: "epic",
+      label: "💎 Epic",
+      bgClass: "from-purple-900/20 via-slate-950/5 to-transparent",
+      borderClass: "border-purple-800/50 group-hover:border-purple-600/80",
+      textClass: "text-purple-400",
+      pillClass: "text-purple-400 border-purple-500/20 bg-purple-500/10",
+      glowClass: "shadow-[0_0_25px_-3px_rgba(168,85,247,0.35)] group-hover:shadow-[0_0_30px_-3px_rgba(168,85,247,0.55)]",
+      accentColor: "#A855F7",
+      prestigeBonus: 35
+    };
+  }
+  
+  // 4. Legendary / Gold
   return {
-    key: "mythic",
-    label: "🔥 Mythic",
-    bgClass: "from-rose-500/30 via-indigo-950/20 to-transparent",
-    borderClass: "border-rose-500/70 group-hover:border-rose-400/90",
-    textClass: "text-rose-400 font-extrabold",
-    pillClass: "text-rose-400 border-rose-500/30 bg-rose-500/15",
-    glowClass: "shadow-[0_0_35px_-5px_rgba(244,63,94,0.55)] group-hover:shadow-[0_0_40px_-5px_rgba(244,63,94,0.85)]",
-    accentColor: "#F43F5E"
+    key: "legendary",
+    label: "👑 Legendary",
+    bgClass: "from-yellow-900/25 via-slate-950/5 to-transparent",
+    borderClass: "border-yellow-600/60 group-hover:border-yellow-400/90",
+    textClass: "text-yellow-400",
+    pillClass: "text-yellow-400 border-yellow-500/30 bg-yellow-500/15",
+    glowClass: "shadow-[0_0_30px_-5px_rgba(234,179,8,0.45)] group-hover:shadow-[0_0_35px_-5px_rgba(234,179,8,0.65)]",
+    accentColor: "#EAB308",
+    prestigeBonus: 50
   };
 }
 
@@ -460,23 +447,84 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
 
         {/* 7. Bottom Rarity Pill + Date / Lock Info */}
         <div className="pt-4 flex flex-col items-center gap-2 mt-auto">
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[9px] font-black tracking-widest uppercase rounded-full px-3.5 py-0.5 h-5 border border-solid shrink-0 shadow-sm transition-all duration-300",
-              isLocked ? "text-slate-500 bg-slate-900/30 border-slate-800" : norm.pillClass
+          <div className="flex items-center gap-1.5">
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[9px] font-black tracking-widest uppercase rounded-full px-3 py-0.5 h-5 border border-solid shrink-0 shadow-sm transition-all duration-300",
+                isLocked ? "text-slate-500 bg-slate-900/30 border-slate-800" : norm.pillClass
+              )}
+            >
+              {isLocked ? "LOCKED" : norm.label}
+            </Badge>
+            
+            {!isLocked && (
+              <Badge
+                variant="outline"
+                className="text-[9px] font-bold text-yellow-400 bg-yellow-500/10 border-yellow-500/20 px-2 py-0.5 rounded-full"
+              >
+                +{norm.prestigeBonus} Prestige
+              </Badge>
             )}
-          >
-            {isLocked ? "LOCKED" : norm.label}
-          </Badge>
+          </div>
 
-          {!isLocked && badge.awardedAt && (
+          {!isLocked && badge.awardedAt ? (
             <span className="text-[9px] text-slate-500/80 flex items-center gap-1 font-medium transition-colors group-hover:text-slate-400">
               <Calendar className="w-2.5 h-2.5" />
               {new Date(badge.awardedAt).toLocaleDateString(undefined, {
                 month: "short",
                 year: "numeric",
               })}
+            </span>
+          ) : (
+            <span className="text-[9px] text-slate-600 flex items-center gap-1 font-medium">
+              <Lock className="w-2.5 h-2.5" /> Requirement details on hover
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Dynamic Slide-up Details Hover Drawer */}
+      <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out flex flex-col justify-between p-5 z-30 rounded-2xl text-left border border-white/10 shadow-2xl">
+        <div className="space-y-3">
+          <div>
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block mb-0.5">
+              Badge Title
+            </span>
+            <span className="text-sm font-bold text-white leading-tight block">
+              {badge.name}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block mb-0.5">
+              Unlock Requirement
+            </span>
+            <p className="text-xs font-semibold text-slate-300 leading-relaxed">
+              {badge.requirement || "Achieve specific milestones to unlock this badge."}
+            </p>
+          </div>
+
+          <div>
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block mb-0.5">
+              Progression Reward
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-md shadow-sm mt-0.5">
+              <Award className="w-3.5 h-3.5" />
+              +{norm.prestigeBonus} Prestige XP
+            </span>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400 font-medium">
+          <span>Rarity: <span className="font-bold text-white capitalize">{norm.key}</span></span>
+          {badge.awardedAt ? (
+            <span className="text-emerald-400 font-semibold flex items-center gap-1">
+              <Check className="w-3 h-3 stroke-[3]" /> Earned
+            </span>
+          ) : (
+            <span className="text-slate-500 flex items-center gap-1">
+              <Lock className="w-3 h-3" /> Locked
             </span>
           )}
         </div>

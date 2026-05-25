@@ -407,7 +407,32 @@ export const getAcceptedContributors = query({
         q.eq("ideaId", args.ideaId).eq("status", "accepted")
       )
       .collect();
-    return requests;
+
+    const contributorsWithUsers = await Promise.all(
+      requests.map(async (req) => {
+        const user = await ctx.db.get(req.contributorId);
+        if (!user) return null;
+
+        // Programmatic online status if user had login activity in last 5 minutes
+        const isOnline = user.lastLoginAt ? (Date.now() - user.lastLoginAt < 5 * 60 * 1000) : false;
+
+        return {
+          requestId: req._id,
+          userId: user._id,
+          displayName: user.displayName,
+          username: user.username,
+          avatar: user.avatar || `https://api.dicebear.com/7.x/adventurer/png?seed=${user.username}&size=128&backgroundColor=transparent`,
+          personaGender: user.personaGender || "male",
+          role: user.role || "contributor",
+          level: user.level || 1,
+          xp: user.xp || 0,
+          isOnline,
+          createdAt: req.createdAt,
+        };
+      })
+    );
+
+    return contributorsWithUsers.filter((c) => c !== null);
   },
 });
 

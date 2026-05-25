@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import { AssetLoader } from "../utils/asset-loader";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender } from "../entities/Persona";
+import { ContributorCompanion, type ContributorData } from "../entities/ContributorCompanion";
 import { BossSilhouette } from "../entities/Boss";
 import { MiniBoss, type MiniBossType } from "../entities/MiniBoss";
 import { audioManager, type CheckpointSFXId } from "../../audio/audioManager";
@@ -253,6 +254,7 @@ export class WorldMapScene extends Phaser.Scene {
   // Core entities
   private checkpointNodes: Map<string, CheckpointNode>;
   private persona: Persona | null;
+  private companions: Map<string, ContributorCompanion> = new Map();
   private bosses: Map<string, BossSilhouette>;
   private miniBosses: Map<number, MiniBoss>;
   /** Stages whose mini-boss has already played the retreat animation this session */
@@ -329,6 +331,7 @@ export class WorldMapScene extends Phaser.Scene {
       stage: number;
       variant: "standard" | "gold";
     }) => void;
+    updateContributors?: (event: { contributors: ContributorData[] }) => void;
   };
 
   // Map dimensions
@@ -5282,6 +5285,8 @@ export class WorldMapScene extends Phaser.Scene {
     this.boundHandlers.focusStage = this.handleFocusStage.bind(this);
     this.boundHandlers.playCheckpointAnimation =
       this.handlePlayCheckpointAnimation.bind(this);
+    this.boundHandlers.updateContributors =
+      this.handleUpdateContributors.bind(this);
 
     eventBridge.onPhaser(
       "UPDATE_BRIGHTNESS",
@@ -5303,6 +5308,10 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "PLAY_CHECKPOINT_ANIMATION",
       this.boundHandlers.playCheckpointAnimation,
+    );
+    eventBridge.onPhaser(
+      "UPDATE_CONTRIBUTORS",
+      this.boundHandlers.updateContributors,
     );
 
     // Handle checkpoint clicks (emitted by CheckpointNode)
@@ -5326,6 +5335,48 @@ export class WorldMapScene extends Phaser.Scene {
   private handleUpdateBrightness(event?: { brightness: number }): void {
     // Always keep full brightness - no darkness overlay
     this.updateBrightnessFilter(100);
+  }
+
+  /**
+   * Updates contributor sprite personas orbiting the main player
+   */
+  private handleUpdateContributors(event?: { contributors: ContributorData[] }): void {
+    if (!event || !event.contributors) return;
+    console.log("[Phaser] Received UPDATE_CONTRIBUTORS:", event.contributors);
+
+    // Limit to maximum 5 contributors visible at once
+    const allowedContributors = event.contributors.slice(0, 5);
+    const activeIds = new Set(allowedContributors.map(c => c.userId));
+
+    // 1. Remove companions that are no longer in the active list
+    for (const [userId, companion] of this.companions.entries()) {
+      if (!activeIds.has(userId)) {
+        companion.destroy();
+        this.companions.delete(userId);
+      }
+    }
+
+    // 2. Add new contributors or update active ones
+    allowedContributors.forEach((contributor) => {
+      let companion = this.companions.get(contributor.userId);
+      if (!companion) {
+        // Spawn them slightly offset from player persona or center
+        const startX = this.persona ? this.persona.x : 0;
+        const startY = this.persona ? this.persona.y : 0;
+
+        companion = new ContributorCompanion(this, startX, startY, contributor);
+        
+        // Add to the main gameLayer (same z-index context as player)
+        if (this.gameLayer) {
+          this.gameLayer.add(companion);
+        }
+        
+        this.companions.set(contributor.userId, companion);
+      } else {
+        // Update its data reference
+        companion.contributorData = contributor;
+      }
+    });
   }
 
   /**
@@ -6160,6 +6211,14 @@ export class WorldMapScene extends Phaser.Scene {
    */
   update(): void {
     this.emitTutorialPulsePosition();
+
+    // Update accepted contributor companion sprites follow tracking
+    if (this.persona && this.companions && this.companions.size > 0) {
+      const companionsArray = Array.from(this.companions.values());
+      companionsArray.forEach((companion, index) => {
+        companion.updateCompanion(this.persona!.x, this.persona!.y, index, companionsArray.length);
+      });
+    }
   }
 
   private emitTutorialPulsePosition(): void {
@@ -6217,6 +6276,10 @@ export class WorldMapScene extends Phaser.Scene {
     this.retreatedStages.clear();
     this.checkpointIdAliases.clear();
 
+    // Clean up companions
+    this.companions.forEach((companion) => companion.destroy());
+    this.companions.clear();
+
     // Clean up bosses
     this.bosses.forEach((boss) => boss.destroy());
     this.bosses.clear();
@@ -6250,6 +6313,12 @@ export class WorldMapScene extends Phaser.Scene {
       eventBridge.off(
         "PLAY_CHECKPOINT_ANIMATION",
         this.boundHandlers.playCheckpointAnimation,
+      );
+    }
+    if (this.boundHandlers.updateContributors) {
+      eventBridge.off(
+        "UPDATE_CONTRIBUTORS",
+        this.boundHandlers.updateContributors,
       );
     }
     if (this.resizeHandler) {

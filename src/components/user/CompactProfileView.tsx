@@ -13,7 +13,8 @@ import { Id } from "@convex/_generated/dataModel";
 import { ContributionRequest } from "@/components/requests/request-status-card"
 import { useChat } from "@/components/chat/ChatContext";
 import { InvitationButton } from "@/components/requests/invitation-button";
-import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
+import { getVentureBadgeEmoji, BadgeItem } from "@/components/badges/BadgeCard";
+import { BadgeDetailModal } from "@/components/badges/BadgeDetailModal";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -90,6 +91,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   const { openChatWithUser } = useChat();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"created" | "sparked" | "contributed">("created");
+  const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
   const equippedBadgeIds = profile.equippedBadges || [];
@@ -143,7 +145,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                       {equippedBadgesList.slice(0, 3).map((badge) => (
                         <span
                           key={badge.id}
-                          title={`${badge.name}: ${badge.description}`}
+                          title={`${badge.name}: ${badge.description} (Click to view details)`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedBadge(badge as any);
+                          }}
                           className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
                           style={{ animationDuration: "3s" }}
                         >
@@ -378,6 +384,14 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         type={dialogType}
         isOpen={dialogOpen}
         onOpenChange={setDialogOpen}
+      />
+
+      <BadgeDetailModal
+        badge={selectedBadge}
+        isOpen={selectedBadge !== null}
+        onClose={() => setSelectedBadge(null)}
+        isOwner={isOwner}
+        isEquipped={selectedBadge ? equippedBadgeIds.includes(selectedBadge.id) : false}
       />
     </div>
   )

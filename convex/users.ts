@@ -368,31 +368,92 @@ export const userExists = query({
 export const searchUsers = query({
   args: { query: v.string(), limit: v.optional(v.number()) },
   handler: async ({ db }, { query, limit = 20 }): Promise<
-    Array<{ id: string; username: string; displayName: string; avatar?: string }>
+    Array<{ id: string; username: string; displayName: string; avatar?: string; isOnline: boolean; role?: string }>
   > => {
     const normalizedQuery = query.toLowerCase().trim()
-    if (!normalizedQuery) return []
 
-    // For partial matching, we'll fetch more users and filter client-side
-    // This is a workaround since Convex doesn't support prefix search directly
+    // Fetch active users (excluding deactivated ones)
     const allUsers = await db
       .query("users")
-      .withIndex("by_is_active", (q) => q.eq("isActive", true))
-      .take(1000) // Fetch a reasonable number of active users
+      .withIndex("by_created_at")
+      .order("desc")
+      .take(200);
 
-    // Filter users whose username starts with the query
-    const filteredUsers = allUsers
+    const now = Date.now();
+
+    // Enrich users with online status and basic details, filtering out deactivated users
+    const enrichedUsers = allUsers
+      .filter((user) => user.isActive !== false)
+      .map((user) => {
+        const isOnline = user.lastLoginAt ? (now - user.lastLoginAt < 5 * 60 * 1000) : false;
+        return {
+          id: user._id,
+          username: user.username,
+          displayName: user.displayName,
+          avatar: user.avatar,
+          isOnline,
+          role: user.role || "user",
+          lastLoginAt: user.lastLoginAt || 0,
+          createdAt: user.createdAt,
+        };
+      });
+
+    // If query is empty, return suggested active users (online first, then recently active, then newest)
+    if (!normalizedQuery) {
+      const sortedUsers = [...enrichedUsers].sort((a, b) => {
+        // Online users first
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+
+        // Then by lastLoginAt desc (recently active)
+        if (b.lastLoginAt !== a.lastLoginAt) {
+          return b.lastLoginAt - a.lastLoginAt;
+        }
+
+        // Then by createdAt desc (newest)
+        return b.createdAt - a.createdAt;
+      });
+
+      return sortedUsers.slice(0, limit).map((u) => ({
+        id: u.id,
+        username: u.username,
+        displayName: u.displayName,
+        avatar: u.avatar,
+        isOnline: u.isOnline,
+        role: u.role,
+      }));
+    }
+
+    // Filter users matching query (case-insensitive username/displayName check)
+    const filteredUsers = enrichedUsers
       .filter((user) =>
-        user.username.toLowerCase().startsWith(normalizedQuery)
+        user.username.toLowerCase().includes(normalizedQuery) ||
+        user.displayName.toLowerCase().includes(normalizedQuery)
       )
-      .slice(0, limit)
+      .sort((a, b) => {
+        // Match sorting: online first, then query match position
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
 
-    return filteredUsers.map((user) => ({
-      id: user._id,
-      username: user.username,
-      displayName: user.displayName,
-      avatar: user.avatar,
-    }))
+        // Then by username match position (closer to start gets priority)
+        const aIndex = a.username.toLowerCase().indexOf(normalizedQuery);
+        const bIndex = b.username.toLowerCase().indexOf(normalizedQuery);
+        if (aIndex !== bIndex && aIndex >= 0 && bIndex >= 0) {
+          return aIndex - bIndex;
+        }
+
+        return b.lastLoginAt - a.lastLoginAt;
+      })
+      .slice(0, limit);
+
+    return filteredUsers.map((u) => ({
+      id: u.id,
+      username: u.username,
+      displayName: u.displayName,
+      avatar: u.avatar,
+      isOnline: u.isOnline,
+      role: u.role,
+    }));
   },
 })
 

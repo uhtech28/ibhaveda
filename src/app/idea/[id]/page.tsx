@@ -729,7 +729,7 @@ const TodoSection: React.FC<{
 
   const allUsers = useQuery(api.users.getAllUsers) || [];
   const acceptedRequests = useQuery(api.contributionRequests.getAcceptedContributors, { ideaId: idea._id as Id<"ideas"> }) || [];
-  const contributors = allUsers.filter((u) => u._id === idea.authorId || acceptedRequests.some((req) => req.contributorId === u._id && req.status === "accepted")).map((u) => ({ _id: u._id, clerkId: u.clerkId, username: u.username, displayName: u.displayName, avatar: u.avatar }));
+  const contributors = allUsers.filter((u) => u._id === idea.authorId || acceptedRequests.some((req) => req.userId === u._id)).map((u) => ({ _id: u._id, clerkId: u.clerkId, username: u.username, displayName: u.displayName, avatar: u.avatar }));
 
   const confirmDeleteTodo = async () => {
     if (!todoToDelete || isDeleting) return;
