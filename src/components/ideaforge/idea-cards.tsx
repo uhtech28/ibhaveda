@@ -263,6 +263,15 @@ export function IdeaStoryCard({
   const description = idea.description || "No description yet.";
   const shouldClamp = description.length > 220;
 
+  const comments = useQuery(api.ideas.getComments, {
+    ideaId: idea._id as Id<"ideas">,
+    limit: 10,
+  });
+  const rootComments = useMemo(
+    () => (comments || []).filter((c) => !c.parentCommentId),
+    [comments]
+  );
+
   // Whole-card click-to-open. Skip when the click originated from any inner
   // interactive element (button, link, input, etc.) so Spark / Save /
   // Collaborate / tag chips keep working normally.
@@ -468,58 +477,48 @@ export function IdeaStoryCard({
       </div>
 
       {/* Recent Updates & Contributions Preview */}
-      {(() => {
-        const comments = useQuery(api.ideas.getComments, {
-          ideaId: idea._id as Id<"ideas">,
-          limit: 10,
-        });
-        const rootComments = (comments || []).filter((c) => !c.parentCommentId);
-
-        if (rootComments.length === 0) return null;
-
-        return (
-          <div className="mt-4 border-t border-white/5 pt-4 space-y-2.5">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                Latest Venture Feed
-              </span>
-            </div>
-            <div className="space-y-2">
-              {rootComments.slice(-2).reverse().map((c) => (
-                <div
-                  key={c._id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onComment(idea._id);
-                  }}
-                  className="flex gap-2.5 items-start rounded-xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/[0.08] p-3 transition-all duration-200 cursor-pointer"
-                >
-                  <Avatar className="h-6.5 w-6.5 shrink-0 ring-1 ring-white/10">
-                    <AvatarImage src={c.author?.avatar} alt={c.author?.name} />
-                    <AvatarFallback className="bg-[#1B2440] text-[9px] text-white font-bold">
-                      {getInitials(c.author?.name || c.author?.username)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold text-slate-300 truncate">
-                        {c.author?.name || c.author?.username || "Builder"}
-                      </span>
-                      <span className="text-[9px] text-slate-500 font-medium shrink-0">
-                        {formatRelativeTime(c.createdAt)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed break-words whitespace-pre-wrap">
-                      {c.content}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {rootComments.length > 0 && (
+        <div className="mt-4 border-t border-white/5 pt-4 space-y-2.5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              Latest Venture Feed
+            </span>
           </div>
-        );
-      })()}
+          <div className="space-y-2">
+            {rootComments.slice(-2).reverse().map((c) => (
+              <div
+                key={c._id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onComment(idea._id);
+                }}
+                className="flex gap-2.5 items-start rounded-xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/[0.08] p-3 transition-all duration-200 cursor-pointer"
+              >
+                <Avatar className="h-6.5 w-6.5 shrink-0 ring-1 ring-white/10">
+                  <AvatarImage src={c.author?.avatar} alt={c.author?.name} />
+                  <AvatarFallback className="bg-[#1B2440] text-[9px] text-white font-bold">
+                    {getInitials(c.author?.name || c.author?.username)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-300 truncate">
+                      {c.author?.name || c.author?.username || "Builder"}
+                    </span>
+                    <span className="text-[9px] text-slate-500 font-medium shrink-0">
+                      {formatRelativeTime(c.createdAt)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed break-words whitespace-pre-wrap">
+                    {c.content}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {bannerImage && (
         <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
