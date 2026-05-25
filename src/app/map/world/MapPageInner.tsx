@@ -2863,7 +2863,7 @@ function MapPageInner() {
 
       {/* HUD at bottom - Stage Info, Progress, Level, XP */}
       <div className="absolute inset-x-0 bottom-4 z-[70] pointer-events-none flex justify-center">
-        <div className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl">
+        <div id="bottom-hud-control" className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl">
           <div className="shrink-0">
             <StageInfo
               stageName={stageInfo.stageName}
@@ -3072,7 +3072,7 @@ function MapPageInner() {
           )}
 
           {/* Left Sidebar & Floating Popup Tools Panel Wrapper */}
-          <div className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
+          <div id="left-control-panel" className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
             <LeftSidebar
               ventureName={ideaTitle}
               onOpenPanel={(tab) => {

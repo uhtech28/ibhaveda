@@ -16,22 +16,83 @@ interface TourStep {
   description: string;
   icon: React.ReactNode;
   sparkyTip: string;
-  // Mask cutout settings
-  cutoutType: "none" | "circle" | "rect";
-  cutoutData?: {
-    cx?: string;
-    cy?: string;
-    r?: string;
-    x?: string;
-    y?: string;
-    w?: string;
-    h?: string;
-    rx?: string;
-  };
+  selector: string | null;
+  fallbackSelector?: string | null;
+  shape?: "circle" | "rect" | "none";
+  rx?: number;
+  padding?: number;
 }
 
 export function WorldMapTour({ show, onClose, ventureName }: WorldMapTourProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [targetRect, setTargetRect] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rx: number;
+    shape: "circle" | "rect" | "none";
+  }>({ x: 0, y: 0, width: 0, height: 0, rx: 8, shape: "none" });
+
+  const steps: TourStep[] = [
+    {
+      title: `Welcome to the Map of ${ventureName}!`,
+      description: "This world map represents your journey to building a real startup venture. Let's guide you through the key elements of the interactive layout.",
+      icon: <Compass className="w-8 h-8 text-yellow-400" />,
+      sparkyTip: "Hey! I'm Sparky, your Venture Companion! ✨ Let's explore how we turn your raw ideas into a powerhouse!",
+      selector: null,
+      shape: "none",
+    },
+    {
+      title: "Interactive Checkpoint Path",
+      description: "The main path features interactive gemstone nodes. Red nodes are pending, glowing green nodes are completed, and golden stars represent prestige completions. Blinking nodes show your active quest goals. Click any node to view its detailed requirements!",
+      icon: <Play className="w-8 h-8 text-emerald-400" />,
+      sparkyTip: "Completing checkpoints advances your character and companion sprites along the trail!",
+      selector: "canvas",
+      shape: "circle",
+    },
+    {
+      title: "Biome Navigation & Progress",
+      description: "Your startup growth is tracked across 36 checkpoints. The bottom HUD panel displays your active Stage (Ideation to Scale), completed checkpoints count, current user Level, and XP progression.",
+      icon: <Sparkles className="w-8 h-8 text-yellow-400" />,
+      sparkyTip: "Unlock new biomes as you clear older ones! Each biome features unique graphic styles and ambient loops.",
+      selector: "#bottom-hud-control",
+      shape: "rect",
+      rx: 16,
+      padding: 10,
+    },
+    {
+      title: "Venture Control Sidebar",
+      description: "The left sidebar houses all utility buttons (All Tools, Kanban Board, Calendar, Settings, and Help). When you add contributors to your team, their companion sprites will automatically appear orbiting around your main character on the map!",
+      icon: <Compass className="w-8 h-8 text-indigo-400" />,
+      sparkyTip: "Hover over companion sprites on the map to see their username, role, and online/offline status!",
+      selector: "#left-control-panel",
+      shape: "rect",
+      rx: 20,
+      padding: 12,
+    },
+    {
+      title: "Quest Log & Task Tiers",
+      description: "This top-right panel shows your current quest objectives. Each checkpoint consists of Task Tiers (T1, T2, T3) that must be cleared to advance. Lock icons represent sequential tasks that unlock once previous tiers are completed.",
+      icon: <Sparkles className="w-8 h-8 text-violet-400" />,
+      sparkyTip: "Complete tasks using specific tool integrations to earn high-purity points!",
+      selector: "#hud-quest-log",
+      shape: "rect",
+      rx: 16,
+      padding: 8,
+    },
+    {
+      title: "Purity & Boss Battles",
+      description: "Keep an eye on the corruption level! Creeping corruption triggers boss encounters (like The Wraith Council). Completing tasks fast and clean deals damage to the boss, restoring purity to secure Prestige points.",
+      icon: <AlertTriangle className="w-8 h-8 text-amber-500" />,
+      sparkyTip: "Defeat corruption bosses to keep your venture healthy and secure shiny Completion Medals for your Profile Showcase!",
+      selector: "#boss-hp-bar",
+      fallbackSelector: "#bottom-hud-control",
+      shape: "rect",
+      rx: 20,
+      padding: 12,
+    },
+  ];
 
   useEffect(() => {
     if (show) {
@@ -40,71 +101,93 @@ export function WorldMapTour({ show, onClose, ventureName }: WorldMapTourProps) 
     }
   }, [show]);
 
-  if (!show) return null;
+  // Handle dynamic DOM measurements and responsive recalculations
+  useEffect(() => {
+    if (!show) return;
 
-  const steps: TourStep[] = [
-    {
-      title: `Welcome to the Map of ${ventureName}!`,
-      description: "This world map is your journey to building a real startup venture. Complete checkpoints along the path to grow your business.",
-      icon: <Compass className="w-8 h-8 text-yellow-400" />,
-      sparkyTip: "Hey! I'm Sparky, your Venture Companion! ✨ Let's explore how we turn your raw ideas into a powerhouse!",
-      cutoutType: "none",
-    },
-    {
-      title: "The 8 Stages of Growth",
-      description: "Your journey starts at Stage 1 (Ideation) and advances step-by-step all the way to Stage 8 (Scale). Use the Stage selector at the bottom to view the entire biome map.",
-      icon: <Sparkles className="w-8 h-8 text-emerald-400" />,
-      sparkyTip: "Each biome represents a different phase of startup validation. Unlock new biomes as you clear older ones!",
-      cutoutType: "rect",
-      cutoutData: {
-        x: "5%",
-        y: "82%",
-        w: "90%",
-        h: "16%",
-        rx: "24",
-      },
-    },
-    {
-      title: "Venture Control Panel",
-      description: "The Left Sidebar tracks your current Quest goals and active tasks. Clicking any open flag on the map loads its details here.",
-      icon: <Compass className="w-8 h-8 text-indigo-400" />,
-      sparkyTip: "Make sure to check the active tasks checklist! Every task completed brings us closer to clearing the checkpoint.",
-      cutoutType: "rect",
-      cutoutData: {
-        x: "16px",
-        y: "80px",
-        w: "350px",
-        h: "83%",
-        rx: "24",
-      },
-    },
-    {
-      title: "Corruption & Prestige Medals",
-      description: "Watch the Corruption Meter in the top HUD! Submitting evidence clean and fast maintains a high purity score, awarding prestigious Gold Medals on checkpoint and stage completions.",
-      icon: <AlertTriangle className="w-8 h-8 text-amber-500" />,
-      sparkyTip: "If corruption climbs too high, your prestige drops from Gold to Silver or Bronze. Strive for excellence!",
-      cutoutType: "rect",
-      cutoutData: {
-        x: "15%",
-        y: "12px",
-        w: "70%",
-        h: "85px",
-        rx: "35",
-      },
-    },
-    {
-      title: "Active Checkpoints & Flags",
-      description: "Ready to make history? Click on any active blinking flag on the main path to submit evidence, play mini-games, and conquer your startup goals!",
-      icon: <Play className="w-8 h-8 text-yellow-400" />,
-      sparkyTip: "Go get them! Complete Stage 1 to unlock your first major Completion Medal in your Profile Showcase!",
-      cutoutType: "circle",
-      cutoutData: {
-        cx: "50%",
-        cy: "50%",
-        r: "120",
-      },
-    },
-  ];
+    const updateTargetRect = () => {
+      const step = steps[currentStep];
+      if (!step || !step.selector) {
+        setTargetRect({ x: 0, y: 0, width: 0, height: 0, rx: 0, shape: "none" });
+        return;
+      }
+
+      let element = document.querySelector(step.selector) as HTMLElement | null;
+      
+      // Fallback logic
+      if (!element && step.fallbackSelector) {
+        element = document.querySelector(step.fallbackSelector) as HTMLElement | null;
+      }
+
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        const padding = step.padding ?? 8;
+        const x = rect.left - padding;
+        const y = rect.top - padding;
+        const width = rect.width + padding * 2;
+        const height = rect.height + padding * 2;
+        const rx = step.rx ?? 16;
+        
+        setTargetRect({
+          x,
+          y,
+          width,
+          height,
+          rx,
+          shape: step.shape ?? "rect",
+        });
+
+        // Add glow class to targeted element
+        element.classList.add("tour-glow-active");
+        
+        // Clean up previously active glow elements
+        const allGlowElements = document.querySelectorAll(".tour-glow-active");
+        allGlowElements.forEach((el) => {
+          if (el !== element) {
+            el.classList.remove("tour-glow-active");
+          }
+        });
+      } else {
+        // Fallback to center or default if selector is canvas/center
+        if (step.selector === "canvas" || step.selector === "center") {
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+          const r = 130;
+          setTargetRect({
+            x: cx - r,
+            y: cy - r,
+            width: r * 2,
+            height: r * 2,
+            rx: r,
+            shape: "circle",
+          });
+        } else {
+          setTargetRect({ x: 0, y: 0, width: 0, height: 0, rx: 0, shape: "none" });
+        }
+      }
+    };
+
+    updateTargetRect();
+    
+    window.addEventListener("resize", updateTargetRect);
+    window.addEventListener("scroll", updateTargetRect);
+    
+    // Interval polling for async mounted components
+    const interval = setInterval(updateTargetRect, 250);
+
+    return () => {
+      window.removeEventListener("resize", updateTargetRect);
+      window.removeEventListener("scroll", updateTargetRect);
+      clearInterval(interval);
+      
+      const allGlowElements = document.querySelectorAll(".tour-glow-active");
+      allGlowElements.forEach((el) => {
+        el.classList.remove("tour-glow-active");
+      });
+    };
+  }, [currentStep, show]);
+
+  if (!show) return null;
 
   const step = steps[currentStep];
 
@@ -129,57 +212,79 @@ export function WorldMapTour({ show, onClose, ventureName }: WorldMapTourProps) 
     onClose();
   };
 
+  // Card layout positioning helper: keep card in the middle with previous layout size
+  const getCardStyle = () => {
+    return {
+      width: "min(448px, 92%)",
+    };
+  };
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[9990] flex items-center justify-center overflow-hidden">
+        {/* Dynamic global CSS injector for pulsing glow borders */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              @keyframes tour-pulse-glow {
+                0%, 100% {
+                  box-shadow: 0 0 15px rgba(99, 102, 241, 0.5), 0 0 25px rgba(99, 102, 241, 0.25);
+                  border-color: rgba(99, 102, 241, 0.6) !important;
+                }
+                50% {
+                  box-shadow: 0 0 30px rgba(99, 102, 241, 0.9), 0 0 50px rgba(99, 102, 241, 0.45);
+                  border-color: rgba(99, 102, 241, 1) !important;
+                }
+              }
+              .tour-glow-active {
+                animation: tour-pulse-glow 1.5s infinite ease-in-out !important;
+                border-width: 1.5px !important;
+                border-color: rgba(99, 102, 241, 0.8) !important;
+                z-index: 9995 !important;
+              }
+            `
+          }}
+        />
+
         {/* SVG Spotlight Mask */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
           <defs>
             <mask id="tour-spotlight-mask">
-              {/* White background: fully opaque overlay mask */}
               <rect width="100%" height="100%" fill="white" />
-              {/* Black cutouts: transparent spotlights */}
-              {step.cutoutType === "circle" && step.cutoutData && (
-                <circle
-                  cx={step.cutoutData.cx}
-                  cy={step.cutoutData.cy}
-                  r={step.cutoutData.r}
-                  fill="black"
-                />
-              )}
-              {step.cutoutType === "rect" && step.cutoutData && (
-                <rect
-                  x={step.cutoutData.x}
-                  y={step.cutoutData.y}
-                  width={step.cutoutData.w}
-                  height={step.cutoutData.h}
-                  rx={step.cutoutData.rx}
+              {targetRect.shape !== "none" && (
+                <motion.rect
+                  animate={{
+                    x: targetRect.x,
+                    y: targetRect.y,
+                    width: targetRect.width,
+                    height: targetRect.height,
+                    rx: targetRect.shape === "circle" ? targetRect.width / 2 : targetRect.rx,
+                  }}
+                  transition={{ type: "spring", stiffness: 140, damping: 22 }}
                   fill="black"
                 />
               )}
             </mask>
           </defs>
-          {/* Backdrop applying the mask */}
           <rect
             width="100%"
             height="100%"
-            fill="rgba(5, 8, 16, 0.78)"
+            fill="rgba(5, 8, 16, 0.82)"
             mask="url(#tour-spotlight-mask)"
-            className="transition-all duration-500 ease-in-out"
           />
         </svg>
 
-        {/* Backdrop catcher to close or prevent clicking outside */}
+        {/* Prevent background interaction during walkthrough */}
         <div className="absolute inset-0 z-0 pointer-events-auto" />
 
         {/* Tour Card Panel */}
         <motion.div
           key={currentStep}
-          initial={{ opacity: 0, scale: 0.85, y: 50 }}
+          initial={{ opacity: 0, scale: 0.9, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.85, y: 50 }}
-          transition={{ type: "spring", damping: 25, stiffness: 220 }}
-          className="relative z-20 max-w-md w-[92%] bg-slate-900/90 border border-white/10 p-6 rounded-3xl shadow-2xl backdrop-blur-xl flex flex-col gap-6"
+          exit={{ opacity: 0, scale: 0.9, y: 15 }}
+          style={getCardStyle()}
+          className="relative z-20 bg-slate-900/90 border border-white/10 p-6 rounded-3xl shadow-2xl backdrop-blur-xl flex flex-col gap-6"
         >
           {/* Close button */}
           <button
