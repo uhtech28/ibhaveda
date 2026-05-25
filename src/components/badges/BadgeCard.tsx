@@ -251,8 +251,8 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
     const halfHeight = box.height / 2;
     
     // Smooth 3D tilt calculation
-    const rX = -(y - halfHeight) / 6;
-    const rY = (x - halfWidth) / 6;
+    const rX = -(y - halfHeight) / 8;
+    const rY = (x - halfWidth) / 8;
     
     setRotateX(rX);
     setRotateY(rY);
@@ -267,10 +267,15 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
     setGlareY(50);
   };
 
-  // Background style based on rarity and state
+  // Luxury high-end glassmorphism background style based on rarity and state
   const bgStyle = isLocked
-    ? "bg-slate-950/20 border-slate-900/60 opacity-30 grayscale cursor-not-allowed"
-    : cn("bg-slate-950/45 border-white/5 backdrop-blur-md cursor-pointer hover:-translate-y-1.5", norm.glowClass);
+    ? "bg-slate-950/25 border-slate-900/60 opacity-40 grayscale cursor-not-allowed"
+    : cn(
+        "bg-gradient-to-br bg-slate-950/80 backdrop-blur-xl cursor-pointer hover:-translate-y-1.5",
+        norm.bgClass,
+        norm.borderClass,
+        norm.glowClass
+      );
 
   const ringColor = badge.secondaryColor || norm.accentColor;
   const isMythic = norm.key === "mythic";
@@ -284,42 +289,65 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
         opacity: 1,
         rotateX,
         rotateY,
-        scale: rotateX !== 0 ? 1.04 : 1,
+        scale: rotateX !== 0 ? 1.03 : 1,
       }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }}
       onClick={isLocked ? undefined : onClick}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{
         transformStyle: "preserve-3d",
-        perspective: 1000,
+        perspective: 1200,
       }}
       className={cn(
-        "group relative flex flex-col items-center justify-between text-center p-5 rounded-2xl border transition-all duration-300 h-full w-full overflow-hidden select-none",
+        "group relative flex flex-col items-center justify-between text-center p-6 rounded-2xl border transition-all duration-500 h-full w-full overflow-hidden select-none",
         bgStyle,
-        isEquipped && "border-yellow-400/80 shadow-[0_0_25px_rgba(250,204,21,0.25)] ring-1 ring-yellow-400/40",
+        isEquipped && "border-yellow-400/80 shadow-[0_0_30px_rgba(250,204,21,0.3)] ring-1 ring-yellow-400/50",
         className
       )}
     >
       {/* 3D Reflection Glare Overlay */}
       {!isLocked && (
         <div
-          className="absolute inset-0 pointer-events-none z-20 mix-blend-color-dodge transition-opacity duration-300 opacity-0 group-hover:opacity-60"
+          className="absolute inset-0 pointer-events-none z-20 mix-blend-color-dodge transition-opacity duration-300 opacity-0 group-hover:opacity-40"
           style={{
-            background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255, 255, 255, 0.15) 0%, transparent 60%)`,
+            background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255, 255, 255, 0.12) 0%, transparent 60%)`,
           }}
         />
       )}
+
+      {/* Ambient Volumetric Rarity Glow Backdrop */}
+      {!isLocked && (
+        <div
+          className="absolute w-40 h-40 rounded-full blur-3xl opacity-20 group-hover:opacity-35 transition-all duration-700 pointer-events-none -z-10 animate-pulse"
+          style={{
+            background: `radial-gradient(circle, ${ringColor} 0%, transparent 75%)`,
+            top: "5%",
+            left: "50%",
+            transform: "translateX(-50%)",
+          }}
+        />
+      )}
+
+      {/* Corner Filigree Brackets for luxury physical card look */}
+      {!isLocked && (
+        <>
+          <div className="absolute top-2.5 left-2.5 w-2 h-2 border-t border-l border-white/10 rounded-tl-sm transition-all duration-500 group-hover:border-white/30" />
+          <div className="absolute top-2.5 right-2.5 w-2 h-2 border-t border-r border-white/10 rounded-tr-sm transition-all duration-500 group-hover:border-white/30" />
+          <div className="absolute bottom-2.5 left-2.5 w-2 h-2 border-b border-l border-white/10 rounded-bl-sm transition-all duration-500 group-hover:border-white/30" />
+          <div className="absolute bottom-2.5 right-2.5 w-2 h-2 border-b border-r border-white/10 rounded-br-sm transition-all duration-500 group-hover:border-white/30" />
+        </>
+      )}
+
       {/* 1. Mythic / Founder Cosmic Space Particle Effect */}
       {!isLocked && isMythic && (
         <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(244,63,94,0.15)_0%,_rgba(0,0,0,0)_70%)] animate-pulse" />
-          {/* Rotating Cosmic aura */}
           <motion.div
             animate={{ rotate: 360 }}
-            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-            className="absolute -inset-10 bg-[conic-gradient(from_0deg,_transparent_0%,_rgba(244,63,94,0.1)_25%,_transparent_50%,_rgba(99,102,241,0.1)_75%,_transparent_100%)] rounded-full blur-md"
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            className="absolute -inset-10 bg-[conic-gradient(from_0deg,_transparent_0%,_rgba(244,63,94,0.1)_25%,_transparent_50%,_rgba(99,102,241,0.1)_75%,_transparent_100%)] rounded-full blur-lg"
           />
         </div>
       )}
@@ -328,27 +356,27 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
       {!isLocked && ["gold", "diamond", "legendary", "mythic"].includes(norm.key) && (
         <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
           <motion.div
-            animate={{ x: ["-100%", "200%"] }}
+            animate={{ x: ["-150%", "250%"] }}
             transition={{
               repeat: Infinity,
-              duration: norm.key === "mythic" ? 2.5 : 4,
-              repeatDelay: norm.key === "mythic" ? 1.5 : 3,
+              duration: norm.key === "mythic" ? 3 : 5,
+              repeatDelay: norm.key === "mythic" ? 2 : 4,
               ease: "easeInOut",
             }}
-            className="absolute top-0 bottom-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12"
+            className="absolute top-0 bottom-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent skew-x-12"
           />
         </div>
       )}
 
       {/* 3. Floating Lock / Equipped badge indicators */}
       {isLocked && (
-        <div className="absolute top-2 right-2 bg-slate-950/80 border border-white/10 p-1.5 rounded-full z-20">
-          <Lock className="w-3 h-3 text-slate-400" />
+        <div className="absolute top-3 right-3 bg-slate-950/80 border border-white/10 p-1.5 rounded-full z-20">
+          <Lock className="w-3.5 h-3.5 text-slate-400" />
         </div>
       )}
 
       {isEquipped && (
-        <div className="absolute top-2 left-2 bg-yellow-500 text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide shadow-md flex items-center gap-0.5 z-20">
+        <div className="absolute top-3 left-3 bg-yellow-500 text-slate-950 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest shadow-md flex items-center gap-0.5 z-20 border border-yellow-400/40">
           <Check className="w-2.5 h-2.5 stroke-[3]" />
           Equipped
         </div>
@@ -356,87 +384,86 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
 
       {/* 4. Category Indicator Icon floating top-right (unlocked) */}
       {!isLocked && (
-        <div className="absolute top-2.5 right-2.5 opacity-40 group-hover:opacity-80 transition-opacity z-10">
-          {badge.category === "onboarding" && <Compass className="w-3.5 h-3.5" />}
-          {badge.category === "community" && <Users className="w-3.5 h-3.5" />}
-          {badge.category === "consistency" && <Flame className="w-3.5 h-3.5" />}
-          {badge.category === "skill" && <Code className="w-3.5 h-3.5" />}
-          {badge.category === "idea_milestones" && <Award className="w-3.5 h-3.5" />}
+        <div className="absolute top-3 right-3 opacity-30 group-hover:opacity-75 transition-opacity duration-300 z-10 text-white">
+          {badge.category === "onboarding" && <Compass className="w-4 h-4" />}
+          {badge.category === "community" && <Users className="w-4 h-4" />}
+          {badge.category === "consistency" && <Flame className="w-4 h-4" />}
+          {badge.category === "skill" && <Code className="w-4 h-4" />}
+          {badge.category === "idea_milestones" && <Award className="w-4 h-4" />}
         </div>
       )}
 
       {/* 5. Badge Icon Canvas */}
-      <div className="relative w-20 h-20 flex items-center justify-center mb-4 shrink-0 z-10">
+      <div className="relative w-24 h-24 flex items-center justify-center mb-5 shrink-0 z-10">
         {/* Outer Rotating Halo for Legendary and Mythic */}
         {!isLocked && (isLegendary || isMythic) && (
           <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+            animate={{ rotate: -360 }}
+            transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
             className={cn(
-              "absolute inset-0 rounded-2xl border border-dashed opacity-45",
-              isMythic ? "border-rose-400/50" : "border-purple-400/50"
+              "absolute inset-0 rounded-2xl border border-dashed opacity-35 group-hover:opacity-60 transition-opacity duration-500",
+              isMythic ? "border-rose-400/60" : "border-purple-400/60"
             )}
-            style={{ padding: "-2px" }}
           />
         )}
 
-        {/* Diamond Ring Background (mirrors profile design but upgraded) */}
+        {/* Diamond Ring Background (mirrors profile design but upgraded to glowing glass) */}
         <motion.div
           animate={isLocked ? {} : { rotate: 45 }}
           className={cn(
-            "absolute inset-1.5 rounded-2xl border transition-all duration-500",
-            isLocked ? "border-slate-800 bg-slate-900/60" : "group-hover:rotate-90"
+            "absolute inset-2 rounded-2xl border transition-all duration-500 backdrop-blur-sm shadow-[0_0_15px_rgba(255,255,255,0.02)]",
+            isLocked ? "border-slate-800 bg-slate-900/60" : "group-hover:rotate-90 group-hover:scale-105"
           )}
           style={{
-            backgroundColor: isLocked ? undefined : badge.primaryColor || `${ringColor}15`,
-            borderColor: isLocked ? undefined : `${ringColor}50`,
+            backgroundColor: isLocked ? undefined : badge.primaryColor ? `${badge.primaryColor}1a` : `${ringColor}1a`,
+            borderColor: isLocked ? undefined : `${ringColor}40`,
           }}
         />
 
         {/* Inner Canvas Circle */}
         <div
           className={cn(
-            "relative w-14 h-14 flex items-center justify-center rounded-full z-10 transition-transform duration-300",
+            "relative w-16 h-16 flex items-center justify-center rounded-full z-10 transition-all duration-500 shadow-lg",
             isLocked
               ? "bg-slate-950/40 border-slate-900 text-slate-600"
-              : "bg-slate-950/70 border-white/5 shadow-inner group-hover:scale-110"
+              : "bg-slate-950/80 border border-white/10 shadow-inner group-hover:scale-110 group-hover:border-white/20 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.05)]"
           )}
           style={{ color: isLocked ? undefined : ringColor }}
         >
           <span
             className={cn(
-              "select-none filter drop-shadow-md flex items-center justify-center",
-              !isLocked && "group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+              "select-none filter drop-shadow-md flex items-center justify-center transition-all duration-500",
+              !isLocked && "group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
             )}
-            style={{ fontSize: "1.85rem" }}
+            style={{ fontSize: "2.1rem" }}
           >
-            {isLocked ? "❓" : <PremiumIcon name={iconEmoji} className="w-8 h-8" strokeWidth={1.5} />}
+            {isLocked ? "❓" : <PremiumIcon name={iconEmoji} className="w-9 h-9" strokeWidth={1.5} />}
           </span>
         </div>
       </div>
 
       {/* 6. Details details */}
-      <div className="space-y-1 flex-1 flex flex-col justify-between w-full z-10">
+      <div className="space-y-1.5 flex-1 flex flex-col justify-between w-full z-10">
         <div>
           <h4
             className={cn(
-              "font-bold text-sm leading-tight transition-colors line-clamp-1",
-              isLocked ? "text-slate-500" : "text-white group-hover:text-primary"
+              "font-extrabold text-base tracking-tight leading-tight transition-colors line-clamp-1 drop-shadow-sm",
+              isLocked ? "text-slate-500" : "text-white"
             )}
           >
             {isLocked ? "Secret Achievement" : badge.name}
           </h4>
-          <p className="text-[10px] text-slate-400 line-clamp-2 px-1 mt-1 leading-normal">
-            {isLocked ? (badge.requirement || "Locked achievement") : (badge.tagline || badge.description)}
+          <p className="text-[11px] text-slate-400 line-clamp-2 px-1 mt-1 leading-relaxed italic font-medium">
+            {isLocked ? (badge.requirement || "Locked achievement") : `"${badge.tagline || badge.description}"`}
           </p>
         </div>
 
         {/* 7. Bottom Rarity Pill + Date / Lock Info */}
-        <div className="pt-3 flex flex-col items-center gap-1.5 mt-auto">
+        <div className="pt-4 flex flex-col items-center gap-2 mt-auto">
           <Badge
             variant="outline"
             className={cn(
-              "text-[8px] font-extrabold tracking-widest uppercase rounded-full px-2.5 py-0 h-4 border border-solid shrink-0",
+              "text-[9px] font-black tracking-widest uppercase rounded-full px-3.5 py-0.5 h-5 border border-solid shrink-0 shadow-sm transition-all duration-300",
               isLocked ? "text-slate-500 bg-slate-900/30 border-slate-800" : norm.pillClass
             )}
           >
@@ -444,7 +471,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
           </Badge>
 
           {!isLocked && badge.awardedAt && (
-            <span className="text-[8.5px] text-slate-500/70 flex items-center gap-1">
+            <span className="text-[9px] text-slate-500/80 flex items-center gap-1 font-medium transition-colors group-hover:text-slate-400">
               <Calendar className="w-2.5 h-2.5" />
               {new Date(badge.awardedAt).toLocaleDateString(undefined, {
                 month: "short",

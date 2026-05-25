@@ -85,39 +85,9 @@ const StageInfoComponent = ({
         </div>
 
         <div className="flex flex-col justify-center gap-0.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[8px] font-black uppercase tracking-wider text-indigo-400">
-              Stage {stage}
-            </span>
-            <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500">
-              {stageName}
-            </span>
-          </div>
           <span className="hidden sm:block truncate text-[12px] font-black uppercase tracking-tight text-white">
             {biomeName}
           </span>
-          <div className="hidden sm:flex items-center gap-1.5 mt-0.5">
-             <div className="flex items-center gap-1">
-              {Array.from({ length: visibleCheckpoints }).map((_, index) => {
-                const checkpointNumber = index + 1;
-                const isUnlocked = checkpointNumber <= currentCheckpoint;
-                const isCurrent = checkpointNumber === currentCheckpoint;
-
-                return (
-                  <div
-                    key={checkpointNumber}
-                    className={`h-1.5 rounded-full transition-all ${
-                      isCurrent
-                        ? "w-4 bg-amber-300"
-                        : isUnlocked
-                          ? "w-1.5 bg-emerald-400"
-                          : "w-1.5 bg-white/10"
-                    }`}
-                  />
-                );
-              })}
-            </div>
-          </div>
         </div>
       </motion.div>
     );
@@ -138,43 +108,9 @@ const StageInfoComponent = ({
       </div>
 
       <div className="flex min-w-0 flex-col justify-center gap-1">
-        <div className="flex items-center gap-2">
-          <span className="rounded-md border border-[#d1bd89]/30 bg-[#75693c]/45 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#f2dfab]">
-            Stage {stage}
-          </span>
-          <span className="truncate text-[9px] font-bold uppercase tracking-[0.18em] text-[#a79a72]">
-            {stageName}
-          </span>
-        </div>
         <span className="truncate text-[14px] font-black uppercase tracking-[0.14em] leading-none text-[#f7f0db] drop-shadow-sm">
           {biomeName}
         </span>
-
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#a79a72]">
-            Route
-          </span>
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: visibleCheckpoints }).map((_, index) => {
-              const checkpointNumber = index + 1;
-              const isUnlocked = checkpointNumber <= currentCheckpoint;
-              const isCurrent = checkpointNumber === currentCheckpoint;
-
-              return (
-                <div
-                  key={checkpointNumber}
-                  className={`h-2.5 rounded-full border transition-all ${
-                    isCurrent
-                      ? "w-6 border-amber-300 bg-gradient-to-r from-amber-300 to-orange-400 shadow-[0_0_10px_rgba(251,191,36,0.45)]"
-                      : isUnlocked
-                        ? "w-2.5 border-emerald-300/80 bg-emerald-300"
-                        : "w-2.5 border-white/10 bg-white/10"
-                  }`}
-                />
-              );
-            })}
-          </div>
-        </div>
       </div>
     </motion.div>
   );

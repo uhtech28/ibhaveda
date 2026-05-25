@@ -53,6 +53,73 @@ export const initializeUserLevel = mutation({
   },
 });
 
+export async function awardPointsHelper(
+  ctx: { db: MutationCtx["db"] },
+  args: {
+    userId: Id<"users">;
+    amount: number;
+    type: string;
+    relatedId?: string;
+  }
+) {
+  if (args.amount <= 0) return;
+
+  const now = Date.now();
+
+  // Find or create wallet
+  let wallet = await ctx.db
+    .query("wallets")
+    .withIndex("by_user", (q) => q.eq("userId", args.userId))
+    .first();
+
+  if (!wallet) {
+    const walletId = await ctx.db.insert("wallets", {
+      userId: args.userId,
+      balance: 0,
+      updatedAt: now,
+    });
+    wallet = await ctx.db.get(walletId);
+  }
+
+  if (!wallet) return;
+
+  // Create transaction
+  await ctx.db.insert("transactions", {
+    walletId: wallet._id,
+    amount: args.amount,
+    type: args.type,
+    description: args.type.replace(/_/g, " "),
+    relatedId: args.relatedId,
+    createdAt: now,
+  });
+
+  // Update wallet
+  await ctx.db.patch(wallet._id, {
+    balance: wallet.balance + args.amount,
+    updatedAt: now,
+  });
+
+  // Update user level tracking
+  const userLevel = await ctx.db
+    .query("userLevels")
+    .withIndex("by_user", (q) => q.eq("userId", args.userId))
+    .first();
+
+  if (userLevel) {
+    await ctx.db.patch(userLevel._id, {
+      totalPoints: userLevel.totalPoints + args.amount,
+      titlePoints: userLevel.titlePoints + args.amount,
+      updatedAt: now,
+    });
+
+    // Check for level up
+    await checkLevelUp(ctx, userLevel._id);
+
+    // Recalculate and award badges in real-time
+    await recalculateAndAwardBadgesHelper(ctx, args.userId);
+  }
+}
+
 /**
  * Award points and check for level up.
  */
@@ -64,62 +131,7 @@ export const awardPoints = mutation({
     relatedId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (args.amount <= 0) return;
-
-    const now = Date.now();
-
-    // Find or create wallet
-    let wallet = await ctx.db
-      .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-
-    if (!wallet) {
-      const walletId = await ctx.db.insert("wallets", {
-        userId: args.userId,
-        balance: 0,
-        updatedAt: now,
-      });
-      wallet = await ctx.db.get(walletId);
-    }
-
-    if (!wallet) return;
-
-    // Create transaction
-    await ctx.db.insert("transactions", {
-      walletId: wallet._id,
-      amount: args.amount,
-      type: args.type,
-      description: args.type.replace(/_/g, " "),
-      relatedId: args.relatedId,
-      createdAt: now,
-    });
-
-    // Update wallet
-    await ctx.db.patch(wallet._id, {
-      balance: wallet.balance + args.amount,
-      updatedAt: now,
-    });
-
-    // Update user level tracking
-    const userLevel = await ctx.db
-      .query("userLevels")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-
-    if (userLevel) {
-      await ctx.db.patch(userLevel._id, {
-        totalPoints: userLevel.totalPoints + args.amount,
-        titlePoints: userLevel.titlePoints + args.amount,
-        updatedAt: now,
-      });
-
-      // Check for level up
-      await checkLevelUp(ctx, userLevel._id);
-
-      // Recalculate and award badges in real-time
-      await recalculateAndAwardBadgesHelper(ctx, args.userId);
-    }
+    await awardPointsHelper(ctx, args);
   },
 });
 

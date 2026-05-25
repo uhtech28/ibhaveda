@@ -7,7 +7,6 @@ import { XPBar } from "./XPBar";
 import { LevelDisplay } from "./LevelDisplay";
 import { StageInfo } from "./StageInfo";
 import { CheckpointProgress } from "./CheckpointProgress";
-import { AudioControls } from "./AudioControls";
 import { QuestList } from "./QuestList";
 import { BossHPBar } from "./BossHPBar";
 
@@ -18,6 +17,7 @@ import {
   userProgressAtom,
   stageInfoAtom,
   checkpointProgressAtom,
+  corruptionStateAtom,
 
   submittingTaskAtom,
   activeTaskAtom,
@@ -31,6 +31,7 @@ const HUDComponent = () => {
   const [userProgress] = useAtom(userProgressAtom);
   const [stageInfo] = useAtom(stageInfoAtom);
   const [checkpointProgress] = useAtom(checkpointProgressAtom);
+  const [corruption] = useAtom(corruptionStateAtom);
 
   const [, setSubmittingTask] = useAtom(submittingTaskAtom);
   const [activeTask] = useAtom(activeTaskAtom);
@@ -143,10 +144,10 @@ const HUDComponent = () => {
                         currentXP={userProgress.xp}
                         maxXP={userProgress.xpToNextLevel}
                         compact={true}
+                        bossHp={corruption.bossHp}
+                        bossBaseHp={corruption.bossBaseHp}
+                        bossName={corruption.bossName}
                       />
-                    </div>
-                    <div className="ml-0.5 shrink-0 sm:ml-1">
-                      <AudioControls />
                     </div>
                   </div>
                 </div>

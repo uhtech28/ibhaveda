@@ -64,7 +64,7 @@ export function BadgeAwardSequence({
           : null
       }
       reason={badge?.tagline || badge?.description}
-      xpEarned={500}
+      xpEarned={20}
       onClose={handleClose}
     />
   );

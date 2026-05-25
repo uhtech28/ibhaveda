@@ -11,6 +11,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Edit2, MapPin, Link2, Lightbulb, Sparkles, Users, ChevronRight } from "lucide-react";
 import { RequestStatusCard, ContributionRequest } from "@/components/requests/request-status-card";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
+import { getVentureBadgeEmoji } from "../badges/BadgeCard";
 
 interface DetailedProfileViewProps {
   profile: UserProfile;
@@ -59,6 +63,10 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
 }) => {
   const router = useRouter();
 
+  const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
+  const equippedBadgeIds = profile.equippedBadges || [];
+  const equippedBadgesList = earnedBadges?.filter((b) => equippedBadgeIds.includes(b.id)) || [];
+
   const handleEditProfile = () => {
     router.push("/profile-setup");
   };
@@ -86,7 +94,19 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                 <div className="flex-1 space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h1 className="text-xl font-bold text-foreground leading-tight">{profile.displayName}</h1>
+                      <h1 className="text-xl font-bold text-foreground leading-tight flex items-center gap-2">
+                        {profile.displayName}
+                        {equippedBadgesList.slice(0, 3).map((badge) => (
+                          <span
+                            key={badge.id}
+                            title={`${badge.name}: ${badge.description}`}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
+                            style={{ animationDuration: "3s" }}
+                          >
+                            <PremiumIcon name={(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)} className="w-3.5 h-3.5" strokeWidth={1.5} />
+                          </span>
+                        ))}
+                      </h1>
                       <p className="text-muted-foreground font-medium text-sm">@{profile.username}</p>
                     </div>
                     <Button 

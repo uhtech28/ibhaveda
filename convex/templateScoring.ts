@@ -90,22 +90,61 @@ export interface TemplateScoringResult {
 // PROMPT BUILDERS
 // ─────────────────────────────────────────────────────────────────────────────
 
+const TEMPLATE_BOSS_STAGES: Record<string, number> = {
+  venture: 8,
+  academic: 6,
+  lab: 7,
+  creative: 6,
+};
+
 function buildTemplateScoringPrompt(
   content: string,
   checkpointOutcome: string,
   templateId: "academic" | "lab" | "creative",
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
 ): string {
   const config = getScoringConfig(templateId);
   const { dimensions, evaluatorPersona, workContext } = config;
   const [d1, d2, d3, d4] = dimensions;
 
+  const bossPromptSegment = isBossRound
+    ? `
+CRITICAL: THIS IS A BOSS CHALLENGE ROUND.
+You must perform an extremely strict, final evaluation. 
+Evaluate each dimension with the highest level of academic rigor and critical depth:
+1. ${d1.id}: Evaluate this specifically as 'problem-solving capability'. Does it solve the real core problem of the original idea in a viable, non-trivial way?
+2. ${d2.id}: Evaluate this specifically as 'scalability'. Can this solution scale, or is it too localized/basic/generic?
+3. ${d3.id}: Evaluate this specifically as 'concrete verification'. Is there real-world verification or evidence?
+4. ${d4.id}: Evaluate this specifically as 'true differentiation'. Is there a unique, non-copied competitive advantage?
+
+The overall score will be heavily influenced by both this Boss Challenge performance and the user's historical idea consistency score across previous submissions (Historical Consistency Score: ${averageConsistencyScore.toFixed(1)} / 12).
+If the submission is inconsistent with the historical quality or shows a regression/copy-paste pattern, penalize the scores accordingly.
+`
+    : "";
+
   return `${evaluatorPersona}
+
+ORIGINAL IDEA/CONCEPT:
+Title: "${ideaTitle}"
+Description: "${ideaDescription}"
 
 CHECKPOINT OUTCOME BEING EVALUATED (${workContext}):
 "${checkpointOutcome}"
 
 SUBMISSION:
 "${content}"
+
+${bossPromptSegment}
+
+CRITICAL RULE: RELEVANCE & ALIGNMENT CHECK (HIGHEST WEIGHT)
+First and foremost, you MUST strictly check if the submission is directly, strongly aligned with the original startup idea/concept above (Title: "${ideaTitle}", Description: "${ideaDescription}").
+- If the submission is unrelated, generic, a generic AI-generated template, or copy-pasted ChatGPT text that does not solve the specific problem of this startup, YOU MUST CARRY OUT THE RELEVANCE PENALTY:
+  * You MUST penalize all scoring dimensions severely. Capped at 0 or 1.
+  * The feedback must explicitly call out the lack of relevance to the startup idea: "${ideaTitle}".
+- Do not award high scores to well-written but generic content. Relevance is the absolute gatekeeper. Technical implementation, UI/UX, and AI usage can only score highly if relevance is verified.
 
 Score the submission on EXACTLY these four dimensions. Each dimension is scored 0, 1, 2, or 3.
 Return ONLY a valid JSON object with no extra text.
@@ -135,38 +174,84 @@ RESPOND WITH ONLY THIS JSON (no markdown, no extra text):
 function mockTemplateScore(
   content: string,
   templateId: TemplateId,
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
 ): { d1: number; d2: number; d3: number; d4: number; feedback: string } {
   const words = content.trim().split(/\s+/).length;
   const hasNumbers = /\d+/.test(content);
   const hasLinks = /https?:\/\//.test(content);
   const hasQuotes = /"[^"]+"/.test(content);
 
+  // Relevance check: does the submission content mention keywords or concepts from the idea title or description?
+  const titleKeywords = ideaTitle.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  const descKeywords = ideaDescription.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+  const contentLower = content.toLowerCase();
+  
+  const matchesTitle = titleKeywords.some(kw => contentLower.includes(kw));
+  const matchesDesc = descKeywords.filter(kw => contentLower.includes(kw)).length >= Math.min(2, descKeywords.length);
+  
+  const isRelevant = matchesTitle || matchesDesc || contentLower.includes("academic") || contentLower.includes("lab") || contentLower.includes("creative") || words > 150;
+
   const base = words > 100 ? 3 : words > 50 ? 2 : words > 20 ? 1 : 0;
   const specific = (hasNumbers ? 1 : 0) + (words > 80 ? 1 : 0) + (hasLinks ? 1 : 0);
 
-  const d1 = Math.min(3, base);
-  const d2 = Math.min(3, specific);
-  const d3 = Math.min(3, (hasLinks ? 2 : 0) + (hasQuotes ? 1 : 0));
-  const d4 = Math.min(3, words > 60 ? 2 : words > 30 ? 1 : 0);
+  let d1 = Math.min(3, base);
+  let d2 = Math.min(3, specific);
+  let d3 = Math.min(3, (hasLinks ? 2 : 0) + (hasQuotes ? 1 : 0));
+  let d4 = Math.min(3, words > 60 ? 2 : words > 30 ? 1 : 0);
+
+  // STRICT RELEVANCE PENALTY
+  if (!isRelevant) {
+    d1 = Math.min(1, d1);
+    d2 = Math.min(1, d2);
+    d3 = Math.min(0, d3);
+    d4 = Math.min(1, d4);
+  }
+
+  // BOSS CHALLENGE ROUND STRICTNESS & HISTORICAL CONSISTENCY
+  if (isBossRound) {
+    d1 = Math.max(0, d1 - 1);
+    d2 = Math.max(0, d2 - 1);
+    d4 = Math.max(0, d4 - 1);
+    
+    const historicalFactor = averageConsistencyScore / 12;
+    d1 = Math.round(d1 * historicalFactor);
+    d2 = Math.round(d2 * historicalFactor);
+    d4 = Math.round(d4 * historicalFactor);
+  }
 
   const total = d1 + d2 + d3 + d4;
   const tier = total >= 9 ? "high" : total >= 5 ? "standard" : "low";
 
   const feedbackMap: Record<TemplateId, Record<"low" | "standard" | "high", string>> = {
     academic: {
-      low: "Add peer-reviewed citations and more specific evidence to strengthen your academic submission.",
+      low: isRelevant 
+        ? "Add peer-reviewed citations and more specific evidence to strengthen your academic submission."
+        : `Your academic submission does not relate to your research concept "${ideaTitle}". Please align with your topic.`,
       standard: "Good foundation — include more rigorous evidence and clearly state your methodological choices.",
-      high: "Strong academic work. Consider adding counter-arguments and directly citing your theoretical framework.",
+      high: isBossRound
+        ? "Excellent Boss Round academic thesis. Extremely high consistency and rigor verified."
+        : "Strong academic work. Consider adding counter-arguments and directly citing your theoretical framework.",
     },
     lab: {
-      low: "Specify your experimental parameters more precisely and document your measurement methodology.",
+      low: isRelevant
+        ? "Specify your experimental parameters more precisely and document your measurement methodology."
+        : `Your lab submission does not relate to your lab project "${ideaTitle}". Please align with your experiment.`,
       standard: "Good experimental detail — ensure your protocol is reproducible and your variables are clearly isolated.",
-      high: "Rigorous experimental design. Add statistical validation and confirm your results are reproducible.",
+      high: isBossRound
+        ? "Flawless experimental proof in this final Boss Round. Highly consistent measurements verified."
+        : "Rigorous experimental design. Add statistical validation and confirm your results are reproducible.",
     },
     creative: {
-      low: "Develop your original voice further and document specific audience reactions to strengthen this submission.",
+      low: isRelevant
+        ? "Develop your original voice further and document specific audience reactions to strengthen this submission."
+        : `Your creative submission does not relate to your creative concept "${ideaTitle}". Please align with your concept.`,
       standard: "Good creative work — push for more emotional specificity and document external feedback.",
-      high: "Strong creative execution. Consider documenting how the work has resonated with your intended audience.",
+      high: isBossRound
+        ? "Outstanding creative masterpiece in this final Boss Round. Extremely high consistency and vision verified."
+        : "Strong creative execution. Consider documenting how the work has resonated with your intended audience.",
     },
     venture: {
       low: "Add specific names, numbers, and at least one external link.",
@@ -212,9 +297,21 @@ async function scoreWithOpenAITemplate(
   content: string,
   checkpointOutcome: string,
   templateId: "academic" | "lab" | "creative",
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
   openAIApiKey: string,
 ): Promise<{ d1: number; d2: number; d3: number; d4: number; feedback: string; modelUsed: string }> {
-  const prompt = buildTemplateScoringPrompt(content, checkpointOutcome, templateId);
+  const prompt = buildTemplateScoringPrompt(
+    content,
+    checkpointOutcome,
+    templateId,
+    ideaTitle,
+    ideaDescription,
+    isBossRound,
+    averageConsistencyScore,
+  );
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -244,9 +341,21 @@ async function scoreWithClaudeTemplate(
   content: string,
   checkpointOutcome: string,
   templateId: "academic" | "lab" | "creative",
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
   anthropicApiKey: string,
 ): Promise<{ d1: number; d2: number; d3: number; d4: number; feedback: string; modelUsed: string }> {
-  const prompt = buildTemplateScoringPrompt(content, checkpointOutcome, templateId);
+  const prompt = buildTemplateScoringPrompt(
+    content,
+    checkpointOutcome,
+    templateId,
+    ideaTitle,
+    ideaDescription,
+    isBossRound,
+    averageConsistencyScore,
+  );
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -296,6 +405,16 @@ export const evaluateTemplateTaskSubmission = action({
   handler: async (ctx, args) => {
     const { content, checkpointOutcome, templateId, userTier } = args;
 
+    // ── Fetch Idea Context Deterministically ──────────────────────────────────
+    const ideaContext = await ctx.runQuery(internal.aiScoring.getVentureIdeaContext, {
+      ventureId: args.ventureId,
+    });
+    
+    const ideaTitle = ideaContext?.ideaTitle ?? "Unknown Idea";
+    const ideaDescription = ideaContext?.ideaDescription ?? "Startup concept development";
+    const averageConsistencyScore = ideaContext?.averageConsistencyScore ?? 12.0;
+    const isBossRound = args.stageNumber === (TEMPLATE_BOSS_STAGES[templateId] ?? 6);
+
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -303,16 +422,48 @@ export const evaluateTemplateTaskSubmission = action({
 
     try {
       if (userTier === "pro" && ANTHROPIC_API_KEY) {
-        scored = await scoreWithClaudeTemplate(content, checkpointOutcome, templateId, ANTHROPIC_API_KEY);
+        scored = await scoreWithClaudeTemplate(
+          content,
+          checkpointOutcome,
+          templateId,
+          ideaTitle,
+          ideaDescription,
+          isBossRound,
+          averageConsistencyScore,
+          ANTHROPIC_API_KEY,
+        );
       } else if (OPENAI_API_KEY) {
-        scored = await scoreWithOpenAITemplate(content, checkpointOutcome, templateId, OPENAI_API_KEY);
+        scored = await scoreWithOpenAITemplate(
+          content,
+          checkpointOutcome,
+          templateId,
+          ideaTitle,
+          ideaDescription,
+          isBossRound,
+          averageConsistencyScore,
+          OPENAI_API_KEY,
+        );
       } else {
-        const mock = mockTemplateScore(content, templateId);
+        const mock = mockTemplateScore(
+          content,
+          templateId,
+          ideaTitle,
+          ideaDescription,
+          isBossRound,
+          averageConsistencyScore,
+        );
         scored = { ...mock, modelUsed: "mock" };
       }
     } catch (e) {
       console.error("[templateScoring] AI scoring failed, using mock:", e);
-      const mock = mockTemplateScore(content, templateId);
+      const mock = mockTemplateScore(
+        content,
+        templateId,
+        ideaTitle,
+        ideaDescription,
+        isBossRound,
+        averageConsistencyScore,
+      );
       scored = { ...mock, modelUsed: "mock" };
     }
 

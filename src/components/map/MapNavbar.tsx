@@ -38,7 +38,6 @@ import {
   CheckpointProgress as StandardCheckpointProgress,
   LevelDisplay as StandardLevelDisplay,
   XPBar as StandardXPBar,
-  AudioControls as StandardAudioControls,
 } from "@/components/hud";
 
 const displayFontClass = "font-sans";
@@ -286,9 +285,7 @@ export function MapNavbar() {
                   />
                 </div>
 
-                <div className="shrink-0">
-                  <StandardAudioControls />
-                </div>
+
               </>
             )}
           </div>

@@ -71,8 +71,7 @@ export function QuestList() {
                 Quest Log
               </h3>
               <p className="text-xs text-gray-400">
-                Stage {currentQuest.stage} · GP {currentQuest.checkpoint}/
-                {totalInStage}
+                CP {currentQuest.checkpoint}/{totalInStage}
               </p>
             </div>
             <div className="flex items-center gap-2">

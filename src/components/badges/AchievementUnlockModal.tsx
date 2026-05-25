@@ -89,7 +89,7 @@ const getMascotSpeech = (rarity: string, name: string): string => {
 export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
   badge,
   reason,
-  xpEarned = 500,
+  xpEarned = 20,
   isOpen,
   onClose,
   onViewBadge,

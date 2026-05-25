@@ -219,10 +219,17 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       delay: Math.random() * 1800,
     });
 
-    this.setSize(84, 84);
+    this.setSize(100, 100);
     this.setInteractive();
 
     this.on("pointerover", () => {
+      // Always show pointer cursor for all checkpoints
+      if (typeof document !== "undefined") {
+        document.body.style.cursor = "pointer";
+      }
+      
+      this.numberText.setStyle({ color: "#fff3d6" });
+
       if (this._status !== "locked") {
         audioManager.playUI("hover");
         this.scene.tweens.add({
@@ -237,6 +244,15 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     });
 
     this.on("pointerout", () => {
+      // Always reset cursor when leaving checkpoint
+      if (typeof document !== "undefined") {
+        document.body.style.cursor = "default";
+      }
+      
+      this.numberText.setStyle({
+        color: this._status === "gold" ? "#3b2412" : "#fff7e6",
+      });
+
       this.scene.tweens.add({
         targets: this,
         scaleX: 1,
@@ -291,31 +307,20 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   }
 
   override setInteractive(): this {
+    // Make the entire visible checkpoint circle clickable including outer glow ring
+    // Using radius of 110 to cover all visual elements + generous click margin
     super.setInteractive(
-      new Phaser.Geom.Circle(0, 0, 60),
+      new Phaser.Geom.Circle(0, 0, 110),
       Phaser.Geom.Circle.Contains,
     );
 
+    this.off(Phaser.Input.Events.GAMEOBJECT_POINTER_UP);
     this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
       this.scene.events.emit("checkpoint_clicked", {
         id: this.checkpointId,
         stage: this.stage,
         checkpoint: this.checkpoint,
       });
-    });
-
-    this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      this.numberText.setStyle({ color: "#fff3d6" });
-      if (typeof document !== "undefined")
-        document.body.style.cursor = "pointer";
-    });
-
-    this.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      this.numberText.setStyle({
-        color: this._status === "gold" ? "#3b2412" : "#fff7e6",
-      });
-      if (typeof document !== "undefined")
-        document.body.style.cursor = "default";
     });
 
     return this;

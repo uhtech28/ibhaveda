@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as LucideIcons from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const EMOJI_TO_LUCIDE_NAME: Record<string, string> = {
   // Stages & General
@@ -16,13 +17,13 @@ export const EMOJI_TO_LUCIDE_NAME: Record<string, string> = {
   
   // Badges & Categories
   "🕯️": "Flame",
-  "👤": "User",
+  "👤": "UserCheck",
   "🛠️": "Wrench",
   "🥾": "Compass",
-  "💬": "MessageSquare",
-  "🌱": "Sprout",
-  "✉️": "Mail",
-  "🚪": "DoorOpen",
+  "💬": "MessageSquareCode",
+  "🌱": "Leaf",
+  "✉️": "Handshake",
+  "🚪": "KeyRound",
   "🎯": "Target",
   "🪙": "Coins",
   "🚩": "Flag",
@@ -35,7 +36,7 @@ export const EMOJI_TO_LUCIDE_NAME: Record<string, string> = {
   "🧠": "Brain",
   "🗺️": "Map",
   "✨": "Sparkles",
-  "🔟": "Hash",
+  "🔟": "Layers",
   "⚖️": "Scale",
   "🛡️": "Shield",
   "👂": "Ear",
@@ -59,7 +60,7 @@ export const EMOJI_TO_LUCIDE_NAME: Record<string, string> = {
   "🏮": "Lightbulb",
   "⏳": "Hourglass",
   "⭐": "Star",
-  "📐": "Ruler",
+  "📐": "GitFork",
   "🌐": "Globe",
   "👻": "Ghost",
   "🌕": "Moon",
@@ -124,8 +125,17 @@ export const PremiumIcon: React.FC<PremiumIconProps> = ({
     const IconComponent = LucideIcons[matchedKey as keyof typeof LucideIcons] as React.ComponentType<{
       className?: string;
       strokeWidth?: number;
+      fill?: string;
+      fillOpacity?: number;
     }>;
-    return <IconComponent className={className} strokeWidth={strokeWidth} />;
+    return (
+      <IconComponent
+        className={cn(className, "transition-all duration-300 drop-shadow-[0_2px_8px_rgba(255,255,255,0.07)]")}
+        strokeWidth={strokeWidth}
+        fill="currentColor"
+        fillOpacity={0.2}
+      />
+    );
   }
 
   // 3. Check if the string has any emoji character as a fallback
@@ -136,5 +146,12 @@ export const PremiumIcon: React.FC<PremiumIconProps> = ({
 
   // 4. Default fallback (e.g. HelpCircle)
   const DefaultIcon = LucideIcons.HelpCircle;
-  return <DefaultIcon className={className} strokeWidth={strokeWidth} />;
+  return (
+    <DefaultIcon
+      className={cn(className, "transition-all duration-300")}
+      strokeWidth={strokeWidth}
+      fill="currentColor"
+      fillOpacity={0.2}
+    />
+  );
 };

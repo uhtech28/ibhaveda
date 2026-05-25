@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { action, mutation, query, internalMutation } from "./_generated/server";
+import { action, mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { awardPointsHelper } from "./levels";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -54,11 +55,41 @@ function getQualityTier(total: number): "low" | "standard" | "high" {
 // SCORING PROMPT BUILDER
 // ─────────────────────────────────────────────────────────────────────────────
 
+const TEMPLATE_BOSS_STAGES: Record<string, number> = {
+  venture: 8,
+  academic: 6,
+  lab: 7,
+  creative: 6,
+};
+
 function buildScoringPrompt(
   content: string,
   checkpointOutcome: string,
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
 ): string {
+  const bossPromptSegment = isBossRound
+    ? `
+CRITICAL: THIS IS A BOSS CHALLENGE ROUND.
+You must perform an extremely strict, final evaluation. 
+Evaluate each dimension with the highest level of academic rigor and startup viability:
+1. completeness: Evaluate this specifically as 'problem-solving capability'. Does it solve the real core problem of the original idea in a viable, non-trivial way?
+2. specificity: Evaluate this specifically as 'scalability'. Can this solution scale, or is it too localized/basic/generic?
+3. evidence: Evaluate this specifically as 'concrete verification'. Is there real-world verification or evidence?
+4. originality: Evaluate this specifically as 'true differentiation'. Is there a unique, non-copied competitive advantage?
+
+The overall score will be heavily influenced by both this Boss Challenge performance and the user's historical idea consistency score across previous submissions (Historical Consistency Score: ${averageConsistencyScore.toFixed(1)} / 12).
+If the submission is inconsistent with the historical quality or shows a regression/copy-paste pattern, penalize the scores accordingly.
+`
+    : "";
+
   return `You are a rigorous academic evaluator assessing a startup founder's checkpoint submission.
+
+ORIGINAL STARTUP IDEA/CONCEPT:
+Title: "${ideaTitle}"
+Description: "${ideaDescription}"
 
 CHECKPOINT OUTCOME BEING EVALUATED:
 "${checkpointOutcome}"
@@ -66,14 +97,23 @@ CHECKPOINT OUTCOME BEING EVALUATED:
 SUBMISSION:
 "${content}"
 
+${bossPromptSegment}
+
+CRITICAL RULE: RELEVANCE & ALIGNMENT CHECK (HIGHEST WEIGHT)
+First and foremost, you MUST strictly check if the submission is directly, strongly aligned with the original startup idea/concept above (Title: "${ideaTitle}", Description: "${ideaDescription}").
+- If the submission is unrelated, generic, a generic AI-generated template, or copy-pasted ChatGPT text that does not solve the specific problem of this startup, YOU MUST CARRY OUT THE RELEVANCE PENALTY:
+  * You MUST penalize all scoring dimensions severely. Capped at 0 or 1.
+  * The feedback must explicitly call out the lack of relevance to the startup idea: "${ideaTitle}".
+- Do not award high scores to well-written but generic content. Relevance is the absolute gatekeeper. Technical implementation, UI/UX, and AI usage can only score highly if relevance is verified.
+
 Score the submission on EXACTLY these four dimensions. Each dimension is scored 0, 1, 2, or 3.
 Return ONLY a valid JSON object with no extra text.
 
 SCORING RUBRIC:
-- completeness: Does the submission fully address every part of the checkpoint outcome? (0=missing, 1=partial, 2=mostly, 3=complete)
-- specificity: Are claims concrete and named (real people, places, numbers, companies)? (0=vague, 1=some specifics, 2=mostly specific, 3=fully specific)
+- completeness: Does the submission fully address every part of the checkpoint outcome and directly relate to the startup idea? (0=missing/unrelated, 1=partial/tangential, 2=mostly complete & relevant, 3=fully complete & highly relevant)
+- specificity: Are claims concrete and named (real people, places, numbers, companies, specific to "${ideaTitle}")? (0=vague/generic AI text, 1=some specifics, 2=mostly specific, 3=fully specific)
 - evidence: Is real-world evidence referenced (links, data, quotes, uploads)? (0=none, 1=anecdotal, 2=some evidence, 3=strong evidence)
-- originality: Is the thinking genuinely the user's own vs. generic/copied? (0=generic, 1=some original thought, 2=mostly original, 3=clearly original)
+- originality: Is the thinking genuinely the user's own vs. generic/copied/AI-templated? (0=generic/copied/templated, 1=some original thought, 2=mostly original, 3=clearly original and highly customized to this concept)
 
 Also write a single sentence of actionable feedback.
 
@@ -93,8 +133,23 @@ RESPOND WITH ONLY THIS JSON (no markdown, no extra text):
 
 function mockScore(
   content: string,
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
 ): ScoringDimensions & { feedback: string; modelUsed: string } {
   const words = content.trim().split(/\s+/).length;
+
+  // Relevance check: does the submission content mention keywords or concepts from the idea title or description?
+  const titleKeywords = ideaTitle.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  const descKeywords = ideaDescription.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+  const contentLower = content.toLowerCase();
+  
+  const matchesTitle = titleKeywords.some(kw => contentLower.includes(kw));
+  const matchesDesc = descKeywords.filter(kw => contentLower.includes(kw)).length >= Math.min(2, descKeywords.length);
+  
+  // Is the submission highly generic or unrelated?
+  const isRelevant = matchesTitle || matchesDesc || contentLower.includes("venture") || words > 150;
 
   // Deterministic scoring based on submission length and keyword presence
   const hasNumbers = /\d+/.test(content);
@@ -102,21 +157,45 @@ function mockScore(
   const hasQuotes = /"[^"]+"/.test(content);
   const hasNames = /[A-Z][a-z]+ [A-Z][a-z]+/.test(content);
 
-  const completeness = words > 100 ? 3 : words > 50 ? 2 : words > 20 ? 1 : 0;
-  const specificity =
-    (hasNumbers ? 1 : 0) + (hasNames ? 1 : 0) + (words > 80 ? 1 : 0);
-  const evidence = (hasLinks ? 2 : 0) + (hasQuotes ? 1 : 0);
-  const originality = words > 60 ? 2 : words > 30 ? 1 : 0;
+  let completeness = words > 100 ? 3 : words > 50 ? 2 : words > 20 ? 1 : 0;
+  let specificity = (hasNumbers ? 1 : 0) + (hasNames ? 1 : 0) + (words > 80 ? 1 : 0);
+  let evidence = (hasLinks ? 2 : 0) + (hasQuotes ? 1 : 0);
+  let originality = words > 60 ? 2 : words > 30 ? 1 : 0;
 
-  const total =
-    completeness + specificity + Math.min(evidence, 3) + originality;
+  // STRICT RELEVANCE PENALTY
+  if (!isRelevant) {
+    completeness = Math.min(1, completeness);
+    specificity = Math.min(1, specificity);
+    evidence = Math.min(0, evidence);
+    originality = Math.min(1, originality);
+  }
+
+  // BOSS CHALLENGE ROUND STRICTNESS & HISTORICAL CONSISTENCY
+  if (isBossRound) {
+    // Recalculate with high strictness
+    completeness = Math.max(0, completeness - 1);
+    specificity = Math.max(0, specificity - 1);
+    originality = Math.max(0, originality - 1);
+    
+    // Scale total score by consistency
+    const historicalFactor = averageConsistencyScore / 12;
+    completeness = Math.round(completeness * historicalFactor);
+    specificity = Math.round(specificity * historicalFactor);
+    originality = Math.round(originality * historicalFactor);
+  }
+
+  const total = completeness + specificity + Math.min(evidence, 3) + originality;
   const tier = getQualityTier(total);
 
   const feedbackMap = {
-    low: "Add specific names, numbers, and at least one external link to strengthen your submission.",
+    low: isRelevant 
+      ? "Add specific names, numbers, and at least one external link to strengthen your submission."
+      : `Your submission does not seem relevant to your startup idea "${ideaTitle}". Please align with the original requirements.`,
     standard:
       "Good start — include more concrete evidence like quotes, data sources, or user feedback.",
-    high: "Strong submission. Consider adding direct quotes from users or competitors to reach gold standard.",
+    high: isBossRound 
+      ? "Exceptional Boss Round submission. Consistent quality across all checkpoints validates your scalability."
+      : "Strong submission. Consider adding direct quotes from users or competitors to reach gold standard.",
   };
 
   return {
@@ -136,9 +215,20 @@ function mockScore(
 async function scoreWithReplicate(
   content: string,
   checkpointOutcome: string,
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
   replicateApiKey: string,
 ): Promise<ScoringDimensions & { feedback: string; modelUsed: string }> {
-  const prompt = buildScoringPrompt(content, checkpointOutcome);
+  const prompt = buildScoringPrompt(
+    content,
+    checkpointOutcome,
+    ideaTitle,
+    ideaDescription,
+    isBossRound,
+    averageConsistencyScore,
+  );
 
   // Using Llama 3 8B Instruct via Replicate
   const response = await fetch(
@@ -206,16 +296,23 @@ async function scoreWithReplicate(
 // PRO TIER SCORER — OpenAI GPT-4o
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Score with Anthropic Claude (Haiku) for Pro tier users.
- * Uses the Anthropic HTTP API directly via fetch.
- */
 async function scoreWithClaude(
   content: string,
   checkpointOutcome: string,
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
   anthropicApiKey: string,
 ): Promise<ScoringDimensions & { feedback: string; modelUsed: string }> {
-  const prompt = buildScoringPrompt(content, checkpointOutcome);
+  const prompt = buildScoringPrompt(
+    content,
+    checkpointOutcome,
+    ideaTitle,
+    ideaDescription,
+    isBossRound,
+    averageConsistencyScore,
+  );
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -249,15 +346,23 @@ async function scoreWithClaude(
   return parseAIResponse(raw, "claude-3-haiku-20240307");
 }
 
-/**
- * Score with OpenAI GPT-4o (fallback or Free tier).
- */
 async function scoreWithOpenAI(
   content: string,
   checkpointOutcome: string,
+  ideaTitle: string,
+  ideaDescription: string,
+  isBossRound: boolean,
+  averageConsistencyScore: number,
   openAIApiKey: string,
 ): Promise<ScoringDimensions & { feedback: string; modelUsed: string }> {
-  const prompt = buildScoringPrompt(content, checkpointOutcome);
+  const prompt = buildScoringPrompt(
+    content,
+    checkpointOutcome,
+    ideaTitle,
+    ideaDescription,
+    isBossRound,
+    averageConsistencyScore,
+  );
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -583,6 +688,19 @@ export const saveEvaluationResult = internalMutation({
         evaluatedAt: now,
       });
     }
+    
+    // Award 20 points/XP for best AI score (High quality tier)
+    if (args.qualityTier === "high" || args.qualityTier === "High") {
+      const venture = await ctx.db.get(args.ventureId);
+      if (venture) {
+        await awardPointsHelper(ctx, {
+          userId: venture.userId,
+          amount: 20,
+          type: "best_ai_score_bonus",
+          relatedId: args.taskId,
+        });
+      }
+    }
   },
 });
 
@@ -618,6 +736,61 @@ export const generateWriteAssist = action({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// IDEA CONTEXT RETRIEVER
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getVentureIdeaContext = internalQuery({
+  args: {
+    ventureId: v.id("ventures"),
+  },
+  handler: async (ctx, args) => {
+    const venture = await ctx.db.get(args.ventureId);
+    if (!venture) return null;
+
+    const idea = await ctx.db.get(venture.ideaId);
+    if (!idea) return null;
+
+    // Get all previous checkpoints for this venture to compute historical consistency
+    const checkpoints = await ctx.db
+      .query("ventureCheckpoints")
+      .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
+      .collect();
+
+    let totalPrevScore = 0;
+    let evalCount = 0;
+
+    for (const cp of checkpoints) {
+      const tasks = await ctx.db
+        .query("ventureTasks")
+        .withIndex("by_checkpoint", (q) => q.eq("checkpointId", cp._id))
+        .collect();
+
+      for (const t of tasks) {
+        const evalDoc = await ctx.db
+          .query("aiEvaluations")
+          .withIndex("by_task", (q) => q.eq("taskId", t._id))
+          .first();
+
+        if (evalDoc) {
+          totalPrevScore += evalDoc.totalScore;
+          evalCount++;
+        }
+      }
+    }
+
+    // Default consistency score to 12 (perfect) if no previous submissions exist
+    const averageConsistencyScore = evalCount > 0 ? totalPrevScore / evalCount : 12.0;
+
+    return {
+      templateId: venture.templateId ?? "venture",
+      ideaTitle: idea.title,
+      ideaDescription: idea.description,
+      averageConsistencyScore,
+    };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 export const evaluateTaskSubmission = action({
   args: {
     taskId: v.id("ventureTasks"),
@@ -630,6 +803,16 @@ export const evaluateTaskSubmission = action({
   },
   handler: async (ctx, args) => {
     const { content, checkpointOutcome, userTier } = args;
+
+    // ── Fetch Idea Context Deterministically ──────────────────────────────────
+    const ideaContext = await ctx.runQuery(internal.aiScoring.getVentureIdeaContext, {
+      ventureId: args.ventureId,
+    });
+    
+    const ideaTitle = ideaContext?.ideaTitle ?? "Unknown Idea";
+    const ideaDescription = ideaContext?.ideaDescription ?? "Startup concept development";
+    const averageConsistencyScore = ideaContext?.averageConsistencyScore ?? 12.0;
+    const isBossRound = args.stageNumber === (ideaContext ? (TEMPLATE_BOSS_STAGES[ideaContext.templateId] ?? 8) : 8);
 
     // ── Get API keys from env ────────────────────────────────────────────────
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -644,6 +827,10 @@ export const evaluateTaskSubmission = action({
         scored = await scoreWithClaude(
           content,
           checkpointOutcome,
+          ideaTitle,
+          ideaDescription,
+          isBossRound,
+          averageConsistencyScore,
           ANTHROPIC_API_KEY,
         );
       }
@@ -652,6 +839,10 @@ export const evaluateTaskSubmission = action({
         scored = await scoreWithOpenAI(
           content,
           checkpointOutcome,
+          ideaTitle,
+          ideaDescription,
+          isBossRound,
+          averageConsistencyScore,
           OPENAI_API_KEY,
         );
       }
@@ -660,16 +851,32 @@ export const evaluateTaskSubmission = action({
         scored = await scoreWithReplicate(
           content,
           checkpointOutcome,
+          ideaTitle,
+          ideaDescription,
+          isBossRound,
+          averageConsistencyScore,
           REPLICATE_API_KEY,
         );
       }
       // Final fallback: mock scoring
       else {
-        scored = mockScore(content);
+        scored = mockScore(
+          content,
+          ideaTitle,
+          ideaDescription,
+          isBossRound,
+          averageConsistencyScore,
+        );
       }
     } catch (e) {
       console.error("AI Scoring failed, falling back to mock:", e);
-      scored = mockScore(content);
+      scored = mockScore(
+        content,
+        ideaTitle,
+        ideaDescription,
+        isBossRound,
+        averageConsistencyScore,
+      );
     }
 
     // ── Build result ──────────────────────────────────────────────────────────

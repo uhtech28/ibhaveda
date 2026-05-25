@@ -11,6 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ArrowLeft } from "lucide-react";
 import { ProfileBadges } from "@/components/user/ProfileBadges";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
+import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 
 export default function ProfileBadgesPage() {
   const params = useParams();
@@ -19,6 +21,10 @@ export default function ProfileBadgesPage() {
 
   const currentUser = useQuery(api.users.getCurrentUser);
   const profile = useQuery(api.users.getUserProfile, { username });
+
+  const earnedBadges = useQuery(api.badges.getUserProfileBadges, profile ? { userId: profile._id } : "skip");
+  const equippedBadgeIds = profile?.equippedBadges || [];
+  const equippedBadgesList = earnedBadges?.filter((b) => equippedBadgeIds.includes(b.id)) || [];
 
   if (profile === undefined) {
     return (
@@ -70,7 +76,19 @@ export default function ProfileBadgesPage() {
             <ArrowLeft className="w-4 h-4 mr-2" /> Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{profile.displayName}&apos;s Badges</h1>
+            <h1 className="text-2xl font-bold flex items-center gap-2 flex-wrap">
+              {profile.displayName}&apos;s Badges
+              {equippedBadgesList.slice(0, 3).map((badge) => (
+                <span
+                  key={badge.id}
+                  title={`${badge.name}: ${badge.description}`}
+                  className="inline-flex items-center justify-center w-6.5 h-6.5 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
+                  style={{ animationDuration: "3s" }}
+                >
+                  <PremiumIcon name={(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)} className="w-4 h-4" strokeWidth={1.5} />
+                </span>
+              ))}
+            </h1>
             <p className="text-sm text-muted-foreground">@{profile.username}</p>
           </div>
         </div>

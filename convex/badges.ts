@@ -5,6 +5,7 @@ import {
   BADGE_DEFINITIONS,
   VENTURE_STAGES,
   getVentureBadgeEmoji,
+  LEVEL_DEFINITIONS,
 } from "./ventureConstants";
 
 const INITIAL_BADGES = [
@@ -560,6 +561,92 @@ export const getVentureBadgeProgress = query({
   },
 });
 
+// Helper to award points/XP when a badge is unlocked and handle level up
+async function awardBadgePoints(ctx: any, userId: Id<"users">, amount: number, badgeName: string) {
+  const now = Date.now();
+
+  // Find or create wallet
+  let wallet = await ctx.db
+    .query("wallets")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .first();
+
+  if (!wallet) {
+    const walletId = await ctx.db.insert("wallets", {
+      userId,
+      balance: 0,
+      updatedAt: now,
+    });
+    wallet = await ctx.db.get(walletId);
+  }
+
+  if (!wallet) return;
+
+  // Create transaction
+  await ctx.db.insert("transactions", {
+    walletId: wallet._id,
+    amount,
+    type: "badge_unlock_bonus",
+    description: `Badge Unlock: ${badgeName}`,
+    createdAt: now,
+  });
+
+  // Update wallet balance
+  await ctx.db.patch(wallet._id, {
+    balance: wallet.balance + amount,
+    updatedAt: now,
+  });
+
+  // Update user level tracking
+  const userLevel = await ctx.db
+    .query("userLevels")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .first();
+
+  if (userLevel) {
+    const newTitlePoints = userLevel.titlePoints + amount;
+    const newTotalPoints = userLevel.totalPoints + amount;
+
+    await ctx.db.patch(userLevel._id, {
+      totalPoints: newTotalPoints,
+      titlePoints: newTitlePoints,
+      updatedAt: now,
+    });
+
+    // Check for level up
+    const currentLevel = userLevel.currentLevel;
+    const targetLevel = Math.min(
+      50,
+      LEVEL_DEFINITIONS.reduce((currentLevel: number, def: any) => {
+        return newTitlePoints >= def.titlePoints ? def.level : currentLevel;
+      }, 1)
+    );
+
+    if (targetLevel > currentLevel) {
+      await ctx.db.patch(userLevel._id, {
+        currentLevel: targetLevel,
+        updatedAt: now,
+      });
+
+      // Award level up bonuses
+      for (let lvl = currentLevel + 1; lvl <= targetLevel; lvl++) {
+        const levelUpPoints = lvl * 5;
+        await ctx.db.patch(wallet._id, {
+          balance: wallet.balance + levelUpPoints,
+          updatedAt: now,
+        });
+        await ctx.db.insert("transactions", {
+          walletId: wallet._id,
+          amount: levelUpPoints,
+          type: "level_up_bonus",
+          description: `Level Up Bonus for Level ${lvl}`,
+          createdAt: now,
+        });
+      }
+    }
+  }
+}
+
 // Helper: Recalculate all stats and award both general and venture badges in real-time
 export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"users">) {
   const now = Date.now();
@@ -920,6 +1007,9 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
         awardedAt: now,
       });
 
+      // Award 20 points/XP
+      await awardBadgePoints(ctx, userId, 20, badge.name);
+
       // Trigger notification
       await ctx.db.insert("notifications", {
         recipientId: userId,
@@ -1042,6 +1132,9 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
         },
       });
 
+      // Award 20 points/XP
+      await awardBadgePoints(ctx, userId, 20, badgeDef.name);
+
       await ctx.db.insert("badgeEvaluations", {
         badgeId: id,
         userId,
@@ -1087,7 +1180,7 @@ export const getUserProfileBadges = query({
         const badge = await ctx.db.get(ub.badgeId);
         if (!badge) return null;
         return {
-          id: `general_${badge._id}`,
+          id: `general_${badge.slug}`,
           name: badge.name,
           description: badge.description,
           category: badge.category || "onboarding",
@@ -1160,7 +1253,7 @@ export const getUserProfileBadges = query({
         }
 
         return {
-          id: `venture_${vb._id}`,
+          id: `venture_${def.id}`,
           name,
           description: def.tagline,
           category: def.category,

@@ -1,6 +1,8 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { useAtomValue } from "jotai";
+import { activeVentureAtom } from "@/lib/stores/hudStore";
 
 interface CheckpointProgressProps {
   completed: number;
@@ -18,6 +20,8 @@ export function CheckpointProgress({
   onClick,
 }: CheckpointProgressProps) {
   const percentage = Math.min((completed / total) * 100, 100);
+  const activeVenture = useAtomValue(activeVentureAtom);
+  const ideaName = activeVenture?.name || "Progress";
 
   if (compact) {
     return (
@@ -26,23 +30,10 @@ export function CheckpointProgress({
         onClick={onClick}
       >
         <div className="flex flex-col">
-          <span className="text-[7px] text-zinc-500 uppercase tracking-widest font-black leading-none mb-0.5">
-            Progress
+          <span className="text-[10px] text-white uppercase tracking-widest font-black leading-none truncate max-w-[120px]" title={ideaName}>
+            {ideaName}
           </span>
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-[13px] font-black leading-none text-white">{completed}</span>
-            <span className="text-[8px] font-bold text-zinc-500">/{total}</span>
-          </div>
         </div>
-
-        <div className="hidden sm:block relative h-1.5 w-16 overflow-hidden rounded-full border border-white/5 bg-black/40">
-          <motion.div
-             className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"
-             initial={{ width: 0 }}
-             animate={{ width: `${percentage}%` }}
-             transition={{ duration: 0.8 }}
-           />
-         </div>
 
         <AnimatePresence>
           {goldCount > 0 && (
@@ -68,33 +59,9 @@ export function CheckpointProgress({
       onClick={onClick}
     >
       <div className="flex flex-col">
-        <span className="mb-1 text-[8px] font-black uppercase leading-none tracking-[0.24em] text-zinc-500">
-          Progress
+        <span className="text-[12px] font-black uppercase leading-none tracking-[0.15em] text-white truncate max-w-[150px]" title={ideaName}>
+          {ideaName}
         </span>
-        <div className="flex items-center gap-2">
-          <div className="flex h-[18px] w-[18px] items-center justify-center rounded-md border border-indigo-400/20 bg-indigo-500/20">
-            <svg className="w-3 h-3 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-              <line x1="4" y1="22" x2="4" y2="15"/>
-            </svg>
-          </div>
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-[13px] font-black leading-none text-white">{completed}</span>
-            <span className="text-[9px] font-bold text-zinc-500">/{total}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative mt-4 h-2 w-20 overflow-hidden rounded-full border border-white/5 bg-black/40 shadow-inner backdrop-blur-sm sm:w-24">
-        <motion.div
-          className="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-400 rounded-full relative"
-          initial={{ width: 0 }}
-          animate={{ width: `${percentage}%` }}
-          transition={{ type: "spring", stiffness: 150, damping: 20 }}
-        >
-          {/* Inner highlight */}
-          <div className="absolute inset-x-0 top-0 h-[1px] bg-white/20 rounded-full" />
-        </motion.div>
       </div>
 
       <AnimatePresence>

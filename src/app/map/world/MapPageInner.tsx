@@ -30,7 +30,7 @@ import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { MessageSquare, X, Lock, Users } from "lucide-react";
-import { QuestList, BossHPBar, StageInfo, CheckpointProgress, LevelDisplay, XPBar, AudioControls } from "@/components/hud";
+import { QuestList, BossHPBar, StageInfo, CheckpointProgress, LevelDisplay, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
@@ -2788,6 +2788,7 @@ function MapPageInner() {
   const stageInfo = useAtomValue(stageInfoAtom);
   const checkpointProgress = useAtomValue(checkpointProgressAtom);
   const userProgress = useAtomValue(userProgressAtom);
+  const corruption = useAtomValue(corruptionStateAtom);
 
   // ── Loading / no-venture guard ─────────────────────────────────────────────
   // worldMapData is "skip"ped while intro is showing, so only check it after
@@ -2857,12 +2858,13 @@ function MapPageInner() {
               currentXP={userProgress.xp}
               maxXP={userProgress.xpToNextLevel}
               compact={true}
+              bossHp={corruption.bossHp}
+              bossBaseHp={corruption.bossBaseHp}
+              bossName={corruption.bossName}
             />
           </div>
 
-          <div className="shrink-0">
-            <AudioControls />
-          </div>
+
         </div>
       </div>
 
