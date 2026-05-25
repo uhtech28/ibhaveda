@@ -2425,9 +2425,8 @@ function MapPageInner() {
         t3: "T3",
       };
 
-      setSelectedDetail((current) => {
-        if (!current || current.id !== checkpointId) return current;
-
+      const current = selectedDetail;
+      if (current && current.id === checkpointId) {
         const updatedTasks = current.tasks.map((task) =>
           task._taskId === taskId ? { ...task, done: true } : task,
         );
@@ -2485,13 +2484,13 @@ function MapPageInner() {
           }, 1800);
         }
 
-        return {
+        setSelectedDetail({
           ...current,
           status:
             doneCount >= 3 ? "gold" : doneCount >= 2 ? "completed" : "partial",
           tasks: updatedTasks,
-        };
-      });
+        });
+      }
 
       console.log("[MapPage] Task submitted successfully", {
         checkpointId,
@@ -2499,6 +2498,7 @@ function MapPageInner() {
       });
     },
     [
+      selectedDetail,
       setActiveTaskAtom,
       setCurrentQuestAtom,
       setSubmittingTask,

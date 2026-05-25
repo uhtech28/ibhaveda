@@ -27,6 +27,7 @@ import { SelfReportTool } from "@/components/tools/self-report-tool";
 import { JournalTool } from "@/components/tools/journal-tool";
 import { KanbanTool } from "@/components/tools/kanban-tool";
 import { CalendarTool } from "@/components/tools/calendar-tool";
+import { OAuthTool } from "@/components/tools/oauth-tool";
 
 interface TaskSubmissionModalProps {
   isOpen: boolean;
@@ -72,6 +73,8 @@ function getMinRequirementLabel(toolType: string): string {
       return "Board with at least 2 columns & 1 card";
     case "calendar":
       return "At least 1 event or milestone placed";
+    case "oauth":
+      return "Select provider and enter valid URL";
     default:
       return "Complete the form";
   }
@@ -274,6 +277,15 @@ export function TaskSubmissionModal({
       case "calendar":
         return (
           <CalendarTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
+          />
+        );
+
+      case "oauth":
+        return (
+          <OAuthTool
             prompt={task.description}
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}

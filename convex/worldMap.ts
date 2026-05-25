@@ -1280,14 +1280,15 @@ function validateToolContent(toolType: string, content: unknown): void {
       if (typeof parsed !== "object" || parsed === null) {
         throw new Error("Link data must be a valid object.");
       }
-      const data = parsed as { url?: unknown };
+      const data = parsed as { url?: unknown; externalUrl?: unknown };
+      const urlValue = typeof data.url === "string" ? data.url : typeof data.externalUrl === "string" ? data.externalUrl : "";
 
-      if (typeof data.url !== "string" || !data.url.trim()) {
+      if (!urlValue.trim()) {
         throw new Error("Link must have a URL.");
       }
       // Basic URL validation
       try {
-        new URL(data.url);
+        new URL(urlValue);
       } catch {
         throw new Error("Link must be a valid URL.");
       }

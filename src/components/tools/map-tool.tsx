@@ -84,7 +84,6 @@ const COLORS = [
   "#6366F1",
   "#14B8A6",
   "#F43F5E",
-  "#8B5CF6",
 ];
 
 const POSTIT_COLORS = [
