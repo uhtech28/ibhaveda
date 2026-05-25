@@ -270,8 +270,7 @@ export function MapNavbar() {
 
                 <div className="shrink-0">
                   <StandardLevelDisplay
-                    level={userProgress.level}
-                    phase={userProgress.phase}
+                    score={userProgress.qualityScore}
                     compact={true}
                     onClick={handleHUDClick}
                   />

@@ -2979,8 +2979,7 @@ function MapPageInner() {
 
           <div className="shrink-0">
             <LevelDisplay
-              level={userProgress.level}
-              phase={userProgress.phase}
+              score={userProgress.qualityScore}
               compact={true}
             />
           </div>
