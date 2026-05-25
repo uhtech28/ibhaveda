@@ -69,15 +69,20 @@ export const SearchableUserDropdown: React.FC<SearchableUserDropdownProps> = ({
     (user) => user.username !== currentUser?.username
   ) || [];
 
-  // Resolve the currently selected user profile to show in the trigger button
-  const selectedUser = filteredResults?.find((user) => user.username === value) || 
-    (searchResults?.find((user) => user.username === value));
+  // Resolve the currently selected user profile to show in the trigger button (case-insensitive)
+  const selectedUser = filteredResults?.find((user) => user.username.toLowerCase() === value?.toLowerCase()) || 
+    (searchResults?.find((user) => user.username.toLowerCase() === value?.toLowerCase()));
 
-  const handleSelect = useCallback((username: string) => {
-    onChange(username);
+  const handleSelect = useCallback((selectedValue: string) => {
+    // Find matching user (case-insensitive) to retrieve the exact stored case username
+    const match = searchResults?.find(
+      (u) => u.username.toLowerCase() === selectedValue.toLowerCase()
+    );
+    const exactUsername = match ? match.username : selectedValue;
+    onChange(exactUsername);
     setOpen(false);
     setSearchQuery("");
-  }, [onChange]);
+  }, [onChange, searchResults]);
 
   const handleOpenChange = useCallback((newOpen: boolean) => {
     setOpen(newOpen);
@@ -133,7 +138,7 @@ export const SearchableUserDropdown: React.FC<SearchableUserDropdownProps> = ({
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <Command className="bg-transparent text-white border-0">
+        <Command shouldFilter={false} className="bg-transparent text-white border-0">
           <CommandInput
             placeholder="Type to filter users..."
             value={searchQuery}
@@ -141,25 +146,31 @@ export const SearchableUserDropdown: React.FC<SearchableUserDropdownProps> = ({
             className="h-11 border-0 border-b border-[#1e293b] bg-transparent text-slate-100 placeholder-slate-400 focus:ring-0 text-sm"
           />
           <CommandList className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#1e293b]">
-            <CommandEmpty className="py-6 text-center text-sm">
-              {hasError ? (
-                <div className="px-4">
-                  <p className="text-red-400 font-medium mb-1">Failed to fetch users</p>
-                  <p className="text-slate-400 text-xs">
-                    Please try again or check your connection
-                  </p>
-                </div>
-              ) : debouncedQuery.length > 0 ? (
-                <div className="px-4">
-                  <p className="text-slate-300 mb-1">No users found matching "{debouncedQuery}"</p>
-                  <p className="text-slate-400 text-xs">
-                    Try another username or check for spelling errors
-                  </p>
-                </div>
-              ) : (
-                <p className="text-slate-400 text-xs">No active users available</p>
-              )}
-            </CommandEmpty>
+            {/* Error State */}
+            {hasError && (
+              <div className="py-6 text-center text-sm text-red-400 px-4">
+                <p className="font-medium mb-1">Failed to fetch users</p>
+                <p className="text-slate-400 text-xs">
+                  Please try again or check your connection
+                </p>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!hasError && searchResults !== undefined && filteredResults.length === 0 && (
+              <div className="py-6 text-center text-sm text-slate-400 px-4">
+                {debouncedQuery.length > 0 ? (
+                  <div>
+                    <p className="text-slate-300 mb-1">No users found matching "{debouncedQuery}"</p>
+                    <p className="text-slate-400 text-xs">
+                      Try another username or check for spelling errors
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-xs">No active users available</p>
+                )}
+              </div>
+            )}
 
             {/* Shimmer / Skeleton Loading State */}
             {searchResults === undefined && !hasError && (
@@ -179,64 +190,62 @@ export const SearchableUserDropdown: React.FC<SearchableUserDropdownProps> = ({
             {/* Real-time suggested and searched user items */}
             {!hasError && searchResults !== undefined && filteredResults.length > 0 && (
               <CommandGroup heading={debouncedQuery ? "Search Results" : "Suggested Teammates"} className="text-slate-400 text-xs font-semibold px-2 pt-2">
-                <div className="space-y-1 mt-1">
-                  {filteredResults.map((user) => (
-                    <CommandItem
-                      key={user.id}
-                      value={user.username}
-                      onSelect={handleSelect}
-                      className={cn(
-                        "flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all duration-200 border border-transparent hover:border-[#38bdf8]/30 hover:bg-[#161e31]/80 text-slate-200 hover:text-white"
-                      )}
-                    >
-                      {/* Avatar with dynamic online indicator */}
-                      <div className="relative shrink-0">
-                        <Avatar className="w-8 h-8 border border-[#1e293b] transition-transform duration-200 group-hover:scale-105">
-                          <AvatarImage src={user.avatar} />
-                          <AvatarFallback className="bg-[#1e293b] text-slate-200 font-semibold text-xs">
-                            {user.displayName.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span
-                          className={cn(
-                            "absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0e131f] shadow-sm",
-                            user.isOnline ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"
-                          )}
-                        />
-                      </div>
-
-                      {/* Display name and username */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-slate-200 truncate flex items-center gap-1.5">
-                          {user.displayName}
-                          
-                          {/* Premium Discord/Slack style role indicators */}
-                          {user.role && user.role !== "user" && (
-                            <span className={cn(
-                              "text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wider uppercase shrink-0 scale-90 origin-left",
-                              user.role === "admin" 
-                                ? "bg-red-950/60 text-red-400 border border-red-900/30" 
-                                : "bg-purple-950/60 text-purple-400 border border-purple-900/30"
-                            )}>
-                              {user.role}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-400 truncate">
-                          @{user.username}
-                        </div>
-                      </div>
-
-                      {/* Check icon if currently selected */}
-                      <Check
+                {filteredResults.map((user) => (
+                  <CommandItem
+                    key={user.id}
+                    value={user.username}
+                    onSelect={handleSelect}
+                    className={cn(
+                      "mb-1 flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all duration-200 border border-transparent hover:border-[#38bdf8]/30 hover:bg-[#161e31]/80 text-slate-200 hover:text-white"
+                    )}
+                  >
+                    {/* Avatar with dynamic online indicator */}
+                    <div className="relative shrink-0">
+                      <Avatar className="w-8 h-8 border border-[#1e293b] transition-transform duration-200 group-hover:scale-105">
+                        <AvatarImage src={user.avatar} />
+                        <AvatarFallback className="bg-[#1e293b] text-slate-200 font-semibold text-xs">
+                          {user.displayName.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span
                         className={cn(
-                          "ml-auto h-4 w-4 text-[#38bdf8]",
-                          value === user.username ? "opacity-100" : "opacity-0"
+                          "absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0e131f] shadow-sm",
+                          user.isOnline ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"
                         )}
                       />
-                    </CommandItem>
-                  ))}
-                </div>
+                    </div>
+
+                    {/* Display name and username */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-slate-200 truncate flex items-center gap-1.5">
+                        {user.displayName}
+                        
+                        {/* Premium Discord/Slack style role indicators */}
+                        {user.role && user.role !== "user" && (
+                          <span className={cn(
+                            "text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wider uppercase shrink-0 scale-90 origin-left",
+                            user.role === "admin" 
+                              ? "bg-red-950/60 text-red-400 border border-red-900/30" 
+                              : "bg-purple-950/60 text-purple-400 border border-purple-900/30"
+                          )}>
+                            {user.role}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-400 truncate">
+                        @{user.username}
+                      </div>
+                    </div>
+
+                    {/* Check icon if currently selected */}
+                    <Check
+                      className={cn(
+                        "ml-auto h-4 w-4 text-[#38bdf8]",
+                        value?.toLowerCase() === user.username.toLowerCase() ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                  </CommandItem>
+                ))}
               </CommandGroup>
             )}
           </CommandList>
