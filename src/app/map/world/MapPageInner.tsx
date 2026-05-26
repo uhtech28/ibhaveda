@@ -29,7 +29,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { CommentsSection } from "@/components/comments/CommentsSection";
-import { MessageSquare, X, Lock, Users } from "lucide-react";
+import { MessageSquare, X, Lock, Users, GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon } from "lucide-react";
 import {
   QuestList,
   BossHPBar,
@@ -49,6 +49,10 @@ import { ContributionDashboard } from "@/components/requests/ContributionDashboa
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContributorPreviewDialog } from "@/components/user/ContributorPreviewDialog";
+import { IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
+import { CalendarTool } from "@/components/tools/calendar-tool";
+import { KanbanTool } from "@/components/tools/kanban-tool";
+import { JournalTool } from "@/components/tools/journal-tool";
 
 // Dynamic/lazy loaded overlay components for faster page loading performance
 const LevelUpSequence = dynamic(
@@ -1405,6 +1409,43 @@ function MapPageInner() {
   // Group chat popup modal state
   const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
   const [isContributorsOpen, setIsContributorsOpen] = useState(false);
+  const [isContributionsOpen, setIsContributionsOpen] = useState(false);
+  const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isKanbanOpen, setIsKanbanOpen] = useState(false);
+  const [isJournalOpen, setIsJournalOpen] = useState(false);
+
+  const saveToolData = useMutation(api.worldMap.saveToolData);
+
+  const kanbanData = useQuery(
+    api.worldMap.getToolData,
+    activeVenture?._id
+      ? { ventureId: activeVenture._id, toolType: "kanban" }
+      : "skip",
+  );
+
+  const calendarData = useQuery(
+    api.worldMap.getToolData,
+    activeVenture?._id
+      ? { ventureId: activeVenture._id, toolType: "calendar" }
+      : "skip",
+  );
+
+  const journalData = useQuery(
+    api.worldMap.getToolData,
+    activeVenture?._id
+      ? { ventureId: activeVenture._id, toolType: "journal" }
+      : "skip",
+  );
+
+  const handleToolSubmit = async (toolType: string, data: unknown) => {
+    if (!activeVenture?._id) return;
+    await saveToolData({
+      ventureId: activeVenture._id,
+      toolType,
+      data,
+    });
+  };
 
   // Badge queue — pop-and-show one at a time
   const [badgeQueue, setBadgeQueue] = useState<BadgePayload[]>([]);
@@ -3241,7 +3282,23 @@ function MapPageInner() {
             <LeftSidebar
               ventureName={ideaTitle}
               onOpenPanel={(tab) => {
-                updateUrlParams({ panel: "tools", tab, checkpointId: null });
+                if (tab === "chat") {
+                  setIsGroupChatOpen(true);
+                } else if (tab === "contributors") {
+                  setIsContributorsOpen(true);
+                } else if (tab === "feed") {
+                  setIsContributionsOpen(true);
+                } else if (tab === "hierarchy") {
+                  setIsHierarchyOpen(true);
+                } else if (tab === "calendar") {
+                  setIsCalendarOpen(true);
+                } else if (tab === "kanban") {
+                  setIsKanbanOpen(true);
+                } else if (tab === "journal") {
+                  setIsJournalOpen(true);
+                } else {
+                  updateUrlParams({ panel: "tools", tab, checkpointId: null });
+                }
               }}
             />
 
@@ -3254,6 +3311,11 @@ function MapPageInner() {
               activeVentureId={activeVenture?._id}
               onOpenGroupChat={() => setIsGroupChatOpen(true)}
               onOpenContributors={() => setIsContributorsOpen(true)}
+              onOpenContributions={() => setIsContributionsOpen(true)}
+              onOpenHierarchy={() => setIsHierarchyOpen(true)}
+              onOpenCalendar={() => setIsCalendarOpen(true)}
+              onOpenKanban={() => setIsKanbanOpen(true)}
+              onOpenJournal={() => setIsJournalOpen(true)}
             />
           </div>
 
@@ -3325,6 +3387,150 @@ function MapPageInner() {
               setStageClearModal({ ...stageClearModal, show: false })
             }
           />
+
+          {/* Calendar Popup Modal */}
+          <AnimatePresence>
+            {isCalendarOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsCalendarOpen(false)}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  transition={{ type: "spring", duration: 0.5 }}
+                  className="relative w-full max-w-[800px] h-[650px] max-h-[85vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+                    boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+                  }}
+                >
+                  <div className="flex-1 h-full min-h-0 flex flex-col p-5">
+                    <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
+                      <h2 className="text-md font-bold text-white flex items-center gap-2">
+                        <CalendarIcon className="w-5 h-5 text-amber-400" />
+                        Calendar &amp; Syncs
+                      </h2>
+                      <button
+                        onClick={() => setIsCalendarOpen(false)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+                      <CalendarTool
+                        prompt="Plan your venture milestones and team syncs."
+                        initialContent={calendarData}
+                        onSubmit={(data) => handleToolSubmit("calendar", data)}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Kanban Popup Modal */}
+          <AnimatePresence>
+            {isKanbanOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsKanbanOpen(false)}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  transition={{ type: "spring", duration: 0.5 }}
+                  className="relative w-full max-w-[1000px] h-[700px] max-h-[88vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+                    boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+                  }}
+                >
+                  <div className="flex-1 h-full min-h-0 flex flex-col p-5">
+                    <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
+                      <h2 className="text-md font-bold text-white flex items-center gap-2">
+                        <KanbanIcon className="w-5 h-5 text-emerald-400" />
+                        Kanban Board
+                      </h2>
+                      <button
+                        onClick={() => setIsKanbanOpen(false)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+                      <KanbanTool
+                        prompt="Manage your venture tasks and workflow."
+                        initialContent={kanbanData}
+                        onSubmit={(data) => handleToolSubmit("kanban", data)}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Journal Popup Modal */}
+          <AnimatePresence>
+            {isJournalOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsJournalOpen(false)}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  transition={{ type: "spring", duration: 0.5 }}
+                  className="relative w-full max-w-[650px] h-[650px] max-h-[85vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+                    boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+                  }}
+                >
+                  <div className="flex-1 h-full min-h-0 flex flex-col p-5">
+                    <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
+                      <h2 className="text-md font-bold text-white flex items-center gap-2">
+                        <JournalIcon className="w-5 h-5 text-violet-400" />
+                        Journal
+                      </h2>
+                      <button
+                        onClick={() => setIsJournalOpen(false)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+                      <JournalTool
+                        prompt="Log your daily progress and thoughts."
+                        initialContent={journalData}
+                        onSubmit={(data) => handleToolSubmit("journal", data)}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
 
           {/* Contributors Popup Modal — same style as Group Chat */}
           <AnimatePresence>
