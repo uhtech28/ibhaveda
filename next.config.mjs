@@ -1,3 +1,5 @@
+import path from "path";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -52,6 +54,13 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
+  },
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      jotai: path.resolve(process.cwd(), "node_modules/jotai"),
+    };
+    return config;
   },
 };
 

@@ -30,15 +30,15 @@ interface BiomeConfig {
   name: string;
   theme: string;
   visualTheme:
-    | "village"
-    | "forest"
-    | "arena"
-    | "artisan"
-    | "mine"
-    | "harbour"
-    | "crossroads"
-    | "capital"
-    | "dungeon";
+  | "village"
+  | "forest"
+  | "arena"
+  | "artisan"
+  | "mine"
+  | "harbour"
+  | "crossroads"
+  | "capital"
+  | "dungeon";
   colors: {
     sky: number;
     ground: number;
@@ -871,33 +871,33 @@ export class WorldMapScene extends Phaser.Scene {
     const style =
       biome.id === 2
         ? {
-            baseTint: 0xc2ea7b,
-            shadeTint: 0x7dbb49,
-            canopyTint: 0x21532f,
-            mistTint: 0xe9ffd8,
-            waterTint: 0x83d7e5,
-            pathTint: 0xb78b5a,
-            hillTint: 0xffffff,
-          }
+          baseTint: 0xc2ea7b,
+          shadeTint: 0x7dbb49,
+          canopyTint: 0x21532f,
+          mistTint: 0xe9ffd8,
+          waterTint: 0x83d7e5,
+          pathTint: 0xb78b5a,
+          hillTint: 0xffffff,
+        }
         : biome.id === 5
           ? {
-              baseTint: 0xa5c56d,
-              shadeTint: 0x6c8748,
-              canopyTint: 0x2f2a22,
-              mistTint: 0xf4efd9,
-              waterTint: 0x6fb7cb,
-              pathTint: 0x9a7a53,
-              hillTint: 0xf3efe0,
-            }
+            baseTint: 0xa5c56d,
+            shadeTint: 0x6c8748,
+            canopyTint: 0x2f2a22,
+            mistTint: 0xf4efd9,
+            waterTint: 0x6fb7cb,
+            pathTint: 0x9a7a53,
+            hillTint: 0xf3efe0,
+          }
           : {
-              baseTint: 0xb8de7c,
-              shadeTint: 0x6d9157,
-              canopyTint: 0x39455a,
-              mistTint: 0xf2f7fb,
-              waterTint: 0x74aeca,
-              pathTint: 0xaa7d60,
-              hillTint: 0xf6f1e9,
-            };
+            baseTint: 0xb8de7c,
+            shadeTint: 0x6d9157,
+            canopyTint: 0x39455a,
+            mistTint: 0xf2f7fb,
+            waterTint: 0x74aeca,
+            pathTint: 0xaa7d60,
+            hillTint: 0xf6f1e9,
+          };
     const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
     const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
     const hillFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24, 33, 34, 35, 88, 89];
@@ -934,7 +934,7 @@ export class WorldMapScene extends Phaser.Scene {
       radiusY: number,
     ) =>
       ((x - centerX) * (x - centerX)) / (radiusX * radiusX) +
-        ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
+      ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
       1;
 
     const addFrameSprite = (
@@ -1076,7 +1076,7 @@ export class WorldMapScene extends Phaser.Scene {
           addFrameSprite(
             "sprout_grass_sheet",
             grassAccentFrames[
-              (col + row + biome.id) % grassAccentFrames.length
+            (col + row + biome.id) % grassAccentFrames.length
             ],
             col,
             row,
@@ -5371,7 +5371,7 @@ export class WorldMapScene extends Phaser.Scene {
     if (stageId === 1) {
       const anchor =
         stageOneVillageAnchors[
-          Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
+        Math.min(checkpointIndex, stageOneVillageAnchors.length - 1)
         ];
       return {
         x: biomeOffsetX + anchor.x * this.MAP_PANEL_SCALE,
@@ -5640,7 +5640,6 @@ export class WorldMapScene extends Phaser.Scene {
     this.events.on(
       "checkpoint_clicked",
       (data: { id: string; stage: number; checkpoint: number }) => {
-        console.log("[Phaser] Checkpoint clicked:", data);
         eventBridge.dispatchToReact({
           type: "CHECKPOINT_CLICKED",
           checkpointId: data.id,
@@ -5678,7 +5677,6 @@ export class WorldMapScene extends Phaser.Scene {
       onComplete: () => {
         miniBoss.retreat();
         this.retreatedStages.add(event.stage);
-        console.log(`[WorldMapScene] 🟡 Boss Stage ${event.stage} retreated to end after checkpoint combat.`);
       },
     });
   }
@@ -5695,7 +5693,6 @@ export class WorldMapScene extends Phaser.Scene {
     if (event.outcome === "slay_gold") {
       miniBoss.slayGold();
       this.transformBiomeGold(event.stage);
-      console.log(`[WorldMapScene] 🏆 Boss Stage ${event.stage} SLAIN (gold)!`);
     } else {
       this.tweens.add({
         targets: miniBoss,
@@ -5708,7 +5705,6 @@ export class WorldMapScene extends Phaser.Scene {
         onComplete: () => miniBoss.destroy(),
       });
       this.restoreBiome(event.stage);
-      console.log(`[WorldMapScene] 🟡 Boss Stage ${event.stage} retreated permanently.`);
     }
 
     this.slainMiniBossStages.add(event.stage);
@@ -5729,7 +5725,6 @@ export class WorldMapScene extends Phaser.Scene {
     contributors: ContributorData[];
   }): void {
     if (!event || !event.contributors) return;
-    console.log("[Phaser] Received UPDATE_CONTRIBUTORS:", event.contributors);
 
     // Limit to maximum 5 contributors visible at once
     const allowedContributors = event.contributors.slice(0, 5);
@@ -5887,7 +5882,6 @@ export class WorldMapScene extends Phaser.Scene {
    * Updates mini-boss weakness based on checkpoint completion
    */
   private updateMiniBossProgress(checkpoints: CheckpointState[]): void {
-    console.log("[WorldMapScene] updateMiniBossProgress - total checkpoints received:", checkpoints.length);
 
     if (!this.initializedBossTriggers) {
       checkpoints.forEach((cp) => {
@@ -5895,15 +5889,13 @@ export class WorldMapScene extends Phaser.Scene {
         if (doneTasks >= 2) {
           const cpKey = `${cp.stage}-${cp.checkpoint}`;
           this.triggeredBossCheckpoints.add(cpKey);
-          
+
           // If a checkpoint in this stage has at least 2 completed tasks,
           // the mini-boss for this stage should start in the retreated state.
           this.retreatedStages.add(cp.stage);
         }
       });
       this.initializedBossTriggers = true;
-      console.log("[WorldMapScene] Initialized triggeredBossCheckpoints on load:", Array.from(this.triggeredBossCheckpoints));
-      console.log("[WorldMapScene] Initialized retreatedStages on load:", Array.from(this.retreatedStages));
 
       // Make sure those bosses that are retreated start in the retreated visual state
       for (const [stage, miniBoss] of this.miniBosses.entries()) {
@@ -5950,7 +5942,6 @@ export class WorldMapScene extends Phaser.Scene {
     for (const [stage, miniBoss] of this.miniBosses.entries()) {
       const progress = stageProgress.get(stage);
       if (!progress) {
-        console.log(`[WorldMapScene] No progress found for stage ${stage}`);
         continue;
       }
 
@@ -5971,8 +5962,6 @@ export class WorldMapScene extends Phaser.Scene {
       const finalCheckpointGold =
         finalCheckpoint?.status === "gold" ||
         !!finalCheckpoint?.goldBonusEarned;
-
-      console.log(`[WorldMapScene] Stage ${stage}: completed=${completed}/${total}, stageComplete=${stageComplete}, playerMovedPast=${playerMovedPast}, finalCheckpointGold=${finalCheckpointGold}`);
 
       if (stageComplete && !this.slainMiniBossStages.has(stage)) {
         // Slay or retreat permanently when stage is complete
@@ -6014,20 +6003,15 @@ export class WorldMapScene extends Phaser.Scene {
           this.retreatedStages.add(stage);
           // Create residual marker at boss position
           this.createResidualMarker(stage, miniBoss.x, miniBoss.y);
-          console.log(
-            `[WorldMapScene] 🌑 Mini-boss Stage ${stage} retreated (partial progress: ${completed}/${total})`,
-          );
         }
       } else if (!playerMovedPast && !stageComplete) {
         // Check for 2/3 tasks completion on checkpoints in this active stage
         stageCheckpoints.forEach((cp) => {
           const doneTasks = (cp.t1 ? 1 : 0) + (cp.t2 ? 1 : 0) + (cp.t3 ? 1 : 0);
           const cpKey = `${cp.stage}-${cp.checkpoint}`;
-          console.log(`[WorldMapScene] Checkpoint ${cpKey}: doneTasks=${doneTasks}, cp.checkpoint=${cp.checkpoint}, total=${total}, triggered=${this.triggeredBossCheckpoints.has(cpKey)}`);
 
           // Only trigger for mid-stage checkpoints (final checkpoint triggers final outcome)
           if (doneTasks >= 2 && cp.checkpoint < total && !this.triggeredBossCheckpoints.has(cpKey)) {
-            console.log(`[WorldMapScene] 🎯 Triggering mini-boss combat at checkpoint ${cpKey}!`);
             this.triggeredBossCheckpoints.add(cpKey);
 
             if (miniBoss && miniBoss.active) {
@@ -6074,7 +6058,6 @@ export class WorldMapScene extends Phaser.Scene {
                       // Play standard retreat visual feedback
                       miniBoss.retreat();
                       this.retreatedStages.add(stage);
-                      console.log(`[WorldMapScene] Mini-boss Stage ${stage} successfully retreated to end of stage.`);
                     }
                   });
                 }
@@ -6198,7 +6181,7 @@ export class WorldMapScene extends Phaser.Scene {
           event.personaGender as PersonaGender,
           event.userName ?? "User",
           event.userImageUrl ??
-            "https://api.dicebear.com/7.x/adventurer/png?seed=User&size=128&backgroundColor=transparent",
+          "https://api.dicebear.com/7.x/adventurer/png?seed=User&size=128&backgroundColor=transparent",
         );
         this.gameLayer.add(this.persona);
       }
@@ -6214,9 +6197,6 @@ export class WorldMapScene extends Phaser.Scene {
         audioManager.playAmbienceForTemplate(
           this.currentTemplateId,
           event.currentStage,
-        );
-        console.log(
-          `[WorldMapScene] Playing ambience for ${this.currentTemplateId} stage ${event.currentStage}`,
         );
       }
 
@@ -6254,7 +6234,7 @@ export class WorldMapScene extends Phaser.Scene {
         this.autoScrollToActive();
       });
     } catch (error) {
-      console.warn("[WorldMapScene] Failed to set active venture:", error);
+      // Silently handle venture setup errors
     }
   }
 
@@ -6386,12 +6366,7 @@ export class WorldMapScene extends Phaser.Scene {
     // the last known position, just teleport forward silently.
     const lastNode = previousNode;
     if (lastNode && targetNode.globalIndex < lastNode.globalIndex) {
-      console.warn(
-        "[WorldMapScene] ⚠️ Prevented backward persona movement from",
-        lastNode.globalIndex,
-        "→",
-        targetNode.globalIndex,
-      );
+      // Prevent backward movement - just teleport to the new position
       this.persona.setPosition(pos.x, pos.y);
       this.persona.setIdleFacingRight(
         this.getPersonaIdleFacingRight(targetNode),
@@ -6419,7 +6394,7 @@ export class WorldMapScene extends Phaser.Scene {
         targetNode.y - 120,
         targetNode.stage,
         this.activeBiomeConfigs[targetNode.stage - 1]?.colors.accent2 ??
-          0xdff5ff,
+        0xdff5ff,
       );
     }
 
@@ -6467,7 +6442,7 @@ export class WorldMapScene extends Phaser.Scene {
     try {
       this.scrollToCheckpoint(event.checkpointId, true);
     } catch (error) {
-      console.warn("[WorldMapScene] Failed to scroll to checkpoint:", error);
+      // Silently handle scroll errors
     }
   }
 
@@ -6478,7 +6453,7 @@ export class WorldMapScene extends Phaser.Scene {
     try {
       this.focusStage(event.stage, event.checkpointId, true);
     } catch (error) {
-      console.warn("[WorldMapScene] Failed to focus stage:", error);
+      // Silently handle focus errors
     }
   }
 
@@ -6590,10 +6565,10 @@ export class WorldMapScene extends Phaser.Scene {
       visibleWorldWidth >= this.BIOME_WIDTH
         ? stageStartX + this.BIOME_WIDTH / 2
         : Phaser.Math.Clamp(
-            preferredX,
-            stageStartX + halfWidth,
-            stageEndX - halfWidth,
-          );
+          preferredX,
+          stageStartX + halfWidth,
+          stageEndX - halfWidth,
+        );
     const y = Phaser.Math.Clamp(
       preferredY,
       halfHeight,
@@ -6646,10 +6621,7 @@ export class WorldMapScene extends Phaser.Scene {
         event.variant,
       );
     } catch (error) {
-      console.warn(
-        "[WorldMapScene] Failed to play checkpoint animation:",
-        error,
-      );
+      // Silently handle animation errors
     }
   }
 
@@ -6667,9 +6639,6 @@ export class WorldMapScene extends Phaser.Scene {
     // Get checkpoint node position for animation placement
     const node = this.getCheckpointNode(checkpointId);
     if (!node) {
-      console.warn(
-        `[WorldMapScene] Cannot play animation - checkpoint ${checkpointId} not found`,
-      );
       return;
     }
 
@@ -6682,7 +6651,6 @@ export class WorldMapScene extends Phaser.Scene {
     // Play checkpoint SFX based on animation type and variant
     const sfxId = `${animationType}_${variant}`;
     audioManager.playCheckpointSFX(sfxId as CheckpointSFXId);
-    console.log(`[WorldMapScene] Playing checkpoint SFX: ${sfxId}`);
 
     // Create animation instance
     this.currentAnimation = createCheckpointAnimation(this, animationType, {
@@ -6988,10 +6956,6 @@ export class WorldMapScene extends Phaser.Scene {
         });
       }, i * 50);
     }
-
-    console.log(
-      `[WorldMapScene] 🌟 Gold biome transformation for stage ${stage}`,
-    );
   }
 
   /**
@@ -7066,8 +7030,6 @@ export class WorldMapScene extends Phaser.Scene {
         });
       },
     });
-
-    console.log(`[WorldMapScene] ✨ Biome restored for stage ${stage}`);
   }
 
   /**
@@ -7135,10 +7097,6 @@ export class WorldMapScene extends Phaser.Scene {
     });
 
     this.residualMarkers.set(stage, container);
-
-    console.log(
-      `[WorldMapScene] 🌫️ Residual marker created for stage ${stage}`,
-    );
   }
 
   /**
@@ -7156,9 +7114,6 @@ export class WorldMapScene extends Phaser.Scene {
         },
       });
       this.residualMarkers.delete(stage);
-      console.log(
-        `[WorldMapScene] 🌟 Residual marker removed for stage ${stage}`,
-      );
     }
   }
 }

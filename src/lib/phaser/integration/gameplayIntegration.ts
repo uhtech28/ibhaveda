@@ -103,10 +103,6 @@ export function updateBiomeState(
 
   // ── 6. Layer corruption audio ─────────────────────────────────────────────
   // TODO: Implement corruption audio layering when dedicated SFX are available
-
-  console.log(
-    `[GameplayIntegration] Biome updated: ${biomeConfig.biomeName} (${templateId}, Stage ${stageNumber}, Corruption ${corruptionLevel}%)`,
-  );
 }
 
 /**
@@ -289,10 +285,6 @@ export async function executeCheckpointFlow(
     corruptionLevel,
   } = options;
 
-  console.log(
-    `[GameplayIntegration] Executing checkpoint flow: S${stage}C${checkpoint} (gold: ${isGold}, stageComplete: ${isStageComplete})`,
-  );
-
   // ── 1. Crossing Animation ──────────────────────────────────────────────────
   eventBridge.dispatchToPhaser({
     type: "PLAY_CHECKPOINT_ANIMATION",
@@ -324,9 +316,6 @@ export async function executeCheckpointFlow(
   if (isStageComplete) {
     const nextStage = stage + 1;
     if (nextStage <= 8) {
-      console.log(
-        `[GameplayIntegration] Stage ${stage} → ${nextStage} transition`,
-      );
 
       // Fade out current biome
       scene.cameras.main.fadeOut(600, 0, 0, 0);
@@ -356,8 +345,6 @@ export async function executeCheckpointFlow(
 
     await wait(1500);
   }
-
-  console.log(`[GameplayIntegration] Checkpoint flow complete`);
 }
 
 function wait(ms: number): Promise<void> {
@@ -424,10 +411,6 @@ export function applyBiomeParticles(
   emitter.setName("biome_particles_emitter");
   emitter.setDepth(-10); // Behind everything
   emitter.setScrollFactor(0); // Fixed to camera
-
-  console.log(
-    `[GameplayIntegration] Applied ${biomeConfig.particles.style} particles`,
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -440,7 +423,6 @@ export function applyBiomeParticles(
  */
 export function initializeAudio(): void {
   // Audio is initialized by audioManager.init() in WorldMapScene.create()
-  console.log("[GameplayIntegration] Audio initialization hook");
 }
 
 /**
@@ -493,9 +475,6 @@ export function syncHUDState(data: {
   // HUD state is already synced via the React layer's useEffect hooks
   // that subscribe to Convex data. This function is for future use when
   // we need to push Phaser-side state updates to React.
-  console.log(
-    `[GameplayIntegration] HUD state sync: S${stage}C${checkpoint}, corruption ${corruptionLevel}%`,
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -536,10 +515,6 @@ export function updateBossVisuals(
       });
     }
   }
-
-  console.log(
-    `[GameplayIntegration] Updated boss ${bossSlug}: opacity ${weakenedOpacity.toFixed(2)}, corruption ${corruptionLevel}%, fragments ${insightFragments}`,
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
