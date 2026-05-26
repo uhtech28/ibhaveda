@@ -157,8 +157,7 @@ const HUDComponent = () => {
         )}
       </motion.div>
 
-      {/* Quest List - floating top-right panel (manages own positioning) */}
-      <QuestList />
+      {/* Quest List removed per user request */}
 
       {/* Boss HP Bar - shows when corruption > 60% */}
       <BossHPBar />
