@@ -6338,22 +6338,11 @@ export class WorldMapScene extends Phaser.Scene {
 
     const allNodes = Array.from(this.checkpointNodes.values());
 
-    // ── 1. Find the furthest-forward active/in_progress node ──────────────
-    const frontierNode =
+    // ── 1. Find the furthest-forward node that the player has unlocked/accessed ──
+    let targetNode =
       allNodes
-        .filter((n) => n.status === "active" || n.status === "in_progress")
+        .filter((n) => n.status !== "locked")
         .sort((a, b) => b.globalIndex - a.globalIndex)[0] ?? null;
-
-    // ── 2. Determine target node ───────────────────────────────────────────
-    let targetNode: CheckpointNode | null = frontierNode;
-
-    if (!targetNode) {
-      // All tasks done in current stage – stand on the last completed node
-      targetNode =
-        allNodes
-          .filter((n) => n.status === "completed" || n.status === "gold")
-          .sort((a, b) => b.globalIndex - a.globalIndex)[0] ?? null;
-    }
 
     if (!targetNode) {
       // Absolute fallback: very first checkpoint node

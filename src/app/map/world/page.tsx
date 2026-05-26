@@ -507,7 +507,7 @@ function CheckpointPanel({
 
   const doneTasks = detail.tasks.filter((t) => t.done).length;
   const canAdvance = doneTasks >= 2;
-  const isGold = doneTasks >= 3;
+  const isGold = doneTasks >= detail.tasks.length;
   const isLocked = detail.status === "locked";
   const isActiveNode = detail.stage === activeStage && detail.checkpointIndex === activeCheckpoint;
 
@@ -617,9 +617,9 @@ function CheckpointPanel({
                     initial={{ width: 0 }}
                     animate={{ width: t.done ? "100%" : "0%" }}
                     style={{
-                      background: i === 2 ? "#eab308" : "#818cf8",
+                      background: i === detail.tasks.length - 1 ? "#eab308" : "#818cf8",
                       boxShadow: t.done
-                        ? `0 0 10px ${i === 2 ? "#eab308" : "#818cf8"}`
+                        ? `0 0 10px ${i === detail.tasks.length - 1 ? "#eab308" : "#818cf8"}`
                         : "none",
                     }}
                   />
@@ -627,7 +627,7 @@ function CheckpointPanel({
               ))}
             </div>
             <p className="text-[10px] sm:text-[11px] md:text-xs lg:text-sm font-medium tracking-wide text-slate-400">
-              {doneTasks}/3 tasks ·{" "}
+              {doneTasks}/{detail.tasks.length} tasks ·{" "}
               {2 - doneTasks > 0 && !canAdvance
                 ? `${2 - doneTasks} more to advance`
                 : canAdvance
@@ -641,10 +641,10 @@ function CheckpointPanel({
               </p>
               <p className="mt-1 text-[11px] sm:text-[12px] md:text-sm lg:text-base leading-relaxed text-slate-300">
                 {isGold
-                  ? "All 3 tasks are complete. This checkpoint will advance as gold."
-                  : doneTasks === 2
-                    ? "Advance is unlocked now, but completing task 3 upgrades this checkpoint to gold."
-                    : "Gold status requires all 3 tasks. Standard advance unlocks after any 2 tasks."}
+                  ? `All ${detail.tasks.length} tasks are complete. This checkpoint will advance as gold.`
+                  : doneTasks >= 2
+                    ? `Advance is unlocked now, but completing the remaining tasks upgrades this checkpoint to gold.`
+                    : `Gold status requires all ${detail.tasks.length} tasks. Standard advance unlocks after any 2 tasks.`}
               </p>
             </div>
 
