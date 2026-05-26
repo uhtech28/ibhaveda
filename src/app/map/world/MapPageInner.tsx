@@ -34,8 +34,6 @@ import {
   QuestList,
   BossHPBar,
   StageInfo,
-  CheckpointProgress,
-  LevelDisplay,
   XPBar,
 } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
@@ -2998,25 +2996,9 @@ function MapPageInner() {
             />
           </div>
 
-          <div className="h-5 w-px bg-white/10 shrink-0" />
+          <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
 
-          <div className="shrink-0">
-            <CheckpointProgress
-              completed={checkpointProgress.completed}
-              total={checkpointProgress.total}
-              goldCount={checkpointProgress.goldCount}
-              compact={true}
-            />
-          </div>
-
-          <div className="shrink-0">
-            <LevelDisplay
-              score={userProgress.qualityScore}
-              compact={true}
-            />
-          </div>
-
-          <div className="shrink-0 hidden md:block">
+          <div className="min-w-0 flex-1 sm:w-[320px] md:w-[400px]">
             <XPBar
               currentXP={userProgress.xp}
               maxXP={userProgress.xpToNextLevel}

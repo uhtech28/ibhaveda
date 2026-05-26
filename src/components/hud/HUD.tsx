@@ -4,9 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAtom } from "jotai";
 import { motion, AnimatePresence } from "framer-motion";
 import { XPBar } from "./XPBar";
-import { LevelDisplay } from "./LevelDisplay";
 import { StageInfo } from "./StageInfo";
-import { CheckpointProgress } from "./CheckpointProgress";
 import { QuestList } from "./QuestList";
 import { BossHPBar } from "./BossHPBar";
 
@@ -16,12 +14,9 @@ import {
   activeVentureAtom,
   userProgressAtom,
   stageInfoAtom,
-  checkpointProgressAtom,
   corruptionStateAtom,
-  submittingTaskAtom,
-  activeTaskAtom,
 } from "@/lib/stores/hudStore";
-import { ChevronDown, ChevronUp, Sparkles, Crown } from "lucide-react";
+import { Sparkles, Crown } from "lucide-react";
 
 const HUDComponent = () => {
   const [hudVisible] = useAtom(hudVisibleAtom);
@@ -29,11 +24,7 @@ const HUDComponent = () => {
   const [activeVenture] = useAtom(activeVentureAtom);
   const [userProgress] = useAtom(userProgressAtom);
   const [stageInfo] = useAtom(stageInfoAtom);
-  const [checkpointProgress] = useAtom(checkpointProgressAtom);
   const [corruption] = useAtom(corruptionStateAtom);
-
-  const [, setSubmittingTask] = useAtom(submittingTaskAtom);
-  const [activeTask] = useAtom(activeTaskAtom);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -109,37 +100,6 @@ const HUDComponent = () => {
                       />
                     </div>
 
-                    <div className="hidden h-6 w-px shrink-0 bg-[#c8b47a]/15 sm:block" />
-
-                    {/* Idea name + gold count — shrinks and truncates */}
-                    <div className="min-w-0 flex-1 sm:flex-none sm:shrink-0">
-                      <CheckpointProgress
-                        completed={checkpointProgress.completed}
-                        total={checkpointProgress.total}
-                        goldCount={checkpointProgress.goldCount}
-                        compact={true}
-                        onClick={() => {
-                          if (activeTask) {
-                            setSubmittingTask(activeTask);
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div className="hidden h-6 w-px shrink-0 bg-[#c8b47a]/15 sm:block" />
-
-                    {/* Score badge */}
-                    <div className="shrink-0">
-                      <LevelDisplay
-                        score={userProgress.qualityScore}
-                        compact={true}
-                        onClick={() => {
-                          if (activeTask) {
-                            setSubmittingTask(activeTask);
-                          }
-                        }}
-                      />
-                    </div>
 
                     <div className="hidden h-6 w-px shrink-0 bg-[#c8b47a]/15 sm:block" />
 
