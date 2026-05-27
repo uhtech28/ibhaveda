@@ -1547,6 +1547,15 @@ export class WorldMapScene extends Phaser.Scene {
     const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
     const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
     const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
+    const treeKeys = [
+      "Tree_Emerald_1",
+      "Tree_Emerald_2",
+      "Tree_Emerald_3",
+      "Tree_Emerald_4",
+    ];
+    const shrubFrames = [27, 28, 29, 30, 31, 32];
+    const plantFrames = [0, 1, 2, 3, 4, 5, 7, 8, 10, 11];
+    const flowerFrames = [3, 4, 5, 6, 7, 14, 15, 16, 17];
     const dirtPatches: Array<{
       cx: number;
       cy: number;
@@ -1565,6 +1574,23 @@ export class WorldMapScene extends Phaser.Scene {
       { cx: 34.2, cy: 33.6, rx: 3.3, ry: 4.2 },
       { cx: 5.0, cy: 38.5, rx: 5.0, ry: 3.2 },
       { cx: 23.4, cy: 39.4, rx: 4.8, ry: 3.6 },
+    ];
+    const trail = [
+      { x: 1, y: 11 },
+      { x: 6, y: 11 },
+      { x: 10, y: 11 },
+      { x: 10, y: 14 },
+      { x: 16, y: 14 },
+      { x: 16, y: 18 },
+      { x: 20, y: 18 },
+      { x: 20, y: 19 },
+      { x: 31, y: 19 },
+      { x: 31, y: 22 },
+      { x: 36, y: 22 },
+      { x: 36, y: 28 },
+      { x: 34, y: 28 },
+      { x: 34, y: 35 },
+      { x: 38, y: 35 },
     ];
 
     const tileKey = (col: number, row: number) => `${col},${row}`;
@@ -1596,6 +1622,71 @@ export class WorldMapScene extends Phaser.Scene {
       this.backgroundLayer.add(tile);
     };
 
+    const addGroundPatch = (
+      x: number,
+      y: number,
+      radiusX: number,
+      radiusY: number,
+      color: number,
+      alpha: number,
+    ) => {
+      const patch = this.add.graphics();
+      patch.setDepth(1.25);
+      patch.fillStyle(color, alpha);
+      patch.fillEllipse(toX(x), toY(y), radiusX * tileSize, radiusY * tileSize);
+      this.backgroundLayer.add(patch);
+    };
+
+    const addCanopyTree = (
+      key: string,
+      col: number,
+      row: number,
+      treeScale: number,
+      alpha = 1,
+    ) => {
+      const x = toX(col) + tileSize / 2;
+      const y = toY(row) + tileSize * 0.95;
+
+      const shadow = this.add.image(
+        x + 7,
+        y + 11,
+        "Shadow_Round_48x24_Flat_Black",
+      );
+      shadow.setOrigin(0.5, 0.5);
+      shadow.setScale(treeScale * 0.9);
+      shadow.setAlpha(0.2);
+      shadow.setDepth(12);
+      this.midgroundLayer.add(shadow);
+
+      const tree = this.add.image(x, y, key);
+      tree.setOrigin(0.5, 1);
+      tree.setScale(treeScale);
+      tree.setAlpha(alpha);
+      tree.setDepth(13 + row * 0.01);
+      this.midgroundLayer.add(tree);
+    };
+
+    const addForestFloorProp = (
+      frame: number,
+      col: number,
+      row: number,
+      propScale: number,
+      depth: number,
+      alpha = 1,
+    ) => {
+      const sprite = this.add.sprite(
+        toX(col) + tileSize / 2,
+        toY(row) + tileSize * 0.86,
+        "sprout_forest_decor_sheet",
+        frame,
+      );
+      sprite.setOrigin(0.5, 1);
+      sprite.setScale(propScale);
+      sprite.setAlpha(alpha);
+      sprite.setDepth(depth + row * 0.005);
+      this.midgroundLayer.add(sprite);
+    };
+
     const patchContains = (col: number, row: number) =>
       dirtPatches.some((patch, index) => {
         const dx = (col + 0.5 - patch.cx) / patch.rx;
@@ -1605,11 +1696,41 @@ export class WorldMapScene extends Phaser.Scene {
         return dx * dx + dy * dy < 1 + roughEdge;
       });
 
+    const pathTiles = new Set<string>();
+    trail.forEach(({ x, y }) => {
+      for (let oy = -2; oy <= 2; oy += 1) {
+        for (let ox = -2; ox <= 2; ox += 1) {
+          if (Math.abs(ox) + Math.abs(oy) <= 3 && isInside(x + ox, y + oy)) {
+            pathTiles.add(tileKey(x + ox, y + oy));
+          }
+        }
+      }
+    });
+
+    const isNearPath = (col: number, row: number, radius = 3) => {
+      for (let y = Math.floor(row - radius); y <= Math.ceil(row + radius); y += 1) {
+        for (let x = Math.floor(col - radius); x <= Math.ceil(col + radius); x += 1) {
+          if (!pathTiles.has(tileKey(x, y))) continue;
+          const dx = col - x;
+          const dy = row - y;
+          if (dx * dx + dy * dy <= radius * radius) return true;
+        }
+      }
+      return false;
+    };
+
     const ground = this.add.graphics();
-    ground.fillStyle(0xa4ef8c, 1);
+    ground.fillStyle(0x86c96b, 1);
     ground.fillRect(panelX, panelOffsetY, panelW, panelH);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
+
+    addGroundPatch(4, 7, 9.5, 12.5, 0x3f7c45, 0.18);
+    addGroundPatch(38, 10, 8.5, 11.5, 0x2f6f3e, 0.2);
+    addGroundPatch(8, 34, 12, 9, 0x4d8542, 0.18);
+    addGroundPatch(28, 34, 10, 9.5, 0x3f7c45, 0.18);
+    addGroundPatch(24, 5, 11, 5.5, 0xaadf78, 0.12);
+    addGroundPatch(20, 22, 9, 6.5, 0xb9ea88, 0.1);
 
     const dirtTiles = new Set<string>();
     for (let row = 0; row < rows; row += 1) {
@@ -1623,73 +1744,46 @@ export class WorldMapScene extends Phaser.Scene {
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
         const key = tileKey(col, row);
+        const edgeShade =
+          row < 4 || row > rows - 5 || col < 3 || col > cols - 4;
+        const forestMass =
+          edgeShade ||
+          dirtTiles.has(key) ||
+          (col < 10 && row > 18) ||
+          (col > 29 && row < 14) ||
+          (col > 24 && row > 28);
 
-        if (dirtTiles.has(key)) {
-          addFrameSprite(
-            "sprout_grass_sheet",
-            grassFrames[(col * 5 + row * 3) % grassFrames.length],
-            col,
-            row,
-            2,
-            (col + row) % 4 === 0 ? 0xc4b0a4 : 0xbba89c,
-            0.96,
-          );
-          continue;
-        }
+        const grassTint = forestMass
+          ? (col + row) % 3 === 0
+            ? 0x5eac52
+            : 0x6fbb5d
+          : (col * 7 + row * 5) % 5 === 0
+            ? 0x9ddd72
+            : 0x86cf68;
 
-        if ((col * 7 + row * 5) % 4 === 0) {
-          addFrameSprite(
-            "sprout_grass_sheet",
-            grassFrames[(col * 11 + row * 3) % grassFrames.length],
-            col,
-            row,
-            2,
-            (col + row) % 3 === 0 ? 0x8cdd7f : 0xffffff,
-            0.72,
-          );
-        }
+        addFrameSprite(
+          "sprout_grass_sheet",
+          grassFrames[(col * 11 + row * 3) % grassFrames.length],
+          col,
+          row,
+          2,
+          grassTint,
+          forestMass ? 0.72 : 0.5,
+        );
 
-        if ((col * 13 + row * 17) % 11 === 0) {
+        if (!isNearPath(col, row, 2.2) && (col * 13 + row * 17) % 8 === 0) {
           addFrameSprite(
             "sprout_grass_sheet",
             grassAccentFrames[(col + row) % grassAccentFrames.length],
             col,
             row,
             3,
-            0x77d983,
-            0.7,
+            forestMass ? 0x4c9b4c : 0x76b85d,
+            forestMass ? 0.55 : 0.46,
           );
         }
       }
     }
-
-    const trail = [
-      { x: 1, y: 12 },
-      { x: 8, y: 12 },
-      { x: 8, y: 14 },
-      { x: 13, y: 14 },
-      { x: 13, y: 17 },
-      { x: 18, y: 17 },
-      { x: 18, y: 19 },
-      { x: 31, y: 19 },
-      { x: 31, y: 21 },
-      { x: 36, y: 21 },
-      { x: 36, y: 28 },
-      { x: 34, y: 28 },
-      { x: 34, y: 35 },
-      { x: 38, y: 35 },
-    ];
-
-    const pathTiles = new Set<string>();
-    trail.forEach(({ x, y }) => {
-      for (let oy = -2; oy <= 2; oy += 1) {
-        for (let ox = -2; ox <= 2; ox += 1) {
-          if (Math.abs(ox) + Math.abs(oy) <= 3 && isInside(x + ox, y + oy)) {
-            pathTiles.add(tileKey(x + ox, y + oy));
-          }
-        }
-      }
-    });
 
     const pathShadow = this.add.graphics();
     pathShadow.setDepth(4);
@@ -1721,45 +1815,45 @@ export class WorldMapScene extends Phaser.Scene {
       const length = horizontal
         ? Math.abs(endX - startX) + tileSize
         : Math.abs(endY - startY) + tileSize;
-      const thickness = tileSize * 3.1;
-      const innerThickness = tileSize * 2.25;
-      const edgeThickness = tileSize * 3.55;
+      const thickness = tileSize * 2.9;
+      const innerThickness = tileSize * 2.08;
+      const edgeThickness = tileSize * 3.28;
 
       if (horizontal) {
         const baseY = startY - tileSize * 1.05;
-        pathShadow.fillRoundedRect(minX + 8, baseY + 10, length, thickness, 16);
-        pathEdge.fillRoundedRect(minX, baseY, length, edgeThickness, 18);
+        pathShadow.fillRoundedRect(minX + 8, baseY + 10, length, thickness, 14);
+        pathEdge.fillRoundedRect(minX, baseY, length, edgeThickness, 16);
         pathBase.fillRoundedRect(
           minX + tileSize * 0.12,
           baseY + tileSize * 0.12,
           length - tileSize * 0.24,
           thickness - tileSize * 0.24,
-          16,
+          14,
         );
         pathInner.fillRoundedRect(
           minX + tileSize * 0.35,
           baseY + tileSize * 0.35,
           length - tileSize * 0.7,
           innerThickness,
-          14,
+          12,
         );
       } else {
         const baseX = startX - tileSize * 1.05;
-        pathShadow.fillRoundedRect(baseX + 8, minY + 10, thickness, length, 16);
-        pathEdge.fillRoundedRect(baseX, minY, edgeThickness, length, 18);
+        pathShadow.fillRoundedRect(baseX + 8, minY + 10, thickness, length, 14);
+        pathEdge.fillRoundedRect(baseX, minY, edgeThickness, length, 16);
         pathBase.fillRoundedRect(
           baseX + tileSize * 0.12,
           minY + tileSize * 0.12,
           thickness - tileSize * 0.24,
           length - tileSize * 0.24,
-          16,
+          14,
         );
         pathInner.fillRoundedRect(
           baseX + tileSize * 0.35,
           minY + tileSize * 0.35,
           innerThickness,
           length - tileSize * 0.7,
-          14,
+          12,
         );
       }
     };
@@ -1771,10 +1865,10 @@ export class WorldMapScene extends Phaser.Scene {
     trail.forEach(({ x, y }) => {
       const cx = toX(x) + tileSize / 2;
       const cy = toY(y) + tileSize / 2;
-      pathShadow.fillCircle(cx + 8, cy + 10, tileSize * 1.65);
-      pathEdge.fillCircle(cx, cy, tileSize * 1.78);
-      pathBase.fillCircle(cx, cy, tileSize * 1.56);
-      pathInner.fillCircle(cx, cy, tileSize * 1.12);
+      pathShadow.fillCircle(cx + 8, cy + 10, tileSize * 1.46);
+      pathEdge.fillCircle(cx, cy, tileSize * 1.55);
+      pathBase.fillCircle(cx, cy, tileSize * 1.36);
+      pathInner.fillCircle(cx, cy, tileSize * 0.96);
     });
 
     this.backgroundLayer.add(pathShadow);
@@ -1814,6 +1908,91 @@ export class WorldMapScene extends Phaser.Scene {
       );
     });
     this.backgroundLayer.add(pathSpeckles);
+
+    const canopyWash = this.add.graphics();
+    canopyWash.setDepth(6.1);
+    canopyWash.fillStyle(0x113c25, 0.1);
+    canopyWash.fillRect(panelX, panelOffsetY, panelW, tileSize * 4);
+    canopyWash.fillRect(panelX, panelOffsetY + panelH - tileSize * 4, panelW, tileSize * 4);
+    canopyWash.fillRect(panelX, panelOffsetY, tileSize * 3.2, panelH);
+    canopyWash.fillRect(panelX + panelW - tileSize * 3.2, panelOffsetY, tileSize * 3.2, panelH);
+    this.backgroundLayer.add(canopyWash);
+
+    [
+      [2.0, 5.2, 0, 0.86, 0.96],
+      [5.5, 6.4, 1, 0.78, 0.94],
+      [9.4, 5.6, 3, 0.78, 0.94],
+      [14.8, 5.2, 2, 0.76, 0.92],
+      [21.8, 5.6, 0, 0.82, 0.95],
+      [27.5, 6.6, 1, 0.76, 0.93],
+      [33.4, 5.4, 2, 0.78, 0.94],
+      [38.1, 9.2, 3, 0.82, 0.95],
+      [2.4, 18.4, 2, 0.78, 0.93],
+      [4.8, 22.4, 0, 0.82, 0.95],
+      [8.4, 25.6, 1, 0.72, 0.9],
+      [2.6, 31.6, 3, 0.86, 0.95],
+      [7.8, 35.2, 0, 0.82, 0.95],
+      [13.4, 33.8, 2, 0.78, 0.92],
+      [18.6, 35.8, 1, 0.74, 0.92],
+      [23.6, 33.0, 3, 0.8, 0.94],
+      [28.6, 30.8, 0, 0.78, 0.92],
+      [30.8, 36.2, 1, 0.82, 0.95],
+      [38.3, 37.1, 2, 0.88, 0.95],
+    ].forEach(([col, row, keyIndex, treeScale, alpha]) => {
+      if (isNearPath(col as number, row as number, 3.1)) return;
+      addCanopyTree(
+        treeKeys[(keyIndex as number) % treeKeys.length],
+        col as number,
+        row as number,
+        treeScale as number,
+        alpha as number,
+      );
+    });
+
+    for (let row = 6; row < rows - 4; row += 3) {
+      for (let col = 4; col < cols - 4; col += 4) {
+        if (isNearPath(col, row, 3.1)) continue;
+        if ((col * 19 + row * 11) % 5 !== 0) continue;
+
+        addForestFloorProp(
+          shrubFrames[(col + row) % shrubFrames.length],
+          col + 0.25,
+          row + 0.2,
+          1.04 + ((col + row) % 3) * 0.08,
+          11,
+          0.86,
+        );
+      }
+    }
+
+    for (let row = 7; row < rows - 7; row += 2) {
+      for (let col = 5; col < cols - 5; col += 3) {
+        if (isNearPath(col, row, 2.2)) continue;
+        if ((col * 23 + row * 17) % 7 !== 0) continue;
+
+        addFrameSprite(
+          "sprout_plants_sheet",
+          plantFrames[(col + row) % plantFrames.length],
+          col,
+          row,
+          6,
+          0xffffff,
+          0.82,
+        );
+
+        if ((col + row) % 4 === 0) {
+          addFrameSprite(
+            "sprout_forest_decor_sheet",
+            flowerFrames[(col + row) % flowerFrames.length],
+            col + 0.3,
+            row + 0.2,
+            6.2,
+            0xffffff,
+            0.8,
+          );
+        }
+      }
+    }
   }
 
   private createArenaTilePanel(
@@ -5829,7 +6008,7 @@ export class WorldMapScene extends Phaser.Scene {
     }
 
     if (stageId === 2) {
-      // Venture Stage 2 uses a compact forest trail matching the tile route
+      // Venture Stage 2 uses a compact forest trail matching the sand route
       // drawn by createVentureStageTwoForestPanel().
       const forestAnchors = [
         { x: 88, y: 190 },
@@ -6325,7 +6504,7 @@ export class WorldMapScene extends Phaser.Scene {
     // Make sure those bosses that are retreated start in the retreated visual state (ran outside initializedBossTriggers so newly lazy-loaded bosses get their state)
     for (const [stage, miniBoss] of this.miniBosses.entries()) {
       if (this.retreatedStages.has(stage) && !this.slainMiniBossStages.has(stage)) {
-        if (miniBoss && miniBoss.active && miniBoss.status !== "retreated") {
+        if (miniBoss && miniBoss.active && !miniBoss.isRetreated) {
           miniBoss.retreat();
         }
       }

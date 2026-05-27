@@ -325,7 +325,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                   scale: { duration: 1 },
                   rotate: { repeat: Infinity, duration: 25, ease: "linear" }
                 }}
-                className="absolute w-[420px] h-[420px] pointer-events-none z-0"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] pointer-events-none z-0"
                 style={{
                   background: `conic-gradient(from 0deg, transparent, ${badgeColor}40, transparent, ${badgeColor}10, transparent, ${badgeColor}40, transparent)`,
                   borderRadius: "50%",
@@ -344,7 +344,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                   scale: { duration: 1 },
                   rotate: { repeat: Infinity, duration: 35, ease: "linear" }
                 }}
-                className="absolute w-[380px] h-[380px] pointer-events-none z-0"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[380px] pointer-events-none z-0"
                 style={{
                   background: `conic-gradient(from 0deg, transparent, ${badgeColor}30, transparent, ${badgeColor}05, transparent, ${badgeColor}30, transparent)`,
                   borderRadius: "50%",
@@ -360,7 +360,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                   initial={{ scale: 0.35, opacity: 1, borderWidth: "6px" }}
                   animate={{ scale: 2.2, opacity: 0, borderWidth: "0.5px" }}
                   transition={{ duration: 0.85, ease: "easeOut" }}
-                  className="absolute rounded-full pointer-events-none z-20"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none z-20"
                   style={{
                     width: "180px",
                     height: "180px",
@@ -381,7 +381,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                   animate={{ scale: 2.8, opacity: [0, 1, 1, 0] }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="absolute w-40 h-40 rounded-full bg-white blur-xl mix-blend-screen z-20 pointer-events-none"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full bg-white blur-xl mix-blend-screen z-20 pointer-events-none"
                 />
               )}
             </AnimatePresence>
@@ -389,6 +389,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
 
             {/* Same profile badge card used by the collection grid */}
             <motion.div
+              key={badge.id}
               initial={{ scale: 0, rotateY: -180, rotateX: 20, z: -200 }}
               animate={
                 activeStep === "silhouette"

@@ -512,22 +512,23 @@ function CheckpointPanel({
   const isActiveNode = detail.stage === activeStage && detail.checkpointIndex === activeCheckpoint;
 
   return (
-    <AnimatePresence>
-      <div className="absolute right-4 top-4 bottom-4 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full">
-        <motion.div
-          key="cp-panel"
-          initial={{ x: "100%", opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: "100%", opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 32 }}
-          className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-[80vh] md:max-h-[85vh]"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
-            backdropFilter: "blur(24px)",
-            boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
-          }}
-        >
+    <motion.div
+      key="cp-panel"
+      initial={{ x: "100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: "100%", opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 32 }}
+      className="absolute right-4 top-4 bottom-4 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
+    >
+      <div
+        className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-[80vh] md:max-h-[85vh]"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+          backdropFilter: "blur(24px)",
+          boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+        }}
+      >
           {/* Close button */}
           <button
             onClick={() => {
@@ -727,9 +728,8 @@ function CheckpointPanel({
                 </motion.button>
               </div>
             )}
-        </motion.div>
       </div>
-    </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -1373,7 +1373,66 @@ function MapPageInner() {
 
   // Badge queue — pop-and-show one at a time
   const [badgeQueue, setBadgeQueue] = useState<BadgePayload[]>([]);
-  const activeBadge = badgeQueue[0] ?? null;
+  const [activeBadge, setActiveBadge] = useState<BadgePayload | null>(null);
+  const badgeBufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (badgeQueue.length === 0) {
+      return;
+    }
+
+    if (activeBadge) return;
+
+    if (badgeBufferTimeoutRef.current) {
+      clearTimeout(badgeBufferTimeoutRef.current);
+    }
+
+    badgeBufferTimeoutRef.current = setTimeout(() => {
+      setBadgeQueue((currentQueue) => {
+        if (currentQueue.length === 0) return currentQueue;
+
+        const taskBadges = currentQueue.filter((b) => b.id.startsWith("task_"));
+        const dbBadges = currentQueue.filter((b) => !b.id.startsWith("task_"));
+
+        if (dbBadges.length > 0) {
+          // Priority 1: If database badges are present, choose the best one
+          const rarityOrder = {
+            legendary: 4,
+            gold: 4,
+            epic: 3,
+            diamond: 3,
+            rare: 2,
+            silver: 2,
+            uncommon: 1,
+            bronze: 1,
+            common: 0,
+          };
+          const getRarityWeight = (rarity?: string) => {
+            if (!rarity) return 0;
+            return rarityOrder[rarity.toLowerCase() as keyof typeof rarityOrder] ?? 0;
+          };
+
+          const bestDbBadge = [...dbBadges].sort(
+            (a, b) => getRarityWeight(b.rarity) - getRarityWeight(a.rarity),
+          )[0];
+
+          setActiveBadge(bestDbBadge);
+        } else if (taskBadges.length > 0) {
+          // Priority 2: If only task badges, show the first one
+          setActiveBadge(taskBadges[0]);
+        }
+
+        // Clear the entire queue since we only show one animation per batch
+        return [];
+      });
+    }, 400);
+
+    return () => {
+      if (badgeBufferTimeoutRef.current) {
+        clearTimeout(badgeBufferTimeoutRef.current);
+      }
+    };
+  }, [badgeQueue, activeBadge]);
 
   // Tutorial: First checkpoint pulse
   const [showFirstCheckpointPulse, setShowFirstCheckpointPulse] =
@@ -2988,8 +3047,8 @@ function MapPageInner() {
           <BadgeAwardSequence
             isVisible={!!activeBadge}
             badge={activeBadge}
-            onComplete={() => setBadgeQueue((q) => q.slice(1))}
-            onSkip={() => setBadgeQueue((q) => q.slice(1))}
+            onComplete={() => setActiveBadge(null)}
+            onSkip={() => setActiveBadge(null)}
           />
 
           {/* Gold checkpoint notification popup */}

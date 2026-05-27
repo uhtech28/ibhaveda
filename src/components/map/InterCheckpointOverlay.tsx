@@ -6,7 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { audioManager } from "@/lib/audio/audioManager";
-import { Shield, Gem, Trophy, Coins, Flame, Check, X, ArrowRight, ArrowLeft } from "lucide-react";
+import { Shield, Gem, Trophy, Coins, Flame, Check, X, ArrowRight, ArrowLeft, TrendingUp } from "lucide-react";
 
 interface InterCheckpointOverlayProps {
   isOpen: boolean;
@@ -153,6 +153,26 @@ export function InterCheckpointOverlay({
   // Wallet and mutations
   const wallet = useQuery(api.gamification.getWallet);
   const walletBalance = wallet?.balance ?? 0;
+
+  // User profile and level progress
+  const currentUser = useQuery(api.users.getCurrentUser);
+  const userLevel = useQuery(
+    api.levels.getUserLevelProgress,
+    currentUser?._id ? { userId: currentUser._id } : "skip"
+  );
+  const userScore = userLevel?.totalPoints ?? 0;
+
+  // Venture/Project stage quality score
+  const stageQuality = useQuery(
+    api.aiScoring.getStageQualityScore,
+    ventureId
+      ? {
+          ventureId,
+          stageNumber: stage,
+        }
+      : "skip"
+  );
+  const projectScore = stageQuality?.totalScore ?? 0;
 
   const resolveHenchman = useMutation(api.interCheckpoint.resolveHenchmanEncounter);
   const collectTreasure = useMutation(api.interCheckpoint.collectTreasureChest);
@@ -489,6 +509,23 @@ export function InterCheckpointOverlay({
                   <p className="text-sm text-gray-300 leading-relaxed mb-6">
                     {henchmanInfo.intro}
                   </p>
+
+                  {/* Combat Stats Panel */}
+                  <div className="grid grid-cols-3 gap-2.5 w-full mb-6">
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">User Score</span>
+                      <span className="text-xs font-black text-indigo-400 mt-0.5">{userScore} XP</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Project Score</span>
+                      <span className="text-xs font-black text-emerald-400 mt-0.5">{projectScore}/12</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Your Gold</span>
+                      <span className="text-xs font-black text-yellow-400 mt-0.5">{walletBalance}g</span>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-3 w-full">
                     <button
                       onClick={() => {
@@ -533,6 +570,22 @@ export function InterCheckpointOverlay({
                       transition={{ duration: 1, ease: "linear" }}
                       className={`h-full rounded-full transition-colors ${timeLeft <= 5 ? "bg-red-500 shadow-[0_0_8px_#ef4444]" : "bg-indigo-500"}`}
                     />
+                  </div>
+
+                  {/* Combat Stats Panel */}
+                  <div className="grid grid-cols-3 gap-2.5 w-full mb-4">
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">User Score</span>
+                      <span className="text-xs font-black text-indigo-400 mt-0.5">{userScore} XP</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Project Score</span>
+                      <span className="text-xs font-black text-emerald-400 mt-0.5">{projectScore}/12</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Your Gold</span>
+                      <span className="text-xs font-black text-yellow-400 mt-0.5">{walletBalance}g</span>
+                    </div>
                   </div>
 
                   {/* Question Box */}

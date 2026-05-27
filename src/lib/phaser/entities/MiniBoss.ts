@@ -73,6 +73,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
   readonly bossId: string;
   readonly bossType: MiniBossType;
   readonly stage: number;
+  public isRetreated = false;
 
   // ── Private state ─────────────────────────────────────────────────────────
 
@@ -500,6 +501,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
    */
   retreat(): void {
     if (!this.scene || !this.scene.tweens) return;
+    this.isRetreated = true;
 
     this.scene.tweens.killTweensOf([
       this,
