@@ -363,6 +363,12 @@ export class WorldMapScene extends Phaser.Scene {
     new Map();
   private revealedStages: Set<number> = new Set([1]);
   private stageEntryInProgress: Set<number> = new Set();
+  private loadedStages: Set<number> = new Set();
+  private phaserTilesets: Phaser.Tilemaps.Tileset[] = [];
+  private panelOffsetX = 0;
+  private panelOffsetY = 0;
+  private objectLayer: Phaser.Tilemaps.ObjectLayer | null = null;
+  private latestCheckpointsState: CheckpointState[] | null = null;
 
   private particleEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private updateHandlers: Array<() => void> = [];
@@ -414,14 +420,26 @@ export class WorldMapScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT + 160);
     this.physics.world.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT + 160);
 
-    this.createBiomeZones();
-    this.createTilemap();
+    // Initialize loaded stages tracking
+    this.loadedStages.clear();
+
+    // 1. Initialize tilemap metadata (load map and tileset imagery, but don't draw layers yet)
+    this.initTilemap();
+
+    // 2. Create the snake path and checkpoints (needed on startup so nodes are interactive and persona can be positioned)
     this.createSnakePath();
-    this.createBiomeLandmarks();
+
+    // 3. Create the super boss
     this.createSuperBoss();
-    this.createMiniBosses();
+
+    // 4. Create global atmospheric effects (clouds, rays, motes, etc.)
     this.createAtmosphericEffects();
-    // Fog overlays removed - all stages visible
+
+    // 5. Force load the current stage (active stage) immediately
+    this.loadStage(this.currentStage);
+
+    // 6. Run checkBiomeLoading to check camera proximity immediately
+    this.checkBiomeLoading();
   }
 
   private rebuildWorldForTemplate(): void {
@@ -756,9 +774,9 @@ export class WorldMapScene extends Phaser.Scene {
    * Creates all 8 biome visual zones left to right
    */
   /**
-   * Creates the Tiled map and its layers, integrated into the background.
+   * Initializes the Tiled map metadata (loads tilesets)
    */
-  private createTilemap(): void {
+  private initTilemap(): void {
     this.map = this.make.tilemap({ key: "beginning_fields" });
 
     const tilesetMapping = [
@@ -782,13 +800,31 @@ export class WorldMapScene extends Phaser.Scene {
       { name: "Objects_Shadows", key: "Shadow_Round_16x16_Flat_Black" },
     ];
 
-    const phaserTilesets = tilesetMapping
+    this.phaserTilesets = tilesetMapping
       .map((tileset) => this.map.addTilesetImage(tileset.name, tileset.key))
       .filter(
         (tileset): tileset is Phaser.Tilemaps.Tileset => tileset !== null,
       );
 
     const scale = this.MAP_PANEL_SCALE;
+    const panelWidth = this.map.widthInPixels * scale;
+    const panelHeight = this.map.heightInPixels * scale;
+    this.panelOffsetX = (this.BIOME_WIDTH - panelWidth) / 2;
+    this.panelOffsetY = this.MAP_HEIGHT - panelHeight + 120;
+    this.objectLayer = this.map.getObjectLayer("Object Layer 1");
+  }
+
+  /**
+   * Lazily loads the tile panel for stage index i (0-based)
+   */
+  private loadStageTilePanel(i: number): void {
+    const biome = this.activeBiomeConfigs[i];
+    if (!biome) return;
+
+    const scale = this.MAP_PANEL_SCALE;
+    const panelX = i * this.BIOME_WIDTH + this.panelOffsetX;
+    const panelOffsetY = this.panelOffsetY;
+    const phaserTilesets = this.phaserTilesets;
     const layerNames = [
       "Ground",
       "Flowers",
@@ -798,62 +834,196 @@ export class WorldMapScene extends Phaser.Scene {
       "Water",
       "Shadows",
     ];
-    const panelWidth = this.map.widthInPixels * scale;
-    const panelHeight = this.map.heightInPixels * scale;
-    const panelOffsetX = (this.BIOME_WIDTH - panelWidth) / 2;
-    const panelOffsetY = this.MAP_HEIGHT - panelHeight + 120;
-    const objectLayer = this.map.getObjectLayer("Object Layer 1");
+
+    if (biome.visualTheme === "forest") {
+      this.createForestTilePanel(panelX, panelOffsetY, scale, biome, i);
+      return;
+    }
+    if (biome.visualTheme === "arena") {
+      this.createArenaTilePanel(panelX, panelOffsetY, scale, biome, i);
+      return;
+    }
+    if (biome.visualTheme === "artisan") {
+      this.createArtisanTilePanel(panelX, panelOffsetY, scale, biome, i);
+      return;
+    }
+    if (biome.visualTheme === "mine") {
+      this.createMineTilePanel(panelX, panelOffsetY, scale, biome, i);
+      return;
+    }
+    if (biome.visualTheme === "harbour") {
+      this.createHarbourTilePanel(panelX, panelOffsetY, scale, biome, i);
+      return;
+    }
+    if (biome.visualTheme === "crossroads") {
+      this.createCrossroadsTilePanel(panelX, panelOffsetY, scale, biome, i);
+      return;
+    }
+    if (biome.visualTheme === "capital") {
+      this.createCapitalTilePanel(panelX, panelOffsetY, scale, biome, i);
+      return;
+    }
+
+    layerNames.forEach((name) => {
+      const layer = this.map.createLayer(name, phaserTilesets, panelX, 0);
+      if (!layer) return;
+
+      layer.setScale(scale);
+      layer.setY(panelOffsetY);
+      layer.setAlpha(name === "Shadows" ? 0.35 : 1);
+      layer.setDepth(name === "Shadows" ? 4 : 3);
+
+      if (name === "Water") {
+        layer.setAlpha(0.9);
+      }
+
+      this.backgroundLayer.add(layer);
+    });
+
+    if (this.objectLayer) {
+      this.renderMapObjects(this.objectLayer.objects, panelX, panelOffsetY, scale);
+    }
+  }
+
+  /**
+   * Lazily loads the background and label for stage index i (0-based)
+   */
+  private loadStageBiomeBackgroundAndLabel(i: number): void {
+    const biome = this.activeBiomeConfigs[i];
+    if (!biome) return;
+
+    const container = this.add.container(i * this.BIOME_WIDTH, 0);
+    this.biomeContainers.set(biome.id, container);
+    this.backgroundLayer.add(container);
+
+    // Draw biome background
+    this.drawBiomeBackground(container, biome);
+
+    // Add biome label
+    this.addBiomeLabel(container, biome);
+  }
+
+  /**
+   * Lazily loads stage-specific landmarks
+   */
+  private loadStageLandmarks(stageId: number): void {
+    if (this.currentTemplateId === "venture") {
+      if (stageId === 1) this.createVillageLandmarks(1);
+      else if (stageId === 2) this.createForestLandmarks(2);
+      else if (stageId === 3) this.createArenaLandmarks(3);
+      else if (stageId === 4) this.createArtisanLandmarks(4);
+      else if (stageId === 5) this.createMineLandmarks(5);
+      else if (stageId === 6) this.createHarbourLandmarks(6);
+      else if (stageId === 7) this.createCrossroadsLandmarks(7);
+      else if (stageId === 8) this.createCapitalLandmarks(8);
+      return;
+    }
+
+    // Custom templates: Academic, Lab, Creative maps mapped dynamically
+    const biome = this.activeBiomeConfigs[stageId - 1];
+    if (biome) {
+      const visualTheme = biome.visualTheme;
+      if (visualTheme === "village") {
+        this.createVillageLandmarks(stageId);
+      } else if (visualTheme === "forest") {
+        this.createForestLandmarks(stageId);
+      } else if (visualTheme === "arena") {
+        this.createArenaLandmarks(stageId);
+      } else if (visualTheme === "artisan") {
+        this.createArtisanLandmarks(stageId);
+      } else if (visualTheme === "mine") {
+        this.createMineLandmarks(stageId);
+      } else if (visualTheme === "harbour") {
+        this.createHarbourLandmarks(stageId);
+      } else if (visualTheme === "crossroads") {
+        this.createCrossroadsLandmarks(stageId);
+      } else if (visualTheme === "capital") {
+        this.createCapitalLandmarks(stageId);
+      }
+    }
+  }
+
+  /**
+   * Lazily creates the mini-boss for a specific stage if not already slain
+   */
+  private createMiniBossForStage(stageId: number): void {
+    if (this.slainMiniBossStages.has(stageId)) return;
+    const stage = this.activeStages.find((s) => s.id === stageId);
+    if (!stage) return;
+
+    // Place mini-boss at the end of each stage
+    let globalIndex = 0;
+    for (let s = 0; s < stage.id - 1; s++) {
+      globalIndex += this.activeStages[s].checkpoints;
+    }
+    globalIndex += stage.checkpoints - 1;
+
+    const pos = this.calculateSnakePosition(
+      globalIndex,
+      this.TOTAL_CHECKPOINTS,
+    );
+    const offsetX = 100;
+    const offsetY = -120;
+
+    const miniBoss = new MiniBoss(this, {
+      bossId: `mini_boss_${stage.id}`,
+      bossType: (stage.monsterName || "Fog of Vagueness") as MiniBossType,
+      stage: stage.id,
+      x: pos.x + offsetX,
+      y: pos.y + offsetY,
+    });
+
+    this.miniBosses.set(stage.id, miniBoss);
+    this.gameLayer.add(miniBoss);
+  }
+
+  /**
+   * Loads a stage dynamically (called on startup and as camera approaches)
+   */
+  private loadStage(stageId: number): void {
+    if (this.loadedStages.has(stageId)) return;
+    const i = stageId - 1;
+    if (i < 0 || i >= this.activeBiomeConfigs.length) return;
+
+    this.loadedStages.add(stageId);
+
+    // 1. Draw biome background and label
+    this.loadStageBiomeBackgroundAndLabel(i);
+
+    // 2. Load stage tile panel
+    this.loadStageTilePanel(i);
+
+    // 3. Load stage landmarks
+    this.loadStageLandmarks(stageId);
+
+    // 4. Create stage mini-boss
+    this.createMiniBossForStage(stageId);
+
+    // 5. Update the new mini-boss state if checkpoints have been loaded
+    if (this.latestCheckpointsState) {
+      this.updateMiniBossProgress(this.latestCheckpointsState);
+    }
+  }
+
+  /**
+   * Checks the camera scroll position and loads stages that are near the view
+   */
+  private checkBiomeLoading(): void {
+    const cam = this.cameras.main;
+    const camX = cam.scrollX + cam.width / 2;
+    const loadBuffer = 2000; // Load buffer zone around the camera center
 
     for (let i = 0; i < this.activeBiomeConfigs.length; i++) {
-      const biome = this.activeBiomeConfigs[i];
-      const panelX = i * this.BIOME_WIDTH + panelOffsetX;
-      if (biome.visualTheme === "forest") {
-        this.createForestTilePanel(panelX, panelOffsetY, scale, biome, i);
-        continue;
-      }
-      if (biome.visualTheme === "arena") {
-        this.createArenaTilePanel(panelX, panelOffsetY, scale, biome, i);
-        continue;
-      }
-      if (biome.visualTheme === "artisan") {
-        this.createArtisanTilePanel(panelX, panelOffsetY, scale, biome, i);
-        continue;
-      }
-      if (biome.visualTheme === "mine") {
-        this.createMineTilePanel(panelX, panelOffsetY, scale, biome, i);
-        continue;
-      }
-      if (biome.visualTheme === "harbour") {
-        this.createHarbourTilePanel(panelX, panelOffsetY, scale, biome, i);
-        continue;
-      }
-      if (biome.visualTheme === "crossroads") {
-        this.createCrossroadsTilePanel(panelX, panelOffsetY, scale, biome, i);
-        continue;
-      }
-      if (biome.visualTheme === "capital") {
-        this.createCapitalTilePanel(panelX, panelOffsetY, scale, biome, i);
+      const stageId = i + 1;
+      if (this.loadedStages.has(stageId)) {
         continue;
       }
 
-      layerNames.forEach((name) => {
-        const layer = this.map.createLayer(name, phaserTilesets, panelX, 0);
-        if (!layer) return;
+      const stageCenterX = i * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
+      const distance = Math.abs(camX - stageCenterX);
 
-        layer.setScale(scale);
-        layer.setY(panelOffsetY);
-        layer.setAlpha(name === "Shadows" ? 0.35 : 1);
-        layer.setDepth(name === "Shadows" ? 4 : 3);
-
-        if (name === "Water") {
-          layer.setAlpha(0.9);
-        }
-
-        this.backgroundLayer.add(layer);
-      });
-
-      if (objectLayer) {
-        this.renderMapObjects(objectLayer.objects, panelX, panelOffsetY, scale);
+      if (distance < loadBuffer) {
+        this.loadStage(stageId);
       }
     }
   }
@@ -865,6 +1035,11 @@ export class WorldMapScene extends Phaser.Scene {
     biome: BiomeConfig,
     biomeIndex: number,
   ): void {
+    if (this.currentTemplateId === "venture" && biome.id === 2) {
+      this.createVentureStageTwoForestPanel(panelX, panelOffsetY, scale);
+      return;
+    }
+
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
@@ -1357,6 +1532,288 @@ export class WorldMapScene extends Phaser.Scene {
         0.9,
       );
     });
+  }
+
+  private createVentureStageTwoForestPanel(
+    panelX: number,
+    panelOffsetY: number,
+    scale: number,
+  ): void {
+    const tileSize = 16 * scale;
+    const cols = this.map.width;
+    const rows = this.map.height;
+    const panelW = cols * tileSize;
+    const panelH = rows * tileSize;
+    const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
+    const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
+    const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
+    const dirtPatches: Array<{
+      cx: number;
+      cy: number;
+      rx: number;
+      ry: number;
+    }> = [
+      { cx: -1.8, cy: 4.2, rx: 4.8, ry: 6.2 },
+      { cx: 5.2, cy: 0.5, rx: 3.6, ry: 3.4 },
+      { cx: 16.5, cy: 0.2, rx: 3.2, ry: 2.9 },
+      { cx: 28.8, cy: 2.2, rx: 4.1, ry: 4.2 },
+      { cx: 39.2, cy: 7.4, rx: 3.7, ry: 4.8 },
+      { cx: 4.0, cy: 23.6, rx: 4.4, ry: 5.4 },
+      { cx: 13.2, cy: 29.0, rx: 2.4, ry: 3.6 },
+      { cx: 20.2, cy: 28.4, rx: 3.6, ry: 4.1 },
+      { cx: 28.2, cy: 24.0, rx: 3.5, ry: 3.8 },
+      { cx: 34.2, cy: 33.6, rx: 3.3, ry: 4.2 },
+      { cx: 5.0, cy: 38.5, rx: 5.0, ry: 3.2 },
+      { cx: 23.4, cy: 39.4, rx: 4.8, ry: 3.6 },
+    ];
+
+    const tileKey = (col: number, row: number) => `${col},${row}`;
+    const toX = (col: number) => panelX + col * tileSize;
+    const toY = (row: number) => panelOffsetY + row * tileSize;
+    const isInside = (col: number, row: number) =>
+      col >= 0 && col < cols && row >= 0 && row < rows;
+
+    const addFrameSprite = (
+      texture: string,
+      frame: number,
+      col: number,
+      row: number,
+      depth: number,
+      tint = 0xffffff,
+      alpha = 1,
+    ) => {
+      const tile = this.add.sprite(
+        toX(col) + tileSize / 2,
+        toY(row) + tileSize / 2,
+        texture,
+        frame,
+      );
+      tile.setOrigin(0.5);
+      tile.setScale(scale);
+      tile.setTint(tint);
+      tile.setAlpha(alpha);
+      tile.setDepth(depth);
+      this.backgroundLayer.add(tile);
+    };
+
+    const patchContains = (col: number, row: number) =>
+      dirtPatches.some((patch, index) => {
+        const dx = (col + 0.5 - patch.cx) / patch.rx;
+        const dy = (row + 0.5 - patch.cy) / patch.ry;
+        const roughEdge =
+          (((col * 37 + row * 19 + index * 23) % 17) - 8) * 0.018;
+        return dx * dx + dy * dy < 1 + roughEdge;
+      });
+
+    const ground = this.add.graphics();
+    ground.fillStyle(0xa4ef8c, 1);
+    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
+    ground.setDepth(1);
+    this.backgroundLayer.add(ground);
+
+    const dirtTiles = new Set<string>();
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        if (patchContains(col, row)) {
+          dirtTiles.add(tileKey(col, row));
+        }
+      }
+    }
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const key = tileKey(col, row);
+
+        if (dirtTiles.has(key)) {
+          addFrameSprite(
+            "sprout_grass_sheet",
+            grassFrames[(col * 5 + row * 3) % grassFrames.length],
+            col,
+            row,
+            2,
+            (col + row) % 4 === 0 ? 0xc4b0a4 : 0xbba89c,
+            0.96,
+          );
+          continue;
+        }
+
+        if ((col * 7 + row * 5) % 4 === 0) {
+          addFrameSprite(
+            "sprout_grass_sheet",
+            grassFrames[(col * 11 + row * 3) % grassFrames.length],
+            col,
+            row,
+            2,
+            (col + row) % 3 === 0 ? 0x8cdd7f : 0xffffff,
+            0.72,
+          );
+        }
+
+        if ((col * 13 + row * 17) % 11 === 0) {
+          addFrameSprite(
+            "sprout_grass_sheet",
+            grassAccentFrames[(col + row) % grassAccentFrames.length],
+            col,
+            row,
+            3,
+            0x77d983,
+            0.7,
+          );
+        }
+      }
+    }
+
+    const trail = [
+      { x: 1, y: 12 },
+      { x: 8, y: 12 },
+      { x: 8, y: 14 },
+      { x: 13, y: 14 },
+      { x: 13, y: 17 },
+      { x: 18, y: 17 },
+      { x: 18, y: 19 },
+      { x: 31, y: 19 },
+      { x: 31, y: 21 },
+      { x: 36, y: 21 },
+      { x: 36, y: 28 },
+      { x: 34, y: 28 },
+      { x: 34, y: 35 },
+      { x: 38, y: 35 },
+    ];
+
+    const pathTiles = new Set<string>();
+    trail.forEach(({ x, y }) => {
+      for (let oy = -2; oy <= 2; oy += 1) {
+        for (let ox = -2; ox <= 2; ox += 1) {
+          if (Math.abs(ox) + Math.abs(oy) <= 3 && isInside(x + ox, y + oy)) {
+            pathTiles.add(tileKey(x + ox, y + oy));
+          }
+        }
+      }
+    });
+
+    const pathShadow = this.add.graphics();
+    pathShadow.setDepth(4);
+    pathShadow.fillStyle(0x8e6c46, 0.24);
+
+    const pathBase = this.add.graphics();
+    pathBase.setDepth(5);
+    pathBase.fillStyle(0xe9c486, 1);
+
+    const pathInner = this.add.graphics();
+    pathInner.setDepth(5.2);
+    pathInner.fillStyle(0xf4d39a, 0.82);
+
+    const pathEdge = this.add.graphics();
+    pathEdge.setDepth(5.4);
+    pathEdge.fillStyle(0xcfab70, 0.7);
+
+    const drawSegment = (
+      start: { x: number; y: number },
+      end: { x: number; y: number },
+    ) => {
+      const startX = toX(start.x);
+      const startY = toY(start.y);
+      const endX = toX(end.x);
+      const endY = toY(end.y);
+      const horizontal = start.y === end.y;
+      const minX = Math.min(startX, endX);
+      const minY = Math.min(startY, endY);
+      const length = horizontal
+        ? Math.abs(endX - startX) + tileSize
+        : Math.abs(endY - startY) + tileSize;
+      const thickness = tileSize * 3.1;
+      const innerThickness = tileSize * 2.25;
+      const edgeThickness = tileSize * 3.55;
+
+      if (horizontal) {
+        const baseY = startY - tileSize * 1.05;
+        pathShadow.fillRoundedRect(minX + 8, baseY + 10, length, thickness, 16);
+        pathEdge.fillRoundedRect(minX, baseY, length, edgeThickness, 18);
+        pathBase.fillRoundedRect(
+          minX + tileSize * 0.12,
+          baseY + tileSize * 0.12,
+          length - tileSize * 0.24,
+          thickness - tileSize * 0.24,
+          16,
+        );
+        pathInner.fillRoundedRect(
+          minX + tileSize * 0.35,
+          baseY + tileSize * 0.35,
+          length - tileSize * 0.7,
+          innerThickness,
+          14,
+        );
+      } else {
+        const baseX = startX - tileSize * 1.05;
+        pathShadow.fillRoundedRect(baseX + 8, minY + 10, thickness, length, 16);
+        pathEdge.fillRoundedRect(baseX, minY, edgeThickness, length, 18);
+        pathBase.fillRoundedRect(
+          baseX + tileSize * 0.12,
+          minY + tileSize * 0.12,
+          thickness - tileSize * 0.24,
+          length - tileSize * 0.24,
+          16,
+        );
+        pathInner.fillRoundedRect(
+          baseX + tileSize * 0.35,
+          minY + tileSize * 0.35,
+          innerThickness,
+          length - tileSize * 0.7,
+          14,
+        );
+      }
+    };
+
+    for (let i = 0; i < trail.length - 1; i += 1) {
+      drawSegment(trail[i], trail[i + 1]);
+    }
+
+    trail.forEach(({ x, y }) => {
+      const cx = toX(x) + tileSize / 2;
+      const cy = toY(y) + tileSize / 2;
+      pathShadow.fillCircle(cx + 8, cy + 10, tileSize * 1.65);
+      pathEdge.fillCircle(cx, cy, tileSize * 1.78);
+      pathBase.fillCircle(cx, cy, tileSize * 1.56);
+      pathInner.fillCircle(cx, cy, tileSize * 1.12);
+    });
+
+    this.backgroundLayer.add(pathShadow);
+    this.backgroundLayer.add(pathEdge);
+    this.backgroundLayer.add(pathBase);
+    this.backgroundLayer.add(pathInner);
+
+    pathTiles.forEach((key) => {
+      const [col, row] = key.split(",").map(Number);
+      if ((col + row) % 3 !== 0) return;
+      addFrameSprite(
+        "sprout_paths_sheet",
+        pathFrames[(col + row * 3) % pathFrames.length],
+        col,
+        row,
+        5.6,
+        0xd7a55f,
+        0.12,
+      );
+    });
+
+    const pathSpeckles = this.add.graphics();
+    pathSpeckles.setDepth(5.8);
+    pathSpeckles.fillStyle(0xc48f55, 0.34);
+    pathTiles.forEach((key) => {
+      const [col, row] = key.split(",").map(Number);
+      if ((col * 5 + row * 7) % 9 !== 0) return;
+      pathSpeckles.fillCircle(
+        toX(col) + tileSize * 0.38,
+        toY(row) + tileSize * 0.42,
+        tileSize * 0.1,
+      );
+      pathSpeckles.fillCircle(
+        toX(col) + tileSize * 0.68,
+        toY(row) + tileSize * 0.62,
+        tileSize * 0.07,
+      );
+    });
+    this.backgroundLayer.add(pathSpeckles);
   }
 
   private createArenaTilePanel(
@@ -3682,17 +4139,7 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private createBiomeZones(): void {
-    this.activeBiomeConfigs.forEach((biome, index) => {
-      const container = this.add.container(index * this.BIOME_WIDTH, 0);
-      this.biomeContainers.set(biome.id, container);
-      this.backgroundLayer.add(container);
-
-      // Draw biome background
-      this.drawBiomeBackground(container, biome);
-
-      // Add biome label
-      this.addBiomeLabel(container, biome);
-    });
+    // Handled lazily per stage in loadStage
   }
 
   /**
@@ -3820,46 +4267,7 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private createBiomeLandmarks(): void {
-    if (this.currentTemplateId === "venture") {
-      this.createVillageLandmarks(1); // Stage 1: The Village ✅
-      this.createForestLandmarks(2); // Stage 2: The Forest ✅
-      this.createArenaLandmarks(3); // Stage 3: The Arena
-      this.createArtisanLandmarks(4); // Stage 4: The Artisan's Quarter
-      this.createMineLandmarks(5); // Stage 5: The Mine
-      this.createHarbourLandmarks(6); // Stage 6: The Harbour
-      this.createCrossroadsLandmarks(7); // Stage 7: The Crossroads Town
-      this.createCapitalLandmarks(8); // Stage 8: The Capital
-      return;
-    }
-
-    this.activeBiomeConfigs.forEach((biome) => {
-      switch (biome.visualTheme) {
-        case "forest":
-          this.createForestLandmarks(biome.id);
-          break;
-        case "arena":
-          this.createArenaLandmarks(biome.id);
-          break;
-        case "artisan":
-          this.createArtisanLandmarks(biome.id);
-          break;
-        case "mine":
-          this.createMineLandmarks(biome.id);
-          break;
-        case "harbour":
-          this.createHarbourLandmarks(biome.id);
-          break;
-        case "crossroads":
-          this.createCrossroadsLandmarks(biome.id);
-          break;
-        case "capital":
-          this.createCapitalLandmarks(biome.id);
-          break;
-        default:
-          this.createVillageLandmarks(biome.id);
-          break;
-      }
-    });
+    // Handled lazily per stage in loadStage
   }
 
   private getStageNodes(stageId: number): CheckpointNode[] {
@@ -4287,6 +4695,11 @@ export class WorldMapScene extends Phaser.Scene {
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
 
+    if (this.currentTemplateId === "venture" && stageId === 2) {
+      this.createVentureStageTwoForestLandmarks(nodes);
+      return;
+    }
+
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const centerX = (first.x + last.x) / 2;
@@ -4314,6 +4727,41 @@ export class WorldMapScene extends Phaser.Scene {
         node.y + 138,
         1.32,
         0.92,
+      );
+    });
+  }
+
+  private createVentureStageTwoForestLandmarks(
+    nodes: CheckpointNode[],
+  ): void {
+    const shrubFrames = [27, 28, 29, 30, 31, 32];
+
+    nodes.forEach((node, index) => {
+      const side = index % 2 === 0 ? -1 : 1;
+      this.addForestLandmarkSprite(
+        shrubFrames[index % shrubFrames.length],
+        node.x + side * 78,
+        node.y + 96,
+        1.16,
+        0.84,
+        14,
+      );
+    });
+
+    [
+      [nodes[0].x - 170, nodes[0].y - 34, 0, 1.22],
+      [nodes[1].x + 142, nodes[1].y + 112, 1, 1.18],
+      [nodes[2].x - 138, nodes[2].y - 88, 2, 1.16],
+      [nodes[3].x - 124, nodes[3].y + 124, 9, 1.12],
+      [nodes[nodes.length - 1].x - 170, nodes[nodes.length - 1].y + 88, 3, 1.18],
+    ].forEach(([x, y, frame, spriteScale]) => {
+      this.addForestLandmarkSprite(
+        frame as number,
+        x as number,
+        y as number,
+        spriteScale as number,
+        0.78,
+        13,
       );
     });
   }
@@ -5049,10 +5497,11 @@ export class WorldMapScene extends Phaser.Scene {
 
       // Strict per-stage path only: do NOT draw connectors to another stage.
       // Venture stages 3 and 4 use bespoke plaza layouts, so skip the generic
-      // wooden connector there. Stage 7 Crossroads does not need the wooden plank overlay.
+      // wooden connector there. Stage 2 draws a tile trail inside the forest
+      // panel. Stage 7 Crossroads does not need the wooden plank overlay.
       const shouldSkipGenericConnector =
         (this.currentTemplateId === "venture" &&
-          [1, 3, 4].includes(stage.id)) ||
+          [1, 2, 3, 4].includes(stage.id)) ||
         stage.id === 1 ||
         stage.id === 7;
       if (!shouldSkipGenericConnector && stagePositions.length > 1 && biome) {
@@ -5380,15 +5829,14 @@ export class WorldMapScene extends Phaser.Scene {
     }
 
     if (stageId === 2) {
-      // Keep all five Forest checkpoints inside the Stage 2 panel.
-      // Use conservative local anchors and clamp against the Forest panel's
-      // world-space right edge so nodes can never spill into Stage 3.
+      // Venture Stage 2 uses a compact forest trail matching the tile route
+      // drawn by createVentureStageTwoForestPanel().
       const forestAnchors = [
-        { x: 118, y: 504 },
-        { x: 206, y: 306 },
-        { x: 394, y: 300 },
-        { x: 506, y: 408 },
-        { x: 598, y: 526 },
+        { x: 88, y: 190 },
+        { x: 266, y: 296 },
+        { x: 466, y: 306 },
+        { x: 560, y: 432 },
+        { x: 574, y: 552 },
       ];
       const anchor =
         forestAnchors[Math.min(checkpointIndex, forestAnchors.length - 1)];
@@ -5552,32 +6000,7 @@ export class WorldMapScene extends Phaser.Scene {
    * Creates 8 mini-bosses, one for each stage
    */
   private createMiniBosses(): void {
-    this.activeStages.forEach((stage) => {
-      // Place mini-boss at the end of each stage
-      let globalIndex = 0;
-      for (let s = 0; s < stage.id - 1; s++) {
-        globalIndex += this.activeStages[s].checkpoints;
-      }
-      globalIndex += stage.checkpoints - 1;
-
-      const pos = this.calculateSnakePosition(
-        globalIndex,
-        this.TOTAL_CHECKPOINTS,
-      );
-      const offsetX = 100;
-      const offsetY = -120;
-
-      const miniBoss = new MiniBoss(this, {
-        bossId: `mini_boss_${stage.id}`,
-        bossType: (stage.monsterName || "Fog of Vagueness") as MiniBossType,
-        stage: stage.id,
-        x: pos.x + offsetX,
-        y: pos.y + offsetY,
-      });
-
-      this.miniBosses.set(stage.id, miniBoss);
-      this.gameLayer.add(miniBoss);
-    });
+    // Handled lazily per stage in loadStage
   }
 
   /**
@@ -5810,6 +6233,7 @@ export class WorldMapScene extends Phaser.Scene {
     checkpoints: CheckpointState[];
   }): void {
     const checkpoints = event.checkpoints;
+    this.latestCheckpointsState = checkpoints;
 
     // Update checkpoint nodes
     checkpoints.forEach((cp) => {
@@ -5896,13 +6320,13 @@ export class WorldMapScene extends Phaser.Scene {
         }
       });
       this.initializedBossTriggers = true;
+    }
 
-      // Make sure those bosses that are retreated start in the retreated visual state
-      for (const [stage, miniBoss] of this.miniBosses.entries()) {
-        if (this.retreatedStages.has(stage) && !this.slainMiniBossStages.has(stage)) {
-          if (miniBoss && miniBoss.active) {
-            miniBoss.retreat();
-          }
+    // Make sure those bosses that are retreated start in the retreated visual state (ran outside initializedBossTriggers so newly lazy-loaded bosses get their state)
+    for (const [stage, miniBoss] of this.miniBosses.entries()) {
+      if (this.retreatedStages.has(stage) && !this.slainMiniBossStages.has(stage)) {
+        if (miniBoss && miniBoss.active && miniBoss.status !== "retreated") {
+          miniBoss.retreat();
         }
       }
     }
@@ -6689,6 +7113,7 @@ export class WorldMapScene extends Phaser.Scene {
    * Update loop - handles parallax scrolling
    */
   update(): void {
+    this.checkBiomeLoading();
     this.emitTutorialPulsePosition();
 
     // Update accepted contributor companion sprites follow tracking

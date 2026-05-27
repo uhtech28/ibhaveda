@@ -17,6 +17,7 @@ interface Badge {
   secondaryColor?: string;
   tagline?: string;
   awardedAt?: number;
+  scoreEarned?: number;
 }
 
 interface BadgeAwardSequenceProps {
@@ -64,7 +65,7 @@ export function BadgeAwardSequence({
           : null
       }
       reason={badge?.tagline || badge?.description}
-      xpEarned={20}
+      scoreEarned={badge?.scoreEarned ?? 20}
       onClose={handleClose}
     />
   );

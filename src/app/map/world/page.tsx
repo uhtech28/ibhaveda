@@ -1065,6 +1065,7 @@ interface BadgePayload {
   tagline?: string;
   category?: string;
   awardedAt?: number;
+  scoreEarned?: number;
 }
 
 function MapPageInner() {
@@ -2392,6 +2393,7 @@ function MapPageInner() {
           secondaryColor: taskSecondaryColor,
           tagline: taskTagline,
           awardedAt: Date.now(),
+          scoreEarned: taskLevel === "t3" ? 35 : 20,
         },
       ]);
 
@@ -2654,6 +2656,7 @@ function MapPageInner() {
           secondaryColor: checkpointBadgeSecondary,
           tagline: levelBadgeDesc,
           awardedAt: Date.now(),
+          scoreEarned: levelBadgeRarity === "legendary" ? 50 : levelBadgeRarity === "rare" ? 20 : 10,
         },
       ]);
 
@@ -2723,6 +2726,7 @@ function MapPageInner() {
             secondaryColor: stageBadgeSecondary,
             tagline: stageBadgeDesc,
             awardedAt: Date.now(),
+            scoreEarned: stageBadgeRarity === "legendary" ? 100 : stageBadgeRarity === "rare" ? 50 : 25,
           },
         ]);
 

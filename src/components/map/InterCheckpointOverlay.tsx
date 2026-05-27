@@ -275,10 +275,10 @@ export function InterCheckpointOverlay({
         const victoryMsg = isBossCombat
           ? isLastCheckpointInStage
             ? isGoldCheckpoint
-              ? `⚔️ BOSS SLAIN!\n\nYou completed all tasks with gold mastery. The ${henchmanInfo.name} is destroyed for good!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} XP`
-              : `⚔️ BOSS DEFEATED!\n\nStage cleared — the ${henchmanInfo.name} retreats permanently from this stage!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} XP`
-            : `⚔️ BOSS RETREATS!\n\nYou forced the ${henchmanInfo.name} back to the stage boundary!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} XP`
-          : `Boss Defeated!\n\n✏️ Your Answer: "${answer}"\n\n🎯 AI Evaluation:\n• Relevance Score: ${relevance}%\n• Completion Standard: ${completeness}\n• Time Bonus: +${timeBonus} XP (${timeLeft}s remaining)`;
+              ? `⚔️ BOSS SLAIN!\n\nYou completed all tasks with gold mastery. The ${henchmanInfo.name} is destroyed for good!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} Score`
+              : `⚔️ BOSS DEFEATED!\n\nStage cleared — the ${henchmanInfo.name} retreats permanently from this stage!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} Score`
+            : `⚔️ BOSS RETREATS!\n\nYou forced the ${henchmanInfo.name} back to the stage boundary!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} Score`
+          : `Boss Defeated!\n\n✏️ Your Answer: "${answer}"\n\n🎯 AI Evaluation:\n• Relevance Score: ${relevance}%\n• Completion Standard: ${completeness}\n• Time Bonus: +${timeBonus} Score (${timeLeft}s remaining)`;
 
         setResultData({
           outcome: "victory",
@@ -688,8 +688,8 @@ export function InterCheckpointOverlay({
                     animate={{ scale: 1 }}
                     className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
                   >
-                    <span className="text-xs text-white/50">Experience</span>
-                    <span className="text-lg font-bold text-emerald-400 font-mono">+{resultData.xpEarned} XP</span>
+                    <span className="text-xs text-white/50">Score</span>
+                    <span className="text-lg font-bold text-emerald-400 font-mono">+{resultData.xpEarned} Score</span>
                   </motion.div>
                 )}
                 {resultData.corruptionReduction > 0 && (

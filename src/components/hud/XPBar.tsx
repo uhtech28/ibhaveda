@@ -259,7 +259,7 @@ const XPBarComponent = ({
         {/* XP Progress Bar */}
         <div className="flex-1 min-w-[120px] flex flex-col gap-1">
           <div className="flex items-center justify-between text-[7.5px] font-mono leading-none">
-            <span className="text-zinc-500 uppercase tracking-widest font-black">Progression (XP)</span>
+            <span className="text-zinc-500 uppercase tracking-widest font-black">Venture Progression</span>
             <span className="text-cyan-400 font-bold">{Math.round(percentage)}%</span>
           </div>
           <div className="relative h-2.5 w-full overflow-hidden rounded-full border border-white/5 bg-black/50 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
@@ -453,7 +453,7 @@ const XPBarComponent = ({
       <div className="flex flex-col gap-2">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-black leading-none">Experience</span>
+            <span className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-black leading-none">Progression</span>
             <span className="text-[10px] text-cyan-400/80 font-bold tabular-nums">{Math.round(percentage)}%</span>
           </div>
 
@@ -492,7 +492,7 @@ const XPBarComponent = ({
 
       <div className="mt-1 hidden min-w-[62px] flex-col items-end sm:flex">
         <div className="text-[12px] font-black tracking-tight text-white tabular-nums leading-none">{currentXP.toLocaleString()}</div>
-        <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-tighter mt-1">/ {maxXP.toLocaleString()} XP</div>
+        <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-tighter mt-1">/ {maxXP.toLocaleString()} Score</div>
       </div>
     </div>
   );

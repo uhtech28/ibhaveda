@@ -268,7 +268,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
         isOpen={!!activeAwardBadge}
         badge={activeAwardBadge}
         reason={activeAwardBadge?.description}
-        xpEarned={500}
+        scoreEarned={500}
         onClose={() => setBadgeQueue((q) => q.slice(1))}
       />
 
