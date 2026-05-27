@@ -73,6 +73,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
   readonly bossId: string;
   readonly bossType: MiniBossType;
   readonly stage: number;
+  public isRetreated = false;
 
   // ── Private state ─────────────────────────────────────────────────────────
 
@@ -500,6 +501,7 @@ export class MiniBoss extends Phaser.GameObjects.Container {
    */
   retreat(): void {
     if (!this.scene || !this.scene.tweens) return;
+    this.isRetreated = true;
 
     this.scene.tweens.killTweensOf([
       this,
@@ -638,113 +640,158 @@ export class MiniBoss extends Phaser.GameObjects.Container {
     const cx = 0; // center X
     const cy = 0; // center Y
 
-    // ── Swirling Mist Wisps (Layered for mystical depth) ───────────────────
-    // We mix deep indigo, cool slate grey, and wisps of pale sky blue to create
-    // a gorgeous, living nebula cloud instead of flat geometric circles.
-    
-    // Clear graphics before draw
     g.clear();
 
-    // 1. Deep Core Shadow (Obscuring void behind the fog)
-    g.fillStyle(0x111827, 0.95);
-    g.fillCircle(cx, cy + 20, 36);
+    // ── 1. Ghostly Cyan Aura / Back-glow ──────────────────────────────────
+    // Makes the specter stand out on any map background
+    g.fillStyle(0x06b6d4, 0.15);
+    g.fillCircle(cx, cy, 42);
+    g.fillCircle(cx - 15, cy + 20, 32);
+    g.fillCircle(cx + 15, cy + 20, 32);
 
-    // 2. Mystical Dark Purple Mist (Base atmosphere)
-    g.fillStyle(0x312e81, 0.5);
-    g.fillCircle(cx - 15, cy + 15, 30);
-    g.fillCircle(cx + 15, cy + 15, 30);
-    g.fillCircle(cx, cy + 35, 34);
+    // ── 2. Ethereal Spectral Shroud / Hood ────────────────────────────────
+    // Main deep indigo/purple ghost robes
+    g.fillStyle(0x1e1b4b, 0.95);
+    
+    // Draw the hooded head
+    g.beginPath();
+    g.moveTo(cx - 22, cy);
+    g.lineTo(cx + 22, cy);
+    g.lineTo(cx + 18, cy - 25);
+    g.lineTo(cx, cy - 36); // peak of hood
+    g.lineTo(cx - 18, cy - 25);
+    g.closePath();
+    g.fillPath();
 
-    // 3. Medium Slate Smoke Layers (Creates soft volume)
-    g.fillStyle(0x6b7280, 0.65);
-    g.fillCircle(cx - 28, cy + 20, 24);
-    g.fillCircle(cx + 28, cy + 20, 24);
-    g.fillCircle(cx, cy + 8, 28);
-    g.fillCircle(cx - 12, cy + 30, 26);
-    g.fillCircle(cx + 12, cy + 30, 26);
+    // Draw the flowing, wispy body trailing downwards
+    g.beginPath();
+    g.moveTo(cx - 22, cy);
+    g.lineTo(cx + 22, cy);
+    g.lineTo(cx + 26, cy + 30);
+    g.lineTo(cx + 12, cy + 56); // tail end right
+    g.lineTo(cx - 6, cy + 62);  // tail end left
+    g.lineTo(cx - 24, cy + 26);
+    g.closePath();
+    g.fillPath();
 
-    // 4. Soft Edge Wisps (Lighter gray with alpha layering for a fuzzy cloud look)
-    g.fillStyle(0x9ca3af, 0.4);
-    g.fillCircle(cx - 36, cy + 28, 18);
-    g.fillCircle(cx + 36, cy + 28, 18);
-    g.fillCircle(cx, cy + 46, 22);
-    g.fillCircle(cx - 20, cy + 8, 20);
-    g.fillCircle(cx + 20, cy + 8, 20);
+    // ── 3. Shading & Ethereal Cyan highlights on Robe ──────────────────────
+    // Gives definition and depth to the folds of the shroud
+    g.fillStyle(0x0891b2, 0.7);
+    g.beginPath();
+    g.moveTo(cx - 16, cy);
+    g.lineTo(cx, cy - 30);
+    g.lineTo(cx - 4, cy);
+    g.closePath();
+    g.fillPath();
 
-    // ── Dark Gaping Mouth of the Void ──────────────────────────────────────
-    g.fillStyle(0x030712, 1);
-    g.fillEllipse(cx, cy + 26, 26, 16);
-    // Inner gaping depth
+    g.beginPath();
+    g.moveTo(cx - 20, cy + 8);
+    g.lineTo(cx - 10, cy + 42);
+    g.lineTo(cx - 4, cy + 12);
+    g.closePath();
+    g.fillPath();
+
+    g.fillStyle(0x0e7490, 0.55);
+    g.beginPath();
+    g.moveTo(cx + 18, cy + 10);
+    g.lineTo(cx + 8, cy + 44);
+    g.lineTo(cx + 4, cy + 14);
+    g.closePath();
+    g.fillPath();
+
+    // ── 4. Ethereal Gaseous Tail (Bottom mist) ─────────────────────────────
+    // Layers of transparent cyan circles that represent floating ectoplasm
+    g.fillStyle(0x22d3ee, 0.35);
+    g.fillCircle(cx - 8, cy + 48, 14);
+    g.fillCircle(cx + 8, cy + 48, 12);
+    g.fillCircle(cx - 2, cy + 58, 9);
+
+    g.fillStyle(0x06b6d4, 0.2);
+    g.fillCircle(cx - 18, cy + 34, 10);
+    g.fillCircle(cx + 18, cy + 34, 10);
+
+    // ── 5. Hollow Shroud Shadow / Dark Face Void ───────────────────────────
+    g.fillStyle(0x020617, 1);
+    g.fillEllipse(cx, cy - 10, 18, 22);
+
+    // ── 6. Gaping Mouth of the Void ────────────────────────────────────────
     g.fillStyle(0x000000, 1);
-    g.fillEllipse(cx, cy + 28, 18, 10);
+    g.fillEllipse(cx, cy - 2, 8, 12);
 
-    // ── Floating Smoky Particles (Drifting upward) ─────────────────────────
-    const particleColors = [0x9ca3af, 0x6b7280, 0x4b5563];
-    for (let i = 0; i < 12; i++) {
-      const px = cx + Phaser.Math.Between(-35, 35);
-      const py = cy + Phaser.Math.Between(-10, 50);
-      const size = Phaser.Math.Between(3, 6);
-      g.fillStyle(particleColors[i % 3], 0.35);
+    // ── 7. Floating Ghostly Particles ──────────────────────────────────────
+    const particleColors = [0x22d3ee, 0x06b6d4, 0x3b82f6];
+    for (let i = 0; i < 14; i++) {
+      const px = cx + Phaser.Math.Between(-32, 32);
+      const py = cy + Phaser.Math.Between(-20, 50);
+      const size = Phaser.Math.Between(2, 5);
+      g.fillStyle(particleColors[i % 3], 0.25);
       g.fillCircle(px, py, size);
     }
 
-    // ── Highly Stylized Glowing Ember Eyes ────────────────────────────────
-    // We construct multi-layered glowing eyes: a wide soft orange aura with
-    // additive blend mode + a solid intense amber core + a bright white reflection.
-    
-    // Left Eye components
-    const eyeLeftX = cx - 11;
-    const eyeLeftY = cy + 10;
-    
-    // Left Eye Outer Soft Glow
-    const leftGlow = new Phaser.GameObjects.Arc(this.scene, eyeLeftX, eyeLeftY, 9, 0, 360, false, 0xf59e0b, 0.4);
+    // ── 8. Highly Stylized Glowing Ember Eyes (Amber glowing cores) ────────
+    // Matches "Fog of Vagueness" amber eyes look but with premium flares
+    const eyeLeftX = cx - 9;
+    const eyeLeftY = cy - 12;
+
+    // Left Eye Outer Glow
+    const leftGlow = new Phaser.GameObjects.Arc(this.scene, eyeLeftX, eyeLeftY, 9, 0, 360, false, 0xf59e0b, 0.45);
     leftGlow.setBlendMode(Phaser.BlendModes.ADD);
-    
+
     // Left Eye Core
     this.eyeLeft = new Phaser.GameObjects.Arc(this.scene, eyeLeftX, eyeLeftY, 5, 0, 360, false, 0xfbbf24, 1);
     this.eyeLeft.setStrokeStyle(2, 0xd97706, 1);
-    
+
     // Left Eye Glint
-    const leftGlint = new Phaser.GameObjects.Arc(this.scene, eyeLeftX - 1.5, eyeLeftY - 1.5, 1.5, 0, 360, false, 0xffffff, 0.9);
+    const leftGlint = new Phaser.GameObjects.Arc(this.scene, eyeLeftX - 1.5, eyeLeftY - 1.5, 1.5, 0, 360, false, 0xffffff, 0.95);
 
     // Right Eye components
-    const eyeRightX = cx + 11;
-    const eyeRightY = cy + 10;
-    
-    // Right Eye Outer Soft Glow
-    const rightGlow = new Phaser.GameObjects.Arc(this.scene, eyeRightX, eyeRightY, 9, 0, 360, false, 0xf59e0b, 0.4);
+    const eyeRightX = cx + 9;
+    const eyeRightY = cy - 12;
+
+    // Right Eye Outer Glow
+    const rightGlow = new Phaser.GameObjects.Arc(this.scene, eyeRightX, eyeRightY, 9, 0, 360, false, 0xf59e0b, 0.45);
     rightGlow.setBlendMode(Phaser.BlendModes.ADD);
-    
+
     // Right Eye Core
     this.eyeRight = new Phaser.GameObjects.Arc(this.scene, eyeRightX, eyeRightY, 5, 0, 360, false, 0xfbbf24, 1);
     this.eyeRight.setStrokeStyle(2, 0xd97706, 1);
-    
+
     // Right Eye Glint
-    const rightGlint = new Phaser.GameObjects.Arc(this.scene, eyeRightX - 1.5, eyeRightY - 1.5, 1.5, 0, 360, false, 0xffffff, 0.9);
+    const rightGlint = new Phaser.GameObjects.Arc(this.scene, eyeRightX - 1.5, eyeRightY - 1.5, 1.5, 0, 360, false, 0xffffff, 0.95);
 
     // Add extra glowing elements to container
     this.add([leftGlow, leftGlint, rightGlow, rightGlint]);
 
-    // ── Mystical Swirling & Floating Tweens ───────────────────────────────
+    // ── 9. Mystical Swirling & Floating Tweens ─────────────────────────────
     // Soft breathing + shifting of the cloud wisps
     this.scene.tweens.add({
       targets: g,
       scaleX: { from: 1.0, to: 1.06 },
       scaleY: { from: 1.0, to: 1.06 },
-      alpha: { from: 0.88, to: 1.0 },
+      alpha: { from: 0.9, to: 1.0 },
       duration: 2000,
       ease: "Sine.easeInOut",
       yoyo: true,
       repeat: -1,
     });
 
-    // Sinister, organic eye pulse & shimmer
+    // Eye pulse and shimmer
     this.scene.tweens.add({
       targets: [this.eyeLeft, this.eyeRight, leftGlow, rightGlow],
-      alpha: { from: 0.5, to: 1.0 },
-      scaleX: { from: 0.92, to: 1.15 },
-      scaleY: { from: 0.92, to: 1.15 },
-      duration: 1100,
+      alpha: { from: 0.45, to: 1.0 },
+      scaleX: { from: 0.95, to: 1.18 },
+      scaleY: { from: 0.95, to: 1.18 },
+      duration: 1200,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // Ethereal vertical hover floating animation (custom for ghost)
+    this.scene.tweens.add({
+      targets: this,
+      y: this.y - 12,
+      duration: 2500,
       ease: "Sine.easeInOut",
       yoyo: true,
       repeat: -1,

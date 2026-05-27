@@ -8,13 +8,13 @@ import {
 } from "@/lib/audio/audioManager";
 import { cn } from "@/lib/utils";
 import { BadgeCard, getNormalizedRarity, BadgeItem } from "./BadgeCard";
-import { Sparkles, Trophy, Plus, ShieldCheck } from "lucide-react";
+import { Sparkles, Trophy, Plus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AchievementUnlockModalProps {
   badge: BadgeItem | null;
   reason?: string;
-  xpEarned?: number;
+  scoreEarned?: number;
   isOpen: boolean;
   onClose: () => void;
   onViewBadge?: () => void;
@@ -68,7 +68,7 @@ const getMascotSpeech = (rarity: string, name: string): string => {
       "Boom! Task complete. Let's keep this fire burning! 🔥",
     ],
     default: [
-      "Incredible milestone unlocked! You're leveling up fast! 🎓",
+      "Incredible milestone unlocked! Project score boosted! 🚀",
       "Hooray! Another notch on your journey. You got this! 🌟",
       "Awesome achievement! The community is cheering you on! 👥",
     ],
@@ -89,7 +89,7 @@ const getMascotSpeech = (rarity: string, name: string): string => {
 export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
   badge,
   reason,
-  xpEarned = 20,
+  scoreEarned = 20,
   isOpen,
   onClose,
   onViewBadge,
@@ -97,13 +97,13 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
   const [activeStep, setActiveStep] = useState<
     "backdrop" | "silhouette" | "burst" | "show"
   >("backdrop");
-  const [xpDisplay, setXpDisplay] = useState(0);
+  const [scoreDisplay, setScoreDisplay] = useState(0);
   const [particles, setParticles] = useState<Particle[]>([]);
 
   useEffect(() => {
     if (isOpen && badge) {
       setActiveStep("backdrop");
-      setXpDisplay(0);
+      setScoreDisplay(0);
 
       // 1. Enter Silhouette: t=100ms (almost instant feedback)
       const silTimer = setTimeout(() => {
@@ -147,39 +147,39 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                     ? ["#A855F7", "#D946EF", "#F3E8FF", "#7E22CE", "#FBBF24"]
                     : ["#F43F5E", "#EC4899", "#818CF8", "#FFFFFF", "#FBBF24"]; // Mythic / default cosmic colors
 
-        // Generate 32 clean confetti particles for excellent visual weight without lagging
-        const generated: Particle[] = Array.from({ length: 32 }).map((_, i) => {
+        // Generate 36 clean confetti particles for excellent visual weight without lagging
+        const generated: Particle[] = Array.from({ length: 36 }).map((_, i) => {
           const angle = (Math.random() * 360 * Math.PI) / 180;
-          const velocity = 70 + Math.random() * 180;
+          const velocity = 80 + Math.random() * 220;
           const x = Math.cos(angle) * velocity;
-          const y = Math.sin(angle) * velocity - (20 + Math.random() * 60); // arc upwards
-          const size = Math.random() * 9 + 4;
-          const delay = Math.random() * 0.08;
-          const duration = Math.random() * 1.0 + 0.9;
+          const y = Math.sin(angle) * velocity - (30 + Math.random() * 80); // arc upwards
+          const size = Math.random() * 10 + 4;
+          const delay = Math.random() * 0.12;
+          const duration = Math.random() * 1.2 + 0.8;
           const rotate = Math.random() * 360 - 180;
           const color =
             particleColors[Math.floor(Math.random() * particleColors.length)];
           const shapeSeed = Math.random();
           const shape =
-            shapeSeed < 0.4 ? "circle" : shapeSeed < 0.8 ? "rect" : "sparkle";
+            shapeSeed < 0.35 ? "circle" : shapeSeed < 0.7 ? "rect" : "sparkle";
 
           return { id: i, x, y, size, delay, duration, rotate, color, shape };
         });
         setParticles(generated);
       }, 450);
 
-      // 3. Enter Show (text + XP countup + buttons): t=750ms
+      // 3. Enter Show (text + score countup + buttons): t=750ms
       const showTimer = setTimeout(() => {
         setActiveStep("show");
 
-        let currentXp = 0;
+        let currentScore = 0;
         const interval = setInterval(() => {
-          currentXp += Math.ceil(xpEarned / 8);
-          if (currentXp >= xpEarned) {
-            currentXp = xpEarned;
+          currentScore += Math.ceil(scoreEarned / 8);
+          if (currentScore >= scoreEarned) {
+            currentScore = scoreEarned;
             clearInterval(interval);
           }
-          setXpDisplay(currentXp);
+          setScoreDisplay(currentScore);
         }, 20);
       }, 750);
 
@@ -189,7 +189,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
         clearTimeout(showTimer);
       };
     }
-  }, [isOpen, badge, xpEarned]);
+  }, [isOpen, badge, scoreEarned]);
 
   if (!isOpen || !badge) return null;
 
@@ -211,7 +211,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 bg-slate-950/85 backdrop-blur-xl"
+          className="absolute inset-0 bg-slate-950/85 backdrop-blur-md"
           onClick={activeStep === "show" ? onClose : undefined}
         />
 
@@ -252,7 +252,9 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                     p.shape === "sparkle" ? `10px solid ${p.color}` : undefined,
                   top: "50%",
                   left: "50%",
-                  transform: "translate(-50%, -50%)",
+                  marginTop: -p.size / 2,
+                  marginLeft: -p.size / 2,
+                  willChange: "transform, opacity",
                 }}
               />
             ))}
@@ -267,18 +269,25 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
               {activeStep === "show" && (
                 <motion.div
                   key="header-announcement"
-                  initial={{ y: 50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
                   className="flex flex-col items-center"
                 >
-                  <span className="text-yellow-400 font-extrabold tracking-widest text-xs uppercase flex items-center gap-1.5 drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)] animate-pulse">
+                  <motion.span
+                    initial={{ letterSpacing: "0.1em", opacity: 0 }}
+                    animate={{ letterSpacing: "0.2em", opacity: 1 }}
+                    transition={{ duration: 0.5 }}
+                    className="text-yellow-400 font-extrabold text-xs uppercase flex items-center gap-1.5 drop-shadow-[0_2px_8px_rgba(234,179,8,0.25)] animate-pulse"
+                  >
                     <Trophy className="w-3.5 h-3.5" />
                     Achievement Unlocked
-                  </span>
-                  <h2 className="text-3xl font-black text-white mt-1 leading-tight tracking-tight">
+                  </motion.span>
+                  <motion.h2
+                    initial={{ scale: 0.9, opacity: 0, letterSpacing: "-0.05em" }}
+                    animate={{ scale: 1, opacity: 1, letterSpacing: "0.02em" }}
+                    transition={{ type: "spring", stiffness: 200, damping: 16, delay: 0.05 }}
+                    className="text-3xl sm:text-4xl font-black text-white mt-1 leading-tight tracking-tight drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                  >
                     CONGRATULATIONS!
-                  </h2>
+                  </motion.h2>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -306,6 +315,63 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
               }}
             />
 
+            {/* Cosmic Rotating Beams / Rays */}
+            {["burst", "show"].includes(activeStep) && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, rotate: 0 }}
+                animate={{ opacity: 0.28, scale: 1.15, rotate: 360 }}
+                transition={{
+                  opacity: { duration: 1 },
+                  scale: { duration: 1 },
+                  rotate: { repeat: Infinity, duration: 25, ease: "linear" }
+                }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] pointer-events-none z-0"
+                style={{
+                  background: `conic-gradient(from 0deg, transparent, ${badgeColor}40, transparent, ${badgeColor}10, transparent, ${badgeColor}40, transparent)`,
+                  borderRadius: "50%",
+                  willChange: "transform",
+                }}
+              />
+            )}
+
+            {/* Cosmic Rotating Beams (Counter-Rotating) */}
+            {["burst", "show"].includes(activeStep) && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, rotate: 360 }}
+                animate={{ opacity: 0.15, scale: 1.1, rotate: 0 }}
+                transition={{
+                  opacity: { duration: 1 },
+                  scale: { duration: 1 },
+                  rotate: { repeat: Infinity, duration: 35, ease: "linear" }
+                }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[380px] pointer-events-none z-0"
+                style={{
+                  background: `conic-gradient(from 0deg, transparent, ${badgeColor}30, transparent, ${badgeColor}05, transparent, ${badgeColor}30, transparent)`,
+                  borderRadius: "50%",
+                  willChange: "transform",
+                }}
+              />
+            )}
+
+            {/* Expanding Shockwave Ring */}
+            <AnimatePresence>
+              {(activeStep === "burst" || activeStep === "show") && (
+                <motion.div
+                  initial={{ scale: 0.35, opacity: 1, borderWidth: "6px" }}
+                  animate={{ scale: 2.2, opacity: 0, borderWidth: "0.5px" }}
+                  transition={{ duration: 0.85, ease: "easeOut" }}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none z-20"
+                  style={{
+                    width: "180px",
+                    height: "180px",
+                    borderColor: badgeColor,
+                    borderStyle: "solid",
+                    boxShadow: `0 0 40px ${badgeColor}`,
+                  }}
+                />
+              )}
+            </AnimatePresence>
+
             {/* Flash Effect during burst */}
             <AnimatePresence>
               {activeStep === "burst" && (
@@ -315,76 +381,168 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                   animate={{ scale: 2.8, opacity: [0, 1, 1, 0] }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="absolute w-40 h-40 rounded-full bg-white blur-xl mix-blend-screen z-20 pointer-events-none"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full bg-white blur-xl mix-blend-screen z-20 pointer-events-none"
                 />
               )}
             </AnimatePresence>
 
+
             {/* Same profile badge card used by the collection grid */}
             <motion.div
-              initial={{ scale: 0, rotateY: 180, z: -200 }}
+              key={badge.id}
+              initial={{ scale: 0, rotateY: -180, rotateX: 20, z: -200 }}
               animate={
                 activeStep === "silhouette"
                   ? {
-                      scale: 0.95,
-                      rotateY: 180,
-                      y: [0, -6, 0],
+                      scale: 0.9,
+                      rotateY: -180,
+                      rotateX: 12,
+                      y: [0, -8, 0],
                       z: 0,
                     }
                   : ["burst", "show"].includes(activeStep)
                     ? {
                         scale: 1,
                         rotateY: 0,
+                        rotateX: 0,
                         rotateZ: 0,
-                        y: 0,
+                        y: [0, -6, 0],
                         z: 0,
                       }
-                    : { scale: 0, rotateY: 180 }
+                    : { scale: 0, rotateY: -180 }
               }
+              whileHover={{
+                scale: 1.08,
+                rotateY: 8,
+                rotateX: 6,
+                transition: { duration: 0.25, ease: "easeOut" }
+              }}
               transition={
                 activeStep === "silhouette"
                   ? { 
-                      y: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                      scale: { duration: 0.3 }
+                      y: { repeat: Infinity, duration: 2.2, ease: "easeInOut" },
+                      scale: { duration: 0.4, ease: "easeOut" }
                     }
-                  : { 
-                      scale: { duration: 0.4, ease: "easeOut" },
-                      rotateY: { duration: 0.6, ease: "easeOut" },
-                      rotateZ: { duration: 0.4, ease: "easeOut" }
-                    }
+                  : ["burst"].includes(activeStep)
+                    ? { 
+                        scale: { type: "spring", stiffness: 140, damping: 11 },
+                        rotateY: { type: "spring", stiffness: 100, damping: 12 },
+                        rotateX: { type: "spring", stiffness: 100, damping: 12 },
+                        rotateZ: { type: "spring", stiffness: 100, damping: 12 },
+                      }
+                    : {
+                        y: { repeat: Infinity, duration: 2.8, ease: "easeInOut" }
+                      }
               }
-              className="relative z-10 h-64 w-52 sm:h-[17rem] sm:w-56"
+              className="relative z-10 h-64 w-52 sm:h-[17rem] sm:w-56 cursor-pointer"
               style={{
                 transformStyle: "preserve-3d",
                 filter: ["burst", "show"].includes(activeStep)
-                  ? `drop-shadow(0 0 34px ${badgeColor}65)`
+                  ? `drop-shadow(0 0 38px ${badgeColor}65)`
                   : undefined,
+                willChange: "transform, filter",
               }}
             >
-              <BadgeCard
-                badge={displayBadge}
-                state={activeStep === "silhouette" ? "locked" : "unlocked"}
-                className="pointer-events-none h-full w-full"
-              />
+              {/* Back Face (Mystery Card Back with glowing Lock) */}
+              <div 
+                className="absolute inset-0 rounded-2xl p-6 flex flex-col items-center justify-center border bg-slate-950/95 overflow-hidden select-none"
+                style={{
+                  borderColor: `${badgeColor}40`,
+                  boxShadow: `inset 0 0 20px rgba(0,0,0,0.85), 0 0 30px ${badgeColor}30`,
+                  backfaceVisibility: "hidden",
+                  WebkitBackfaceVisibility: "hidden",
+                  transform: "rotateY(180deg)",
+                }}
+              >
+                {/* Dynamic background pattern */}
+                <div className="absolute inset-0 opacity-15 pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-transparent to-rose-500/20" />
+                  <div className="absolute -inset-[50%] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent animate-pulse" />
+                </div>
 
-              {activeStep === "show" && isPremiumRarity && (
-                <>
+                {/* Corners */}
+                <div className="absolute top-3 left-3 w-4 h-4 border-t border-l rounded-tl" style={{ borderColor: badgeColor }} />
+                <div className="absolute top-3 right-3 w-4 h-4 border-t border-r rounded-tr" style={{ borderColor: badgeColor }} />
+                <div className="absolute bottom-3 left-3 w-4 h-4 border-b border-l rounded-bl" style={{ borderColor: badgeColor }} />
+                <div className="absolute bottom-3 right-3 w-4 h-4 border-b border-r rounded-br" style={{ borderColor: badgeColor }} />
+
+                {/* Center glowing lock symbol */}
+                <div className="relative flex items-center justify-center w-20 h-20 rounded-full border bg-black/40 shadow-inner"
+                  style={{ borderColor: `${badgeColor}30` }}
+                >
+                  <div 
+                    className="absolute inset-0 rounded-full blur-md opacity-40 animate-pulse"
+                    style={{ background: badgeColor }}
+                  />
                   <motion.div
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-                    transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }}
-                    className="absolute top-4 right-4 z-30 text-yellow-400"
+                    animate={{ scale: [1, 1.08, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+                    className="relative z-10"
                   >
-                    <Sparkles className="w-4 h-4" />
+                    <Lock className="w-8 h-8 text-white" style={{ filter: `drop-shadow(0 0 8px ${badgeColor})` }} />
                   </motion.div>
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-                    transition={{ repeat: Infinity, duration: 1.5, delay: 0.8 }}
-                    className="absolute bottom-4 left-4 z-30 text-cyan-400"
-                  >
-                    <Sparkles className="w-4.5 h-4.5" />
-                  </motion.div>
-                </>
-              )}
+                </div>
+
+                {/* Decorative text */}
+                <div className="mt-4 flex flex-col items-center">
+                  <span className="text-[9px] uppercase tracking-[0.3em] font-black text-white/40">Interactive</span>
+                  <span className="text-[7px] uppercase tracking-[0.4em] font-bold text-white/20 mt-1">Idea Milestone</span>
+                </div>
+              </div>
+
+              {/* Front Face (Unlocked Card Design) */}
+              <div 
+                className="absolute inset-0 h-full w-full"
+                style={{
+                  backfaceVisibility: "hidden",
+                  WebkitBackfaceVisibility: "hidden",
+                  transform: "rotateY(0deg)",
+                }}
+              >
+                <BadgeCard
+                  badge={displayBadge}
+                  state="unlocked"
+                  className="pointer-events-none h-full w-full"
+                  customScore={scoreEarned}
+                />
+
+                {/* Shine Sweep Overlay */}
+                {activeStep === "show" && (
+                  <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none z-30">
+                    <motion.div 
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "200%" }}
+                      transition={{
+                        repeat: Infinity,
+                        repeatDelay: 2.5,
+                        duration: 1.5,
+                        ease: "easeInOut",
+                        delay: 0.8
+                      }}
+                      className="absolute top-0 bottom-0 w-2/3 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12"
+                      style={{ willChange: "transform" }}
+                    />
+                  </div>
+                )}
+                {activeStep === "show" && isPremiumRarity && (
+                  <>
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                      transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }}
+                      className="absolute top-4 right-4 z-30 text-yellow-400"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </motion.div>
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                      transition={{ repeat: Infinity, duration: 1.5, delay: 0.8 }}
+                      className="absolute bottom-4 left-4 z-30 text-cyan-400"
+                    >
+                      <Sparkles className="w-4.5 h-4.5" />
+                    </motion.div>
+                  </>
+                )}
+              </div>
             </motion.div>
           </div>
 
@@ -399,73 +557,9 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
             </motion.p>
           )}
 
-          {/* Main Info Stage: Name, description, XP */}
+          {/* Main Info Stage: Score reward and Actions */}
           <div className="space-y-4 w-full">
-            {/* Badge Name */}
-            <div className="h-10 overflow-hidden">
-              <AnimatePresence>
-                {activeStep === "show" && (
-                  <motion.h3
-                    key="badge-name"
-                    initial={{ y: 30, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-                    className="text-2xl font-black tracking-tight"
-                    style={{ color: badgeColor }}
-                  >
-                    {badge.name}
-                  </motion.h3>
-                )}
-              </AnimatePresence>
-            </div>
 
-            {/* Description / Lore */}
-            <div className="h-16 overflow-hidden">
-              <AnimatePresence>
-                {activeStep === "show" && (
-                  <motion.div
-                    key="badge-description"
-                    initial={{ y: 30, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="flex flex-col items-center"
-                  >
-                    <p className="text-slate-200 text-sm font-medium max-w-sm">
-                      "{badge.tagline || badge.description}"
-                    </p>
-                    {reason && (
-                      <p className="text-slate-400 text-xs mt-1 bg-slate-900/40 px-3 py-1 rounded-full border border-white/5 flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        {reason}
-                      </p>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Reward Points Box (Dopamine counter) */}
-            <div className="h-16 flex justify-center items-center">
-              <AnimatePresence>
-                {activeStep === "show" && (
-                  <motion.div
-                    key="xp-box"
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.35, type: "spring", damping: 12 }}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-extrabold shadow-[0_4px_20px_rgba(234,179,8,0.1)]"
-                  >
-                    <Plus className="w-4 h-4 stroke-[3]" />
-                    <span className="text-2xl font-black tabular-nums">
-                      {xpDisplay}
-                    </span>
-                    <span className="text-sm font-extrabold tracking-widest uppercase">
-                      XP Earned
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
 
             {/* Actions Button Bar */}
             <div className="h-14 pt-2 flex items-center justify-center gap-3">
@@ -478,9 +572,9 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                     {onViewBadge && (
                       <motion.div
                         key="view-badge-btn"
-                        initial={{ x: -20, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        transition={{ delay: 0.5 }}
+                        initial={{ y: 25, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.3 }}
                       >
                         <Button
                           variant="outline"
@@ -497,9 +591,9 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
 
                     <motion.div
                       key="continue-quest-btn"
-                      initial={{ x: 20, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      transition={{ delay: 0.5 }}
+                      initial={{ y: 25, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.35 }}
                     >
                       <Button
                         onClick={onClose}

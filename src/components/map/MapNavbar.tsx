@@ -35,8 +35,6 @@ import type { TemplateId } from "@/config/templates";
 
 import {
   StageInfo as StandardStageInfo,
-  CheckpointProgress as StandardCheckpointProgress,
-  LevelDisplay as StandardLevelDisplay,
   XPBar as StandardXPBar,
 } from "@/components/hud";
 
@@ -258,29 +256,14 @@ export function MapNavbar() {
 
                 <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
 
-                <div className="shrink-0">
-                  <StandardCheckpointProgress
-                    completed={checkpointProgress.completed}
-                    total={checkpointProgress.total}
-                    goldCount={checkpointProgress.goldCount}
-                    compact={true}
-                    onClick={handleHUDClick}
-                  />
-                </div>
-
-                <div className="shrink-0">
-                  <StandardLevelDisplay
-                    score={userProgress.qualityScore}
-                    compact={true}
-                    onClick={handleHUDClick}
-                  />
-                </div>
-
-                <div className="shrink-0 hidden md:block">
+                <div className="min-w-0 flex-1 sm:w-[280px] md:w-[350px]">
                   <StandardXPBar
                     currentXP={userProgress.xp}
                     maxXP={userProgress.xpToNextLevel}
                     compact={true}
+                    bossHp={corruption.bossHp}
+                    bossBaseHp={corruption.bossBaseHp}
+                    bossName={corruption.bossName}
                   />
                 </div>
 

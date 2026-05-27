@@ -31,6 +31,7 @@ interface BadgeCardProps {
   onEquipToggle?: () => void;
   onClick?: () => void;
   className?: string;
+  customScore?: number;
 }
 
 // Map database/legacy rarities to the 6 premium tiers
@@ -216,7 +217,8 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
   isOwner = false,
   onEquipToggle,
   onClick,
-  className
+  className,
+  customScore
 }) => {
   const isLocked = state === "locked";
   const isEquipped = state === "equipped";
@@ -463,7 +465,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
                 variant="outline"
                 className="text-[9px] font-bold text-yellow-400 bg-yellow-500/10 border-yellow-500/20 px-2 py-0.5 rounded-full"
               >
-                +{norm.prestigeBonus} Prestige
+                +{customScore !== undefined ? customScore : norm.prestigeBonus} Score
               </Badge>
             )}
           </div>
@@ -511,7 +513,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-md shadow-sm mt-0.5">
               <Award className="w-3.5 h-3.5" />
-              +{norm.prestigeBonus} Prestige XP
+              +{customScore !== undefined ? customScore : norm.prestigeBonus} Score
             </span>
           </div>
         </div>

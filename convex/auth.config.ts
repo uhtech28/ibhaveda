@@ -5,6 +5,10 @@ export default {
       applicationID: "convex",
     },
     {
+      domain: "https://clerk.theinteractiveideas.com",
+      applicationID: "convex",
+    },
+    {
       domain: "https://clerk.uhtech.in",
       applicationID: "convex",
     },

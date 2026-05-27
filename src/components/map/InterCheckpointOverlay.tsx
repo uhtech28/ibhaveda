@@ -6,7 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { audioManager } from "@/lib/audio/audioManager";
-import { Shield, Gem, Trophy, Coins, Flame, Check, X, ArrowRight, ArrowLeft } from "lucide-react";
+import { Shield, Gem, Trophy, Coins, Flame, Check, X, ArrowRight, ArrowLeft, TrendingUp } from "lucide-react";
 
 interface InterCheckpointOverlayProps {
   isOpen: boolean;
@@ -154,6 +154,26 @@ export function InterCheckpointOverlay({
   const wallet = useQuery(api.gamification.getWallet);
   const walletBalance = wallet?.balance ?? 0;
 
+  // User profile and level progress
+  const currentUser = useQuery(api.users.getCurrentUser);
+  const userLevel = useQuery(
+    api.levels.getUserLevelProgress,
+    currentUser?._id ? { userId: currentUser._id } : "skip"
+  );
+  const userScore = userLevel?.totalPoints ?? 0;
+
+  // Venture/Project stage quality score
+  const stageQuality = useQuery(
+    api.aiScoring.getStageQualityScore,
+    ventureId
+      ? {
+          ventureId,
+          stageNumber: stage,
+        }
+      : "skip"
+  );
+  const projectScore = stageQuality?.totalScore ?? 0;
+
   const resolveHenchman = useMutation(api.interCheckpoint.resolveHenchmanEncounter);
   const collectTreasure = useMutation(api.interCheckpoint.collectTreasureChest);
   const collectShield = useMutation(api.interCheckpoint.collectCorruptionShield);
@@ -275,10 +295,10 @@ export function InterCheckpointOverlay({
         const victoryMsg = isBossCombat
           ? isLastCheckpointInStage
             ? isGoldCheckpoint
-              ? `⚔️ BOSS SLAIN!\n\nYou completed all tasks with gold mastery. The ${henchmanInfo.name} is destroyed for good!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} XP`
-              : `⚔️ BOSS DEFEATED!\n\nStage cleared — the ${henchmanInfo.name} retreats permanently from this stage!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} XP`
-            : `⚔️ BOSS RETREATS!\n\nYou forced the ${henchmanInfo.name} back to the stage boundary!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} XP`
-          : `Boss Defeated!\n\n✏️ Your Answer: "${answer}"\n\n🎯 AI Evaluation:\n• Relevance Score: ${relevance}%\n• Completion Standard: ${completeness}\n• Time Bonus: +${timeBonus} XP (${timeLeft}s remaining)`;
+              ? `⚔️ BOSS SLAIN!\n\nYou completed all tasks with gold mastery. The ${henchmanInfo.name} is destroyed for good!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} Score`
+              : `⚔️ BOSS DEFEATED!\n\nStage cleared — the ${henchmanInfo.name} retreats permanently from this stage!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} Score`
+            : `⚔️ BOSS RETREATS!\n\nYou forced the ${henchmanInfo.name} back to the stage boundary!\n\n✏️ Answer: "${answer}"\n\n🎯 Relevance: ${relevance}% • ${completeness} • Time Bonus: +${timeBonus} Score`
+          : `Boss Defeated!\n\n✏️ Your Answer: "${answer}"\n\n🎯 AI Evaluation:\n• Relevance Score: ${relevance}%\n• Completion Standard: ${completeness}\n• Time Bonus: +${timeBonus} Score (${timeLeft}s remaining)`;
 
         setResultData({
           outcome: "victory",
@@ -489,6 +509,23 @@ export function InterCheckpointOverlay({
                   <p className="text-sm text-gray-300 leading-relaxed mb-6">
                     {henchmanInfo.intro}
                   </p>
+
+                  {/* Combat Stats Panel */}
+                  <div className="grid grid-cols-3 gap-2.5 w-full mb-6">
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">User Score</span>
+                      <span className="text-xs font-black text-indigo-400 mt-0.5">{userScore} XP</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Project Score</span>
+                      <span className="text-xs font-black text-emerald-400 mt-0.5">{projectScore}/12</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Your Gold</span>
+                      <span className="text-xs font-black text-yellow-400 mt-0.5">{walletBalance}g</span>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-3 w-full">
                     <button
                       onClick={() => {
@@ -533,6 +570,22 @@ export function InterCheckpointOverlay({
                       transition={{ duration: 1, ease: "linear" }}
                       className={`h-full rounded-full transition-colors ${timeLeft <= 5 ? "bg-red-500 shadow-[0_0_8px_#ef4444]" : "bg-indigo-500"}`}
                     />
+                  </div>
+
+                  {/* Combat Stats Panel */}
+                  <div className="grid grid-cols-3 gap-2.5 w-full mb-4">
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">User Score</span>
+                      <span className="text-xs font-black text-indigo-400 mt-0.5">{userScore} XP</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Project Score</span>
+                      <span className="text-xs font-black text-emerald-400 mt-0.5">{projectScore}/12</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Your Gold</span>
+                      <span className="text-xs font-black text-yellow-400 mt-0.5">{walletBalance}g</span>
+                    </div>
                   </div>
 
                   {/* Question Box */}
@@ -688,8 +741,8 @@ export function InterCheckpointOverlay({
                     animate={{ scale: 1 }}
                     className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
                   >
-                    <span className="text-xs text-white/50">Experience</span>
-                    <span className="text-lg font-bold text-emerald-400 font-mono">+{resultData.xpEarned} XP</span>
+                    <span className="text-xs text-white/50">Score</span>
+                    <span className="text-lg font-bold text-emerald-400 font-mono">+{resultData.xpEarned} Score</span>
                   </motion.div>
                 )}
                 {resultData.corruptionReduction > 0 && (

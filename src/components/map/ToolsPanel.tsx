@@ -122,6 +122,9 @@ interface ToolsPanelProps {
   onOpenContributors?: () => void;
   onOpenContributions?: () => void;
   onOpenHierarchy?: () => void;
+  onOpenCalendar?: () => void;
+  onOpenKanban?: () => void;
+  onOpenJournal?: () => void;
 }
 
 export function ToolsPanel({
@@ -134,6 +137,9 @@ export function ToolsPanel({
   onOpenContributors,
   onOpenContributions,
   onOpenHierarchy,
+  onOpenCalendar,
+  onOpenKanban,
+  onOpenJournal,
 }: ToolsPanelProps) {
   const [stageInfo] = useAtom(stageInfoAtom);
   const [searchQuery, setSearchQuery] = useState("");
@@ -204,11 +210,6 @@ export function ToolsPanel({
 
   const displayedTabs = [
     allTabs.tools,
-    allTabs.calendar,
-    allTabs.kanban,
-    ...(["journal"].includes(activeTab)
-      ? [allTabs[activeTab as "journal"]]
-      : []),
     allTabs.settings,
     allTabs.help,
   ];
@@ -323,6 +324,9 @@ export function ToolsPanel({
                     onOpenContributors={onOpenContributors}
                     onOpenContributions={onOpenContributions}
                     onOpenHierarchy={onOpenHierarchy}
+                    onOpenCalendar={onOpenCalendar}
+                    onOpenKanban={onOpenKanban}
+                    onOpenJournal={onOpenJournal}
                   />
                 )}
 
@@ -404,6 +408,9 @@ function AllToolsGrid({
   onOpenContributors,
   onOpenContributions,
   onOpenHierarchy,
+  onOpenCalendar,
+  onOpenKanban,
+  onOpenJournal,
 }: {
   searchQuery: string;
   onToolSelect: (id: TabType) => void;
@@ -412,6 +419,9 @@ function AllToolsGrid({
   onOpenContributors?: () => void;
   onOpenContributions?: () => void;
   onOpenHierarchy?: () => void;
+  onOpenCalendar?: () => void;
+  onOpenKanban?: () => void;
+  onOpenJournal?: () => void;
 }) {
   const router = useRouter();
   const venture = useQuery(
@@ -496,6 +506,12 @@ function AllToolsGrid({
               onOpenContributions();
             } else if (tool.id === "hierarchy" && onOpenHierarchy) {
               onOpenHierarchy();
+            } else if (tool.id === "calendar" && onOpenCalendar) {
+              onOpenCalendar();
+            } else if (tool.id === "kanban" && onOpenKanban) {
+              onOpenKanban();
+            } else if (tool.id === "journal" && onOpenJournal) {
+              onOpenJournal();
             } else if (tool.isExternal && activeVentureId) {
               window.open(`/venture/${activeVentureId}/${(tool as any).path}`, "_blank");
             } else {

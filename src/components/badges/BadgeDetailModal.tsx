@@ -149,7 +149,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
                 </span>
                 <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-400">
                   <Award className="w-3.5 h-3.5" />
-                  +{norm.prestigeBonus} Prestige XP
+                  +{norm.prestigeBonus} Score
                 </span>
               </div>
             </div>
