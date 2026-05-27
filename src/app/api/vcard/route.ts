@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const VCARD = `BEGIN:VCARD
 VERSION:3.0
+N:Awasthi;Aryan;;;
 FN:Aryan Awasthi
 ORG:Ibhaveda
 TITLE:Founder
