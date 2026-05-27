@@ -163,8 +163,8 @@ export function buildFarewellEmail(
           <!-- Logo — update src if your path differs from /logo.png -->
           <tr>
             <td align="center" style="padding-bottom:28px;">
-              <a href="https://theinteractiveideas.com" style="text-decoration:none;display:block;">
-                <img src="https://theinteractiveideas.com/logo.png"
+              <a href="https://ibhaveda.com" style="text-decoration:none;display:block;">
+                <img src="https://ibhaveda.com/logo.png"
                      alt="Interactive Ideas"
                      width="210"
                      style="display:block;margin:0 auto;height:auto;border:0;max-width:210px;"
@@ -223,7 +223,7 @@ export function buildFarewellEmail(
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
                 <tr>
                   <td align="center">
-                    <a href="https://theinteractiveideas.com"
+                    <a href="https://ibhaveda.com"
                        style="display:inline-block;background:linear-gradient(135deg,#7C3AED,#5b21b6);color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:16px 44px;border-radius:10px;letter-spacing:0.3px;line-height:1;">
                       Take me back &rarr;
                     </a>
@@ -248,7 +248,7 @@ export function buildFarewellEmail(
               </p>
               <p style="margin:6px 0 0;color:#4a4568;font-size:12px;">
                 &copy; 2025 Interactive Ideas &middot;
-                <a href="https://theinteractiveideas.com" style="color:#7C3AED;text-decoration:none;">Visit Platform</a>
+                <a href="https://ibhaveda.com" style="color:#7C3AED;text-decoration:none;">Visit Platform</a>
               </p>
             </td>
           </tr>
@@ -306,8 +306,8 @@ export function buildReengagementEmail(
           <!-- Logo — update src if your path differs from /logo.png -->
           <tr>
             <td align="center" style="padding-bottom:28px;">
-              <a href="https://theinteractiveideas.com" style="text-decoration:none;display:block;">
-                <img src="https://theinteractiveideas.com/logo.png"
+              <a href="https://ibhaveda.com" style="text-decoration:none;display:block;">
+                <img src="https://ibhaveda.com/logo.png"
                      alt="Interactive Ideas"
                      width="210"
                      style="display:block;margin:0 auto;height:auto;border:0;max-width:210px;"
@@ -352,7 +352,7 @@ export function buildReengagementEmail(
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td align="center">
-                    <a href="https://theinteractiveideas.com"
+                    <a href="https://ibhaveda.com"
                        style="display:inline-block;background:linear-gradient(135deg,#7C3AED,#5b21b6);color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:16px 44px;border-radius:10px;letter-spacing:0.3px;line-height:1;">
                       Come Back to Interactive Ideas &rarr;
                     </a>
@@ -371,7 +371,7 @@ export function buildReengagementEmail(
               </p>
               <p style="margin:6px 0 0;color:#4a4568;font-size:12px;">
                 &copy; 2025 Interactive Ideas &middot;
-                <a href="https://theinteractiveideas.com" style="color:#7C3AED;text-decoration:none;">Visit Platform</a>
+                <a href="https://ibhaveda.com" style="color:#7C3AED;text-decoration:none;">Visit Platform</a>
               </p>
             </td>
           </tr>

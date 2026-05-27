@@ -21,7 +21,7 @@ export const sendEmail = internalAction({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "aryan@theinteractiveideas.com",
+        from: "aryan@ibhaveda.com",
         to,
         subject,
         html,

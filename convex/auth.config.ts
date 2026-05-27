@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://clerk.theinteractiveideas.com",
+      domain: "https://clerk.ibhaveda.com",
       applicationID: "convex",
     },
     {
