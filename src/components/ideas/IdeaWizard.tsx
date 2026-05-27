@@ -5,7 +5,13 @@ import { useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,11 +22,69 @@ import CardUpload from "@/components/card-upload";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import { Sparkles, ArrowLeft, AlertCircle, Globe, Lock } from "lucide-react";
-import { displayFontClass, transitionBase } from "@/components/ideaforge/shared";
+import {
+  Sparkles,
+  ArrowLeft,
+  AlertCircle,
+  Globe,
+  Lock,
+  ChevronRight,
+  Rocket,
+  Palette,
+  FlaskConical,
+  Microscope,
+  type LucideIcon,
+} from "lucide-react";
+import { displayFontClass } from "@/components/ideaforge/shared";
 import { audioManager } from "@/lib/audio/audioManager";
+import { type TemplateId } from "@/config/templates";
 
-type Step = "outline" | "generating" | "preview";
+// ─── Template display metadata ─────────────────────────────────────────────
+
+type TemplateDef = {
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  color: string;
+  accent: string;
+};
+
+const TEMPLATE_DEFS: Record<TemplateId, TemplateDef> = {
+  venture: {
+    icon: Rocket,
+    title: "Business Venture",
+    subtitle: "Valuation score",
+    color: "#818cf8",
+    accent: "rgba(129,140,248,0.12)",
+  },
+  creative: {
+    icon: Palette,
+    title: "Creative Project",
+    subtitle: "Fan score",
+    color: "#fbbf24",
+    accent: "rgba(251,191,36,0.12)",
+  },
+  academic: {
+    icon: Microscope,
+    title: "Research Project",
+    subtitle: "JIF score",
+    color: "#d4a853",
+    accent: "rgba(212,168,83,0.12)",
+  },
+  lab: {
+    icon: FlaskConical,
+    title: "Lab Experiment",
+    subtitle: "p-value",
+    color: "#34d399",
+    accent: "rgba(52,211,153,0.12)",
+  },
+};
+
+const TEMPLATE_ORDER: TemplateId[] = ["venture", "creative", "academic", "lab"];
+
+// ─── Types ─────────────────────────────────────────────────────────────────
+
+type Step = "template" | "outline" | "generating" | "preview";
 type Visibility = "public" | "private";
 
 interface IdeaWizardProps {
@@ -37,21 +101,31 @@ interface IdeaWizardProps {
   };
 }
 
-export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardProps) {
+// ─── Component ─────────────────────────────────────────────────────────────
+
+export function IdeaWizard({
+  isOpen,
+  onOpenChange,
+  initialDraft,
+}: IdeaWizardProps) {
   const router = useRouter();
   const { toast } = useToast();
 
   const generateFromOutline = useAction(api.ai.generateIdeaFromOutline);
   const createIdea = useMutation(api.ideas.createIdea);
+  const createVenture = useMutation(api.ventures.createVenture);
   const generateUploadUrl = useMutation(api.ideas.generateUploadUrl);
   const attachFileToIdea = useMutation(api.ideas.attachFileToIdea);
 
-  const [step, setStep] = useState<Step>("outline");
+  // ── Step & template state ──
+  const [step, setStep] = useState<Step>("template");
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<TemplateId>("venture");
 
-  // Step 1
+  // ── Step 2: outline ──
   const [outline, setOutline] = useState("");
 
-  // Step 3 — form fields, pre-filled in step 2
+  // ── Step 4: form fields ──
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [industries, setIndustries] = useState<string[]>([]);
@@ -64,8 +138,10 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
   const [aiHadError, setAiHadError] = useState(false);
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
 
+  // ── Helpers ──
   const reset = () => {
-    setStep("outline");
+    setStep("template");
+    setSelectedTemplate("venture");
     setOutline("");
     setTitle("");
     setDescription("");
@@ -84,7 +160,7 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
     setTimeout(reset, 300);
   };
 
-  // Populate/reset fields based on isOpen and initialDraft
+  // Populate fields from initialDraft (skips template + outline steps)
   useEffect(() => {
     if (isOpen) {
       if (initialDraft && Object.keys(initialDraft).length > 0) {
@@ -92,7 +168,6 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
         setDescription(initialDraft.description || "");
         setVisibility(initialDraft.visibility || "public");
 
-        // Map skills/tags
         let mappedSkills: string[] = [];
         if (initialDraft.skills && initialDraft.skills.length > 0) {
           mappedSkills = initialDraft.skills;
@@ -101,22 +176,24 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
         } else if (initialDraft.category) {
           try {
             const parsed = JSON.parse(initialDraft.category);
-            mappedSkills = Array.isArray(parsed) ? parsed : [initialDraft.category];
+            mappedSkills = Array.isArray(parsed)
+              ? parsed
+              : [initialDraft.category];
           } catch {
             mappedSkills = [initialDraft.category];
           }
         }
         setSkills(mappedSkills);
 
-        // Map industries
         let mappedIndustries: string[] = [];
         if (initialDraft.industries && initialDraft.industries.length > 0) {
           mappedIndustries = initialDraft.industries;
         } else if (initialDraft.industries) {
-          // If it's a stringified JSON array
           try {
             const parsed = JSON.parse(initialDraft.industries as any);
-            mappedIndustries = Array.isArray(parsed) ? parsed : [initialDraft.industries as any];
+            mappedIndustries = Array.isArray(parsed)
+              ? parsed
+              : [initialDraft.industries as any];
           } catch {
             mappedIndustries = [initialDraft.industries as any];
           }
@@ -130,22 +207,15 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
     }
   }, [isOpen, initialDraft]);
 
+  // ── AI handlers ──
   const handleGenerate = async () => {
     if (!outline.trim()) return;
     setAiHadError(false);
     setStep("generating");
     try {
       const result = await generateFromOutline({ outline: outline.trim() });
-      
-      // Log what AI returned for debugging
-      console.log("AI generated result:", result);
-      
-      // Always preserve user's typed outline exactly as the description
       setDescription(outline.trim());
-      
-      // Ensure we have at least a title
-      if (!result.title || !result.title.trim()) {
-        console.warn("AI returned empty title, using fallback");
+      if (!result.title?.trim()) {
         setAiHadError(true);
         setTitle("");
         setIndustries(result.industries || []);
@@ -157,10 +227,8 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
         setSkills(result.skills || []);
         setVisibility(result.visibility);
       }
-      
       setStep("preview");
-    } catch (err) {
-      console.error("AI generation failed:", err);
+    } catch {
       setAiHadError(true);
       setTitle("");
       setDescription(outline.trim());
@@ -176,25 +244,45 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
     setStep("preview");
   };
 
-  // Auto-generate tags when title and description are filled (only if user skipped AI)
+  // Auto-generate tags when AI had an error
   useEffect(() => {
     const generateTags = async () => {
-      if (step === "preview" && title.trim() && description.trim() && industries.length === 0 && skills.length === 0 && !isGeneratingTags && aiHadError) {
+      if (
+        step === "preview" &&
+        title.trim() &&
+        description.trim() &&
+        industries.length === 0 &&
+        skills.length === 0 &&
+        !isGeneratingTags &&
+        aiHadError
+      ) {
         setIsGeneratingTags(true);
         try {
-          const result = await generateFromOutline({ outline: `${title}\n\n${description}` });
+          const result = await generateFromOutline({
+            outline: `${title}\n\n${description}`,
+          });
           setIndustries(result.industries);
           setSkills(result.skills);
-        } catch (err) {
-          console.error("Tag generation failed:", err);
+        } catch {
+          // silently ignore
         } finally {
           setIsGeneratingTags(false);
         }
       }
     };
     generateTags();
-  }, [step, title, description, industries.length, skills.length, isGeneratingTags, aiHadError, generateFromOutline]);
+  }, [
+    step,
+    title,
+    description,
+    industries.length,
+    skills.length,
+    isGeneratingTags,
+    aiHadError,
+    generateFromOutline,
+  ]);
 
+  // ── Submit ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError("");
@@ -209,22 +297,38 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
 
     setIsSubmitting(true);
     try {
+      // 1. Create the idea
       const res = await createIdea({
         title: title.trim(),
         description: description.trim(),
         category: skills.length > 0 ? JSON.stringify(skills) : "",
-        industries: industries.length > 0 ? JSON.stringify(industries) : undefined,
+        industries:
+          industries.length > 0 ? JSON.stringify(industries) : undefined,
         visibility,
       });
       const newIdeaId = res.ideaId as Id<"ideas">;
 
+      // 2. Create venture with selected template
+      const ventureId = await createVenture({
+        ideaId: newIdeaId,
+        templateId: selectedTemplate,
+        skills,
+        industries,
+      });
+
+      // 3. Handle attachment upload
       if (files.length > 0) {
         const file = files[0];
         try {
           const { uploadUrl } = await generateUploadUrl({});
-          const uploadResp = await fetch(uploadUrl, { method: "POST", body: file });
+          const uploadResp = await fetch(uploadUrl, {
+            method: "POST",
+            body: file,
+          });
           if (uploadResp.ok) {
-            const { storageId } = (await uploadResp.json()) as { storageId?: string };
+            const { storageId } = (await uploadResp.json()) as {
+              storageId?: string;
+            };
             if (storageId) {
               await attachFileToIdea({
                 ideaId: newIdeaId,
@@ -236,8 +340,7 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
               });
             }
           }
-        } catch (uploadErr) {
-          console.error("File upload failed:", uploadErr);
+        } catch {
           toast({
             title: "Idea posted, attachment upload failed",
             description: "You can edit the idea to attach a file later.",
@@ -250,32 +353,167 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
         title: visibility === "public" ? "Idea posted!" : "Saved as private",
         description:
           visibility === "public"
-            ? "Loading your venture game map..."
+            ? "Loading your world map…"
             : "Only you can see it — toggle to Public any time.",
       });
       close();
-      router.push(`/map?ideaId=${newIdeaId}`);
+      router.push(`/map/world?ventureId=${ventureId}`);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to post idea.");
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to post idea.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // ── Derived (used in outline + preview badge) ──
+  const activeDef = TEMPLATE_DEFS[selectedTemplate];
+
+  // ───────────────────────────────────────────────────────────────────────────
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className={cn(
-        "w-[min(100%-2rem,600px)] max-w-[600px] gap-0 flex flex-col rounded-[16px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] transition-all duration-300 ease-in-out overflow-hidden h-auto max-h-[95vh]"
-      )}>
-        {/* Step 1 — Outline */}
+      <DialogContent
+        className={cn(
+          "w-[min(100%-2rem,600px)] max-w-[600px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[95vh]",
+        )}
+      >
+        {/* ── STEP 0: Template selector ───────────────────────────────────── */}
+        {step === "template" && (
+          <>
+            <DialogHeader className="border-b border-white/5 px-5 pt-5 pb-4 text-left bg-[#0A0E1A] shrink-0">
+              <DialogTitle
+                className={cn(
+                  displayFontClass,
+                  "text-base font-semibold text-white",
+                )}
+              >
+                What are you working on?
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[#6B7280] mt-0.5">
+                Pick a path — this shapes your world map.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="px-4 py-3 grid grid-cols-2 gap-2">
+              {TEMPLATE_ORDER.map((templateId) => {
+                const def = TEMPLATE_DEFS[templateId];
+                const isSelected = selectedTemplate === templateId;
+                return (
+                  <button
+                    key={templateId}
+                    type="button"
+                    onClick={() => {
+                      audioManager.playTouch("click");
+                      setSelectedTemplate(templateId);
+                    }}
+                    className={cn(
+                      "relative flex flex-col gap-2 rounded-xl border px-3 py-3 text-left transition-all duration-200",
+                      isSelected
+                        ? "border-white/20 bg-white/[0.06] shadow-[0_0_16px_rgba(0,0,0,0.4)]"
+                        : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10",
+                    )}
+                    style={isSelected ? { boxShadow: `0 0 0 1px ${def.color}33, 0 4px 20px ${def.color}1a` } : {}}
+                  >
+                    {/* Selected dot */}
+                    {isSelected && (
+                      <span
+                        className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full"
+                        style={{ background: def.color, boxShadow: `0 0 6px ${def.color}` }}
+                      />
+                    )}
+
+                    {/* Outline icon badge */}
+                    <span
+                      className="inline-flex items-center justify-center h-9 w-9 rounded-lg transition-all duration-200"
+                      style={{
+                        background: isSelected ? `${def.color}20` : `${def.color}10`,
+                        border: `1.5px solid ${def.color}${isSelected ? "55" : "30"}`,
+                        boxShadow: isSelected ? `0 0 12px ${def.color}30` : "none",
+                      }}
+                    >
+                      <def.icon
+                        strokeWidth={1.5}
+                        style={{ color: def.color, width: 18, height: 18 }}
+                      />
+                    </span>
+
+                    <span className="text-[13px] font-semibold text-white leading-tight">
+                      {def.title}
+                    </span>
+
+                    <span
+                      className="text-[11px] font-medium"
+                      style={{ color: def.color }}
+                    >
+                      {def.subtitle}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-4 py-3 bg-[#0A0E1A] shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  audioManager.playTouch("click");
+                  close();
+                }}
+                className="text-sm text-[#6B7280] hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <Button
+                type="button"
+                onClick={() => {
+                  audioManager.playTouch("confirm");
+                  setStep("outline");
+                }}
+                className="h-8 rounded-lg bg-[#6366F1] hover:bg-[#5254cc] px-4 text-sm font-medium text-white flex items-center gap-1.5"
+              >
+                Continue
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* ── STEP 1: Outline ─────────────────────────────────────────────── */}
         {step === "outline" && (
           <>
             <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
               <div className="flex items-center gap-2.5">
                 <Sparkles className="h-5 w-5 text-[#8B5CF6] animate-pulse" />
-                <DialogTitle className={cn(displayFontClass, "text-lg font-semibold text-white")}>
+                <DialogTitle
+                  className={cn(
+                    displayFontClass,
+                    "text-lg font-semibold text-white",
+                  )}
+                >
                   Describe your idea
                 </DialogTitle>
+              </div>
+              {/* Template badge */}
+              <div className="mt-1.5 flex items-center gap-2">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    borderColor: `${activeDef.color}50`,
+                    color: activeDef.color,
+                    background: `${activeDef.color}15`,
+                  }}
+                >
+                  <activeDef.icon strokeWidth={1.5} style={{ width: 10, height: 10 }} />
+                  {activeDef.title}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStep("template")}
+                  className="text-[10px] text-[#6B7280] hover:text-white transition-colors underline underline-offset-2"
+                >
+                  change
+                </button>
               </div>
               <DialogDescription className="text-xs text-[#9CA3AF] mt-1">
                 Briefly describe your idea. AI will generate the full form.
@@ -299,16 +537,28 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3 bg-[#0D1117] shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  audioManager.playTouch("click");
-                  handleSkipAI();
-                }}
-                className="text-xs font-medium text-[#C7D2FE] hover:text-white transition-colors"
-              >
-                Skip AI, fill manually →
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    audioManager.playTouch("click");
+                    setStep("template");
+                  }}
+                  className="text-xs text-[#9CA3AF] hover:text-white transition-colors flex items-center gap-1"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    audioManager.playTouch("click");
+                    handleSkipAI();
+                  }}
+                  className="text-xs font-medium text-[#C7D2FE] hover:text-white transition-colors"
+                >
+                  Skip AI, fill manually →
+                </button>
+              </div>
               <div className="flex gap-2.5">
                 <Button
                   type="button"
@@ -324,7 +574,9 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                 <Button
                   type="button"
                   onClick={() => {
-                    audioManager.playTouch(outline.trim() ? "confirm" : "error");
+                    audioManager.playTouch(
+                      outline.trim() ? "confirm" : "error",
+                    );
                     if (outline.trim()) handleGenerate();
                   }}
                   disabled={!outline.trim()}
@@ -338,45 +590,76 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
           </>
         )}
 
-        {/* Step 2 — Generating */}
+        {/* ── STEP 2: Generating ──────────────────────────────────────────── */}
         {step === "generating" && (
           <>
             <DialogHeader className="sr-only">
               <DialogTitle>Generating</DialogTitle>
-              <DialogDescription>AI is drafting your idea form.</DialogDescription>
+              <DialogDescription>
+                AI is drafting your idea form.
+              </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center bg-[#0D1117]">
+            <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center bg-[#0D1117] min-h-[260px]">
               <div className="relative">
                 <div className="h-12 w-12 animate-spin rounded-full border-2 border-[#6366F1]/20 border-t-[#8B5CF6]" />
                 <Sparkles className="absolute inset-0 m-auto h-5 w-5 text-[#C7D2FE] animate-pulse" />
               </div>
               <div>
-                <p className="text-base font-semibold text-white">Drafting your idea…</p>
-                <p className="text-xs text-[#9CA3AF] mt-1.5">This usually takes 1–2 seconds.</p>
+                <p className="text-base font-semibold text-white">
+                  Drafting your idea…
+                </p>
+                <p className="text-xs text-[#9CA3AF] mt-1.5">
+                  This usually takes 1–2 seconds.
+                </p>
               </div>
             </div>
           </>
         )}
 
-        {/* Step 3 — Preview & post */}
+        {/* ── STEP 3: Preview & post ──────────────────────────────────────── */}
         {step === "preview" && (
-          <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col h-full min-h-0"
+          >
             <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
-              <DialogTitle className={cn(displayFontClass, "text-lg font-semibold text-white")}>
-                Review and post
-              </DialogTitle>
+              <div className="flex items-center justify-between">
+                <DialogTitle
+                  className={cn(
+                    displayFontClass,
+                    "text-lg font-semibold text-white",
+                  )}
+                >
+                  Review and post
+                </DialogTitle>
+                {/* Template badge */}
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    borderColor: `${activeDef.color}50`,
+                    color: activeDef.color,
+                    background: `${activeDef.color}15`,
+                  }}
+                >
+                  <activeDef.icon strokeWidth={1.5} style={{ width: 10, height: 10 }} />
+                  {activeDef.title}
+                </span>
+              </div>
               <DialogDescription className="text-xs text-[#9CA3AF] mt-1">
                 {aiHadError
                   ? "AI couldn't fill the form this time — please fill it in below."
                   : !aiHadError && title && description
-                  ? "✨ AI filled the form for you. Review and edit as needed."
-                  : "Edit anything you want, then post."}
+                    ? "✨ AI filled the form for you. Review and edit as needed."
+                    : "Edit anything you want, then post."}
               </DialogDescription>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2 min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <div className="space-y-1">
-                <Label htmlFor="wiz-title" className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
+                <Label
+                  htmlFor="wiz-title"
+                  className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider"
+                >
                   Title <span className="text-destructive">*</span>
                 </Label>
                 <Input
@@ -393,7 +676,10 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="wiz-description" className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
+                  <Label
+                    htmlFor="wiz-description"
+                    className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider"
+                  >
                     Description <span className="text-destructive">*</span>
                   </Label>
                   <span className="text-[10px] text-[#6B7280]">
@@ -415,31 +701,45 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider flex items-center gap-1.5">
                     Industries
-                    {isGeneratingTags && <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />}
+                    {isGeneratingTags && (
+                      <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />
+                    )}
                   </Label>
                   <IndustriesMultiSelect
                     selectedIndustries={industries}
                     onChange={setIndustries}
-                    placeholder={isGeneratingTags ? "AI is selecting..." : "Select industries..."}
+                    placeholder={
+                      isGeneratingTags
+                        ? "AI is selecting..."
+                        : "Select industries..."
+                    }
                     hideBadges
                   />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider flex items-center gap-1.5">
                     Skills needed
-                    {isGeneratingTags && <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />}
+                    {isGeneratingTags && (
+                      <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />
+                    )}
                   </Label>
                   <SkillsMultiSelect
                     selectedSkills={skills}
                     onChange={setSkills}
-                    placeholder={isGeneratingTags ? "AI is selecting..." : "Select skills..."}
+                    placeholder={
+                      isGeneratingTags
+                        ? "AI is selecting..."
+                        : "Select skills..."
+                    }
                     hideBadges
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">Visibility <span className="text-destructive">*</span></Label>
+                <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
+                  Visibility <span className="text-destructive">*</span>
+                </Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -451,14 +751,23 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                       "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
                       visibility === "public"
                         ? "border-[#6366F1]/50 bg-[#6366F1]/10 ring-1 ring-[#6366F1]/30"
-                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]"
+                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]",
                     )}
                   >
-                    <div className={cn("mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0", visibility === "public" ? "bg-[#6366F1]/20 text-[#C7D2FE]" : "bg-white/[0.05] text-[#9CA3AF]")}>
+                    <div
+                      className={cn(
+                        "mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0",
+                        visibility === "public"
+                          ? "bg-[#6366F1]/20 text-[#C7D2FE]"
+                          : "bg-white/[0.05] text-[#9CA3AF]",
+                      )}
+                    >
                       <Globe className="h-3 w-3" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-semibold text-white">Public</span>
+                      <span className="text-xs font-semibold text-white">
+                        Public
+                      </span>
                       <p className="mt-0.5 text-[10px] leading-tight text-[#9CA3AF]">
                         Anyone can spark, comment, and ask to collaborate.
                       </p>
@@ -475,14 +784,23 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                       "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
                       visibility === "private"
                         ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/30"
-                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]"
+                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]",
                     )}
                   >
-                    <div className={cn("mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0", visibility === "private" ? "bg-amber-500/20 text-amber-400" : "bg-white/[0.05] text-[#9CA3AF]")}>
+                    <div
+                      className={cn(
+                        "mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0",
+                        visibility === "private"
+                          ? "bg-amber-500/20 text-amber-400"
+                          : "bg-white/[0.05] text-[#9CA3AF]",
+                      )}
+                    >
                       <Lock className="h-3 w-3" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-semibold text-white">Private</span>
+                      <span className="text-xs font-semibold text-white">
+                        Private
+                      </span>
                       <p className="mt-0.5 text-[10px] leading-tight text-[#9CA3AF]">
                         Only you can see it. Use as a draft.
                       </p>
@@ -493,18 +811,21 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
 
               <div className="space-y-1">
                 <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
-                  Attachment <span className="text-[11px] text-[#6B7280] font-normal lowercase">(optional)</span>
+                  Attachment{" "}
+                  <span className="text-[11px] text-[#6B7280] font-normal lowercase">
+                    (optional)
+                  </span>
                 </Label>
                 <CardUpload
                   maxFiles={1}
                   maxSize={50 * 1024 * 1024}
-                  accept={"application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"}
+                  accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"
                   multiple={false}
                   onChange={(f) => setFiles(f)}
                   compact
                 />
                 <p className="text-[10px] text-[#6B7280]">
-                  PDF, DOCX, PPTX, XLSX, JPG, PNG, GIF, MP4 (≤50MB)
+                  PDF, DOCX, PPTX, XLSX, JPG, PNG, GIF, MP4 (≤50 MB)
                 </p>
               </div>
 
@@ -543,7 +864,9 @@ export function IdeaWizard({ isOpen, onOpenChange, initialDraft }: IdeaWizardPro
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !title.trim() || !description.trim()}
+                  disabled={
+                    isSubmitting || !title.trim() || !description.trim()
+                  }
                   className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? <Spinner size={14} className="mr-2" /> : null}

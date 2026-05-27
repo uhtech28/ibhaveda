@@ -62,7 +62,7 @@ const LevelDisplayComponent = ({
           </span>
         </div>
         <div className="hidden sm:flex flex-col gap-0">
-          <span className="text-[7px] text-zinc-500 uppercase tracking-widest font-black leading-none mb-0.5">
+          <span className="text-[7px] text-zinc-500 tracking-widest font-black leading-none mb-0.5">
             Score
           </span>
           <span
@@ -105,7 +105,7 @@ const LevelDisplayComponent = ({
 
       {/* Score info */}
       <div className="flex flex-col justify-center">
-        <span className="text-[9px] text-zinc-500 uppercase tracking-[0.2em] font-black leading-none mb-1">
+        <span className="text-[9px] text-zinc-500 tracking-[0.2em] font-black leading-none mb-1">
           Project Score
         </span>
 
