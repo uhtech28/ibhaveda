@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, Crown, Flame, Gem, Hammer, Pickaxe, Ship, Swords, Trees } from "lucide-react";
 
-const TOTAL_RUNTIME_MS = 25000;
+const TOTAL_RUNTIME_MS = 22350;
 
 const STAGES = [
   {
@@ -50,7 +50,13 @@ const STAGES = [
   },
 ];
 
-export default function LandingIntroSandbox() {
+export default function LandingIntroSandbox({
+  ariaLabel = "Ibhaveda intro preview",
+  onComplete,
+}: {
+  ariaLabel?: string;
+  onComplete?: () => void;
+}) {
   const [stage, setStage] = useState(0);
   const [closing, setClosing] = useState(false);
 
@@ -60,11 +66,11 @@ export default function LandingIntroSandbox() {
     const timeline = [
       { at: 900, value: 1 },
       { at: 2500, value: 2 },
-      { at: 5000, value: 3 },
-      { at: 10000, value: 4 },
-      { at: 15000, value: 5 },
-      { at: 20000, value: 6 },
-      { at: 24400, value: 7 },
+      { at: 4750, value: 3 },
+      { at: 8350, value: 4 },
+      { at: 12350, value: 5 },
+      { at: 17350, value: 6 },
+      { at: 21750, value: 7 },
     ];
     const timers = timeline.map(({ at, value }) =>
       window.setTimeout(() => setStage(value), at),
@@ -75,12 +81,68 @@ export default function LandingIntroSandbox() {
   useEffect(() => {
     if (stage !== 7) return;
     setClosing(true);
-  }, [stage]);
+    const id = window.setTimeout(() => onComplete?.(), 900);
+    return () => window.clearTimeout(id);
+  }, [onComplete, stage]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let context: AudioContext | null = null;
+    let stopped = false;
+    let started = false;
+    const notes = [392, 392, 392, 311.13, 349.23, 349.23, 349.23, 293.66];
+
+    const playMotif = async () => {
+      if (stopped || started) return;
+      const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtor) return;
+      context ??= new AudioCtor();
+      await context.resume().catch(() => undefined);
+      if (context.state !== "running") return;
+      started = true;
+
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.035, context.currentTime);
+      gain.connect(context.destination);
+
+      notes.forEach((frequency, index) => {
+        const start = context!.currentTime + index * 0.42;
+        const oscillator = context!.createOscillator();
+        const noteGain = context!.createGain();
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(frequency, start);
+        noteGain.gain.setValueAtTime(0, start);
+        noteGain.gain.linearRampToValueAtTime(0.8, start + 0.03);
+        noteGain.gain.exponentialRampToValueAtTime(0.001, start + 0.36);
+        oscillator.connect(noteGain);
+        noteGain.connect(gain);
+        oscillator.start(start);
+        oscillator.stop(start + 0.38);
+      });
+    };
+
+    playMotif();
+    window.addEventListener("pointerdown", playMotif, { once: true });
+    window.addEventListener("keydown", playMotif, { once: true });
+
+    return () => {
+      stopped = true;
+      window.removeEventListener("pointerdown", playMotif);
+      window.removeEventListener("keydown", playMotif);
+      context?.close().catch(() => undefined);
+    };
+  }, []);
+
+  const closeIntro = () => {
+    setClosing(true);
+    window.setTimeout(() => onComplete?.(), 350);
+  };
 
   return (
     <div
       role="dialog"
-      aria-label="Ibhaveda intro preview"
+      aria-label={ariaLabel}
       className="fixed inset-0 z-[9999] overflow-hidden bg-[#070A0F] text-white"
       style={{
         opacity: closing ? 0 : 1,
@@ -92,10 +154,10 @@ export default function LandingIntroSandbox() {
 
       <button
         type="button"
-        onClick={() => setClosing(true)}
+        onClick={closeIntro}
         className="absolute right-5 top-5 z-20 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-300 backdrop-blur transition hover:border-white/20 hover:text-white"
       >
-        Skip intro
+        Skip
       </button>
 
       <div className="absolute inset-x-0 bottom-0 z-20 h-1 bg-white/[0.05]">
@@ -105,7 +167,7 @@ export default function LandingIntroSandbox() {
         />
       </div>
 
-      <div className="relative z-10 grid min-h-dvh place-items-center px-4 py-9 sm:px-6">
+      <div className="relative z-10 grid min-h-dvh place-items-start px-4 pb-9 pt-20 sm:px-6 sm:py-9 lg:place-items-center">
         {stage < 3 && <OpeningHook stage={stage} />}
         {stage === 3 && <ProductLaunch activeStep={stage} />}
         {stage === 4 && <BossGate />}
@@ -114,6 +176,26 @@ export default function LandingIntroSandbox() {
       </div>
 
       <style>{`
+        .intro-headline {
+          font-size: 2.25rem;
+          line-height: 1.08;
+          letter-spacing: 0;
+          font-weight: 900;
+        }
+        .intro-slide-title {
+          font-size: 2.25rem;
+          line-height: 1.08;
+          letter-spacing: 0;
+          font-weight: 900;
+        }
+        @media (min-width: 640px) {
+          .intro-headline {
+            font-size: 3.75rem;
+          }
+          .intro-slide-title {
+            font-size: 1.875rem;
+          }
+        }
         @keyframes intro-progress {
           from { width: 0%; }
           to { width: 100%; }
@@ -167,8 +249,8 @@ function OpeningHook({ stage }: { stage: number }) {
   if (stage < 2) {
     return (
       <section className="flex w-full max-w-4xl flex-col items-center text-center">
-        <p className="text-xs font-bold uppercase tracking-[0.42em] text-[#F7D66D]">
-          Before Ibhaveda
+        <p className="intro-headline max-w-3xl font-display text-[#F7D66D]">
+          Everyone says 'just build it.' Nobody shows you how.
         </p>
         <div
           className="mt-8 grid w-full gap-4 sm:grid-cols-2"
@@ -193,7 +275,7 @@ function OpeningHook({ stage }: { stage: number }) {
         Ibhaveda
       </p>
       <h1
-        className="mt-4 max-w-4xl font-display text-4xl font-black leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl"
+        className="intro-headline mt-4 max-w-4xl font-display text-white lg:text-7xl"
         style={{ animation: "reveal-up 800ms ease both" }}
       >
         What if building your startup felt like playing a video game?
@@ -215,11 +297,11 @@ function ProductLaunch({ activeStep }: { activeStep: number }) {
         <p className="mt-6 text-xs font-bold uppercase tracking-[0.42em] text-[#F7D66D]">
           Ibhaveda
         </p>
-        <h1 className="mt-4 max-w-xl font-display text-4xl font-black leading-tight tracking-tight sm:text-6xl">
-          Post an idea. Meet likely collaborators.
+        <h1 className="intro-headline mt-4 max-w-xl font-display">
+          Post an idea. Find people willing to build with you.
         </h1>
         <p className="mt-4 max-w-md text-sm leading-6 text-slate-300 sm:text-base">
-          Ibhaveda matches you with people most likely to become free collaborators.
+          Ibhaveda turns your idea into a contribution request and surfaces people likely to help for free.
         </p>
       </div>
 
@@ -230,7 +312,7 @@ function ProductLaunch({ activeStep }: { activeStep: number }) {
 
 function StrikeLine({ text, delayMs }: { text: string; delayMs: number }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-left text-sm font-bold text-slate-300 sm:text-base">
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-left text-xs font-bold leading-5 text-slate-300 sm:text-base">
       <span className="relative z-10">{text}</span>
       <span
         className="absolute left-4 top-1/2 z-20 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-[#E48AA6] to-transparent shadow-[0_0_14px_rgba(228,138,166,0.55)]"
@@ -295,16 +377,16 @@ function LiveSiteFrame({ activeStep }: { activeStep: number }) {
 
           <div className="my-3 flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-[0.22em] text-[#F7D66D]">
             <span className="h-px w-16 bg-[#F7D66D]/30" />
-            Matching likely free collaborators
+            Suggested free collaborators
             <span className="h-px w-16 bg-[#F7D66D]/30" />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3">
             {[
-              ["Riya", "Research", "92%", "#34D399"],
-              ["Arjun", "Build", "88%", "#60A5FA"],
-              ["Unnati", "Launch", "84%", "#F7D66D"],
-            ].map(([name, role, match, color], index) => (
+              ["Riya", "Market interviews", "Available to collaborate", "#34D399"],
+              ["Arjun", "Prototype build", "Can contribute free", "#60A5FA"],
+              ["Unnati", "Launch content", "Open to help", "#F7D66D"],
+            ].map(([name, role, status, color], index) => (
               <div
                 key={name}
                 className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"
@@ -314,27 +396,22 @@ function LiveSiteFrame({ activeStep }: { activeStep: number }) {
                   transition: "opacity 500ms ease, transform 500ms ease",
                 }}
               >
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                  <div className="grid h-9 w-9 place-items-center rounded-full text-xs font-black text-black" style={{ background: color }}>
-                    {name[0]}
-                  </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-xs font-black text-black" style={{ background: color }}>
+                      {name[0]}
+                    </div>
                     <div className="min-w-0">
-                    <p className="truncate text-sm font-bold">{name}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500">{role}</p>
+                      <p className="truncate text-sm font-bold">{name}</p>
+                      <p className="truncate text-xs text-slate-400">{role}</p>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full rounded-full" style={{ width: `${78 + index * 7}%`, background: color }} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                  <div className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-xs font-black" style={{ color }}>
-                    {match}
+                  <div className="shrink-0 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color }}>
+                    {status}
                   </div>
-                </div>
-                <div className="mb-2 rounded-xl border border-white/10 bg-black/20 px-2.5 py-2">
-                  <p className="text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-slate-500">
-                    Free collaborator fit
-                  </p>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full" style={{ width: `${70 + index * 8}%`, background: color }} />
                 </div>
               </div>
             ))}
@@ -356,11 +433,18 @@ function VillageCheckpoint() {
   return (
     <section className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
       <VillageMap />
-      <div className="grid gap-4" style={{ animation: "reveal-up 700ms ease both" }}>
-        <MiniHud />
-        <TaskCard done label="T1" text="Define the user" />
-        <TaskCard done label="T2" text="Validate the problem" />
-        <TaskCard label="T3" text="Upload proof" highlighted />
+      <div className="order-first grid gap-4 lg:order-none" style={{ animation: "reveal-up 700ms ease both" }}>
+        <SlideCopy
+          eyebrow="Checkpoint path"
+          title="Move your venture through visible checkpoints."
+          body="Tasks become proof, proof moves the character, and the map shows progress without another status meeting."
+        />
+        <div className="hidden gap-4 lg:grid">
+          <MiniHud />
+          <TaskCard done label="T1" text="Define the user" />
+          <TaskCard done label="T2" text="Validate the problem" />
+          <TaskCard label="T3" text="Upload proof" highlighted />
+        </div>
       </div>
     </section>
   );
@@ -368,14 +452,14 @@ function VillageCheckpoint() {
 
 function VillageMap() {
   const checkpoints = [
-    { left: "15%", top: "68%", active: true },
-    { left: "32%", top: "52%", active: true },
-    { left: "51%", top: "62%", active: true },
-    { left: "72%", top: "40%", active: false },
+    { left: "15%", top: "68%", active: true, icon: "/assets/dungeon/items%20and%20trap_animation/torch/torch_1.png" },
+    { left: "32%", top: "52%", active: true, icon: "/assets/dungeon/items%20and%20trap_animation/flag/flag_1.png" },
+    { left: "51%", top: "62%", active: true, icon: "/assets/dungeon/items%20and%20trap_animation/mini_chest/mini_chest_1.png" },
+    { left: "72%", top: "40%", active: false, icon: "/assets/fan-tasy/LampPost_3.png" },
   ];
 
   return (
-    <div className="relative min-h-[480px] overflow-hidden rounded-[28px] border border-white/10 bg-[#10151F] shadow-2xl" style={{ animation: "reveal-up 700ms ease both" }}>
+    <div className="relative min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-[#10151F] shadow-2xl sm:min-h-[480px]" style={{ animation: "reveal-up 700ms ease both" }}>
       <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:32px_32px]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_72%,rgba(52,211,153,0.18),transparent_30%),radial-gradient(circle_at_72%_35%,rgba(247,214,109,0.16),transparent_26%)]" />
 
@@ -391,7 +475,7 @@ function VillageMap() {
       {checkpoints.map((point, index) => (
         <div
           key={index}
-          className="absolute grid h-14 w-14 place-items-center border bg-[#0B111A]/90 text-sm font-black"
+          className="absolute grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center border bg-[#0B111A]/90 text-sm font-black"
           style={{
             left: point.left,
             top: point.top,
@@ -400,7 +484,7 @@ function VillageMap() {
             animation: point.active ? "checkpoint-glow 1700ms ease-in-out infinite" : undefined,
           }}
         >
-          {index + 1}
+          <img src={point.icon} alt="" className="h-9 w-9 object-contain [image-rendering:pixelated]" />
         </div>
       ))}
 
@@ -426,7 +510,7 @@ function StageRun() {
           <img src="/logo.png" alt="" className="h-11 w-11 rounded-xl object-cover" />
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#F7D66D]">World map</p>
-            <p className="text-lg font-black">Stages unlock visually</p>
+            <p className="text-lg font-black">Every stage gives the next kind of work a place to live.</p>
           </div>
         </div>
         <Pill>6 of 8 shown</Pill>
@@ -479,23 +563,23 @@ function StageCard({ stage, index }: { stage: (typeof STAGES)[number]; index: nu
 function BossGate() {
   return (
     <section className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-      <div className="relative min-h-[460px] overflow-hidden rounded-[28px] border border-white/10 bg-[#080B11] p-5 shadow-2xl">
+      <div className="relative min-h-[330px] overflow-hidden rounded-[28px] border border-white/10 bg-[#080B11] p-5 shadow-2xl sm:min-h-[460px]">
         <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(247,214,109,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(247,214,109,0.09)_1px,transparent_1px)] [background-size:28px_28px]" />
         <img
           src="/assets/dungeon/character%20and%20tileset/demonstration.png"
           alt=""
           className="absolute bottom-0 left-0 h-full w-full object-cover opacity-20 [image-rendering:pixelated]"
         />
-        <div className="relative z-10 flex h-full min-h-[420px] flex-col justify-between">
+        <div className="relative z-10 flex h-full min-h-[290px] flex-col justify-between sm:min-h-[420px]">
           <div className="flex items-center justify-between">
             <Pill>Boss gate</Pill>
             <Pill>Stage clear</Pill>
           </div>
 
-          <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-5">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
             <Fighter label="Builder" icon={<Crown className="h-9 w-9 text-[#F7D66D]" />} />
-            <div className="pb-8 text-[#F7D66D]">
-              <Swords className="h-10 w-10" />
+            <div className="grid h-14 w-14 place-items-center rounded-full border border-[#F7D66D]/35 bg-black/45 text-[#F7D66D] shadow-[0_0_28px_rgba(247,214,109,0.18)]">
+              <Swords className="h-7 w-7" />
             </div>
             <div style={{ animation: "boss-hit 420ms ease 3" }}>
               <Fighter
@@ -517,13 +601,20 @@ function BossGate() {
         </div>
       </div>
 
-      <div className="grid gap-4" style={{ animation: "reveal-up 700ms ease both" }}>
-        <RewardCard icon={<Flame className="h-5 w-5" />} title="Level up" value="+75 XP" />
-        <RewardCard icon={<Gem className="h-5 w-5" />} title="Gold checkpoint" value="Proof accepted" />
-        <div className="rounded-[24px] border border-[#F7D66D]/25 bg-[#F7D66D]/10 p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-black uppercase tracking-[0.24em] text-[#F7D66D]">Next biome unlocked</span>
-            <ArrowRight className="h-5 w-5 text-[#F7D66D]" />
+      <div className="order-first grid gap-4 lg:order-none" style={{ animation: "reveal-up 700ms ease both" }}>
+        <SlideCopy
+          eyebrow="Boss combat"
+          title="Test your idea against a boss and win progress."
+          body="Each boss represents the doubts, missing proof, or execution gaps that block the next stage."
+        />
+        <div className="hidden gap-4 lg:grid">
+          <RewardCard icon={<Flame className="h-5 w-5" />} title="Level up" value="+75 XP" />
+          <RewardCard icon={<Gem className="h-5 w-5" />} title="Gold checkpoint" value="Proof accepted" />
+          <div className="rounded-[24px] border border-[#F7D66D]/25 bg-[#F7D66D]/10 p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black uppercase tracking-[0.24em] text-[#F7D66D]">Next biome unlocked</span>
+              <ArrowRight className="h-5 w-5 text-[#F7D66D]" />
+            </div>
           </div>
         </div>
       </div>
@@ -533,10 +624,10 @@ function BossGate() {
 
 function Fighter({ label, icon, image }: { label: string; icon?: React.ReactNode; image?: string }) {
   return (
-    <div className="text-center">
-      <div className="grid h-24 w-24 place-items-center border border-[#F7D66D]/35 bg-[#F7D66D]/10 shadow-[0_0_42px_rgba(247,214,109,0.16)]">
+    <div className="flex flex-col items-center text-center">
+      <div className="grid h-24 w-24 place-items-center border border-[#F7D66D]/35 bg-[#F7D66D]/10 shadow-[0_0_42px_rgba(247,214,109,0.16)] sm:h-28 sm:w-28">
         {image ? (
-          <img src={image} alt="" className="h-16 w-16 object-contain [image-rendering:pixelated]" />
+          <img src={image} alt="" className="h-16 w-16 object-contain [image-rendering:pixelated] sm:h-20 sm:w-20" />
         ) : (
           icon
         )}
@@ -559,6 +650,28 @@ function SpriteFrame({ src, className }: { src: string; className?: string }) {
         imageRendering: "pixelated",
       }}
     />
+  );
+}
+
+function SlideCopy({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
+      <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#F7D66D]">
+        {eyebrow}
+      </p>
+      <h2 className="intro-slide-title mt-3 font-display text-white">
+        {title}
+      </h2>
+      <p className="mt-3 text-sm leading-6 text-slate-300">{body}</p>
+    </div>
   );
 }
 
