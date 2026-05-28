@@ -2,40 +2,46 @@
 
 import { SignUpButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { GraduationCap, TrendingUp, Rocket, Building2 } from "lucide-react";
+import { GraduationCap, TrendingUp, Rocket, Building2, ArrowRight } from "lucide-react";
 
-// Roles offered on the landing page. The selected role is stashed in
-// localStorage at this key so post-signup flows can read it.
 export const SELECTED_ROLE_KEY = "ii.selectedRole";
 
 const ROLES = [
   {
     key: "student",
     label: "Student",
+    eyebrow: "Ideate",
+    description: "Validate ideas and find builders who can help bring them to life.",
     icon: GraduationCap,
-    gradient: "from-blue-500/15 to-cyan-500/15",
-    border: "border-blue-400/30",
+    color: "#60A5FA",
+    glow: "rgba(96,165,250,0.12)",
   },
   {
     key: "investor",
     label: "Investor",
+    eyebrow: "Discover",
+    description: "Surface high-potential ideas early and connect with founders.",
     icon: TrendingUp,
-    gradient: "from-emerald-500/15 to-teal-500/15",
-    border: "border-emerald-400/30",
+    color: "#34D399",
+    glow: "rgba(52,211,153,0.12)",
   },
   {
     key: "founder",
     label: "Founder",
+    eyebrow: "Build",
+    description: "Move your venture through stages with proof at every step.",
     icon: Rocket,
-    gradient: "from-purple-500/15 to-pink-500/15",
-    border: "border-purple-400/30",
+    color: "#C084FC",
+    glow: "rgba(192,132,252,0.12)",
   },
   {
     key: "incubator",
     label: "Incubator",
+    eyebrow: "Scale",
+    description: "Connect startups with the right resources at the right stage.",
     icon: Building2,
-    gradient: "from-amber-500/15 to-orange-500/15",
-    border: "border-amber-400/30",
+    color: "#FBBF24",
+    glow: "rgba(251,191,36,0.12)",
   },
 ] as const;
 
@@ -48,39 +54,68 @@ export default function RoleSelector() {
     try {
       localStorage.setItem(SELECTED_ROLE_KEY, role);
     } catch {
-      // localStorage may be unavailable (Safari private mode, etc.)
+      // localStorage may be unavailable
     }
   };
 
-  // Card classNames extracted so we can reuse for the button & link variants.
-  const cardClass = (role: { gradient: string; border: string }) =>
-    `group relative flex flex-col items-center justify-center gap-2 md:gap-3 rounded-2xl border ${role.border} bg-gradient-to-br ${role.gradient} p-4 md:p-6 min-h-[110px] md:min-h-[140px] transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-primary/40 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 text-center w-full cursor-pointer`;
-
   return (
-    <section className="py-10 md:py-14">
-      <div className="text-center mb-6 md:mb-10">
-        <h2 className="text-xl md:text-3xl font-semibold tracking-tight">
-          Who are you?
-        </h2>
-        <p className="mt-2 text-sm md:text-base text-muted-foreground">
-          Pick what fits you best — we&apos;ll tailor the feed and connections.
+    <section className="relative px-4 py-16 md:py-20 max-w-[1100px] mx-auto">
+      <div className="flex items-center justify-center gap-4 mb-8">
+        <span className="h-px flex-1 max-w-[100px] bg-gradient-to-r from-transparent to-white/[0.12]" />
+        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-[#F7D66D]">
+          Choose your path
         </p>
+        <span className="h-px flex-1 max-w-[100px] bg-gradient-to-l from-transparent to-white/[0.12]" />
       </div>
+
+      <h2 className="text-center text-2xl sm:text-[2rem] font-black text-white mb-2 font-display">
+        Who are you on Ibhaveda?
+      </h2>
+      <p className="text-center text-sm text-slate-400 mb-10">
+        Pick what fits — we&apos;ll tailor your feed and connections.
+      </p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {ROLES.map((role) => {
           const Icon = role.icon;
 
-          const cardInner = (
+          const inner = (
             <>
-              <Icon className="h-7 w-7 md:h-9 md:w-9 text-foreground/90" />
-              <div className="font-semibold text-sm md:text-base text-foreground">
-                {role.label}
+              <div className="absolute inset-0 opacity-[0.10] [background-image:linear-gradient(rgba(255,255,255,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.09)_1px,transparent_1px)] [background-size:18px_18px]" />
+              <div
+                className="absolute -right-6 -top-6 h-24 w-24 rounded-full blur-2xl"
+                style={{ background: role.glow }}
+              />
+              <div className="relative z-10 flex flex-col items-start gap-4 h-full">
+                <div
+                  className="grid h-12 w-12 place-items-center rounded-xl border border-white/10"
+                  style={{ background: `${role.color}18` }}
+                >
+                  <Icon className="h-6 w-6" style={{ color: role.color }} />
+                </div>
+                <div className="flex-1">
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-[0.28em] mb-1"
+                    style={{ color: role.color }}
+                  >
+                    {role.eyebrow}
+                  </p>
+                  <p className="text-base sm:text-lg font-black text-white">{role.label}</p>
+                  <p className="mt-1.5 text-xs text-slate-400 leading-5">{role.description}</p>
+                </div>
+                <div
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: role.color }}
+                >
+                  Enter <ArrowRight className="h-3 w-3" />
+                </div>
               </div>
             </>
           );
 
-          // Already signed in? Skip Clerk modal — go straight to feed (or profile setup).
+          const cardClass =
+            "relative overflow-hidden rounded-[22px] border border-white/10 bg-[#0B111A] min-h-[200px] md:min-h-[240px] p-5 transition-all duration-200 hover:border-white/20 hover:scale-[1.02] hover:shadow-[0_8px_40px_rgba(0,0,0,0.6)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 cursor-pointer text-left flex flex-col";
+
           if (isSignedIn) {
             return (
               <button
@@ -90,28 +125,23 @@ export default function RoleSelector() {
                   handleSelect(role.key);
                   router.push("/feed");
                 }}
-                className={cardClass(role)}
+                className={cardClass}
                 aria-label={`Continue as ${role.label}`}
               >
-                {cardInner}
+                {inner}
               </button>
             );
           }
 
-          // Not signed in: open Clerk's sign-up modal.
           return (
-            <SignUpButton
-              key={role.key}
-              mode="modal"
-              forceRedirectUrl="/profile-setup"
-            >
+            <SignUpButton key={role.key} mode="modal" forceRedirectUrl="/profile-setup">
               <button
                 type="button"
                 onClick={() => handleSelect(role.key)}
-                className={cardClass(role)}
+                className={cardClass}
                 aria-label={`Sign up as ${role.label}`}
               >
-                {cardInner}
+                {inner}
               </button>
             </SignUpButton>
           );

@@ -3,41 +3,40 @@
 import React from "react";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/logo";
+import Link from "next/link";
 
-/**
- * Centered top bar for the public landing page (desktop only).
- *
- * Renders inline at the very top of the page (normal flow) so it scrolls
- * away with the rest of the content. Wording adapts to auth state:
- *   - Signed out: opens Clerk's sign-in modal, redirects to /feed.
- *   - Signed in:  navigates straight to /feed.
- */
 export function LandingTopBar() {
   const { isSignedIn } = useUser();
   const router = useRouter();
 
-  const linkClass =
-    "text-primary font-semibold hover:underline underline-offset-4 transition-colors cursor-pointer";
-
   return (
-    <div className="hidden lg:flex items-center justify-center gap-3 text-lg pt-6 pb-2 w-full">
-      <span className="text-muted-foreground">Already have an account?</span>
-      {isSignedIn ? (
-        <button type="button" onClick={() => router.push("/feed")} className={linkClass}>
-          Log in
-        </button>
-      ) : (
-        <SignInButton
-          mode="modal"
-          forceRedirectUrl="/feed"
-          fallbackRedirectUrl="/feed"
-        >
-          <button type="button" className={linkClass}>
-            Log in
+    <header className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-4 px-5 py-3 border-b border-white/[0.07] bg-[#070A0F]/80 backdrop-blur-md">
+      <Link href="/" aria-label="Ibhaveda home">
+        <Logo />
+      </Link>
+
+      <div className="flex items-center gap-3">
+        {isSignedIn ? (
+          <button
+            type="button"
+            onClick={() => router.push("/feed")}
+            className="rounded-full border border-white/10 bg-white/[0.04] px-5 py-2 text-xs font-semibold text-slate-200 backdrop-blur transition hover:border-white/20 hover:text-white"
+          >
+            Go to Feed
           </button>
-        </SignInButton>
-      )}
-    </div>
+        ) : (
+          <SignInButton mode="modal" forceRedirectUrl="/feed" fallbackRedirectUrl="/feed">
+            <button
+              type="button"
+              className="rounded-full border border-white/10 bg-white/[0.04] px-5 py-2 text-xs font-semibold text-slate-200 backdrop-blur transition hover:border-white/20 hover:text-white"
+            >
+              Log in
+            </button>
+          </SignInButton>
+        )}
+      </div>
+    </header>
   );
 }
 

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, Crown, Flame, Gem, Hammer, Pickaxe, Ship, Swords, Trees } from "lucide-react";
 
-const TOTAL_RUNTIME_MS = 22350;
+const TOTAL_RUNTIME_MS = 24950;
 
 const STAGES = [
   {
@@ -64,13 +64,13 @@ export default function LandingIntroSandbox({
     setStage(0);
     setClosing(false);
     const timeline = [
-      { at: 900, value: 1 },
+      { at: 1000, value: 1 },
       { at: 2500, value: 2 },
       { at: 4750, value: 3 },
       { at: 8350, value: 4 },
       { at: 12350, value: 5 },
       { at: 17350, value: 6 },
-      { at: 21750, value: 7 },
+      { at: 24350, value: 7 },
     ];
     const timers = timeline.map(({ at, value }) =>
       window.setTimeout(() => setStage(value), at),
@@ -91,23 +91,45 @@ export default function LandingIntroSandbox({
     let context: AudioContext | null = null;
     let stopped = false;
     let started = false;
-    const notes = [392, 392, 392, 311.13, 349.23, 349.23, 349.23, 293.66];
 
-    const playMotif = async () => {
+    // 59-note composition (~24.8s at 0.42s/note) — one continuous piece, no looping.
+    // Structured to match the intro's emotional arc:
+    //   P1 opening hook → P2 logo reveal → P3 product build →
+    //   P4 boss gate (dark) → P5 village (hopeful) → P6-7 stage run (triumphant) → P8 cadence
+    const notes = [
+      392, 392, 392, 311.13, 349.23, 349.23, 349.23, 293.66,       // P1 opening motif
+      293.66, 293.66, 349.23, 392, 392, 466.16, 392, 349.23,        // P2 logo reveal
+      349.23, 392, 466.16, 466.16, 523.25, 466.16, 392, 349.23,     // P3 product / energy build
+      523.25, 523.25, 466.16, 392, 311.13, 293.66, 196.00, 293.66,  // P4 boss gate — drops low
+      293.66, 349.23, 392, 466.16, 523.25, 466.16, 523.25, 466.16,  // P5 village — hopeful ascent
+      392, 466.16, 523.25, 587.33, 523.25, 466.16, 523.25, 587.33,  // P6 stage run A — triumphant
+      587.33, 523.25, 466.16, 392, 466.16, 392, 349.23, 293.66,     // P7 stage run B — sweeping
+      293.66, 349.23, 392,                                            // P8 final cadence
+    ];
+    const NOTE_INTERVAL = 0.42;
+
+    const startAudio = async () => {
       if (stopped || started) return;
-      const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      const AudioCtor =
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtor) return;
       context ??= new AudioCtor();
       await context.resume().catch(() => undefined);
       if (context.state !== "running") return;
       started = true;
 
-      const gain = context.createGain();
-      gain.gain.setValueAtTime(0.035, context.currentTime);
-      gain.connect(context.destination);
+      const masterGain = context.createGain();
+      const startTime = context.currentTime + 0.1;
+      const endTime = startTime + TOTAL_RUNTIME_MS / 1000;
+      masterGain.gain.setValueAtTime(0.035, startTime);
+      masterGain.gain.setValueAtTime(0.035, endTime - 1.5);
+      masterGain.gain.linearRampToValueAtTime(0.001, endTime - 0.1);
+      masterGain.connect(context.destination);
 
       notes.forEach((frequency, index) => {
-        const start = context!.currentTime + index * 0.42;
+        const start = startTime + index * NOTE_INTERVAL;
+        if (start >= endTime) return;
         const oscillator = context!.createOscillator();
         const noteGain = context!.createGain();
         oscillator.type = "triangle";
@@ -116,20 +138,20 @@ export default function LandingIntroSandbox({
         noteGain.gain.linearRampToValueAtTime(0.8, start + 0.03);
         noteGain.gain.exponentialRampToValueAtTime(0.001, start + 0.36);
         oscillator.connect(noteGain);
-        noteGain.connect(gain);
+        noteGain.connect(masterGain);
         oscillator.start(start);
         oscillator.stop(start + 0.38);
       });
     };
 
-    playMotif();
-    window.addEventListener("pointerdown", playMotif, { once: true });
-    window.addEventListener("keydown", playMotif, { once: true });
+    startAudio();
+    window.addEventListener("pointerdown", startAudio, { once: true });
+    window.addEventListener("keydown", startAudio, { once: true });
 
     return () => {
       stopped = true;
-      window.removeEventListener("pointerdown", playMotif);
-      window.removeEventListener("keydown", playMotif);
+      window.removeEventListener("pointerdown", startAudio);
+      window.removeEventListener("keydown", startAudio);
       context?.close().catch(() => undefined);
     };
   }, []);
