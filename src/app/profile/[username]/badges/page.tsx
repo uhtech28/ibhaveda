@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { HeroHeader } from "@/components/header";
 import FooterSection from "@/components/footer";
@@ -13,6 +13,7 @@ import { ArrowLeft } from "lucide-react";
 import { ProfileBadges } from "@/components/user/ProfileBadges";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
+import { BadgeDetailModal } from "@/components/badges/BadgeDetailModal";
 
 export default function ProfileBadgesPage() {
   const params = useParams();
@@ -24,6 +25,25 @@ export default function ProfileBadgesPage() {
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, profile ? { userId: profile._id } : "skip");
   const equippedBadgeIds = profile?.equippedBadges || [];
+
+  const [selectedBadge, setSelectedBadge] = React.useState<any | null>(null);
+  const updateUserProfile = useMutation(api.users.updateUserProfile);
+
+  const handleEquipToggle = async (badgeId: string) => {
+    let currentEquipped = [...equippedBadgeIds];
+    if (currentEquipped.includes(badgeId)) {
+      currentEquipped = currentEquipped.filter((id) => id !== badgeId);
+    } else {
+      if (currentEquipped.length >= 3) return;
+      currentEquipped.push(badgeId);
+    }
+    
+    try {
+      await updateUserProfile({ equippedBadges: currentEquipped });
+    } catch (e) {
+      console.error("Failed to update equipped badges:", e);
+    }
+  };
 
   // Resolve equipped list with a fallback/padding of the highest-rarity earned badges
   const equippedBadgesList = React.useMemo(() => {
@@ -120,6 +140,7 @@ export default function ProfileBadgesPage() {
                 <span
                   key={badge.id}
                   title={`${badge.name}: ${badge.description}`}
+                  onClick={() => setSelectedBadge(badge)}
                   className="inline-flex items-center justify-center w-6.5 h-6.5 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
                   style={{ animationDuration: "3s" }}
                 >
@@ -133,6 +154,18 @@ export default function ProfileBadgesPage() {
 
         <ProfileBadges userId={profile._id} isOwner={isCurrentUser} profile={profileData} />
       </main>
+
+      {selectedBadge && (
+        <BadgeDetailModal
+          badge={selectedBadge}
+          isOpen={!!selectedBadge}
+          onClose={() => setSelectedBadge(null)}
+          isOwner={isCurrentUser}
+          isEquipped={equippedBadgeIds.includes(selectedBadge.id)}
+          canEquipMore={equippedBadgeIds.length < 3}
+          onEquipToggle={() => handleEquipToggle(selectedBadge.id)}
+        />
+      )}
 
       <FooterSection />
     </div>

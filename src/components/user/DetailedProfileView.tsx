@@ -14,7 +14,7 @@ import { RequestStatusCard, ContributionRequest } from "@/components/requests/re
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
-import { getVentureBadgeEmoji, BadgeItem } from "../badges/BadgeCard";
+import { getNormalizedRarity, getVentureBadgeEmoji, BadgeItem } from "../badges/BadgeCard";
 import { BadgeDetailModal } from "@/components/badges/BadgeDetailModal";
 
 interface DetailedProfileViewProps {
@@ -115,7 +115,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
     <TooltipProvider>
       <div className="max-w-6xl mx-auto px-4 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          
+
           {/* 1. Identity Card (Span 2) */}
           <Card className="md:col-span-2 shadow-sm border-border/40 bg-card/50 backdrop-blur-sm overflow-hidden relative flex flex-col">
             <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent"></div>
@@ -130,32 +130,42 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                   </Avatar>
                   <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background"></div>
                 </div>
-                
+
                 <div className="flex-1 space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
                       <h1 className="text-xl font-bold text-foreground leading-tight flex items-center gap-2">
                         {profile.displayName}
-                        {equippedBadgesList.slice(0, 3).map((badge) => (
-                          <span
-                            key={badge.id}
-                            title={`${badge.name}: ${badge.description} (Click to view details)`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedBadge(badge as any);
-                            }}
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
-                            style={{ animationDuration: "3s" }}
-                          >
-                            <PremiumIcon name={(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)} className="w-3.5 h-3.5" strokeWidth={1.5} />
-                          </span>
-                        ))}
+                        {equippedBadgesList.slice(0, 3).map((badge) => {
+                          const norm = getNormalizedRarity(badge.rarity);
+                          const accentColor = badge.secondaryColor || norm.accentColor;
+                          return (
+                            <span
+                              key={badge.id}
+                              title={`${badge.name}: ${badge.description} (Click to view details)`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBadge(badge as any);
+                              }}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-md text-sm select-none hover:scale-115 transition-transform duration-200 cursor-pointer"
+                              style={{
+                                backgroundColor: `${accentColor}20`,
+                                borderColor: `${accentColor}80`,
+                                borderWidth: "1px",
+                                color: accentColor,
+                                boxShadow: `0 0 12px ${accentColor}50`,
+                              }}
+                            >
+                              <PremiumIcon name={(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)} className="w-3.5 h-3.5" strokeWidth={1.5} />
+                            </span>
+                          );
+                        })}
                       </h1>
                       <p className="text-muted-foreground font-medium text-sm">@{profile.username}</p>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleEditProfile}
                       className="gap-2 h-8"
                     >
@@ -186,29 +196,29 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                   </div>
 
                   <div className="pt-1.5 space-y-2">
-                     {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
-                       <div className="flex flex-wrap gap-1.5">
-                          {profile.industry && (
-                            <Badge variant="secondary" className="rounded-md px-2 py-0 text-[10px] font-medium h-5">
-                              {profile.industry}
-                            </Badge>
-                          )}
-                          {profile.skills && profile.skills.slice(0, 5).map((skill, index) => (
-                            <Badge 
-                              key={index} 
-                              variant="outline" 
-                              className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5"
-                            >
-                              {skill}
-                            </Badge>
-                          ))}
-                          {profile.skills && profile.skills.length > 5 && (
-                            <Badge variant="outline" className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5">
-                              +{profile.skills.length - 5}
-                            </Badge>
-                          )}
-                       </div>
-                     )}
+                    {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {profile.industry && (
+                          <Badge variant="secondary" className="rounded-md px-2 py-0 text-[10px] font-medium h-5">
+                            {profile.industry}
+                          </Badge>
+                        )}
+                        {profile.skills && profile.skills.slice(0, 5).map((skill, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5"
+                          >
+                            {skill}
+                          </Badge>
+                        ))}
+                        {profile.skills && profile.skills.length > 5 && (
+                          <Badge variant="outline" className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5">
+                            +{profile.skills.length - 5}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -231,7 +241,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="shadow-sm border-border/40 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-4 flex items-center justify-between h-full">
                 <div className="flex items-center gap-3">
@@ -266,63 +276,63 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
 
         {/* Contribution Requests (Only visible to owner) */}
         <div className="mt-16 pt-8 border-t">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Contribution Requests</h2>
-              <Link href="/profile/contribution-requests">
-                <Button variant="outline" size="sm" className="gap-2">
-                  Manage Requests
-                </Button>
-              </Link>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Outgoing Requests */}
-              {myRequests && myRequests.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">My Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {myRequests.slice(0, 3).map((request) => (
-                        <RequestStatusCard key={request._id} request={request} />
-                      ))}
-                      {myRequests.length > 3 && (
-                        <Button variant="link" className="w-full text-xs">View all {myRequests.length} requests</Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">Contribution Requests</h2>
+            <Link href="/profile/contribution-requests">
+              <Button variant="outline" size="sm" className="gap-2">
+                Manage Requests
+              </Button>
+            </Link>
+          </div>
 
-              {/* Incoming Requests */}
-              {incomingRequests && incomingRequests.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Incoming Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {incomingRequests.slice(0, 3).map((request) => (
-                        <div key={request._id} className="border rounded-lg p-3 bg-muted/20 text-sm">
-                          <p className="font-medium truncate">{request.idea?.title || "Idea"}</p>
-                          <p className="text-muted-foreground truncate">{request.message}</p>
-                        </div>
-                      ))}
-                        {incomingRequests.length > 3 && (
-                        <Button variant="link" className="w-full text-xs">View all {incomingRequests.length} incoming</Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {(!myRequests?.length && !incomingRequests?.length) && (
-                <div className="col-span-full text-center py-8 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
-                  No active contribution requests.
-                </div>
-              )}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Outgoing Requests */}
+            {myRequests && myRequests.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">My Requests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {myRequests.slice(0, 3).map((request) => (
+                      <RequestStatusCard key={request._id} request={request} />
+                    ))}
+                    {myRequests.length > 3 && (
+                      <Button variant="link" className="w-full text-xs">View all {myRequests.length} requests</Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Incoming Requests */}
+            {incomingRequests && incomingRequests.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Incoming Requests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {incomingRequests.slice(0, 3).map((request) => (
+                      <div key={request._id} className="border rounded-lg p-3 bg-muted/20 text-sm">
+                        <p className="font-medium truncate">{request.idea?.title || "Idea"}</p>
+                        <p className="text-muted-foreground truncate">{request.message}</p>
+                      </div>
+                    ))}
+                    {incomingRequests.length > 3 && (
+                      <Button variant="link" className="w-full text-xs">View all {incomingRequests.length} incoming</Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {(!myRequests?.length && !incomingRequests?.length) && (
+              <div className="col-span-full text-center py-8 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
+                No active contribution requests.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

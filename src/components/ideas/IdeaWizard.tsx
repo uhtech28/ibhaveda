@@ -375,7 +375,7 @@ export function IdeaWizard({
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent
         className={cn(
-          "w-[min(100%-2rem,600px)] max-w-[600px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[95vh]",
+          "w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[85dvh] sm:max-h-[90vh]",
         )}
       >
         {/* ── STEP 0: Template selector ───────────────────────────────────── */}
@@ -442,18 +442,18 @@ export function IdeaWizard({
                       {def.title}
                     </span>
 
-                    <span
+                    {/* <span
                       className="text-[11px] font-medium"
                       style={{ color: def.color }}
                     >
                       {def.subtitle}
-                    </span>
+                    </span> */}
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-4 py-3 bg-[#0A0E1A] shrink-0">
+            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-4 pt-3 pb-4 sm:pb-3 bg-[#0A0E1A] shrink-0 pb-safe">
               <button
                 type="button"
                 onClick={() => {
@@ -536,7 +536,7 @@ export function IdeaWizard({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3 bg-[#0D1117] shrink-0">
+            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 pt-3 pb-4 sm:pb-3 bg-[#0D1117] shrink-0 pb-safe">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -620,10 +620,10 @@ export function IdeaWizard({
         {step === "preview" && (
           <form
             onSubmit={handleSubmit}
-            className="flex flex-col h-full min-h-0"
+            className="flex flex-col w-full max-h-[85dvh] sm:max-h-[90vh] overflow-hidden"
           >
             <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <DialogTitle
                   className={cn(
                     displayFontClass,
@@ -654,7 +654,7 @@ export function IdeaWizard({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2 min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-2.5 sm:px-5 sm:py-3 space-y-2 min-h-0">
               <div className="space-y-1">
                 <Label
                   htmlFor="wiz-title"
@@ -713,7 +713,6 @@ export function IdeaWizard({
                         ? "AI is selecting..."
                         : "Select industries..."
                     }
-                    hideBadges
                   />
                 </div>
                 <div className="space-y-1">
@@ -731,102 +730,109 @@ export function IdeaWizard({
                         ? "AI is selecting..."
                         : "Select skills..."
                     }
-                    hideBadges
                   />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
-                  Visibility <span className="text-destructive">*</span>
-                </Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      audioManager.playTouch("click");
-                      setVisibility("public");
-                    }}
-                    className={cn(
-                      "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
-                      visibility === "public"
-                        ? "border-[#6366F1]/50 bg-[#6366F1]/10 ring-1 ring-[#6366F1]/30"
-                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]",
-                    )}
-                  >
-                    <div
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Visibility */}
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
+                    Visibility <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        audioManager.playTouch("click");
+                        setVisibility("public");
+                      }}
                       className={cn(
-                        "mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0",
+                        "flex items-start gap-2 rounded-xl border p-2 text-left transition-all h-[52px]",
                         visibility === "public"
-                          ? "bg-[#6366F1]/20 text-[#C7D2FE]"
-                          : "bg-white/[0.05] text-[#9CA3AF]",
+                          ? "border-[#6366F1]/50 bg-[#6366F1]/10 ring-1 ring-[#6366F1]/30"
+                          : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]",
                       )}
                     >
-                      <Globe className="h-3 w-3" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-semibold text-white">
-                        Public
-                      </span>
-                      <p className="mt-0.5 text-[10px] leading-tight text-[#9CA3AF]">
-                        Anyone can spark, comment, and ask to collaborate.
-                      </p>
-                    </div>
-                  </button>
+                      <div
+                        className={cn(
+                          "mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0",
+                          visibility === "public"
+                            ? "bg-[#6366F1]/20 text-[#C7D2FE]"
+                            : "bg-white/[0.05] text-[#9CA3AF]",
+                        )}
+                      >
+                        <Globe className="h-3 w-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-semibold text-white block leading-tight">
+                          Public
+                        </span>
+                        <p className="mt-0.5 text-[9px] leading-tight text-[#9CA3AF]">
+                          Anyone can spark and collaborate.
+                        </p>
+                      </div>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      audioManager.playTouch("click");
-                      setVisibility("private");
-                    }}
-                    className={cn(
-                      "flex items-start gap-2 rounded-xl border p-2 text-left transition-all",
-                      visibility === "private"
-                        ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/30"
-                        : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]",
-                    )}
-                  >
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => {
+                        audioManager.playTouch("click");
+                        setVisibility("private");
+                      }}
                       className={cn(
-                        "mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0",
+                        "flex items-start gap-2 rounded-xl border p-2 text-left transition-all h-[52px]",
                         visibility === "private"
-                          ? "bg-amber-500/20 text-amber-400"
-                          : "bg-white/[0.05] text-[#9CA3AF]",
+                          ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/30"
+                          : "border-white/5 bg-[#0D1117] hover:border-white/10 hover:bg-white/[0.04]",
                       )}
                     >
-                      <Lock className="h-3 w-3" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-semibold text-white">
-                        Private
-                      </span>
-                      <p className="mt-0.5 text-[10px] leading-tight text-[#9CA3AF]">
-                        Only you can see it. Use as a draft.
-                      </p>
-                    </div>
-                  </button>
+                      <div
+                        className={cn(
+                          "mt-0.5 grid h-6 w-6 place-items-center rounded-lg transition-colors shrink-0",
+                          visibility === "private"
+                            ? "bg-amber-500/20 text-amber-400"
+                            : "bg-white/[0.05] text-[#9CA3AF]",
+                        )}
+                      >
+                        <Lock className="h-3 w-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-semibold text-white block leading-tight">
+                          Private
+                        </span>
+                        <p className="mt-0.5 text-[9px] leading-tight text-[#9CA3AF]">
+                          Only you can see it. Use as draft.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
-                  Attachment{" "}
-                  <span className="text-[11px] text-[#6B7280] font-normal lowercase">
-                    (optional)
-                  </span>
-                </Label>
-                <CardUpload
-                  maxFiles={1}
-                  maxSize={50 * 1024 * 1024}
-                  accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"
-                  multiple={false}
-                  onChange={(f) => setFiles(f)}
-                  compact
-                />
-                <p className="text-[10px] text-[#6B7280]">
-                  PDF, DOCX, PPTX, XLSX, JPG, PNG, GIF, MP4 (≤50 MB)
-                </p>
+                {/* Attachment */}
+                <div className="space-y-1 flex flex-col justify-between">
+                  <div>
+                    <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
+                      Attachment{" "}
+                      <span className="text-[11px] text-[#6B7280] font-normal lowercase">
+                        (optional)
+                      </span>
+                    </Label>
+                    <div className="mt-1">
+                      <CardUpload
+                        maxFiles={1}
+                        maxSize={50 * 1024 * 1024}
+                        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"
+                        multiple={false}
+                        onChange={(f) => setFiles(f)}
+                        compact
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-[#6B7280] leading-none mt-1">
+                    PDF, DOCX, PPTX, XLSX, JPG, PNG, GIF, MP4 (≤50 MB)
+                  </p>
+                </div>
               </div>
 
               {submitError && (
@@ -837,7 +843,7 @@ export function IdeaWizard({
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3 bg-[#0D1117] shrink-0">
+            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 pt-3 pb-4 sm:pb-3 bg-[#0D1117] shrink-0 pb-safe">
               <button
                 type="button"
                 onClick={() => {

@@ -130,7 +130,7 @@ export function IndustriesMultiSelect({
 
   return (
     <div className="flex flex-col gap-3">
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={true}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -232,14 +232,14 @@ export function IndustriesMultiSelect({
 
       {/* Selected Industries Badges */}
       {!hideBadges && selectedIndustries.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 mt-1 transition-all duration-300">
           {selectedIndustries.map((industry) => {
             const isMandatory = mandatoryIndustries.includes(industry);
             return (
               <Badge
                 key={industry}
-                variant="secondary"
-                className="pl-2 pr-1 py-1 flex items-center gap-1 max-w-full"
+                variant="outline"
+                className="pl-2.5 pr-1.5 py-0.5 flex items-center gap-1 max-w-full text-[11px] font-medium bg-indigo-500/10 border-indigo-500/30 text-indigo-300 rounded-lg hover:bg-indigo-500/15 transition-all duration-200 animate-in fade-in zoom-in-95 duration-150"
               >
                 <span className="truncate">{industry}</span>
                 {!isMandatory && (
@@ -251,13 +251,12 @@ export function IndustriesMultiSelect({
                       handleSelect(industry);
                     }}
                     onMouseDown={(e) => {
-                      // Prevent badge from absorbing the click before button receives it.
                       e.stopPropagation();
                     }}
-                    className="ml-1 shrink-0 hover:bg-destructive/20 rounded-full p-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 cursor-pointer"
+                    className="ml-1 shrink-0 hover:bg-red-500/20 text-indigo-300/60 hover:text-red-400 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer"
                     aria-label={`Remove ${industry}`}
                   >
-                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive pointer-events-none" />
+                    <X className="h-3 w-3 pointer-events-none" />
                   </button>
                 )}
               </Badge>

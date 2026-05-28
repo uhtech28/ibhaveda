@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Zap, Shield, Skull } from "lucide-react";
 import { useAtomValue } from "jotai";
-import { activeVentureAtom, userProgressAtom } from "@/lib/stores/hudStore";
+import { activeVentureAtom, userProgressAtom, checkpointProgressAtom, corruptionStateAtom } from "@/lib/stores/hudStore";
 
 interface XPBarProps {
   currentXP: number;
@@ -28,14 +28,6 @@ function formatINR(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
-function getVentureLabel(score: number): string {
-  if (score >= 9.0) return "Exceptional";
-  if (score >= 8.0) return "Strong";
-  if (score >= 7.0) return "Solid";
-  if (score >= 5.0) return "Developing";
-  if (score >= 3.0) return "Early";
-  return "Nascent";
-}
 
 function getScoreColor(score: number) {
   if (score >= 8) return { bar: "from-emerald-600 via-green-400 to-emerald-300", text: "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]", glow: "rgba(52,211,153,0.6)" };
@@ -57,13 +49,18 @@ const XPBarComponent = ({
 
   const activeVenture = useAtomValue(activeVentureAtom);
   const userProgress = useAtomValue(userProgressAtom);
+  const checkpointProgress = useAtomValue(checkpointProgressAtom);
+  const corruption = useAtomValue(corruptionStateAtom);
+
+  const totalCP = checkpointProgress.total || 36;
+  const completedCP = checkpointProgress.completed || 0;
+  const venturePercentage = Math.min((completedCP / totalCP) * 100, 100);
 
   const hasBoss = bossHp !== undefined && bossBaseHp !== undefined && bossHp > 0;
   const bossPercentage = hasBoss ? Math.min((bossHp! / bossBaseHp!) * 100, 100) : 0;
 
   const projectName = activeVenture?.name ?? "Your Project";
   const projectScore = userProgress.qualityScore ?? 0;
-  const ventureLabel = getVentureLabel(projectScore);
   const valuationScore = userProgress.valuationScore ?? 0;
   const scoreColors = getScoreColor(projectScore);
 
@@ -103,7 +100,7 @@ const XPBarComponent = ({
             <motion.div
               className={`h-full rounded-full bg-gradient-to-r ${scoreColors.bar} origin-left`}
               initial={{ width: 0 }}
-              animate={{ width: `${percentage}%` }}
+              animate={{ width: `${venturePercentage}%` }}
               transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
             />
             {/* Shimmer */}
@@ -132,12 +129,6 @@ const XPBarComponent = ({
                 {projectScore.toFixed(1)}
               </motion.span>
             </div>
-            
-            <span className="text-zinc-700 font-bold text-[9px] shrink-0">|</span>
-            
-            <span className="text-[9px] text-white font-black uppercase tracking-wider leading-none shrink-0">
-              {ventureLabel}
-            </span>
             
             <span className="text-zinc-700 font-bold text-[9px] shrink-0">|</span>
             
@@ -197,20 +188,16 @@ const XPBarComponent = ({
               {bossName || "BOSS"}
             </span>
           </div>
-
-          {/* Boss HP bar — reversed direction */}
+          {/* Boss HP bar */}
           <div className="relative h-[5px] w-full overflow-hidden rounded-full"
             style={{ background: "rgba(0,0,0,0.7)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.8)" }}
           >
-            {/* Fill from RIGHT */}
-            <div className="absolute inset-0 flex justify-end">
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-l from-rose-700 via-red-500 to-rose-300"
-                initial={{ width: 0 }}
-                animate={{ width: `${bossPercentage}%` }}
-                transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
-              />
-            </div>
+            <motion.div
+              className="h-full rounded-full bg-gradient-to-r from-rose-700 via-red-500 to-rose-300 origin-left"
+              initial={{ width: 0 }}
+              animate={{ width: `${bossPercentage}%` }}
+              transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
+            />
             {/* Shimmer */}
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent w-1/3"
@@ -223,19 +210,19 @@ const XPBarComponent = ({
           </div>
 
           {/* HP info row */}
-          <div className="flex items-center justify-end gap-2 mt-0.5">
+          <div className="flex items-center justify-between mt-0.5">
             <div className="flex items-baseline gap-1 shrink-0">
-              <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wider">HP:</span>
-              <span className="text-[10px] text-zinc-200 font-black font-mono leading-none">
-                {bossHp} <span className="text-zinc-600 font-normal">/</span> {bossBaseHp}
+              <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">Threat:</span>
+              <span className="text-[9px] font-black uppercase tracking-wider text-rose-400 shrink-0">
+                {corruption.phase || "calm"}
               </span>
             </div>
-
-            <span className="text-zinc-700 font-bold text-[9px] shrink-0">|</span>
-
-            <span className="text-[10.5px] font-black font-mono leading-none text-rose-400 shrink-0">
-              {Math.round(bossPercentage)}%
-            </span>
+            <div className="flex items-baseline gap-1 shrink-0">
+              <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">HP:</span>
+              <span className="text-[10.5px] font-black font-mono leading-none text-rose-400 shrink-0">
+                {Math.round(bossPercentage)}%
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -260,13 +247,13 @@ const XPBarComponent = ({
         <div className="flex-1 min-w-[120px] flex flex-col gap-1">
           <div className="flex items-center justify-between text-[7.5px] font-mono leading-none">
             <span className="text-zinc-500 uppercase tracking-widest font-black">Venture Progression</span>
-            <span className="text-cyan-400 font-bold">{Math.round(percentage)}%</span>
+            <span className="text-cyan-400 font-bold">{Math.round(venturePercentage)}%</span>
           </div>
           <div className="relative h-2.5 w-full overflow-hidden rounded-full border border-white/5 bg-black/50 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
             <motion.div
               className="h-full rounded-full bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-400 origin-left"
               initial={{ width: 0 }}
-              animate={{ width: `${percentage}%` }}
+              animate={{ width: `${venturePercentage}%` }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             />
             {/* Shimmer */}
@@ -282,12 +269,9 @@ const XPBarComponent = ({
 
         {/* Scores Display */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex flex-col items-end gap-[2px]">
+          <div className="flex flex-col items-end justify-center">
             <span className="text-[10px] font-black font-mono leading-none text-zinc-400">
               Score: <span className="text-white text-[11px] font-mono">{projectScore.toFixed(1)}</span>
-            </span>
-            <span className="text-[8px] text-cyan-400 font-bold leading-none uppercase tracking-wider">
-              {ventureLabel}
             </span>
           </div>
           
@@ -326,7 +310,7 @@ const XPBarComponent = ({
                 {projectName}
               </span>
               <span className={`text-[8px] font-bold ${scoreColors.text}`}>
-                Score {projectScore.toFixed(1)} · {ventureLabel}
+                Score {projectScore.toFixed(1)}
               </span>
             </div>
           </div>
@@ -356,7 +340,7 @@ const XPBarComponent = ({
               <motion.div
                 className={`h-full rounded-lg bg-gradient-to-r ${scoreColors.bar} relative overflow-hidden`}
                 initial={{ width: 0 }}
-                animate={{ width: `${percentage}%` }}
+                animate={{ width: `${venturePercentage}%` }}
                 transition={{ duration: 1, ease: [0.23, 1, 0.32, 1] }}
               >
                 <motion.div

@@ -198,15 +198,24 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
 
   const percentageValue = totalPossibleCount > 0 ? Math.round((totalEarnedCount / totalPossibleCount) * 100) : 0;
 
+  const titlePoints = levelProgress?.titlePoints ?? 0;
+  const nextLevelPoints = levelProgress?.nextLevelPoints ?? null;
+  const xpDetail = levelProgress === undefined
+    ? "Loading..."
+    : nextLevelPoints && nextLevelPoints > 0
+      ? `${titlePoints} / ${nextLevelPoints} XP`
+      : `${titlePoints} XP`;
+  const xpProgress = levelProgress?.progress ?? 0;
+
   return (
     <div className="pt-3 space-y-4">
-      {/* Level — single combined bar with average progress of all ideas */}
+      {/* Level — single combined bar with individual XP progress */}
       <ProgressBar
         icon={<Trophy className="w-3.5 h-3.5 text-amber-400" />}
         iconBgClass="bg-amber-500/15 ring-1 ring-amber-500/30"
         label={`Lv ${level} — ${title}`}
-        detail={`${averageProgress}% Avg Progress`}
-        value={averageProgress}
+        detail={xpDetail}
+        value={xpProgress}
         max={100}
         fillClass="bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.45)]"
       />
@@ -224,12 +233,12 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
         </span>
       </div>
 
-      {/* Futuristic Prestige Score & Badge Progress Card */}
+      {/* Futuristic Badges Earned & Badge Progress Card */}
       <div className="mt-4 bg-slate-900/60 border border-white/5 rounded-2xl px-5 py-3 flex items-center gap-4 self-start backdrop-blur-md shadow-lg hover:bg-slate-900/70 hover:border-yellow-500/25 transition-all duration-300 group w-fit">
         <Award className="w-6 h-6 text-yellow-400 group-hover:scale-105 transition-transform duration-300 animate-[bounce_3s_infinite]" />
         <div className="flex flex-col">
           <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest leading-none">
-            Prestige Score
+            Badges Earned
           </span>
           <span className="text-2xl font-black text-white leading-tight mt-1">
             {totalEarnedCount}{" "}

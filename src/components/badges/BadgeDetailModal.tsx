@@ -37,7 +37,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md bg-slate-950/95 border-white/10 backdrop-blur-xl text-white rounded-3xl overflow-hidden p-0 shadow-2xl">
+      <DialogContent showCloseButton={false} className="sm:max-w-md bg-slate-950/95 border-white/10 backdrop-blur-xl text-white rounded-3xl overflow-hidden p-0 shadow-2xl">
         <DialogTitle className="sr-only">{badge.name} Details</DialogTitle>
         
         {/* Detail Header with Close Button */}
@@ -108,18 +108,6 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
             )}
           </div>
 
-          {/* Rarity Tag */}
-          <span
-            className={cn(
-              "text-[10px] font-extrabold tracking-widest uppercase rounded-full px-3.5 py-0.5 border mb-3 shadow-inner",
-              isLocked
-                ? "text-slate-500 bg-slate-900/40 border-slate-800"
-                : norm.pillClass
-            )}
-          >
-            {isLocked ? "Locked Achievement" : norm.label}
-          </span>
-
           {/* Badge Name */}
           <h3 className="text-2xl font-black tracking-tight mb-2 leading-tight">
             {badge.name}
@@ -130,56 +118,22 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
             "{badge.tagline || badge.description}"
           </p>
 
-          {/* Details / Unlock Requirements List */}
-          <div className="w-full bg-slate-900/65 border border-white/5 rounded-2xl p-4 text-left space-y-3 mb-6">
-            
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-0.5">
-                  Category
-                </span>
-                <span className="text-xs font-semibold text-slate-200 capitalize block">
-                  {badge.category.replace("_", " ")}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-0.5">
-                  Progression Reward
-                </span>
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-400">
-                  <Award className="w-3.5 h-3.5" />
-                  +{norm.prestigeBonus} Score
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-0.5">
-                Requirement to Unlock
+          {/* Unlocked Date / Earned Stats */}
+          {!isLocked && badge.awardedAt && (
+            <div className="w-full bg-slate-900/65 border border-white/5 rounded-2xl p-4 text-left mb-6 flex items-center justify-between text-xs">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Unlocked On
               </span>
-              <p className="text-xs font-medium text-slate-300 leading-relaxed">
-                {badge.requirement || "Achieve specific milestones to unlock this badge."}
-              </p>
+              <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                {new Date(badge.awardedAt).toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric"
+                })}
+              </span>
             </div>
-
-            {/* Unlocked Date / Earned Stats */}
-            {!isLocked && badge.awardedAt && (
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                  Unlocked On
-                </span>
-                <span className="text-slate-300 font-semibold flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  {new Date(badge.awardedAt).toLocaleDateString(undefined, {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric"
-                  })}
-                </span>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Action Buttons */}
           {isOwner && !isLocked && onEquipToggle ? (

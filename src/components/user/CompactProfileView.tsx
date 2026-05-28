@@ -13,10 +13,10 @@ import { Id } from "@convex/_generated/dataModel";
 import { ContributionRequest } from "@/components/requests/request-status-card"
 import { useChat } from "@/components/chat/ChatContext";
 import { InvitationButton } from "@/components/requests/invitation-button";
-import { getVentureBadgeEmoji, BadgeItem } from "@/components/badges/BadgeCard";
+import { getNormalizedRarity, getVentureBadgeEmoji, BadgeItem } from "@/components/badges/BadgeCard";
 import { BadgeDetailModal } from "@/components/badges/BadgeDetailModal";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
 
@@ -95,11 +95,29 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
   const equippedBadgeIds = profile.equippedBadges || [];
-  
+
+  const updateUserProfile = useMutation(api.users.updateUserProfile);
+
+  const handleEquipToggle = async (badgeId: string) => {
+    let currentEquipped = [...equippedBadgeIds];
+    if (currentEquipped.includes(badgeId)) {
+      currentEquipped = currentEquipped.filter((id) => id !== badgeId);
+    } else {
+      if (currentEquipped.length >= 3) return;
+      currentEquipped.push(badgeId);
+    }
+    
+    try {
+      await updateUserProfile({ equippedBadges: currentEquipped });
+    } catch (e) {
+      console.error("Failed to update equipped badges:", e);
+    }
+  };
+
   // Resolve equipped list with a fallback/padding of the highest-rarity earned badges
   const equippedBadgesList = React.useMemo(() => {
     if (!earnedBadges) return [];
-    
+
     // Start with explicitly equipped badges
     const equipped = earnedBadges.filter((b) => equippedBadgeIds.includes(b.id));
     const list = [...equipped];
@@ -180,20 +198,30 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                   <div>
                     <h1 className="text-xl font-bold text-foreground leading-tight flex items-center gap-2">
                       {profile.displayName}
-                      {equippedBadgesList.slice(0, 3).map((badge) => (
-                        <span
-                          key={badge.id}
-                          title={`${badge.name}: ${badge.description} (Click to view details)`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedBadge(badge as any);
-                          }}
-                          className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 text-sm select-none shadow-[0_0_8px_rgba(234,179,8,0.2)] animate-pulse hover:scale-115 transition-transform duration-200 cursor-pointer"
-                          style={{ animationDuration: "3s" }}
-                        >
-                          <PremiumIcon name={(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)} className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        </span>
-                      ))}
+                      {equippedBadgesList.slice(0, 3).map((badge) => {
+                        const norm = getNormalizedRarity(badge.rarity);
+                        const accentColor = badge.secondaryColor || norm.accentColor;
+                        return (
+                          <span
+                            key={badge.id}
+                            title={`${badge.name}: ${badge.description} (Click to view details)`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedBadge(badge as any);
+                            }}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-sm select-none hover:scale-115 transition-transform duration-200 cursor-pointer"
+                            style={{
+                              backgroundColor: `${accentColor}20`,
+                              borderColor: `${accentColor}80`,
+                              borderWidth: "1px",
+                              color: accentColor,
+                              boxShadow: `0 0 12px ${accentColor}50`,
+                            }}
+                          >
+                            <PremiumIcon name={(badge as any).icon || getVentureBadgeEmoji(badge.id, badge.name)} className="w-3.5 h-3.5" strokeWidth={1.5} />
+                          </span>
+                        );
+                      })}
                     </h1>
                     <p className="text-muted-foreground font-medium text-sm">@{profile.username}</p>
                   </div>
@@ -430,8 +458,10 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         onClose={() => setSelectedBadge(null)}
         isOwner={isOwner}
         isEquipped={selectedBadge ? equippedBadgeIds.includes(selectedBadge.id) : false}
+        canEquipMore={equippedBadgeIds.length < 3}
+        onEquipToggle={selectedBadge ? () => handleEquipToggle(selectedBadge.id) : undefined}
       />
     </div>
-  )
+  );
 }
 

@@ -260,9 +260,29 @@ export const getUserLevelProgress = query({
       nextLevel: nextDef?.level ?? null,
       nextLevelTitle: nextDef?.title ?? null,
       nextLevelPoints: nextDef?.titlePoints ?? null,
-      progress: nextDef && nextDef.titlePoints > 0
-        ? Math.min(100, Math.round((titlePoints / nextDef.titlePoints) * 100))
-        : 100,
+      progress: (() => {
+        if (!nextDef) return 100;
+        const currentMin = currentDef?.titlePoints ?? 0;
+        const nextMin = nextDef.titlePoints;
+        if (nextMin > currentMin) {
+          const range = nextMin - currentMin;
+          return Math.min(100, Math.max(0, Math.round(((titlePoints - currentMin) / range) * 100)));
+        } else {
+          // Early tutorial levels where titlePoints doesn't increase yet
+          const ideas = userLevel?.ideasCreated || 0;
+          const comments = userLevel?.commentsCount || 0;
+          if (currentLevel === 1) {
+            return (comments >= 1 || ideas >= 1) ? 100 : 0;
+          }
+          if (currentLevel === 2) {
+            return ideas >= 1 ? 100 : 0;
+          }
+          if (currentLevel === 3) {
+            return Math.min(100, Math.round((titlePoints / 50) * 100));
+          }
+          return 100;
+        }
+      })(),
       requirements: currentDef?.requirements ?? [],
     };
   },

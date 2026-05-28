@@ -447,29 +447,8 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
           </p>
         </div>
 
-        {/* 7. Bottom Rarity Pill + Date / Lock Info */}
+        {/* 7. Bottom Date / Lock Info */}
         <div className="pt-4 flex flex-col items-center gap-2 mt-auto">
-          <div className="flex items-center gap-1.5">
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-[9px] font-black tracking-widest uppercase rounded-full px-3 py-0.5 h-5 border border-solid shrink-0 shadow-sm transition-all duration-300",
-                isLocked ? "text-slate-500 bg-slate-900/30 border-slate-800" : norm.pillClass
-              )}
-            >
-              {isLocked ? "LOCKED" : norm.label}
-            </Badge>
-            
-            {!isLocked && (
-              <Badge
-                variant="outline"
-                className="text-[9px] font-bold text-yellow-400 bg-yellow-500/10 border-yellow-500/20 px-2 py-0.5 rounded-full"
-              >
-                +{customScore !== undefined ? customScore : norm.prestigeBonus} Score
-              </Badge>
-            )}
-          </div>
-
           {!isLocked && badge.awardedAt ? (
             <span className="text-[9px] text-slate-500/80 flex items-center gap-1 font-medium transition-colors group-hover:text-slate-400">
               <Calendar className="w-2.5 h-2.5" />
@@ -506,20 +485,9 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
               {badge.requirement || "Achieve specific milestones to unlock this badge."}
             </p>
           </div>
-
-          <div>
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block mb-0.5">
-              Progression Reward
-            </span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-md shadow-sm mt-0.5">
-              <Award className="w-3.5 h-3.5" />
-              +{customScore !== undefined ? customScore : norm.prestigeBonus} Score
-            </span>
-          </div>
         </div>
 
-        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400 font-medium">
-          <span>Rarity: <span className="font-bold text-white capitalize">{norm.key}</span></span>
+        <div className="pt-2 border-t border-white/5 flex items-center justify-center text-[10px] font-medium">
           {badge.awardedAt ? (
             <span className="text-emerald-400 font-semibold flex items-center gap-1">
               <Check className="w-3 h-3 stroke-[3]" /> Earned
