@@ -10,17 +10,19 @@ const crons = cronJobs();
 const api = internal as any;
 
 // Schedule: Daily Idea Generation at 9:00 AM UTC
+// Internally posts 1-3 times from randomly selected agent accounts,
+// with extra posts scheduled at random hours later in the day.
 crons.daily(
   "Generate Daily Idea",
   { hourUTC: 9, minuteUTC: 0 },
   api.agent_actions.generateDailyIdea,
 );
 
-// Schedule: Hourly Engagement (Comment/Spark)
+// Schedule: Auto-accept contribution requests on agent-authored ideas (every 4 h)
 crons.interval(
-  "Agent Engagement",
-  { minutes: 60 },
-  api.agent_actions.generateEngagement,
+  "Accept Agent Contribution Requests",
+  { minutes: 240 },
+  api.agent_actions.acceptPendingContributions,
 );
 
 // Schedule: Daily Leaderboard Reset (00:00 IST -> 18:30 UTC previous day)

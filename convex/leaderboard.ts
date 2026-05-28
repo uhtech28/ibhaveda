@@ -20,7 +20,7 @@ export const getTopUsers = query({
         const topUsers = await Promise.all(
             topWallets.map(async (wallet) => {
                 const user = await ctx.db.get(wallet.userId);
-                if (!user) return null;
+                if (!user || user.role === "agent") return null;
 
                 return {
                     _id: user._id,
@@ -33,7 +33,7 @@ export const getTopUsers = query({
             })
         );
 
-        // Filter out nulls (deleted users)
+        // Filter out nulls (deleted users) and agent accounts
         return topUsers.filter((u) => u !== null);
     },
 });
@@ -78,7 +78,7 @@ export const getWeeklyLeaderboard = query({
                 if (!wallet) return null;
 
                 const user = await ctx.db.get(wallet.userId);
-                if (!user) return null;
+                if (!user || user.role === "agent") return null;
 
                 return {
                     _id: user._id,
@@ -155,7 +155,7 @@ export const getDailyLeaderboard = query({
                 if (!wallet) return null;
 
                 const user = await ctx.db.get(wallet.userId);
-                if (!user) return null;
+                if (!user || user.role === "agent") return null;
 
                 return {
                     _id: user._id,
@@ -217,6 +217,8 @@ export const finalizeDailyLeaderboard = internalMutation({
             const [walletId, points] = top3Wallets[i];
             const wallet = await ctx.db.get(walletId as Id<"wallets">);
             if (wallet) {
+                const walletUser = await ctx.db.get(wallet.userId);
+                if (walletUser?.role === "agent") continue;
                 await ctx.db.insert("dailyLeaderboardWinners", {
                     date: dateStr,
                     userId: wallet.userId,
