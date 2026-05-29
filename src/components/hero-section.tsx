@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { SignedOut, SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
+import { SignUpButton, useClerk, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { GraduationCap, TrendingUp, Rocket, Building2, ArrowRight } from "lucide-react";
 
@@ -87,6 +87,7 @@ function PixelField() {
 
 export default function HeroSection() {
   const { isSignedIn } = useUser();
+  const { openSignIn } = useClerk();
   const router = useRouter();
 
   const handleSelect = (role: string) => {
@@ -138,15 +139,14 @@ export default function HeroSection() {
             className="mb-4"
             style={{ animation: "lp-reveal-simple 600ms ease both" }}
           >
-            <SignInButton mode="modal" forceRedirectUrl="/feed" fallbackRedirectUrl="/feed">
-              <button
-                type="button"
-                className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
-              >
-                Already a member?{" "}
-                <span className="text-[#F7D66D] font-semibold hover:underline">Log in</span>
-              </button>
-            </SignInButton>
+            <button
+              type="button"
+              onClick={() => openSignIn({ afterSignInUrl: "/feed", fallbackRedirectUrl: "/feed" })}
+              className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
+            >
+              Already a member?{" "}
+              <span className="text-[#F7D66D] font-semibold hover:underline">Log in</span>
+            </button>
           </div>
 
           {/* ── Hero copy ── */}
