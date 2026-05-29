@@ -2610,15 +2610,13 @@ export class WorldMapScene extends Phaser.Scene {
       });
 
       // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 7 — GUILD BANNERS (warm artisan colours)
+      //  LAYER 7 — GUILD BANNERS (top entrance only — keeps bottom market clean)
       // ════════════════════════════════════════════════════════════════════════
       const banners = this.add.graphics().setDepth(7);
       const bW = tileSize * 2.0, bH = tileSize * 3.0;
       ([
         [tx(6.8),  ty(6.8)],
         [tx(33.2), ty(6.8)],
-        [tx(6.8),  ty(32.8)],
-        [tx(33.2), ty(32.8)],
       ] as [number, number][]).forEach(([bx, by], bi) => {
         const bannerColor = bi % 2 === 0 ? 0x5c4a78 : 0x6a5030;
         banners.fillStyle(0x000000, 0.3);
@@ -2666,205 +2664,167 @@ export class WorldMapScene extends Phaser.Scene {
       hallGlow.setDepth(9);
       this.midgroundLayer.add(hallGlow);
 
-      // Helper — draw a stone stall foundation pad (grounds props realistically)
+      // ── Zone helpers (Stage-1 style: props NEVER on roads / checkpoint plazas) ──
+      //
+      //  Grid zones (cols):
+      //    0–5   park + storage yard
+      //    7     left path  (CP1 bottom-left, CP2 top-left) — keep clear
+      //    9–12  left market block
+      //    13–27 centre plaza (CP5 medallion, well, bulletin) — keep clear
+      //    28–31 right market block
+      //    33    right path  (CP3 top-right, CP4 bottom-right) — keep clear
+      //    34–39 park + storage yard
+
+      const drawYard = (side: "left" | "right", rowTop: number, rowBot: number) => {
+        const col = side === "left" ? 4.6 : 35.4;
+        const yard = this.add.graphics().setDepth(10);
+        const x = tx(col) - tileSize * 1.7;
+        const y = ty(rowTop);
+        const w = tileSize * 3.4;
+        const h = ty(rowBot) - ty(rowTop);
+        yard.fillStyle(0x383048, 0.88);
+        yard.fillRoundedRect(x, y, w, h, 5);
+        yard.lineStyle(1.5, C.goldDim, 0.45);
+        yard.strokeRoundedRect(x + 1, y + 1, w - 2, h - 2, 4);
+        this.midgroundLayer.add(yard);
+      };
+
       const drawStallPad = (col: number, row: number, wCols: number, hRows: number) => {
         const pad = this.add.graphics().setDepth(11);
         const px = tx(col) - (wCols * tileSize) / 2;
         const py = ty(row) - hRows * tileSize;
         const pw = wCols * tileSize;
         const ph = hRows * tileSize;
-        pad.fillStyle(0x000000, 0.18);
-        pad.fillRoundedRect(px + 3, py + 4, pw, ph, 5);
-        pad.fillStyle(0x4a4258, 0.92);
-        pad.fillRoundedRect(px, py, pw, ph, 5);
-        pad.lineStyle(1.5, C.goldDim, 0.5);
-        pad.strokeRoundedRect(px + 2, py + 2, pw - 4, ph - 4, 4);
+        pad.fillStyle(0x000000, 0.15);
+        pad.fillRoundedRect(px + 2, py + 3, pw, ph, 4);
+        pad.fillStyle(0x4a4258, 0.94);
+        pad.fillRoundedRect(px, py, pw, ph, 4);
+        pad.lineStyle(1.5, C.goldDim, 0.55);
+        pad.strokeRoundedRect(px + 2, py + 2, pw - 4, ph - 4, 3);
         this.midgroundLayer.add(pad);
       };
 
-      // Helper — place a row of storage props (bins, barrels, crates) in a neat line
-      const storageRow = (
-        items: Array<[string, number, number, number?, number?]>,
-        baseDepth = 13,
-      ) => {
-        items.forEach(([key, col, row, sc = 1, tint = 0x988868]) => {
-          prop(key, col, row, baseDepth, tint, sc, 0.92);
-        });
-      };
+      const stripeW = 12;
 
       // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 9 — TOWN SQUARE (bulletin board, benches, bins — organized centre)
+      //  LAYER 9 — CENTRE PLAZA (minimal — well + notice board only, paths clear)
       // ════════════════════════════════════════════════════════════════════════
-      // Central notice board on the middle road
-      prop("BulletinBoard_1", 20.0, 23.2, 12, 0xa89070, 1.0);
-
-      // Benches flanking the centre path with waste baskets beside each (realistic street layout)
-      prop("Bench_1", 15.2, 21.2, 11, 0x988868, 0.94);
-      prop("Basket_Empty", 14.2, 21.3, 12, 0x887858, 0.9);   // bin left of bench
-      prop("Barrel_Small_Empty", 16.2, 21.3, 12, 0x807050, 0.88); // rain barrel right
-
-      prop("Bench_1", 24.8, 21.2, 11, 0x988868, 0.94);
-      prop("Basket_Empty", 23.8, 21.3, 12, 0x887858, 0.9);
-      prop("Barrel_Small_Empty", 25.8, 21.3, 12, 0x807050, 0.88);
-
-      // Direction signs at path forks (left / centre / right)
-      prop("Sign_2", 9.2, 21.4, 12, C.gold, 0.96);
-      prop("Sign_1", 31.0, 21.4, 12, C.gold, 0.96);
-      prop("Sign_2", 20.0, 16.8, 12, C.gold, 0.94);
-
-      // Guild hall entrance planters
-      prop("Plant_2", 13.2, 14.8, 10, 0x90b878, 0.95);
-      prop("Plant_2", 26.8, 14.8, 10, 0x90b878, 0.95);
-
-      // Community well on the centre spine (Stage 1 has a well — artisan quarter needs one too)
-      prop("Well_Hay_1", 20.0, 17.6, 11, 0xc8b890, 0.96);
+      prop("Well_Hay_1", 20.0, 17.4, 11, 0xc8b890, 0.96);
+      prop("BulletinBoard_1", 20.0, 23.0, 12, 0xa89070, 1.0);
+      prop("Plant_2", 13.0, 14.6, 10, 0x90b878, 0.95);
+      prop("Plant_2", 27.0, 14.6, 10, 0x90b878, 0.95);
 
       // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 10 — LEFT MARKET STALL (blacksmith — neatly arranged stock)
+      //  LAYER 10 — LEFT STORAGE YARD (all bins/barrels/crates — one neat column)
       // ════════════════════════════════════════════════════════════════════════
-      drawStallPad(11.0, 27.6, 4.2, 2.2);
+      drawYard("left", 22.0, 32.5);
+      prop("HayStack_2",       4.6, 22.4, 12, 0xc8b878, 0.84);
+      prop("Sack_3",           4.6, 24.2, 12, 0x887858, 0.9);
+      prop("Sack_3",           5.2, 25.0, 12, 0x807050, 0.88);
+      prop("Barrel_Small_Empty", 4.4, 26.4, 12, 0x887858, 0.92);
+      prop("Barrel_Small_Empty", 5.0, 27.2, 12, 0x807050, 0.9);
+      prop("Basket_Empty",     4.6, 28.6, 12, 0x887858, 0.9);   // bin row
+      prop("Basket_Empty",     5.2, 29.4, 12, 0x807050, 0.88);
+      prop("Crate_Large_Empty", 4.4, 30.8, 12, 0x988868, 0.9);
+      prop("Crate_Medium_Closed", 5.0, 31.6, 12, 0x908070, 0.88);
 
-      prop("Table_Medium_1", 11.0, 27.2, 14, 0xa89878, 0.96);
+      // ════════════════════════════════════════════════════════════════════════
+      //  LAYER 11 — RIGHT STORAGE YARD (mirror of left)
+      // ════════════════════════════════════════════════════════════════════════
+      drawYard("right", 22.0, 32.5);
+      prop("HayStack_2",       35.4, 22.4, 12, 0xc8b878, 0.84);
+      prop("Sack_3",           35.4, 24.2, 12, 0x887858, 0.9);
+      prop("Sack_3",           34.8, 25.0, 12, 0x807050, 0.88);
+      prop("Barrel_Small_Empty", 35.6, 26.4, 12, 0x887858, 0.92);
+      prop("Barrel_Small_Empty", 35.0, 27.2, 12, 0x807050, 0.9);
+      prop("Basket_Empty",     35.4, 28.6, 12, 0x887858, 0.9);
+      prop("Basket_Empty",     34.8, 29.4, 12, 0x807050, 0.88);
+      prop("Crate_Large_Empty", 35.6, 30.8, 12, 0x988868, 0.9);
+      prop("Crate_Medium_Closed", 35.0, 31.6, 12, 0x908070, 0.88);
+
+      // ════════════════════════════════════════════════════════════════════════
+      //  LAYER 12 — LEFT MARKET STALL (compact block, off the main path)
+      // ════════════════════════════════════════════════════════════════════════
+      drawStallPad(10.5, 27.4, 3.6, 2.0);
+      prop("Table_Medium_1", 10.5, 27.2, 14, 0xa89878, 0.96);
 
       const smithCanopy = this.add.graphics().setDepth(15);
-      smithCanopy.fillStyle(0x000000, 0.22);
-      smithCanopy.fillRect(tx(9.6) + 3, ty(27.2) - 32, 76, 38);
-      const stripeW = 12;
+      smithCanopy.fillStyle(0x000000, 0.2);
+      smithCanopy.fillRect(tx(9.2) + 2, ty(27.2) - 30, 68, 34);
       for (let s = 0; s < 6; s++) {
         smithCanopy.fillStyle(s % 2 === 0 ? 0xe87830 : 0x3a3028, 0.96);
-        smithCanopy.fillRect(tx(9.6) + s * stripeW, ty(27.2) - 36, stripeW, 34);
+        smithCanopy.fillRect(tx(9.2) + s * stripeW, ty(27.2) - 34, stripeW, 32);
       }
-      smithCanopy.lineStyle(1.5, C.gold, 0.75);
-      smithCanopy.strokeRect(tx(9.6), ty(27.2) - 36, 72, 34);
+      smithCanopy.lineStyle(1.5, C.gold, 0.7);
+      smithCanopy.strokeRect(tx(9.2), ty(27.2) - 34, 72, 32);
       this.midgroundLayer.add(smithCanopy);
 
-      // Stock row — crates and barrels in a tidy line behind the stall
-      storageRow([
-        ["Crate_Large_Empty",    9.2,  27.2, 0.95, 0x988868],
-        ["Barrel_Small_Empty",  10.0, 27.35, 0.92, 0x887858],
-        ["Crate_Medium_Closed", 12.2, 27.2, 0.9,  0x908070],
-        ["Barrel_Small_Empty",  13.0, 27.35, 0.92, 0x887858],
-      ]);
-
-      // Storage alley beside left path — sacks, hay, baskets (bins) stacked neatly
-      storageRow([
-        ["HayStack_2",       5.6, 24.0, 0.82, 0xc8b878],
-        ["Sack_3",           5.6, 25.8, 0.88, 0x887858],
-        ["Sack_3",           6.4, 26.4, 0.85, 0x807050],
-        ["Basket_Empty",     5.8, 28.2, 0.9,  0x887858],
-        ["Basket_Empty",     6.6, 28.2, 0.88, 0x807050],
-        ["Barrel_Small_Empty", 5.4, 29.8, 0.9, 0x887858],
-      ], 12);
-
-      // Corner waste station near CP1 approach (bottom-left path)
-      prop("Basket_Empty", 8.4, 33.2, 12, 0x887858, 0.9);
-      prop("Barrel_Small_Empty", 8.4, 34.0, 12, 0x807050, 0.88);
-      prop("Crate_Water_1", 9.2, 33.6, 12, 0x788898, 0.85);
+      // Two crates tucked behind stall only — not on path
+      prop("Crate_Large_Empty",    9.4, 27.2, 13, 0x988868, 0.9);
+      prop("Barrel_Small_Empty",  11.6, 27.3, 13, 0x887858, 0.88);
 
       // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 11 — RIGHT MARKET STALL (alchemist — mirror layout)
+      //  LAYER 13 — RIGHT MARKET STALL (mirror)
       // ════════════════════════════════════════════════════════════════════════
-      drawStallPad(29.0, 27.6, 4.2, 2.2);
-
-      prop("Table_Medium_1", 29.0, 27.2, 14, 0xa89878, 0.96);
+      drawStallPad(29.5, 27.4, 3.6, 2.0);
+      prop("Table_Medium_1", 29.5, 27.2, 14, 0xa89878, 0.96);
 
       const alchCanopy = this.add.graphics().setDepth(15);
-      alchCanopy.fillStyle(0x000000, 0.22);
-      alchCanopy.fillRect(tx(27.6) + 3, ty(27.2) - 32, 76, 38);
+      alchCanopy.fillStyle(0x000000, 0.2);
+      alchCanopy.fillRect(tx(28.2) + 2, ty(27.2) - 30, 68, 34);
       for (let s = 0; s < 6; s++) {
         alchCanopy.fillStyle(s % 2 === 0 ? 0x7a68a8 : 0xd4a843, 0.96);
-        alchCanopy.fillRect(tx(27.6) + s * stripeW, ty(27.2) - 36, stripeW, 34);
+        alchCanopy.fillRect(tx(28.2) + s * stripeW, ty(27.2) - 34, stripeW, 32);
       }
-      alchCanopy.lineStyle(1.5, C.gold, 0.75);
-      alchCanopy.strokeRect(tx(27.6), ty(27.2) - 36, 72, 34);
+      alchCanopy.lineStyle(1.5, C.gold, 0.7);
+      alchCanopy.strokeRect(tx(28.2), ty(27.2) - 34, 72, 32);
       this.midgroundLayer.add(alchCanopy);
 
-      storageRow([
-        ["Crate_Medium_Closed", 27.4, 27.2, 0.9,  0x908070],
-        ["Barrel_Small_Empty",  28.2, 27.35, 0.92, 0x887858],
-        ["Crate_Large_Empty",   30.2, 27.2, 0.95, 0x988868],
-        ["Barrel_Small_Empty",  31.0, 27.35, 0.92, 0x887858],
-      ]);
-
-      storageRow([
-        ["HayStack_2",         34.4, 24.0, 0.82, 0xc8b878],
-        ["Sack_3",             34.4, 25.8, 0.88, 0x887858],
-        ["Sack_3",             33.6, 26.4, 0.85, 0x807050],
-        ["Basket_Empty",       34.2, 28.2, 0.9,  0x887858],
-        ["Basket_Empty",       33.4, 28.2, 0.88, 0x807050],
-        ["Barrel_Small_Empty", 34.6, 29.8, 0.9,  0x887858],
-      ], 12);
-
-      // Corner waste station near CP4 approach (bottom-right path)
-      prop("Basket_Empty", 31.6, 33.2, 12, 0x887858, 0.9);
-      prop("Barrel_Small_Empty", 31.6, 34.0, 12, 0x807050, 0.88);
-      prop("Crate_Water_1", 30.8, 33.6, 12, 0x788898, 0.85);
+      prop("Crate_Medium_Closed", 28.4, 27.2, 13, 0x908070, 0.9);
+      prop("Barrel_Small_Empty",  30.6, 27.3, 13, 0x887858, 0.88);
 
       // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 12 — UPPER PATH FURNITURE (top row bins + signs at CP2/CP3)
+      //  LAYER 14 — PARK EDGES (trees + bushes only — no props on paths)
       // ════════════════════════════════════════════════════════════════════════
-      // Bins tucked against the guild terrace wall at top path corners
-      prop("Basket_Empty", 8.6, 11.2, 12, 0x887858, 0.88);
-      prop("Barrel_Small_Empty", 9.4, 11.2, 12, 0x807050, 0.86);
-      prop("Basket_Empty", 32.4, 11.2, 12, 0x887858, 0.88);
-      prop("Barrel_Small_Empty", 31.6, 11.2, 12, 0x807050, 0.86);
+      prop("Tree_Emerald_3", 2.4, 14.0, 10, 0xa8d8a0, 1.02);
+      prop("Tree_Emerald_4", 3.2, 26.0, 10, 0x98c890, 0.98);
+      prop("Bush_Emerald_1", 3.6, 18.0, 11, 0x88b878, 0.88);
+      prop("Bush_Emerald_5", 3.0, 30.0, 11, 0x80b070, 0.86);
 
-      // Small bench + bin rest stop on upper crossroad
-      prop("Bench_3", 17.6, 20.0, 11, 0x988868, 0.9);
-      prop("Bench_3", 22.4, 20.0, 11, 0x988868, 0.9);
-      prop("Basket_Empty", 17.0, 20.1, 12, 0x887858, 0.85);
-      prop("Basket_Empty", 23.0, 20.1, 12, 0x887858, 0.85);
+      prop("Tree_Emerald_4", 37.6, 14.0, 10, 0xa8d8a0, 1.02);
+      prop("Tree_Emerald_3", 36.8, 26.0, 10, 0x98c890, 0.98);
+      prop("Bush_Emerald_2", 36.4, 18.0, 11, 0x88b878, 0.88);
+      prop("Bush_Emerald_6", 37.0, 30.0, 11, 0x80b070, 0.86);
 
       // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 13 — FRAMING VEGETATION (trees on edges, bushes fill gaps only)
+      //  LAYER 15 — LAMPS at cross-street midpoints ONLY (not on checkpoint plazas)
       // ════════════════════════════════════════════════════════════════════════
-      prop("Tree_Emerald_3", 2.2, 12.0, 10, 0xa8d8a0, 1.05);
-      prop("Tree_Emerald_4", 3.0, 21.0, 10, 0x98c890, 0.98);
-      prop("Tree_Emerald_3", 2.4, 30.0, 10, 0xa8d8a0, 1.02);
-      prop("Bush_Emerald_1", 3.4, 13.5, 11, 0x88b878, 0.9);
-      prop("Bush_Emerald_5", 2.8, 22.5, 11, 0x80b070, 0.88);
-      prop("Bush_Emerald_2", 3.6, 31.5, 11, 0x88b878, 0.9);
-
-      prop("Tree_Emerald_4", 37.8, 12.0, 10, 0xa8d8a0, 1.05);
-      prop("Tree_Emerald_3", 37.0, 21.0, 10, 0x98c890, 0.98);
-      prop("Tree_Emerald_4", 37.6, 30.0, 10, 0xa8d8a0, 1.02);
-      prop("Bush_Emerald_2", 36.6, 13.5, 11, 0x88b878, 0.9);
-      prop("Bush_Emerald_6", 37.2, 22.5, 11, 0x80b070, 0.88);
-      prop("Bush_Emerald_1", 36.4, 31.5, 11, 0x88b878, 0.9);
-
-      // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 14 — LAMP POSTS AT PATH INTERSECTIONS ONLY (6 key corners)
-      // ════════════════════════════════════════════════════════════════════════
-      prop("LampPost_3", 7.0,  9.8,  14, C.gold, 0.98);
-      prop("LampPost_3", 33.0, 9.8,  14, C.gold, 0.98);
-      prop("LampPost_3", 7.0,  35.8, 14, C.gold, 0.98);
-      prop("LampPost_3", 33.0, 35.8, 14, C.gold, 0.98);
-      prop("LampPost_3", 20.0, 9.8,  14, C.gold, 0.92);
-      prop("LampPost_3", 20.0, 35.8, 14, C.gold, 0.92);
+      prop("LampPost_3", 13.5, 9.6,  14, C.gold, 0.96);
+      prop("LampPost_3", 26.5, 9.6,  14, C.gold, 0.96);
+      prop("LampPost_3", 13.5, 35.6, 14, C.gold, 0.96);
+      prop("LampPost_3", 26.5, 35.6, 14, C.gold, 0.96);
 
       ([
-        [tx(7.0),  ty(8.4)],
-        [tx(33.0), ty(8.4)],
-        [tx(7.0),  ty(34.4)],
-        [tx(33.0), ty(34.4)],
-        [tx(20.0), ty(8.4)],
-        [tx(20.0), ty(34.4)],
+        [tx(13.5), ty(8.2)],
+        [tx(26.5), ty(8.2)],
+        [tx(13.5), ty(34.2)],
+        [tx(26.5), ty(34.2)],
       ] as [number, number][]).forEach(([lx, ly], li) => {
-        const halo = this.add.circle(lx, ly, tileSize * 2.8, C.warmGlow, 0.08);
+        const halo = this.add.circle(lx, ly, tileSize * 2.4, C.warmGlow, 0.07);
         halo.setDepth(15);
         this.midgroundLayer.add(halo);
         this.tweens.add({
           targets: halo,
-          alpha: { from: 0.08, to: 0.22 },
+          alpha: { from: 0.07, to: 0.18 },
           scale: { from: 0.96, to: 1.04 },
-          duration: 2400 + li * 280,
+          duration: 2600 + li * 300,
           yoyo: true, repeat: -1,
           ease: "Sine.easeInOut",
         });
       });
 
       // ════════════════════════════════════════════════════════════════════════
-      //  LAYER 15 — WORKSHOP EMBERS & AMBIENT WARMTH
+      //  LAYER 16 — WORKSHOP EMBERS & AMBIENT WARMTH
       // ════════════════════════════════════════════════════════════════════════
       const emberOffsets = [0, 4, 8, 12, 16, 20];
       emberOffsets.forEach((off, p) => {
@@ -5497,51 +5457,9 @@ export class WorldMapScene extends Phaser.Scene {
     this.addLandmarkSprite("Rock_Brown_6", centerX + 172, centerY + 178, 0.88, 0.74);
   }
 
-  private createArtisanLandmarks(stageId: number): void {
-      const nodes = this.getStageNodes(stageId);
-      if (nodes.length === 0) return;
-
-      const first = nodes[0];
-      const last  = nodes[nodes.length - 1];
-      const centerX = (first.x + last.x) / 2;
-      const centerY = (first.y + last.y) / 2;
-
-      // Tile panel handles the main layout. Landmarks add only checkpoint-adjacent
-      // street furniture — lamps and subtle props placed like Stage 1 village.
-
-      // Lamp posts beside each checkpoint (matching Stage 1 village pattern)
-      nodes.forEach((node, index) => {
-        if (index === 4) return; // CP5 centre — medallion already lit
-        const side = index < 2 ? -72 : 72;
-        const lampX = node.x + side;
-        const lampY = node.y + 48;
-        this.addLandmarkSprite("LampPost_3", lampX, lampY, 0.8, 0.94);
-
-        const glow = this.add.circle(lampX, lampY - 48, 22, 0xffb040, 0.1);
-        glow.setDepth(16);
-        this.midgroundLayer.add(glow);
-        this.tweens.add({
-          targets: glow,
-          alpha: { from: 0.08, to: 0.2 },
-          duration: 2000 + index * 200,
-          yoyo: true, repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-
-        // Waste bin cluster beside each corner checkpoint (realistic street corner)
-        const binX = node.x + (index < 2 ? -38 : 38);
-        const binY = node.y + 62;
-        this.addLandmarkSprite("Basket_Empty", binX, binY, 0.72, 0.88);
-        this.addLandmarkSprite("Barrel_Small_Empty", binX + (index < 2 ? 14 : -14), binY + 2, 0.7, 0.86);
-      });
-
-      // Blacksmith forge glow at left market (if texture exists)
-      if (this.textures.exists("Fireplace_1")) {
-        this.addLandmarkSprite("Fireplace_1", centerX - 168, centerY + 118, 0.78, 0.92);
-      }
-
-      // Hay supply near right storage alley
-      this.addLandmarkSprite("HayStack_2", centerX + 228, centerY + 108, 0.8, 0.9);
+  private createArtisanLandmarks(_stageId: number): void {
+      // All layout lives in createArtisanTilePanel — no duplicate props here.
+      // (Previously added lamps/bins at checkpoints which cluttered the paths.)
     }
 
   private createMineLandmarks(stageId: number): void {
