@@ -256,7 +256,7 @@ const BIOME_CONFIGS: BiomeConfig[] = [
 export class WorldMapScene extends Phaser.Scene {
   // Core entities
   private checkpointNodes: Map<string, CheckpointNode>;
-  private persona: Persona | null;
+  public persona: Persona | null;
   private companions: Map<string, ContributorCompanion> = new Map();
   private bosses: Map<string, BossSilhouette>;
   private miniBosses: Map<number, MiniBoss>;
@@ -365,6 +365,7 @@ export class WorldMapScene extends Phaser.Scene {
   private revealedStages: Set<number> = new Set([1]);
   private stageEntryInProgress: Set<number> = new Set();
   private loadedStages: Set<number> = new Set();
+  private monkeys: ProceduralMonkey[] = [];
   private phaserTilesets: Phaser.Tilemaps.Tileset[] = [];
   private panelOffsetX = 0;
   private panelOffsetY = 0;
@@ -423,6 +424,7 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Initialize loaded stages tracking
     this.loadedStages.clear();
+    this.monkeys = [];
 
     // 1. Initialize tilemap metadata (load map and tileset imagery, but don't draw layers yet)
     this.initTilemap();
@@ -2005,34 +2007,149 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    for (let row = 7; row < rows - 7; row += 2) {
-      for (let col = 5; col < cols - 5; col += 3) {
+    // Mossy rocks, mushrooms, and log stumps definitions
+    const rockFrames = [8, 9, 10];
+    const mushroomFrames = [11, 12, 13];
+    const logFrames = [0, 1, 2];
+
+    for (let row = 4; row < rows - 4; row += 2) {
+      for (let col = 4; col < cols - 4; col += 2) {
         if (isNearPath(col, row, 2.2)) continue;
-        if ((col * 23 + row * 17) % 7 !== 0) continue;
 
-        addFrameSprite(
-          "sprout_plants_sheet",
-          plantFrames[(col + row) % plantFrames.length],
-          col,
-          row,
-          6,
-          0xffffff,
-          0.82,
-        );
-
-        if ((col + row) % 4 === 0) {
+        const val = (col * 31 + row * 17) % 100;
+        
+        // 1. Sprout plants
+        if (val < 15) {
+          addFrameSprite(
+            "sprout_plants_sheet",
+            plantFrames[(col + row) % plantFrames.length],
+            col,
+            row,
+            6,
+            0xffffff,
+            0.82,
+          );
+        }
+        
+        // 2. Flowers
+        if (val >= 15 && val < 28) {
           addFrameSprite(
             "sprout_forest_decor_sheet",
             flowerFrames[(col + row) % flowerFrames.length],
-            col + 0.3,
+            col + 0.25,
             row + 0.2,
             6.2,
             0xffffff,
-            0.8,
+            0.85,
+          );
+        }
+
+        // 3. Mushrooms (nature feeling)
+        if (val >= 28 && val < 36) {
+          addFrameSprite(
+            "sprout_forest_decor_sheet",
+            mushroomFrames[(col + row) % mushroomFrames.length],
+            col + 0.15,
+            row + 0.15,
+            6.1,
+            0xffffff,
+            0.9,
+          );
+        }
+
+        // 4. Mossy stones/rocks
+        if (val >= 36 && val < 42) {
+          addFrameSprite(
+            "sprout_forest_decor_sheet",
+            rockFrames[(col + row) % rockFrames.length],
+            col + 0.1,
+            row + 0.1,
+            6.0,
+            0xffffff,
+            0.88,
+          );
+        }
+
+        // 5. Stumps and logs
+        if (val >= 42 && val < 46) {
+          addFrameSprite(
+            "sprout_forest_decor_sheet",
+            logFrames[(col + row) % logFrames.length],
+            col + 0.2,
+            row + 0.2,
+            6.3,
+            0xffffff,
+            0.85,
           );
         }
       }
     }
+
+    // Add atmospheric sunbeams / god rays filtering through the canopy
+    const sunbeams = this.add.graphics();
+    sunbeams.setDepth(15); // Above the trees (depth 13) and props
+    sunbeams.fillStyle(0xfff7c2, 0.05); // Very soft warm white/yellow
+    
+    // Draw diagonal beams across the map
+    const beamCount = 8;
+    for (let i = 0; i < beamCount; i++) {
+      const startX = panelX + (i * (panelW / (beamCount - 1))) - 300;
+      const startY = panelOffsetY - 50;
+      
+      sunbeams.beginPath();
+      sunbeams.moveTo(startX, startY);
+      sunbeams.lineTo(startX + 90, startY);
+      sunbeams.lineTo(startX + 350, startY + panelH + 100);
+      sunbeams.lineTo(startX + 220, startY + panelH + 100);
+      sunbeams.closePath();
+      sunbeams.fillPath();
+    }
+    this.midgroundLayer.add(sunbeams);
+
+    // Spawn procedural jumping monkeys in Stage 2 forest biome
+    const monkeyPaths = [
+      {
+        // Monkey 1: Upper-left canopy jumping
+        start: { x: panelX + 2.0 * tileSize, y: panelOffsetY + 5.2 * tileSize - 10 },
+        path: [
+          { x: panelX + 2.0 * tileSize, y: panelOffsetY + 5.2 * tileSize - 10 },
+          { x: panelX + 5.5 * tileSize, y: panelOffsetY + 6.4 * tileSize - 10 },
+          { x: panelX + 9.4 * tileSize, y: panelOffsetY + 5.6 * tileSize - 10 }
+        ]
+      },
+      {
+        // Monkey 2: Lower-left tree transition jumping
+        start: { x: panelX + 2.4 * tileSize, y: panelOffsetY + 18.4 * tileSize - 10 },
+        path: [
+          { x: panelX + 2.4 * tileSize, y: panelOffsetY + 18.4 * tileSize - 10 },
+          { x: panelX + 4.8 * tileSize, y: panelOffsetY + 22.4 * tileSize - 10 },
+          { x: panelX + 8.4 * tileSize, y: panelOffsetY + 25.6 * tileSize - 10 }
+        ]
+      },
+      {
+        // Monkey 3: Upper-right canopy jumping
+        start: { x: panelX + 27.5 * tileSize, y: panelOffsetY + 6.6 * tileSize - 10 },
+        path: [
+          { x: panelX + 27.5 * tileSize, y: panelOffsetY + 6.6 * tileSize - 10 },
+          { x: panelX + 33.4 * tileSize, y: panelOffsetY + 5.4 * tileSize - 10 }
+        ]
+      },
+      {
+        // Monkey 4: Lower-right log / grass hopping
+        start: { x: panelX + 28.6 * tileSize, y: panelOffsetY + 30.8 * tileSize },
+        path: [
+          { x: panelX + 28.6 * tileSize, y: panelOffsetY + 30.8 * tileSize },
+          { x: panelX + 30.8 * tileSize, y: panelOffsetY + 36.2 * tileSize },
+          { x: panelX + 23.6 * tileSize, y: panelOffsetY + 33.0 * tileSize }
+        ]
+      }
+    ];
+
+    monkeyPaths.forEach((m) => {
+      const monkey = new ProceduralMonkey(this, m.start.x, m.start.y, m.path);
+      this.monkeys.push(monkey);
+      this.midgroundLayer.add(monkey);
+    });
   }
 
   private createArenaTilePanel(
@@ -7345,6 +7462,11 @@ export class WorldMapScene extends Phaser.Scene {
     this.checkBiomeLoading();
     this.emitTutorialPulsePosition();
 
+    // Update jumping monkeys in Stage 2 forest
+    if (this.monkeys && this.monkeys.length > 0) {
+      this.monkeys.forEach((monkey) => monkey.update());
+    }
+
     // Update accepted contributor companion sprites follow tracking
     if (this.persona && this.companions && this.companions.size > 0) {
       const companionsArray = Array.from(this.companions.values());
@@ -7768,6 +7890,598 @@ export class WorldMapScene extends Phaser.Scene {
         },
       });
       this.residualMarkers.delete(stage);
+    }
+  }
+}
+
+class ProceduralMonkey extends Phaser.GameObjects.Container {
+  declare scene: WorldMapScene;
+
+  private bodySprite: Phaser.GameObjects.Arc;
+  private headSprite: Phaser.GameObjects.Arc;
+  private muzzleSprite: Phaser.GameObjects.Arc;
+  private leftEar: Phaser.GameObjects.Arc;
+  private rightEar: Phaser.GameObjects.Arc;
+  private leftEyeBg: Phaser.GameObjects.Arc;
+  private rightEyeBg: Phaser.GameObjects.Arc;
+  private leftEye: Phaser.GameObjects.Arc;
+  private rightEye: Phaser.GameObjects.Arc;
+  private tailGraphics: Phaser.GameObjects.Graphics;
+  private leftArm: Phaser.GameObjects.Graphics;
+  private rightArm: Phaser.GameObjects.Graphics;
+  private leftLeg: Phaser.GameObjects.Graphics;
+  private rightLeg: Phaser.GameObjects.Graphics;
+  private shadow: Phaser.GameObjects.Ellipse;
+
+  private startX: number;
+  private startY: number;
+  private homeX: number;
+  private homeY: number;
+  private targetX?: number;
+  private targetY?: number;
+  private jumpProgress = 0;
+  private jumpSpeed = 0.025;
+  private monkeyState: 'idle' | 'jumping' | 'scratching' | 'alerted' | 'jumping_to_persona' | 'walking_to_persona' | 'interacting' | 'returning' = 'idle';
+  private nextActionTime = 0;
+  private isFacingRight = true;
+  private lastInteractionTime = 0;
+  private alertBubble: Phaser.GameObjects.Container;
+
+  constructor(
+    scene: WorldMapScene,
+    x: number,
+    y: number,
+    private pathOrTarget?: Array<{ x: number; y: number }>,
+  ) {
+    super(scene, x, y);
+    this.startX = x;
+    this.startY = y;
+    this.homeX = x;
+    this.homeY = y;
+
+    const brown = 0x825432;
+    const darkBrown = 0x5a341b;
+    const tanFace = 0xe3ab7a;
+    const black = 0x1d140f;
+
+    this.tailGraphics = scene.add.graphics();
+    this.add(this.tailGraphics);
+
+    this.leftArm = scene.add.graphics();
+    this.rightArm = scene.add.graphics();
+    this.leftLeg = scene.add.graphics();
+    this.rightLeg = scene.add.graphics();
+    this.add(this.leftArm);
+    this.add(this.rightArm);
+    this.add(this.leftLeg);
+    this.add(this.rightLeg);
+
+    // Dynamic ground-pinned shadow
+    this.shadow = scene.add.ellipse(0, 9, 10, 3.5, 0x000000, 0.25);
+    this.add(this.shadow);
+
+    this.bodySprite = scene.add.arc(0, 3, 6, 0, 360, false, brown);
+    this.add(this.bodySprite);
+
+    const belly = scene.add.arc(0, 4, 3.5, 0, 360, false, tanFace);
+    this.add(belly);
+
+    this.headSprite = scene.add.arc(0, -4, 5.5, 0, 360, false, brown);
+    this.add(this.headSprite);
+
+    this.leftEar = scene.add.arc(-5.5, -5.5, 2.2, 0, 360, false, darkBrown);
+    this.rightEar = scene.add.arc(5.5, -5.5, 2.2, 0, 360, false, darkBrown);
+    this.add(this.leftEar);
+    this.add(this.rightEar);
+
+    const innerLeftEar = scene.add.arc(-5.5, -5.5, 1.0, 0, 360, false, tanFace);
+    const innerRightEar = scene.add.arc(5.5, -5.5, 1.0, 0, 360, false, tanFace);
+    this.add(innerLeftEar);
+    this.add(innerRightEar);
+
+    this.muzzleSprite = scene.add.arc(0, -2.5, 3.5, 0, 360, false, tanFace);
+    this.add(this.muzzleSprite);
+
+    // Premium cartoon-style eyes (White backings + Black pupils)
+    this.leftEyeBg = scene.add.arc(-1.6, -4.5, 1.2, 0, 360, false, 0xffffff);
+    this.rightEyeBg = scene.add.arc(1.6, -4.5, 1.2, 0, 360, false, 0xffffff);
+    this.add(this.leftEyeBg);
+    this.add(this.rightEyeBg);
+
+    this.leftEye = scene.add.arc(-1.6, -4.5, 0.6, 0, 360, false, black);
+    this.rightEye = scene.add.arc(1.6, -4.5, 0.6, 0, 360, false, black);
+    this.add(this.leftEye);
+    this.add(this.rightEye);
+
+    // Create alert exclamation bubble
+    this.alertBubble = scene.add.container(0, -18);
+    const bg = scene.add.graphics();
+    bg.fillStyle(0xffcc00, 1);
+    bg.lineStyle(1, 0x000000, 1);
+    bg.fillRoundedRect(-5, -7, 10, 14, 3);
+    bg.strokeRoundedRect(-5, -7, 10, 14, 3);
+    bg.beginPath();
+    bg.moveTo(-2, 7);
+    bg.lineTo(2, 7);
+    bg.lineTo(0, 10);
+    bg.closePath();
+    bg.fillPath();
+    bg.strokePath();
+
+    const txt = scene.add.text(0, 0, "!", {
+      fontFamily: "monospace",
+      fontSize: "10px",
+      color: "#000000",
+      fontStyle: "bold"
+    }).setOrigin(0.5);
+
+    this.alertBubble.add(bg);
+    this.alertBubble.add(txt);
+    this.alertBubble.setVisible(false);
+    this.add(this.alertBubble);
+
+    this.setDepth(14);
+
+    this.drawTail(0);
+    this.drawLimbs(0);
+
+    scene.add.existing(this);
+    this.nextActionTime = scene.time.now + Phaser.Math.Between(1000, 3000);
+
+    // Click to interact
+    this.setInteractive(new Phaser.Geom.Circle(0, 0, 12), Phaser.Geom.Circle.Contains);
+    this.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event.stopPropagation();
+      this.triggerInteraction();
+    });
+  }
+
+  private triggerInteraction() {
+    const now = this.scene.time.now;
+    if (now < this.lastInteractionTime + 6000) return;
+
+    if (this.monkeyState === "idle" || this.monkeyState === "scratching") {
+      this.lastInteractionTime = now;
+      this.alertAndApproach();
+    }
+  }
+
+  private alertAndApproach() {
+    const now = this.scene.time.now;
+    this.monkeyState = "alerted";
+    this.nextActionTime = now + 800; // 0.8s alert state
+
+    if (this.alertBubble) {
+      this.alertBubble.setVisible(true);
+      this.alertBubble.setScale(0);
+      this.alertBubble.setAlpha(1);
+      this.scene.tweens.add({
+        targets: this.alertBubble,
+        scale: 1,
+        y: -24,
+        duration: 200,
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          this.scene.time.delayedCall(600, () => {
+            if (this.alertBubble && this.scene) {
+              this.scene.tweens.add({
+                targets: this.alertBubble,
+                alpha: 0,
+                duration: 150,
+                onComplete: () => {
+                  this.alertBubble.setVisible(false);
+                  this.alertBubble.y = -18;
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // Cute excited hop
+    this.scene.tweens.add({
+      targets: this,
+      y: this.y - 15,
+      duration: 150,
+      yoyo: true,
+      repeat: 0,
+      ease: 'Quad.easeOut'
+    });
+  }
+
+  private drawTail(offset: number) {
+    this.tailGraphics.clear();
+    this.tailGraphics.lineStyle(1.8, 0x825432, 1);
+    this.tailGraphics.beginPath();
+    
+    const startX = -2;
+    const startY = 7;
+    const controlX = -7 + Math.sin(offset) * 3;
+    const controlY = 7 + Math.cos(offset) * 2;
+    const endX = -10 + Math.sin(offset) * 4;
+    const endY = 1 + Math.cos(offset) * 4;
+
+    this.tailGraphics.moveTo(startX, startY);
+    
+    const steps = 8;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const x1 = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * controlX + t * t * endX;
+      const y1 = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * controlY + t * t * endY;
+      this.tailGraphics.lineTo(x1, y1);
+    }
+    this.tailGraphics.strokePath();
+  }
+
+  private drawLimbs(offset: number) {
+    const time = this.scene.time.now * 0.005;
+
+    this.leftArm.clear();
+    this.leftArm.lineStyle(1.8, 0x5a341b, 1);
+    this.leftArm.beginPath();
+    this.leftArm.moveTo(-3, 1.5);
+    
+    if (this.monkeyState === "scratching") {
+      this.leftArm.lineTo(-7, -3 + Math.sin(time * 3) * 2.5);
+      this.leftArm.lineTo(-1.5, -7 + Math.sin(time * 3) * 1.5);
+    } else if (this.monkeyState === "jumping" || this.monkeyState === "jumping_to_persona" || this.monkeyState === "returning") {
+      this.leftArm.lineTo(-7, -5);
+      this.leftArm.lineTo(-10, -10);
+    } else if (this.monkeyState === "walking_to_persona") {
+      const walkTime = this.scene.time.now * 0.015;
+      this.leftArm.lineTo(-6 + Math.sin(walkTime) * 3, 4 + Math.cos(walkTime) * 2);
+    } else {
+      this.leftArm.lineTo(-7, 3 + Math.sin(time) * 1.2);
+    }
+    this.leftArm.strokePath();
+
+    this.rightArm.clear();
+    this.rightArm.lineStyle(1.8, 0x5a341b, 1);
+    this.rightArm.beginPath();
+    this.rightArm.moveTo(3, 1.5);
+    
+    if (this.monkeyState === "jumping" || this.monkeyState === "jumping_to_persona" || this.monkeyState === "returning") {
+      this.rightArm.lineTo(7, -5);
+      this.rightArm.lineTo(10, -10);
+    } else if (this.monkeyState === "walking_to_persona") {
+      const walkTime = this.scene.time.now * 0.015;
+      this.rightArm.lineTo(6 - Math.sin(walkTime) * 3, 4 - Math.cos(walkTime) * 2);
+    } else {
+      this.rightArm.lineTo(7, 3 + Math.cos(time) * 1.2);
+    }
+    this.rightArm.strokePath();
+
+    this.leftLeg.clear();
+    this.leftLeg.lineStyle(2.0, 0x5a341b, 1);
+    this.leftLeg.beginPath();
+    this.leftLeg.moveTo(-2.5, 7);
+    
+    if (this.monkeyState === "jumping" || this.monkeyState === "jumping_to_persona" || this.monkeyState === "returning") {
+      this.leftLeg.lineTo(-5, 11);
+    } else if (this.monkeyState === "walking_to_persona") {
+      const walkTime = this.scene.time.now * 0.015;
+      this.leftLeg.lineTo(-4.5 + Math.cos(walkTime) * 3, 10 + Math.sin(walkTime) * 2);
+    } else {
+      this.leftLeg.lineTo(-4.5, 10 + Math.sin(time * 0.5) * 0.4);
+    }
+    this.leftLeg.strokePath();
+
+    this.rightLeg.clear();
+    this.rightLeg.lineStyle(2.0, 0x5a341b, 1);
+    this.rightLeg.beginPath();
+    this.rightLeg.moveTo(2.5, 7);
+    
+    if (this.monkeyState === "jumping" || this.monkeyState === "jumping_to_persona" || this.monkeyState === "returning") {
+      this.rightLeg.lineTo(5, 11);
+    } else if (this.monkeyState === "walking_to_persona") {
+      const walkTime = this.scene.time.now * 0.015;
+      this.rightLeg.lineTo(4.5 - Math.cos(walkTime) * 3, 10 - Math.sin(walkTime) * 2);
+    } else {
+      this.rightLeg.lineTo(4.5, 10 + Math.cos(time * 0.5) * 0.4);
+    }
+    this.rightLeg.strokePath();
+  }
+
+  private updateJumpProgress(now: number) {
+    const t = this.jumpProgress;
+    const currentX = Phaser.Math.Linear(this.startX, this.targetX!, t);
+    const currentY = Phaser.Math.Linear(this.startY, this.targetY!, t);
+
+    const jumpHeight = this.monkeyState === "returning" ? -80 : -50;
+    const jumpY = Math.sin(t * Math.PI) * jumpHeight;
+    const arcY = currentY + jumpY;
+
+    this.x = currentX;
+    this.y = arcY;
+
+    const heightFactor = Math.sin(t * Math.PI);
+    this.shadow.y = 9 - jumpY;
+    this.shadow.alpha = 0.25 * (1.0 - heightFactor * 0.55);
+    this.shadow.scaleX = 1.0 - heightFactor * 0.45;
+
+    this.angle = Math.sin((t - 0.5) * Math.PI) * 15;
+
+    const stretch = 1.0 + Math.sin(t * Math.PI) * 0.25;
+    this.scaleY = stretch;
+    this.scaleX = this.isFacingRight ? 2.0 - stretch : -(2.0 - stretch);
+
+    this.drawTail(now * 0.01);
+    this.drawLimbs(now * 0.01);
+  }
+
+  update() {
+    const now = this.scene.time.now;
+
+    // Get distance to Persona
+    const persona = this.scene.persona;
+    let distanceToPersona = 999999;
+    if (persona && persona.active && persona.visible) {
+      distanceToPersona = Phaser.Math.Distance.Between(this.x, this.y, persona.x, persona.y);
+    }
+
+    // Auto-alert if Persona is close
+    if (
+      (this.monkeyState === "idle" || this.monkeyState === "scratching") &&
+      distanceToPersona < 140
+    ) {
+      this.triggerInteraction();
+    }
+
+    if (this.monkeyState === "idle") {
+      const bounce = Math.sin(now * 0.004) * 0.35;
+      this.headSprite.y = -4 + bounce;
+      this.leftEyeBg.y = -4.5 + bounce;
+      this.rightEyeBg.y = -4.5 + bounce;
+      this.leftEye.y = -4.5 + bounce;
+      this.rightEye.y = -4.5 + bounce;
+      this.leftEar.y = -5.5 + bounce * 0.5;
+      this.rightEar.y = -5.5 + bounce * 0.5;
+      this.muzzleSprite.y = -2.5 + bounce;
+
+      this.shadow.y = 9;
+      this.shadow.alpha = 0.25;
+      this.shadow.scaleX = 1.0;
+
+      this.drawTail(now * 0.003);
+      this.drawLimbs(now * 0.003);
+
+      if (now > this.nextActionTime) {
+        const rng = Phaser.Math.Between(0, 100);
+        if (rng < 45 && this.pathOrTarget && this.pathOrTarget.length > 0) {
+          const nextTarget =
+            this.pathOrTarget[Phaser.Math.Between(0, this.pathOrTarget.length - 1)];
+          if (nextTarget.x !== this.x || nextTarget.y !== this.y) {
+            this.targetX = nextTarget.x;
+            this.targetY = nextTarget.y;
+            this.startX = this.x;
+            this.startY = this.y;
+            this.monkeyState = "jumping";
+            this.jumpProgress = 0;
+            this.isFacingRight = this.targetX > this.x;
+            this.scaleX = this.isFacingRight ? 1 : -1;
+          }
+        } else if (rng < 75) {
+          this.monkeyState = "scratching";
+          this.nextActionTime = now + Phaser.Math.Between(1500, 3000);
+        } else {
+          this.nextActionTime = now + Phaser.Math.Between(1000, 3000);
+        }
+      }
+    } else if (this.monkeyState === "scratching") {
+      this.drawLimbs(now * 0.003);
+      if (now > this.nextActionTime) {
+        this.monkeyState = "idle";
+        this.nextActionTime = now + Phaser.Math.Between(1000, 3000);
+      }
+    } else if (this.monkeyState === "alerted") {
+      if (now > this.nextActionTime) {
+        const persona = this.scene.persona;
+        if (persona) {
+          const offsetDirection = this.x < persona.x ? -25 : 25;
+          this.targetX = persona.x + offsetDirection;
+          this.targetY = persona.y + 10;
+          this.startX = this.x;
+          this.startY = this.y;
+          this.monkeyState = "jumping_to_persona";
+          this.jumpProgress = 0;
+          this.jumpSpeed = 0.035;
+          this.isFacingRight = this.targetX > this.x;
+          this.scaleX = this.isFacingRight ? 1 : -1;
+        } else {
+          this.monkeyState = "idle";
+        }
+      }
+    } else if (this.monkeyState === "jumping") {
+      this.jumpProgress += this.jumpSpeed;
+      if (this.jumpProgress >= 1) {
+        this.jumpProgress = 1;
+        this.x = this.targetX!;
+        this.y = this.targetY!;
+        this.monkeyState = "idle";
+        this.nextActionTime = now + Phaser.Math.Between(1500, 4000);
+
+        this.scene.tweens.add({
+          targets: this,
+          scaleY: 0.7,
+          scaleX: this.isFacingRight ? 1.3 : -1.3,
+          angle: 0,
+          duration: 100,
+          yoyo: true,
+          ease: "Quad.easeOut",
+          onComplete: () => {
+            this.scaleY = 1.0;
+            this.scaleX = this.isFacingRight ? 1.0 : -1.0;
+            this.angle = 0;
+          },
+        });
+      } else {
+        this.updateJumpProgress(now);
+      }
+    } else if (this.monkeyState === "jumping_to_persona") {
+      this.jumpProgress += this.jumpSpeed;
+      if (this.jumpProgress >= 1) {
+        this.jumpProgress = 1;
+        this.x = this.targetX!;
+        this.y = this.targetY!;
+        this.monkeyState = "walking_to_persona";
+
+        this.scene.tweens.add({
+          targets: this,
+          scaleY: 0.7,
+          scaleX: this.isFacingRight ? 1.3 : -1.3,
+          angle: 0,
+          duration: 100,
+          yoyo: true,
+          ease: "Quad.easeOut",
+          onComplete: () => {
+            this.scaleY = 1.0;
+            this.scaleX = this.isFacingRight ? 1.0 : -1.0;
+            this.angle = 0;
+          },
+        });
+      } else {
+        this.updateJumpProgress(now);
+      }
+    } else if (this.monkeyState === "walking_to_persona") {
+      const persona = this.scene.persona;
+      if (!persona) {
+        this.monkeyState = "idle";
+        return;
+      }
+
+      if (distanceToPersona > 240) {
+        this.targetX = this.homeX;
+        this.targetY = this.homeY;
+        this.startX = this.x;
+        this.startY = this.y;
+        this.monkeyState = "returning";
+        this.jumpProgress = 0;
+        this.jumpSpeed = 0.02;
+        this.isFacingRight = this.targetX > this.x;
+        this.scaleX = this.isFacingRight ? 1 : -1;
+        return;
+      }
+
+      const targetOffset = this.x < persona.x ? -25 : 25;
+      const tx = persona.x + targetOffset;
+      const ty = persona.y + 10;
+
+      const distToTarget = Phaser.Math.Distance.Between(this.x, this.y, tx, ty);
+      if (distToTarget < 10) {
+        this.monkeyState = "interacting";
+        this.nextActionTime = now + Phaser.Math.Between(1000, 3000);
+      } else {
+        const angle = Phaser.Math.Angle.Between(this.x, this.y, tx, ty);
+        const speed = 2.0;
+        this.x += Math.cos(angle) * speed;
+        this.y += Math.sin(angle) * speed;
+
+        this.isFacingRight = tx > this.x;
+        this.scaleX = this.isFacingRight ? 1 : -1;
+
+        this.drawLimbs(now * 0.003);
+        this.drawTail(now * 0.003);
+
+        this.shadow.y = 9;
+        this.shadow.alpha = 0.25;
+        this.shadow.scaleX = 1.0;
+      }
+    } else if (this.monkeyState === "interacting") {
+      const persona = this.scene.persona;
+      if (!persona) {
+        this.monkeyState = "idle";
+        return;
+      }
+
+      if (distanceToPersona > 60 && distanceToPersona <= 240) {
+        this.monkeyState = "walking_to_persona";
+        return;
+      }
+
+      if (distanceToPersona > 240) {
+        this.targetX = this.homeX;
+        this.targetY = this.homeY;
+        this.startX = this.x;
+        this.startY = this.y;
+        this.monkeyState = "returning";
+        this.jumpProgress = 0;
+        this.jumpSpeed = 0.02;
+        this.isFacingRight = this.targetX > this.x;
+        this.scaleX = this.isFacingRight ? 1 : -1;
+        return;
+      }
+
+      const bounce = Math.sin(now * 0.008) * 0.4;
+      this.headSprite.y = -4 + bounce;
+      this.leftEyeBg.y = -4.5 + bounce;
+      this.rightEyeBg.y = -4.5 + bounce;
+      this.leftEye.y = -4.5 + bounce;
+      this.rightEye.y = -4.5 + bounce;
+      this.leftEar.y = -5.5 + bounce * 0.5;
+      this.rightEar.y = -5.5 + bounce * 0.5;
+      this.muzzleSprite.y = -2.5 + bounce;
+
+      this.shadow.y = 9;
+      this.shadow.alpha = 0.25;
+      this.shadow.scaleX = 1.0;
+
+      this.drawTail(now * 0.003);
+      this.drawLimbs(now * 0.003);
+
+      if (now > this.nextActionTime) {
+        const rng = Phaser.Math.Between(0, 100);
+        if (rng < 35) {
+          this.scene.tweens.add({
+            targets: this,
+            y: this.y - 8,
+            duration: 100,
+            yoyo: true,
+            repeat: 0,
+            ease: "Quad.easeOut",
+          });
+          this.nextActionTime = now + Phaser.Math.Between(1000, 2000);
+        } else if (rng < 70) {
+          this.scene.tweens.add({
+            targets: this,
+            scaleY: 0.9,
+            scaleX: this.isFacingRight ? 1.1 : -1.1,
+            duration: 200,
+            yoyo: true,
+            repeat: 1,
+            ease: "Quad.easeInOut",
+          });
+          this.nextActionTime = now + Phaser.Math.Between(1500, 3000);
+        } else {
+          this.nextActionTime = now + Phaser.Math.Between(1000, 3000);
+        }
+      }
+    } else if (this.monkeyState === "returning") {
+      this.jumpProgress += this.jumpSpeed;
+      if (this.jumpProgress >= 1) {
+        this.jumpProgress = 1;
+        this.x = this.targetX!;
+        this.y = this.targetY!;
+        this.monkeyState = "idle";
+        this.nextActionTime = now + Phaser.Math.Between(1000, 3000);
+
+        this.scene.tweens.add({
+          targets: this,
+          scaleY: 0.7,
+          scaleX: this.isFacingRight ? 1.3 : -1.3,
+          angle: 0,
+          duration: 100,
+          yoyo: true,
+          ease: "Quad.easeOut",
+          onComplete: () => {
+            this.scaleY = 1.0;
+            this.scaleX = this.isFacingRight ? 1.0 : -1.0;
+            this.angle = 0;
+          },
+        });
+      } else {
+        this.updateJumpProgress(now);
+      }
     }
   }
 }

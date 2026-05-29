@@ -204,8 +204,6 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       this.pulseRing,
       this.mainSprite,
       this.stageDot,
-      this.labelPlate,
-      this.stageLabel,
       this.numberText,
     ]);
 
