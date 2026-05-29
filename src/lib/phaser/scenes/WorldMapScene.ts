@@ -2159,6 +2159,7 @@ export class WorldMapScene extends Phaser.Scene {
     biome: BiomeConfig,
     biomeIndex: number,
   ): void {
+    void biome; void biomeIndex;
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
@@ -2169,14 +2170,7 @@ export class WorldMapScene extends Phaser.Scene {
     const centerX = toX(cols / 2);
     const centerY = toY(rows / 2 + 0.8);
 
-    const addProp = (
-      texture: string,
-      x: number,
-      y: number,
-      depth: number,
-      tint = 0xffffff,
-      spriteScale = 1,
-    ) => {
+    const addProp = (texture: string, x: number, y: number, depth: number, tint = 0xffffff, spriteScale = 1) => {
       if (!this.textures.exists(texture)) return;
       const sprite = this.add.sprite(toX(x), toY(y), texture);
       sprite.setOrigin(0.5, 1);
@@ -2186,158 +2180,219 @@ export class WorldMapScene extends Phaser.Scene {
       this.midgroundLayer.add(sprite);
     };
 
-    // Premium coliseum base: restrained crimson stone with gold accents.
+    // ── 1. Deep base fill ────────────────────────────────────────────────────
     const ground = this.add.graphics();
-    ground.fillStyle(0x240b0a, 1);
+    ground.fillStyle(0x1a0504, 1);
     ground.fillRect(panelX, panelOffsetY, panelW, panelH);
     ground.setDepth(1);
     this.backgroundLayer.add(ground);
 
-    // Clean checkerboard stone texture, less noisy than the old tile mix.
+    // ── 2. Blood-moon sky vignette (top gradient band) ───────────────────────
+    const vignette = this.add.graphics();
+    vignette.setDepth(1.5);
+    const vigSteps = 10;
+    for (let v = 0; v < vigSteps; v++) {
+      const t = v / vigSteps;
+      const vigH = panelH * 0.45 * (1 - t);
+      vignette.fillStyle(0x5a0808, (0.38 - t * 0.36));
+      vignette.fillRect(panelX, panelOffsetY + v * (panelH * 0.045), panelW, panelH * 0.045);
+    }
+    this.backgroundLayer.add(vignette);
+
+    // ── 3. Checkerboard stone floor ──────────────────────────────────────────
     const stone = this.add.graphics();
     stone.setDepth(2);
-    for (let r = 0; r < rows; r += 1) {
-      for (let c = 0; c < cols; c += 1) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
         const shade = (r + c) % 2 === 0 ? 0x2f100d : 0x1c0707;
-        stone.fillStyle(shade, 0.74);
+        stone.fillStyle(shade, 0.78);
         stone.fillRect(toX(c), toY(r), tileSize, tileSize);
       }
     }
     this.backgroundLayer.add(stone);
 
-    // Outer royal boundary wall.
+    // ── 4. Boundary wall border ──────────────────────────────────────────────
     const wall = this.add.graphics();
     wall.setDepth(3);
-    wall.fillStyle(0x120404, 0.86);
-    wall.fillRect(panelX, panelOffsetY, panelW, tileSize * 2.2);
-    wall.fillRect(
-      panelX,
-      panelOffsetY + panelH - tileSize * 2.2,
-      panelW,
-      tileSize * 2.2,
-    );
-    wall.fillRect(panelX, panelOffsetY, tileSize * 2.2, panelH);
-    wall.fillRect(
-      panelX + panelW - tileSize * 2.2,
-      panelOffsetY,
-      tileSize * 2.2,
-      panelH,
-    );
-    // Removed the square strokeRect border to keep the arena floor clean.
+    wall.fillStyle(0x0e0303, 0.92);
+    wall.fillRect(panelX, panelOffsetY, panelW, tileSize * 2.5);
+    wall.fillRect(panelX, panelOffsetY + panelH - tileSize * 2.5, panelW, tileSize * 2.5);
+    wall.fillRect(panelX, panelOffsetY, tileSize * 2.5, panelH);
+    wall.fillRect(panelX + panelW - tileSize * 2.5, panelOffsetY, tileSize * 2.5, panelH);
+    // Gilded border inset
+    wall.lineStyle(3, 0xc9922a, 0.55);
+    wall.strokeRect(panelX + tileSize * 2.5, panelOffsetY + tileSize * 2.5, panelW - tileSize * 5, panelH - tileSize * 5);
     this.backgroundLayer.add(wall);
 
-    // Central elite arena rings.
+    // ── 5. Crowd silhouette band ─────────────────────────────────────────────
+    const crowd = this.add.graphics();
+    crowd.setDepth(3.5);
+    crowd.fillStyle(0x0a0202, 0.72);
+    crowd.fillRect(panelX, panelOffsetY, panelW, tileSize * 3.5);
+    crowd.fillRect(panelX, panelOffsetY + panelH - tileSize * 3.5, panelW, tileSize * 3.5);
+    // Silhouette bumps (crowd heads)
+    crowd.fillStyle(0x140606, 0.88);
+    for (let c = 0; c < cols; c += 2) {
+      const bumpH = tileSize * (0.6 + ((c * 7 + 3) % 5) * 0.12);
+      crowd.fillEllipse(toX(c) + tileSize, panelOffsetY + tileSize * 3.5, tileSize * 1.6, bumpH);
+      crowd.fillEllipse(toX(c) + tileSize, panelOffsetY + panelH - tileSize * 3.5, tileSize * 1.6, bumpH);
+    }
+    this.backgroundLayer.add(crowd);
+
+    // ── 6. Arena floor rings (layered, rich depth) ───────────────────────────
     const arena = this.add.graphics();
     arena.setDepth(5);
-    arena.fillStyle(0x000000, 0.24);
-    arena.fillEllipse(centerX + 8, centerY + 16, 620, 370);
+    // Drop shadow
+    arena.fillStyle(0x000000, 0.32);
+    arena.fillEllipse(centerX + 10, centerY + 20, 650, 390);
+    // Outer dark clay
     arena.fillStyle(0x3b130d, 1);
-    arena.fillEllipse(centerX, centerY, 600, 360);
-    arena.fillStyle(0x6f2d18, 1);
-    arena.fillEllipse(centerX, centerY, 470, 278);
-    arena.fillStyle(0xc17a36, 0.9);
-    arena.fillEllipse(centerX, centerY, 330, 194);
-    arena.lineStyle(8, 0xf6c76a, 0.72);
-    arena.strokeEllipse(centerX, centerY, 600, 360);
-    arena.lineStyle(5, 0xffe6a8, 0.46);
-    arena.strokeEllipse(centerX, centerY, 470, 278);
-    arena.lineStyle(3, 0xfff0c2, 0.38);
-    arena.strokeEllipse(centerX, centerY, 230, 132);
-    arena.lineStyle(3, 0xfff0c2, 0.34);
-    arena.lineBetween(centerX - 165, centerY, centerX + 165, centerY);
-    arena.lineBetween(centerX, centerY - 96, centerX, centerY + 96);
+    arena.fillEllipse(centerX, centerY, 630, 376);
+    // Mid-tone packed sand
+    arena.fillStyle(0x5e2212, 1);
+    arena.fillEllipse(centerX, centerY, 520, 308);
+    // Inner warm sand ring
+    arena.fillStyle(0x8b4a1e, 1);
+    arena.fillEllipse(centerX, centerY, 400, 236);
+    // Bright sand centre
+    arena.fillStyle(0xc17a36, 1);
+    arena.fillEllipse(centerX, centerY, 260, 152);
+    // Hot centre highlight
+    arena.fillStyle(0xd9943e, 0.7);
+    arena.fillEllipse(centerX, centerY, 160, 92);
 
-    // Radial gilded marks around the combat ring.
-    for (let i = 0; i < 24; i += 1) {
-      const angle = (Math.PI * 2 * i) / 24;
-      const x1 = centerX + Math.cos(angle) * 210;
-      const y1 = centerY + Math.sin(angle) * 124;
-      const x2 = centerX + Math.cos(angle) * 285;
-      const y2 = centerY + Math.sin(angle) * 172;
-      arena.lineStyle(i % 4 === 0 ? 4 : 2, 0xf6c76a, i % 4 === 0 ? 0.42 : 0.22);
-      arena.lineBetween(x1, y1, x2, y2);
+    // Gilded stroke rings
+    arena.lineStyle(9, 0xf6c76a, 0.78);
+    arena.strokeEllipse(centerX, centerY, 630, 376);
+    arena.lineStyle(5, 0xffe6a8, 0.52);
+    arena.strokeEllipse(centerX, centerY, 520, 308);
+    arena.lineStyle(3, 0xfff0c2, 0.4);
+    arena.strokeEllipse(centerX, centerY, 400, 236);
+    arena.lineStyle(2, 0xfff8e0, 0.3);
+    arena.strokeEllipse(centerX, centerY, 260, 152);
+
+    // Cross & sector lines
+    arena.lineStyle(3, 0xfff0c2, 0.36);
+    arena.lineBetween(centerX - 180, centerY, centerX + 180, centerY);
+    arena.lineBetween(centerX, centerY - 105, centerX, centerY + 105);
+
+    // Sector triangles (8 wedges)
+    for (let s = 0; s < 8; s++) {
+      const a = (Math.PI * 2 * s) / 8;
+      const mx = centerX + Math.cos(a) * 100;
+      const my = centerY + Math.sin(a) * 58;
+      arena.lineStyle(1, 0xf6c76a, 0.18);
+      arena.lineBetween(centerX, centerY, mx, my);
+    }
+
+    // Radial gilded tick marks (32 ticks)
+    for (let i = 0; i < 32; i++) {
+      const angle = (Math.PI * 2 * i) / 32;
+      const inner = i % 4 === 0 ? 230 : 250;
+      const outer = i % 4 === 0 ? 290 : 272;
+      const innerY = inner * 0.6, outerY = outer * 0.6;
+      arena.lineStyle(i % 4 === 0 ? 4 : 2, 0xf6c76a, i % 4 === 0 ? 0.5 : 0.22);
+      arena.lineBetween(
+        centerX + Math.cos(angle) * inner, centerY + Math.sin(angle) * innerY,
+        centerX + Math.cos(angle) * outer, centerY + Math.sin(angle) * outerY,
+      );
     }
     this.backgroundLayer.add(arena);
 
-    // Tiered spectator stands, kept to the corners so checkpoints stay readable.
-    const stands = this.add.graphics();
-    stands.setDepth(4.5);
-    const standBlocks: Array<[number, number, number, number]> = [
-      [5, 5, 8, 7],
-      [28, 5, 8, 7],
-      [5, 33, 8, 4],
-      [28, 33, 8, 4],
+    // ── 7. Animated torch glow rings at lamp post positions ─────────────────
+    const torchPositions = [
+      { tx: toX(14.2), ty: toY(17.2) },
+      { tx: toX(25.8), ty: toY(17.2) },
+      { tx: toX(14.2), ty: toY(29.4) },
+      { tx: toX(25.8), ty: toY(29.4) },
     ];
-    standBlocks.forEach(([x, y, w, h]) => {
-      stands.fillStyle(0x3f1711, 0.92);
-      stands.fillRect(toX(x), toY(y), tileSize * w, tileSize * h);
-      stands.lineStyle(2, 0x8f5b2e, 0.42);
-      for (let row = 0; row < h; row += 1.2) {
-        stands.lineBetween(toX(x), toY(y + row), toX(x + w), toY(y + row));
-      }
-      stands.lineStyle(3, 0xf6c76a, 0.22);
-      stands.strokeRect(toX(x), toY(y), tileSize * w, tileSize * h);
+    torchPositions.forEach(({ tx, ty }, idx) => {
+      // Outer soft glow
+      const outerGlow = this.add.circle(tx, ty - tileSize * 3.8, 58, 0xff6600, 0.08);
+      outerGlow.setDepth(6);
+      this.backgroundLayer.add(outerGlow);
+      // Inner bright core
+      const innerGlow = this.add.circle(tx, ty - tileSize * 3.8, 28, 0xffb347, 0.22);
+      innerGlow.setDepth(7);
+      this.backgroundLayer.add(innerGlow);
+      // Flicker tween
+      this.tweens.add({
+        targets: [outerGlow, innerGlow],
+        alpha: { from: 0.06, to: 0.24 },
+        scaleX: { from: 0.85, to: 1.15 },
+        scaleY: { from: 0.85, to: 1.15 },
+        duration: 900 + idx * 130,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+        delay: idx * 220,
+      });
     });
-    this.backgroundLayer.add(stands);
 
-    // Royal banners positioned as checkpoint anchors.
-    // Keep them in the midground so Stage 3 checkpoint nodes render on top.
-    const decor = this.add.graphics();
-    decor.setDepth(16);
+    // ── 8. Royal banners ─────────────────────────────────────────────────────
     const bannerWidth = tileSize * 2.3;
     const bannerHeight = tileSize * 1.75;
     const bannerNotch = tileSize * 0.55;
-    [
-      // x, y, direction: left stands fly right; right stands fly left.
-      [5.0, 12.0, 1],
-      [36.0, 12.0, -1],
-      [5.0, 31.0, 1],
-      [36.0, 31.0, -1],
-    ].forEach(([x, y, direction]) => {
+    const bannerDefs: [number, number, number][] = [
+      [5.0, 12.0, 1], [36.0, 12.0, -1], [5.0, 31.0, 1], [36.0, 31.0, -1],
+    ];
+    bannerDefs.forEach(([x, y, direction], bi) => {
+      const decor = this.add.graphics();
+      decor.setDepth(16);
       const poleX = toX(x);
       const poleY = toY(y);
-      const poleWidth = 5;
+      const poleWidth = 6;
       const attachmentX = direction === 1 ? poleX + poleWidth : poleX;
       const tipX = attachmentX + bannerWidth * direction;
       const notchX = tipX - bannerNotch * direction;
       const stripeY = poleY + tileSize * 0.64;
       const stripeStartX = direction === 1 ? attachmentX : tipX;
 
-      decor.fillStyle(0xb7792a, 0.98);
-      decor.fillRect(poleX, poleY, poleWidth, tileSize * 4.0);
-      decor.fillStyle(0xd92626, 0.9);
-      decor.fillPoints(
-        [
-          new Phaser.Geom.Point(attachmentX, poleY),
-          new Phaser.Geom.Point(tipX, poleY),
-          new Phaser.Geom.Point(notchX, poleY + bannerHeight * 0.5),
-          new Phaser.Geom.Point(tipX, poleY + bannerHeight),
-          new Phaser.Geom.Point(attachmentX, poleY + bannerHeight),
-        ],
-        true,
-      );
-      decor.fillStyle(0xf6c76a, 0.38);
-      decor.fillRect(stripeStartX, stripeY, bannerWidth * 0.78, 4);
-    });
-    this.midgroundLayer.add(decor);
+      // Pole with gold cap
+      decor.fillStyle(0xc9922a, 1);
+      decor.fillRect(poleX, poleY, poleWidth, tileSize * 4.2);
+      decor.fillStyle(0xf6c76a, 1);
+      decor.fillCircle(poleX + poleWidth / 2, poleY, poleWidth);
 
-    // Stage hero structure: grounded with a shadow to prevent floating on the arena floor.
-    const houseShadow = this.add.ellipse(
-      centerX + 8,
-      toY(13.4) - 10,
-      160,
-      50,
-      0x000000,
-      0.22,
-    );
+      // Banner body
+      decor.fillStyle(0xcc2020, 0.95);
+      decor.fillPoints([
+        new Phaser.Geom.Point(attachmentX, poleY),
+        new Phaser.Geom.Point(tipX, poleY),
+        new Phaser.Geom.Point(notchX, poleY + bannerHeight * 0.5),
+        new Phaser.Geom.Point(tipX, poleY + bannerHeight),
+        new Phaser.Geom.Point(attachmentX, poleY + bannerHeight),
+      ], true);
+
+      // Gold stripe + border
+      decor.lineStyle(2, 0xf6c76a, 0.7);
+      decor.strokeRect(attachmentX, poleY, bannerWidth * direction, bannerHeight);
+      decor.fillStyle(0xf6c76a, 0.45);
+      decor.fillRect(stripeStartX, stripeY, bannerWidth * 0.78 * direction, 4);
+
+      this.midgroundLayer.add(decor);
+
+      // Subtle banner shimmer tween
+      this.tweens.add({
+        targets: decor,
+        alpha: { from: 0.88, to: 1.0 },
+        duration: 1400 + bi * 200,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+        delay: bi * 350,
+      });
+    });
+
+    // ── 9. Hero building + lamp posts ────────────────────────────────────────
+    const houseShadow = this.add.ellipse(centerX + 7, toY(13.4) - 9, 140, 44, 0x000000, 0.32);
     houseShadow.setDepth(8.5);
     this.midgroundLayer.add(houseShadow);
-
-    addProp("House_Hay_2", cols / 2, 13.4, 9, 0xffd37a, 1.0);
-    addProp("LampPost_3", 14.2, 17.2, 10, 0xffd37a, 0.86);
-    addProp("LampPost_3", 25.8, 17.2, 10, 0xffd37a, 0.86);
-    addProp("LampPost_3", 14.2, 29.4, 10, 0xffd37a, 0.82);
-    addProp("LampPost_3", 25.8, 29.4, 10, 0xffd37a, 0.82);
+    addProp("House_Hay_2", cols / 2, 13.4, 9, 0xffd37a, 0.88);
+    addProp("LampPost_3", 14.2, 17.2, 10, 0xffd37a, 0.9);
+    addProp("LampPost_3", 25.8, 17.2, 10, 0xffd37a, 0.9);
+    addProp("LampPost_3", 14.2, 29.4, 10, 0xffd37a, 0.86);
+    addProp("LampPost_3", 25.8, 29.4, 10, 0xffd37a, 0.86);
   }
 
   private createArtisanTilePanel(
@@ -5120,23 +5175,35 @@ export class WorldMapScene extends Phaser.Scene {
     const centerX = (first.x + last.x) / 2;
     const centerY = (first.y + last.y) / 2;
 
-    // No extra oval tracker pads for Stage 3 — checkpoints sit behind flags.
+    // Animated ember glow ring under each checkpoint node
+    nodes.forEach((node, idx) => {
+      const ring = this.add.graphics();
+      ring.setDepth(14);
+      ring.lineStyle(4, 0xf6c76a, 0.55);
+      ring.strokeEllipse(node.x, node.y + 46, 96, 30);
+      ring.lineStyle(2, 0xff8c00, 0.35);
+      ring.strokeEllipse(node.x, node.y + 46, 70, 20);
+      this.midgroundLayer.add(ring);
 
-    // Two subtle rocks near the lower arena edge for depth, not clutter.
-    this.addLandmarkSprite(
-      "Rock_Brown_4",
-      centerX - 170,
-      centerY + 180,
-      0.9,
-      0.72,
-    );
-    this.addLandmarkSprite(
-      "Rock_Brown_6",
-      centerX + 170,
-      centerY + 176,
-      0.86,
-      0.72,
-    );
+      // Pulsing ember glow orb
+      const emb = this.add.circle(node.x, node.y + 46, 22, 0xff6600, 0.14);
+      emb.setDepth(14.5);
+      this.midgroundLayer.add(emb);
+      this.tweens.add({
+        targets: emb,
+        alpha: { from: 0.08, to: 0.26 },
+        scale: { from: 0.85, to: 1.2 },
+        duration: 1100 + idx * 150,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+        delay: idx * 280,
+      });
+    });
+
+    // Decorative rocks flanking the lower arena edge
+    this.addLandmarkSprite("Rock_Brown_4", centerX - 172, centerY + 182, 0.9, 0.74);
+    this.addLandmarkSprite("Rock_Brown_6", centerX + 172, centerY + 178, 0.88, 0.74);
   }
 
   private createArtisanLandmarks(stageId: number): void {

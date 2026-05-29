@@ -225,7 +225,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       if (typeof document !== "undefined") {
         document.body.style.cursor = "pointer";
       }
-      
+
       this.numberText.setStyle({ color: "#fff3d6" });
 
       if (this._status !== "locked") {
@@ -246,7 +246,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       if (typeof document !== "undefined") {
         document.body.style.cursor = "default";
       }
-      
+
       this.numberText.setStyle({
         color: this._status === "gold" ? "#3b2412" : "#fff7e6",
       });
@@ -386,7 +386,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     if (!this.scene || !this.scene.sys || !this.mainSprite || !this.mainSprite.scene) {
       return;
     }
-    
+
     this.stopAnimations();
     this.mainSprite.setTexture(
       `cp_${this._status === "partial" ? "in_progress" : this._status}`,
