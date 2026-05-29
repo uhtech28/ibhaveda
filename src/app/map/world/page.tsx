@@ -1494,6 +1494,22 @@ function MapPageInner() {
     isGold: boolean;
   } | null>(null);
 
+  useEffect(() => {
+    if (!phaserReady || !bossCombatTarget) return;
+    eventBridge.dispatchToPhaser({
+      type: "BOSS_COMBAT_START",
+      stage: bossCombatTarget.stage,
+      checkpoint: bossCombatTarget.checkpoint,
+    });
+  }, [bossCombatTarget, phaserReady]);
+
+  const dismissBossCombatVisual = useCallback((stage: number) => {
+    eventBridge.dispatchToPhaser({
+      type: "BOSS_COMBAT_DISMISS",
+      stage,
+    });
+  }, []);
+
   const interCheckpointData = useQuery(
     api.interCheckpoint.getInterCheckpointEvents,
     activeVenture
@@ -3282,10 +3298,17 @@ function MapPageInner() {
                 setTimeout(() => handleAdvanceRef.current(true), 300);
               }}
               onBossRetreat={() => {
+                dismissBossCombatVisual(bossCombatTarget.stage);
                 setBossCombatTarget(null);
               }}
-              onComplete={() => setBossCombatTarget(null)}
-              onClose={() => setBossCombatTarget(null)}
+              onComplete={() => {
+                dismissBossCombatVisual(bossCombatTarget.stage);
+                setBossCombatTarget(null);
+              }}
+              onClose={() => {
+                dismissBossCombatVisual(bossCombatTarget.stage);
+                setBossCombatTarget(null);
+              }}
             />
           )}
 

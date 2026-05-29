@@ -181,6 +181,37 @@ export class MiniBoss extends Phaser.GameObjects.Container {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
+  /** Hidden until boss combat overlay opens. */
+  hideUntilCombat(): void {
+    this.scene?.tweens.killTweensOf([
+      this,
+      this.bossGraphics,
+      this.cracksGraphics,
+      this.eyeLeft,
+      this.eyeRight,
+      this.namePlate,
+    ]);
+    this.setVisible(false);
+    this.setAlpha(0);
+  }
+
+  /** Reveal at combat checkpoint with full visual state reset. */
+  showForCombat(): void {
+    this.isRetreated = false;
+    this.bossGraphics.setPosition(0, 0);
+    this.bossGraphics.setAlpha(1);
+    this.bossGraphics.setScale(1);
+    this.cracksGraphics.setAlpha(0);
+    this.namePlate.setAlpha(1);
+    if (this.eyeLeft) {
+      this.eyeLeft.setAlpha(1);
+      this.eyeRight?.setAlpha(1);
+    }
+    this.setScale(1);
+    this.setAlpha(1);
+    this.setVisible(true);
+  }
+
   /**
    * Progressively weaken the boss based on checkpoint completion.
    *
