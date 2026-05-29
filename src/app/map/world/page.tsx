@@ -574,7 +574,7 @@ function CheckpointPanel({
                   key={i}
                   task={task}
                   index={i}
-                  locked={isLocked || (i > 0 && !detail.tasks[i - 1].done)}
+                  locked={isLocked}
                   evaluationSummary={evaluationSummary?.find(
                     (entry) => entry.taskLevel === task._taskLevel,
                   )}

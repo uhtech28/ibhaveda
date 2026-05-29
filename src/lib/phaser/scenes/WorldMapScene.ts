@@ -280,6 +280,7 @@ export class WorldMapScene extends Phaser.Scene {
   private lastSuperBossDefeatStatus: "active" | "retreated" | "slain" | null =
     null;
   private lastEmitTime = 0;
+  private lastBiomeCheckTime = 0;
   private lastEmitX = 0;
   private lastEmitY = 0;
   private lastEmitVisible = false;
@@ -1009,6 +1010,12 @@ export class WorldMapScene extends Phaser.Scene {
    * Checks the camera scroll position and loads stages that are near the view
    */
   private checkBiomeLoading(): void {
+    const now = this.time.now;
+    if (now - this.lastBiomeCheckTime < 250) {
+      return;
+    }
+    this.lastBiomeCheckTime = now;
+
     const cam = this.cameras.main;
     const camX = cam.scrollX + cam.width / 2;
     const loadBuffer = 2000; // Load buffer zone around the camera center

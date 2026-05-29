@@ -225,11 +225,6 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
   const norm = getNormalizedRarity(badge.rarity);
   const iconEmoji = badge.icon || getVentureBadgeEmoji(badge.id, badge.name);
 
-  const [rotateX, setRotateX] = React.useState(0);
-  const [rotateY, setRotateY] = React.useState(0);
-  const [glareX, setGlareX] = React.useState(50);
-  const [glareY, setGlareY] = React.useState(50);
-
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isLocked) return;
     const card = e.currentTarget;
@@ -243,17 +238,20 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
     const rX = -(y - halfHeight) / 8;
     const rY = (x - halfWidth) / 8;
     
-    setRotateX(rX);
-    setRotateY(rY);
-    setGlareX((x / box.width) * 100);
-    setGlareY((y / box.height) * 100);
+    card.style.setProperty("--rx", `${rX}deg`);
+    card.style.setProperty("--ry", `${rY}deg`);
+    card.style.setProperty("--sz", "1.03");
+    card.style.setProperty("--glare-x", `${(x / box.width) * 100}%`);
+    card.style.setProperty("--glare-y", `${(y / box.height) * 100}%`);
+    card.style.setProperty("--glare-opacity", "0.4");
   };
 
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-    setGlareX(50);
-    setGlareY(50);
+  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    card.style.setProperty("--rx", "0deg");
+    card.style.setProperty("--ry", "0deg");
+    card.style.setProperty("--sz", "1");
+    card.style.setProperty("--glare-opacity", "0");
   };
 
   // Luxury high-end glassmorphism background style based on rarity and state
@@ -272,22 +270,18 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, scale: 0.95 }}
-      animate={{
-        opacity: 1,
-        rotateX,
-        rotateY,
-        scale: rotateX !== 0 ? 1.03 : 1,
-      }}
+      animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+      transition={{ duration: 0.3 }}
       onClick={isLocked ? undefined : onClick}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{
         transformStyle: "preserve-3d",
         perspective: 1200,
+        transform: "perspective(1200px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(var(--sz, 1))",
+        transition: "transform 0.12s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.5s, box-shadow 0.5s",
       }}
       className={cn(
         "group relative flex flex-col items-center justify-between text-center p-6 rounded-2xl border transition-all duration-500 h-full w-full overflow-hidden select-none",
@@ -299,9 +293,10 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
       {/* 3D Reflection Glare Overlay */}
       {!isLocked && (
         <div
-          className="absolute inset-0 pointer-events-none z-20 mix-blend-color-dodge transition-opacity duration-300 opacity-0 group-hover:opacity-40"
+          className="absolute inset-0 pointer-events-none z-20 mix-blend-color-dodge transition-opacity duration-200"
           style={{
-            background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255, 255, 255, 0.12) 0%, transparent 60%)`,
+            background: "radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255, 255, 255, 0.12) 0%, transparent 60%)",
+            opacity: "var(--glare-opacity, 0)",
           }}
         />
       )}

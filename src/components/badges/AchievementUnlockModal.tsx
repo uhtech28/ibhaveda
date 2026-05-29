@@ -219,21 +219,8 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
         {(activeStep === "burst" || activeStep === "show") && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
             {particles.map((p) => (
-              <motion.div
+              <div
                 key={p.id}
-                initial={{ x: 0, y: 0, scale: 0, opacity: 1, rotate: 0 }}
-                animate={{
-                  x: [0, p.x, p.x + (p.id % 2 === 0 ? 25 : -25)],
-                  y: [0, p.y, p.y + 160],
-                  scale: [0, 1.2, 0],
-                  opacity: [1, 1, 0],
-                  rotate: [0, p.rotate],
-                }}
-                transition={{
-                  duration: p.duration,
-                  delay: p.delay,
-                  ease: "easeOut",
-                }}
                 className={cn(
                   "absolute",
                   p.shape === "circle" && "rounded-full",
@@ -255,7 +242,15 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
                   marginTop: -p.size / 2,
                   marginLeft: -p.size / 2,
                   willChange: "transform, opacity",
-                }}
+                  // CSS variables for GPU execution
+                  "--p-x": `${p.x}px`,
+                  "--p-y": `${p.y}px`,
+                  "--p-target-x": `${p.x + (p.id % 2 === 0 ? 25 : -25)}px`,
+                  "--p-target-y": `${p.y + 160}px`,
+                  "--p-rotate": `${p.rotate}deg`,
+                  "--p-rotate-half": `${p.rotate / 2}deg`,
+                  animation: `particle-fly ${p.duration}s ease-out ${p.delay}s forwards`,
+                } as React.CSSProperties}
               />
             ))}
           </div>
@@ -317,38 +312,28 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
 
             {/* Cosmic Rotating Beams / Rays */}
             {["burst", "show"].includes(activeStep) && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8, rotate: 0 }}
-                animate={{ opacity: 0.28, scale: 1.15, rotate: 360 }}
-                transition={{
-                  opacity: { duration: 1 },
-                  scale: { duration: 1 },
-                  rotate: { repeat: Infinity, duration: 25, ease: "linear" }
-                }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] pointer-events-none z-0"
+              <div
+                className="absolute top-1/2 left-1/2 w-[420px] h-[420px] pointer-events-none z-0"
                 style={{
                   background: `conic-gradient(from 0deg, transparent, ${badgeColor}40, transparent, ${badgeColor}10, transparent, ${badgeColor}40, transparent)`,
                   borderRadius: "50%",
                   willChange: "transform",
+                  animation: "spin-clockwise 25s linear infinite",
+                  transform: "translate(-50%, -50%) scale(1.15)",
                 }}
               />
             )}
 
             {/* Cosmic Rotating Beams (Counter-Rotating) */}
             {["burst", "show"].includes(activeStep) && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8, rotate: 360 }}
-                animate={{ opacity: 0.15, scale: 1.1, rotate: 0 }}
-                transition={{
-                  opacity: { duration: 1 },
-                  scale: { duration: 1 },
-                  rotate: { repeat: Infinity, duration: 35, ease: "linear" }
-                }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[380px] pointer-events-none z-0"
+              <div
+                className="absolute top-1/2 left-1/2 w-[380px] h-[380px] pointer-events-none z-0"
                 style={{
                   background: `conic-gradient(from 0deg, transparent, ${badgeColor}30, transparent, ${badgeColor}05, transparent, ${badgeColor}30, transparent)`,
                   borderRadius: "50%",
                   willChange: "transform",
+                  animation: "spin-counter-clockwise 35s linear infinite",
+                  transform: "translate(-50%, -50%) scale(1.1)",
                 }}
               />
             )}
@@ -653,6 +638,28 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
 
       {/* CSS style hook for custom sparkle clip-path */}
       <style jsx global>{`
+        @keyframes particle-fly {
+          0% {
+            transform: translate(0, 0) scale(0) rotate(0deg);
+            opacity: 1;
+          }
+          15% {
+            transform: translate(var(--p-x), var(--p-y)) scale(1.2) rotate(var(--p-rotate-half));
+            opacity: 1;
+          }
+          100% {
+            transform: translate(var(--p-target-x), var(--p-target-y)) scale(0) rotate(var(--p-rotate));
+            opacity: 0;
+          }
+        }
+        @keyframes spin-clockwise {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes spin-counter-clockwise {
+          from { transform: translate(-50%, -50%) rotate(360deg); }
+          to { transform: translate(-50%, -50%) rotate(0deg); }
+        }
         .clip-path-sparkle {
           clip-path: polygon(
             50% 0%,
