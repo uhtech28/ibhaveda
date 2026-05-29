@@ -523,10 +523,10 @@ function CheckpointPanel({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 32 }}
-      className="absolute right-4 top-4 bottom-4 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
+      className="absolute right-4 top-20 bottom-24 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
     >
       <div
-        className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-[80vh] md:max-h-[85vh]"
+        className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-full"
         style={{
           background:
             "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
