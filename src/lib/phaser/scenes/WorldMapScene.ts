@@ -1080,8 +1080,8 @@ export class WorldMapScene extends Phaser.Scene {
             pathTint: 0xaa7d60,
             hillTint: 0xf6f1e9,
           };
-    const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
-    const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
+    const grassFrames = [12, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69, 70, 71];
+    const grassAccentFrames = [16, 17, 27, 28];
     const hillFrames = [0, 1, 2, 11, 12, 13, 22, 23, 24, 33, 34, 35, 88, 89];
     const waterFrames = [0, 1, 2, 3];
     const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
@@ -1551,8 +1551,8 @@ export class WorldMapScene extends Phaser.Scene {
     const rows = this.map.height;
     const panelW = cols * tileSize;
     const panelH = rows * tileSize;
-    const grassFrames = [0, 3, 12, 13, 14, 23, 24, 33, 34, 44, 55, 66];
-    const grassAccentFrames = [7, 8, 18, 19, 41, 42, 63, 64, 75];
+    const grassFrames = [12, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69, 70, 71];
+    const grassAccentFrames = [16, 17, 27, 28];
     const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
     const treeKeys = [
       "Tree_Emerald_1",
@@ -1955,6 +1955,39 @@ export class WorldMapScene extends Phaser.Scene {
         alpha as number,
       );
     });
+
+    // Procedurally spawn additional trees in deep forest areas to make it dense and lush
+    const staticTrees = [
+      [2.0, 5.2], [5.5, 6.4], [9.4, 5.6], [14.8, 5.2], [21.8, 5.6], [27.5, 6.6], [33.4, 5.4], [38.1, 9.2],
+      [2.4, 18.4], [4.8, 22.4], [8.4, 25.6], [2.6, 31.6], [7.8, 35.2], [13.4, 33.8], [18.6, 35.8],
+      [23.6, 33.0], [28.6, 30.8], [30.8, 36.2], [38.3, 37.1]
+    ];
+    for (let r = 2; r < rows - 2; r += 2.2) {
+      for (let c = 2; c < cols - 2; c += 2.2) {
+        // Add random jitter to make it look natural
+        const col = c + (((c * 7 + r * 13) % 7) - 3) * 0.25;
+        const row = r + (((c * 17 + r * 5) % 7) - 3) * 0.25;
+        
+        if (isNearPath(col, row, 2.6)) continue;
+        
+        // Don't place a tree if it overlaps with an existing tree from the static list (approximate distance check)
+        const overlap = staticTrees.some(([tc, tr]) => Math.abs(col - tc) < 1.6 && Math.abs(row - tr) < 1.6);
+        if (overlap) continue;
+        
+        // Random scale & type
+        const keyIndex = Math.floor((col * 13 + row * 7) % treeKeys.length);
+        const treeScale = 0.74 + ((col * 3 + row * 5) % 5) * 0.05;
+        const alpha = 0.92 + ((col + row) % 3) * 0.02;
+        
+        addCanopyTree(
+          treeKeys[keyIndex],
+          col,
+          row,
+          treeScale,
+          alpha
+        );
+      }
+    }
 
     for (let row = 6; row < rows - 4; row += 3) {
       for (let col = 4; col < cols - 4; col += 4) {
