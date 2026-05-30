@@ -195,11 +195,11 @@ const BIOME_CONFIGS: BiomeConfig[] = [
     theme: "Build & Deliver",
     visualTheme: "mine",
     colors: {
-      sky: 0x1e1a14,
-      ground: 0x2a2218,
-      accent1: 0x6b4f28,
+      sky: 0x120e0a,
+      ground: 0x1e1812,
+      accent1: 0x5a4220,
       accent2: 0xf97316, // ember orange
-      path: 0x2a2218,
+      path: 0x3a3020,
     },
   },
   {
@@ -241,6 +241,16 @@ const BIOME_CONFIGS: BiomeConfig[] = [
       path: 0x5c2800,
     },
   },
+];
+
+/** Stage 5 mine route — grid cols/rows on the 40×40 map panel (single layout source). */
+const MINE_CP_GRID: [number, number][] = [
+  [7, 32],
+  [12, 26],
+  [18, 21],
+  [26, 21],
+  [32, 26],
+  [38, 32],
 ];
 
 /**
@@ -3225,273 +3235,420 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  STAGE 5 · MINE  —  Enhanced Dark Rocky Mine + Coal Outpost
-  //  Ground: Ash-dark soil with coal seams  |  Props: Dead trees, mining carts, pickaxes, lanterns
-  //  Mine shaft: Detailed timber frame  |  Atmosphere: Ember sparks, fog, warm lamplight
+  //  STAGE 5 · MINE  —  Deep Mine cavern with V-rail network
+  //  Ground: cave brick floor  |  Mining pit, service roads, animated haul trucks
+  //  Paths: V-shaped cart rails on MINE_CP_GRID — checkpoints stay clear
   // ─────────────────────────────────────────────────────────────
   private createMineTilePanel(
     panelX: number,
     panelOffsetY: number,
     scale: number,
-    biome: BiomeConfig,
-    biomeIndex: number,
+    _biome: BiomeConfig,
+    _biomeIndex: number,
   ): void {
+    void _biome;
+    void _biomeIndex;
+
     const tileSize = 16 * scale;
     const cols = this.map.width;
     const rows = this.map.height;
-    const toX = (x: number) => panelX + x * tileSize;
-    const toY = (y: number) => panelOffsetY + y * tileSize;
-    const midRow = rows / 2;
     const panelW = cols * tileSize;
     const panelH = rows * tileSize;
-    const midY = toY(midRow);
+    const cpRoute = MINE_CP_GRID;
 
-    // ── BASE GROUND: Dark ash soil with subtle coal streaking ────────────────────
-    const ground = this.add.graphics();
-    ground.fillStyle(0x1a1510, 1);
+    const tx = (c: number) => panelX + c * tileSize;
+    const ty = (r: number) => panelOffsetY + r * tileSize;
+
+    const prop = (
+      key: string, col: number, row: number, depth: number,
+      tint = 0xffffff, sc = 1, alpha = 1,
+    ) => {
+      if (!this.textures.exists(key)) return;
+      const s = this.add.sprite(tx(col), ty(row), key);
+      s.setOrigin(0.5, 1).setScale(scale * sc).setTint(tint).setAlpha(alpha).setDepth(depth);
+      this.midgroundLayer.add(s);
+    };
+
+    const propShadow = (col: number, row: number, depth: number, sc = 0.75) => {
+      const key = "Shadow_Round_32x16_Flat_Black";
+      if (!this.textures.exists(key)) return;
+      const s = this.add.sprite(tx(col), ty(row) + 3, key);
+      s.setOrigin(0.5, 0.5).setScale(scale * sc).setAlpha(0.35).setDepth(depth - 0.5);
+      this.midgroundLayer.add(s);
+    };
+
+    const mineProp = (
+      key: string, col: number, row: number, depth: number,
+      sc = 0.5, alpha = 1, flipX = false,
+    ) => {
+      if (!this.textures.exists(key)) return;
+      const s = this.add.image(tx(col), ty(row), key);
+      s.setOrigin(0.5, 1).setScale(scale * sc).setAlpha(alpha).setDepth(depth);
+      if (flipX) s.setFlipX(true);
+      this.midgroundLayer.add(s);
+    };
+
+    const C = {
+      groundDark: 0x100c08,
+      groundMid: 0x1a1410,
+      stoneA: 0x2a2218,
+      stoneB: 0x342820,
+      stoneC: 0x201810,
+      timber: 0x5a4220,
+      timberLight: 0x6b5030,
+      railBase: 0x4a4030,
+      railMid: 0x6a5a3a,
+      railHighlight: 0x8b7355,
+      amber: 0xfbbf24,
+      ember: 0xf97316,
+      warmGlow: 0xf59e0b,
+    };
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 1 — CAVE BASE + EDGE VIGNETTE
+    // ════════════════════════════════════════════════════════════════════════
+    const ground = this.add.graphics().setDepth(1);
+    ground.fillGradientStyle(C.groundDark, C.groundMid, 0x141008, C.groundDark, 1);
     ground.fillRect(panelX, panelOffsetY, panelW, panelH);
-    // Add coal seam streaks
-    ground.fillStyle(0x0d0a08, 0.7);
-    for (let x = panelX; x < panelX + panelW; x += tileSize * 3) {
-      ground.fillRect(x, panelOffsetY, tileSize * 1.5, panelH);
-    }
-    ground.setDepth(1);
+    const vig = this.add.graphics().setDepth(1.5);
+    vig.fillStyle(0x000000, 0.32);
+    vig.fillRect(panelX, panelOffsetY, panelW, panelH * 0.07);
+    vig.fillRect(panelX, panelOffsetY, panelW * 0.05, panelH);
+    vig.fillRect(panelX + panelW * 0.95, panelOffsetY, panelW * 0.05, panelH);
+    this.backgroundLayer.add(vig);
     this.backgroundLayer.add(ground);
 
-    // ── TILE TEXTURE: Subtle 16×16 grid with ore glints ──
-    const tex = this.add.graphics();
-    tex.setDepth(2);
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const shade = (r + c) % 2 === 0 ? 0x221d16 : 0x1a1510;
-        tex.fillStyle(shade, 0.45);
-        tex.fillRect(toX(c), toY(r), tileSize, tileSize);
+    // Optional tiled cave backdrop
+    if (this.textures.exists("mine_bg_cave")) {
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const tile = this.add.image(tx(col) + tileSize / 2, ty(row) + tileSize / 2, "mine_bg_cave");
+          tile.setOrigin(0.5).setScale(scale).setAlpha(0.55).setDepth(1.2);
+          tile.setTint(0xc8b8a0);
+          this.backgroundLayer.add(tile);
+        }
       }
     }
-    this.backgroundLayer.add(tex);
 
-    // ── DIRT PATH (horizontal band) with mining cart rails ─────────────────────────
-    const path = this.add.graphics();
-    path.fillStyle(0x2a2218, 1);
-    path.fillRect(panelX, midY - 14, panelW, 28);
-    // Cart rail ties with metallic shine
-    path.fillStyle(0x3d2e1a, 0.8);
-    for (let x = panelX + 8; x < panelX + panelW; x += 22) {
-      path.fillRect(x, midY - 10, 14, 4);
-      path.fillRect(x, midY + 6, 14, 4);
-      // Metallic highlights on ties
-      path.fillStyle(0xf59e0b, 0.4);
-      path.fillRect(x + 2, midY - 9, 4, 2);
-      path.fillRect(x + 2, midY + 7, 4, 2);
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 2 — BRICK CAVE FLOOR (pixel-aligned, low noise)
+    // ════════════════════════════════════════════════════════════════════════
+    const floor = this.add.graphics().setDepth(2);
+    const stoneColors = [C.stoneA, C.stoneB, C.stoneC, 0x2e261c, 0x382e22];
+    for (let row = 0; row < rows; row += 1) {
+      const rowOff = (row % 2) * 8;
+      for (let col = 0; col < cols; col += 1) {
+        const px = tx(col) + rowOff * 0.5;
+        const seed = (col * 17 + row * 31) % stoneColors.length;
+        floor.fillStyle(stoneColors[seed], 0.92);
+        floor.fillRect(px, ty(row), tileSize - 1, tileSize - 1);
+      }
     }
-    // Rails with metallic gradient
-    const railGradient = [0x5a4a2a, 0x7a6a4a, 0x5a4a2a];
-    railGradient.forEach((color, i) => {
-      path.fillStyle(color, 0.7 - i * 0.1);
-      path.fillRect(panelX, midY - 8 + i * 2, panelW, 2);
-      path.fillRect(panelX, midY + 6 - i * 2, panelW, 2);
-    });
-    path.setDepth(4);
-    this.backgroundLayer.add(path);
+    this.backgroundLayer.add(floor);
 
-    // ── MINE SHAFT ENTRANCE (left) with detailed timber frame and lanterns ───────────────────
-    const shaft = this.add.graphics();
-    shaft.setDepth(5);
-    // Main shaft structure
-    shaft.fillStyle(0x2e2418, 0.95);
-    shaft.fillRect(toX(4), toY(midRow - 5), tileSize * 5, tileSize * 4);
-    // Dark interior
-    shaft.fillStyle(0x080604, 0.95);
-    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 3.5, tileSize * 3);
-    // Timber frame - darker wood
-    shaft.fillStyle(0x5a4220, 1);
-    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 0.5, tileSize * 3);
-    shaft.fillRect(toX(7.6), toY(midRow - 4.5), tileSize * 0.5, tileSize * 3);
-    shaft.fillRect(toX(4.6), toY(midRow - 4.5), tileSize * 3.5, tileSize * 0.5);
-    // Roof support beam
-    shaft.fillRect(toX(5.8), toY(midRow - 5), tileSize * 1.9, tileSize * 0.6);
-    // Lantern on shaft entrance
-    const lanternX = toX(6.5);
-    const lanternY = toY(midRow - 6);
-    shaft.fillStyle(0xf59e0b, 0.8);
-    shaft.fillRect(lanternX - 3, lanternY, 6, 4);
-    shaft.fillStyle(0xfbbf24, 0.9);
-    shaft.fillCircle(lanternX, lanternY + 2, 2);
-    // Lantern glow
-    const glow = this.add.circle(lanternX, lanternY - 8, 20, 0xf59e0b, 0.15);
-    glow.setDepth(4.5);
-    this.midgroundLayer.add(glow);
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 3 — V-SHAPED RAIL TRACK (3 segments, dashed centre line)
+    // ════════════════════════════════════════════════════════════════════════
+    const rails = this.add.graphics().setDepth(3);
+    const roadW = tileSize * 2.0;
+
+    const drawRailSeg = (x1: number, y1: number, x2: number, y2: number) => {
+      rails.lineStyle(roadW + 8, 0x000000, 0.2);
+      rails.beginPath();
+      rails.moveTo(x1, y1);
+      rails.lineTo(x2, y2);
+      rails.strokePath();
+
+      rails.lineStyle(roadW, C.railBase, 0.96);
+      rails.beginPath();
+      rails.moveTo(x1, y1);
+      rails.lineTo(x2, y2);
+      rails.strokePath();
+
+      rails.lineStyle(6, C.railMid, 0.65);
+      rails.beginPath();
+      rails.moveTo(x1, y1);
+      rails.lineTo(x2, y2);
+      rails.strokePath();
+
+      rails.lineStyle(2, C.railHighlight, 0.5);
+      rails.beginPath();
+      rails.moveTo(x1, y1);
+      rails.lineTo(x2, y2);
+      rails.strokePath();
+
+      // Dashed amber centre line
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const dashLen = tileSize * 0.55;
+      const gapLen = tileSize * 0.35;
+      const steps = Math.ceil(len / (dashLen + gapLen));
+      for (let t = 0; t < steps; t += 1) {
+        const f0 = (t * (dashLen + gapLen)) / len;
+        const f1 = Math.min((t * (dashLen + gapLen) + dashLen) / len, 1);
+        rails.lineStyle(3, C.amber, 0.75);
+        rails.beginPath();
+        rails.moveTo(x1 + (x2 - x1) * f0, y1 + (y2 - y1) * f0);
+        rails.lineTo(x1 + (x2 - x1) * f1, y1 + (y2 - y1) * f1);
+        rails.strokePath();
+      }
+
+      // Rail ties
+      const tieSteps = Math.max(2, Math.floor(len / 28));
+      for (let t = 0; t <= tieSteps; t += 1) {
+        const f = t / tieSteps;
+        const px = x1 + (x2 - x1) * f;
+        const py = y1 + (y2 - y1) * f;
+        const nx = -(y2 - y1) / len;
+        const ny = (x2 - x1) / len;
+        rails.fillStyle(C.timber, 0.85);
+        rails.fillRect(px + nx * 10 - 3, py + ny * 10 - 2, 6, 4);
+      }
+    };
+
+    for (let i = 0; i < cpRoute.length - 1; i += 1) {
+      const [c1, r1] = cpRoute[i];
+      const [c2, r2] = cpRoute[i + 1];
+      drawRailSeg(tx(c1), ty(r1), tx(c2), ty(r2));
+    }
+    this.backgroundLayer.add(rails);
+
+    // Rail sprite overlays (when asset is present)
+    if (this.textures.exists("mine_cave_rail")) {
+      const stampRail = (col: number, row: number, cropW: number, cropH: number, sx: number, sy: number, angle = 0) => {
+        const img = this.add.image(tx(col), ty(row), "mine_cave_rail");
+        img.setOrigin(0.5, 0.5).setCrop(sx, sy, cropW, cropH).setScale(scale * 1.8);
+        img.setAngle(angle).setDepth(3.2).setAlpha(0.92);
+        this.backgroundLayer.add(img);
+      };
+      stampRail(12, 26.5, 176, 32, 0, 16, -38);
+      stampRail(22, 21, 176, 32, 0, 16, 0);
+      stampRail(32, 26.5, 176, 32, 0, 16, 38);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 4 — CHECKPOINT STONE PADS (subtle — nodes render on top)
+    // ════════════════════════════════════════════════════════════════════════
+    const plaza = this.add.graphics().setDepth(4);
+    cpRoute.forEach(([pc, pr]) => {
+      const px = tx(pc);
+      const py = ty(pr);
+      const pw = tileSize * 2.4;
+      const ph = tileSize * 1.4;
+      plaza.fillStyle(0x000000, 0.22);
+      plaza.fillRoundedRect(px - pw / 2 + 2, py - ph / 2 + 3, pw, ph, 5);
+      plaza.fillStyle(0x3a3228, 0.9);
+      plaza.fillRoundedRect(px - pw / 2, py - ph / 2, pw, ph, 5);
+      plaza.lineStyle(2, C.amber, 0.6);
+      plaza.strokeRoundedRect(px - pw / 2, py - ph / 2, pw, ph, 5);
+    });
+    this.backgroundLayer.add(plaza);
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 5 — SHAFT (HOLE BOX) + MINING AREA + SERVICE ROADS
+    // ════════════════════════════════════════════════════════════════════════
+    const shaft = this.add.graphics().setDepth(5);
+    const shX = tx(2.2);
+    const shY = ty(7.0);
+    const shW = tileSize * 4.2;
+    const shH = tileSize * 4.2;
+    shaft.fillStyle(0x000000, 0.35);
+    shaft.fillRoundedRect(shX + 4, shY + 5, shW, shH, 6);
+    shaft.fillStyle(C.timber, 0.96);
+    shaft.fillRoundedRect(shX, shY, shW, shH, 6);
+    shaft.fillStyle(0x020100, 0.99);
+    shaft.fillRoundedRect(shX + tileSize * 0.55, shY + tileSize * 0.55, shW - tileSize * 1.1, shH - tileSize * 1.1, 3);
+    shaft.lineStyle(2, C.timberLight, 0.85);
+    shaft.strokeRoundedRect(shX, shY, shW, shH, 6);
+    shaft.fillStyle(C.timberLight, 0.9);
+    shaft.fillRect(shX + 5, shY + 5, 5, shH - 10);
+    shaft.fillRect(shX + shW - 10, shY + 5, 5, shH - 10);
+    this.backgroundLayer.add(shaft);
+
+    const shaftGlow = this.add.circle(shX + shW * 0.5, shY + shH * 0.55, tileSize * 1.8, C.ember, 0.12);
+    shaftGlow.setDepth(5);
+    this.backgroundLayer.add(shaftGlow);
     this.tweens.add({
-      targets: glow,
-      alpha: { from: 0.1, to: 0.25 },
-      duration: 1500,
+      targets: shaftGlow,
+      alpha: { from: 0.06, to: 0.18 },
+      duration: 2000,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
     });
-    this.backgroundLayer.add(shaft);
 
-    // ── TOP FENCE (above path) ───────────────────────────────
-    const fenceG = this.add.graphics();
-    fenceG.setDepth(5);
-    this.drawFenceRow(
-      fenceG,
-      toX(3),
-      midY - 30,
-      tileSize * (cols - 6),
-      0x6b4f28,
-      0x5a3e1e,
-      24,
-    );
-    // ── BOTTOM FENCE ─────────────────────────────────────────
-    this.drawFenceRow(
-      fenceG,
-      toX(3),
-      midY + 18,
-      tileSize * (cols - 6),
-      0x6b4f28,
-      0x5a3e1e,
-      24,
-    );
-    this.backgroundLayer.add(fenceG);
+    // Mining zone — polished procedural pit beside shaft (no image decal)
+    const mineGfx = this.add.graphics().setDepth(5);
+    const maX = tx(7);
+    const maY = ty(6);
+    const maW = tx(13) - maX;
+    const maH = ty(14.5) - maY;
+    mineGfx.fillStyle(0x000000, 0.3);
+    mineGfx.fillRoundedRect(maX + 3, maY + 4, maW, maH, 8);
+    mineGfx.fillStyle(0x1e1810, 0.96);
+    mineGfx.fillRoundedRect(maX, maY, maW, maH, 8);
+    mineGfx.lineStyle(2.5, C.amber, 0.8);
+    mineGfx.strokeRoundedRect(maX + 1, maY + 1, maW - 2, maH - 2, 7);
+    // caution corner marks
+    [[maX + 6, maY + 6], [maX + maW - 6, maY + 6]].forEach(([cx, cy]) => {
+      mineGfx.fillStyle(C.amber, 0.85);
+      mineGfx.fillRect(cx - 2, cy - 2, 4, 4);
+    });
+    this.backgroundLayer.add(mineGfx);
 
-    // ── SCATTERED PROPS: Dead trees + rocks + coal lumps + mining equipment ──────
-    const props = this.add.graphics();
-    props.setDepth(6);
+    const pit = this.add.graphics().setDepth(6);
+    const pitCx = tx(10);
+    const pitCy = ty(9.8);
+    pit.fillStyle(0x080604, 0.95);
+    pit.fillEllipse(pitCx, pitCy, tileSize * 2.8, tileSize * 2.0);
+    pit.fillStyle(0x040302, 1);
+    pit.fillEllipse(pitCx, pitCy + 4, tileSize * 2.0, tileSize * 1.2);
+    pit.fillStyle(C.ember, 0.35);
+    pit.fillEllipse(pitCx, pitCy + 6, tileSize * 1.0, tileSize * 0.5);
+    this.midgroundLayer.add(pit);
 
-    // Dead trees (bare trunk, grey-brown canopy)
-    const deadTreePositions = [
-      [6, midRow - 4],
-      [11, midRow - 6],
-      [18, midRow - 5],
-      [34, midRow - 4],
-      [40, midRow - 6],
-      [46, midRow - 5],
-      [8, midRow + 3],
-      [14, midRow + 4],
-      [30, midRow + 3],
-      [38, midRow + 4],
-      [44, midRow + 5],
-    ];
-    deadTreePositions.forEach(([c, r]) => {
-      this.drawPixelTree(
-        props,
-        toX(c),
-        toY(r),
-        0x4a3520,
-        0x3d3028,
-        0x1e1810,
-        scale,
-      );
+    const pitGlow = this.add.circle(pitCx, pitCy + 8, tileSize * 1.2, C.ember, 0.15);
+    pitGlow.setDepth(6);
+    this.midgroundLayer.add(pitGlow);
+    this.tweens.add({
+      targets: pitGlow,
+      alpha: { from: 0.08, to: 0.22 },
+      duration: 1800,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
     });
 
-    // Mining equipment - pickaxes stuck in ground
-    [12, 25, 37].forEach((c) => {
-      props.fillStyle(0x8b7355, 0.9);
-      props.fillRect(toX(c) - 2, toY(midRow - 2), 4, 12);
-      props.fillStyle(0xc2b280, 0.9);
-      props.fillRect(toX(c) - 8, toY(midRow - 1), 12, 4);
-    });
+    // Headframe removed — keep pit only inside mining frame
 
-    // Coal/rock lumps
-    [
-      [9, midRow + 2],
-      [22, midRow - 3],
-      [28, midRow + 2],
-      [36, midRow - 4],
-      [42, midRow + 3],
-    ].forEach(([c, r]) => {
-      this.drawPixelRock(props, toX(c), toY(r), 0x2e2820, scale);
-    });
+    // Service roads linking mine → main V-rail (vertical only, no road through pit)
+    const serviceRoad = this.add.graphics().setDepth(3.5);
+    const drawServiceRoad = (x1: number, y1: number, x2: number, y2: number) => {
+      const sw = tileSize * 1.4;
+      serviceRoad.lineStyle(sw + 6, 0x000000, 0.18);
+      serviceRoad.beginPath();
+      serviceRoad.moveTo(x1, y1);
+      serviceRoad.lineTo(x2, y2);
+      serviceRoad.strokePath();
+      serviceRoad.lineStyle(sw, 0x3a3428, 0.92);
+      serviceRoad.beginPath();
+      serviceRoad.moveTo(x1, y1);
+      serviceRoad.lineTo(x2, y2);
+      serviceRoad.strokePath();
+      serviceRoad.lineStyle(2, C.amber, 0.45);
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const dash = tileSize * 0.4;
+      const gap = tileSize * 0.3;
+      const n = Math.ceil(len / (dash + gap));
+      for (let t = 0; t < n; t += 1) {
+        const f0 = (t * (dash + gap)) / len;
+        const f1 = Math.min((t * (dash + gap) + dash) / len, 1);
+        serviceRoad.beginPath();
+        serviceRoad.moveTo(x1 + (x2 - x1) * f0, y1 + (y2 - y1) * f0);
+        serviceRoad.lineTo(x1 + (x2 - x1) * f1, y1 + (y2 - y1) * f1);
+        serviceRoad.strokePath();
+      }
+    };
+    drawServiceRoad(tx(10), ty(14.5), tx(10), ty(24.5));
+    drawServiceRoad(tx(10), ty(24.5), tx(12), ty(26));
+    this.backgroundLayer.add(serviceRoad);
 
-    // Small coal seam glints with animated sparkle
-    [
-      [12, midRow - 2.5],
-      [25, midRow + 1.5],
-      [39, midRow - 2],
-    ].forEach(([c, r]) => {
-      props.fillStyle(0x1a1614, 0.9);
-      props.fillRect(toX(c) - 4, toY(r) - 3, 14, 8);
-      props.fillStyle(0x3d3428, 0.4);
-      props.fillRect(toX(c) - 2, toY(r) - 2, 6, 4);
-      // Animated sparkle
-      const sparkle = this.add.rectangle(
-        toX(c),
-        toY(r) - 6,
-        3,
-        3,
-        0xf59e0b,
-        0.7,
-      );
-      sparkle.setDepth(7);
-      this.animationLayer.add(sparkle);
+    const truckKey = this.textures.exists("mine_truck_red") ? "mine_truck_red" : "mine_truck_1";
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 6 — ORE YARD FRAMES (gold-bordered storage rectangles)
+    // ════════════════════════════════════════════════════════════════════════
+    const drawOreYard = (centerCol: number, rowTop: number, rowBot: number) => {
+      const yard = this.add.graphics().setDepth(10);
+      const x = tx(centerCol) - tileSize * 1.75;
+      const y = ty(rowTop);
+      const w = tileSize * 3.5;
+      const h = ty(rowBot) - ty(rowTop);
+      yard.fillStyle(0x000000, 0.22);
+      yard.fillRoundedRect(x + 2, y + 3, w, h, 5);
+      yard.fillStyle(0x2a2218, 0.94);
+      yard.fillRoundedRect(x, y, w, h, 5);
+      yard.lineStyle(2, C.amber, 0.65);
+      yard.strokeRoundedRect(x + 1, y + 1, w - 2, h - 2, 4);
+      this.midgroundLayer.add(yard);
+    };
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 7 — LEFT ORE YARD (grid: rock → barrels → crate → parked truck)
+    // ════════════════════════════════════════════════════════════════════════
+    drawOreYard(3, 23, 31.5);
+    propShadow(2.6, 26.5, 12, 0.65);
+    prop("Barrel_Small_Empty", 2.6, 26.5, 12, 0x5a4838, 0.92);
+    propShadow(3.8, 26.5, 12, 0.65);
+    prop("Barrel_Small_Empty", 3.8, 26.5, 12, 0x504030, 0.9);
+    propShadow(3.2, 28.5, 12, 0.7);
+    prop("Crate_Large_Empty", 3.2, 28.5, 12, 0x6a5848, 0.9);
+    mineProp(truckKey, 3.2, 31.0, 13, 0.46);
+
+    // Right ore yard — wooden boxes above checkpoint 6
+    drawOreYard(38, 26.5, 30.5);
+    propShadow(37.2, 28.8, 12, 0.65);
+    prop("Barrel_Small_Empty", 37.2, 28.8, 12, 0x5a4838, 0.92);
+    propShadow(38.8, 28.8, 12, 0.65);
+    prop("Barrel_Small_Empty", 38.8, 28.8, 12, 0x504030, 0.9);
+    propShadow(38.0, 30.0, 12, 0.7);
+    prop("Crate_Medium_Closed", 38.0, 30.0, 12, 0x6a5848, 0.9);
+    mineProp(truckKey, 38.0, 31.0, 13, 0.46, 1, true);
+
+    // Mid-path supply beside CP2 (single tidy cluster)
+    propShadow(10.0, 27.8, 11, 0.75);
+    prop("Barrel_Small_Empty", 10.0, 27.8, 11, 0x504030, 0.88);
+    propShadow(11.2, 28.0, 11, 0.75);
+    prop("Crate_Large_Empty", 11.2, 28.0, 11, 0x6a5848, 0.9);
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  LAYER 9 — STREET LIGHTS NEAR CP2, CP3, CP6 (roadside, grounded)
+    // ════════════════════════════════════════════════════════════════════════
+    const streetLightKey = this.textures.exists("mine_street_light")
+      ? "mine_street_light"
+      : "mine_street_light_1";
+    const placeStreetLight = (col: number, row: number, li: number) => {
+      const gx = tx(col);
+      const gy = ty(row);
+      const base = this.add.graphics().setDepth(13);
+      base.fillStyle(0x000000, 0.28);
+      base.fillEllipse(gx, gy + 1, tileSize * 0.55, tileSize * 0.14);
+      base.fillStyle(0x3a3428, 0.9);
+      base.fillEllipse(gx, gy + 1, tileSize * 0.45, tileSize * 0.1);
+      this.midgroundLayer.add(base);
+      if (this.textures.exists(streetLightKey)) {
+        const lamp = this.add.image(gx, gy, streetLightKey);
+        lamp.setOrigin(0.5, 1).setScale(scale * 0.48).setDepth(14);
+        this.midgroundLayer.add(lamp);
+      }
+      const halo = this.add.circle(gx, gy - tileSize * 1.4, tileSize * 2.2, C.warmGlow, 0.12);
+      halo.setDepth(13);
+      this.midgroundLayer.add(halo);
       this.tweens.add({
-        targets: sparkle,
-        alpha: { from: 0.3, to: 0.9 },
-        duration: 800 + Math.random() * 400,
+        targets: halo,
+        alpha: { from: 0.07, to: 0.2 },
+        duration: 2400 + li * 350,
         yoyo: true,
         repeat: -1,
         ease: "Sine.easeInOut",
       });
-    });
+    };
+    // Off-road beside each checkpoint — feet aligned to tile row
+    [
+      [9.0, 27.2],   // CP2 — left shoulder
+      [24.5, 21.8],  // CP3 — right shoulder
+      [40.5, 32.5],  // CP6 — right shoulder below yard
+    ].forEach(([lc, lr], li) => placeStreetLight(lc, lr, li));
 
-    // Lantern posts along the path
-    [10, 22, 34, 46].forEach((c) => {
-      const lx = toX(c);
-      const ly = midY + 4;
-      props.fillStyle(0x5a4a3a, 1);
-      props.fillRect(lx - 1, ly, 2, 12);
-      props.fillStyle(0xf59e0b, 0.8);
-      props.fillCircle(lx, ly + 2, 3);
-    });
+    // Subtle warm bloom + low fog
+    const bloom = this.add.graphics().setDepth(0);
+    bloom.fillStyle(C.warmGlow, 0.03);
+    bloom.fillEllipse(tx(22), ty(21), panelW * 0.45, panelH * 0.18);
+    this.backgroundLayer.add(bloom);
 
-    this.backgroundLayer.add(props);
-
-    // ── SPRITES ───────────────────────────────────────────────
-    if (this.textures.exists("House_Hay_3")) {
-      const house = this.add.sprite(toX(21), toY(midRow - 5.2), "House_Hay_3");
-      house.setOrigin(0.5, 1);
-      house.setScale(scale);
-      house.setTint(0x9a8870);
-      house.setDepth(8);
-      this.midgroundLayer.add(house);
-    }
-
-    // Mining cart sprite
-    if (this.textures.exists("Barrel_Small_Empty")) {
-      const cart = this.add.sprite(
-        toX(8),
-        toY(midRow - 1.5),
-        "Barrel_Small_Empty",
-      );
-      cart.setOrigin(0.5, 1);
-      cart.setScale(scale * 0.8);
-      cart.setTint(0x5a4a30);
-      cart.setAngle(-5);
-      cart.setDepth(9);
-      this.midgroundLayer.add(cart);
-    }
-
-    if (this.textures.exists("LampPost_3")) {
-      [16, 26].forEach((cx) => {
-        const lp = this.add.sprite(toX(cx), toY(midRow + 1.5), "LampPost_3");
-        lp.setOrigin(0.5, 1);
-        lp.setScale(scale);
-        lp.setTint(0xf59e0b);
-        lp.setDepth(9);
-        this.midgroundLayer.add(lp);
-      });
-    }
-
-    // Mine cart tracks extending from shaft
-    const tracks = this.add.graphics();
-    tracks.setDepth(3.5);
-    tracks.lineStyle(3, 0x5a4a2a, 0.8);
-    tracks.beginPath();
-    tracks.moveTo(toX(9), midY - 10);
-    tracks.lineTo(toX(18), midY - 5);
-    tracks.strokePath();
-    this.midgroundLayer.add(tracks);
+    const fog = this.add.graphics().setDepth(1.6);
+    fog.fillStyle(0x2a2018, 0.1);
+    fog.fillRect(panelX, panelOffsetY + panelH * 0.58, panelW, panelH * 0.18);
+    this.backgroundLayer.add(fog);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -5737,57 +5894,8 @@ export class WorldMapScene extends Phaser.Scene {
       // (Previously added lamps/bins at checkpoints which cluttered the paths.)
     }
 
-  private createMineLandmarks(stageId: number): void {
-    const nodes = this.getStageNodes(stageId);
-    if (nodes.length === 0) return;
-
-    // Stage 5 has highest checkpoint density, so use tighter ring sizes.
-    const pads = this.add.graphics();
-    pads.setDepth(14);
-    nodes.forEach((node) => {
-      pads.fillStyle(0x2a3a23, 0.24);
-      pads.fillEllipse(node.x + 4, node.y + 72, 100, 34);
-      pads.lineStyle(3, 0xb8d084, 0.34);
-      pads.strokeEllipse(node.x, node.y + 61, 76, 24);
-
-      // Enhanced lantern posts with warm glow
-      [0, 1].forEach((offset, i) => {
-        const lampX = node.x + (offset === 0 ? -52 : 52);
-        const lampSprite = this.addLandmarkSprite(
-          "LampPost_3",
-          lampX,
-          node.y + 114,
-          0.76,
-          0.88,
-        );
-        // Add warm lantern glow
-        const glow = this.add.circle(lampX, node.y + 60, 18, 0xf59e0b, 0.18);
-        glow.setDepth(16);
-        this.midgroundLayer.add(glow);
-        this.tweens.add({
-          targets: glow,
-          alpha: { from: 0.1, to: 0.25 },
-          duration: 1600 + i * 200,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-      });
-    });
-    this.midgroundLayer.add(pads);
-
-    // Add mining support beams near checkpoints
-    nodes.forEach((node, index) => {
-      if (index % 2 === 0) {
-        const beam = this.add.graphics();
-        beam.fillStyle(0x5a4220, 0.8);
-        beam.fillRect(node.x - 2, node.y + 30, 4, 30);
-        beam.lineStyle(1, 0x8b6f47, 0.6);
-        beam.strokeRect(node.x - 2, node.y + 30, 4, 30);
-        beam.setDepth(15);
-        this.midgroundLayer.add(beam);
-      }
-    });
+  private createMineLandmarks(_stageId: number): void {
+    // All mine layout lives in createMineTilePanel — no duplicate lamps at checkpoints.
   }
 
   private createHarbourLandmarks(stageId: number): void {
@@ -6770,15 +6878,8 @@ export class WorldMapScene extends Phaser.Scene {
     }
 
     const lateStageAnchors: Record<number, Array<{ x: number; y: number }>> = {
-      // Mine: follows the rail road, then climbs to the mine works.
-      5: [
-        { x: 104, y: 510 },
-        { x: 188, y: 420 },
-        { x: 292, y: 342 },
-        { x: 420, y: 342 },
-        { x: 532, y: 424 },
-        { x: 614, y: 512 },
-      ],
+      // Mine: V-shaped cart rail — synced with createMineTilePanel / MINE_CP_GRID.
+      5: MINE_CP_GRID.map(([col, row]) => ({ x: col * 16, y: row * 16 })),
       // Harbour: three clear stops across the dock, market pier, and launch slip.
       6: [
         { x: 118, y: 500 },
