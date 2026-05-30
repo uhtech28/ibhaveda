@@ -37,10 +37,10 @@ export type PersonaGender = "male" | "female";
  */
 export class Persona extends Phaser.GameObjects.Container {
   private static readonly ARRIVAL_EPSILON = 3;
-  /** World pixels covered by one full 8-frame walk cycle at timeScale 1. */
-  private static readonly WALK_STRIDE_PX = 52;
+  /** World pixels covered by one full 8-frame walk cycle at timeScale 1 (16 fps → 0.5s/cycle at ~80px). */
+  private static readonly WALK_STRIDE_PX = 80;
   private static readonly WALK_ANIM_FRAMES = 8;
-  private static readonly WALK_ANIM_FPS = 10;
+  private static readonly WALK_ANIM_FPS = 16;
 
   // ── Public readonly ───────────────────────────────────────────────────────
 
@@ -155,6 +155,7 @@ export class Persona extends Phaser.GameObjects.Container {
     if (this.sprite) {
       this.sprite.setFlipX(this.idleFacingRight);
       this.sprite.y = 0;
+      this.sprite.setAngle(0);
     }
     return this;
   }
@@ -260,6 +261,7 @@ export class Persona extends Phaser.GameObjects.Container {
 
     if (this.sprite) {
       this.sprite.y = 0;
+      this.sprite.setAngle(0);
       if (this.sprite.anims) {
         this.sprite.anims.timeScale = 1;
       }
@@ -636,7 +638,7 @@ export class Persona extends Phaser.GameObjects.Container {
     const speedPxPerSec = distance / (duration / 1000);
     const baseCycleSpeed =
       Persona.WALK_STRIDE_PX / (Persona.WALK_ANIM_FRAMES / Persona.WALK_ANIM_FPS);
-    const timeScale = Phaser.Math.Clamp(speedPxPerSec / baseCycleSpeed, 0.65, 2.2);
+    const timeScale = Phaser.Math.Clamp(speedPxPerSec / baseCycleSpeed, 1.0, 3.5);
     return (Persona.WALK_ANIM_FRAMES / Persona.WALK_ANIM_FPS) * 1000 / timeScale;
   }
 
@@ -646,7 +648,7 @@ export class Persona extends Phaser.GameObjects.Container {
     const speedPxPerSec = distancePx / (durationMs / 1000);
     const baseCycleSpeed =
       Persona.WALK_STRIDE_PX / (Persona.WALK_ANIM_FRAMES / Persona.WALK_ANIM_FPS);
-    const timeScale = Phaser.Math.Clamp(speedPxPerSec / baseCycleSpeed, 0.65, 2.2);
+    const timeScale = Phaser.Math.Clamp(speedPxPerSec / baseCycleSpeed, 1.0, 3.5);
 
     if (this.sprite.anims.isPlaying) {
       this.sprite.anims.timeScale = timeScale;
@@ -657,13 +659,17 @@ export class Persona extends Phaser.GameObjects.Container {
     const phase = (distanceTraveled / Persona.WALK_STRIDE_PX) * Math.PI * 2;
 
     if (this.sprite) {
-      this.sprite.y = Math.sin(phase) * -2.5;
+      // Stronger vertical bob for a confident, weighty stride
+      this.sprite.y = Math.abs(Math.sin(phase)) * -5.0;
+      // Slight lateral lean into each step
+      this.sprite.setAngle(Math.sin(phase) * 2.5);
     }
 
-    const stepWeight = 0.5 + Math.abs(Math.sin(phase * 0.5)) * 0.5;
+    // Shadow pulses tighter when foot is lifted, wider when planted
+    const liftPhase = Math.abs(Math.sin(phase));
     this.shadowEllipse.setScale(
-      Phaser.Math.Linear(1, 0.78, stepWeight),
-      Phaser.Math.Linear(1, 0.72, stepWeight),
+      Phaser.Math.Linear(1.05, 0.7, liftPhase),
+      Phaser.Math.Linear(1.0, 0.6, liftPhase),
     );
   }
 

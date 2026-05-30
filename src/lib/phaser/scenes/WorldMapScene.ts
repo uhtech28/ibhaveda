@@ -7955,8 +7955,8 @@ export class WorldMapScene extends Phaser.Scene {
       targetY,
     );
 
-    // Natural walking pace synced to the 8-frame walk cycle (~140 px/sec).
-    return Phaser.Math.Clamp(distance * 7.0, 1200, 5500);
+    // Brisk walking pace synced to the 16-frame walk cycle (~250 px/sec).
+    return Phaser.Math.Clamp(distance * 4.0, 800, 3500);
   }
 
   /**
