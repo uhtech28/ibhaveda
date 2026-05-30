@@ -10,6 +10,7 @@
 export {
   gameplayIntegration,
   updateBiomeState,
+  clearCorruptionVisuals,
   executeCheckpointFlow,
   applyBiomeParticles,
   initializeAudio,

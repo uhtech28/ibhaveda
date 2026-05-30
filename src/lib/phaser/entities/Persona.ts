@@ -37,6 +37,10 @@ export type PersonaGender = "male" | "female";
  */
 export class Persona extends Phaser.GameObjects.Container {
   private static readonly ARRIVAL_EPSILON = 3;
+  /** World pixels covered by one full 8-frame walk cycle at timeScale 1. */
+  private static readonly WALK_STRIDE_PX = 52;
+  private static readonly WALK_ANIM_FRAMES = 8;
+  private static readonly WALK_ANIM_FPS = 10;
 
   // ── Public readonly ───────────────────────────────────────────────────────
 
@@ -48,6 +52,7 @@ export class Persona extends Phaser.GameObjects.Container {
   private shadowEllipse: Phaser.GameObjects.Ellipse;
   private shadowTween: Phaser.Tweens.Tween | null = null;
   private walkTween: Phaser.Tweens.Tween | null = null;
+  private walkProgressTween: Phaser.Tweens.Tween | null = null;
   private currentAnimation: "idle" | "walk" | null = null;
   private isWalking = false;
   private idleFacingRight = true;
@@ -140,11 +145,7 @@ export class Persona extends Phaser.GameObjects.Container {
    * @returns This persona instance for chaining.
    */
   override setPosition(x: number, y: number): this {
-    // Stop any active movement
-    if (this.walkTween) {
-      this.walkTween.stop();
-      this.walkTween = null;
-    }
+    this.stopWalkTweens();
     this.isWalking = false;
 
     this.x = x;
@@ -153,6 +154,7 @@ export class Persona extends Phaser.GameObjects.Container {
     // Safe-check because super() constructor calls setPosition before sprite is initialized.
     if (this.sprite) {
       this.sprite.setFlipX(this.idleFacingRight);
+      this.sprite.y = 0;
     }
     return this;
   }
@@ -190,9 +192,6 @@ export class Persona extends Phaser.GameObjects.Container {
   moveAlongPath(points: { x: number; y: number }[], duration = 1200): void {
     if (!this.scene) return;
 
-    // Hide speech bubble when walking
-    this.hideSpeechBubble();
-
     const route = points.filter((point) => {
       if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
       return (
@@ -205,110 +204,22 @@ export class Persona extends Phaser.GameObjects.Container {
       return;
     }
 
-    if (this.walkTween) {
-      this.walkTween.stop();
-      this.walkTween = null;
+    const segments = this.buildPathSegments(route);
+    if (segments.length === 0) {
+      this.playIdle();
+      return;
     }
 
-    this.currentAnimation = "walk";
-    this.isWalking = true;
-
-    if (this.shadowTween) {
-      this.shadowTween.stop();
-      this.shadowTween = null;
-    }
-
-    if (this.sprite) {
-      const walkAnimKey =
-        this.gender === "male" ? "persona_male_walk" : "persona_female_walk";
-      this.playSpriteAnimation(walkAnimKey);
-    }
-    this.startWalkShadowPulse();
-
-    // ── Start dynamic waddle/bounce walking loop on Memoji avatarContainer ────
-    if (this.avatarBobTween) {
-      this.avatarBobTween.stop();
-      this.avatarBobTween = null;
-    }
-    if (this.avatarContainer && this.scene) {
-      if (this.avatarWalkTween) {
-        this.avatarWalkTween.stop();
-        this.avatarWalkTween = null;
+    const totalPathDistance = segments.reduce((sum, segment) => sum + segment.length, 0);
+    this.beginWalk(totalPathDistance, duration);
+    this.followPathSegments(segments, totalPathDistance, duration, () => {
+      const last = segments[segments.length - 1]?.end;
+      if (last) {
+        this.x = last.x;
+        this.y = last.y;
       }
-      this.avatarContainer.y = -100;
-      this.avatarWalkTween = this.scene.tweens.add({
-        targets: this.avatarContainer,
-        y: { from: -100, to: -112 },
-        angle: { from: -6, to: 6 },
-        duration: 350,
-        ease: 'Quad.easeInOut',
-        yoyo: true,
-        repeat: -1,
-      });
-    }
-
-    // Calculate total path distance to ensure uniform constant velocity
-    let totalPathDistance = 0;
-    let prevX = this.x;
-    let prevY = this.y;
-    for (const point of route) {
-      totalPathDistance += Phaser.Math.Distance.Between(prevX, prevY, point.x, point.y);
-      prevX = point.x;
-      prevY = point.y;
-    }
-
-    // Time factor in ms per pixel (e.g. at 8ms per pixel, speed is ~125px/sec)
-    const timeFactor = totalPathDistance > 0 ? (duration / totalPathDistance) : 8.0;
-    let index = 0;
-
-    const walkNextSegment = () => {
-      const point = route[index];
-      if (!point) {
-        // Reached end of path - ensure we're in idle state
-        this.isWalking = false;
-        this.currentAnimation = "idle";
-        this.playIdle();
-        return;
-      }
-
-      const segmentDistance = Phaser.Math.Distance.Between(this.x, this.y, point.x, point.y);
-      if (segmentDistance <= Persona.ARRIVAL_EPSILON) {
-        index += 1;
-        walkNextSegment();
-        return;
-      }
-
-      // Flip sprite based on movement direction (only if using sprite)
-      if (this.sprite && point.x !== this.x) {
-        const facingRight = point.x > this.x;
-        this.sprite.setFlipX(facingRight);
-        this.idleFacingRight = facingRight;
-      }
-
-      // Flip Memoji container scale horizontally to face the walking direction!
-      if (this.avatarContainer && point.x !== this.x) {
-        const facingRight = point.x > this.x;
-        this.avatarContainer.scaleX = facingRight ? 1 : -1;
-        this.idleFacingRight = facingRight;
-      }
-
-      // Calculate exact duration for this segment to preserve constant linear speed
-      const segmentDuration = segmentDistance * timeFactor;
-
-      this.walkTween = this.scene.tweens.add({
-        targets: this,
-        x: point.x,
-        y: point.y,
-        duration: Math.max(16, segmentDuration),
-        ease: "Linear", // Linear ease avoids easing stutters on segment transitions
-        onComplete: () => {
-          index += 1;
-          walkNextSegment();
-        },
-      });
-    };
-
-    walkNextSegment();
+      this.finishWalk();
+    });
   }
 
   /**
@@ -325,10 +236,7 @@ export class Persona extends Phaser.GameObjects.Container {
     this.isWalking = false;
 
     // ── Stop all active movement tweens ────────────────────────────────────
-    if (this.walkTween) {
-      this.walkTween.stop();
-      this.walkTween = null;
-    }
+    this.stopWalkTweens();
 
     // ── Stop shadow pulse so shadow stays at fixed size ─────────────────────
     if (this.shadowTween) {
@@ -348,6 +256,13 @@ export class Persona extends Phaser.GameObjects.Container {
       this.avatarContainer.y = -100;
       this.avatarContainer.scaleX = this.idleFacingRight ? 1 : -1;
       this.avatarContainer.scaleY = 1;
+    }
+
+    if (this.sprite) {
+      this.sprite.y = 0;
+      if (this.sprite.anims) {
+        this.sprite.anims.timeScale = 1;
+      }
     }
 
     // ── Start gorgeous breathing bob/pulse loop on avatarContainer ──────────
@@ -544,9 +459,6 @@ export class Persona extends Phaser.GameObjects.Container {
   playWalk(targetX: number, targetY: number, duration = 1000): void {
     if (!this.scene) return;
 
-    // Hide speech bubble when walking
-    this.hideSpeechBubble();
-
     if (
       Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY) <=
       Persona.ARRIVAL_EPSILON
@@ -557,74 +469,202 @@ export class Persona extends Phaser.GameObjects.Container {
       return;
     }
 
-    if (this.walkTween) {
-      this.walkTween.stop();
-      this.walkTween = null;
+    const start = new Phaser.Math.Vector2(this.x, this.y);
+    const end = new Phaser.Math.Vector2(targetX, targetY);
+    const distance = start.distance(end);
+
+    this.beginWalk(distance, duration);
+    this.followPathSegments(
+      [{ start, end, length: distance }],
+      distance,
+      duration,
+      () => {
+        this.x = targetX;
+        this.y = targetY;
+        this.finishWalk();
+      },
+    );
+  }
+
+  // ── Private: animations ───────────────────────────────────────────────────
+
+  private buildPathSegments(
+    points: { x: number; y: number }[],
+  ): Array<{ start: Phaser.Math.Vector2; end: Phaser.Math.Vector2; length: number }> {
+    const segments: Array<{
+      start: Phaser.Math.Vector2;
+      end: Phaser.Math.Vector2;
+      length: number;
+    }> = [];
+
+    let previous = new Phaser.Math.Vector2(this.x, this.y);
+    for (const point of points) {
+      const next = new Phaser.Math.Vector2(point.x, point.y);
+      const length = previous.distance(next);
+      if (length > Persona.ARRIVAL_EPSILON) {
+        segments.push({ start: previous.clone(), end: next, length });
+        previous = next;
+      }
     }
+
+    return segments;
+  }
+
+  private beginWalk(totalDistance: number, duration: number): void {
+    if (!this.scene) return;
+
+    this.hideSpeechBubble();
+    this.stopWalkTweens();
 
     this.currentAnimation = "walk";
     this.isWalking = true;
 
-    // Stop idle shadow animation
     if (this.shadowTween) {
       this.shadowTween.stop();
       this.shadowTween = null;
     }
 
-    // Play walk sprite animation (only if using sprite)
     if (this.sprite) {
       const walkAnimKey =
         this.gender === "male" ? "persona_male_walk" : "persona_female_walk";
       this.playSpriteAnimation(walkAnimKey);
-    }
-    this.startWalkShadowPulse();
-
-    // Flip sprite based on movement direction (only if using sprite)
-    if (this.sprite && targetX !== this.x) {
-      const facingRight = targetX > this.x;
-      this.sprite.setFlipX(facingRight);
-      this.idleFacingRight = facingRight;
+      this.syncWalkAnimationSpeed(totalDistance, duration);
     }
 
-    // Move the container
-    this.walkTween = this.scene.tweens.add({
-      targets: this,
-      x: targetX,
-      y: targetY,
-      duration: duration,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        this.x = targetX;
-        this.y = targetY;
-        this.currentAnimation = "idle";
-        this.playIdle();
+    this.shadowEllipse.setScale(1, 1);
+
+    if (this.avatarBobTween) {
+      this.avatarBobTween.stop();
+      this.avatarBobTween = null;
+    }
+    if (this.avatarContainer && this.scene) {
+      if (this.avatarWalkTween) {
+        this.avatarWalkTween.stop();
+        this.avatarWalkTween = null;
+      }
+      this.avatarContainer.y = -100;
+      const bobDuration = this.getWalkCycleDurationMs(duration, totalDistance) * 0.5;
+      this.avatarWalkTween = this.scene.tweens.add({
+        targets: this.avatarContainer,
+        y: { from: -100, to: -112 },
+        angle: { from: -6, to: 6 },
+        duration: bobDuration,
+        ease: "Sine.easeInOut",
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+  }
+
+  private followPathSegments(
+    segments: Array<{ start: Phaser.Math.Vector2; end: Phaser.Math.Vector2; length: number }>,
+    totalDistance: number,
+    duration: number,
+    onComplete: () => void,
+  ): void {
+    if (!this.scene || totalDistance <= 0) {
+      onComplete();
+      return;
+    }
+
+    const progress = { t: 0 };
+    let lastX = this.x;
+
+    this.walkProgressTween = this.scene.tweens.add({
+      targets: progress,
+      t: 1,
+      duration: Math.max(16, duration),
+      ease: "Linear",
+      onUpdate: () => {
+        const traveled = progress.t * totalDistance;
+        let accumulated = 0;
+
+        for (const segment of segments) {
+          if (accumulated + segment.length >= traveled || segment === segments[segments.length - 1]) {
+            const localT =
+              segment.length > 0
+                ? Phaser.Math.Clamp((traveled - accumulated) / segment.length, 0, 1)
+                : 0;
+            const nextX = Phaser.Math.Linear(segment.start.x, segment.end.x, localT);
+            const nextY = Phaser.Math.Linear(segment.start.y, segment.end.y, localT);
+
+            this.x = nextX;
+            this.y = nextY;
+
+            const deltaX = nextX - lastX;
+            if (Math.abs(deltaX) > 0.05) {
+              const facingRight = deltaX > 0;
+              this.idleFacingRight = facingRight;
+              if (this.sprite) {
+                this.sprite.setFlipX(facingRight);
+              }
+              if (this.avatarContainer) {
+                this.avatarContainer.scaleX = facingRight ? 1 : -1;
+              }
+            }
+            lastX = nextX;
+
+            this.updateWalkVisuals(traveled);
+            break;
+          }
+          accumulated += segment.length;
+        }
       },
+      onComplete,
     });
   }
 
-  // ── Private: animations ───────────────────────────────────────────────────
+  private finishWalk(): void {
+    this.isWalking = false;
+    this.currentAnimation = "idle";
+    this.stopWalkTweens();
+    this.playIdle();
+  }
 
-  /**
-   * Plays a subtle shadow compression during walk to give a grounded feel.
-   * Only active while the persona is walking; automatically stopped on idle.
-   */
-  private startWalkShadowPulse(): void {
-    if (!this.scene) return;
-
-    if (this.shadowTween) {
-      this.shadowTween.stop();
+  private stopWalkTweens(): void {
+    if (this.walkTween) {
+      this.walkTween.stop();
+      this.walkTween = null;
     }
-    this.shadowEllipse.setScale(1, 1);
+    if (this.walkProgressTween) {
+      this.walkProgressTween.stop();
+      this.walkProgressTween = null;
+    }
+  }
 
-    this.shadowTween = this.scene.tweens.add({
-      targets: this.shadowEllipse,
-      scaleX: { from: 1, to: 0.75 },
-      scaleY: { from: 1, to: 0.75 },
-      duration: 350,
-      ease: Phaser.Math.Easing.Sine.InOut,
-      yoyo: true,
-      repeat: -1,
-    });
+  private getWalkCycleDurationMs(duration: number, distance: number): number {
+    const speedPxPerSec = distance / (duration / 1000);
+    const baseCycleSpeed =
+      Persona.WALK_STRIDE_PX / (Persona.WALK_ANIM_FRAMES / Persona.WALK_ANIM_FPS);
+    const timeScale = Phaser.Math.Clamp(speedPxPerSec / baseCycleSpeed, 0.65, 2.2);
+    return (Persona.WALK_ANIM_FRAMES / Persona.WALK_ANIM_FPS) * 1000 / timeScale;
+  }
+
+  private syncWalkAnimationSpeed(distancePx: number, durationMs: number): void {
+    if (!this.sprite?.anims) return;
+
+    const speedPxPerSec = distancePx / (durationMs / 1000);
+    const baseCycleSpeed =
+      Persona.WALK_STRIDE_PX / (Persona.WALK_ANIM_FRAMES / Persona.WALK_ANIM_FPS);
+    const timeScale = Phaser.Math.Clamp(speedPxPerSec / baseCycleSpeed, 0.65, 2.2);
+
+    if (this.sprite.anims.isPlaying) {
+      this.sprite.anims.timeScale = timeScale;
+    }
+  }
+
+  private updateWalkVisuals(distanceTraveled: number): void {
+    const phase = (distanceTraveled / Persona.WALK_STRIDE_PX) * Math.PI * 2;
+
+    if (this.sprite) {
+      this.sprite.y = Math.sin(phase) * -2.5;
+    }
+
+    const stepWeight = 0.5 + Math.abs(Math.sin(phase * 0.5)) * 0.5;
+    this.shadowEllipse.setScale(
+      Phaser.Math.Linear(1, 0.78, stepWeight),
+      Phaser.Math.Linear(1, 0.72, stepWeight),
+    );
   }
 
   private playSpriteAnimation(animationKey: string): void {

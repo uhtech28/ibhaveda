@@ -197,6 +197,8 @@ export type PhaserToReactEvent =
     }
   /** Periodic frame-rate report from the game loop (throttled to ~1 Hz). */
   | { type: "FPS_UPDATE"; fps: number }
+  /** Camera snapped or focused on a stage — used by React nav controls. */
+  | { type: "STAGE_IN_VIEW"; stage: number }
   /** An unrecoverable error occurred inside the game; React may show a fallback UI. */
   | { type: "ERROR"; message: string }
   /**

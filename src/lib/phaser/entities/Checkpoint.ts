@@ -335,7 +335,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       alpha: { from: 0.12, to: 0.42 },
       scaleX: { from: 0.96, to: 1.14 },
       scaleY: { from: 0.96, to: 1.14 },
-      duration: 850,
+      duration: 600,
       ease: Phaser.Math.Easing.Sine.InOut,
       yoyo: true,
       repeat: -1,
@@ -353,7 +353,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     this.shimmerTween = this.scene.tweens.add({
       targets: counter,
       t: 1,
-      duration: 1400,
+      duration: 900,
       ease: Phaser.Math.Easing.Sine.InOut,
       yoyo: true,
       repeat: -1,

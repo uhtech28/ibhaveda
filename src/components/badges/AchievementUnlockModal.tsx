@@ -105,12 +105,12 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
       setActiveStep("backdrop");
       setScoreDisplay(0);
 
-      // 1. Enter Silhouette: t=100ms (almost instant feedback)
+      // 1. Enter Silhouette: t=50ms (almost instant feedback)
       const silTimer = setTimeout(() => {
         setActiveStep("silhouette");
-      }, 100);
+      }, 50);
 
-      // 2. Trigger Burst: t=450ms (snappy dramatic unlock)
+      // 2. Trigger Burst: t=280ms (snappy dramatic unlock)
       const burstTimer = setTimeout(() => {
         setActiveStep("burst");
 
@@ -166,9 +166,9 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
           return { id: i, x, y, size, delay, duration, rotate, color, shape };
         });
         setParticles(generated);
-      }, 450);
+      }, 280);
 
-      // 3. Enter Show (text + score countup + buttons): t=750ms
+      // 3. Enter Show (text + score countup + buttons): t=480ms
       const showTimer = setTimeout(() => {
         setActiveStep("show");
 
@@ -181,7 +181,7 @@ export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
           }
           setScoreDisplay(currentScore);
         }, 20);
-      }, 750);
+      }, 480);
 
       return () => {
         clearTimeout(silTimer);

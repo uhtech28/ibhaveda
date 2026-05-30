@@ -16,7 +16,7 @@ export default function Loading() {
             Ibhaveda
           </p>
           <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">
-            Preparing your venture map
+            Preparing your journey
           </h1>
           <div className="mt-6 grid w-56 grid-cols-3 gap-2" aria-hidden="true">
             {[0, 1, 2].map((item) => (
