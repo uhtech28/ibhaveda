@@ -281,6 +281,8 @@ export class WorldMapScene extends Phaser.Scene {
   private initializedBossTriggers: boolean = false;
   /** Wheel scroll handler reference for cleanup */
   private wheelHandler: ((e: WheelEvent) => void) | null = null;
+  /** Debounced snap-to-stage after wheel scrolling */
+  private wheelSnapTimer: Phaser.Time.TimerEvent | null = null;
   /** Residual path markers for partially completed stages */
   private residualMarkers: Map<number, Phaser.GameObjects.Container> =
     new Map();
@@ -296,6 +298,8 @@ export class WorldMapScene extends Phaser.Scene {
   private lastEmitX = 0;
   private lastEmitY = 0;
   private lastEmitVisible = false;
+  /** Stage currently framed in the camera (one stage visible at a time). */
+  private viewingStageId = 1;
 
   // Scene layers
   private map!: Phaser.Tilemaps.Tilemap;
@@ -359,12 +363,17 @@ export class WorldMapScene extends Phaser.Scene {
     bossFinalOutcome?: (event: { stage: number; outcome: "slay_gold" | "retreat_permanent" }) => void;
   };
 
-  // Map dimensions
+  // Map dimensions — every stage shares the same world frame (40×40 tiles @ 16px).
   private TOTAL_CHECKPOINTS = 36;
-  private readonly BIOME_WIDTH = 1400;
+  /** Width of one stage slot — synced to the rendered panel width in initTilemap(). */
+  private BIOME_WIDTH = 1280;
   private MAP_WIDTH = this.BIOME_WIDTH * 8;
   private readonly MAP_HEIGHT = 1200;
+  private readonly MAP_TILE_PX = 16;
+  private readonly MAP_TILE_COLS = 40;
+  private readonly MAP_TILE_ROWS = 40;
   private readonly MAP_PANEL_SCALE = 2;
+  private readonly STAGE_LABEL_HEIGHT = 0;
 
   // Snake path configuration
   private readonly CHECKPOINT_SPACING = 220;
@@ -432,9 +441,9 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private buildWorldForCurrentTemplate(): void {
-    // Extend vertical bounds to MAP_HEIGHT + 160 to make the bottom of all map panels fully visible under full zoom
-    this.cameras.main.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT + 160);
-    this.physics.world.setBounds(0, 0, this.MAP_WIDTH, this.MAP_HEIGHT + 160);
+    const worldHeight = this.getWorldHeight();
+    this.cameras.main.setBounds(0, 0, this.MAP_WIDTH, worldHeight);
+    this.physics.world.setBounds(0, 0, this.MAP_WIDTH, worldHeight);
 
     // Initialize loaded stages tracking
     this.loadedStages.clear();
@@ -449,8 +458,12 @@ export class WorldMapScene extends Phaser.Scene {
     // 3. Create the super boss
     this.createSuperBoss();
 
-    // 4. Create global atmospheric effects (clouds, rays, motes, etc.)
-    this.createAtmosphericEffects();
+    // 4. Defer atmospheric effects so the map paints immediately
+    this.time.delayedCall(0, () => {
+      if (this.sys.isActive()) {
+        this.createAtmosphericEffects();
+      }
+    });
 
     // 5. Force load the current stage (active stage) immediately
     this.loadStage(this.currentStage);
@@ -515,10 +528,14 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Apply full brightness (100%) - no darkness
     this.updateBrightnessFilter(100);
+    gameplayIntegration.clearCorruptionVisuals(this);
 
     // Camera setup with responsive zoom
     this.cameras.main.roundPixels = true;
     this.applyResponsiveCamera(true);
+
+    // Signal React that Phaser is ready — before input wiring so the map appears fast
+    eventBridge.dispatchToReact({ type: "PHASER_READY" });
     this.resizeHandler = () => {
       this.applyResponsiveCamera(false);
     };
@@ -578,6 +595,7 @@ export class WorldMapScene extends Phaser.Scene {
 
         this.cameras.main.scrollX = dragStartX + deltaX;
         this.cameras.main.scrollY = dragStartY + deltaY;
+        this.clampCameraToStagePanel(this.viewingStageId);
 
         this.registry.set("lastPointerX", pointer.x);
         this.registry.set("lastPointerY", pointer.y);
@@ -586,7 +604,6 @@ export class WorldMapScene extends Phaser.Scene {
 
     this.input.on("pointerup", () => {
       isDragging = false;
-      // Momentum on mobile / tablet only (feels unnatural on desktop mouse)
       if (
         (isMobile || isTablet) &&
         (Math.abs(dragVelocityX) > 2 || Math.abs(dragVelocityY) > 2)
@@ -597,14 +614,13 @@ export class WorldMapScene extends Phaser.Scene {
           scrollY: this.cameras.main.scrollY + dragVelocityY * 3,
           duration: 400,
           ease: "Cubic.easeOut",
+          onUpdate: () => this.clampCameraToStagePanel(this.viewingStageId),
+          onComplete: () => this.clampCameraToStagePanel(this.viewingStageId),
         });
       }
     });
 
-    // ── 3. Mouse-wheel / trackpad scroll (all devices) ────────────────────────
-    //   • Vertical wheel   → scrolls map LEFT / RIGHT (primary axis)
-    //   • Horizontal swipe → scrolls map LEFT / RIGHT (trackpad two-finger)
-    //   • Shift + wheel    → scrolls map UP / DOWN
+    // ── 3. Mouse-wheel / trackpad — pan within the current stage map ─────────
     this.wheelHandler = (e: WheelEvent) => {
       e.preventDefault();
       const zoom = this.cameras.main.zoom;
@@ -615,7 +631,11 @@ export class WorldMapScene extends Phaser.Scene {
       } else {
         this.cameras.main.scrollX +=
           ((e.deltaX + e.deltaY) / zoom) * scrollSpeed;
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          this.cameras.main.scrollY += (e.deltaY / zoom) * scrollSpeed * 0.35;
+        }
       }
+      this.clampCameraToStagePanel(this.viewingStageId);
     };
     this.game.canvas.addEventListener("wheel", this.wheelHandler, {
       passive: false,
@@ -649,9 +669,6 @@ export class WorldMapScene extends Phaser.Scene {
       });
     }
 
-    // Signal React that Phaser is ready
-    eventBridge.dispatchToReact({ type: "PHASER_READY" });
-
     // FPS monitoring
     this.time.addEvent({
       delay: 1000,
@@ -668,11 +685,9 @@ export class WorldMapScene extends Phaser.Scene {
   private applyResponsiveCamera(initial: boolean): void {
     const width = this.scale.width;
     const height = this.scale.height;
-    const aspectRatio = width / height;
     const isPortrait = height > width;
-    const devicePixelRatio = window?.devicePixelRatio ?? 1;
 
-    // ── Device categories ────────────────────────────────────────────────────
+    // ── Device categories (used by React HUD) ────────────────────────────────
     const isSmallMobile = width < 480;
     const isMobile = width >= 480 && width < 768;
     const isTabletPortrait = width >= 768 && width < 1024 && isPortrait;
@@ -682,90 +697,36 @@ export class WorldMapScene extends Phaser.Scene {
     const isLargeDesktop = width >= 1920 && width < 2560;
     const is4KDisplay = width >= 2560;
 
-    // ── Step 1 — Compute the "perfect fit" zoom for width AND height ─────────
-    // Fit one stage (BIOME_WIDTH) horizontally with a comfortable side margin.
-    const hMargin = isSmallMobile ? 0.88 : isMobile ? 0.9 : 0.93;
-    const fitZoomW = (width * hMargin) / this.BIOME_WIDTH;
+    // ── Step 1 — Full-screen fit: scale the tile panel to fill the canvas ────
+    const layout = this.getStandardPanelLayout();
 
-    // Fit the full rendered panel height (tiles * scale) vertically with margin.
-    const panelH = this.map.heightInPixels * this.MAP_PANEL_SCALE;
-    const vMargin = isSmallMobile
-      ? 0.82
-      : isMobile
-        ? 0.85
-        : isPortrait
-          ? 0.88
-          : 0.92;
-    const fitZoomH = (height * vMargin) / panelH;
+    const fitZoomW = width / layout.panelWidth;
+    const fitZoomH = height / layout.panelHeight;
 
-    // The base zoom is the smaller of the two fits — guarantees nothing is cut.
-    let zoom = Math.min(fitZoomW, fitZoomH);
+    // Cover mode — fill the entire canvas; no black bars.
+    let zoom = Math.max(fitZoomW, fitZoomH);
 
-    // ── Step 2 — Per-device fine-tuning nudges ───────────────────────────────
-    if (is4KDisplay) {
-      // 4 K / ultra-HD monitors — map can afford to be slightly larger.
-      zoom *= 1.1;
-    } else if (isLargeDesktop) {
-      zoom *= 1.05;
-    } else if (isMediumDesktop) {
-      zoom *= 1.0; // perfect fit, no nudge
-    } else if (isSmallDesktop) {
-      zoom *= 0.97; // tiny inset so stage label is visible
-    } else if (isTabletLandscape) {
-      zoom *= 0.95;
-    } else if (isTabletPortrait) {
-      zoom *= 0.9;
-    } else if (isMobile) {
-      zoom *= isPortrait ? 0.88 : 0.92;
-    } else if (isSmallMobile) {
-      zoom *= isPortrait ? 0.82 : 0.86;
-    }
+    // ── Step 2 — Hard clamp to safe range ───────────────────────────────────
+    zoom = Phaser.Math.Clamp(zoom, 0.5, 4.0);
 
-    // ── Step 3 — Aspect-ratio corrections ───────────────────────────────────
-    if (aspectRatio < 0.55) {
-      // Very narrow portrait (phone held upright) — compress a touch more.
-      zoom *= 0.88;
-    } else if (aspectRatio > 2.2) {
-      // Ultra-wide monitors — a bit of extra zoom looks great.
-      zoom *= 1.06;
-    }
-
-    // ── Step 4 — HiDPI / Retina correction ──────────────────────────────────
-    // On retina screens CSS pixels are already doubled, so no extra scaling is
-    // needed. But if somehow the game renders at physical resolution, pull back.
-    if (devicePixelRatio >= 3) {
-      zoom *= 0.95;
-    }
-
-    // Ensure that the visible world width is at most BIOME_WIDTH to prevent neighboring stages from bleeding in.
-    const minZoomToFitStage = width / this.BIOME_WIDTH;
-    if (zoom < minZoomToFitStage) {
-      zoom = minZoomToFitStage;
-    }
-
-    // ── Step 5 — Hard clamp to safe range (increased max zoom to 3.0 to support QHD/4K) ───────────────────────────────────
-    zoom = Phaser.Math.Clamp(zoom, 0.28, 3.0);
-
-    // ── Step 6 — Compute camera target ──────────────────────────────────────
-    const activeNode = this.getCurrentActiveCheckpointNode();
-    const stageCenterX =
-      (this.currentStage - 1) * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
-    const stageCenterY = this.MAP_HEIGHT / 2;
-
-    // Apply bounds for the current stage
-    this.updateCameraBoundsForStage(this.currentStage);
+    // ── Step 3 — Compute camera target ──────────────────────────────────────
+    this.viewingStageId = Phaser.Math.Clamp(this.currentStage, 1, this.activeBiomeConfigs.length);
+    this.updateCameraBoundsForViewingStage(this.viewingStageId);
+    const stageCenterX = this.getStageViewCameraX(this.viewingStageId, zoom);
+    const stageCenterY = this.getStageViewCameraY(zoom);
 
     const { x: targetX, y: targetY } = this.getStageCameraTarget(
-      this.currentStage,
-      activeNode?.x ?? stageCenterX,
-      activeNode?.y ?? stageCenterY,
+      this.viewingStageId,
+      stageCenterX,
+      stageCenterY,
       zoom,
     );
 
-    // ── Step 7 — Apply zoom + center on current stage ────────────────────────
+    // ── Step 4 — Apply zoom + center on current stage ────────────────────────
     if (initial) {
       this.cameras.main.setZoom(zoom);
       this.cameras.main.centerOn(targetX, targetY);
+      this.clampCameraToStagePanel(this.viewingStageId);
     } else {
       this.tweens.killTweensOf(this.cameras.main);
       this.tweens.add({
@@ -774,7 +735,11 @@ export class WorldMapScene extends Phaser.Scene {
         duration: 320,
         ease: "Sine.easeInOut",
       });
-      this.cameras.main.pan(targetX, targetY, 320, "Sine.easeInOut", false);
+      this.cameras.main.pan(targetX, targetY, 320, "Sine.easeInOut", false, (_cam, progress) => {
+        if (progress === 1) {
+          this.clampCameraToStagePanel(this.viewingStageId);
+        }
+      });
     }
 
     // ── Step 8 — Publish values for React UI ────────────────────────────────
@@ -790,6 +755,143 @@ export class WorldMapScene extends Phaser.Scene {
   /**
    * Creates all 8 biome visual zones left to right
    */
+  /**
+   * Single source of truth for stage panel dimensions and placement.
+   * Every biome uses the same width, height, and vertical alignment.
+   */
+  private getStandardPanelLayout(): {
+    panelWidth: number;
+    panelHeight: number;
+    panelOffsetX: number;
+    panelOffsetY: number;
+    stageViewCenterY: number;
+  } {
+    const baseWidth = this.map?.widthInPixels ?? this.MAP_TILE_COLS * this.MAP_TILE_PX;
+    const baseHeight = this.map?.heightInPixels ?? this.MAP_TILE_ROWS * this.MAP_TILE_PX;
+    const panelWidth = baseWidth * this.MAP_PANEL_SCALE;
+    const panelHeight = baseHeight * this.MAP_PANEL_SCALE;
+    const panelOffsetX = 0;
+    const panelOffsetY = Math.round((this.MAP_HEIGHT - panelHeight) / 2);
+    return {
+      panelWidth,
+      panelHeight,
+      panelOffsetX,
+      panelOffsetY,
+      stageViewCenterY: panelOffsetY + panelHeight / 2,
+    };
+  }
+
+  /** Sync stage slot width to the rendered panel so there is no empty side padding. */
+  private syncStageLayoutMetrics(): void {
+    const layout = this.getStandardPanelLayout();
+    this.BIOME_WIDTH = layout.panelWidth;
+    this.MAP_WIDTH = this.BIOME_WIDTH * this.activeBiomeConfigs.length;
+    this.panelOffsetX = layout.panelOffsetX;
+    this.panelOffsetY = layout.panelOffsetY;
+  }
+
+  private getStagePanelCenterX(stageId: number): number {
+    const layout = this.getStandardPanelLayout();
+    return (
+      (stageId - 1) * this.BIOME_WIDTH +
+      layout.panelOffsetX +
+      layout.panelWidth / 2
+    );
+  }
+
+  /** Total scrollable world height — covers the full panel plus breathing room. */
+  private getWorldHeight(): number {
+    const layout = this.getStandardPanelLayout();
+    return Math.max(
+      this.MAP_HEIGHT,
+      layout.panelOffsetY + layout.panelHeight,
+    ) + 80;
+  }
+
+  /** Keep the camera inside the current stage panel — never bleed into neighbors. */
+  private clampCameraToStagePanel(stageId = this.viewingStageId): void {
+    const cam = this.cameras.main;
+    const zoom = cam.zoom;
+    if (!zoom) return;
+
+    const layout = this.getStandardPanelLayout();
+    const stageStartX = (stageId - 1) * this.BIOME_WIDTH;
+    const panelLeft = stageStartX + layout.panelOffsetX;
+    const panelTop = layout.panelOffsetY;
+    const panelRight = panelLeft + layout.panelWidth;
+    const panelBottom = panelTop + layout.panelHeight;
+    const viewW = this.scale.width / zoom;
+    const viewH = this.scale.height / zoom;
+
+    if (viewW >= layout.panelWidth) {
+      cam.scrollX = panelLeft + layout.panelWidth / 2 - viewW / 2;
+    } else {
+      cam.scrollX = Phaser.Math.Clamp(cam.scrollX, panelLeft, panelRight - viewW);
+    }
+
+    if (viewH >= layout.panelHeight) {
+      cam.scrollY = panelTop + layout.panelHeight / 2 - viewH / 2;
+    } else {
+      cam.scrollY = Phaser.Math.Clamp(cam.scrollY, panelTop, panelBottom - viewH);
+    }
+  }
+
+  /** UI chrome inset so the full map panel fits the visible play area. */
+  private getViewportSafeArea(): {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  } {
+    const width = this.scale.width;
+    const isSmallMobile = width < 480;
+    const isMobile = width >= 480 && width < 768;
+    const isTablet = width >= 768 && width < 1024;
+
+    return {
+      top: isSmallMobile ? 52 : isMobile ? 56 : isTablet ? 60 : 64,
+      bottom: isSmallMobile ? 80 : isMobile ? 88 : isTablet ? 96 : 100,
+      left: isSmallMobile ? 40 : isMobile ? 44 : 48,
+      right: isSmallMobile ? 8 : 12,
+    };
+  }
+
+  /** X world coordinate — centers the panel in the visible play area. */
+  private getStageViewCameraX(stageId: number, zoom: number): number {
+    const safe = this.getViewportSafeArea();
+    const chromeXOffset = (safe.left - safe.right) / (2 * zoom);
+    return this.getStagePanelCenterX(stageId) + chromeXOffset;
+  }
+
+  /** Y world coordinate that keeps the full stage panel inside the safe viewport. */
+  private getStageViewCameraY(zoom = this.cameras.main.zoom): number {
+    const layout = this.getStandardPanelLayout();
+    const safe = this.getViewportSafeArea();
+    const chromeYOffset = (safe.bottom - safe.top) / (2 * zoom);
+    return layout.stageViewCenterY + chromeYOffset;
+  }
+
+  /** Keep the camera vertically locked so every stage reads at the same height. */
+  private getLockedCameraScrollY(zoom = this.cameras.main.zoom): number {
+    const halfHeight = this.scale.height / (2 * zoom);
+    return this.getStageViewCameraY(zoom) - halfHeight;
+  }
+
+  /** Snap the camera to the nearest unlocked stage after horizontal scrolling. */
+  private snapCameraToNearestStage(smooth = true): void {
+    this.navigateToViewingStage(this.viewingStageId, smooth);
+  }
+
+  private scheduleStageSnapAfterWheel(): void {
+    if (this.wheelSnapTimer) {
+      this.wheelSnapTimer.remove(false);
+    }
+    this.wheelSnapTimer = this.time.delayedCall(180, () => {
+      this.snapCameraToNearestStage(true);
+      this.wheelSnapTimer = null;
+    });
+  }
+
   /**
    * Initializes the Tiled map metadata (loads tilesets)
    */
@@ -823,11 +925,7 @@ export class WorldMapScene extends Phaser.Scene {
         (tileset): tileset is Phaser.Tilemaps.Tileset => tileset !== null,
       );
 
-    const scale = this.MAP_PANEL_SCALE;
-    const panelWidth = this.map.widthInPixels * scale;
-    const panelHeight = this.map.heightInPixels * scale;
-    this.panelOffsetX = (this.BIOME_WIDTH - panelWidth) / 2;
-    this.panelOffsetY = this.MAP_HEIGHT - panelHeight + 120;
+    this.syncStageLayoutMetrics();
     this.objectLayer = this.map.getObjectLayer("Object Layer 1");
   }
 
@@ -2149,26 +2247,7 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    // Add atmospheric sunbeams / god rays filtering through the canopy
-    const sunbeams = this.add.graphics();
-    sunbeams.setDepth(15); // Above the trees (depth 13) and props
-    sunbeams.fillStyle(0xfff7c2, 0.05); // Very soft warm white/yellow
-    
-    // Draw diagonal beams across the map
-    const beamCount = 8;
-    for (let i = 0; i < beamCount; i++) {
-      const startX = panelX + (i * (panelW / (beamCount - 1))) - 300;
-      const startY = panelOffsetY - 50;
-      
-      sunbeams.beginPath();
-      sunbeams.moveTo(startX, startY);
-      sunbeams.lineTo(startX + 90, startY);
-      sunbeams.lineTo(startX + 350, startY + panelH + 100);
-      sunbeams.lineTo(startX + 220, startY + panelH + 100);
-      sunbeams.closePath();
-      sunbeams.fillPath();
-    }
-    this.midgroundLayer.add(sunbeams);
+    // Sunbeams removed — they washed out the map with a white transparent layer.
 
     // Spawn procedural jumping monkeys in Stage 2 forest biome
     const monkeyPaths = [
@@ -5218,9 +5297,14 @@ export class WorldMapScene extends Phaser.Scene {
     container: Phaser.GameObjects.Container,
     biome: BiomeConfig,
   ): void {
+    const layout = this.getStandardPanelLayout();
+    const bgHeight = Math.max(
+      this.MAP_HEIGHT,
+      layout.panelOffsetY + layout.panelHeight,
+    );
     const sky = this.add.graphics();
-    sky.fillStyle(biome.colors.sky, 0.78);
-    sky.fillRect(0, 0, this.BIOME_WIDTH, this.MAP_HEIGHT);
+    sky.fillStyle(biome.colors.sky, 1);
+    sky.fillRect(0, 0, this.BIOME_WIDTH, bgHeight);
     container.add(sky);
   }
 
@@ -6099,27 +6183,13 @@ export class WorldMapScene extends Phaser.Scene {
       scale: { start: 0.08, end: 0 },
       alpha: { start: 0.25, end: 0 },
       lifespan: 5000,
-      frequency: 2000,
+      frequency: 3500,
       blendMode: "ADD",
       tint: 0xffffff,
     });
     this.backgroundLayer.add(dustParticles);
 
-    // Light rays from top (god rays effect) - static high performance
-    for (let i = 0; i < 3; i++) {
-      const rayX = (i * this.MAP_WIDTH) / 3 + Math.random() * 200;
-      const rayGraphics = this.add.graphics();
-      rayGraphics.fillStyle(0xffffff, 0.06);
-      rayGraphics.fillTriangle(
-        rayX,
-        0,
-        rayX - 30,
-        this.MAP_HEIGHT * 0.5,
-        rayX + 30,
-        this.MAP_HEIGHT * 0.5,
-      );
-      this.backgroundLayer.add(rayGraphics);
-    }
+    // God-ray overlays removed — they created a white wash over the map.
 
     // Ambient glow orbs floating in background - static orbs
     for (let i = 0; i < 4; i++) {
@@ -6147,7 +6217,7 @@ export class WorldMapScene extends Phaser.Scene {
             scale: { start: 0.15, end: 0.05 },
             alpha: { start: 0.6, end: 0 },
             lifespan: 12000,
-            frequency: 450,
+            frequency: 700,
             tint: [biome.colors.accent2, biome.colors.accent1, 0xffffff],
             rotate: { min: 0, max: 360 },
           };
@@ -6494,25 +6564,7 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private createStageFogOverlays(): void {
-    for (const biome of this.activeBiomeConfigs) {
-      if (biome.id === 1) continue;
-
-      const x = (biome.id - 1) * this.BIOME_WIDTH;
-      const fog = this.add.container(x, 0);
-      fog.setDepth(90);
-
-      const veil = this.add.graphics();
-      veil.fillStyle(0xffffff, 0.18);
-      veil.fillRect(-80, 0, this.BIOME_WIDTH + 160, this.MAP_HEIGHT);
-      veil.fillStyle(biome.colors.accent2, 0.06);
-      veil.fillRect(-80, 0, this.BIOME_WIDTH + 160, this.MAP_HEIGHT);
-      veil.lineStyle(4, 0xffffff, 0.16);
-      veil.strokeRect(8, 28, this.BIOME_WIDTH - 16, this.MAP_HEIGHT - 56);
-
-      fog.add([veil]);
-      this.animationLayer.add(fog);
-      this.stageFogOverlays.set(biome.id, fog);
-    }
+    // Disabled — white fog veils overlapped adjacent stages and washed out the map.
   }
 
   private updateStageVisibility(
@@ -6543,79 +6595,15 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    for (const [stage, overlay] of this.stageFogOverlays.entries()) {
-      if (stage <= maxVisibleStage) {
-        if (!this.revealedStages.has(stage)) {
-          this.revealedStages.add(stage);
-          if (animateReveal) {
-            this.playStageEntryReveal(stage);
-            continue;
-          }
-        }
-        overlay.setVisible(false);
-        overlay.setAlpha(0);
-      } else {
-        overlay.setVisible(true);
-        overlay.setAlpha(1);
-      }
+    for (const [, overlay] of this.stageFogOverlays.entries()) {
+      overlay.setVisible(false);
+      overlay.setAlpha(0);
     }
   }
 
   private playStageEntryReveal(stage: number): void {
-    if (this.stageEntryInProgress.has(stage)) return;
-    this.stageEntryInProgress.add(stage);
-
-    const overlay = this.stageFogOverlays.get(stage);
-    overlay?.setVisible(true);
-    overlay?.setAlpha(1);
-
-    const stageX = (stage - 1) * this.BIOME_WIDTH;
-    const centerX = stageX + this.BIOME_WIDTH / 2;
-    const centerY = this.MAP_HEIGHT / 2;
-    const biome = this.activeBiomeConfigs[stage - 1];
-    const accent = biome?.colors.accent2 ?? 0xdff5ff;
-
-    const sweep = this.add.rectangle(
-      stageX - 120,
-      centerY,
-      260,
-      this.MAP_HEIGHT * 1.2,
-      0xffffff,
-      0.18,
-    );
-    sweep.setDepth(125);
-    sweep.setAngle(-10);
-    this.animationLayer.add(sweep);
-
-    this.tweens.add({
-      targets: sweep,
-      x: stageX + this.BIOME_WIDTH + 160,
-      alpha: { from: 0.2, to: 0 },
-      duration: 1450,
-      ease: "Cubic.easeInOut",
-      onComplete: () => sweep.destroy(),
-    });
-
-    if (overlay) {
-      this.tweens.add({
-        targets: overlay,
-        alpha: 0,
-        x: stageX + 120,
-        duration: 1500,
-        ease: "Cubic.easeInOut",
-        onComplete: () => {
-          overlay.setVisible(false);
-          overlay.setAlpha(0);
-          overlay.setX(stageX);
-        },
-      });
-    }
-
-    this.playStageEntryWeather(centerX, centerY, stage, accent);
-
-    this.time.delayedCall(1550, () => {
-      this.stageEntryInProgress.delete(stage);
-    });
+    void stage;
+    // Disabled — white sweep overlay obscured the map on stage entry.
   }
 
   private playStageEntryWeather(
@@ -6790,10 +6778,8 @@ export class WorldMapScene extends Phaser.Scene {
     checkpointIndex: number,
     checkpointTotal: number,
   ): { x: number; y: number } {
-    const panelWidth = this.map.widthInPixels * this.MAP_PANEL_SCALE;
-    const panelHeight = this.map.heightInPixels * this.MAP_PANEL_SCALE;
-    const panelOffsetX = (this.BIOME_WIDTH - panelWidth) / 2;
-    const panelOffsetY = this.MAP_HEIGHT - panelHeight + 120;
+    const layout = this.getStandardPanelLayout();
+    const { panelOffsetX, panelOffsetY, panelHeight } = layout;
     const biomeOffsetX = (stageId - 1) * this.BIOME_WIDTH + panelOffsetX;
 
     const stageOneVillageAnchors = [
@@ -7267,7 +7253,7 @@ export class WorldMapScene extends Phaser.Scene {
 
       // Fog overlays removed - all stages visible
       // this.updateStageVisibility(this.currentStage, stageChanged);
-      this.updateCameraBoundsForStage(this.currentStage);
+      this.navigateToViewingStage(this.currentStage, false);
 
       // Count completed stages (all stages before current)
       this.completedStages = this.currentStage - 1;
@@ -7554,7 +7540,7 @@ export class WorldMapScene extends Phaser.Scene {
         this.currentStage = event.currentStage;
         // Fog overlays removed - all stages visible
         // this.updateStageVisibility(event.currentStage, !ventureChanged);
-        this.updateCameraBoundsForStage(event.currentStage);
+        this.navigateToViewingStage(event.currentStage, false);
 
         // Play ambience for the current stage + template
         audioManager.playAmbienceForTemplate(
@@ -7592,8 +7578,8 @@ export class WorldMapScene extends Phaser.Scene {
       // Position persona on active checkpoint
       this.positionPersonaOnActiveCheckpoint();
 
-      // Auto-scroll to active checkpoint after a short delay
-      this.time.delayedCall(500, () => {
+      // Auto-scroll to active checkpoint quickly after venture loads
+      this.time.delayedCall(100, () => {
         this.autoScrollToActive();
       });
     } catch (error) {
@@ -7814,7 +7800,7 @@ export class WorldMapScene extends Phaser.Scene {
     checkpointId?: string;
   }): void {
     try {
-      this.focusStage(event.stage, event.checkpointId, true);
+      this.navigateToViewingStage(event.stage, true);
     } catch (error) {
       // Silently handle focus errors
     }
@@ -7827,81 +7813,96 @@ export class WorldMapScene extends Phaser.Scene {
     const node = this.getCheckpointNode(checkpointId);
     if (!node) return;
 
-    this.updateCameraBoundsForStage(node.stage);
+    this.viewingStageId = node.stage;
+    this.updateCameraBoundsForViewingStage(node.stage);
 
+    const zoom = this.cameras.main.zoom;
     const { x: targetX, y: targetY } = this.getStageCameraTarget(
       node.stage,
       node.x,
       node.y,
+      zoom,
     );
 
     if (smooth) {
-      // Camera pan animation only.
-      // Persona movement is handled exclusively by positionPersonaOnActiveCheckpoint
-      // when the active checkpoint actually changes.
-      this.cameras.main.pan(targetX, targetY, 800, "Sine.easeInOut", false);
+      this.cameras.main.pan(targetX, targetY, 800, "Sine.easeInOut", false, (_cam, progress) => {
+        if (progress === 1) {
+          this.clampCameraToStagePanel(node.stage);
+        }
+      });
     } else {
       this.cameras.main.centerOn(targetX, targetY);
+      this.clampCameraToStagePanel(node.stage);
     }
   }
 
   private focusStage(
     stage: number,
-    checkpointId?: string,
+    _checkpointId?: string,
     smooth = true,
   ): void {
+    void _checkpointId;
     const focusStage = Phaser.Math.Clamp(stage, 1, this.currentStage);
-    this.updateCameraBoundsForStage(focusStage);
+    this.viewingStageId = focusStage;
+    this.updateCameraBoundsForViewingStage(focusStage);
 
-    const requestedNode = checkpointId
-      ? this.getCheckpointNode(checkpointId)
-      : null;
-    const node = requestedNode?.stage === focusStage ? requestedNode : null;
-    const activeNode = node ?? this.getCurrentActiveCheckpointNode();
-    const stageCenterX =
-      (focusStage - 1) * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
-    const stageCenterY = this.MAP_HEIGHT / 2;
+    const zoom = this.cameras.main.zoom;
+    const stageCenterX = this.getStageViewCameraX(focusStage, zoom);
+    const stageCenterY = this.getStageViewCameraY(zoom);
     const { x, y } = this.getStageCameraTarget(
       focusStage,
-      activeNode?.x ?? stageCenterX,
-      activeNode?.y ?? stageCenterY,
+      stageCenterX,
+      stageCenterY,
+      zoom,
     );
 
     if (smooth) {
-      // Camera focus only. Persona should stay idle at its checkpoint unless
-      // checkpoint progression explicitly changes the active node.
-      this.cameras.main.pan(x, y, 800, "Sine.easeInOut", false);
+      this.cameras.main.pan(x, y, 800, "Sine.easeInOut", false, (_cam, progress) => {
+        if (progress === 1) {
+          this.clampCameraToStagePanel(focusStage);
+          eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
+        }
+      });
       return;
     }
 
     this.cameras.main.centerOn(x, y);
+    this.clampCameraToStagePanel(focusStage);
+    eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
   }
 
-  private updateCameraBoundsForStage(stageId: number): void {
+  /** Lock the camera to one stage — no neighboring maps bleed into view. */
+  private updateCameraBoundsForViewingStage(stageId: number): void {
     if (
       !this.cameras ||
       !this.cameras.main ||
       !this.physics ||
       !this.physics.world
     ) {
-      return; // Scene not fully initialized or being destroyed
+      return;
     }
-    // We allow the camera bounds to expand from Stage 1 (0) up to the furthest unlocked stage.
-    // This allows panning back and forth across all unlocked stages.
-    const maxStage = Math.max(stageId, this.currentStage || 1);
-    const totalWidth = maxStage * this.BIOME_WIDTH;
+    const clampedStage = Phaser.Math.Clamp(stageId, 1, this.currentStage || 1);
+    const stageStartX = (clampedStage - 1) * this.BIOME_WIDTH;
+    const worldHeight = this.getWorldHeight();
     this.cameras.main.setBounds(
+      stageStartX,
       0,
-      0,
-      totalWidth,
-      this.MAP_HEIGHT + 160,
+      this.BIOME_WIDTH,
+      worldHeight,
     );
     this.physics.world.setBounds(
       0,
       0,
-      totalWidth,
-      this.MAP_HEIGHT + 160,
+      Math.max(this.currentStage, 1) * this.BIOME_WIDTH,
+      worldHeight,
     );
+  }
+
+  private navigateToViewingStage(stageId: number, smooth = true): void {
+    const stage = Phaser.Math.Clamp(stageId, 1, this.currentStage || 1);
+    this.viewingStageId = stage;
+    this.updateCameraBoundsForViewingStage(stage);
+    this.focusStage(stage, undefined, smooth);
   }
 
   private getCurrentActiveCheckpointNode(): CheckpointNode | null {
@@ -7938,7 +7939,7 @@ export class WorldMapScene extends Phaser.Scene {
     const y = Phaser.Math.Clamp(
       preferredY,
       halfHeight,
-      this.MAP_HEIGHT + 160 - halfHeight,
+      this.getWorldHeight() - halfHeight,
     );
 
     return { x, y };
@@ -7954,9 +7955,8 @@ export class WorldMapScene extends Phaser.Scene {
       targetY,
     );
 
-    // Slower, more organic human walking pace: ~125 pixels per second (8ms per pixel)
-    // Clamped between 1500ms (minimum to show legs swinging) and 6000ms
-    return Phaser.Math.Clamp(distance * 8.0, 1500, 6000);
+    // Natural walking pace synced to the 8-frame walk cycle (~140 px/sec).
+    return Phaser.Math.Clamp(distance * 7.0, 1200, 5500);
   }
 
   /**
@@ -8207,6 +8207,10 @@ export class WorldMapScene extends Phaser.Scene {
     if (this.wheelHandler && this.game?.canvas) {
       this.game.canvas.removeEventListener("wheel", this.wheelHandler);
       this.wheelHandler = null;
+    }
+    if (this.wheelSnapTimer) {
+      this.wheelSnapTimer.remove(false);
+      this.wheelSnapTimer = null;
     }
 
     this.updateHandlers.forEach((handler) =>

@@ -1372,11 +1372,17 @@ export class AssetLoader {
           bob = Math.round(Math.sin((fi / 4) * Math.PI * 2) * 0.8);
         } else {
           const ph = t * Math.PI * 2;
-          bob = Math.round(Math.abs(Math.sin(ph * 2)) * -1.5);
-          llY = Math.round(Math.sin(ph) * 4); rlY = Math.round(-Math.sin(ph) * 4);
-          llX = Math.round(Math.sin(ph) * 1); rlX = Math.round(-Math.sin(ph) * 1);
-          lA = Math.round(-Math.sin(ph) * 2); rA = Math.round(Math.sin(ph) * 2);
-          lF = Math.round(Math.sin(ph) * 1); rF = Math.round(-Math.sin(ph) * 1);
+          const sinPh = Math.sin(ph);
+          const cosPh = Math.cos(ph);
+          bob = Math.round(Math.abs(Math.sin(ph * 2)) * -1.2);
+          llY = Math.round(sinPh * 3.5);
+          rlY = Math.round(-sinPh * 3.5);
+          llX = Math.round(cosPh * 1.2);
+          rlX = Math.round(-cosPh * 1.2);
+          lA = Math.round(-sinPh * 2.2);
+          rA = Math.round(sinPh * 2.2);
+          lF = Math.round(cosPh * 1.2);
+          rF = Math.round(-cosPh * 1.2);
         }
         const ht = 3 + bob;
         
@@ -1529,9 +1535,9 @@ export class AssetLoader {
   static createPersonaAnimations(scene: Phaser.Scene): void {
     const anims = [
       { key: 'persona_male_idle', sheet: 'persona_male_idle_sheet', frames: 4, fps: 5 },
-      { key: 'persona_male_walk', sheet: 'persona_male_walk_sheet', frames: 8, fps: 6 },
+      { key: 'persona_male_walk', sheet: 'persona_male_walk_sheet', frames: 8, fps: 10 },
       { key: 'persona_female_idle', sheet: 'persona_female_idle_sheet', frames: 4, fps: 5 },
-      { key: 'persona_female_walk', sheet: 'persona_female_walk_sheet', frames: 8, fps: 6 },
+      { key: 'persona_female_walk', sheet: 'persona_female_walk_sheet', frames: 8, fps: 10 },
     ];
     for (const anim of anims) {
       if (scene.anims.exists(anim.key) || !scene.textures.exists(anim.sheet)) continue;

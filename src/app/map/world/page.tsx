@@ -30,7 +30,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { CommentsSection } from "@/components/comments/CommentsSection";
-import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock } from "lucide-react";
+import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight } from "lucide-react";
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { getTemplate, type TemplateId } from "@/config/templates";
@@ -1600,7 +1600,7 @@ function MapPageInner() {
 
     const previousStage = prevStageRef.current;
     if (activeStage > previousStage) {
-      // StageResetNotice dialog disabled per user request
+      setViewingStage(activeStage);
       prevStageRef.current = activeStage;
     }
 
@@ -2657,11 +2657,10 @@ function MapPageInner() {
         }
 
         // ── Auto-advance when the checkpoint is now ready (≥2 tasks done) ──
-        // Delay gives the badge animation time to breathe before transitioning.
         if (doneCount >= 2) {
           setTimeout(() => {
             handleAdvanceRef.current(false, true);
-          }, 1800);
+          }, 900);
         }
 
         setSelectedDetail({
@@ -2992,22 +2991,57 @@ function MapPageInner() {
   }, []);
 
   // ── Stage strip select ─────────────────────────────────────────────────────
+  const [viewingStage, setViewingStage] = useState(1);
+  const viewingStageSyncedRef = useRef(false);
+
   const handleStageSelect = useCallback(
     (stageId: number) => {
-      if (stageId > activeStage) return;
+      if (stageId > activeStage || stageId < 1) return;
 
-      const firstCp = checkpoints.find(
-        (c) => c.stage === stageId && c.checkpoint === 1,
-      );
+      setViewingStage(stageId);
 
       eventBridge.dispatchToPhaser({
         type: "FOCUS_STAGE",
         stage: stageId,
-        checkpointId: firstCp?._id,
       });
     },
-    [activeStage, checkpoints],
+    [activeStage],
   );
+
+  const handlePrevStage = useCallback(() => {
+    if (viewingStage <= 1) return;
+    audioManager.playUI("click");
+    handleStageSelect(viewingStage - 1);
+  }, [viewingStage, handleStageSelect]);
+
+  const handleNextStage = useCallback(() => {
+    if (viewingStage >= activeStage) return;
+    audioManager.playUI("click");
+    handleStageSelect(viewingStage + 1);
+  }, [viewingStage, activeStage, handleStageSelect]);
+
+  const handleCurrentStage = useCallback(() => {
+    if (viewingStage === activeStage) return;
+    audioManager.playUI("click");
+    handleStageSelect(activeStage);
+  }, [viewingStage, activeStage, handleStageSelect]);
+
+  useEffect(() => {
+    if (phaserReady && !viewingStageSyncedRef.current) {
+      setViewingStage(activeStage);
+      viewingStageSyncedRef.current = true;
+    }
+  }, [phaserReady, activeStage]);
+
+  useEffect(() => {
+    const onStageInView = (event: { type: string; stage?: number }) => {
+      if (event.type === "STAGE_IN_VIEW" && typeof event.stage === "number") {
+        setViewingStage(event.stage);
+      }
+    };
+    eventBridge.on("STAGE_IN_VIEW", onStageInView);
+    return () => eventBridge.off("STAGE_IN_VIEW", onStageInView);
+  }, []);
 
   useEffect(() => {
     if (selectedStageId && checkpoints.length > 0 && phaserReady) {
@@ -3029,10 +3063,7 @@ function MapPageInner() {
   const corruption = useAtomValue(corruptionStateAtom);
 
   // ── Loading / no-venture guard ─────────────────────────────────────────────
-  // worldMapData is "skip"ped while intro is showing, so only check it after
-  const isLoading =
-    ventures === undefined ||
-    (activeVenture !== null && worldMapData === undefined);
+  // worldMapData is "skip"ped while intro is showing, so only check it after intro
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -3059,6 +3090,61 @@ function MapPageInner() {
       {/* HUD at bottom - Stage Info, Progress, Level, XP */}
       <div className="absolute inset-x-0 bottom-4 z-[70] pointer-events-none flex justify-center">
         <div id="bottom-hud-control" className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl">
+          <button
+            onClick={handlePrevStage}
+            disabled={viewingStage <= 1}
+            onMouseEnter={() => {
+              if (viewingStage > 1) audioManager.playUI("hover");
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0 ${
+              viewingStage > 1
+                ? "border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25 hover:text-white"
+                : "border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50"
+            }`}
+            title={
+              viewingStage > 1
+                ? `Go back to Stage ${viewingStage - 1}`
+                : "You are on the first stage"
+            }
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Prev. Stage</span>
+          </button>
+
+          <button
+            onClick={handleNextStage}
+            disabled={viewingStage >= activeStage}
+            onMouseEnter={() => {
+              if (viewingStage < activeStage) audioManager.playUI("hover");
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0 ${
+              viewingStage < activeStage
+                ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 hover:text-white"
+                : "border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50"
+            }`}
+            title={
+              viewingStage < activeStage
+                ? `Go forward to Stage ${viewingStage + 1}`
+                : "You are on your latest unlocked stage"
+            }
+          >
+            <span>Next Stage</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+
+          {viewingStage < activeStage && (
+            <button
+              onClick={handleCurrentStage}
+              onMouseEnter={() => audioManager.playUI("hover")}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/50 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25 hover:text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0"
+              title={`Jump to your current stage (Stage ${activeStage})`}
+            >
+              <span>Current Map</span>
+            </button>
+          )}
+
+          <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
+
           <div className="shrink-0">
             <StageInfo
               stageName={stageInfo.stageName}
@@ -3130,26 +3216,13 @@ function MapPageInner() {
         }}
       />
 
-      {/* Loading screen */}
+      {/* Loading screen — hide once Phaser canvas is ready; data can sync in background */}
       <AnimatePresence>
         {!phaserReady && (
           <motion.div
             key="loading"
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <LoadingScreen />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Loading overlay */}
-      <AnimatePresence>
-        {isLoading && (
-          <motion.div
-            key="data-loading"
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
           >
             <LoadingScreen />
           </motion.div>
@@ -3161,25 +3234,8 @@ function MapPageInner() {
 
       {phaserReady && activeVenture && (
         <>
-          <div
-            className="pointer-events-none absolute inset-0 z-[12] transition-opacity duration-500"
-            style={{
-              opacity:
-                corruptionPhase === "critical"
-                  ? 0.5
-                  : corruptionPhase === "urgent"
-                    ? 0.38
-                    : corruptionPhase === "desaturated"
-                      ? 0.26
-                      : corruptionPhase === "creeping"
-                        ? 0.16
-                        : 0,
-              background:
-                corruptionPhase === "critical"
-                  ? "radial-gradient(circle at center, rgba(140, 40, 40, 0.05), rgba(76, 0, 94, 0.52))"
-                  : "radial-gradient(circle at center, rgba(0, 0, 0, 0), rgba(88, 28, 135, 0.55))",
-            }}
-          />
+          {/* Corruption colour wash removed — it dimmed the map with a transparent layer. */}
+
           {corruptionPhase === "critical" && (
             <div className="pointer-events-none absolute inset-0 z-[13] animate-pulse border-[10px] border-red-500/25" />
           )}

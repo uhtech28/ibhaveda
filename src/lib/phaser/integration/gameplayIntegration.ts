@@ -17,8 +17,6 @@
 
 import {
   getBiomeConfig,
-  getBiomeCSSFilter,
-  getCorruptionVisualState,
 } from "../config/biomeEngine";
 import { audioManager, type BiomeId } from "@/lib/audio/audioManager";
 import { eventBridge } from "../utils/event-bridge";
@@ -84,17 +82,8 @@ export function updateBiomeState(
   // ── 2. Apply scene background color ───────────────────────────────────────
   scene.cameras.main.setBackgroundColor(biomeConfig.bgColor);
 
-  // ── 3. Apply CSS filter to canvas wrapper ─────────────────────────────────
-  const cssFilter = getBiomeCSSFilter(templateId, stageNumber, corruptionLevel);
-  const canvasWrapper = document.querySelector(
-    ".phaser-canvas-wrapper",
-  ) as HTMLElement;
-  if (canvasWrapper) {
-    canvasWrapper.style.filter = cssFilter;
-  }
-
-  // ── 4. Apply corruption visual overlay ────────────────────────────────────
-  applyCorruptionVisuals(scene, corruptionLevel);
+  // Keep the canvas at full brightness — no corruption wash or shader dimming.
+  clearCorruptionVisuals(scene);
 
   // ── 5. Update audio ambience (with crossfade) ─────────────────────────────
   if (stageChanged || templateChanged) {
@@ -110,90 +99,29 @@ export function updateBiomeState(
 }
 
 /**
- * Apply corruption visual overlays to the Phaser scene.
- * Uses the corruptionVisualState config to set:
- *   - Vignette intensity
- *   - Desaturation filter
- *   - Crack texture overlays
- *   - Screen flicker effect
+ * Remove corruption dark overlays and canvas dimming filters.
+ * The map stays at full brightness regardless of corruption level.
  */
-function applyCorruptionVisuals(
-  scene: Phaser.Scene,
-  corruptionLevel: number,
-): void {
-  if (!scene || !scene.cameras || !scene.cameras.main) {
-    return; // Scene cameras not ready yet
-  }
+export function clearCorruptionVisuals(scene: Phaser.Scene): void {
+  if (!scene?.cameras?.main) return;
 
-  const visual = getCorruptionVisualState(corruptionLevel);
-
-  // Remove existing corruption overlay if present
   const existing = scene.children.getByName("corruption_overlay") as
     | Phaser.GameObjects.Rectangle
     | undefined;
-  if (existing) {
-    existing.destroy();
-  }
+  existing?.destroy();
 
-  // Remove existing vignette overlay if present
   const existingVignette = scene.children.getByName("corruption_vignette") as
     | Phaser.GameObjects.Graphics
     | undefined;
-  if (existingVignette) {
-    existingVignette.destroy();
-  }
+  existingVignette?.destroy();
 
-  // Add corruption overlay rectangle
-  if (visual.overlayAlpha > 0) {
-    const overlay = scene.add.rectangle(
-      scene.cameras.main.centerX,
-      scene.cameras.main.centerY,
-      scene.cameras.main.width * 2,
-      scene.cameras.main.height * 2,
-      visual.overlayColor,
-      visual.overlayAlpha,
-    );
-    overlay.setName("corruption_overlay");
-    overlay.setScrollFactor(0); // Fixed to camera
-    overlay.setDepth(9999); // Always on top
-    overlay.setBlendMode(Phaser.BlendModes.MULTIPLY);
-  }
+  scene.cameras.main.setAlpha(1);
 
-  // Apply vignette gradient graphics overlay (representing shadow closing in)
-  if (corruptionLevel > 0) {
-    const vignette = scene.add.graphics();
-    vignette.setName("corruption_vignette");
-    vignette.setScrollFactor(0);
-    vignette.setDepth(9998); // just below overlay
-
-    const w = scene.cameras.main.width;
-    const h = scene.cameras.main.height;
-
-    const steps = 8;
-    const maxAlpha = (corruptionLevel / 100) * 0.65;
-    for (let i = 0; i < steps; i++) {
-      const scale = 1 - (i / steps);
-      const alpha = (i / steps) * maxAlpha;
-      vignette.lineStyle(w / steps, 0x000000, alpha);
-      vignette.strokeRect(
-        (w * (1 - scale)) / 2,
-        (h * (1 - scale)) / 2,
-        w * scale,
-        h * scale
-      );
-    }
-  }
-
-  // Flicker effect for critical corruption (70%+)
-  if (visual.showFlicker) {
-    scene.tweens.add({
-      targets: scene.cameras.main,
-      alpha: 0.9,
-      duration: 80,
-      yoyo: true,
-      repeat: 2,
-      ease: "Sine.easeInOut",
-    });
+  const canvasWrapper = document.querySelector(
+    ".phaser-canvas-wrapper",
+  ) as HTMLElement | null;
+  if (canvasWrapper) {
+    canvasWrapper.style.filter = "none";
   }
 }
 
@@ -539,6 +467,7 @@ export function updateBossVisuals(
 
 export const gameplayIntegration = {
   updateBiomeState,
+  clearCorruptionVisuals,
   executeCheckpointFlow,
   applyBiomeParticles,
   initializeAudio,

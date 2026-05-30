@@ -27,12 +27,11 @@ export abstract class BaseCheckpointAnimation {
     this.config = config;
     this.container = scene.add.container(config.x, config.y);
 
-    // Randomize duration within spec ranges for more organic feel
-    // Standard: 1.5-2.5s, Gold: 2.5-3.5s
+    // Standard: 0.8-1.2s, Gold: 1.2-1.8s
     this.calculatedDuration =
       config.variant === "gold"
-        ? Phaser.Math.Between(2500, 3500)
-        : Phaser.Math.Between(1500, 2500);
+        ? Phaser.Math.Between(1200, 1800)
+        : Phaser.Math.Between(800, 1200);
   }
 
   abstract create(): void;
