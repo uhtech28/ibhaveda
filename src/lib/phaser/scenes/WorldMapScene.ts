@@ -3601,43 +3601,38 @@ export class WorldMapScene extends Phaser.Scene {
     prop("Crate_Large_Empty", 11.2, 28.0, 11, 0x6a5848, 0.9);
 
     // ════════════════════════════════════════════════════════════════════════
-    //  LAYER 9 — STREET LIGHTS NEAR CP2, CP3, CP6 (roadside, grounded)
+    //  LAYER 9 — STREET LIGHTS ON CP1–CP4 (flush on checkpoint crown)
     // ════════════════════════════════════════════════════════════════════════
     const streetLightKey = this.textures.exists("mine_street_light")
       ? "mine_street_light"
       : "mine_street_light_1";
+    // CheckpointNode outer ring radius is 36px (world px, not tile-scaled).
+    const checkpointCrownOffset = 36;
     const placeStreetLight = (col: number, row: number, li: number) => {
       const gx = tx(col);
-      const gy = ty(row);
-      const base = this.add.graphics().setDepth(13);
-      base.fillStyle(0x000000, 0.28);
-      base.fillEllipse(gx, gy + 1, tileSize * 0.55, tileSize * 0.14);
-      base.fillStyle(0x3a3428, 0.9);
-      base.fillEllipse(gx, gy + 1, tileSize * 0.45, tileSize * 0.1);
-      this.midgroundLayer.add(base);
+      const gy = ty(row) - checkpointCrownOffset;
       if (this.textures.exists(streetLightKey)) {
         const lamp = this.add.image(gx, gy, streetLightKey);
-        lamp.setOrigin(0.5, 1).setScale(scale * 0.48).setDepth(14);
+        lamp.setOrigin(0.5, 1).setScale(scale * 0.42).setDepth(17);
         this.midgroundLayer.add(lamp);
+        const halo = this.add.circle(gx, gy - 28 * scale, tileSize * 0.5, C.warmGlow, 0.14);
+        halo.setDepth(16);
+        this.midgroundLayer.add(halo);
+        this.tweens.add({
+          targets: halo,
+          alpha: { from: 0.08, to: 0.22 },
+          duration: 2400 + li * 350,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
       }
-      const halo = this.add.circle(gx, gy - tileSize * 1.4, tileSize * 2.2, C.warmGlow, 0.12);
-      halo.setDepth(13);
-      this.midgroundLayer.add(halo);
-      this.tweens.add({
-        targets: halo,
-        alpha: { from: 0.07, to: 0.2 },
-        duration: 2400 + li * 350,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
     };
-    // Off-road beside each checkpoint — feet aligned to tile row
-    [
-      [9.0, 27.2],   // CP2 — left shoulder
-      [24.5, 21.8],  // CP3 — right shoulder
-      [40.5, 32.5],  // CP6 — right shoulder below yard
-    ].forEach(([lc, lr], li) => placeStreetLight(lc, lr, li));
+    // CP1, CP2, CP3, CP4 — indices into MINE_CP_GRID
+    [0, 1, 2, 3].forEach((cpi, li) => {
+      const [pc, pr] = MINE_CP_GRID[cpi];
+      placeStreetLight(pc, pr, li);
+    });
 
     // Subtle warm bloom + low fog
     const bloom = this.add.graphics().setDepth(0);
