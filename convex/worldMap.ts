@@ -1001,11 +1001,8 @@ export const redoTask = mutation({
     // ── Find the task row ────────────────────────────────────────────────────
     const task = await ctx.db
       .query("ventureTasks")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("checkpointId"), args.checkpointId),
-          q.eq(q.field("taskLevel"), args.taskLevel),
-        ),
+      .withIndex("by_checkpoint_level", (q) =>
+        q.eq("checkpointId", args.checkpointId).eq("taskLevel", args.taskLevel),
       )
       .first();
 
@@ -1025,10 +1022,14 @@ export const redoTask = mutation({
     }
 
     // ── Reset task status ─────────────────────────────────────────────────────
-    await ctx.db.patch(task._id, {
+    // Use replace to cleanly remove optional fields (evidenceId, completedAt).
+    // patch() with undefined values can cause a Convex server error on
+    // optional fields in some runtime versions.
+    await ctx.db.replace(task._id, {
+      checkpointId: task.checkpointId,
+      taskLevel: task.taskLevel,
+      toolType: task.toolType,
       status: "not_started",
-      evidenceId: undefined,
-      completedAt: undefined,
     });
 
     // ── Reset checkpoint flag ─────────────────────────────────────────────────

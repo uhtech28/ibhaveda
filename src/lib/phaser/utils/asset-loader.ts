@@ -1149,11 +1149,18 @@ export class AssetLoader {
       "persona_male_walk_sheet",
       "persona_female_idle_sheet",
       "persona_female_walk_sheet",
+      // Mine cave tiles are optional — the scene has texture-exists guards
+      "mine_bg_cave",
+      "mine_cave_rail",
+      "mine_cave_rock",
     ]);
 
     const onLoadError = (file: { key: string }) => {
-      if (optionalSheetKeys.has(file.key) && scene.textures.exists(file.key)) {
-        scene.textures.remove(file.key);
+      if (optionalSheetKeys.has(file.key)) {
+        // Silently remove the partial texture entry if it was partially registered
+        if (scene.textures.exists(file.key)) {
+          scene.textures.remove(file.key);
+        }
       }
     };
     scene.load.on("loaderror", onLoadError);
