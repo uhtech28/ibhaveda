@@ -1280,6 +1280,20 @@ export class AssetLoader {
     ];
     objects.forEach(obj => scene.load.image(obj, `${fanTasyPath}/${obj}.png`));
 
+    // --- Deep Mine biome tiles ---
+    const minePath = "/assets/mine";
+    scene.load.image("mine_bg_cave", `${minePath}/bg_cave.png`);
+    scene.load.image("mine_cave_rail", `${minePath}/tile_cave_rail.png`);
+    scene.load.image("mine_cave_rock", `${minePath}/tile_cave_bg_rock.png`);
+    scene.load.image("mine_street_light", `${minePath}/mine_street_light.png`);
+    scene.load.image("mine_street_light_1", `${minePath}/mine_street_light_1.png`);
+    scene.load.image("mine_street_light_2", `${minePath}/mine_street_light_2.png`);
+    scene.load.image("mine_street_light_3", `${minePath}/mine_street_light_3.png`);
+    scene.load.image("mine_truck_1", `${minePath}/mine_truck_1.png`);
+    scene.load.image("mine_truck_2", `${minePath}/mine_truck_2.png`);
+    scene.load.image("mine_truck_3", `${minePath}/mine_truck_3.png`);
+    scene.load.image("mine_truck_red", `${minePath}/mine_truck_red.png`);
+
 
 
     // Load main Tilemap (JSON with embedded tilesets)
