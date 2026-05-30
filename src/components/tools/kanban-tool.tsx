@@ -165,9 +165,9 @@ function DroppableColumn({
         items={cards.map((c) => c.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-2 min-h-[200px] p-2 border-2 border-dashed border-muted rounded-lg">
+        <div className="space-y-2 min-h-[200px] p-2 border-2 border-dashed border-white/40 rounded-lg bg-white/[0.02]">
           {cards.length === 0 ? (
-            <div className="flex items-center justify-center h-[100px] text-xs text-muted-foreground">
+            <div className="flex items-center justify-center h-[100px] text-xs text-white/55">
               Drop cards here
             </div>
           ) : (
