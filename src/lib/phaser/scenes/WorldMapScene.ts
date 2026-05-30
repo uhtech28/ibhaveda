@@ -3601,7 +3601,7 @@ export class WorldMapScene extends Phaser.Scene {
     prop("Crate_Large_Empty", 11.2, 28.0, 11, 0x6a5848, 0.9);
 
     // ════════════════════════════════════════════════════════════════════════
-    //  LAYER 9 — STREET LIGHTS ON CP1–CP4 (flush on checkpoint crown)
+    //  LAYER 9 — STREET LIGHTS ON CP1–CP5 (flush on checkpoint crown)
     // ════════════════════════════════════════════════════════════════════════
     const streetLightKey = this.textures.exists("mine_street_light")
       ? "mine_street_light"
@@ -3628,8 +3628,8 @@ export class WorldMapScene extends Phaser.Scene {
         });
       }
     };
-    // CP1, CP2, CP3, CP4 — indices into MINE_CP_GRID
-    [0, 1, 2, 3].forEach((cpi, li) => {
+    // CP1–CP5 — indices into MINE_CP_GRID
+    [0, 1, 2, 3, 4].forEach((cpi, li) => {
       const [pc, pr] = MINE_CP_GRID[cpi];
       placeStreetLight(pc, pr, li);
     });
