@@ -253,7 +253,6 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
             >
               <X className="h-3 w-3" />
             </Button>
-            </div>
           </div>
 
           {respondError && (
