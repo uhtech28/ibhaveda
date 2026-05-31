@@ -192,7 +192,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {/* Row 1: message text + × (top-right, always visible) */}
+          {/* Row 1: message text + top-right controls */}
           <div className="flex items-start gap-1.5">
             <p className="text-xs text-foreground leading-snug flex-1 min-w-0">
               <span className="font-semibold">{notification.sender?.name || 'Someone'}</span>{' '}
@@ -200,45 +200,45 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
                 {cleanMessage(notification.message, notification.sender?.name || '')}
               </span>
             </p>
-            {/* × — top-right, always visible */}
-            <button
-              className="shrink-0 flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors mt-0.5"
-              onClick={(e) => { e.stopPropagation(); onDismiss(notification._id) }}
-              aria-label="Dismiss"
-            >
-              <X className="h-2.5 w-2.5" />
-            </button>
+            {/* Contribution requests: ✓ and ✗ replace the dismiss × */}
+            {isPendingContrib && matchedContribRequest ? (
+              <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                <button
+                  type="button"
+                  onClick={handleContribAccept}
+                  disabled={respondingState !== 'idle'}
+                  aria-label="Accept"
+                  title="Accept"
+                  className="h-5 w-5 flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+                >
+                  {respondingState === 'accepting'
+                    ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    : <Check className="h-2.5 w-2.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { handleContribReject(e); onDismiss(notification._id) }}
+                  disabled={respondingState !== 'idle'}
+                  aria-label="Reject"
+                  title="Reject"
+                  className="h-5 w-5 flex items-center justify-center rounded bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 transition-colors"
+                >
+                  {respondingState === 'rejecting'
+                    ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    : <X className="h-2.5 w-2.5" />}
+                </button>
+              </div>
+            ) : (
+              /* All other notifications: standard dismiss × */
+              <button
+                className="shrink-0 flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors mt-0.5"
+                onClick={(e) => { e.stopPropagation(); onDismiss(notification._id) }}
+                aria-label="Dismiss"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
           </div>
-
-          {/* Row 2: action buttons (contribution request or invitation) — fixed row, won't shift */}
-          {isPendingContrib && matchedContribRequest && (
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <button
-                type="button"
-                onClick={handleContribAccept}
-                disabled={respondingState !== 'idle'}
-                aria-label="Accept"
-                title="Accept"
-                className="h-6 w-6 flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors shrink-0"
-              >
-                {respondingState === 'accepting'
-                  ? <Loader2 className="h-3 w-3 animate-spin" />
-                  : <Check className="h-3 w-3" />}
-              </button>
-              <button
-                type="button"
-                onClick={handleContribReject}
-                disabled={respondingState !== 'idle'}
-                aria-label="Reject"
-                title="Reject"
-                className="h-6 w-6 flex items-center justify-center rounded bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 transition-colors shrink-0"
-              >
-                {respondingState === 'rejecting'
-                  ? <Loader2 className="h-3 w-3 animate-spin" />
-                  : <X className="h-3 w-3" />}
-              </button>
-            </div>
-          )}
 
           {isPendingInvitation && matchedInvitation && (
             <div className="flex items-center gap-1.5 mt-1.5">
