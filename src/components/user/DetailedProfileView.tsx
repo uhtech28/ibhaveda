@@ -201,7 +201,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                         {(profile.industries && profile.industries.length > 0
                           ? profile.industries
                           : profile.industry ? [profile.industry] : []
-                        ).map((ind, index) => (
+                        ).map((ind: string, index: number) => (
                           <Badge key={index} variant="outline" className="rounded-md px-2 py-0 text-[10px] font-medium h-5 bg-purple-500/10 text-purple-600 border border-purple-500/20">
                             {ind}
                           </Badge>

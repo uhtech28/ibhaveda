@@ -34,6 +34,7 @@ export interface UserProfile {
   github?: string;
   skills?: string[];
   industry?: string;
+  industries?: string[];
   ideasCreated?: number;
   ideasSparked?: number;
   ideasContributed?: number;
@@ -288,7 +289,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                       {(profile.industries && profile.industries.length > 0
                         ? profile.industries
                         : profile.industry ? [profile.industry] : []
-                      ).map((ind, index) => (
+                      ).map((ind: string, index: number) => (
                         <Link
                           key={index}
                           href={`/community?q=${encodeURIComponent(ind)}`}
