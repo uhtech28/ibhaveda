@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
+function cleanMessage(raw: string, senderName: string): string {
+  return raw
+    .replace(senderName, '')
+    .replace(/\s+your idea\s+/gi, ' ')
+    .replace(/requested to contribute to/gi, 'wants to contribute to')
+    .replace(/you earned the\s+/gi, 'gained ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 const formatRelativeTime = (timestamp: number): string => {
   const now = Date.now()
   const diff = now - timestamp
@@ -186,7 +196,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
             <p className="text-sm text-foreground leading-snug">
               <span className="font-semibold">{notification.sender?.name || 'Someone'}</span>{' '}
               <span className="text-muted-foreground">
-                {notification.message.replace(notification.sender?.name || '', '').trim()}
+                {cleanMessage(notification.message, notification.sender?.name || '')}
               </span>
             </p>
             <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap mt-0.5">
@@ -194,62 +204,55 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            {isPendingInvitation && matchedInvitation ? (
-              // Inline accept / reject — replaces the "invitation received" badge
-              // and the previous browser-confirm flow. Tick = green, cross = red.
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleAccept}
-                  disabled={respondingState !== 'idle'}
-                  aria-label="Accept invitation"
-                  title="Accept"
-                  className="h-7 px-2.5 gap-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30"
-                >
-                  {respondingState === 'accepting'
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <Check className="h-3.5 w-3.5" />}
-                  <span className="text-xs">Accept</span>
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleReject}
-                  disabled={respondingState !== 'idle'}
-                  aria-label="Decline invitation"
-                  title="Decline"
-                  className="h-7 px-2.5 gap-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/25"
-                >
-                  {respondingState === 'rejecting'
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <X className="h-3.5 w-3.5" />}
-                  <span className="text-xs">Decline</span>
-                </Button>
-              </div>
-            ) : (
-              <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-5 font-normal ${getNotificationBadgeColor(notification.type)}`}>
-                {notification.type.replace(/_/g, ' ')}
-              </Badge>
-            )}
-
-            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              {!notification.isRead && (
-                <div className="w-2 h-2 bg-blue-500 rounded-full" title="Unread" />
-              )}
+          {isPendingInvitation && matchedInvitation && (
+            <div className="flex items-center gap-1.5 pt-0.5">
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDismiss(notification._id)
-                }}
+                type="button"
+                size="sm"
+                onClick={handleAccept}
+                disabled={respondingState !== 'idle'}
+                aria-label="Accept invitation"
+                title="Accept"
+                className="h-7 px-2.5 gap-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30"
               >
-                <X className="h-3 w-3" />
+                {respondingState === 'accepting'
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Check className="h-3.5 w-3.5" />}
+                <span className="text-xs">Accept</span>
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleReject}
+                disabled={respondingState !== 'idle'}
+                aria-label="Decline invitation"
+                title="Decline"
+                className="h-7 px-2.5 gap-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/25"
+              >
+                {respondingState === 'rejecting'
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <X className="h-3.5 w-3.5" />}
+                <span className="text-xs">Decline</span>
+              </Button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!notification.isRead && (
+              <div className="w-2 h-2 bg-blue-500 rounded-full" title="Unread" />
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDismiss(notification._id)
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
             </div>
           </div>
 
@@ -265,7 +268,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
   )
 }
 
-export const NotificationList = () => {
+export const NotificationList = ({ onClose }: { onClose?: () => void }) => {
   const [activeTab, setActiveTab] = useState<"all" | "interactions" | "requests">("all")
 
   const notifications = useQuery(api.notifications.getNotifications, {
@@ -312,6 +315,11 @@ export const NotificationList = () => {
       <div className="flex flex-col h-full bg-background">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background sticky top-0 z-10">
           <h3 className="font-semibold text-sm">Notifications</h3>
+          {onClose && (
+            <button onClick={onClose} aria-label="Close notifications" className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-muted/80 text-foreground transition-colors focus:outline-none">
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
           <div className="bg-muted/50 p-4 rounded-full mb-4">
@@ -334,18 +342,25 @@ export const NotificationList = () => {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between pl-4 pr-12 py-3 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <h3 className="font-semibold text-sm">Notifications</h3>
-        {notifications.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDismissAll()}
-            className="h-6 text-[11px] text-muted-foreground hover:text-red-600 hover:bg-red-50 px-1.5"
-          >
-            Clear
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {notifications.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDismissAll()}
+              className="h-6 text-[11px] text-muted-foreground hover:text-red-600 hover:bg-red-50 px-1.5"
+            >
+              Clear
+            </Button>
+          )}
+          {onClose && (
+            <button onClick={onClose} aria-label="Close notifications" className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-muted/80 text-foreground transition-colors focus:outline-none">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

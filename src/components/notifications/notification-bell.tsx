@@ -55,8 +55,7 @@ export const NotificationBell = () => {
         <Bell className="h-4 w-4" />
         {unreadCount && unreadCount > 0 && (
           <Badge
-            variant="destructive"
-            className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] rounded-full p-0 text-[10px] leading-none font-semibold flex items-center justify-center px-1 ring-2 ring-[#0A0D12]"
+            className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] rounded-full p-0 text-[10px] leading-none font-semibold flex items-center justify-center px-1 bg-red-500 text-white border-0"
           >
             {unreadCount > 99 ? '99+' : unreadCount}
           </Badge>
@@ -83,24 +82,8 @@ export const NotificationBell = () => {
                 bg-background border border-border/60 rounded-xl shadow-2xl
               "
             >
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close notifications"
-                className="
-                  absolute right-3 top-3 z-30
-                  flex h-8 w-8 items-center justify-center rounded-full
-                  bg-muted hover:bg-muted/80 text-foreground
-                  border border-border/60 shadow-md
-                  focus:outline-none focus:ring-2 focus:ring-primary/40
-                  transition-colors
-                "
-              >
-                <X className="h-4 w-4" />
-              </button>
-
               <ScrollArea className="h-[min(45vh,360px)] bg-background">
-                <NotificationList />
+                <NotificationList onClose={() => setOpen(false)} />
               </ScrollArea>
             </div>
           </>,
