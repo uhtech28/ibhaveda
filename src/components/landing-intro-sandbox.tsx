@@ -129,14 +129,11 @@ export default function LandingIntroSandbox({
     let done = false;
 
     const play = (audioCtx: AudioContext) => {
-      // Master gain — simple fixed value, no automation (iOS Safari has
-      // known bugs with exponentialRampToValueAtTime on future-scheduled nodes)
       const masterGain = audioCtx.createGain();
       masterGain.gain.value = 0.07;
       masterGain.connect(audioCtx.destination);
-
-      // Start notes 0.5s from now so the clock is definitely ticking by then
-      let t = audioCtx.currentTime + 0.5;
+      // Schedule from currentTime — works whether it's 0 or already ticking
+      let t = audioCtx.currentTime;
       for (const { f, d } of notes) {
         if (f > 0) {
           const osc = audioCtx.createOscillator();
@@ -144,7 +141,7 @@ export default function LandingIntroSandbox({
           osc.frequency.value = f;
           osc.connect(masterGain);
           osc.start(t);
-          osc.stop(t + d * 0.88); // small gap between notes
+          osc.stop(t + d * 0.88);
         }
         t += d;
       }
@@ -154,38 +151,35 @@ export default function LandingIntroSandbox({
       if (done) return;
       done = true;
       try {
-        ctx = new AC();
-        // Play a silent buffer synchronously — this is the iOS clock-start trick
-        const buf = ctx.createBuffer(1, 1, 22050);
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
-        src.connect(ctx.destination);
-        src.start(0);
-        // Schedule music immediately; 0.5s head-start in play() covers any lag
+        // Always create AudioContext inside the gesture handler
+        ctx = new AC({ latencyHint: "playback" } as AudioContextOptions);
         play(ctx);
-      } catch { /* AudioContext unavailable */ }
+      } catch {
+        try {
+          // Fallback without options (older Safari)
+          ctx = new AC();
+          play(ctx);
+        } catch { /* unavailable */ }
+      }
     };
 
-    // Attach native listeners directly to the overlay DOM element.
-    // React synthetic events go through a delegated root listener which iOS
-    // may not treat as a valid AudioContext gesture. Native listeners on the
-    // actual target element are unambiguously within the gesture context.
-    // We listen for both touchend (finger-up) and touchstart (finger-down)
-    // so whichever fires first wins; the `done` flag prevents double-running.
+    // iOS Safari only recognises `touchend` and `click` as valid gesture
+    // events for AudioContext — touchstart is NOT listed in Apple's docs.
+    // Attach native listeners directly to the overlay element (not window).
     const el = overlayRef.current;
     if (el) {
-      el.addEventListener("touchend",   unlock, { once: true });
-      el.addEventListener("touchstart", unlock, { once: true, passive: true });
+      el.addEventListener("touchend", unlock, { once: true });
+      el.addEventListener("click",    unlock, { once: true });
     }
-    // Desktop fallback
+    // Desktop: also listen on window for pointer/keyboard
     window.addEventListener("pointerdown", unlock, { once: true });
     window.addEventListener("keydown",     unlock, { once: true });
 
     return () => {
       done = true;
       if (el) {
-        el.removeEventListener("touchend",   unlock);
-        el.removeEventListener("touchstart", unlock);
+        el.removeEventListener("touchend", unlock);
+        el.removeEventListener("click",    unlock);
       }
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown",     unlock);
