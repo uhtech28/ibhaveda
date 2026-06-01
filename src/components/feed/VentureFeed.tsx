@@ -1,12 +1,15 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trophy, Sparkles, Rocket, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, Sparkles, Rocket, Calendar, Loader2 } from "lucide-react";
+
+const PAGE_SIZE = 20;
 
 // ============================================================================
 // TYPES
@@ -56,9 +59,12 @@ export function VentureFeed({
   ideaId,
   userFeed,
   communityFeed,
-  limit = 20,
+  limit: _initialLimit,
   compact = false,
 }: VentureFeedProps) {
+  const [limit, setLimit] = useState(_initialLimit ?? PAGE_SIZE);
+  const [prevCount, setPrevCount] = useState(0);
+
   // Determine which query to use based on props
   const ventureFeedData = useQuery(
     api.socialFeed.getVentureFeed,
@@ -81,10 +87,17 @@ export function VentureFeed({
   );
 
   // Get the active feed
-  const feed = ventureFeedData || ideaFeedData || userFeedData || communityFeedData;
+  const feed = ventureFeedData ?? ideaFeedData ?? userFeedData ?? communityFeedData;
 
-  // Loading state
-  if (feed === undefined) {
+  const isLoadingMore = feed === undefined && prevCount > 0;
+
+  function handleLoadMore() {
+    setPrevCount(feed?.length ?? 0);
+    setLimit((l) => l + PAGE_SIZE);
+  }
+
+  // Initial loading state
+  if (feed === undefined && prevCount === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -96,7 +109,7 @@ export function VentureFeed({
   }
 
   // Empty state
-  if (feed.length === 0) {
+  if (feed && feed.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
         <Sparkles className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -108,11 +121,29 @@ export function VentureFeed({
     );
   }
 
+  const hasMore = feed ? feed.length >= limit : false;
+
   return (
     <div className={`space-y-${compact ? "3" : "4"}`}>
       {(feed as FeedItem[]).map((item) => (
         <FeedCard key={item._id} item={item as FeedItem} compact={compact} />
       ))}
+
+      {/* Load More / loading indicator */}
+      {(hasMore || isLoadingMore) && (
+        <div className="flex justify-center pt-2">
+          {isLoadingMore ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading more…
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={handleLoadMore}>
+              Load more
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
