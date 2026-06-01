@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
-import { SignedIn, SignedOut, SignInButton, SignUpButton, useClerk } from '@clerk/nextjs'
+import { SignedIn, SignedOut, useClerk } from '@clerk/nextjs'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -41,7 +41,7 @@ export const HeroHeader = ({
     onOpenTodos?: () => void
     onOpenCalendar?: () => void
 }) => {
-    const { signOut } = useClerk()
+    const { signOut, openSignIn, openSignUp } = useClerk()
     const currentUser = useQuery(api.users.getCurrentUser)
     const pathname = usePathname()
     const router = useRouter()
@@ -115,8 +115,8 @@ export const HeroHeader = ({
                             </button>
                             <SignedOut>
                                 <div className="flex shrink-0 gap-1">
-                                    <SignInButton><Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">Login</Button></SignInButton>
-                                    <SignUpButton><Button size="sm">Sign Up</Button></SignUpButton>
+                                    <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn({ afterSignInUrl: "/feed" })}>Login</Button>
+                                    <Button size="sm" onClick={() => openSignUp({ afterSignUpUrl: "/profile-setup" })}>Sign Up</Button>
                                 </div>
                             </SignedOut>
                             <SignedIn>
@@ -193,8 +193,8 @@ export const HeroHeader = ({
                     <div className="ml-auto flex items-center gap-3">
                         <SignedOut>
                             <div className="flex gap-2">
-                                <SignInButton><Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">Login</Button></SignInButton>
-                                <SignUpButton><Button size="sm">Sign Up</Button></SignUpButton>
+                                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn({ afterSignInUrl: "/feed" })}>Login</Button>
+                                <Button size="sm" onClick={() => openSignUp({ afterSignUpUrl: "/profile-setup" })}>Sign Up</Button>
                             </div>
                         </SignedOut>
                         <SignedIn>

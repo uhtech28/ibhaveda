@@ -60,6 +60,13 @@ crons.daily(
     api.emailReengagement.sendReengagementEmails
 );
 
+// Schedule: Social Proof Engine — daily spark evaluator at 00:05 UTC
+crons.daily(
+  "Social Proof Daily Evaluator",
+  { hourUTC: 0, minuteUTC: 5 },
+  api.socialProof.runDailyEvaluator,
+);
+
 export default crons;
 
 // ─────────────────────────────────────────────────────────────────────────────

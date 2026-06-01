@@ -1,12 +1,15 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import { Trophy, Sparkles, Rocket, Calendar } from "lucide-react";
+
+const PAGE_SIZE = 20;
 
 // ============================================================================
 // TYPES
@@ -56,34 +59,80 @@ export function VentureFeed({
   ideaId,
   userFeed,
   communityFeed,
-  limit = 20,
+  limit: _initialLimit,
   compact = false,
 }: VentureFeedProps) {
-  // Determine which query to use based on props
+  const [requestedLimit, setRequestedLimit] = useState(_initialLimit ?? PAGE_SIZE);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const prevFeedLengthRef = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Use refs so the IntersectionObserver callback always sees fresh values
+  // without needing to be recreated on every render.
+  const hasMoreRef = useRef(false);
+  const isFetchingMoreRef = useRef(false);
+  isFetchingMoreRef.current = isFetchingMore;
+
   const ventureFeedData = useQuery(
     api.socialFeed.getVentureFeed,
-    ventureId ? { ventureId, limit } : "skip"
+    ventureId ? { ventureId, limit: requestedLimit } : "skip"
   );
-
   const ideaFeedData = useQuery(
     api.socialFeed.getIdeaFeed,
-    ideaId ? { ideaId, limit } : "skip"
+    ideaId ? { ideaId, limit: requestedLimit } : "skip"
   );
-
   const userFeedData = useQuery(
     api.socialFeed.getUserVentureFeed,
-    userFeed ? { limit } : "skip"
+    userFeed ? { limit: requestedLimit } : "skip"
   );
-
   const communityFeedData = useQuery(
     api.socialFeed.getCommunityVentureFeed,
-    communityFeed ? { limit } : "skip"
+    communityFeed ? { limit: requestedLimit } : "skip"
   );
 
-  // Get the active feed
-  const feed = ventureFeedData || ideaFeedData || userFeedData || communityFeedData;
+  const feed = ventureFeedData ?? ideaFeedData ?? userFeedData ?? communityFeedData;
 
-  // Loading state
+  // hasMore: backend returned a full page, so there are likely more items
+  const hasMore = feed !== undefined && feed.length >= requestedLimit;
+  hasMoreRef.current = hasMore;
+
+  // Detect when new data has landed after a load-more request
+  useEffect(() => {
+    if (feed === undefined) return;
+    if (isFetchingMore && feed.length !== prevFeedLengthRef.current) {
+      // New items arrived (or we hit the end — either way, stop spinner)
+      setIsFetchingMore(false);
+      prevFeedLengthRef.current = feed.length;
+    } else if (!isFetchingMore) {
+      prevFeedLengthRef.current = feed.length;
+    }
+  }, [feed, isFetchingMore]);
+
+  function loadMore() {
+    if (isFetchingMoreRef.current || !hasMoreRef.current) return;
+    prevFeedLengthRef.current = feed?.length ?? 0;
+    setIsFetchingMore(true);
+    setRequestedLimit((l) => l + PAGE_SIZE);
+  }
+
+  // Set up IntersectionObserver once — uses refs so it never needs to be recreated
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initial loading state
   if (feed === undefined) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -113,6 +162,16 @@ export function VentureFeed({
       {(feed as FeedItem[]).map((item) => (
         <FeedCard key={item._id} item={item as FeedItem} compact={compact} />
       ))}
+
+      {/* Sentinel — triggers next page load when scrolled into view */}
+      <div ref={sentinelRef} className="h-4" />
+
+      {/* Spinner while next batch is in-flight */}
+      {isFetchingMore && (
+        <div className="flex justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
     </div>
   );
 }

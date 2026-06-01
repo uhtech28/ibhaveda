@@ -119,10 +119,25 @@ export default defineSchema({
     userId: v.id("users"), // Reference to users table
     ideaId: v.id("ideas"), // Reference to ideas table
     createdAt: v.number(), // Unix timestamp when sparked
+    seeded: v.optional(v.boolean()), // true = social-proof seeded spark (not visible to users)
   })
     .index("by_user", ["userId"])
     .index("by_idea", ["ideaId"])
     .index("by_user_idea", ["userId", "ideaId"]),
+
+  // Social proof engine — per-post spark delivery schedules
+  socialProofSchedules: defineTable({
+    ideaId: v.id("ideas"),
+    authorId: v.id("users"),
+    createdAt: v.number(),       // when the idea was created (epoch ms)
+    capCount: v.number(),        // absolute max sparks to deliver (75–95 % of total users)
+    capPercent: v.number(),      // the % drawn (analytics only, never shown to users)
+    sparksDelivered: v.number(), // running total of seeded sparks fired
+    isComplete: v.boolean(),     // true once cap is reached or no eligible likers remain
+  })
+    .index("by_idea", ["ideaId"])
+    .index("by_complete", ["isComplete"])
+    .index("by_created_at", ["createdAt"]),
 
   // Contribution requests table
   contributionRequests: defineTable({

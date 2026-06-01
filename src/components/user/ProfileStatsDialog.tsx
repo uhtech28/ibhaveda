@@ -37,7 +37,7 @@ export function ProfileStatsDialog({ userId, type, isOpen, onOpenChange }: Profi
   const router = useRouter();
 
   // Determine which query to run based on type
-  const createdIdeas = useQuery(api.ideas.getPublicIdeasForUser, type === "created" ? { userId } : "skip");
+  const createdIdeas = useQuery(api.ideas.getProfileIdeas, type === "created" ? { userId } : "skip");
   const sparkedIdeas = useQuery(api.ideas.getPublicSparkedIdeasForUser, type === "sparked" ? { userId } : "skip");
   const contributedIdeas = useQuery(api.ideas.getPublicContributedIdeasForUser, type === "contributed" ? { userId } : "skip");
 

@@ -41,6 +41,7 @@ import type * as resend from "../resend.js";
 import type * as search from "../search.js";
 import type * as skillBadges from "../skillBadges.js";
 import type * as socialFeed from "../socialFeed.js";
+import type * as socialProof from "../socialProof.js";
 import type * as templateBadges from "../templateBadges.js";
 import type * as templateEngine from "../templateEngine.js";
 import type * as templateMetrics from "../templateMetrics.js";
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   search: typeof search;
   skillBadges: typeof skillBadges;
   socialFeed: typeof socialFeed;
+  socialProof: typeof socialProof;
   templateBadges: typeof templateBadges;
   templateEngine: typeof templateEngine;
   templateMetrics: typeof templateMetrics;

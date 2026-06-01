@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
+function cleanMessage(raw: string, senderName: string): string {
+  return raw
+    .replace(senderName, '')
+    .replace(/\s+your idea\s+/gi, ' ')
+    .replace(/requested to contribute to/gi, 'wants to contribute to')
+    .replace(/you earned the\s+/gi, 'gained ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 const formatRelativeTime = (timestamp: number): string => {
   const now = Date.now()
   const diff = now - timestamp
@@ -47,225 +57,231 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'spark_received':
-        return <Sparkles className="h-4 w-4 text-orange-500" />
+        return <Sparkles className="h-3 w-3 text-orange-500" />
       case 'comment_received':
-        return <MessageCircle className="h-4 w-4 text-blue-500" />
+        return <MessageCircle className="h-3 w-3 text-blue-500" />
       case 'contribution_request_received':
       case 'contribution_request_accepted':
       case 'contribution_request_rejected':
-        return <UserPlus className="h-4 w-4 text-green-500" />
+        return <UserPlus className="h-3 w-3 text-green-500" />
       case 'invitation_received':
       case 'invitation_rejected':
-        return <Bell className="h-4 w-4 text-purple-500" />
+        return <Bell className="h-3 w-3 text-purple-500" />
       case 'badge_awarded':
-        return <Medal className="h-4 w-4 text-yellow-500" />
+        return <Medal className="h-3 w-3 text-yellow-500" />
       default:
-        return <Bell className="h-4 w-4 text-gray-500" />
-    }
-  }
-
-  const getNotificationBadgeColor = (type: string) => {
-    switch (type) {
-      case 'spark_received':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'comment_received':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'contribution_request_received':
-      case 'contribution_request_accepted':
-      case 'contribution_request_rejected':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'invitation_received':
-      case 'invitation_accepted':
-      case 'invitation_rejected':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      case 'badge_awarded':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+        return <Bell className="h-3 w-3 text-gray-500" />
     }
   }
 
   const isPendingInvitation = notification.type === 'invitation_received'
+  const isPendingContrib = notification.type === 'contribution_request_received'
+  const hasActionButtons = isPendingInvitation || isPendingContrib
 
-  // Real Convex hooks for accept/reject — only fetched/used for invitation rows.
-  const myInvitations = useQuery(
-    api.invitations.getMyInvitations,
-    isPendingInvitation ? {} : "skip"
-  )
+  // ── Invitation hooks ───────────────────────────────────────────────────────
+  const myInvitations = useQuery(api.invitations.getMyInvitations, isPendingInvitation ? {} : "skip")
   const acceptInvitationMutation = useMutation(api.invitations.acceptInvitation)
   const rejectInvitationMutation = useMutation(api.invitations.rejectInvitation)
-  const [respondingState, setRespondingState] = useState<'idle' | 'accepting' | 'rejecting'>('idle')
-  const [respondError, setRespondError] = useState<string | null>(null)
 
-  // Match the notification's relatedId (the idea id) to a pending invitation.
   const matchedInvitation = isPendingInvitation && Array.isArray(myInvitations)
     ? myInvitations.find((inv: any) => inv.ideaId === notification.relatedId)
     : null
 
-  const handleAccept = async (e: React.MouseEvent) => {
+  // ── Contribution-request hooks ─────────────────────────────────────────────
+  const incomingRequests = useQuery(api.contributionRequests.getIncomingRequests, isPendingContrib ? {} : "skip")
+  const updateRequestStatus = useMutation(api.contributionRequests.updateRequestStatus)
+
+  const matchedContribRequest = isPendingContrib && Array.isArray(incomingRequests)
+    ? incomingRequests.find((r: any) => r.ideaId === notification.relatedId && r.status === 'pending')
+    : null
+
+  // ── Shared respond state ───────────────────────────────────────────────────
+  const [respondingState, setRespondingState] = useState<'idle' | 'accepting' | 'rejecting'>('idle')
+  const [respondError, setRespondError] = useState<string | null>(null)
+
+  const handleInvitationAccept = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!matchedInvitation || respondingState !== 'idle') return
     setRespondingState('accepting')
-    setRespondError(null)
     try {
       await acceptInvitationMutation({ invitationId: matchedInvitation._id })
       onMarkAsRead(notification._id)
       onDismiss(notification._id)
     } catch (err) {
-      setRespondError(err instanceof Error ? err.message : 'Failed to accept invitation')
+      setRespondError(err instanceof Error ? err.message : 'Failed')
       setRespondingState('idle')
     }
   }
 
-  const handleReject = async (e: React.MouseEvent) => {
+  const handleInvitationReject = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!matchedInvitation || respondingState !== 'idle') return
     setRespondingState('rejecting')
-    setRespondError(null)
     try {
       await rejectInvitationMutation({ invitationId: matchedInvitation._id })
       onMarkAsRead(notification._id)
       onDismiss(notification._id)
     } catch (err) {
-      setRespondError(err instanceof Error ? err.message : 'Failed to decline invitation')
+      setRespondError(err instanceof Error ? err.message : 'Failed')
+      setRespondingState('idle')
+    }
+  }
+
+  const handleContribAccept = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!matchedContribRequest || respondingState !== 'idle') return
+    setRespondingState('accepting')
+    try {
+      await updateRequestStatus({ requestId: matchedContribRequest._id, status: 'accepted' })
+      onMarkAsRead(notification._id)
+      onDismiss(notification._id)
+    } catch (err) {
+      setRespondError(err instanceof Error ? err.message : 'Failed')
+      setRespondingState('idle')
+    }
+  }
+
+  const handleContribReject = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!matchedContribRequest || respondingState !== 'idle') return
+    setRespondingState('rejecting')
+    try {
+      await updateRequestStatus({ requestId: matchedContribRequest._id, status: 'rejected' })
+      onMarkAsRead(notification._id)
+      onDismiss(notification._id)
+    } catch (err) {
+      setRespondError(err instanceof Error ? err.message : 'Failed')
       setRespondingState('idle')
     }
   }
 
   const handleClick = async () => {
-    if (!notification.isRead) {
-      onMarkAsRead(notification._id)
-    }
-    // Pending invitations stay on this page so the inline ✓/✗ buttons can do
-    // their job. For everything else, drill into the idea or sender profile.
-    if (isPendingInvitation) return
-    if (notification.relatedId) {
-      // Anything tied to an idea — sparks, comments, contribution requests
-      // (received/accepted/rejected) and invitation responses — drills into
-      // that idea's page.
-      const ideaTypes = [
-        'new_idea',
-        'spark_received',
-        'comment_received',
-        'contribution_request_received',
-        'contribution_request_accepted',
-        'contribution_request_rejected',
-        'invitation_accepted',
-        'invitation_rejected',
-      ];
-      if (ideaTypes.includes(notification.type)) {
-        window.location.href = `/idea/${notification.relatedId}`
-      } else if (notification.type === 'badge_awarded') {
-        const username = notification.sender?.username;
-        if (username) window.location.href = `/profile/${username}`;
-      }
+    if (!notification.isRead) onMarkAsRead(notification._id)
+    if (hasActionButtons) return
+    if (!notification.relatedId) return
+    const ideaTypes = ['new_idea','spark_received','comment_received','contribution_request_received','contribution_request_accepted','contribution_request_rejected','invitation_accepted','invitation_rejected']
+    if (ideaTypes.includes(notification.type)) {
+      window.location.href = `/idea/${notification.relatedId}`
+    } else if (notification.type === 'badge_awarded') {
+      const username = notification.sender?.username
+      if (username) window.location.href = `/profile/${username}`
     }
   }
 
   return (
     <div
-      className={`p-3 sm:p-4 ${isPendingInvitation ? '' : 'cursor-pointer'} hover:bg-muted/50 transition-colors w-full relative group ${!notification.isRead ? 'bg-blue-50/50 dark:bg-blue-950/10' : ''
-        }`}
+      className={`px-3 py-2 ${hasActionButtons ? '' : 'cursor-pointer'} hover:bg-muted/50 transition-colors w-full relative ${!notification.isRead ? 'bg-blue-50/50 dark:bg-blue-950/10' : ''}`}
       onClick={handleClick}
     >
-      <div className="flex items-start gap-3 w-full">
+      {/* Unread left bar */}
+      {!notification.isRead && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500" />}
+
+      <div className="flex items-start gap-2 w-full">
+        {/* Avatar + type icon */}
         <div className="relative shrink-0 mt-0.5">
-          <Avatar className="h-9 w-9 border border-border/50">
+          <Avatar className="h-7 w-7 border border-border/50">
             <AvatarImage src={notification.sender?.avatar} />
-            <AvatarFallback className="text-xs">
+            <AvatarFallback className="text-[10px]">
               {notification.sender?.name?.charAt(0).toUpperCase() || 'U'}
             </AvatarFallback>
           </Avatar>
-          <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5 shadow-sm border border-border/50">
+          <div className="absolute -bottom-0.5 -right-0.5 bg-background rounded-full p-0.5 shadow-sm border border-border/40">
             {getNotificationIcon(notification.type)}
           </div>
         </div>
 
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm text-foreground leading-snug">
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {/* Row 1: message text + top-right controls */}
+          <div className="flex items-start gap-1.5">
+            <p className="text-xs text-foreground leading-snug flex-1 min-w-0">
               <span className="font-semibold">{notification.sender?.name || 'Someone'}</span>{' '}
               <span className="text-muted-foreground">
-                {notification.message.replace(notification.sender?.name || '', '').trim()}
+                {cleanMessage(notification.message, notification.sender?.name || '')}
               </span>
             </p>
-            <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap mt-0.5">
-              {formatRelativeTime(notification.createdAt)}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-2">
-            {isPendingInvitation && matchedInvitation ? (
-              // Inline accept / reject — replaces the "invitation received" badge
-              // and the previous browser-confirm flow. Tick = green, cross = red.
-              <div className="flex items-center gap-1.5">
-                <Button
+            {/* Contribution requests: ✓ and ✗ replace the dismiss × */}
+            {isPendingContrib && matchedContribRequest ? (
+              <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                <button
                   type="button"
-                  size="sm"
-                  onClick={handleAccept}
+                  onClick={handleContribAccept}
                   disabled={respondingState !== 'idle'}
-                  aria-label="Accept invitation"
+                  aria-label="Accept"
                   title="Accept"
-                  className="h-7 px-2.5 gap-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30"
+                  className="h-5 w-5 flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
                 >
                   {respondingState === 'accepting'
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <Check className="h-3.5 w-3.5" />}
-                  <span className="text-xs">Accept</span>
-                </Button>
-                <Button
+                    ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    : <Check className="h-2.5 w-2.5" />}
+                </button>
+                <button
                   type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleReject}
+                  onClick={(e) => { handleContribReject(e); onDismiss(notification._id) }}
                   disabled={respondingState !== 'idle'}
-                  aria-label="Decline invitation"
-                  title="Decline"
-                  className="h-7 px-2.5 gap-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/25"
+                  aria-label="Reject"
+                  title="Reject"
+                  className="h-5 w-5 flex items-center justify-center rounded bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 transition-colors"
                 >
                   {respondingState === 'rejecting'
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <X className="h-3.5 w-3.5" />}
-                  <span className="text-xs">Decline</span>
-                </Button>
+                    ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    : <X className="h-2.5 w-2.5" />}
+                </button>
               </div>
             ) : (
-              <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-5 font-normal ${getNotificationBadgeColor(notification.type)}`}>
-                {notification.type.replace(/_/g, ' ')}
-              </Badge>
-            )}
-
-            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              {!notification.isRead && (
-                <div className="w-2 h-2 bg-blue-500 rounded-full" title="Unread" />
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDismiss(notification._id)
-                }}
+              /* All other notifications: standard dismiss × */
+              <button
+                className="shrink-0 flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors mt-0.5"
+                onClick={(e) => { e.stopPropagation(); onDismiss(notification._id) }}
+                aria-label="Dismiss"
               >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
           </div>
 
-          {respondError && (
-            <p className="text-[11px] text-red-400 mt-1">{respondError}</p>
+          {isPendingInvitation && matchedInvitation && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <button
+                type="button"
+                onClick={handleInvitationAccept}
+                disabled={respondingState !== 'idle'}
+                aria-label="Accept"
+                title="Accept invitation"
+                className="h-6 w-6 flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors shrink-0"
+              >
+                {respondingState === 'accepting'
+                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  : <Check className="h-3 w-3" />}
+              </button>
+              <button
+                type="button"
+                onClick={handleInvitationReject}
+                disabled={respondingState !== 'idle'}
+                aria-label="Decline"
+                title="Decline invitation"
+                className="h-6 w-6 flex items-center justify-center rounded bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 transition-colors shrink-0"
+              >
+                {respondingState === 'rejecting'
+                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  : <X className="h-3 w-3" />}
+              </button>
+            </div>
           )}
+
+          {respondError && <p className="text-[10px] text-red-400 mt-1">{respondError}</p>}
+
+          {/* Row 3: time — bottom-right */}
+          <div className="flex justify-end mt-0.5">
+            <span className="text-[10px] text-muted-foreground/60">{formatRelativeTime(notification.createdAt)}</span>
+          </div>
         </div>
       </div>
-      {!notification.isRead && (
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500" />
-      )}
     </div>
   )
 }
 
-export const NotificationList = () => {
+export const NotificationList = ({ onClose }: { onClose?: () => void }) => {
   const [activeTab, setActiveTab] = useState<"all" | "interactions" | "requests">("all")
 
   const notifications = useQuery(api.notifications.getNotifications, {
@@ -312,6 +328,11 @@ export const NotificationList = () => {
       <div className="flex flex-col h-full bg-background">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background sticky top-0 z-10">
           <h3 className="font-semibold text-sm">Notifications</h3>
+          {onClose && (
+            <button onClick={onClose} aria-label="Close notifications" className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-muted/80 text-foreground transition-colors focus:outline-none">
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
           <div className="bg-muted/50 p-4 rounded-full mb-4">
@@ -336,16 +357,23 @@ export const NotificationList = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <h3 className="font-semibold text-sm">Notifications</h3>
-        {notifications.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDismissAll()}
-            className="h-7 text-xs text-muted-foreground hover:text-red-600 hover:bg-red-50 px-2"
-          >
-            Clear all
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {notifications.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDismissAll()}
+              className="h-6 text-[11px] text-muted-foreground hover:text-red-600 hover:bg-red-50 px-1.5"
+            >
+              Clear
+            </Button>
+          )}
+          {onClose && (
+            <button onClick={onClose} aria-label="Close notifications" className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-muted/80 text-foreground transition-colors focus:outline-none">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

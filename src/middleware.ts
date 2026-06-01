@@ -31,6 +31,14 @@ const PROFILE_COMPLETE_COOKIE = 'vq_profile_complete'
 const CACHE_TTL_SECONDS = 300 // 5 minutes
 
 export default clerkMiddleware(async (auth, req) => {
+  // Redirect authenticated users away from the landing page to the feed
+  if (req.nextUrl.pathname === '/') {
+    const { userId } = await auth()
+    if (userId) {
+      return NextResponse.redirect(new URL('/feed', req.url))
+    }
+  }
+
   if (!isPublicRoute(req)) {
     await auth.protect()
 

@@ -6,47 +6,12 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { skillCardOptions } from "@/lib/options";
+import { skillCardGroups } from "@/lib/options";
 
 export interface SkillOption {
   value: string;
   label: string;
 }
-
-// Group skills for better organization
-const groupSkills = (skills: SkillOption[]) => {
-  const groups: { [key: string]: SkillOption[] } = {};
-
-  skills.forEach(skill => {
-    // Categorize skills based on their content
-    let group = "Other";
-
-    if (skill.label.includes("Engineering") || skill.label.includes("Mathematics") || skill.label.includes("Architecture")) {
-      group = "Engineering & Technical";
-    } else if (skill.label.includes("Physics") || skill.label.includes("Chemistry") || skill.label.includes("Biology") || skill.label.includes("Science")) {
-      group = "Sciences";
-    } else if (skill.label.includes("Arts") || skill.label.includes("Painting") || skill.label.includes("Photography") || skill.label.includes("Music") || skill.label.includes("Film") || skill.label.includes("Fashion") || skill.label.includes("Designer") || skill.label.includes("Animator")) {
-      group = "Arts & Design";
-    } else if (skill.label.includes("Finance") || skill.label.includes("Management") || skill.label.includes("Law") || skill.label.includes("Consultancy") || skill.label.includes("Accountancy") || skill.label.includes("Entrepreneurs")) {
-      group = "Business & Services";
-    } else if (skill.label.includes("Healthcare") || skill.label.includes("Medicine") || skill.label.includes("Psychology")) {
-      group = "Healthcare & Social";
-    } else if (skill.label.includes("Services") || skill.label.includes("Hospitality") || skill.label.includes("Training") || skill.label.includes("Research")) {
-      group = "Professional Services";
-    } else if (skill.label.includes("Sociology") || skill.label.includes("Journalism") || skill.label.includes("History") || skill.label.includes("Geography") || skill.label.includes("Economics") || skill.label.includes("Philosophy")) {
-      group = "Social Sciences";
-    }
-
-    if (!groups[group]) {
-      groups[group] = [];
-    }
-    groups[group].push(skill);
-  });
-
-  return Object.entries(groups).map(([group, items]) => ({ group, items }));
-};
-
-const SKILL_GROUPS = groupSkills(skillCardOptions);
 
 interface SkillsMultiSelectProps {
   selectedSkills: string[];
@@ -68,23 +33,19 @@ export function SkillsMultiSelect({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  const filteredSkills = useMemo(() => {
-    if (!searchValue) return SKILL_GROUPS;
-
-    return SKILL_GROUPS.map(group => ({
-      ...group,
-      items: group.items.filter(item =>
-        item.label.toLowerCase().includes(searchValue.toLowerCase()) ||
-        item.value.toLowerCase().includes(searchValue.toLowerCase())
-      ),
-    })).filter(group => group.items.length > 0);
+  const filteredGroups = useMemo(() => {
+    if (!searchValue) return skillCardGroups;
+    const q = searchValue.toLowerCase();
+    return skillCardGroups
+      .map(g => ({ ...g, items: g.items.filter(item => item.label.toLowerCase().includes(q)) }))
+      .filter(g => g.items.length > 0);
   }, [searchValue]);
 
   const handleSelect = (value: string) => {
     const newSelected = selectedSkills.includes(value)
       ? mandatorySkills.includes(value)
-        ? selectedSkills // Cannot remove mandatory skills
-        : selectedSkills.filter(skill => skill !== value)
+        ? selectedSkills
+        : selectedSkills.filter(s => s !== value)
       : maxSelection && selectedSkills.length >= maxSelection
         ? selectedSkills
         : [...selectedSkills, value];
@@ -124,8 +85,8 @@ export function SkillsMultiSelect({
             />
             <CommandList className="flex-1 overflow-y-auto max-h-none">
               <CommandEmpty>No skills found.</CommandEmpty>
-              {filteredSkills.map(group => (
-                <CommandGroup key={group.group} heading={group.group} className="hidden md:block">
+              {filteredGroups.map(group => (
+                <CommandGroup key={group.group} heading={group.group}>
                   {group.items.map(item => (
                     <CommandItem
                       key={item.value}
@@ -144,30 +105,6 @@ export function SkillsMultiSelect({
                   ))}
                 </CommandGroup>
               ))}
-              {/* Mobile view with collapsed groups */}
-              <div className="md:hidden">
-                <CommandGroup>
-                  <div className="px-1 py-2 text-sm font-semibold text-muted-foreground">All Skills</div>
-                  {filteredSkills.flatMap(group =>
-                    group.items.map(item => (
-                      <CommandItem
-                        key={item.value}
-                        value={item.value}
-                        onSelect={() => handleSelect(item.value)}
-                        className="cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSkills.includes(item.value)}
-                          className="mr-2"
-                          readOnly
-                        />
-                        {item.label}
-                      </CommandItem>
-                    ))
-                  )}
-                </CommandGroup>
-              </div>
             </CommandList>
           </Command>
         </PopoverContent>
@@ -176,27 +113,22 @@ export function SkillsMultiSelect({
       {/* Selected Skills Badges */}
       {!hideBadges && selectedSkills.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-1 transition-all duration-300">
-          {selectedSkills.map((skill) => {
-            return (
-              <Badge
-                key={skill}
-                variant="outline"
-                className="pl-2.5 pr-1.5 py-0.5 flex items-center gap-1 text-[11px] font-medium bg-purple-500/10 border-purple-500/30 text-purple-300 rounded-lg hover:bg-purple-500/15 transition-all duration-200 animate-in fade-in zoom-in-95 duration-150"
+          {selectedSkills.map((skill) => (
+            <Badge
+              key={skill}
+              variant="outline"
+              className="pl-2.5 pr-1.5 py-0.5 flex items-center gap-1 text-[11px] font-medium bg-blue-500/10 border-blue-500/20 text-blue-600 rounded-lg hover:bg-blue-500/15 transition-all duration-200 animate-in fade-in zoom-in-95 duration-150"
+            >
+              {skill}
+              <button
+                onClick={(e) => { e.preventDefault(); handleSelect(skill); }}
+                className="ml-1 shrink-0 hover:bg-red-500/20 text-blue-600/60 hover:text-red-400 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer"
               >
-                {skill}
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleSelect(skill);
-                  }}
-                  className="ml-1 shrink-0 hover:bg-red-500/20 text-purple-300/60 hover:text-red-400 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer"
-                >
-                  <X className="h-3 w-3 pointer-events-none" />
-                  <span className="sr-only">Remove {skill}</span>
-                </button>
-              </Badge>
-            );
-          })}
+                <X className="h-3 w-3 pointer-events-none" />
+                <span className="sr-only">Remove {skill}</span>
+              </button>
+            </Badge>
+          ))}
         </div>
       )}
     </div>

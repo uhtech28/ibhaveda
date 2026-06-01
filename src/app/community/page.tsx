@@ -16,8 +16,10 @@ import FooterSection from "@/components/footer";
 import { InvitationButton } from "@/components/requests/invitation-button";
 import { useChat } from "@/components/chat/ChatContext";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
+import { ProfileStatsDialog } from "@/components/user/ProfileStatsDialog";
 
 import { UserProfile } from "../../../convex/users";
+import { Id } from "../../../convex/_generated/dataModel";
 
 // Error Boundary to prevent leaderboard failures from crashing the page
 class LeaderboardErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -203,10 +205,11 @@ const RANK_STYLES = {
 const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user, rank }) => {
   const styles = RANK_STYLES[rank];
   const isFirst = rank === 1;
+  const heightClass = rank === 1 ? "md:min-h-[300px]" : rank === 2 ? "md:min-h-[240px]" : "md:min-h-[210px]";
 
   return (
     <Card
-      className={`relative overflow-hidden border-2 ${styles.border} ${styles.bg} shadow-lg flex flex-col items-center text-center transition-transform duration-300 hover:scale-[1.03] ${
+      className={`relative overflow-hidden border-2 ${styles.border} ${styles.bg} ${heightClass} shadow-lg flex flex-col items-center justify-center text-center transition-transform duration-300 hover:scale-[1.03] ${
         isFirst ? "p-6 md:p-8" : "p-4 md:p-5"
       }`}
     >
@@ -221,11 +224,6 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
       >
         #{rank}
       </div>
-
-      {/* Crown for 1st place */}
-      {isFirst && (
-        <Trophy className="absolute top-3 right-3 w-5 h-5 text-yellow-500" aria-hidden="true" />
-      )}
 
       <Link
         href={`/profile/${encodeURIComponent(user.username)}`}
@@ -266,7 +264,7 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
             {user.points}
           </span>
           <span className={`text-muted-foreground font-medium uppercase tracking-wider ${isFirst ? "text-xs" : "text-[10px]"}`}>
-            Points
+            XP
           </span>
         </div>
       </Link>
@@ -302,17 +300,17 @@ const WeeklyLeaderboard = () => {
        * the left, rank 1 elevated in the center, rank 3 on the right. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
         {/* Rank 1 — first in DOM (top on mobile), centered + elevated on desktop */}
-        <div className="md:order-2 md:-translate-y-2">
+        <div className="md:order-2">
           {first && <PodiumCard user={first} rank={1} />}
         </div>
 
         {/* Rank 2 — second in DOM, left column on desktop */}
-        <div className="md:order-1 md:pb-0 md:translate-y-2">
+        <div className="md:order-1">
           {second ? <PodiumCard user={second} rank={2} /> : <div className="hidden md:block" />}
         </div>
 
         {/* Rank 3 — third in DOM, right column on desktop */}
-        <div className="md:order-3 md:translate-y-2">
+        <div className="md:order-3">
           {third ? <PodiumCard user={third} rank={3} /> : <div className="hidden md:block" />}
         </div>
       </div>
@@ -330,6 +328,8 @@ interface UserCardProps {
 const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) => {
   const isCurrentUser = currentUserId === user.clerkId;
   const { openChatWithUser } = useChat();
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [dialogType, setDialogType] = React.useState<"created" | "sparked" | "contributed">("created");
 
   const handleMessageClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -337,15 +337,28 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
     openChatWithUser(user._id);
   };
 
+  const openStatsDialog = (type: "created" | "sparked" | "contributed") => {
+    setDialogType(type);
+    setDialogOpen(true);
+  };
+
+  const profileHref = `/profile/${encodeURIComponent(user.username)}`;
+  const industries = user.industries && user.industries.length > 0
+    ? user.industries
+    : user.industry
+      ? user.industry.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+  const visibleIndustries = industries.slice(0, 1);
+  const hiddenIndustryCount = Math.max(0, industries.length - visibleIndustries.length);
+  const visibleSkills = user.skills.slice(0, 2);
+  const hiddenSkillCount = Math.max(0, user.skills.length - visibleSkills.length);
+
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 flex flex-col h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
-      <Link
-        href={`/profile/${encodeURIComponent(user.username)}`}
-        className="flex-1 flex flex-col"
-      >
-        <div className="p-3 flex-1 flex flex-col">
+    <Card className="group hover:shadow-lg transition-all duration-300 flex flex-col min-h-[192px] h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+      <div className="px-4 pb-0.5 pt-2 flex flex-col">
+        <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-1.5">
             <Avatar className="w-8 h-8 border-2 border-background shadow-sm shrink-0">
               <AvatarImage src={user.avatar} alt={user.displayName} className="object-cover" />
               <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
@@ -364,57 +377,88 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
           {/* Bio - Hidden if empty to save space, else truncated more aggressively */}
           {user.bio && (
-            <p className="text-[10px] text-muted-foreground mb-2 line-clamp-1 leading-relaxed">
+            <p className="text-[10px] text-muted-foreground mb-1.5 line-clamp-1 leading-relaxed">
               {user.bio}
             </p>
           )}
+        </Link>
 
           {/* Tags Section */}
-          <div className="flex flex-col gap-1.5 mb-2 mt-auto">
-            {/* Ind + Skills mixed or stacked compactly */}
-            <div className="flex flex-wrap gap-1 items-center">
-              {/* Industry */}
-              {user.industry && user.industry.split(',').map(s => s.trim()).slice(0, 1).map((ind, i) => (
-                <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 border border-purple-500/20 truncate max-w-[80px]">
+          <div className="flex flex-col gap-1.5 mb-2">
+            {visibleIndustries.length > 0 && (
+              <div className="flex flex-wrap gap-1 items-center">
+                {visibleIndustries.map((ind, i) => (
+                  <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 border border-purple-500/20 truncate max-w-[96px]">
                   {ind}
                 </span>
-              ))}
+                ))}
+                {hiddenIndustryCount > 0 && (
+                  <Link
+                    href={profileHref}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground border border-border/60 hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    +{hiddenIndustryCount} more
+                  </Link>
+                )}
+              </div>
+            )}
 
-              {/* Skills */}
-              {user.skills.slice(0, 2).map((skill, i) => (
-                <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 truncate max-w-[80px]">
+            {visibleSkills.length > 0 && (
+              <div className="flex flex-wrap gap-1 items-center">
+                {visibleSkills.map((skill, i) => (
+                  <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 truncate max-w-[96px]">
                   {skill}
                 </span>
-              ))}
-              {(user.skills.length + (user.industry ? user.industry.split(',').length : 0)) > 3 && (
-                <span className="text-[9px] px-1 py-0.5 text-muted-foreground">
-                  +{(user.skills.length + (user.industry ? user.industry.split(',').length : 0)) - 3}
-                </span>
-              )}
-            </div>
+                ))}
+                {hiddenSkillCount > 0 && (
+                  <Link
+                    href={profileHref}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground border border-border/60 hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    +{hiddenSkillCount} more
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-1 py-1.5 border-t border-b border-border/40 mb-1">
-            <div className="flex flex-col items-center justify-center text-center">
+          <div className="grid grid-cols-3 gap-1 py-1 border-t border-b border-border/40">
+            <button
+              type="button"
+              onClick={() => openStatsDialog("created")}
+              className="flex flex-col items-center justify-center text-center rounded-md py-1 transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label={`${user.displayName} created ideas`}
+            >
               <Lightbulb className="w-3 h-3 text-primary mb-0.5" />
               <span className="text-[9px] font-bold leading-none">{user.ideasCreated || 0}</span>
-            </div>
-            <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
+            </button>
+            <button
+              type="button"
+              onClick={() => openStatsDialog("sparked")}
+              className="flex flex-col items-center justify-center text-center border-l border-border/40 rounded-md py-1 transition-colors hover:bg-orange-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+              aria-label={`${user.displayName} sparked ideas`}
+            >
               <Sparkles className="w-3 h-3 text-orange-500 mb-0.5" />
               <span className="text-[9px] font-bold leading-none">{user.ideasSparked || 0}</span>
-            </div>
-            <div className="flex flex-col items-center justify-center text-center border-l border-border/40">
+            </button>
+            <button
+              type="button"
+              onClick={() => openStatsDialog("contributed")}
+              className="flex flex-col items-center justify-center text-center border-l border-border/40 rounded-md py-1 transition-colors hover:bg-green-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
+              aria-label={`${user.displayName} contributed ideas`}
+            >
               <Users className="w-3 h-3 text-green-500 mb-0.5" />
               <span className="text-[9px] font-bold leading-none">{user.ideasContributed || 0}</span>
-            </div>
+            </button>
           </div>
-        </div>
-      </Link>
+      </div>
 
       {/* Footer Actions */}
       {!isCurrentUser && currentUserId && (
-        <div className="px-3 pb-3 pt-0 flex items-center gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="px-3 pb-1 pt-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1">
             <InvitationButton
               targetUser={{
@@ -435,6 +479,13 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
           </Button>
         </div>
       )}
+
+      <ProfileStatsDialog
+        userId={user._id as Id<"users">}
+        type={dialogOpen ? dialogType : null}
+        isOpen={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </Card>
   );
 };

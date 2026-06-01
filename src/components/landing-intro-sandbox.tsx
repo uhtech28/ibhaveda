@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Crown, Flame, Gem, Hammer, Pickaxe, Ship, Swords, Trees } from "lucide-react";
 
 const TOTAL_RUNTIME_MS = 24950;
@@ -85,74 +85,127 @@ export default function LandingIntroSandbox({
     return () => window.clearTimeout(id);
   }, [onComplete, stage]);
 
+  // Ref attached to the overlay div so we can add native listeners directly
+  const overlayRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let context: AudioContext | null = null;
-    let stopped = false;
-    let started = false;
-
-    // 59-note composition (~24.8s at 0.42s/note) — one continuous piece, no looping.
-    // Structured to match the intro's emotional arc:
-    //   P1 opening hook → P2 logo reveal → P3 product build →
-    //   P4 boss gate (dark) → P5 village (hopeful) → P6-7 stage run (triumphant) → P8 cadence
-    const notes = [
-      392, 392, 392, 311.13, 349.23, 349.23, 349.23, 293.66,       // P1 opening motif
-      293.66, 293.66, 349.23, 392, 392, 466.16, 392, 349.23,        // P2 logo reveal
-      349.23, 392, 466.16, 466.16, 523.25, 466.16, 392, 349.23,     // P3 product / energy build
-      523.25, 523.25, 466.16, 392, 311.13, 293.66, 196.00, 293.66,  // P4 boss gate — drops low
-      293.66, 349.23, 392, 466.16, 523.25, 466.16, 523.25, 466.16,  // P5 village — hopeful ascent
-      392, 466.16, 523.25, 587.33, 523.25, 466.16, 523.25, 587.33,  // P6 stage run A — triumphant
-      587.33, 523.25, 466.16, 392, 466.16, 392, 349.23, 293.66,     // P7 stage run B — sweeping
-      293.66, 349.23, 392,                                            // P8 final cadence
+    // Beethoven's 5th Symphony — 8-bit arrangement, ~25s
+    // {f: Hz, d: seconds} — f=0 is a rest
+    const notes: Array<{ f: number; d: number }> = [
+      // A — Opening "da-da-da-DUM" motif ×2
+      { f: 392, d: 0.20 }, { f: 392, d: 0.20 }, { f: 392, d: 0.20 }, { f: 311, d: 0.90 }, { f: 0, d: 0.15 },
+      { f: 349, d: 0.20 }, { f: 349, d: 0.20 }, { f: 349, d: 0.20 }, { f: 294, d: 0.90 }, { f: 0, d: 0.15 },
+      // B — Echo motif, lower ×2
+      { f: 311, d: 0.20 }, { f: 311, d: 0.20 }, { f: 311, d: 0.20 }, { f: 262, d: 0.90 }, { f: 0, d: 0.15 },
+      { f: 294, d: 0.20 }, { f: 294, d: 0.20 }, { f: 294, d: 0.20 }, { f: 247, d: 0.90 }, { f: 0, d: 0.15 },
+      // C — Ascending scale run
+      { f: 262, d: 0.20 }, { f: 294, d: 0.20 }, { f: 311, d: 0.20 }, { f: 349, d: 0.20 },
+      { f: 392, d: 0.20 }, { f: 415, d: 0.20 }, { f: 466, d: 0.20 }, { f: 523, d: 0.40 },
+      // D — Descending development
+      { f: 466, d: 0.20 }, { f: 415, d: 0.20 }, { f: 392, d: 0.20 }, { f: 349, d: 0.20 },
+      { f: 311, d: 0.20 }, { f: 294, d: 0.20 }, { f: 262, d: 0.60 },
+      // E — Lyrical interlude
+      { f: 523, d: 0.80 }, { f: 466, d: 0.40 }, { f: 415, d: 0.80 },
+      { f: 392, d: 0.80 }, { f: 349, d: 0.40 }, { f: 311, d: 0.80 },
+      { f: 294, d: 0.40 }, { f: 311, d: 0.40 }, { f: 349, d: 0.40 }, { f: 392, d: 0.80 },
+      // F — Motif returns, high register ×2
+      { f: 784, d: 0.20 }, { f: 784, d: 0.20 }, { f: 784, d: 0.20 }, { f: 622, d: 0.90 }, { f: 0, d: 0.15 },
+      { f: 698, d: 0.20 }, { f: 698, d: 0.20 }, { f: 698, d: 0.20 }, { f: 587, d: 0.90 }, { f: 0, d: 0.15 },
+      // G — Triumphant finale run
+      { f: 523, d: 0.20 }, { f: 622, d: 0.20 }, { f: 784, d: 0.20 }, { f: 622, d: 0.20 }, { f: 523, d: 0.20 }, { f: 392, d: 0.60 },
+      { f: 349, d: 0.20 }, { f: 415, d: 0.20 }, { f: 523, d: 0.20 }, { f: 415, d: 0.20 }, { f: 349, d: 0.20 }, { f: 294, d: 0.60 },
+      // H — Final cadence
+      { f: 311, d: 0.40 }, { f: 294, d: 0.40 }, { f: 262, d: 1.50 },
     ];
-    const NOTE_INTERVAL = 0.42;
 
-    const startAudio = async () => {
-      if (stopped || started) return;
-      const AudioCtor =
-        window.AudioContext ||
-        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtor) return;
-      context ??= new AudioCtor();
-      await context.resume().catch(() => undefined);
-      if (context.state !== "running") return;
-      started = true;
+    const AC: typeof AudioContext =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
 
-      const masterGain = context.createGain();
-      const startTime = context.currentTime + 0.1;
-      const endTime = startTime + TOTAL_RUNTIME_MS / 1000;
-      masterGain.gain.setValueAtTime(0.035, startTime);
-      masterGain.gain.setValueAtTime(0.035, endTime - 1.5);
-      masterGain.gain.linearRampToValueAtTime(0.001, endTime - 0.1);
-      masterGain.connect(context.destination);
+    let ctx: AudioContext | null = null;
+    let done = false;
 
-      notes.forEach((frequency, index) => {
-        const start = startTime + index * NOTE_INTERVAL;
-        if (start >= endTime) return;
-        const oscillator = context!.createOscillator();
-        const noteGain = context!.createGain();
-        oscillator.type = "triangle";
-        oscillator.frequency.setValueAtTime(frequency, start);
-        noteGain.gain.setValueAtTime(0, start);
-        noteGain.gain.linearRampToValueAtTime(0.8, start + 0.03);
-        noteGain.gain.exponentialRampToValueAtTime(0.001, start + 0.36);
-        oscillator.connect(noteGain);
-        noteGain.connect(masterGain);
-        oscillator.start(start);
-        oscillator.stop(start + 0.38);
-      });
+    const play = (audioCtx: AudioContext) => {
+      const masterGain = audioCtx.createGain();
+      const t0 = audioCtx.currentTime + 0.05;
+      const tEnd = t0 + TOTAL_RUNTIME_MS / 1000;
+      masterGain.gain.setValueAtTime(0.022, t0);
+      masterGain.gain.setValueAtTime(0.022, tEnd - 1.5);
+      masterGain.gain.linearRampToValueAtTime(0.001, tEnd - 0.1);
+      masterGain.connect(audioCtx.destination);
+
+      let t = t0;
+      for (const { f, d } of notes) {
+        if (f > 0 && t < tEnd) {
+          const osc = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          osc.type = "square";
+          osc.frequency.setValueAtTime(f, t);
+          const atk = Math.min(0.025, d * 0.12);
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.75, t + atk);
+          g.gain.exponentialRampToValueAtTime(0.001, t + Math.max(d - 0.03, d * 0.88));
+          osc.connect(g);
+          g.connect(masterGain);
+          osc.start(t);
+          osc.stop(t + d);
+        }
+        t += d;
+      }
     };
 
-    startAudio();
-    window.addEventListener("pointerdown", startAudio, { once: true });
-    window.addEventListener("keydown", startAudio, { once: true });
+    const unlock = () => {
+      if (done) return;
+      done = true;
+
+      try {
+        ctx = new AC();
+
+        // iOS requires a silent buffer played synchronously inside the gesture
+        // to unfreeze currentTime. We then wait 50ms (via setTimeout) before
+        // scheduling real notes — by then the clock is reliably ticking.
+        const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+
+        // resume() in case context started suspended (Chrome autoplay policy)
+        ctx.resume().catch(() => undefined);
+
+        setTimeout(() => {
+          if (ctx && ctx.state !== "closed") play(ctx);
+        }, 50);
+      } catch { /* not available */ }
+    };
+
+    // Attach native listeners directly to the overlay DOM element.
+    // React synthetic events go through a delegated root listener which iOS
+    // may not treat as a valid AudioContext gesture. Native listeners on the
+    // actual target element are unambiguously within the gesture context.
+    // We listen for both touchend (finger-up) and touchstart (finger-down)
+    // so whichever fires first wins; the `done` flag prevents double-running.
+    const el = overlayRef.current;
+    if (el) {
+      el.addEventListener("touchend",   unlock, { once: true });
+      el.addEventListener("touchstart", unlock, { once: true, passive: true });
+    }
+    // Desktop fallback
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown",     unlock, { once: true });
 
     return () => {
-      stopped = true;
-      window.removeEventListener("pointerdown", startAudio);
-      window.removeEventListener("keydown", startAudio);
-      context?.close().catch(() => undefined);
+      done = true;
+      if (el) {
+        el.removeEventListener("touchend",   unlock);
+        el.removeEventListener("touchstart", unlock);
+      }
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown",     unlock);
+      ctx?.close().catch(() => undefined);
     };
   }, []);
 
@@ -163,13 +216,11 @@ export default function LandingIntroSandbox({
 
   return (
     <div
+      ref={overlayRef}
       role="dialog"
       aria-label={ariaLabel}
       className="fixed inset-0 z-[9999] overflow-hidden bg-[#070A0F] text-white"
-      style={{
-        opacity: closing ? 0 : 1,
-        transition: "opacity 700ms ease",
-      }}
+      style={{ opacity: closing ? 0 : 1, transition: "opacity 700ms ease" }}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(247,214,109,0.12),transparent_26%),radial-gradient(circle_at_74%_78%,rgba(124,58,237,0.15),transparent_34%),linear-gradient(180deg,#070A0F_0%,#0A0D12_58%,#05070B_100%)]" />
       <PixelField />

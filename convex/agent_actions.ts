@@ -1,10 +1,10 @@
 "use node";
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
-import { POOL_SIZE } from "./agent";
+import { AGENT_POOL, POOL_SIZE } from "./agent";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -89,22 +89,37 @@ function pickProvider(): "openai" | "gemini" | null {
 
 // ── Idea generation ───────────────────────────────────────────────────────────
 
-async function generateIdeaForIndustry(
-  industry: string,
+type AgentProfile = {
+  displayName: string;
+  bio: string;
+  industries: readonly string[];
+  skills: readonly string[];
+};
+
+async function generateIdeaForAgent(
+  agent: AgentProfile,
 ): Promise<{ title: string; description: string; category: string } | null> {
+  // Pick a random industry from the agent's own list so ideas stay on-profile
+  const industry = agent.industries[Math.floor(Math.random() * agent.industries.length)];
+
   const prompt = `
-You are a creative entrepreneur sharing a cool side project idea with friends.
-Generate a unique, feasible, and specific startup idea in the "${industry}" industry.
+You are ${agent.displayName} — a founder sharing a startup idea with the Interactive Ideas community.
+Your background: ${agent.bio}
+Your skills: ${agent.skills.join(", ")}
+Industry focus: ${industry}
+
+Generate a unique, feasible startup idea that genuinely fits your background and skills.
 
 TONE GUIDE:
-- Write like a real person, not a bot.
-- Be casual, engaging, and avoid corporate buzzwords.
-- Use natural language (e.g., "Think of it like...", "What if we could...").
+- Write in first person, like you just thought of this and you're excited.
+- Be specific — draw on your skills and domain experience.
+- Avoid generic buzzwords. Sound like a real founder, not a pitch deck.
+- Indian market context is relevant where it fits naturally.
 
 Return ONLY a JSON object — no markdown, no code fences:
 {
-  "title": "Short catchy title (no colons, just a name, max 60 chars)",
-  "description": "2-3 sentences max. Hook with a question or observation, then the solution.",
+  "title": "Short catchy title (no colons, max 60 chars)",
+  "description": "2-3 sentences. Hook with a problem or observation you've personally noticed, then the solution.",
   "category": "${industry}"
 }`.trim();
 
@@ -149,6 +164,7 @@ Return ONLY a JSON object — no markdown, no code fences:
   return null;
 }
 
+
 // ── Comment generation ────────────────────────────────────────────────────────
 
 async function generateComment(idea: {
@@ -187,7 +203,7 @@ Rules:
 // Entry point called by the daily cron. Picks 1-3 unique random agents,
 // posts immediately from the first, and schedules the rest at random
 // intervals throughout the day (2–9 hours apart).
-export const generateDailyIdea = action({
+export const generateDailyIdea = internalAction({
   args: {},
   handler: async (ctx) => {
     const api = internal as any;
@@ -222,7 +238,7 @@ export const generateDailyIdea = action({
 
 // Posts one idea as the given agent, then runs an engagement sweep covering
 // all real-user public ideas published since this agent's previous post.
-export const postFromAgent = action({
+export const postFromAgent = internalAction({
   args: { agentIndex: v.number() },
   handler: async (ctx, args) => {
     const api = internal as any;
@@ -239,10 +255,11 @@ export const postFromAgent = action({
       { agentIndex: args.agentIndex },
     );
 
-    const industry = INDUSTRIES[Math.floor(Math.random() * INDUSTRIES.length)];
-    console.log(`🤖 Agent[${args.agentIndex}] generating idea in: ${industry}`);
+    const agent = AGENT_POOL[args.agentIndex];
+    const industry = agent.industries[Math.floor(Math.random() * agent.industries.length)];
+    console.log(`🤖 Agent[${args.agentIndex}] (${agent.displayName}) generating idea in: ${industry}`);
 
-    const ideaData = await generateIdeaForIndustry(industry);
+    const ideaData = await generateIdeaForAgent(agent);
     if (!ideaData) {
       console.error(`❌ Agent[${args.agentIndex}] idea generation failed — skipping`);
       return;
@@ -268,7 +285,7 @@ export const postFromAgent = action({
 
 // Likes every real-user public idea posted since `since`, then generates
 // and posts a unique comment on a random ~33% of them.
-export const engageAsAgent = action({
+export const engageAsAgent = internalAction({
   args: {
     agentIndex: v.number(),
     since: v.number(),
@@ -316,7 +333,7 @@ export const engageAsAgent = action({
 
 // Accepts all pending contribution requests on agent-authored ideas.
 // Scheduled to run every 4 hours by crons.ts.
-export const acceptPendingContributions = action({
+export const acceptPendingContributions = internalAction({
   args: {},
   handler: async (ctx) => {
     const api = internal as any;
@@ -327,7 +344,7 @@ export const acceptPendingContributions = action({
 // Kept as a stub so any already-scheduled Convex runs don't error out.
 // The hourly engagement cron has been removed — engagement now happens
 // inline with each post via engageAsAgent.
-export const generateEngagement = action({
+export const generateEngagement = internalAction({
   args: {},
   handler: async () => {
     console.log("🤖 generateEngagement: superseded by per-post engagement in postFromAgent");

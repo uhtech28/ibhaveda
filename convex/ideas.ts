@@ -136,6 +136,11 @@ export const createIdea = mutation({
     }
 
 
+    // Social proof engine: schedule seeded sparks for new public root ideas
+    if (args.visibility === "public" && !args.parentId) {
+      await ctx.scheduler.runAfter(0, internal.socialProof.scheduleForNewIdea, { ideaId });
+    }
+
     // Gamification: Award XP and Coins for creating an idea
     await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
       userId: user._id,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -23,8 +23,18 @@ export default function FeedPage() {
   const { toast } = useToast();
   const { isComplete: isProfileComplete, isLoading: isProfileLoading } = useProfileCompletion();
   const currentUser = useQuery(api.users.getCurrentUser);
-  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit: 60 });
+
+  const PAGE_SIZE = 20;
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit });
   const toggleSpark = useMutation(api.ideas.toggleSpark);
+
+  // Track whether there are more ideas to load
+  const hasMore = ideasQuery !== undefined && ideasQuery.length >= limit;
+
+  function loadMore() {
+    if (hasMore) setLimit((l) => l + PAGE_SIZE);
+  }
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCommentIdea, setActiveCommentIdea] = useState<IdeaForgeIdea | null>(null);
@@ -80,6 +90,8 @@ export default function FeedPage() {
         }}
         isProfileComplete={isProfileComplete}
         onCompleteProfile={() => router.push("/profile-setup")}
+        onLoadMore={loadMore}
+        hasMore={hasMore}
       />
 
       <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
@@ -94,21 +106,11 @@ export default function FeedPage() {
           {/* Header */}
           <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
-              <MessageCircle className="h-4.5 w-4.5 text-[#C7D2FE]" />
+              <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
             </div>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="flex items-center gap-2 text-base font-semibold leading-tight text-white">
-                <span>Comments</span>
-                {activeCommentIdea && (
-                  <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-[#9CA3AF]">
-                    {activeCommentIdea.commentCount ?? 0}
-                  </span>
-                )}
-              </DialogTitle>
-              <p className="mt-0.5 truncate text-xs text-[#9CA3AF]">
-                on <span className="text-[#E5E7EB]">{activeCommentIdea?.title}</span>
-              </p>
-            </div>
+            <DialogTitle className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
+              {activeCommentIdea?.title}
+            </DialogTitle>
           </header>
 
           {/* Body — min-h-0 lets it shrink when keyboard appears */}

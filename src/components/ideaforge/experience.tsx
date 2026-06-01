@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import {
   BarChart3,
@@ -13,6 +13,7 @@ import {
   Lock,
   Map,
   Compass,
+  Loader2,
   MessageSquare,
   Pencil,
   Sparkles,
@@ -94,6 +95,8 @@ export function IdeaForgeExperience({
   onDeleteIdea,
   isProfileComplete,
   onCompleteProfile,
+  onLoadMore,
+  hasMore = false,
 }: {
   mode: "feed" | "my-ideas";
   currentUser: CurrentUserProfile | null | undefined;
@@ -108,10 +111,34 @@ export function IdeaForgeExperience({
   onDeleteIdea?: (ideaId: string) => void;
   isProfileComplete: boolean;
   onCompleteProfile: () => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }) {
   const router = useRouter();
   const userIdeas = useQuery(api.ideas.getUserIdeas) || [];
   const publicIdeas = useQuery(api.ideas.getPublicIdeas, { limit: 60 }) || [];
+
+  // Infinite scroll sentinel
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const hasMoreRef = useRef(hasMore);
+  const onLoadMoreRef = useRef(onLoadMore);
+  hasMoreRef.current = hasMore;
+  onLoadMoreRef.current = onLoadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreRef.current) {
+          onLoadMoreRef.current?.();
+        }
+      },
+      { threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
   
   // Real backend signals for the Analytics tab (Co-dev change)
   const wallet = useQuery(api.gamification.getWallet);
@@ -354,6 +381,17 @@ export function IdeaForgeExperience({
                   </div>
                 );
               })()}
+              {/* Infinite scroll — sentinel triggers next page; spinner shows while loading */}
+              {mode === "feed" && (
+                <>
+                  <div ref={sentinelRef} className="h-4" />
+                  {hasMore && (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-[#6366F1]" />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </section>
 

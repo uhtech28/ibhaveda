@@ -196,19 +196,18 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                   </div>
 
                   <div className="pt-1.5 space-y-2">
-                    {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
+                    {((profile.industries && profile.industries.length > 0) || profile.industry || (profile.skills && profile.skills.length > 0)) && (
                       <div className="flex flex-wrap gap-1.5">
-                        {profile.industry && (
-                          <Badge variant="secondary" className="rounded-md px-2 py-0 text-[10px] font-medium h-5">
-                            {profile.industry}
+                        {(profile.industries && profile.industries.length > 0
+                          ? profile.industries
+                          : profile.industry ? [profile.industry] : []
+                        ).map((ind: string, index: number) => (
+                          <Badge key={index} variant="outline" className="rounded-md px-2 py-0 text-[10px] font-medium h-5 bg-purple-500/10 text-purple-600 border border-purple-500/20">
+                            {ind}
                           </Badge>
-                        )}
+                        ))}
                         {profile.skills && profile.skills.slice(0, 5).map((skill, index) => (
-                          <Badge
-                            key={index}
-                            variant="outline"
-                            className="rounded-md px-2 py-0 text-[10px] font-normal bg-background/50 h-5"
-                          >
+                          <Badge key={index} variant="outline" className="rounded-md px-2 py-0 text-[10px] font-normal h-5 bg-blue-500/10 text-blue-600 border border-blue-500/20">
                             {skill}
                           </Badge>
                         ))}

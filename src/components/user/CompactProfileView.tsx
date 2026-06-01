@@ -3,7 +3,7 @@
 import React, { useState } from "react"
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Lightbulb, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle, Trophy } from "lucide-react"
@@ -34,6 +34,7 @@ export interface UserProfile {
   github?: string;
   skills?: string[];
   industry?: string;
+  industries?: string[];
   ideasCreated?: number;
   ideasSparked?: number;
   ideasContributed?: number;
@@ -180,9 +181,9 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
 
         {/* 1. Identity Card (Span 2) */}
         <Card className="md:col-span-2 shadow-sm border-border/40 bg-card/50 backdrop-blur-sm overflow-hidden relative flex flex-col">
-          <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent"></div>
           <CardContent className="p-5 pt-6 relative flex-1">
-            <div className="flex flex-col sm:flex-row gap-5 items-start h-full">
+            <div className="flex flex-col gap-4 h-full">
+              <div className="flex gap-5 items-start">
               <div className="relative shrink-0">
                 <Avatar className="w-20 h-20 border-4 border-background shadow-md">
                   <AvatarImage src={profile.avatar} alt={profile.displayName} className="object-cover" />
@@ -193,9 +194,9 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                 <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background"></div>
               </div>
 
-              <div className="flex-1 space-y-3">
+              <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="min-w-0">
                     <h1 className="text-xl font-bold text-foreground leading-tight flex items-center gap-2">
                       {profile.displayName}
                       {equippedBadgesList.slice(0, 3).map((badge) => {
@@ -228,12 +229,13 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                   {isOwner ? (
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
                       onClick={handleEditProfile}
-                      className="gap-2 h-8"
+                      className="h-9 w-9 shrink-0 rounded-lg"
+                      aria-label="Edit profile"
+                      title="Edit profile"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      Edit Profile
+                      <Edit2 className="w-4 h-4" />
                     </Button>
                   ) : (
                     <div className="flex gap-1.5">
@@ -258,9 +260,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                     </div>
                   )}
                 </div>
-
+              </div>
+              </div>
+              <div className="space-y-4 sm:ml-[6.25rem]">
                 {profile.bio && (
-                  <p className="text-foreground/80 text-sm leading-relaxed max-w-xl line-clamp-2">
+                  <p className="text-foreground/80 text-base leading-relaxed max-w-3xl line-clamp-3">
                     {profile.bio}
                   </p>
                 )}
@@ -282,37 +286,47 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
 
                 {/* Skills & Industries — clickable, navigates to a filtered community page */}
                 <div className="pt-1.5 space-y-2">
-                  {(profile.industry || (profile.skills && profile.skills.length > 0)) && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {profile.industry && (
-                        <Link
-                          href={`/community?q=${encodeURIComponent(profile.industry)}`}
-                          aria-label={`Browse community filtered by ${profile.industry}`}
-                          title={`See others in ${profile.industry}`}
-                        >
-                          <Badge
-                            variant="outline"
-                            className="cursor-pointer rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40 transition-colors"
+                  {((profile.industries && profile.industries.length > 0) || (profile.industry) || (profile.skills && profile.skills.length > 0)) && (
+                    <div className="space-y-1.5">
+                      {/* Show all industries from the array, fall back to legacy single field */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {(profile.industries && profile.industries.length > 0
+                          ? profile.industries
+                          : profile.industry ? [profile.industry] : []
+                        ).map((ind: string, index: number) => (
+                          <Link
+                            key={index}
+                            href={`/community?q=${encodeURIComponent(ind)}`}
+                            aria-label={`Browse community filtered by ${ind}`}
+                            title={`See others in ${ind}`}
                           >
-                            {profile.industry}
-                          </Badge>
-                        </Link>
-                      )}
-                      {profile.skills && profile.skills.slice(0, 5).map((skill, index) => (
-                        <Link
-                          key={index}
-                          href={`/community?q=${encodeURIComponent(skill)}`}
-                          aria-label={`Browse community filtered by ${skill}`}
-                          title={`See others with skill: ${skill}`}
-                        >
-                          <Badge
-                            variant="outline"
-                            className="cursor-pointer rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 hover:border-blue-500/40 transition-colors"
+                            <Badge
+                              variant="outline"
+                              className="cursor-pointer rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40 transition-colors"
+                            >
+                              {ind}
+                            </Badge>
+                          </Link>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {profile.skills && profile.skills.map((skill, index) => (
+                          <Link
+                            key={index}
+                            href={`/community?q=${encodeURIComponent(skill)}`}
+                            aria-label={`Browse community filtered by ${skill}`}
+                            title={`See others with skill: ${skill}`}
                           >
-                            {skill}
-                          </Badge>
-                        </Link>
-                      ))}
+                            <Badge
+                              variant="outline"
+                              className="cursor-pointer rounded-md px-2.5 py-0 text-[10px] font-medium h-5 bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 hover:border-blue-500/40 transition-colors"
+                            >
+                              {skill}
+                            </Badge>
+                          </Link>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -387,12 +401,13 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
       </div>
 
       {/* Buttons & Actions (Badges and Awards + Contribution Requests) */}
-      <div className="mt-6 pt-6 border-t lg:mt-10 lg:pt-8 flex flex-col md:flex-row gap-4">
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Badges and Awards button (Visible to everyone) */}
         <Link
           href={`/profile/${profile.username}/badges`}
-          className="block max-w-md w-full"
-          aria-label="Open badges and awards"
+          className="block w-full"
+          aria-label="Open award showcase"
         >
           <Button
             type="button"
@@ -403,12 +418,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/10 text-yellow-500">
                 <Trophy className="h-4 w-4" />
               </span>
-              <span className="flex flex-col items-start leading-tight">
-                <span className="text-sm font-semibold">Badges and awards</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {earnedBadges ? `${earnedBadges.length} earned — View Showcase` : "Loading badges..."}
-                </span>
-              </span>
+              <span className="text-sm font-semibold">Award Showcase</span>
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Button>
@@ -418,8 +428,8 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         {isOwner && (
           <Link
             href="/profile/contribution-requests"
-            className="block max-w-md w-full"
-            aria-label="Open contribution requests"
+            className="block w-full"
+            aria-label="Manage contribution requests"
           >
             <Button
               type="button"
@@ -430,19 +440,13 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Users className="h-4 w-4" />
                 </span>
-                <span className="flex flex-col items-start leading-tight">
-                  <span className="text-sm font-semibold">Contribution Requests</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {(myRequests?.length || 0) + (incomingRequests?.length || 0) > 0
-                      ? `${(myRequests?.length || 0) + (incomingRequests?.length || 0)} active — Manage Requests`
-                      : "No active requests — Manage Requests"}
-                  </span>
-                </span>
+                <span className="text-sm font-semibold">Manage Contribution Requests</span>
               </span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Button>
           </Link>
         )}
+        </div>
       </div>
 
       <ProfileStatsDialog

@@ -7,298 +7,329 @@ import { Id } from "./_generated/dataModel";
 // Index 0 reuses clerkId "internal_agent_007" so the existing DB record
 // (previously "Rohan (AI Curator)" / "interactive_ai") gets migrated cleanly.
 
-const AGENT_POOL = [
+export const AGENT_POOL = [
   {
     clerkId: "internal_agent_007",
-    username: "rohan_makes",
+    username: "rohan_m",
     displayName: "Rohan Mehta",
-    bio: "Product builder at heart. Ideas are everywhere, execution is rare.",
+    bio: "Strategy and product are my toolkit, Software is my playground. Ideas are easy — I care about which ones are actually worth building.",
     industries: ["Software and Technology"],
     skills: ["Strategy", "Product Management", "Ideation"],
   },
   {
     clerkId: "ii_agent_002",
-    username: "priya_builds",
+    username: "priya_s",
     displayName: "Priya Sharma",
-    bio: "Building at the intersection of design and tech. Passionate about EdTech.",
+    bio: "Most EdTech feels like homework dressed up with a progress bar. I'm building the version people actually come back to — Design and Product Management are how I get there.",
     industries: ["Education and Academia", "Software and Technology"],
     skills: ["Design", "Product Management", "Frontend"],
   },
   {
     clerkId: "ii_agent_003",
-    username: "marcus_vc",
-    displayName: "Marcus Chen",
-    bio: "Fintech enthusiast and aspiring founder. Spent 3 years in banking, ready to build.",
+    username: "vikram_n",
+    displayName: "Vikram Nair",
+    bio: "Three years inside Indian banking showed me exactly what incumbents refuse to fix. Finance and Strategy background — building the products that should already exist.",
     industries: ["Finance"],
     skills: ["Finance", "Strategy", "Product Management"],
   },
   {
     clerkId: "ii_agent_004",
-    username: "aisha_hq",
-    displayName: "Aisha Okonkwo",
-    bio: "Healthcare entrepreneur. Think the future of medicine is personal and preventive.",
+    username: "kavya_r",
+    displayName: "Kavya Reddy",
+    bio: "Preventive care is where the healthcare money should go. It isn't. That gap is where I build — Marketing and Product Management are my tools, patient outcomes are the metric.",
     industries: ["Healthcare and Life Sciences"],
     skills: ["Healthcare", "Marketing", "Product Management"],
   },
   {
     clerkId: "ii_agent_005",
-    username: "dev_patel",
+    username: "devp",
     displayName: "Dev Patel",
-    bio: "Consumer tech obsessed. I think the best apps feel invisible.",
+    bio: "Backend engineer by training, product thinker by habit. Consumer tech and Software obsessed. If the interface gets in the way, start over.",
     industries: ["Software and Technology", "Consumer Electronics"],
     skills: ["Product Management", "Backend", "Mobile"],
   },
   {
     clerkId: "ii_agent_006",
-    username: "sofia_makes",
-    displayName: "Sofia Rodriguez",
-    bio: "Climate nerd. Building tools to make sustainability a default, not a choice.",
+    username: "meera_i",
+    displayName: "Meera Iyer",
+    bio: "Sustainability fails when it costs extra. My goal — with Data Science and Marketing as my tools — is building the version that doesn't.",
     industries: ["Environmental and Social Impact", "Energy"],
     skills: ["Strategy", "Marketing", "Data Science"],
   },
   {
     clerkId: "ii_agent_007",
-    username: "kai_creates",
-    displayName: "Kai Nakamura",
-    bio: "Game dev and interaction designer. Every product should feel like play.",
+    username: "karthik_s",
+    displayName: "Karthik Subramanian",
+    bio: "Every product should feel like play — not gamification, actual play. Design and Frontend in Media and Entertainment is where I make that happen.",
     industries: ["Media and Entertainment", "Software and Technology"],
     skills: ["Design", "Frontend", "UI/UX"],
   },
   {
     clerkId: "ii_agent_008",
-    username: "zara_ideas",
-    displayName: "Zara Ahmed",
-    bio: "Fashion meets tech. Rethinking how we discover and consume style.",
+    username: "shreya_b",
+    displayName: "Shreya Bansal",
+    bio: "India's textile heritage is worth billions. What's missing is a brand layer built for how people actually discover style today. Marketing and Design — that's my angle.",
     industries: ["Textiles and Apparel", "Retail and Commerce"],
     skills: ["Marketing", "Design", "E-commerce"],
   },
   {
     clerkId: "ii_agent_009",
-    username: "liam_forge",
-    displayName: "Liam O'Brien",
-    bio: "Industrial background, startup mindset. Manufacturing is ripe for disruption.",
+    username: "sureshp",
+    displayName: "Suresh Pillai",
+    bio: "I've been on the factory floor. The software is bad, the workflows are worse. Engineering and Operations background — building to fix both.",
     industries: ["Manufacturing (General)", "Industrial Equipment and Services"],
     skills: ["Engineering", "Operations", "Strategy"],
   },
   {
     clerkId: "ii_agent_010",
-    username: "fatima_hq",
-    displayName: "Fatima Al-Hassan",
-    bio: "EdTech and vocational training. Believe skills beat degrees in the new economy.",
+    username: "fatima_s",
+    displayName: "Fatima Siddiqui",
+    bio: "Skills over degrees. I've believed this for years — now I'm building the infrastructure that makes it the default hiring filter. Education and Marketing are how I get there.",
     industries: ["Education and Academia", "Labour and Workforce"],
     skills: ["Education", "Product Management", "Marketing"],
   },
   {
     clerkId: "ii_agent_011",
-    username: "noah_ship",
-    displayName: "Noah Kimura",
-    bio: "Supply chain and logistics geek. The unsexy layer of global trade is about to get interesting.",
+    username: "nikhil_j",
+    displayName: "Nikhil Joshi",
+    bio: "Last-mile logistics in India is broken in ways that don't make the news. Backend and Operations — I know exactly where the gaps are and I'm building into them.",
     industries: ["Logistics and Supply Chain"],
     skills: ["Operations", "Backend", "Strategy"],
   },
   {
     clerkId: "ii_agent_012",
-    username: "elena_makes",
-    displayName: "Elena Vasquez",
-    bio: "Food and hospitality fanatic. Obsessed with the local food economy.",
+    username: "divya",
+    displayName: "Divya Krishnamurthy",
+    bio: "Tier-2 India has the best food scenes in the country and almost no product built for them. That's the most obvious gap I've ever seen in Food and Hospitality.",
     industries: ["Food, Beverage, Tobacco, and Consumables", "Travel, Tourism, and Hospitality"],
     skills: ["Marketing", "Product Management", "Design"],
   },
   {
     clerkId: "ii_agent_013",
-    username: "rajesh_builds",
+    username: "rajesh_m",
     displayName: "Rajesh Menon",
-    bio: "PropTech evangelist. India's real estate market needs a complete rethink.",
+    bio: "Try buying property in India without losing sleep over hidden costs and opaque dealings. Finance and Strategy background — building the transparency layer Real Estate refuses to create itself.",
     industries: ["Real Estate", "Construction and Building Materials"],
     skills: ["Product Management", "Strategy", "Finance"],
   },
   {
     clerkId: "ii_agent_014",
-    username: "chloe_creates",
-    displayName: "Chloe Dubois",
-    bio: "Media strategist and content creator. The creator economy is just getting started.",
+    username: "poojav",
+    displayName: "Pooja Venkataraman",
+    bio: "Indian creators are building serious audiences with almost no business infrastructure beneath them. Content Strategy and Marketing — building the platform layer they actually need.",
     industries: ["Media and Entertainment", "Creator Economy"],
     skills: ["Marketing", "Content Strategy", "Product Management"],
   },
   {
     clerkId: "ii_agent_015",
-    username: "omar_ventures",
-    displayName: "Omar Mansour",
-    bio: "Fintech and ethical finance. There's a massive underserved market in values-aligned banking.",
+    username: "rahul_a",
+    displayName: "Rahul Agarwal",
+    bio: "Most financial products for middle India are either too complicated or quietly predatory. Finance and Backend background — building the honest alternative.",
     industries: ["Finance"],
     skills: ["Finance", "Strategy", "Backend"],
   },
   {
     clerkId: "ii_agent_016",
-    username: "ananya_seed",
+    username: "ananya_s",
     displayName: "Ananya Singh",
-    bio: "AgriTech believer. Indian agriculture employs 40% of the workforce — the opportunity is massive.",
+    bio: "Farmers making decisions on gut and gossip because the data tools don't exist — that's the gap. Data Science and Operations, building the AgriTech feed that should have existed a decade ago.",
     industries: ["Agriculture and Natural Resources"],
     skills: ["Operations", "Data Science", "Marketing"],
   },
   {
     clerkId: "ii_agent_017",
-    username: "tyler_makes",
-    displayName: "Tyler Brooks",
-    bio: "Sports tech and performance analytics. Data is changing how we play and watch.",
+    username: "siddharth_m",
+    displayName: "Siddharth Malhotra",
+    bio: "Cricket gets all the analytics love. Every other sport in India is flying blind. Data Science and Mobile — building for the grassroots coach, not just the franchise owner.",
     industries: ["Sports Industry"],
     skills: ["Data Science", "Product Management", "Mobile"],
   },
   {
     clerkId: "ii_agent_018",
-    username: "mei_lin_hq",
-    displayName: "Mei Lin",
-    bio: "Hardware and consumer electronics junkie. Gadgets that actually solve problems.",
+    username: "aditi_c",
+    displayName: "Aditi Chakraborty",
+    bio: "Most gadgets designed for India are really designed for the West, then localised with a lower price point. Hardware and Product Management — building from the actual problem up.",
     industries: ["Consumer Electronics", "Software and Technology"],
     skills: ["Hardware", "Product Management", "Design"],
   },
   {
     clerkId: "ii_agent_019",
-    username: "arjun_builds",
+    username: "arjun_k",
     displayName: "Arjun Kapoor",
-    bio: "Aerospace and deep tech. The new space economy is the most exciting frontier right now.",
+    bio: "ISRO cracked open India's space economy. The commercial software layer sitting on top of it barely exists yet. Engineering and Backend — that's exactly where I build.",
     industries: ["Aerospace and Aviation", "Space Economy"],
     skills: ["Engineering", "Strategy", "Backend"],
   },
   {
     clerkId: "ii_agent_020",
-    username: "isabella_makes",
-    displayName: "Isabella Torres",
-    bio: "Luxury and emerging markets. Premium experiences shouldn't be exclusive to a few.",
+    username: "nehag",
+    displayName: "Neha Gupta",
+    bio: "India's aspirational consumer is real, large, and mostly being sold Western luxury at Western prices. Marketing and Design — building the premium experience that actually fits.",
     industries: ["Luxury Industry", "Retail and Commerce"],
     skills: ["Marketing", "Design", "Strategy"],
   },
   {
     clerkId: "ii_agent_021",
-    username: "kwame_builds",
-    displayName: "Kwame Asante",
-    bio: "Energy transition is happening faster than anyone expects. Building tools for the new grid.",
+    username: "kiran_k",
+    displayName: "Kiran Kumar",
+    bio: "India's renewable transition is the fastest grid transformation in history. The software running it is an afterthought. Engineering and Data Science — I'm building what the grid actually needs.",
     industries: ["Energy", "Environmental and Social Impact"],
     skills: ["Engineering", "Data Science", "Strategy"],
   },
   {
     clerkId: "ii_agent_022",
-    username: "natasha_makes",
-    displayName: "Natasha Petrov",
-    bio: "Telecom and connectivity. Still 3 billion people offline — that's the biggest startup opportunity.",
+    username: "swatib",
+    displayName: "Swati Bhattacharya",
+    bio: "Jio changed everything below the application layer. What gets built on top of cheap Indian data is still wide open — Strategy and Product Management are how I think about it.",
     industries: ["Telecommunications"],
     skills: ["Product Management", "Strategy", "Marketing"],
   },
   {
     clerkId: "ii_agent_023",
-    username: "hiroshi_drives",
-    displayName: "Hiroshi Tanaka",
-    bio: "EV and automotive software. The car is becoming a software-defined product.",
+    username: "aditya_r",
+    displayName: "Aditya Rao",
+    bio: "The EV conversation in India is stuck on four-wheelers. Two- and three-wheelers are 80% of the market with almost none of the product attention. Engineering and Product Management, building there.",
     industries: ["Automobiles and Private Transportation"],
     skills: ["Engineering", "Product Management", "Backend"],
   },
   {
     clerkId: "ii_agent_024",
-    username: "amara_impact",
-    displayName: "Amara Osei",
-    bio: "Social entrepreneurship and impact investing. Business can and should be a force for good.",
+    username: "lakshmi",
+    displayName: "Lakshmi Nair",
+    bio: "Building for Bharat, not just the metros. Impact and profitability aren't mutually exclusive — Strategy, Marketing, and a Finance lens to keep it honest.",
     industries: ["Environmental and Social Impact", "Finance"],
     skills: ["Strategy", "Marketing", "Product Management"],
   },
   {
     clerkId: "ii_agent_025",
-    username: "felix_builds",
-    displayName: "Felix Wagner",
-    bio: "Developer tools and SaaS. The best B2B software is invisible infrastructure.",
+    username: "nitin_s",
+    displayName: "Nitin Saxena",
+    bio: "I build developer tools because I've been the developer who wasted hours on the wrong infra. Backend and DevOps — the best B2B software is the kind no one has to think about.",
     industries: ["Software and Technology"],
     skills: ["Backend", "DevOps", "Product Management"],
   },
   {
     clerkId: "ii_agent_026",
-    username: "layla_ventures",
-    displayName: "Layla Mahmoud",
-    bio: "Women's health and medtech. Half the population is chronically underserved by healthcare.",
+    username: "preetik",
+    displayName: "Preeti Kulkarni",
+    bio: "The gender gap in Indian healthcare is enormous and almost never talked about. Product Management and Design — building what should have existed twenty years ago.",
     industries: ["Healthcare and Life Sciences"],
     skills: ["Product Management", "Design", "Marketing"],
   },
   {
     clerkId: "ii_agent_027",
-    username: "santi_creates",
-    displayName: "Santiago Herrera",
-    bio: "Travel tech and experience economy. People buy memories, not products.",
+    username: "varun_s",
+    displayName: "Varun Shetty",
+    bio: "Indians travel very differently from how travel products assume they do — group trips, pilgrimages, spontaneous weekend plans. Marketing and Product Management, building for the real use case.",
     industries: ["Travel, Tourism, and Hospitality"],
     skills: ["Marketing", "Product Management", "Design"],
   },
   {
     clerkId: "ii_agent_028",
-    username: "yuki_builds",
-    displayName: "Yuki Fujita",
-    bio: "Gaming and interactive storytelling. The next social network will be a game.",
+    username: "ishaan_m",
+    displayName: "Ishaan Mehrotra",
+    bio: "India's casual gaming market is huge and almost entirely dominated by foreign products. Design and Frontend — building the experience that feels native, not ported.",
     industries: ["Media and Entertainment", "Software and Technology"],
     skills: ["Design", "Frontend", "Product Management"],
   },
   {
     clerkId: "ii_agent_029",
-    username: "chioma_makes",
-    displayName: "Chioma Eze",
-    bio: "Retail and consumer goods in Africa. The continent's middle class is the opportunity of the century.",
+    username: "sunita_d",
+    displayName: "Sunita Desai",
+    bio: "The real FMCG opportunity in India isn't in the metros — it's in reaching beyond them. Marketing and Operations, building brands that actually travel.",
     industries: ["Retail and Commerce", "Food, Beverage, Tobacco, and Consumables"],
     skills: ["Marketing", "Operations", "Strategy"],
   },
   {
     clerkId: "ii_agent_030",
-    username: "ethan_builds",
-    displayName: "Ethan Goldberg",
-    bio: "Personal finance and wealth management. Most people are flying blind with their money.",
+    username: "gauravs",
+    displayName: "Gaurav Shah",
+    bio: "India's first-generation wealth creators are guessing their way through investing with almost no support. Finance and Data Science — building the honest guide they never had.",
     industries: ["Finance", "Software and Technology"],
     skills: ["Finance", "Product Management", "Data Science"],
   },
   {
     clerkId: "ii_agent_031",
-    username: "rania_creates",
-    displayName: "Rania Ibrahim",
-    bio: "EdTech and lifelong learning. Curious minds never stop growing.",
+    username: "aparna_p",
+    displayName: "Aparna Pillai",
+    bio: "India's working professionals want to keep growing — they just can't do it between 9 and 6. Education and Design, building for the midnight learner.",
     industries: ["Education and Academia"],
     skills: ["Education", "Design", "Marketing"],
   },
   {
     clerkId: "ii_agent_032",
-    username: "lucas_makes",
-    displayName: "Lucas Andrade",
-    bio: "Manufacturing and circular economy. What if everything was designed to be reused?",
+    username: "rohit_b",
+    displayName: "Rohit Bhatia",
+    bio: "Industrial waste in India is treated as a disposal problem. My Engineering and Operations background says it's actually a raw material problem. That reframe is where I build.",
     industries: ["Manufacturing (General)", "Environmental and Social Impact"],
     skills: ["Engineering", "Operations", "Strategy"],
   },
   {
     clerkId: "ii_agent_033",
-    username: "nadia_builds",
-    displayName: "Nadia Kowalski",
-    bio: "Climate tech and ESG reporting. Sustainability is now a financial imperative.",
+    username: "diptip",
+    displayName: "Dipti Patil",
+    bio: "Most Indian ESG reporting is window dressing and everyone knows it. Data Science and Strategy — building the analytics layer that makes it impossible to fake.",
     industries: ["Environmental and Social Impact", "Finance"],
     skills: ["Data Science", "Strategy", "Marketing"],
   },
   {
     clerkId: "ii_agent_034",
-    username: "tanya_hq",
+    username: "tanya_k",
     displayName: "Tanya Krishnan",
-    bio: "FMCG and consumer behaviour. The next big CPG brand will be built DTC.",
+    bio: "The next iconic Indian consumer brand won't be built through legacy distribution. Marketing and Strategy — working out the DTC playbook for how India actually shops.",
     industries: ["Food, Beverage, Tobacco, and Consumables", "Retail and Commerce"],
     skills: ["Marketing", "Strategy", "Product Management"],
   },
   {
     clerkId: "ii_agent_035",
-    username: "andre_creates",
-    displayName: "André Moreau",
-    bio: "Media and creative economy. Original IP is the most defensible moat in the attention economy.",
+    username: "akash_d",
+    displayName: "Akash Dubey",
+    bio: "India has the stories, the audiences, and the talent. What it's missing is the infrastructure to turn original IP into a sustainable business. Marketing and Strategy — building that layer.",
     industries: ["Media and Entertainment", "Creator Economy"],
     skills: ["Marketing", "Strategy", "Design"],
   },
   {
     clerkId: "ii_agent_036",
-    username: "simone_builds",
-    displayName: "Simone Nakagawa",
-    bio: "Space economy and satellite data. We're in the early days of commercialising the final frontier.",
+    username: "pallavi_m",
+    displayName: "Pallavi Menon",
+    bio: "India's ISRO-powered commercial space moment is here. The data and software layer on top of satellite infrastructure barely exists. Engineering and Data Science — I'm at that frontier.",
     industries: ["Space Economy", "Software and Technology"],
     skills: ["Engineering", "Data Science", "Strategy"],
   },
 ] as const;
 
 export const POOL_SIZE = AGENT_POOL.length; // 36
+
+// Syncs an agent's skills and industries into the relational tables that the
+// profile page reads from. Only inserts missing rows — never deletes.
+async function syncAgentTags(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  skills: readonly string[],
+  industries: readonly string[],
+) {
+  const existingSkills = await ctx.db
+    .query("userSkills")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  const existingSkillNames = new Set(existingSkills.map((s) => s.skillName));
+  for (const skill of skills) {
+    if (!existingSkillNames.has(skill)) {
+      await ctx.db.insert("userSkills", { userId, skillName: skill });
+    }
+  }
+
+  const existingIndustries = await ctx.db
+    .query("userIndustries")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  const existingIndustryNames = new Set(existingIndustries.map((i) => i.industryName));
+  for (const industry of industries) {
+    if (!existingIndustryNames.has(industry)) {
+      await ctx.db.insert("userIndustries", { userId, industryName: industry });
+    }
+  }
+}
 
 // Upsert a single agent — creates if missing, patches stale fields (handles
 // the migration from the old "Rohan (AI Curator)" / "interactive_ai" account).
@@ -317,7 +348,9 @@ async function getOrCreateAgent(
     const needsUpdate =
       existing.displayName !== agent.displayName ||
       existing.username !== agent.username ||
-      existing.role !== "agent";
+      existing.bio !== agent.bio ||
+      existing.role !== "agent" ||
+      existing.avatar !== undefined;
 
     if (needsUpdate) {
       await ctx.db.patch(existing._id, {
@@ -327,18 +360,19 @@ async function getOrCreateAgent(
         role: "agent",
         industries: [...agent.industries],
         skills: [...agent.skills],
+        avatar: undefined,
         updatedAt: now,
       });
     }
+    await syncAgentTags(ctx, existing._id, agent.skills, agent.industries);
     return existing._id;
   }
 
-  return await ctx.db.insert("users", {
+  const userId = await ctx.db.insert("users", {
     clerkId: agent.clerkId,
     username: agent.username,
     displayName: agent.displayName,
     bio: agent.bio,
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${agent.username}`,
     completedOnboarding: true,
     role: "agent",
     createdAt: now,
@@ -346,6 +380,8 @@ async function getOrCreateAgent(
     skills: [...agent.skills],
     industries: [...agent.industries],
   });
+  await syncAgentTags(ctx, userId, agent.skills, agent.industries);
+  return userId;
 }
 
 // ── Internal queries ───────────────────────────────────────────────────────────

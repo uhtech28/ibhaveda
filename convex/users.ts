@@ -491,7 +491,7 @@ export const getUserStats = query({
 // Get user profile by username - for public profiles (case-insensitive)
 export const getUserProfile = query({
   args: { username: v.string() },
-  handler: async ({ db }, { username }): Promise<UserProfile | null> => {
+  handler: async ({ db, auth }, { username }): Promise<UserProfile | null> => {
     const normalizedUsername = username.toLowerCase().trim()
     const profile = await db
       .query("users")
@@ -499,6 +499,12 @@ export const getUserProfile = query({
       .first()
 
     if (!profile) return null
+
+    // Check if the viewer is the profile owner
+    const identity = await auth.getUserIdentity()
+    const isOwner = identity
+      ? (await db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).first())?._id === profile._id
+      : false
 
     // Fetch skills efficiently
     const skills = await db
@@ -512,13 +518,17 @@ export const getUserProfile = query({
       .withIndex("by_user", (q) => q.eq("userId", profile._id))
       .collect()
 
-    // Calculate dynamic metrics
-    const createdIdeas = await db
+    // Count created ideas — all for owner, only public for visitors
+    const createdIdeasQuery = db
       .query("ideas")
       .withIndex("by_author", (q) => q.eq("authorId", profile._id))
       .filter((q) => q.neq(q.field("isDeleted"), true))
       .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
-      .collect()
+
+    const createdIdeas = await (isOwner
+      ? createdIdeasQuery
+      : createdIdeasQuery.filter((q) => q.eq(q.field("visibility"), "public"))
+    ).collect()
 
     const sparkedRecords = await db
       .query("userIdeaSparks")
