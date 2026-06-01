@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { createContributionRequest, updateRequestStatus, getRequestsByIdea, getIncomingRequests } from "./contributionRequests";
 
 // Create a new idea (root or with parent) with proper authorization checks
@@ -941,7 +941,7 @@ export const toggleCommentSpark = mutation({
       (spark) => spark.userId !== comment.authorId
     ).length;
 
-    const currentSparkCount = comment.sparkCount ?? 0;
+    const currentSparkCount = Math.max(comment.sparkCount ?? 0, commentSparks.length);
     const now = Date.now();
     const shouldUpdateAuthorCounter = comment.authorId !== user._id;
 
@@ -995,7 +995,7 @@ export const toggleCommentSpark = mutation({
         await updateCommentAuthorSparkedCount(-1);
       }
 
-      await ctx.scheduler.runAfter(0, api.badges.recalculateUserBadges, {
+      await ctx.scheduler.runAfter(0, internal.badges.recalculateUserBadgesInternal, {
         userId: comment.authorId,
       });
 
@@ -1027,7 +1027,7 @@ export const toggleCommentSpark = mutation({
       });
     }
 
-    await ctx.scheduler.runAfter(0, api.badges.recalculateUserBadges, {
+    await ctx.scheduler.runAfter(0, internal.badges.recalculateUserBadgesInternal, {
       userId: comment.authorId,
     });
 

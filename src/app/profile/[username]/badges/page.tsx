@@ -64,13 +64,20 @@ export default function ProfileBadgesPage() {
       <HeroHeader />
 
       <main className="flex-1 container mx-auto px-4 py-6 pt-24 max-w-5xl">
-        <div className="mb-4 -ml-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </div>
+        <div className="relative">
+          <div className="absolute -left-12 top-0 hidden items-center sm:flex">
+            <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="mb-3 flex items-center sm:hidden">
+            <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          </div>
 
-        <ProfileBadges userId={profile._id} isOwner={isCurrentUser} profile={profileData} />
+          <ProfileBadges userId={profile._id} isOwner={isCurrentUser} profile={profileData} />
+        </div>
       </main>
 
       <FooterSection />

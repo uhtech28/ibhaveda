@@ -1169,6 +1169,13 @@ export const recalculateUserBadges = mutation({
   },
 });
 
+export const recalculateUserBadgesInternal = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await recalculateAndAwardBadgesHelper(ctx, args.userId);
+  },
+});
+
 // Unified Profile Badges Query
 export const getUserProfileBadges = query({
   args: { userId: v.id("users") },
