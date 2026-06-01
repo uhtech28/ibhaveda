@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -23,8 +23,18 @@ export default function FeedPage() {
   const { toast } = useToast();
   const { isComplete: isProfileComplete, isLoading: isProfileLoading } = useProfileCompletion();
   const currentUser = useQuery(api.users.getCurrentUser);
-  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit: 60 });
+
+  const PAGE_SIZE = 20;
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit });
   const toggleSpark = useMutation(api.ideas.toggleSpark);
+
+  // Track whether there are more ideas to load
+  const hasMore = ideasQuery !== undefined && ideasQuery.length >= limit;
+
+  function loadMore() {
+    if (hasMore) setLimit((l) => l + PAGE_SIZE);
+  }
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCommentIdea, setActiveCommentIdea] = useState<IdeaForgeIdea | null>(null);
@@ -80,6 +90,8 @@ export default function FeedPage() {
         }}
         isProfileComplete={isProfileComplete}
         onCompleteProfile={() => router.push("/profile-setup")}
+        onLoadMore={loadMore}
+        hasMore={hasMore}
       />
 
       <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
