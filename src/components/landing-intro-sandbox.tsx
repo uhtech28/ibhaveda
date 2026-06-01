@@ -179,16 +179,9 @@ export default function LandingIntroSandbox({
       } catch { /* not available */ }
     };
 
-    // Attempt immediate autoplay — works on desktop where navigating to the
-    // page counts as a user gesture (context starts in "running" state).
-    unlock();
-
-    // Fallback listeners for cases where autoplay is blocked
-    if (!done) {
-      window.addEventListener("touchstart", unlock, { once: true, passive: true });
-      window.addEventListener("pointerdown", unlock, { once: true });
-      window.addEventListener("keydown",     unlock, { once: true });
-    }
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown",     unlock, { once: true });
 
     return () => {
       done = true;
