@@ -1861,7 +1861,6 @@ export class WorldMapScene extends Phaser.Scene {
     const panelH = rows * tileSize;
     const grassFrames = [12, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69, 70, 71];
     const grassAccentFrames = [16, 17, 27, 28];
-    const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
     const treeKeys = [
       "Tree_Emerald_1",
       "Tree_Emerald_2",
@@ -2102,158 +2101,45 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    const drawSegment = (
-      start: { x: number; y: number },
-      end: { x: number; y: number },
-    ) => {
-      const startX = start.x * 16;
-      const startY = start.y * 16;
-      const endX = end.x * 16;
-      const endY = end.y * 16;
-      const horizontal = start.y === end.y;
-      const minX = Math.min(startX, endX);
-      const minY = Math.min(startY, endY);
-      const length = horizontal
-        ? Math.abs(endX - startX) + 16
-        : Math.abs(endY - startY) + 16;
-      const thickness = 16 * 2.9;
-      const innerThickness = 16 * 2.08;
-      const edgeThickness = 16 * 3.28;
+    const drawSandTrail = () => {
+      const points = trail.map(({ x, y }) => ({
+        px: x * 16 + 8,
+        py: y * 16 + 8,
+      }));
+      if (points.length < 2) return;
 
-      if (horizontal) {
-        const baseY = startY - 16 * 1.05;
-        // pathShadow
+      const strokeSandPath = (
+        width: number,
+        color: number,
+        alpha: number,
+      ) => {
         tempGfx.clear();
-        tempGfx.fillStyle(0x8e6c46, 0.24);
-        tempGfx.fillRoundedRect(minX + 4, baseY + 5, length, thickness, 7);
+        tempGfx.lineStyle(width, color, alpha);
+        tempGfx.beginPath();
+        tempGfx.moveTo(points[0].px, points[0].py);
+        for (let i = 1; i < points.length; i += 1) {
+          tempGfx.lineTo(points[i].px, points[i].py);
+        }
+        tempGfx.strokePath();
         rt.draw(tempGfx, 0, 0);
+      };
 
-        // pathEdge
-        tempGfx.clear();
-        tempGfx.fillStyle(0xcfab70, 0.7);
-        tempGfx.fillRoundedRect(minX, baseY, length, edgeThickness, 8);
-        rt.draw(tempGfx, 0, 0);
-
-        // pathBase
-        tempGfx.clear();
-        tempGfx.fillStyle(0xe9c486, 1);
-        tempGfx.fillRoundedRect(
-          minX + 16 * 0.12,
-          baseY + 16 * 0.12,
-          length - 16 * 0.24,
-          thickness - 16 * 0.24,
-          7,
-        );
-        rt.draw(tempGfx, 0, 0);
-
-        // pathInner
-        tempGfx.clear();
-        tempGfx.fillStyle(0xf4d39a, 0.82);
-        tempGfx.fillRoundedRect(
-          minX + 16 * 0.35,
-          baseY + 16 * 0.35,
-          length - 16 * 0.7,
-          innerThickness,
-          6,
-        );
-        rt.draw(tempGfx, 0, 0);
-      } else {
-        const baseX = startX - 16 * 1.05;
-        // pathShadow
-        tempGfx.clear();
-        tempGfx.fillStyle(0x8e6c46, 0.24);
-        tempGfx.fillRoundedRect(baseX + 4, minY + 5, thickness, length, 7);
-        rt.draw(tempGfx, 0, 0);
-
-        // pathEdge
-        tempGfx.clear();
-        tempGfx.fillStyle(0xcfab70, 0.7);
-        tempGfx.fillRoundedRect(baseX, minY, edgeThickness, length, 8);
-        rt.draw(tempGfx, 0, 0);
-
-        // pathBase
-        tempGfx.clear();
-        tempGfx.fillStyle(0xe9c486, 1);
-        tempGfx.fillRoundedRect(
-          baseX + 16 * 0.12,
-          minY + 16 * 0.12,
-          thickness - 16 * 0.24,
-          length - 16 * 0.24,
-          7,
-        );
-        rt.draw(tempGfx, 0, 0);
-
-        // pathInner
-        tempGfx.clear();
-        tempGfx.fillStyle(0xf4d39a, 0.82);
-        tempGfx.fillRoundedRect(
-          baseX + 16 * 0.35,
-          minY + 16 * 0.35,
-          innerThickness,
-          length - 16 * 0.7,
-          6,
-        );
-        rt.draw(tempGfx, 0, 0);
-      }
+      strokeSandPath(16 * 2.85, 0xcfab70, 1);
+      strokeSandPath(16 * 2.35, 0xe9c486, 1);
+      strokeSandPath(16 * 1.55, 0xf4d39a, 0.82);
     };
 
-    for (let i = 0; i < trail.length - 1; i += 1) {
-      drawSegment(trail[i], trail[i + 1]);
-    }
-
-    trail.forEach(({ x, y }) => {
-      const cx = x * 16 + 8;
-      const cy = y * 16 + 8;
-
-      tempGfx.clear();
-      tempGfx.fillStyle(0x8e6c46, 0.24);
-      tempGfx.fillCircle(cx + 4, cy + 5, 16 * 1.46);
-      rt.draw(tempGfx, 0, 0);
-
-      tempGfx.clear();
-      tempGfx.fillStyle(0xcfab70, 0.7);
-      tempGfx.fillCircle(cx, cy, 16 * 1.55);
-      rt.draw(tempGfx, 0, 0);
-
-      tempGfx.clear();
-      tempGfx.fillStyle(0xe9c486, 1);
-      tempGfx.fillCircle(cx, cy, 16 * 1.36);
-      rt.draw(tempGfx, 0, 0);
-
-      tempGfx.clear();
-      tempGfx.fillStyle(0xf4d39a, 0.82);
-      tempGfx.fillCircle(cx, cy, 16 * 0.96);
-      rt.draw(tempGfx, 0, 0);
-    });
-
-    pathTiles.forEach((key) => {
-      const [col, row] = key.split(",").map(Number);
-      if ((col + row) % 3 !== 0) return;
-      addFrameSprite(
-        "sprout_paths_sheet",
-        pathFrames[(col + row * 3) % pathFrames.length],
-        col,
-        row,
-        5.6,
-        0xd7a55f,
-        0.12,
-      );
-    });
+    drawSandTrail();
 
     tempGfx.clear();
-    tempGfx.fillStyle(0xc48f55, 0.34);
+    tempGfx.fillStyle(0xc48f55, 0.28);
     pathTiles.forEach((key) => {
       const [col, row] = key.split(",").map(Number);
-      if ((col * 5 + row * 7) % 9 !== 0) return;
+      if ((col * 5 + row * 7) % 11 !== 0) return;
       tempGfx.fillCircle(
         col * 16 + 16 * 0.38,
         row * 16 + 16 * 0.42,
-        16 * 0.1,
-      );
-      tempGfx.fillCircle(
-        col * 16 + 16 * 0.68,
-        row * 16 + 16 * 0.62,
-        16 * 0.07,
+        16 * 0.08,
       );
     });
     rt.draw(tempGfx, 0, 0);
@@ -6577,11 +6463,9 @@ export class WorldMapScene extends Phaser.Scene {
       // Venture stages 3 and 4 use bespoke plaza layouts, so skip the generic
       // wooden connector there. Stage 2 draws a tile trail inside the forest
       // panel. Stage 7 Crossroads does not need the wooden plank overlay.
-      const shouldSkipGenericConnector =
-        (this.currentTemplateId === "venture" &&
-          [1, 2, 3, 4].includes(stage.id)) ||
-        stage.id === 1 ||
-        stage.id === 7;
+      // Every stage features its own themed road/path textures or vectors,
+      // so we skip drawing the generic vector line connector to prevent double rendering.
+      const shouldSkipGenericConnector = true;
       if (!shouldSkipGenericConnector && stagePositions.length > 1 && biome) {
         this.drawStagePathConnector(stagePositions, biome.colors.path, 0.9);
       }
