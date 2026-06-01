@@ -224,6 +224,8 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
   const isEquipped = state === "equipped";
   const norm = getNormalizedRarity(badge.rarity);
   const iconEmoji = badge.icon || getVentureBadgeEmoji(badge.id, badge.name);
+  const isHiddenAchievement = badge.category === "hidden" || badge.rarity === "hidden";
+  const shouldMaskHiddenDetails = isLocked && isHiddenAchievement;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isLocked) return;
@@ -435,10 +437,10 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
               isLocked ? "text-slate-500" : "text-white"
             )}
           >
-            {isLocked ? "Secret Achievement" : badge.name}
+            {shouldMaskHiddenDetails ? "???" : isLocked ? "Secret Achievement" : badge.name}
           </h4>
           <p className="text-[11px] text-slate-400 line-clamp-2 px-1 mt-1 leading-relaxed italic font-medium">
-            {isLocked ? (badge.requirement || "Locked achievement") : `"${badge.tagline || badge.description}"`}
+            {shouldMaskHiddenDetails ? "???" : isLocked ? (badge.requirement || "Locked achievement") : `"${badge.tagline || badge.description}"`}
           </p>
         </div>
 
@@ -468,7 +470,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
               Badge Title
             </span>
             <span className="text-sm font-bold text-white leading-tight block">
-              {badge.name}
+              {shouldMaskHiddenDetails ? "???" : badge.name}
             </span>
           </div>
 
@@ -477,7 +479,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
               Unlock Requirement
             </span>
             <p className="text-xs font-semibold text-slate-300 leading-relaxed">
-              {badge.requirement || "Achieve specific milestones to unlock this badge."}
+              {shouldMaskHiddenDetails ? "???" : badge.requirement || "Achieve specific milestones to unlock this badge."}
             </p>
           </div>
         </div>

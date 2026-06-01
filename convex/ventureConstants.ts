@@ -1865,7 +1865,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 11,
-    name: "Stage Clear",
+    name: "The First Gate Falls",
     category: "idea_milestones",
     rarity: "common",
     shape: "ribbon",
@@ -2541,7 +2541,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 71,
-    name: "Stage 1: Ideation Clear",
+    name: "The Spark Struck",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",
@@ -2553,7 +2553,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 72,
-    name: "Stage 2: Research Clear",
+    name: "The Map Drawn",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",
@@ -2565,7 +2565,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 73,
-    name: "Stage 3: Validation Clear",
+    name: "The World Answered",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",
@@ -2577,7 +2577,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 74,
-    name: "Stage 4: Offer Design Clear",
+    name: "The Shape of Things",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",
@@ -2589,7 +2589,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 75,
-    name: "Stage 5: Build & Deliver Clear",
+    name: "The Forge Emptied",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",
@@ -2601,7 +2601,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 76,
-    name: "Stage 6: Launch Clear",
+    name: "The Harbour Left",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",
@@ -2613,7 +2613,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 77,
-    name: "Stage 7: Iteration Clear",
+    name: "The Second Shaping",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",
@@ -2625,7 +2625,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
   },
   {
     id: 78,
-    name: "Stage 8: Scale Clear",
+    name: "The Kingdom Grows",
     category: "idea_milestones",
     rarity: "common",
     shape: "medal",

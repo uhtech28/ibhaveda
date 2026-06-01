@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Lock, Award, Trophy, Info, Calendar, Sparkles, Filter, ArrowUpDown, Star, EyeOff } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Search, Award, Filter, ArrowUpDown, Star, EyeOff } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -305,7 +305,6 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                   .filter(b => b.awardedAt && !equippedBadgeIds.includes(b.id))
                   .map((badge) => {
                     const norm = getNormalizedRarity(badge.rarity);
-                    const accentColor = badge.secondaryColor || norm.accentColor;
                     return (
                       <div
                         key={badge.id}
@@ -337,13 +336,9 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
       <CardHeader className="relative pb-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <CardTitle className="text-2xl font-black text-white flex items-center gap-2.5">
-              <Trophy className="w-6 h-6 text-yellow-500 drop-shadow-[0_2px_8px_rgba(234,179,8,0.3)] animate-pulse" />
-              Badge Showcase & Achievements
+            <CardTitle className="text-2xl font-black text-white">
+              {profile.displayName}&apos;s Badge Showcase
             </CardTitle>
-            <CardDescription className="text-slate-400 mt-1">
-              Collect legendary badges, complete developmental milestones, and showcase your finest milestones.
-            </CardDescription>
           </div>
 
           {/* Prestige Progress Stats */}
@@ -394,9 +389,9 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
               </div>
               <div>
                 <h3 className="font-extrabold text-sm text-white flex items-center gap-1.5">
-                  Featured Showcase Profile Slots
-                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold">
-                    {equippedBadges.length} / 3 Equipped
+                  Featured Badges
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-bold">
+                    {equippedBadges.length} / 3
                   </span>
                 </h3>
                 <p className="text-[11px] text-slate-400">These badges sit at the top of your public profile card.</p>
@@ -500,43 +495,43 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
 
             <div className="flex gap-2 shrink-0">
               {/* Sort selector dropdown */}
-              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans">
                 <ArrowUpDown className="w-3.5 h-3.5" />
                 <span className="font-extrabold uppercase tracking-wide text-[10px] text-slate-500">Sort:</span>
                 <select
                   value={sortBy}
                   onChange={(e: any) => setSortBy(e.target.value)}
-                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1"
+                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans"
                 >
-                  <option value="recent" className="bg-slate-950">Recently Earned</option>
-                  <option value="prestige" className="bg-slate-950">Highest Rarity</option>
-                  <option value="name" className="bg-slate-950">Alphabetical (A-Z)</option>
+                  <option value="recent" className="bg-slate-950 text-white font-sans">Recently Earned</option>
+                  <option value="prestige" className="bg-slate-950 text-white font-sans">Highest Rarity</option>
+                  <option value="name" className="bg-slate-950 text-white font-sans">Alphabetical (A-Z)</option>
                 </select>
               </div>
 
               {/* Rarity filter dropdown */}
-              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans">
                 <Filter className="w-3.5 h-3.5" />
                 <span className="font-extrabold uppercase tracking-wide text-[10px] text-slate-500">Rarity:</span>
                 <select
                   value={activeRarity}
                   onChange={(e: any) => setActiveRarity(e.target.value)}
-                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1"
+                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans"
                 >
-                  <option value="all" className="bg-slate-950">All Rarities</option>
-                  <option value="common" className="bg-slate-950">🥉 Bronze</option>
-                  <option value="uncommon" className="bg-slate-950">🥈 Silver</option>
-                  <option value="rare" className="bg-slate-950">🥇 Gold</option>
-                  <option value="epic" className="bg-slate-950">💎 Diamond</option>
-                  <option value="legendary" className="bg-slate-950">👑 Legendary</option>
-                  <option value="mythic" className="bg-slate-950">🔥 Mythic</option>
+                  <option value="all" className="bg-slate-950 text-white font-sans">All Rarities</option>
+                  <option value="common" className="bg-slate-950 text-white font-sans">🥉 Bronze</option>
+                  <option value="uncommon" className="bg-slate-950 text-white font-sans">🥈 Silver</option>
+                  <option value="rare" className="bg-slate-950 text-white font-sans">🥇 Gold</option>
+                  <option value="epic" className="bg-slate-950 text-white font-sans">💎 Diamond</option>
+                  <option value="legendary" className="bg-slate-950 text-white font-sans">👑 Legendary</option>
+                  <option value="mythic" className="bg-slate-950 text-white font-sans">🔥 Mythic</option>
                 </select>
               </div>
             </div>
           </div>
 
           {/* Bottom Row: Tab categories selection */}
-          <div className="flex flex-wrap gap-1.5 border-t border-white/5 pt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 border-t border-white/5 pt-3">
             {[
               { id: "all", label: "All Achievements" },
               { id: "onboarding", label: "Onboarding" },
@@ -544,7 +539,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
               { id: "community", label: "Community" },
               { id: "consistency", label: "Consistency" },
               { id: "skill", label: "Skills" },
-              { id: "locked", label: "Locked Outlines" },
+              { id: "locked", label: "Locked" },
             ].map((tab) => (
               <Button
                 key={tab.id}
@@ -552,13 +547,13 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                 size="sm"
                 onClick={() => setActiveCategory(tab.id as any)}
                 className={cn(
-                  "h-8 rounded-lg text-xs font-bold transition-all px-3.5",
+                  "h-8 w-full rounded-lg text-xs font-bold transition-all px-2",
                   activeCategory === tab.id
                     ? "bg-white text-slate-950 shadow-md font-black hover:bg-slate-100"
                     : "text-slate-400 hover:text-white hover:bg-white/5"
                 )}
               >
-                {tab.label}
+                <span className="truncate">{tab.label}</span>
               </Button>
             ))}
           </div>

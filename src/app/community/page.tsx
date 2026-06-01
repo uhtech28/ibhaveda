@@ -396,7 +396,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
                   <Link
                     href={profileHref}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground border border-border/60 hover:bg-muted hover:text-foreground transition-colors"
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40 transition-colors"
                   >
                     +{hiddenIndustryCount} more
                   </Link>
@@ -415,7 +415,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
                   <Link
                     href={profileHref}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground border border-border/60 hover:bg-muted hover:text-foreground transition-colors"
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 hover:border-blue-500/40 transition-colors"
                   >
                     +{hiddenSkillCount} more
                   </Link>
