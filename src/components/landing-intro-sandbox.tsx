@@ -174,7 +174,7 @@ export default function LandingIntroSandbox({
         ctx.resume().catch(() => undefined);
 
         setTimeout(() => {
-          if (ctx && !ctx.closed) play(ctx);
+          if (ctx && ctx.state !== "closed") play(ctx);
         }, 50);
       } catch { /* not available */ }
     };
