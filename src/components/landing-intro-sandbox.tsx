@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, Crown, Flame, Gem, Hammer, Pickaxe, Ship, Swords, Trees } from "lucide-react";
 
 const TOTAL_RUNTIME_MS = 24950;
@@ -85,9 +85,6 @@ export default function LandingIntroSandbox({
     return () => window.clearTimeout(id);
   }, [onComplete, stage]);
 
-  // Ref attached to the overlay div so we can add native listeners directly
-  const overlayRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -120,70 +117,61 @@ export default function LandingIntroSandbox({
       { f: 311, d: 0.40 }, { f: 294, d: 0.40 }, { f: 262, d: 1.50 },
     ];
 
-    const AC: typeof AudioContext =
+    const AudioCtor =
       window.AudioContext ||
-      (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return;
 
-    let ctx: AudioContext | null = null;
-    let done = false;
+    let context: AudioContext | null = null;
+    let started = false;
+    let stopped = false;
 
-    const play = (audioCtx: AudioContext) => {
-      const masterGain = audioCtx.createGain();
-      masterGain.gain.value = 0.07;
-      masterGain.connect(audioCtx.destination);
-      // Schedule from currentTime — works whether it's 0 or already ticking
-      let t = audioCtx.currentTime;
+    const scheduleNotes = () => {
+      if (!context) return;
+      const masterGain = context.createGain();
+      const t0 = context.currentTime + 0.1;
+      const tEnd = t0 + TOTAL_RUNTIME_MS / 1000;
+      masterGain.gain.setValueAtTime(0.035, t0);
+      masterGain.gain.setValueAtTime(0.035, tEnd - 1.5);
+      masterGain.gain.linearRampToValueAtTime(0.001, tEnd - 0.1);
+      masterGain.connect(context.destination);
+      let t = t0;
       for (const { f, d } of notes) {
-        if (f > 0) {
-          const osc = audioCtx.createOscillator();
+        if (f > 0 && t < tEnd) {
+          const osc = context.createOscillator();
+          const g = context.createGain();
           osc.type = "square";
-          osc.frequency.value = f;
-          osc.connect(masterGain);
+          osc.frequency.setValueAtTime(f, t);
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.8, t + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, t + d * 0.88);
+          osc.connect(g);
+          g.connect(masterGain);
           osc.start(t);
-          osc.stop(t + d * 0.88);
+          osc.stop(t + d);
         }
         t += d;
       }
     };
 
-    const unlock = () => {
-      if (done) return;
-      done = true;
-      try {
-        // Always create AudioContext inside the gesture handler
-        ctx = new AC({ latencyHint: "playback" } as AudioContextOptions);
-        play(ctx);
-      } catch {
-        try {
-          // Fallback without options (older Safari)
-          ctx = new AC();
-          play(ctx);
-        } catch { /* unavailable */ }
-      }
+    const startAudio = async () => {
+      if (started || stopped) return;
+      context ??= new AudioCtor();
+      await context.resume().catch(() => undefined);
+      if (context.state !== "running") return;
+      started = true;
+      scheduleNotes();
     };
 
-    // iOS Safari only recognises `touchend` and `click` as valid gesture
-    // events for AudioContext — touchstart is NOT listed in Apple's docs.
-    // Attach native listeners directly to the overlay element (not window).
-    const el = overlayRef.current;
-    if (el) {
-      el.addEventListener("touchend", unlock, { once: true });
-      el.addEventListener("click",    unlock, { once: true });
-    }
-    // Desktop: also listen on window for pointer/keyboard
-    window.addEventListener("pointerdown", unlock, { once: true });
-    window.addEventListener("keydown",     unlock, { once: true });
+    startAudio();
+    window.addEventListener("pointerdown", startAudio, { once: true });
+    window.addEventListener("keydown", startAudio, { once: true });
 
     return () => {
-      done = true;
-      if (el) {
-        el.removeEventListener("touchend", unlock);
-        el.removeEventListener("click",    unlock);
-      }
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown",     unlock);
-      ctx?.close().catch(() => undefined);
+      stopped = true;
+      window.removeEventListener("pointerdown", startAudio);
+      window.removeEventListener("keydown", startAudio);
+      context?.close().catch(() => undefined);
     };
   }, []);
 
@@ -194,7 +182,6 @@ export default function LandingIntroSandbox({
 
   return (
     <div
-      ref={overlayRef}
       role="dialog"
       aria-label={ariaLabel}
       className="fixed inset-0 z-[9999] overflow-hidden bg-[#070A0F] text-white"
