@@ -2,7 +2,7 @@
  * Lazy Phaser asset packs — keeps startup network requests under ~100.
  * Core pack loads in preload(); biome packs load when the camera nears a stage.
  */
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 import { AssetLoader } from "./asset-loader";
 
 export type AssetPackId = "core" | "sprout" | "mine" | "tropical";
@@ -41,7 +41,7 @@ export function packsForVisualTheme(
 /**
  * Ensures packs are queued and loaded. Safe to call multiple times / concurrently.
  */
-let batchInflight: WeakMap<Phaser.Scene, Promise<void>> = new WeakMap();
+const batchInflight: WeakMap<Phaser.Scene, Promise<void>> = new WeakMap();
 
 /** Queue missing packs in a single loader batch. */
 export function ensureAssetPacks(

@@ -1209,30 +1209,30 @@ export class AssetLoader {
 
     scene.load.spritesheet(
       "persona_male_idle_sheet",
-      `${fanTasyPath}/Character_Idle.png`,
+      `${fanTasyPath}/Character_Idle.webp`,
       { frameWidth: 32, frameHeight: 48 },
     );
     scene.load.spritesheet(
       "persona_male_walk_sheet",
-      `${fanTasyPath}/Character_Walk.png`,
+      `${fanTasyPath}/Character_Walk.webp`,
       { frameWidth: 32, frameHeight: 48 },
     );
 
-    scene.load.image("Tileset_Ground", `${fanTasyPath}/Tileset_Ground.png`);
-    scene.load.image("Tileset_Water", `${fanTasyPath}/Tileset_Water.png`);
-    scene.load.image("Tileset_RockSlope", `${fanTasyPath}/Tileset_RockSlope.png`);
-    scene.load.image("Tileset_RockSlope_Simple", `${fanTasyPath}/Tileset_RockSlope_Simple.png`);
-    scene.load.image("Tileset_Road", `${fanTasyPath}/Tileset_Road.png`);
-    scene.load.image("Tileset_Shadow", `${fanTasyPath}/Tileset_Shadow.png`);
+    scene.load.image("Tileset_Ground", `${fanTasyPath}/Tileset_Ground.webp`);
+    scene.load.image("Tileset_Water", `${fanTasyPath}/Tileset_Water.webp`);
+    scene.load.image("Tileset_RockSlope", `${fanTasyPath}/Tileset_RockSlope.webp`);
+    scene.load.image("Tileset_RockSlope_Simple", `${fanTasyPath}/Tileset_RockSlope_Simple.webp`);
+    scene.load.image("Tileset_Road", `${fanTasyPath}/Tileset_Road.webp`);
+    scene.load.image("Tileset_Shadow", `${fanTasyPath}/Tileset_Shadow.webp`);
 
-    scene.load.image("Buildings", `${fanTasyPath}/Buildings.png`);
-    scene.load.image("Props", `${fanTasyPath}/Props.png`);
-    scene.load.image("Rocks", `${fanTasyPath}/Rocks.png`);
-    scene.load.image("Trees_Bushes", `${fanTasyPath}/Trees_Bushes.png`);
+    scene.load.image("Buildings", `${fanTasyPath}/Buildings.webp`);
+    scene.load.image("Props", `${fanTasyPath}/Props.webp`);
+    scene.load.image("Rocks", `${fanTasyPath}/Rocks.webp`);
+    scene.load.image("Trees_Bushes", `${fanTasyPath}/Trees_Bushes.webp`);
 
-    scene.load.image("Animation_Flowers_Red", `${fanTasyPath}/Flowers_Red.png`);
-    scene.load.image("Animation_Flowers_White", `${fanTasyPath}/Flowers_White.png`);
-    scene.load.image("Animation_Campfire", `${fanTasyPath}/Animation_Campfire.png`);
+    scene.load.image("Animation_Flowers_Red", `${fanTasyPath}/Flowers_Red.webp`);
+    scene.load.image("Animation_Flowers_White", `${fanTasyPath}/Flowers_White.webp`);
+    scene.load.image("Animation_Campfire", `${fanTasyPath}/Animation_Campfire.webp`);
 
     const objects = [
       "House_Hay_1", "House_Hay_2", "House_Hay_3", "House_Hay_4_Purple", "Forest_Hut_1",
@@ -1255,7 +1255,7 @@ export class AssetLoader {
       "Shadow_Round_48x24_Flat_Black", "Shadow_Round_48x24_Long_Black", "Shadow_Round_48x24_Medium_Black", "Shadow_Round_48x24_Short_Black",
       "Shadow_Round_48x48_Flat_Black", "Shadow_Round_48x48_Long_Black", "Shadow_Round_48x48_Medium_Black", "Shadow_Round_48x48_Short_Black",
     ];
-    objects.forEach((obj) => scene.load.image(obj, `${fanTasyPath}/${obj}.png`));
+    objects.forEach((obj) => scene.load.image(obj, `${fanTasyPath}/${obj}.webp`));
 
     scene.load.tilemapTiledJSON(
       "beginning_fields",
@@ -1265,37 +1265,37 @@ export class AssetLoader {
 
   private static queueSproutPack(scene: Phaser.Scene): void {
     const sproutPath = "/assets/sprout";
-    scene.load.spritesheet("sprout_grass_sheet", `${sproutPath}/grass.png`, {
+    scene.load.spritesheet("sprout_grass_sheet", `${sproutPath}/grass.webp`, {
       frameWidth: 16,
       frameHeight: 16,
     });
-    scene.load.spritesheet("sprout_water_sheet", `${sproutPath}/water.png`, {
+    scene.load.spritesheet("sprout_water_sheet", `${sproutPath}/water.webp`, {
       frameWidth: 16,
       frameHeight: 16,
     });
-    scene.load.spritesheet("sprout_hills_sheet", `${sproutPath}/hills.png`, {
+    scene.load.spritesheet("sprout_hills_sheet", `${sproutPath}/hills.webp`, {
       frameWidth: 16,
       frameHeight: 16,
     });
     scene.load.spritesheet(
       "sprout_forest_decor_sheet",
-      `${sproutPath}/forest-decor.png`,
+      `${sproutPath}/forest-decor.webp`,
       { frameWidth: 16, frameHeight: 16 },
     );
-    scene.load.spritesheet("sprout_plants_sheet", `${sproutPath}/plants.png`, {
+    scene.load.spritesheet("sprout_plants_sheet", `${sproutPath}/plants.webp`, {
       frameWidth: 16,
       frameHeight: 16,
     });
-    scene.load.spritesheet("sprout_paths_sheet", `${sproutPath}/paths.png`, {
+    scene.load.spritesheet("sprout_paths_sheet", `${sproutPath}/paths.webp`, {
       frameWidth: 16,
       frameHeight: 16,
     });
     scene.load.spritesheet(
       "sprout_bridge_sheet",
-      `${sproutPath}/wood-bridge.png`,
+      `${sproutPath}/wood-bridge.webp`,
       { frameWidth: 16, frameHeight: 16 },
     );
-    scene.load.spritesheet("sprout_fences_sheet", `${sproutPath}/fences.png`, {
+    scene.load.spritesheet("sprout_fences_sheet", `${sproutPath}/fences.webp`, {
       frameWidth: 16,
       frameHeight: 16,
     });
@@ -1303,17 +1303,17 @@ export class AssetLoader {
 
   private static queueMinePack(scene: Phaser.Scene): void {
     const minePath = "/assets/mine";
-    scene.load.image("mine_bg_cave", `${minePath}/bg_cave.png`);
-    scene.load.image("mine_cave_rail", `${minePath}/tile_cave_rail.png`);
-    scene.load.image("mine_cave_rock", `${minePath}/tile_cave_bg_rock.png`);
-    scene.load.image("mine_street_light", `${minePath}/mine_street_light.png`);
-    scene.load.image("mine_street_light_1", `${minePath}/mine_street_light_1.png`);
-    scene.load.image("mine_street_light_2", `${minePath}/mine_street_light_2.png`);
-    scene.load.image("mine_street_light_3", `${minePath}/mine_street_light_3.png`);
-    scene.load.image("mine_truck_1", `${minePath}/mine_truck_1.png`);
-    scene.load.image("mine_truck_2", `${minePath}/mine_truck_2.png`);
-    scene.load.image("mine_truck_3", `${minePath}/mine_truck_3.png`);
-    scene.load.image("mine_truck_red", `${minePath}/mine_truck_red.png`);
+    scene.load.image("mine_bg_cave", `${minePath}/bg_cave.webp`);
+    scene.load.image("mine_cave_rail", `${minePath}/tile_cave_rail.webp`);
+    scene.load.image("mine_cave_rock", `${minePath}/tile_cave_bg_rock.webp`);
+    scene.load.image("mine_street_light", `${minePath}/mine_street_light.webp`);
+    scene.load.image("mine_street_light_1", `${minePath}/mine_street_light_1.webp`);
+    scene.load.image("mine_street_light_2", `${minePath}/mine_street_light_2.webp`);
+    scene.load.image("mine_street_light_3", `${minePath}/mine_street_light_3.webp`);
+    scene.load.image("mine_truck_1", `${minePath}/mine_truck_1.webp`);
+    scene.load.image("mine_truck_2", `${minePath}/mine_truck_2.webp`);
+    scene.load.image("mine_truck_3", `${minePath}/mine_truck_3.webp`);
+    scene.load.image("mine_truck_red", `${minePath}/mine_truck_red.webp`);
   }
 
   private static queueTropicalPack(scene: Phaser.Scene): void {
@@ -1321,23 +1321,23 @@ export class AssetLoader {
     for (let i = 1; i <= 18; i++) {
       scene.load.image(
         `tropical_building_${i}`,
-        `${tropicalPath}/buildings/building_${i}/building_1.png`,
+        `${tropicalPath}/buildings/building_${i}/building_1.webp`,
       );
     }
     for (let i = 1; i <= 18; i++) {
       scene.load.image(
         `tropical_decor_${i}`,
-        `${tropicalPath}/decor/decor_${i}.png`,
+        `${tropicalPath}/decor/decor_${i}.webp`,
       );
     }
     for (let i = 1; i <= 5; i++) {
       scene.load.image(
         `tropical_greenery_${i}`,
-        `${tropicalPath}/decor/greenery_${i}.png`,
+        `${tropicalPath}/decor/greenery_${i}.webp`,
       );
     }
-    scene.load.image("tropical_tree_1", `${tropicalPath}/decor/tree_1.png`);
-    scene.load.image("tropical_tree_2", `${tropicalPath}/decor/tree_2.png`);
+    scene.load.image("tropical_tree_1", `${tropicalPath}/decor/tree_1.webp`);
+    scene.load.image("tropical_tree_2", `${tropicalPath}/decor/tree_2.webp`);
   }
 
   // ── Persona sprite sheets ─────────────────────────────────────────────────

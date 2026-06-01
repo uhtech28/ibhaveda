@@ -16,6 +16,7 @@ import {
   useCallback,
   useMemo,
   Suspense,
+  memo,
 } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
@@ -348,7 +349,7 @@ function deriveCheckpointStatus(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Stage pill navigation strip */
-function StageStrip({
+const StageStrip = memo(function StageStrip({
   activeStage,
   onSelect,
   stages,
@@ -490,10 +491,10 @@ function StageStrip({
       })}
     </motion.div>
   );
-}
+});
 
 /** Checkpoint detail slide-in panel */
-function CheckpointPanel({
+const CheckpointPanel = memo(function CheckpointPanel({
   detail,
   onClose,
   onAdvance,
@@ -624,7 +625,7 @@ function CheckpointPanel({
                   index={i}
                   locked={isLocked}
                   evaluationSummary={evaluationSummary?.find(
-                    (entry) => entry.taskLevel === task._taskLevel,
+                     (entry) => entry.taskLevel === task._taskLevel,
                   )}
                   onToggle={() => {
                     audioManager.playTouch("click");
@@ -754,7 +755,7 @@ function CheckpointPanel({
       </div>
     </motion.div>
   );
-}
+});
 
 function StatusDot({ status }: { status: CheckpointStatus }) {
   const colors: Record<CheckpointStatus, string> = {
