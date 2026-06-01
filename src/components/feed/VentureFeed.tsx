@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Trophy, Sparkles, Rocket, Calendar, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Trophy, Sparkles, Rocket, Calendar } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
@@ -62,42 +62,62 @@ export function VentureFeed({
   limit: _initialLimit,
   compact = false,
 }: VentureFeedProps) {
-  const [limit, setLimit] = useState(_initialLimit ?? PAGE_SIZE);
-  const [prevCount, setPrevCount] = useState(0);
+  // `requestedLimit` is what we've asked the backend for.
+  // `feed.length < requestedLimit` (once feed is defined) means we've reached the end.
+  const [requestedLimit, setRequestedLimit] = useState(_initialLimit ?? PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Determine which query to use based on props
   const ventureFeedData = useQuery(
     api.socialFeed.getVentureFeed,
-    ventureId ? { ventureId, limit } : "skip"
+    ventureId ? { ventureId, limit: requestedLimit } : "skip"
   );
-
   const ideaFeedData = useQuery(
     api.socialFeed.getIdeaFeed,
-    ideaId ? { ideaId, limit } : "skip"
+    ideaId ? { ideaId, limit: requestedLimit } : "skip"
   );
-
   const userFeedData = useQuery(
     api.socialFeed.getUserVentureFeed,
-    userFeed ? { limit } : "skip"
+    userFeed ? { limit: requestedLimit } : "skip"
   );
-
   const communityFeedData = useQuery(
     api.socialFeed.getCommunityVentureFeed,
-    communityFeed ? { limit } : "skip"
+    communityFeed ? { limit: requestedLimit } : "skip"
   );
 
-  // Get the active feed
   const feed = ventureFeedData ?? ideaFeedData ?? userFeedData ?? communityFeedData;
 
-  const isLoadingMore = feed === undefined && prevCount > 0;
+  // True while Convex hasn't yet returned data for the current requestedLimit.
+  // Convex keeps serving stale data during re-fetch, so we detect "loading more"
+  // by checking whether the returned count is still equal to the *previous* page size.
+  const prevLimit = requestedLimit - PAGE_SIZE;
+  const isLoadingMore =
+    feed !== undefined &&
+    feed.length === prevLimit &&
+    requestedLimit > PAGE_SIZE;
 
-  function handleLoadMore() {
-    setPrevCount(feed?.length ?? 0);
-    setLimit((l) => l + PAGE_SIZE);
-  }
+  // Whether there are likely more items to load
+  const hasMore = feed !== undefined && feed.length >= requestedLimit;
+
+  // Infinite scroll: when the sentinel enters the viewport, bump the limit
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          setRequestedLimit((l) => l + PAGE_SIZE);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore]);
 
   // Initial loading state
-  if (feed === undefined && prevCount === 0) {
+  if (feed === undefined) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -109,7 +129,7 @@ export function VentureFeed({
   }
 
   // Empty state
-  if (feed && feed.length === 0) {
+  if (feed.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
         <Sparkles className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -121,27 +141,19 @@ export function VentureFeed({
     );
   }
 
-  const hasMore = feed ? feed.length >= limit : false;
-
   return (
     <div className={`space-y-${compact ? "3" : "4"}`}>
       {(feed as FeedItem[]).map((item) => (
         <FeedCard key={item._id} item={item as FeedItem} compact={compact} />
       ))}
 
-      {/* Load More / loading indicator */}
-      {(hasMore || isLoadingMore) && (
-        <div className="flex justify-center pt-2">
-          {isLoadingMore ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading more…
-            </div>
-          ) : (
-            <Button variant="outline" size="sm" onClick={handleLoadMore}>
-              Load more
-            </Button>
-          )}
+      {/* Sentinel div — sits just below the last card; triggers next page when visible */}
+      <div ref={sentinelRef} className="h-1" />
+
+      {/* Spinner shown while the next batch is in-flight */}
+      {isLoadingMore && (
+        <div className="flex justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       )}
     </div>
