@@ -205,10 +205,11 @@ const RANK_STYLES = {
 const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user, rank }) => {
   const styles = RANK_STYLES[rank];
   const isFirst = rank === 1;
+  const heightClass = rank === 1 ? "md:min-h-[300px]" : rank === 2 ? "md:min-h-[240px]" : "md:min-h-[210px]";
 
   return (
     <Card
-      className={`relative overflow-hidden border-2 ${styles.border} ${styles.bg} shadow-lg flex flex-col items-center text-center transition-transform duration-300 hover:scale-[1.03] ${
+      className={`relative overflow-hidden border-2 ${styles.border} ${styles.bg} ${heightClass} shadow-lg flex flex-col items-center justify-center text-center transition-transform duration-300 hover:scale-[1.03] ${
         isFirst ? "p-6 md:p-8" : "p-4 md:p-5"
       }`}
     >
@@ -299,17 +300,17 @@ const WeeklyLeaderboard = () => {
        * the left, rank 1 elevated in the center, rank 3 on the right. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
         {/* Rank 1 — first in DOM (top on mobile), centered + elevated on desktop */}
-        <div className="md:order-2 md:-translate-y-2">
+        <div className="md:order-2">
           {first && <PodiumCard user={first} rank={1} />}
         </div>
 
         {/* Rank 2 — second in DOM, left column on desktop */}
-        <div className="md:order-1 md:pb-0 md:translate-y-2">
+        <div className="md:order-1">
           {second ? <PodiumCard user={second} rank={2} /> : <div className="hidden md:block" />}
         </div>
 
         {/* Rank 3 — third in DOM, right column on desktop */}
-        <div className="md:order-3 md:translate-y-2">
+        <div className="md:order-3">
           {third ? <PodiumCard user={third} rank={3} /> : <div className="hidden md:block" />}
         </div>
       </div>
@@ -353,8 +354,8 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const hiddenSkillCount = Math.max(0, user.skills.length - visibleSkills.length);
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 flex flex-col min-h-[236px] h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
-      <div className="p-4 flex-1 flex flex-col">
+    <Card className="group hover:shadow-lg transition-all duration-300 flex flex-col min-h-[204px] h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+      <div className="px-4 pb-2 pt-3 flex flex-col">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
           <div className="flex items-center gap-3 mb-2">
@@ -383,7 +384,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
         </Link>
 
           {/* Tags Section */}
-          <div className="flex flex-col gap-1.5 mb-3 mt-auto">
+          <div className="flex flex-col gap-1.5 mb-2.5">
             {visibleIndustries.length > 0 && (
               <div className="flex flex-wrap gap-1 items-center">
                 {visibleIndustries.map((ind, i) => (
@@ -424,7 +425,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
           </div>
 
           {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-1 py-1.5 border-t border-b border-border/40 mb-1">
+          <div className="grid grid-cols-3 gap-1 py-1.5 border-t border-b border-border/40">
             <button
               type="button"
               onClick={() => openStatsDialog("created")}
@@ -457,7 +458,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
       {/* Footer Actions */}
       {!isCurrentUser && currentUserId && (
-        <div className="px-3 pb-3 pt-0 flex items-center gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="px-3 pb-2 pt-1 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1">
             <InvitationButton
               targetUser={{
