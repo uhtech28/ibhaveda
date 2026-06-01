@@ -1,4 +1,11 @@
 import { describe, it, expect } from 'vitest'
+import {
+  checkpointBossKey,
+  hydrateBossDefeatedFromCheckpoints,
+  isLastCheckpointInStage,
+  mergeBossDefeatedState,
+  needsCheckpointBossCombat,
+} from '@/lib/venture/stageBossGate'
 
 describe('Venture Logic', () => {
   describe('Boss Assignment Logic', () => {
@@ -15,6 +22,58 @@ describe('Venture Logic', () => {
       const assigned = shuffled.slice(0, bossCount)
       const unique = new Set(assigned)
       expect(assigned).toHaveLength(unique.size)
+    })
+  })
+
+  describe('Checkpoint boss gate', () => {
+    const stage1Checkpoints = [
+      { stage: 1, checkpoint: 1, status: 'in_progress', t1Completed: true, t2Completed: true, t3Completed: false },
+      { stage: 1, checkpoint: 2, status: 'not_started', t1Completed: false, t2Completed: false, t3Completed: false },
+      { stage: 1, checkpoint: 3, status: 'not_started', t1Completed: false, t2Completed: false, t3Completed: false },
+    ]
+
+    it('requires boss on current map checkpoint with 2 tasks', () => {
+      const cp = stage1Checkpoints[0]
+      expect(needsCheckpointBossCombat(cp, 2, new Set(), 1, 1)).toBe(true)
+    })
+
+    it('skips boss after defeat on same checkpoint', () => {
+      const cp = stage1Checkpoints[0]
+      const defeated = new Set([checkpointBossKey(1, 1)])
+      expect(needsCheckpointBossCombat(cp, 2, defeated, 1, 1)).toBe(false)
+    })
+
+    it('does not require boss when viewing a different checkpoint than the map position', () => {
+      const cp = stage1Checkpoints[1]
+      expect(needsCheckpointBossCombat(cp, 2, new Set(), 1, 1)).toBe(false)
+    })
+
+    it('requires boss on next checkpoint after map moves', () => {
+      const cp = stage1Checkpoints[1]
+      const defeated = new Set([checkpointBossKey(1, 1)])
+      expect(needsCheckpointBossCombat(cp, 2, defeated, 1, 2)).toBe(true)
+    })
+
+    it('hydrates defeated keys for passed checkpoints only', () => {
+      const cps = [
+        { stage: 1, checkpoint: 1, status: 'completed', t1Completed: true, t2Completed: true, t3Completed: false },
+        { stage: 1, checkpoint: 2, status: 'in_progress', t1Completed: true, t2Completed: true, t3Completed: false },
+      ]
+      const defeated = hydrateBossDefeatedFromCheckpoints(cps, 1, 2)
+      expect(defeated.has('1-1')).toBe(true)
+      expect(defeated.has('1-2')).toBe(false)
+    })
+
+    it('mergeBossDefeatedState keeps session defeat on active checkpoint', () => {
+      const cps = stage1Checkpoints
+      const session = new Set([checkpointBossKey(1, 1)])
+      const merged = mergeBossDefeatedState(cps, 1, 1, undefined, session)
+      expect(merged.has('1-1')).toBe(true)
+    })
+
+    it('detects last checkpoint in stage', () => {
+      expect(isLastCheckpointInStage(stage1Checkpoints, 1, 3)).toBe(true)
+      expect(isLastCheckpointInStage(stage1Checkpoints, 1, 1)).toBe(false)
     })
   })
 

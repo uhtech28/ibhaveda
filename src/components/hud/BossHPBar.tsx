@@ -14,11 +14,11 @@ import { useAtomValue } from "jotai";
 import { corruptionStateAtom } from "@/lib/stores/hudStore";
 import { Skull } from "lucide-react";
 
-export function BossHPBar() {
+export function BossHPBar({ forceVisible = false }: { forceVisible?: boolean }) {
   const corruption = useAtomValue(corruptionStateAtom);
 
-  // Only show when corruption >= 60% (boss emerging)
-  if (corruption.level < 60) return null;
+  // Show during checkpoint boss fights, or when corruption >= 60% (boss emerging)
+  if (!forceVisible && corruption.level < 60) return null;
 
   const hpPercent = (corruption.bossHp / corruption.bossBaseHp) * 100;
   const isLowHP = hpPercent < 30;

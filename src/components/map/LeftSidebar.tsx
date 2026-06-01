@@ -148,53 +148,7 @@ export function LeftSidebar({ onOpenPanel, className, ventureName }: LeftSidebar
             ))}
           </div>
 
-          <div className="mt-auto flex flex-col gap-3">
-            <div className="h-px w-6 sm:w-8 bg-white/10 my-1 sm:my-2" />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    audioManager.playUI("click");
-                    onOpenPanel("settings");
-                  }}
-                  onMouseEnter={() => audioManager.playUI("hover")}
-                  className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all duration-300 hover:scale-110 active:scale-95 group relative"
-                >
-                  <Settings className="h-4 w-4 sm:h-5 sm:w-5 transition-colors" />
-                  <div className="absolute inset-0 rounded-xl bg-indigo-400 opacity-0 group-hover:opacity-5 transition-opacity" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                className="ml-2 bg-slate-900 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest px-3 py-1.5"
-              >
-                <p>Settings</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    audioManager.playUI("click");
-                    onOpenPanel("help");
-                  }}
-                  onMouseEnter={() => audioManager.playUI("hover")}
-                  className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-110 active:scale-95 group relative"
-                >
-                  <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 transition-colors" />
-                  <div className="absolute inset-0 rounded-xl bg-cyan-400 opacity-0 group-hover:opacity-5 transition-opacity" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                className="ml-2 bg-slate-900 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest px-3 py-1.5"
-              >
-                <p>Help Center</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
         </motion.div>
       </TooltipProvider>
     </>

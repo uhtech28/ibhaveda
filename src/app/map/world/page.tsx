@@ -31,11 +31,19 @@ import type { Id } from "@convex/_generated/dataModel";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { CommentsSection } from "@/components/comments/CommentsSection";
-import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight } from "lucide-react";
+import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords } from "lucide-react";
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
+import {
+  checkpointBossKey,
+  isActiveVentureCheckpoint,
+  isLastCheckpointInStage,
+  mergeBossDefeatedState,
+  needsCheckpointBossCombat,
+  persistCheckpointBossDefeated,
+} from "@/lib/venture/stageBossGate";
 import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -489,12 +497,18 @@ function CheckpointPanel({
   isAdvancing,
   activeStage,
   activeCheckpoint,
+  showBossGateHint = false,
+  isCurrentMapCheckpoint = false,
+  totalCheckpointsInStage = 4,
 }: {
   detail: CheckpointDetail | null;
   onClose: () => void;
   onAdvance: () => void;
   onTaskToggle: (taskIdx: number) => void;
   onTaskRedo: (taskIdx: number) => void;
+  showBossGateHint?: boolean;
+  isCurrentMapCheckpoint?: boolean;
+  totalCheckpointsInStage?: number;
   evaluationSummary?: Array<{
     taskLevel: "t1" | "t2" | "t3";
     taskStatus: string;
@@ -511,11 +525,12 @@ function CheckpointPanel({
 }) {
   if (!detail) return null;
 
+  const totalTasks = detail.tasks.length;
   const doneTasks = detail.tasks.filter((t) => t.done).length;
-  const canAdvance = doneTasks >= 2;
-  const isGold = doneTasks >= detail.tasks.length;
+  const canAdvance = doneTasks >= 2 && isCurrentMapCheckpoint;
+  const isGold = doneTasks >= totalTasks && totalTasks > 0;
   const isLocked = detail.status === "locked";
-  const isActiveNode = detail.stage === activeStage && detail.checkpointIndex === activeCheckpoint;
+  const bossEncounterNumber = detail.checkpointIndex;
 
   return (
     <motion.div
@@ -593,11 +608,64 @@ function CheckpointPanel({
 
           </div>
 
-          {/* Advance button */}
-          {!isLocked &&
-            (detail.status !== "completed" || isActiveNode) &&
-            (detail.status !== "gold" || isActiveNode) && (
-              <div className="p-2.5 sm:p-3 pt-0">
+          {/* Advance + boss counter — shown on every unlocked checkpoint */}
+          {!isLocked && (
+              <div className="p-2.5 sm:p-3 pt-0 flex flex-col gap-2">
+                {isGold && (
+                  <div
+                    className="rounded-lg border px-3 py-2.5 flex flex-col gap-2"
+                    style={{
+                      borderColor: "rgba(234, 179, 8, 0.35)",
+                      background:
+                        "linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(120, 53, 15, 0.08))",
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-amber-200/80">
+                        Tasks complete
+                      </span>
+                      <span className="text-[10px] font-black text-amber-300 tabular-nums">
+                        {doneTasks}/{totalTasks}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      {detail.tasks.map((task, i) => (
+                        <div
+                          key={i}
+                          className="h-1.5 flex-1 rounded-full transition-colors"
+                          style={{
+                            background: task.done
+                              ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
+                              : "rgba(255,255,255,0.08)",
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="flex items-center justify-between gap-2 pt-1 border-t"
+                      style={{ borderColor: "rgba(234, 179, 8, 0.2)" }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Swords className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-red-300/90">
+                          Boss encounter
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black text-amber-200 tabular-nums">
+                        CP {bossEncounterNumber}/{totalCheckpointsInStage}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {!isGold && canAdvance && (
+                  <div className="flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-wider text-indigo-300/70">
+                    <span>Tasks {doneTasks}/{totalTasks}</span>
+                    <span className="flex items-center gap-1">
+                      <Swords className="w-3 h-3" />
+                      Boss on advance
+                    </span>
+                  </div>
+                )}
                 <motion.button
                   onClick={() => {
                     audioManager.playTouch(canAdvance ? "confirm" : "error");
@@ -646,14 +714,31 @@ function CheckpointPanel({
                       transition={{ duration: 0.5, ease: "easeInOut" }}
                     />
                   )}
-                  <span className="relative z-10">
-                    {isAdvancing
-                      ? "Processing checkpoint..."
-                      : isGold
-                        ? "⭐  Gold Checkpoint — Advance"
-                        : canAdvance
-                          ? "Advance Checkpoint →"
-                          : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
+                  <span className="relative z-10 flex flex-col items-center gap-0.5">
+                    <span>
+                      {isAdvancing
+                        ? "Processing checkpoint..."
+                        : isGold
+                          ? "Proceed to Next Step →"
+                          : canAdvance
+                            ? "Advance Checkpoint →"
+                            : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
+                    </span>
+                    {!isCurrentMapCheckpoint && doneTasks >= 2 && !isAdvancing && (
+                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-70 text-amber-400/90">
+                        Move to this checkpoint on the map to advance
+                      </span>
+                    )}
+                    {isGold && canAdvance && !isAdvancing && showBossGateHint && (
+                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-80 text-amber-200/90">
+                        Face the stage boss, then advance to the next checkpoint
+                      </span>
+                    )}
+                    {canAdvance && !isGold && !isAdvancing && showBossGateHint && (
+                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-70">
+                        Boss encounter opens when you advance
+                      </span>
+                    )}
                   </span>
                 </motion.button>
               </div>
@@ -1109,6 +1194,7 @@ function MapPageInner() {
     stage: 1,
     checkpoint: 1,
   });
+  const lastAutoOpenedStageRef = useRef(0);
   const hasAutoOpenedRef = useRef(false);
 
   useEffect(() => {
@@ -1474,12 +1560,10 @@ function MapPageInner() {
   const [interCheckpointQueue, setInterCheckpointQueue] = useState<Array<"henchman" | "treasure" | "shield" | "insight" | "clear">>([]);
   const [bypassInterCheckpoint, setBypassInterCheckpoint] = useState(false);
 
-  // ── Boss combat gate state ────────────────────────────────────────────────
-  // Tracks which checkpoints have already had boss defeated (key = "stage-checkpoint")
-  const [bossDefeatedCheckpoints, setBossDefeatedCheckpoints] = useState<Set<string>>(
-    () => new Set()
-  );
-  // When non-null the boss combat overlay is open for this checkpoint
+  // ── Boss combat gate: one fight per checkpoint before advance ─────────────
+  const [bossDefeatedAtCheckpoint, setBossDefeatedAtCheckpoint] = useState<
+    Set<string>
+  >(() => new Set());
   const [bossCombatTarget, setBossCombatTarget] = useState<{
     stage: number;
     checkpoint: number;
@@ -1487,15 +1571,6 @@ function MapPageInner() {
     isLastInStage: boolean;
     isGold: boolean;
   } | null>(null);
-
-  useEffect(() => {
-    if (!phaserReady || !bossCombatTarget) return;
-    eventBridge.dispatchToPhaser({
-      type: "BOSS_COMBAT_START",
-      stage: bossCombatTarget.stage,
-      checkpoint: bossCombatTarget.checkpoint,
-    });
-  }, [bossCombatTarget, phaserReady]);
 
   const dismissBossCombatVisual = useCallback((stage: number) => {
     eventBridge.dispatchToPhaser({
@@ -1566,6 +1641,7 @@ function MapPageInner() {
     () => worldMapData?.checkpoints ?? [],
     [worldMapData?.checkpoints],
   );
+
   const brightness = worldMapData?.brightness;
   const ideaTitle = worldMapData?.ideaTitle ?? "Your Venture";
   const superBoss = worldMapData?.superBoss ?? null;
@@ -1580,6 +1656,107 @@ function MapPageInner() {
 
   const activeStage = venture?.currentStage ?? 1;
   const activeCP = venture?.currentCheckpoint ?? 1;
+
+  useEffect(() => {
+    if (!checkpoints.length) return;
+    setBossDefeatedAtCheckpoint((prev) =>
+      mergeBossDefeatedState(
+        checkpoints,
+        activeStage,
+        activeCP,
+        venture?._id,
+        prev,
+      ),
+    );
+  }, [venture?._id, activeStage, activeCP, checkpoints]);
+
+  const startBossCombat = useCallback(
+    (
+      cp: { stage: number; checkpoint: number; _id: string },
+      doneTasks: number,
+    ) => {
+      const isLastCp = isLastCheckpointInStage(
+        checkpoints,
+        cp.stage,
+        cp.checkpoint,
+      );
+      setBossCombatTarget({
+        stage: cp.stage,
+        checkpoint: cp.checkpoint,
+        checkpointId: cp._id,
+        isLastInStage: isLastCp,
+        isGold: doneTasks >= 3,
+      });
+      audioManager.playUI("confirm");
+      eventBridge.dispatchToPhaser({
+        type: "BOSS_COMBAT_START",
+        stage: cp.stage,
+        checkpoint: cp.checkpoint,
+      });
+    },
+    [checkpoints],
+  );
+
+  const bossCombatTargetRef = useRef(bossCombatTarget);
+  bossCombatTargetRef.current = bossCombatTarget;
+
+  const bossFinishInFlightRef = useRef(false);
+
+  const finishBossCombatAndAdvance = useCallback(() => {
+    if (bossFinishInFlightRef.current) return;
+    const target = bossCombatTargetRef.current;
+    if (!target) return;
+    bossFinishInFlightRef.current = true;
+
+    const { stage, checkpoint, isLastInStage, isGold } = target;
+    const key = checkpointBossKey(stage, checkpoint);
+    setBossDefeatedAtCheckpoint((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+
+    if (isLastInStage) {
+      eventBridge.dispatchToPhaser({
+        type: "BOSS_FINAL_OUTCOME",
+        stage,
+        outcome: isGold ? "slay_gold" : "retreat_permanent",
+      });
+    } else {
+      eventBridge.dispatchToPhaser({
+        type: "BOSS_COMBAT_RETREAT",
+        stage,
+        checkpoint,
+      });
+    }
+
+    bossAdvanceCheckpointIdRef.current = target.checkpointId;
+    setBossCombatTarget(null);
+    advancingFromBossRef.current = true;
+    void handleAdvanceRef.current(true, true, true);
+  }, []);
+
+  const showBossGateHint = useMemo(() => {
+    if (!selectedDetail) return false;
+    const cp = checkpoints.find((c) => c._id === selectedDetail.id);
+    if (!cp) return false;
+    const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
+      Boolean,
+    ).length;
+    return needsCheckpointBossCombat(
+      cp,
+      doneTasks,
+      bossDefeatedAtCheckpoint,
+      activeStage,
+      activeCP,
+    );
+  }, [
+    selectedDetail,
+    checkpoints,
+    bossDefeatedAtCheckpoint,
+    activeStage,
+    activeCP,
+  ]);
   const corruptionLevel = venture?.corruptionLevel ?? 0;
   const corruptionPhase = useMemo(() => {
     if (corruptionLevel >= 90) return "critical" as const;
@@ -1809,21 +1986,24 @@ function MapPageInner() {
             updateUrlParams({ checkpointId: nextActiveCheckpoint._id }, true);
           }
         }
-      } else if (stageChanged) {
-        // Panel was closed (e.g. we closed it on stage boundary) —
-        // auto-open the new active checkpoint so the user sees Level 4 content.
+      } else if (
+        stageChanged &&
+        lastAutoOpenedStageRef.current !== activeStage
+      ) {
         const newActiveCheckpoint = checkpoints.find(
           (cp) => cp.stage === activeStage && cp.checkpoint === activeCP,
         );
         if (newActiveCheckpoint) {
+          lastAutoOpenedStageRef.current = activeStage;
           updateUrlParams({ checkpointId: newActiveCheckpoint._id }, true);
-          eventBridge.dispatchToPhaser({
-            type: "SCROLL_TO_CHECKPOINT",
-            checkpointId: newActiveCheckpoint._id,
-          });
-          console.log(
-            `[MapPage] 🚀 Stage transition detected: ${previousActive.stage} → ${activeStage}. Auto-opening CP ${activeCP}.`,
-          );
+          if (phaserReady) {
+            window.requestAnimationFrame(() => {
+              eventBridge.dispatchToPhaser({
+                type: "SCROLL_TO_CHECKPOINT",
+                checkpointId: newActiveCheckpoint._id,
+              });
+            });
+          }
         }
       }
     }
@@ -1835,6 +2015,7 @@ function MapPageInner() {
     checkpoints,
     selectedDetail,
     updateUrlParams,
+    phaserReady,
   ]);
 
   // ── Persist gender to DB whenever venture + gender are known ─────────────
@@ -2446,7 +2627,15 @@ function MapPageInner() {
 
   // Stable ref so handleTaskSubmissionSuccess can call handleAdvance
   // without creating a circular useCallback dependency.
-  const handleAdvanceRef = useRef<(forceBypass?: boolean, skipDoneTasksCheck?: boolean) => void>(() => { });
+  const handleAdvanceRef = useRef<
+    (
+      forceBypass?: boolean,
+      skipDoneTasksCheck?: boolean,
+      fromBossVictory?: boolean,
+    ) => void | Promise<void>
+  >(() => { });
+  const advancingFromBossRef = useRef(false);
+  const bossAdvanceCheckpointIdRef = useRef<string | null>(null);
 
   const handleTaskSubmissionSuccess = useCallback(
     ({
@@ -2656,13 +2845,6 @@ function MapPageInner() {
           setActiveTaskAtom(null);
         }
 
-        // ── Auto-advance when the checkpoint is now ready (≥2 tasks done) ──
-        if (doneCount >= 2) {
-          setTimeout(() => {
-            handleAdvanceRef.current(false, true);
-          }, 900);
-        }
-
         setSelectedDetail({
           ...current,
           status:
@@ -2689,32 +2871,55 @@ function MapPageInner() {
   );
 
   // ── Advance checkpoint → Convex mutation ──────────────────────────────────
-  const handleAdvance = useCallback(async (forceBypass = false, skipDoneTasksCheck = false) => {
-    if (!selectedDetail || !venture || isAdvancingCheckpoint) return;
+  const handleAdvance = useCallback(async (
+    forceBypass = false,
+    skipDoneTasksCheck = false,
+    fromBossVictory = false,
+  ) => {
+    if (!venture || isAdvancingCheckpoint) return;
 
-    // Find the real Convex checkpoint document
-    const cp = checkpoints.find((c) => c._id === selectedDetail.id);
-    if (!cp) return;
+    const cp = fromBossVictory && bossAdvanceCheckpointIdRef.current
+      ? checkpoints.find((c) => c._id === bossAdvanceCheckpointIdRef.current)
+      : selectedDetail
+        ? checkpoints.find((c) => c._id === selectedDetail.id)
+        : undefined;
+
+    if (!cp) {
+      if (fromBossVictory) {
+        advancingFromBossRef.current = false;
+        bossFinishInFlightRef.current = false;
+        bossAdvanceCheckpointIdRef.current = null;
+      }
+      return;
+    }
 
     const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
       Boolean,
     ).length;
     if (doneTasks < 2 && !skipDoneTasksCheck) return;
 
-    // ── Boss combat gate: must defeat boss before every checkpoint advance ──
-    const bossCombatKey = `${cp.stage}-${cp.checkpoint}`;
-    if (!bossDefeatedCheckpoints.has(bossCombatKey) && !forceBypass) {
-      const isLastCp = !checkpoints.find(
-        (c) => c.stage === cp.stage && c.checkpoint === cp.checkpoint + 1,
-      );
-      const isGoldCp = doneTasks >= 3;
-      setBossCombatTarget({
-        stage: cp.stage,
-        checkpoint: cp.checkpoint,
-        checkpointId: cp._id,
-        isLastInStage: isLastCp,
-        isGold: isGoldCp,
-      });
+    const mapStage = venture.currentStage ?? 1;
+    const mapCheckpoint = venture.currentCheckpoint ?? 1;
+
+    if (
+      !fromBossVictory &&
+      !isActiveVentureCheckpoint(cp, mapStage, mapCheckpoint)
+    ) {
+      return;
+    }
+
+    // ── Boss combat: required once per checkpoint before advance ────────────
+    if (
+      !forceBypass &&
+      needsCheckpointBossCombat(
+        cp,
+        doneTasks,
+        bossDefeatedAtCheckpoint,
+        mapStage,
+        mapCheckpoint,
+      )
+    ) {
+      startBossCombat(cp, doneTasks);
       return;
     }
 
@@ -2741,54 +2946,74 @@ function MapPageInner() {
     setFlashTrigger((n) => n + 1);
     setIsAdvancingCheckpoint(true);
 
+    const afterBossVictory = fromBossVictory || advancingFromBossRef.current;
+
     try {
       if (phaserReady) {
-        await new Promise<void>((resolve) => {
-          let settled = false;
-
-          const handleAnimationDone = (event: {
-            checkpointId: string;
-            stage: number;
-          }) => {
-            if (settled) return;
-            if (event.checkpointId !== cp._id || event.stage !== cp.stage)
-              return;
-
-            settled = true;
-            window.clearTimeout(timeout);
-            eventBridge.off(
-              "CHECKPOINT_ANIMATION_COMPLETE",
-              handleAnimationDone,
-            );
-            resolve();
-          };
-
-          const timeout = window.setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            eventBridge.off(
-              "CHECKPOINT_ANIMATION_COMPLETE",
-              handleAnimationDone,
-            );
-            resolve();
-          }, 4000);
-
-          eventBridge.onReact(
-            "CHECKPOINT_ANIMATION_COMPLETE",
-            handleAnimationDone,
-          );
-          eventBridge.dispatchToPhaser({
-            type: "PLAY_CHECKPOINT_ANIMATION",
-            checkpointId: cp._id,
-            stage: cp.stage,
-            variant: animVariant,
-          });
+        eventBridge.dispatchToPhaser({
+          type: "PLAY_CHECKPOINT_ANIMATION",
+          checkpointId: cp._id,
+          stage: cp.stage,
+          variant: animVariant,
         });
+
+        if (!afterBossVictory) {
+          await new Promise<void>((resolve) => {
+            let settled = false;
+
+            const handleAnimationDone = (event: {
+              checkpointId: string;
+              stage: number;
+            }) => {
+              if (settled) return;
+              if (event.checkpointId !== cp._id || event.stage !== cp.stage)
+                return;
+
+              settled = true;
+              window.clearTimeout(timeout);
+              eventBridge.off(
+                "CHECKPOINT_ANIMATION_COMPLETE",
+                handleAnimationDone,
+              );
+              resolve();
+            };
+
+            const timeout = window.setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              eventBridge.off(
+                "CHECKPOINT_ANIMATION_COMPLETE",
+                handleAnimationDone,
+              );
+              resolve();
+            }, 4000);
+
+            eventBridge.onReact(
+              "CHECKPOINT_ANIMATION_COMPLETE",
+              handleAnimationDone,
+            );
+          });
+        }
       }
 
       recentTaskSubmitRef.current = Date.now();
       await advanceCheckpoint({
         checkpointId: cp._id as Id<"ventureCheckpoints">,
+      });
+
+      if (afterBossVictory) {
+        advancingFromBossRef.current = false;
+        bossAdvanceCheckpointIdRef.current = null;
+      }
+
+      const clearedKey = checkpointBossKey(cp.stage, cp.checkpoint);
+      setBossDefeatedAtCheckpoint((prev) => {
+        const next = new Set(prev);
+        next.add(clearedKey);
+        if (venture._id) {
+          persistCheckpointBossDefeated(venture._id, next);
+        }
+        return next;
       });
 
       // Reset bypass flag AFTER successful advance
@@ -2871,7 +3096,6 @@ function MapPageInner() {
       });
 
       if (isLastInStage) {
-        // Stage boundary — show stage clear modal!
         const stageNames = templateStages.map((stage) => stage.name);
         const stageMedalTier: "gold" | "silver" | "bronze" =
           corruptionLevel <= 30
@@ -2881,17 +3105,23 @@ function MapPageInner() {
               : "bronze";
         const currentStageMeta = templateStages[cp.stage - 1];
         const nextStageMeta = templateStages[cp.stage];
+        const skipStageCeremony = advancingFromBossRef.current;
+        if (skipStageCeremony) {
+          advancingFromBossRef.current = false;
+        }
 
-        setStageClearModal({
-          show: true,
-          stageNumber: cp.stage,
-          stageName: stageNames[cp.stage - 1] || "Stage",
-          isGold,
-          medalTier: stageMedalTier,
-          fromBiome: currentStageMeta?.biome,
-          nextStageName: nextStageMeta?.name,
-          nextBiome: nextStageMeta?.biome,
-        });
+        if (!skipStageCeremony) {
+          setStageClearModal({
+            show: true,
+            stageNumber: cp.stage,
+            stageName: stageNames[cp.stage - 1] || "Stage",
+            isGold,
+            medalTier: stageMedalTier,
+            fromBiome: currentStageMeta?.biome,
+            nextStageName: nextStageMeta?.name,
+            nextBiome: nextStageMeta?.biome,
+          });
+        }
 
         const stageBadgeRarity: BadgePayload["rarity"] =
           stageMedalTier === "gold"
@@ -2940,28 +3170,48 @@ function MapPageInner() {
           },
         ]);
 
-        // Close the panel. Convex will update venture.currentStage
-        // and the useEffect at line ~1038 will auto-open the new active checkpoint.
-        setSelectedDetail(null);
+        const nextStageFirst = checkpoints.find(
+          (c) => c.stage === cp.stage + 1 && c.checkpoint === 1,
+        );
+        if (skipStageCeremony && nextStageFirst) {
+          setSelectedDetail(buildCheckpointDetail(nextStageFirst));
+          updateUrlParams({ checkpointId: nextStageFirst._id }, true);
+          if (phaserReady) {
+            window.requestAnimationFrame(() => {
+              eventBridge.dispatchToPhaser({
+                type: "SCROLL_TO_CHECKPOINT",
+                checkpointId: nextStageFirst._id,
+              });
+            });
+          }
+        } else {
+          setSelectedDetail(null);
+          updateUrlParams({ checkpointId: null }, true);
+        }
       } else if (nextCp) {
         // Same-stage advance — open the next checkpoint panel immediately.
-        // Build the detail now: Convex hasn't updated yet, but the next checkpoint
-        // is still in the same stage so activeStage/activeCP will be correct
-        // once Convex propagates. We optimistically show it.
         setSelectedDetail(buildCheckpointDetail(nextCp));
         updateUrlParams({ checkpointId: nextCp._id }, true);
-        eventBridge.dispatchToPhaser({
-          type: "SCROLL_TO_CHECKPOINT",
-          checkpointId: nextCp._id,
-        });
+        if (phaserReady) {
+          window.requestAnimationFrame(() => {
+            eventBridge.dispatchToPhaser({
+              type: "SCROLL_TO_CHECKPOINT",
+              checkpointId: nextCp._id,
+            });
+          });
+        }
       } else {
         setSelectedDetail(null);
         updateUrlParams({ checkpointId: null }, true);
       }
     } catch (err) {
       console.error("advanceCheckpoint failed:", err);
+      advancingFromBossRef.current = false;
+      bossFinishInFlightRef.current = false;
+      bossAdvanceCheckpointIdRef.current = null;
     } finally {
       setIsAdvancingCheckpoint(false);
+      bossFinishInFlightRef.current = false;
     }
   }, [
     selectedDetail,
@@ -2976,8 +3226,9 @@ function MapPageInner() {
     bypassInterCheckpoint,
     interCheckpointData,
     updateUrlParams,
-    bossDefeatedCheckpoints,
+    bossDefeatedAtCheckpoint,
     setBossCombatTarget,
+    startBossCombat,
   ]);
 
   // Keep handleAdvanceRef always pointing at the latest handleAdvance
@@ -3246,7 +3497,7 @@ function MapPageInner() {
           {/* Quest List removed per user request */}
 
           {/* Boss HP Bar - shows when corruption > 60% */}
-          <BossHPBar />
+          <BossHPBar forceVisible={!!bossCombatTarget} />
 
           {/* Stage navigation strip removed */}
 
@@ -3313,44 +3564,8 @@ function MapPageInner() {
               isBossCombat={true}
               isLastCheckpointInStage={bossCombatTarget.isLastInStage}
               isGoldCheckpoint={bossCombatTarget.isGold}
-              onBossVictory={() => {
-                const key = `${bossCombatTarget.stage}-${bossCombatTarget.checkpoint}`;
-                setBossDefeatedCheckpoints((prev) => {
-                  const next = new Set(prev);
-                  next.add(key);
-                  return next;
-                });
-                if (bossCombatTarget.isLastInStage) {
-                  eventBridge.dispatchToPhaser({
-                    type: "BOSS_FINAL_OUTCOME",
-                    stage: bossCombatTarget.stage,
-                    outcome: bossCombatTarget.isGold ? "slay_gold" : "retreat_permanent",
-                  });
-                } else {
-                  eventBridge.dispatchToPhaser({
-                    type: "BOSS_COMBAT_RETREAT",
-                    stage: bossCombatTarget.stage,
-                    checkpoint: bossCombatTarget.checkpoint,
-                  });
-                }
-                setBossCombatTarget(null);
-                setTimeout(() => handleAdvanceRef.current(true), 300);
-              }}
-              onBossSkip={() => {
-                const key = `${bossCombatTarget.stage}-${bossCombatTarget.checkpoint}`;
-                setBossDefeatedCheckpoints((prev) => {
-                  const next = new Set(prev);
-                  next.add(key);
-                  return next;
-                });
-                eventBridge.dispatchToPhaser({
-                  type: "BOSS_COMBAT_RETREAT",
-                  stage: bossCombatTarget.stage,
-                  checkpoint: bossCombatTarget.checkpoint,
-                });
-                setBossCombatTarget(null);
-                setTimeout(() => handleAdvanceRef.current(true), 300);
-              }}
+              onBossVictory={finishBossCombatAndAdvance}
+              onBossSkip={finishBossCombatAndAdvance}
               onBossRetreat={() => {
                 dismissBossCombatVisual(bossCombatTarget.stage);
                 setBossCombatTarget(null);
@@ -3458,6 +3673,14 @@ function MapPageInner() {
                 isAdvancing={isAdvancingCheckpoint}
                 activeStage={activeStage}
                 activeCheckpoint={activeCP}
+                showBossGateHint={showBossGateHint}
+                isCurrentMapCheckpoint={
+                  selectedDetail.stage === activeStage &&
+                  selectedDetail.checkpointIndex === activeCP
+                }
+                totalCheckpointsInStage={
+                  templateStages[selectedDetail.stage - 1]?.checkpoints ?? 4
+                }
               />
             )}
           </AnimatePresence>

@@ -7253,7 +7253,9 @@ export class WorldMapScene extends Phaser.Scene {
 
       // Fog overlays removed - all stages visible
       // this.updateStageVisibility(this.currentStage, stageChanged);
-      this.navigateToViewingStage(this.currentStage, false);
+      if (this.getMainCamera()) {
+        this.navigateToViewingStage(this.currentStage, false);
+      }
 
       // Count completed stages (all stages before current)
       this.completedStages = this.currentStage - 1;
@@ -7784,6 +7786,14 @@ export class WorldMapScene extends Phaser.Scene {
     return route;
   }
 
+  /** Main camera when scene is active; null during init/teardown (e.g. Fast Refresh). */
+  private getMainCamera(): Phaser.Cameras.Scene2D.Camera | null {
+    if (!this.sys?.isActive() || !this.cameras?.main) {
+      return null;
+    }
+    return this.cameras.main;
+  }
+
   /**
    * Handles camera scroll requests to specific checkpoints
    */
@@ -7810,13 +7820,16 @@ export class WorldMapScene extends Phaser.Scene {
    * Scroll camera to show a specific checkpoint
    */
   private scrollToCheckpoint(checkpointId: string, smooth = true): void {
+    const cam = this.getMainCamera();
+    if (!cam) return;
+
     const node = this.getCheckpointNode(checkpointId);
     if (!node) return;
 
     this.viewingStageId = node.stage;
     this.updateCameraBoundsForViewingStage(node.stage);
 
-    const zoom = this.cameras.main.zoom;
+    const zoom = cam.zoom;
     const { x: targetX, y: targetY } = this.getStageCameraTarget(
       node.stage,
       node.x,
@@ -7825,13 +7838,13 @@ export class WorldMapScene extends Phaser.Scene {
     );
 
     if (smooth) {
-      this.cameras.main.pan(targetX, targetY, 800, "Sine.easeInOut", false, (_cam, progress) => {
+      cam.pan(targetX, targetY, 800, "Sine.easeInOut", false, (_cam, progress) => {
         if (progress === 1) {
           this.clampCameraToStagePanel(node.stage);
         }
       });
     } else {
-      this.cameras.main.centerOn(targetX, targetY);
+      cam.centerOn(targetX, targetY);
       this.clampCameraToStagePanel(node.stage);
     }
   }
@@ -7842,11 +7855,14 @@ export class WorldMapScene extends Phaser.Scene {
     smooth = true,
   ): void {
     void _checkpointId;
+    const cam = this.getMainCamera();
+    if (!cam) return;
+
     const focusStage = Phaser.Math.Clamp(stage, 1, this.currentStage);
     this.viewingStageId = focusStage;
     this.updateCameraBoundsForViewingStage(focusStage);
 
-    const zoom = this.cameras.main.zoom;
+    const zoom = cam.zoom;
     const stageCenterX = this.getStageViewCameraX(focusStage, zoom);
     const stageCenterY = this.getStageViewCameraY(zoom);
     const { x, y } = this.getStageCameraTarget(
@@ -7857,7 +7873,7 @@ export class WorldMapScene extends Phaser.Scene {
     );
 
     if (smooth) {
-      this.cameras.main.pan(x, y, 800, "Sine.easeInOut", false, (_cam, progress) => {
+      cam.pan(x, y, 800, "Sine.easeInOut", false, (_cam, progress) => {
         if (progress === 1) {
           this.clampCameraToStagePanel(focusStage);
           eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
@@ -7866,7 +7882,7 @@ export class WorldMapScene extends Phaser.Scene {
       return;
     }
 
-    this.cameras.main.centerOn(x, y);
+    cam.centerOn(x, y);
     this.clampCameraToStagePanel(focusStage);
     eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
   }

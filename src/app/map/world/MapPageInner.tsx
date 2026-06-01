@@ -40,6 +40,15 @@ import {
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
+import {
+  checkpointBossKey,
+  hydrateBossDefeatedFromCheckpoints,
+  isLastCheckpointInStage,
+  loadCheckpointBossDefeatedFromStorage,
+  mergeBossDefeatedSets,
+  needsCheckpointBossCombat,
+  persistCheckpointBossDefeated,
+} from "@/lib/venture/stageBossGate";
 import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -545,8 +554,6 @@ function CheckpointPanel({
   const canAdvance = doneTasks >= 2;
   const isGold = doneTasks >= detail.tasks.length;
   const isLocked = detail.status === "locked";
-  const isActiveNode =
-    detail.stage === activeStage && detail.checkpointIndex === activeCheckpoint;
 
   return (
     <motion.div
@@ -624,10 +631,8 @@ function CheckpointPanel({
 
           </div>
 
-          {/* Advance button */}
-          {!isLocked &&
-            (detail.status !== "completed" || isActiveNode) &&
-            (detail.status !== "gold" || isActiveNode) && (
+          {/* Advance button — shown on every unlocked checkpoint */}
+          {!isLocked && (
               <div className="p-2.5 sm:p-3 pt-0">
                 <motion.button
                   onClick={() => {
@@ -677,14 +682,21 @@ function CheckpointPanel({
                       transition={{ duration: 0.5, ease: "easeInOut" }}
                     />
                   )}
-                  <span className="relative z-10">
-                    {isAdvancing
-                      ? "Processing checkpoint..."
-                      : isGold
-                        ? "⭐  Gold Checkpoint — Advance"
-                        : canAdvance
-                          ? "Advance Checkpoint →"
-                          : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
+                  <span className="relative z-10 flex flex-col items-center gap-0.5">
+                    <span>
+                      {isAdvancing
+                        ? "Processing checkpoint..."
+                        : isGold
+                          ? "⭐  Gold Checkpoint — Advance"
+                          : canAdvance
+                            ? "Advance Checkpoint →"
+                            : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
+                    </span>
+                    {canAdvance && !isAdvancing && (
+                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-70">
+                        Boss combat required before advancing
+                      </span>
+                    )}
                   </span>
                 </motion.button>
               </div>
@@ -1485,12 +1497,9 @@ function MapPageInner() {
       : "skip",
   );
 
-  // ── Boss combat gate state ────────────────────────────────────────────────
-  // Tracks which checkpoints have had their boss defeated (key = "stage-checkpoint")
-  const [bossDefeatedCheckpoints, setBossDefeatedCheckpoints] = useState<Set<string>>(
-    () => new Set()
-  );
-  // When non-null, the boss combat overlay is open for this checkpoint
+  const [bossDefeatedAtCheckpoint, setBossDefeatedAtCheckpoint] = useState<
+    Set<string>
+  >(() => new Set());
   const [bossCombatTarget, setBossCombatTarget] = useState<{
     stage: number;
     checkpoint: number;
@@ -1550,6 +1559,22 @@ function MapPageInner() {
     () => worldMapData?.checkpoints ?? [],
     [worldMapData?.checkpoints],
   );
+
+  useEffect(() => {
+    if (!checkpoints.length) return;
+    const fromCheckpoints = hydrateBossDefeatedFromCheckpoints(checkpoints);
+    setBossDefeatedAtCheckpoint((prev) =>
+      mergeBossDefeatedSets(prev, fromCheckpoints),
+    );
+  }, [checkpoints]);
+
+  useEffect(() => {
+    if (!venture?._id) return;
+    const fromStorage = loadCheckpointBossDefeatedFromStorage(venture._id);
+    if (fromStorage.size === 0) return;
+    setBossDefeatedAtCheckpoint((prev) => mergeBossDefeatedSets(prev, fromStorage));
+  }, [venture?._id]);
+
   const brightness = worldMapData?.brightness;
   const ideaTitle = worldMapData?.ideaTitle ?? "Your Venture";
   const superBoss = worldMapData?.superBoss ?? null;
@@ -2660,14 +2685,6 @@ function MapPageInner() {
           setActiveTaskAtom(null);
         }
 
-        // ── Auto-advance when the checkpoint is now ready (≥2 tasks done) ──
-        // Delay gives the badge animation time to breathe before transitioning.
-        if (doneCount >= 2) {
-          setTimeout(() => {
-            handleAdvanceRef.current(false, true);
-          }, 1800);
-        }
-
         setSelectedDetail({
           ...current,
           status:
@@ -2707,20 +2724,21 @@ function MapPageInner() {
       ).length;
       if (doneTasks < 2 && !skipDoneTasksCheck) return;
 
-      // ── Boss combat gate: must defeat boss before every checkpoint advance ─
-      const bossCombatKey = `${cp.stage}-${cp.checkpoint}`;
-      if (!bossDefeatedCheckpoints.has(bossCombatKey) && !forceBypass) {
-        // Compute whether this is the last checkpoint in the stage
-        const isLastCp = !checkpoints.find(
-          (c) => c.stage === cp.stage && c.checkpoint === cp.checkpoint + 1,
+      if (
+        !forceBypass &&
+        needsCheckpointBossCombat(cp, doneTasks, bossDefeatedAtCheckpoint)
+      ) {
+        const isLastCp = isLastCheckpointInStage(
+          checkpoints,
+          cp.stage,
+          cp.checkpoint,
         );
-        const isGoldCp = doneTasks >= 3;
         setBossCombatTarget({
           stage: cp.stage,
           checkpoint: cp.checkpoint,
           checkpointId: cp._id,
           isLastInStage: isLastCp,
-          isGold: isGoldCp,
+          isGold: doneTasks >= 3,
         });
         return;
       }
@@ -2987,7 +3005,7 @@ function MapPageInner() {
       setBadgeQueue,
       bypassInterCheckpoint,
       interCheckpointData,
-      bossDefeatedCheckpoints,
+      bossDefeatedAtCheckpoint,
       updateUrlParams,
     ],
   );
@@ -3283,43 +3301,58 @@ function MapPageInner() {
               isLastCheckpointInStage={bossCombatTarget.isLastInStage}
               isGoldCheckpoint={bossCombatTarget.isGold}
               onBossVictory={() => {
-                const key = `${bossCombatTarget.stage}-${bossCombatTarget.checkpoint}`;
-                // Mark boss as defeated for this checkpoint
-                setBossDefeatedCheckpoints((prev) => {
+                const stage = bossCombatTarget.stage;
+                const checkpoint = bossCombatTarget.checkpoint;
+                const key = checkpointBossKey(stage, checkpoint);
+                setBossDefeatedAtCheckpoint((prev) => {
                   const next = new Set(prev);
                   next.add(key);
+                  if (venture?._id) {
+                    persistCheckpointBossDefeated(venture._id, next);
+                  }
                   return next;
                 });
-                // Fire Phaser visual: boss retreats mid-stage, or is slain at final checkpoint
                 if (bossCombatTarget.isLastInStage) {
                   eventBridge.dispatchToPhaser({
                     type: "BOSS_FINAL_OUTCOME",
-                    stage: bossCombatTarget.stage,
+                    stage,
                     outcome: bossCombatTarget.isGold ? "slay_gold" : "retreat_permanent",
                   });
                 } else {
                   eventBridge.dispatchToPhaser({
                     type: "BOSS_COMBAT_RETREAT",
-                    stage: bossCombatTarget.stage,
-                    checkpoint: bossCombatTarget.checkpoint,
+                    stage,
+                    checkpoint,
                   });
                 }
                 setBossCombatTarget(null);
                 setTimeout(() => handleAdvance(true), 300);
               }}
               onBossSkip={() => {
-                const key = `${bossCombatTarget.stage}-${bossCombatTarget.checkpoint}`;
-                setBossDefeatedCheckpoints((prev) => {
+                const stage = bossCombatTarget.stage;
+                const checkpoint = bossCombatTarget.checkpoint;
+                const key = checkpointBossKey(stage, checkpoint);
+                setBossDefeatedAtCheckpoint((prev) => {
                   const next = new Set(prev);
                   next.add(key);
+                  if (venture?._id) {
+                    persistCheckpointBossDefeated(venture._id, next);
+                  }
                   return next;
                 });
-                // Skip = boss retreats (even at final checkpoint)
-                eventBridge.dispatchToPhaser({
-                  type: "BOSS_COMBAT_RETREAT",
-                  stage: bossCombatTarget.stage,
-                  checkpoint: bossCombatTarget.checkpoint,
-                });
+                if (bossCombatTarget.isLastInStage) {
+                  eventBridge.dispatchToPhaser({
+                    type: "BOSS_FINAL_OUTCOME",
+                    stage,
+                    outcome: "retreat_permanent",
+                  });
+                } else {
+                  eventBridge.dispatchToPhaser({
+                    type: "BOSS_COMBAT_RETREAT",
+                    stage,
+                    checkpoint,
+                  });
+                }
                 setBossCombatTarget(null);
                 setTimeout(() => handleAdvance(true), 300);
               }}

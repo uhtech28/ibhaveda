@@ -142,6 +142,13 @@ export function InterCheckpointOverlay({
   const [timeLeft, setTimeLeft] = useState(20);
   const [answer, setAnswer] = useState("");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const onBossVictoryRef = useRef(onBossVictory);
+  const onBossSkipRef = useRef(onBossSkip);
+
+  useEffect(() => {
+    onBossVictoryRef.current = onBossVictory;
+    onBossSkipRef.current = onBossSkip;
+  }, [onBossVictory, onBossSkip]);
 
   // Result state
   const [resultData, setResultData] = useState<{
@@ -323,6 +330,9 @@ export function InterCheckpointOverlay({
           message: victoryMsg,
         });
         setPhase("result");
+        if (isBossCombat) {
+          window.setTimeout(() => onBossVictoryRef.current?.(), 320);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resolve encounter");
@@ -367,6 +377,9 @@ export function InterCheckpointOverlay({
             : `Paid 5 gold coins to slip past the ${henchmanInfo.name}.`,
         });
         setPhase("result");
+        if (isBossCombat) {
+          window.setTimeout(() => onBossSkipRef.current?.(), 280);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to skip encounter");
@@ -525,12 +538,6 @@ export function InterCheckpointOverlay({
 
                   {/* Combat Stats Panel */}
                   <div className="flex justify-center gap-3 w-full mb-6">
-                    {checkpointScore !== null && checkpointScore > 0 && (
-                      <div className="p-2 px-4 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
-                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Checkpoint Score</span>
-                        <span className="text-xs font-black text-indigo-400 mt-0.5">{Math.round(checkpointScore * 10) / 10}/12</span>
-                      </div>
-                    )}
                     <div className="p-2 px-4 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Project Score</span>
                       <span className="text-xs font-black text-emerald-400 mt-0.5">{Math.round(projectScore * 10) / 10}/12</span>
@@ -576,12 +583,6 @@ export function InterCheckpointOverlay({
 
                   {/* Combat Stats Panel */}
                   <div className="flex justify-center gap-3 w-full mb-4">
-                    {checkpointScore !== null && checkpointScore > 0 && (
-                      <div className="p-2 px-4 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
-                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Checkpoint Score</span>
-                        <span className="text-xs font-black text-indigo-400 mt-0.5">{Math.round(checkpointScore * 10) / 10}/12</span>
-                      </div>
-                    )}
                     <div className="p-2 px-4 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center">
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Project Score</span>
                       <span className="text-xs font-black text-emerald-400 mt-0.5">{Math.round(projectScore * 10) / 10}/12</span>
@@ -792,6 +793,19 @@ export function InterCheckpointOverlay({
                   >
                     Back to Map
                   </button>
+                </div>
+              ) : isBossCombat &&
+                (resultData.outcome === "victory" ||
+                  resultData.outcome === "skipped") ? (
+                <div className="w-full py-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex flex-col items-center gap-1">
+                  <span className="text-sm font-bold text-emerald-300">
+                    {resultData.outcome === "victory" ? "Victory!" : "Passed!"}
+                  </span>
+                  <span className="text-[11px] text-emerald-200/80 animate-pulse">
+                    {isLastCheckpointInStage
+                      ? "Continuing to next stage..."
+                      : "Continuing to next checkpoint..."}
+                  </span>
                 </div>
               ) : (
                 <button

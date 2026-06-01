@@ -134,7 +134,7 @@ export const SearchableUserDropdown: React.FC<SearchableUserDropdownProps> = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] max-w-[420px] p-0 bg-[#0e131f] border border-[#1e293b] shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-xl overflow-hidden backdrop-blur-xl z-[200]"
+        className="w-[var(--radix-popover-trigger-width)] max-w-[420px] p-0 bg-[#0e131f] border border-[#1e293b] shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-xl overflow-hidden backdrop-blur-xl z-[10100]"
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
