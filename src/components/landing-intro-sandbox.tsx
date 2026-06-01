@@ -117,11 +117,10 @@ export default function LandingIntroSandbox({
       { f: 311, d: 0.40 }, { f: 294, d: 0.40 }, { f: 262, d: 1.50 },
     ];
 
-    type AudioCtor = typeof AudioContext;
-    const AudioCtor: AudioCtor | undefined =
+    const AudioCtorClass: (typeof AudioContext) | undefined =
       window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: AudioCtor }).webkitAudioContext;
-    if (!AudioCtor) return;
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtorClass) return;
 
     let ctx: AudioContext | null = null;
     let started = false;
@@ -156,29 +155,49 @@ export default function LandingIntroSandbox({
       }
     };
 
-    // Key iOS fix: create AudioContext INSIDE the gesture handler.
-    // iOS Safari starts a context in 'running' state when created within a
-    // touch/click event — no resume() needed. Pre-creating on mount leaves it
-    // permanently suspended and resume() calls from later gestures are ignored.
+    // iOS Safari has two quirks that must both be handled:
+    //   1. AudioContext must be created INSIDE a gesture handler (not on mount).
+    //   2. Even then, currentTime stays at 0 until the context has actually
+    //      output audio — so notes scheduled at currentTime+0.1 are silently
+    //      skipped. Fix: play a 1-sample silent buffer first; its onended
+    //      callback fires once the clock is ticking, then schedule real notes.
     const startAudio = () => {
       if (started || stopped) return;
       started = true;
       try {
-        ctx = new AudioCtor();
-        if (ctx.state === "running") {
+        ctx = new AudioCtorClass();
+
+        let scheduled = false;
+        const doSchedule = () => {
+          if (scheduled || !ctx || stopped) return;
+          scheduled = true;
           scheduleNotes(ctx);
+        };
+
+        // iOS unlock: play a silent 1-sample buffer to kick-start the clock.
+        // onended fires once currentTime is actually advancing.
+        const silentBuf = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const silentSrc = ctx.createBufferSource();
+        silentSrc.buffer = silentBuf;
+        silentSrc.connect(ctx.destination);
+        silentSrc.onended = doSchedule;
+        silentSrc.start(0);
+
+        // Non-iOS fallback: context already running — rAF ensures we don't
+        // wait unnecessarily on browsers that don't fire onended reliably.
+        if (ctx.state === "running") {
+          requestAnimationFrame(doSchedule);
         } else {
-          // Fallback for browsers that still start suspended (rare on modern Chrome/Firefox)
-          ctx.resume().then(() => { if (ctx && !stopped) scheduleNotes(ctx); }).catch(() => undefined);
+          ctx.resume().catch(() => undefined);
         }
       } catch {
-        // AudioContext creation failed — silent fail
+        /* AudioContext unavailable */
       }
     };
 
-    // Attempt immediate autoplay (works on Firefox and ungated Chromium builds)
+    // Attempt immediate autoplay (works on Firefox / ungated Chromium)
     try {
-      const probe = new AudioCtor();
+      const probe = new AudioCtorClass();
       if (probe.state === "running") {
         ctx = probe;
         started = true;
