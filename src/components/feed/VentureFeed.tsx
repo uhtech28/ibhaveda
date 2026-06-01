@@ -62,10 +62,16 @@ export function VentureFeed({
   limit: _initialLimit,
   compact = false,
 }: VentureFeedProps) {
-  // `requestedLimit` is what we've asked the backend for.
-  // `feed.length < requestedLimit` (once feed is defined) means we've reached the end.
   const [requestedLimit, setRequestedLimit] = useState(_initialLimit ?? PAGE_SIZE);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const prevFeedLengthRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Use refs so the IntersectionObserver callback always sees fresh values
+  // without needing to be recreated on every render.
+  const hasMoreRef = useRef(false);
+  const isFetchingMoreRef = useRef(false);
+  isFetchingMoreRef.current = isFetchingMore;
 
   const ventureFeedData = useQuery(
     api.socialFeed.getVentureFeed,
@@ -86,35 +92,45 @@ export function VentureFeed({
 
   const feed = ventureFeedData ?? ideaFeedData ?? userFeedData ?? communityFeedData;
 
-  // True while Convex hasn't yet returned data for the current requestedLimit.
-  // Convex keeps serving stale data during re-fetch, so we detect "loading more"
-  // by checking whether the returned count is still equal to the *previous* page size.
-  const prevLimit = requestedLimit - PAGE_SIZE;
-  const isLoadingMore =
-    feed !== undefined &&
-    feed.length === prevLimit &&
-    requestedLimit > PAGE_SIZE;
-
-  // Whether there are likely more items to load
+  // hasMore: backend returned a full page, so there are likely more items
   const hasMore = feed !== undefined && feed.length >= requestedLimit;
+  hasMoreRef.current = hasMore;
 
-  // Infinite scroll: when the sentinel enters the viewport, bump the limit
+  // Detect when new data has landed after a load-more request
+  useEffect(() => {
+    if (feed === undefined) return;
+    if (isFetchingMore && feed.length !== prevFeedLengthRef.current) {
+      // New items arrived (or we hit the end — either way, stop spinner)
+      setIsFetchingMore(false);
+      prevFeedLengthRef.current = feed.length;
+    } else if (!isFetchingMore) {
+      prevFeedLengthRef.current = feed.length;
+    }
+  }, [feed, isFetchingMore]);
+
+  function loadMore() {
+    if (isFetchingMoreRef.current || !hasMoreRef.current) return;
+    prevFeedLengthRef.current = feed?.length ?? 0;
+    setIsFetchingMore(true);
+    setRequestedLimit((l) => l + PAGE_SIZE);
+  }
+
+  // Set up IntersectionObserver once — uses refs so it never needs to be recreated
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
-          setRequestedLimit((l) => l + PAGE_SIZE);
-        }
+        if (entries[0].isIntersecting) loadMore();
       },
-      { threshold: 0.1 }
+      { threshold: 0 }
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, isLoadingMore]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initial loading state
   if (feed === undefined) {
@@ -147,11 +163,11 @@ export function VentureFeed({
         <FeedCard key={item._id} item={item as FeedItem} compact={compact} />
       ))}
 
-      {/* Sentinel div — sits just below the last card; triggers next page when visible */}
-      <div ref={sentinelRef} className="h-1" />
+      {/* Sentinel — triggers next page load when scrolled into view */}
+      <div ref={sentinelRef} className="h-4" />
 
-      {/* Spinner shown while the next batch is in-flight */}
-      {isLoadingMore && (
+      {/* Spinner while next batch is in-flight */}
+      {isFetchingMore && (
         <div className="flex justify-center py-4">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
