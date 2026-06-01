@@ -117,18 +117,17 @@ export default function LandingIntroSandbox({
       { f: 311, d: 0.40 }, { f: 294, d: 0.40 }, { f: 262, d: 1.50 },
     ];
 
-    const AudioCtorClass: (typeof AudioContext) | undefined =
+    const AC: typeof AudioContext =
       window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtorClass) return;
+      (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
 
     let ctx: AudioContext | null = null;
-    let started = false;
-    let stopped = false;
+    let done = false;
 
-    const scheduleNotes = (audioCtx: AudioContext) => {
+    const play = (audioCtx: AudioContext) => {
       const masterGain = audioCtx.createGain();
-      const t0 = audioCtx.currentTime + 0.1;
+      const t0 = audioCtx.currentTime + 0.05;
       const tEnd = t0 + TOTAL_RUNTIME_MS / 1000;
       masterGain.gain.setValueAtTime(0.022, t0);
       masterGain.gain.setValueAtTime(0.022, tEnd - 1.5);
@@ -155,69 +154,40 @@ export default function LandingIntroSandbox({
       }
     };
 
-    // iOS Safari has two quirks that must both be handled:
-    //   1. AudioContext must be created INSIDE a gesture handler (not on mount).
-    //   2. Even then, currentTime stays at 0 until the context has actually
-    //      output audio — so notes scheduled at currentTime+0.1 are silently
-    //      skipped. Fix: play a 1-sample silent buffer first; its onended
-    //      callback fires once the clock is ticking, then schedule real notes.
-    const startAudio = () => {
-      if (started || stopped) return;
-      started = true;
+    const unlock = () => {
+      if (done) return;
+      done = true;
+
       try {
-        ctx = new AudioCtorClass();
+        ctx = new AC();
 
-        let scheduled = false;
-        const doSchedule = () => {
-          if (scheduled || !ctx || stopped) return;
-          scheduled = true;
-          scheduleNotes(ctx);
-        };
+        // iOS requires a silent buffer played synchronously inside the gesture
+        // to unfreeze currentTime. We then wait 50ms (via setTimeout) before
+        // scheduling real notes — by then the clock is reliably ticking.
+        const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
 
-        // iOS unlock: play a silent 1-sample buffer to kick-start the clock.
-        // onended fires once currentTime is actually advancing.
-        const silentBuf = ctx.createBuffer(1, 1, ctx.sampleRate);
-        const silentSrc = ctx.createBufferSource();
-        silentSrc.buffer = silentBuf;
-        silentSrc.connect(ctx.destination);
-        silentSrc.onended = doSchedule;
-        silentSrc.start(0);
+        // resume() in case context started suspended (Chrome autoplay policy)
+        ctx.resume().catch(() => undefined);
 
-        // Non-iOS fallback: context already running — rAF ensures we don't
-        // wait unnecessarily on browsers that don't fire onended reliably.
-        if (ctx.state === "running") {
-          requestAnimationFrame(doSchedule);
-        } else {
-          ctx.resume().catch(() => undefined);
-        }
-      } catch {
-        /* AudioContext unavailable */
-      }
+        setTimeout(() => {
+          if (ctx && !ctx.closed) play(ctx);
+        }, 50);
+      } catch { /* not available */ }
     };
 
-    // Attempt immediate autoplay (works on Firefox / ungated Chromium)
-    try {
-      const probe = new AudioCtorClass();
-      if (probe.state === "running") {
-        ctx = probe;
-        started = true;
-        scheduleNotes(ctx);
-      } else {
-        probe.close().catch(() => undefined);
-      }
-    } catch { /* ignore */ }
-
-    if (!started) {
-      window.addEventListener("touchstart", startAudio, { once: true, passive: true });
-      window.addEventListener("pointerdown", startAudio, { once: true });
-      window.addEventListener("keydown", startAudio, { once: true });
-    }
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown",     unlock, { once: true });
 
     return () => {
-      stopped = true;
-      window.removeEventListener("touchstart", startAudio);
-      window.removeEventListener("pointerdown", startAudio);
-      window.removeEventListener("keydown", startAudio);
+      done = true;
+      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown",     unlock);
       ctx?.close().catch(() => undefined);
     };
   }, []);
