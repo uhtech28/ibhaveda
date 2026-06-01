@@ -276,7 +276,7 @@ async function deductPointsAndSyncLevel(
 ) {
   if (args.amount <= 0) return;
 
-  let wallet = await ctx.db
+  const wallet = await ctx.db
     .query("wallets")
     .withIndex("by_user", (q) => q.eq("userId", args.userId))
     .first();
@@ -297,7 +297,7 @@ async function deductPointsAndSyncLevel(
     });
   }
 
-  let userLevel = await ctx.db
+  const userLevel = await ctx.db
     .query("userLevels")
     .withIndex("by_user", (q) => q.eq("userId", args.userId))
     .first();
@@ -1108,7 +1108,7 @@ export const redoTask = mutation({
       });
 
       // Update user levels goldCheckpoints count
-      let userLevel = await ctx.db
+      const userLevel = await ctx.db
         .query("userLevels")
         .withIndex("by_user", (q) => q.eq("userId", user._id))
         .first();
