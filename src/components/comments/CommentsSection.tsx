@@ -24,6 +24,16 @@ function compactAge(ts: number): string {
   return `${Math.floor(w / 52)}y`;
 }
 
+function cleanContent(text: string): string {
+  if (text.startsWith("📌")) {
+    const index = text.indexOf("\n\n");
+    if (index !== -1) {
+      return text.substring(index + 2);
+    }
+  }
+  return text;
+}
+
 type Comment = {
   _id: string;
   authorId: string;
@@ -312,7 +322,7 @@ const CommentItem: React.FC<{
               )}
             </div>
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[#E5E7EB]">
-              {comment.content}
+              {cleanContent(comment.content)}
             </p>
           </div>
 

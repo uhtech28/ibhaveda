@@ -345,6 +345,7 @@ export function ToolsPanel({
                       prompt="Manage your venture tasks and workflow."
                       initialContent={kanbanData}
                       onSubmit={(data) => handleToolSubmit("kanban", data)}
+                      activeVentureId={activeVentureId}
                     />
                   </div>
                 )}

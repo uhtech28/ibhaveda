@@ -185,7 +185,7 @@ interface FeedCardProps {
   compact?: boolean;
 }
 
-function FeedCard({ item, compact = false }: FeedCardProps) {
+const FeedCard = React.memo(({ item, compact = false }: FeedCardProps) => {
   const isGoldCheckpoint = item.type === "gold_checkpoint";
   const isStageComplete = item.type === "venture_stage_complete";
   const isVentureComplete = item.type === "venture_complete";
@@ -210,7 +210,14 @@ function FeedCard({ item, compact = false }: FeedCardProps) {
   const timeAgo = formatTimeAgo(item.createdAt);
 
   return (
-    <Card className={`${cardStyles} transition-all hover:shadow-md`}>
+    <Card
+      style={{
+        transitionProperty: "box-shadow, border-color, background-color",
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        transitionDuration: "200ms",
+      }}
+      className={`${cardStyles} hover:shadow-md will-change-[box-shadow]`}
+    >
       <CardContent className={compact ? "p-4" : "p-6"}>
         {/* Header: User Info */}
         <div className="flex items-start gap-3 mb-3">
@@ -282,7 +289,20 @@ function FeedCard({ item, compact = false }: FeedCardProps) {
       </CardContent>
     </Card>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.item._id === nextProps.item._id &&
+    prevProps.item.message === nextProps.item.message &&
+    prevProps.item.createdAt === nextProps.item.createdAt &&
+    prevProps.item.isRead === nextProps.item.isRead &&
+    prevProps.item.user?.avatar === nextProps.item.user?.avatar &&
+    prevProps.item.user?.displayName === nextProps.item.user?.displayName &&
+    prevProps.item.venture?.name === nextProps.item.venture?.name &&
+    prevProps.compact === nextProps.compact
+  );
+});
+
+FeedCard.displayName = "FeedCard";
 
 // ============================================================================
 // UTILITY FUNCTIONS

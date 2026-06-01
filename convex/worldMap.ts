@@ -263,6 +263,61 @@ async function awardPointsAndSyncLevel(
   }
 }
 
+async function deductPointsAndSyncLevel(
+  ctx: { db: WorldMapDbCtx },
+  args: {
+    userId: Id<"users">;
+    amount: number;
+    type: string;
+    description: string;
+    relatedId: string;
+    now: number;
+  },
+) {
+  if (args.amount <= 0) return;
+
+  let wallet = await ctx.db
+    .query("wallets")
+    .withIndex("by_user", (q) => q.eq("userId", args.userId))
+    .first();
+
+  if (wallet) {
+    await ctx.db.insert("transactions", {
+      walletId: wallet._id,
+      amount: -args.amount,
+      type: args.type,
+      description: args.description,
+      relatedId: args.relatedId,
+      createdAt: args.now,
+    });
+
+    await ctx.db.patch(wallet._id, {
+      balance: Math.max(0, wallet.balance - args.amount),
+      updatedAt: args.now,
+    });
+  }
+
+  let userLevel = await ctx.db
+    .query("userLevels")
+    .withIndex("by_user", (q) => q.eq("userId", args.userId))
+    .first();
+
+  if (userLevel) {
+    const titlePoints = Math.max(0, userLevel.titlePoints - args.amount);
+    const totalPoints = Math.max(0, userLevel.totalPoints - args.amount);
+    const targetLevel = deriveLevelFromTitlePoints(titlePoints);
+
+    await ctx.db.patch(userLevel._id, {
+      currentLevel: targetLevel,
+      titlePoints,
+      totalPoints,
+      updatedAt: args.now,
+    });
+
+    await recalculateAndAwardBadgesHelper(ctx, args.userId);
+  }
+}
+
 type WorldMapVentureDoc = {
   _id: Id<"ventures">;
   userId: Id<"users">;
@@ -1021,6 +1076,142 @@ export const redoTask = mutation({
       throw new Error("Task is not completed yet, cannot redo");
     }
 
+    const now = Date.now();
+
+    // ── Deduct points for the task completion ──────────────────────────────────
+    const pointKey = `task_${args.taskLevel}_complete` as keyof typeof POINT_VALUES;
+    const pts = POINT_VALUES[pointKey] as number | undefined;
+    if (pts) {
+      await deductPointsAndSyncLevel(ctx, {
+        userId: user._id,
+        amount: pts,
+        type: `${args.taskLevel}_task_redo_deduction`,
+        description: `Task ${args.taskLevel.toUpperCase()} redo reset deduction`,
+        relatedId: venture._id,
+        now,
+      });
+    }
+
+    // If this was a gold checkpoint, remove the gold bonus flag and deduct points
+    const wasGold =
+      checkpoint.t1Completed &&
+      checkpoint.t2Completed &&
+      checkpoint.t3Completed;
+    if (wasGold) {
+      await deductPointsAndSyncLevel(ctx, {
+        userId: user._id,
+        amount: POINT_VALUES.gold_checkpoint_bonus,
+        type: "gold_checkpoint_redo_deduction",
+        description: "Gold checkpoint bonus deduction due to task redo reset",
+        relatedId: checkpoint._id,
+        now,
+      });
+
+      // Update user levels goldCheckpoints count
+      let userLevel = await ctx.db
+        .query("userLevels")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .first();
+      if (userLevel && userLevel.goldCheckpoints > 0) {
+        await ctx.db.patch(userLevel._id, {
+          goldCheckpoints: userLevel.goldCheckpoints - 1,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // ── Delete associated evidence and AI evaluations ────────────────────────
+    const oldEvidenceId = task.evidenceId;
+    if (oldEvidenceId) {
+      await ctx.db.delete(oldEvidenceId);
+    }
+
+    const existingEval = await ctx.db
+      .query("aiEvaluations")
+      .withIndex("by_task", (q) => q.eq("taskId", task._id))
+      .first();
+    if (existingEval) {
+      await ctx.db.delete(existingEval._id);
+    }
+
+    // Recalculate stage quality score
+    const stageNumber = checkpoint.stage;
+    const stageCheckpoints = await ctx.db
+      .query("ventureCheckpoints")
+      .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
+      .filter((q) => q.eq(q.field("stage"), stageNumber))
+      .collect();
+
+    let totalCompleteness = 0;
+    let totalSpecificity = 0;
+    let totalEvidence = 0;
+    let totalOriginality = 0;
+    let totalScoreSum = 0;
+    let evalCount = 0;
+
+    for (const cp of stageCheckpoints) {
+      const cpTasks = await ctx.db
+        .query("ventureTasks")
+        .withIndex("by_checkpoint", (q) => q.eq("checkpointId", cp._id))
+        .collect();
+
+      for (const t of cpTasks) {
+        if (t._id === task._id) continue;
+
+        const evalDoc = await ctx.db
+          .query("aiEvaluations")
+          .withIndex("by_task", (q) => q.eq("taskId", t._id))
+          .first();
+
+        if (evalDoc) {
+          totalCompleteness += evalDoc.completeness;
+          totalSpecificity += evalDoc.specificity;
+          totalEvidence += evalDoc.evidence;
+          totalOriginality += evalDoc.originality;
+          totalScoreSum += evalDoc.totalScore;
+          evalCount++;
+        }
+      }
+    }
+
+    const existingQualityScore = await ctx.db
+      .query("qualityScores")
+      .withIndex("by_venture_stage", (q) =>
+        q.eq("ventureId", venture._id).eq("stageNumber", stageNumber)
+      )
+      .first();
+
+    if (existingQualityScore) {
+      if (evalCount > 0) {
+        const avgScore = totalScoreSum / evalCount;
+        const getQualityTierLocal = (score: number) => {
+          if (score >= 9) return "high";
+          if (score >= 5) return "standard";
+          return "low";
+        };
+        const VALUATION_MAP_LOCAL: Record<string, number> = {
+          low: 50000,
+          standard: 150000,
+          high: 500000,
+        };
+        const newTier = getQualityTierLocal(Math.round(avgScore));
+        const newValuationScore = VALUATION_MAP_LOCAL[newTier];
+
+        await ctx.db.patch(existingQualityScore._id, {
+          completeness: totalCompleteness / evalCount,
+          specificity: totalSpecificity / evalCount,
+          evidence: totalEvidence / evalCount,
+          originality: totalOriginality / evalCount,
+          totalScore: avgScore,
+          qualityTier: newTier,
+          valuationScore: newValuationScore,
+          evaluatedAt: Date.now(),
+        });
+      } else {
+        await ctx.db.delete(existingQualityScore._id);
+      }
+    }
+
     // ── Reset task status ─────────────────────────────────────────────────────
     // Use replace to cleanly remove optional fields (evidenceId, completedAt).
     // patch() with undefined values can cause a Convex server error on
@@ -1037,11 +1228,6 @@ export const redoTask = mutation({
       [flagField]: false,
     };
 
-    // If this was a gold checkpoint, remove the gold bonus flag
-    const wasGold =
-      checkpoint.t1Completed &&
-      checkpoint.t2Completed &&
-      checkpoint.t3Completed;
     if (wasGold) {
       cpPatch.goldBonusEarned = false;
     }

@@ -36,7 +36,7 @@ interface IdeaGridCardProps {
   onContributeClick?: (ideaId: string) => void;
 }
 
-export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
+export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
   idea,
   onClick,
   onSpark,
@@ -86,7 +86,12 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
     <div
       ref={innerRef}
       onClick={onClick}
-      className="group relative overflow-hidden rounded-3xl border border-border/50 bg-card text-card-foreground transition-all duration-300 cursor-pointer hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1 flex flex-col h-full"
+      style={{
+        transitionProperty: "transform, box-shadow, border-color, background-color",
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        transitionDuration: "250ms",
+      }}
+      className="group relative overflow-hidden rounded-3xl border border-border/50 bg-card text-card-foreground cursor-pointer hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1 flex flex-col h-full will-change-[transform,box-shadow]"
     >
       {/* Image or Gradient Background - Top Section */}
       <div className="relative h-48 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5 overflow-hidden shrink-0">
@@ -121,7 +126,7 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
               window.location.href = `/profile/${idea.author?.username || idea.authorId}`;
             }
           }}
-          className="absolute top-4 right-4 flex items-center gap-2 bg-background/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 shadow-sm z-10 max-w-[45%] hover:bg-background/50 hover:scale-105 transition-all cursor-pointer"
+          className="absolute top-4 right-4 flex items-center gap-2 bg-background/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 shadow-sm z-10 max-w-[45%] hover:bg-background/50 hover:scale-105 transition-[transform,background-color] duration-150 ease-out cursor-pointer"
         >
           {idea.author?.avatar ? (
             <Image
@@ -310,4 +315,26 @@ export const IdeaGridCard: React.FC<IdeaGridCardProps> = ({
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.idea._id === nextProps.idea._id &&
+    prevProps.idea.title === nextProps.idea.title &&
+    prevProps.idea.description === nextProps.idea.description &&
+    prevProps.idea.category === nextProps.idea.category &&
+    prevProps.idea.industries === nextProps.idea.industries &&
+    prevProps.idea.sparkCount === nextProps.idea.sparkCount &&
+    prevProps.idea.commentCount === nextProps.idea.commentCount &&
+    prevProps.idea.updatedAt === nextProps.idea.updatedAt &&
+    prevProps.contributorsCount === nextProps.contributorsCount &&
+    prevProps.idea.author?._id === nextProps.idea.author?._id &&
+    prevProps.idea.author?.avatar === nextProps.idea.author?.avatar &&
+    prevProps.idea.author?.name === nextProps.idea.author?.name &&
+    prevProps.onClick === nextProps.onClick &&
+    prevProps.onSpark === nextProps.onSpark &&
+    prevProps.onTagClick === nextProps.onTagClick &&
+    prevProps.onCommentClick === nextProps.onCommentClick &&
+    prevProps.onContributeClick === nextProps.onContributeClick
+  );
+});
+
+IdeaGridCard.displayName = "IdeaGridCard";

@@ -1,11 +1,17 @@
+import React from "react";
 import Link from "next/link";
 import { articlePath, type Article } from "@/lib/articles";
 
-export function ArticleCard({ article }: { article: Article }) {
+export const ArticleCard = React.memo(({ article }: { article: Article }) => {
   return (
     <Link
       href={articlePath(article)}
-      className="group block rounded-lg border border-white/10 bg-[#111827]/70 p-5 transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-[#121A29]"
+      style={{
+        transitionProperty: "transform, border-color, background-color",
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        transitionDuration: "200ms",
+      }}
+      className="group block rounded-lg border border-white/10 bg-[#111827]/70 p-5 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-[#121A29] will-change-transform"
     >
       <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
         {article.readTime}
@@ -18,4 +24,6 @@ export function ArticleCard({ article }: { article: Article }) {
       </p>
     </Link>
   );
-}
+});
+
+ArticleCard.displayName = "ArticleCard";

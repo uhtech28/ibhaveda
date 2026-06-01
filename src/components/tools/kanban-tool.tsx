@@ -39,12 +39,33 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface KanbanCard {
   id: string;
   title: string;
   column: "todo" | "inprogress" | "done";
   updatedAt?: number;
+  assignedTo?: {
+    _id: string;
+    name?: string;
+    avatar?: string;
+    username?: string;
+    displayName?: string;
+  };
+  deadline?: number;
+  completionTarget?: string;
 }
 
 interface KanbanToolProps {
@@ -61,10 +82,11 @@ interface KanbanToolProps {
   };
   isSubmitting?: boolean;
   isStandalone?: boolean;
+  activeVentureId?: Id<"ventures">;
 }
 
 // Draggable Card Component
-function DraggableCard({
+const DraggableCard = React.memo(({
   card,
   onDelete,
   onMove,
@@ -72,7 +94,7 @@ function DraggableCard({
   card: KanbanCard;
   onDelete: (id: string) => void;
   onMove?: (id: string, newColumn: "todo" | "inprogress" | "done") => void;
-}) {
+}) => {
   const {
     attributes,
     listeners,
@@ -94,17 +116,55 @@ function DraggableCard({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md transition-shadow"
+      style={{
+        ...style,
+        transitionProperty: transition ? "transform, box-shadow, opacity" : "box-shadow, opacity",
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        transitionDuration: "200ms",
+      }}
+      className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md will-change-[transform,box-shadow]"
     >
       <div className="flex items-start justify-between gap-2">
         <div
-          className="flex items-start gap-2 flex-1"
+          className="flex items-start gap-2 flex-1 min-w-0"
           {...attributes}
           {...listeners}
         >
           <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 cursor-grab shrink-0" />
-          <div className="text-sm flex-1 leading-snug">{card.title}</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold leading-snug text-white break-words">{card.title}</div>
+            
+            {card.completionTarget && (
+              <p className="mt-1 text-xs text-slate-400 line-clamp-2 leading-relaxed break-words">
+                {card.completionTarget}
+              </p>
+            )}
+
+            {(card.assignedTo || card.deadline) && (
+              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                {card.assignedTo && (
+                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full pl-1 pr-2 py-0.5 text-[9px] font-bold text-zinc-300">
+                    <Avatar className="h-4 w-4 shrink-0">
+                      {card.assignedTo.avatar ? (
+                        <AvatarImage src={card.assignedTo.avatar} alt={card.assignedTo.displayName || card.assignedTo.username} />
+                      ) : null}
+                      <AvatarFallback className="text-[7px] bg-primary/10 text-primary font-semibold flex items-center justify-center">
+                        {(card.assignedTo.displayName || card.assignedTo.username || "?").charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="max-w-[70px] truncate">
+                      {card.assignedTo.displayName || card.assignedTo.username}
+                    </span>
+                  </div>
+                )}
+                {card.deadline && (
+                  <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full text-[9px] font-medium">
+                    📅 {new Date(card.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
           {card.column !== "todo" && onMove && (
@@ -142,10 +202,26 @@ function DraggableCard({
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.card.id === nextProps.card.id &&
+    prevProps.card.title === nextProps.card.title &&
+    prevProps.card.column === nextProps.card.column &&
+    prevProps.card.updatedAt === nextProps.card.updatedAt &&
+    prevProps.card.completionTarget === nextProps.card.completionTarget &&
+    prevProps.card.deadline === nextProps.card.deadline &&
+    prevProps.card.assignedTo?._id === nextProps.card.assignedTo?._id &&
+    prevProps.card.assignedTo?.avatar === nextProps.card.assignedTo?.avatar &&
+    prevProps.card.assignedTo?.displayName === nextProps.card.assignedTo?.displayName &&
+    prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onMove === nextProps.onMove
+  );
+});
+
+DraggableCard.displayName = "DraggableCard";
 
 // Droppable Column Component
-function DroppableColumn({
+const DroppableColumn = React.memo(({
   column,
   cards,
   onDelete,
@@ -155,7 +231,7 @@ function DroppableColumn({
   cards: KanbanCard[];
   onDelete: (id: string) => void;
   onMove?: (id: string, newColumn: "todo" | "inprogress" | "done") => void;
-}) {
+}) => {
   return (
     <div className="space-y-2">
       <div className={`p-2 rounded-md ${column.color}`}>
@@ -182,7 +258,36 @@ function DroppableColumn({
       </SortableContext>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  if (
+    prevProps.column.id !== nextProps.column.id ||
+    prevProps.column.label !== nextProps.column.label ||
+    prevProps.column.color !== nextProps.column.color ||
+    prevProps.onDelete !== nextProps.onDelete ||
+    prevProps.onMove !== nextProps.onMove
+  ) {
+    return false;
+  }
+  if (prevProps.cards.length !== nextProps.cards.length) return false;
+  for (let i = 0; i < prevProps.cards.length; i++) {
+    const pc = prevProps.cards[i];
+    const nc = prevProps.cards[i];
+    if (
+      pc.id !== nc.id ||
+      pc.title !== nc.title ||
+      pc.column !== nc.column ||
+      pc.updatedAt !== nc.updatedAt ||
+      pc.completionTarget !== nc.completionTarget ||
+      pc.deadline !== nc.deadline ||
+      pc.assignedTo?._id !== nc.assignedTo?._id
+    ) {
+      return false;
+    }
+  }
+  return true;
+});
+
+DroppableColumn.displayName = "DroppableColumn";
 
 export function KanbanTool({
   prompt,
@@ -190,6 +295,7 @@ export function KanbanTool({
   initialContent,
   isSubmitting,
   isStandalone,
+  activeVentureId,
 }: KanbanToolProps) {
   const [cards, setCards] = useState<KanbanCard[]>(initialContent?.cards || []);
   const [newCardTitle, setNewCardTitle] = useState("");
@@ -199,6 +305,33 @@ export function KanbanTool({
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   const [activeColTab, setActiveColTab] = useState<"todo" | "inprogress" | "done">("todo");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // New state variables for form inputs
+  const [newCardAssignee, setNewCardAssignee] = useState("unassigned");
+  const [newCardDeadline, setNewCardDeadline] = useState("");
+  const [newCardCompletionTarget, setNewCardCompletionTarget] = useState("");
+
+  // Queries to fetch venture & contributors list
+  const venture = useQuery(
+    api.ventures.getVenture,
+    activeVentureId ? { ventureId: activeVentureId } : "skip"
+  );
+  const ideaId = venture?.ideaId;
+
+  const allUsers = useQuery(api.users.getAllUsers) || [];
+  const acceptedRequests = useQuery(
+    api.contributionRequests.getAcceptedContributors,
+    ideaId ? { ideaId } : "skip"
+  ) || [];
+
+  const contributors = venture && ideaId
+    ? allUsers.filter((u) => u._id === venture.userId || acceptedRequests.some((req) => req.userId === u._id)).map((u) => ({
+        _id: u._id,
+        username: u.username,
+        displayName: u.displayName,
+        avatar: u.avatar,
+      }))
+    : [];
 
   const handleMoveCard = (cardId: string, newColumn: "todo" | "inprogress" | "done") => {
     setCards((prevCards) =>
@@ -239,19 +372,57 @@ export function KanbanTool({
 
   const addCard = () => {
     if (!newCardTitle.trim()) return;
+
+    const assigneeUser = contributors.find((u) => u._id === newCardAssignee);
+    const assignedTo = assigneeUser
+      ? {
+          _id: assigneeUser._id,
+          name: assigneeUser.displayName || assigneeUser.username,
+          displayName: assigneeUser.displayName,
+          username: assigneeUser.username,
+          avatar: assigneeUser.avatar,
+        }
+      : undefined;
+
     const newCard: KanbanCard = {
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: newCardTitle.trim(),
       column: activeColumn,
       updatedAt: Date.now(),
+      assignedTo,
+      deadline: newCardDeadline ? new Date(newCardDeadline).getTime() : undefined,
+      completionTarget: newCardCompletionTarget.trim() || undefined,
     };
-    setCards([...cards, newCard]);
+    const updatedCards = [...cards, newCard];
+    setCards(updatedCards);
+    onSubmit({
+      cards: updatedCards,
+      columns: columns.map((c) => c.label),
+      timestamp: Date.now(),
+    });
     setNewCardTitle("");
+    setNewCardAssignee("unassigned");
+    setNewCardDeadline("");
+    setNewCardCompletionTarget("");
     setIsModalOpen(false);
   };
 
+  const openModal = () => {
+    setNewCardTitle("");
+    setNewCardAssignee("unassigned");
+    setNewCardDeadline("");
+    setNewCardCompletionTarget("");
+    setIsModalOpen(true);
+  };
+
   const deleteCard = (cardId: string) => {
-    setCards(cards.filter((c) => c.id !== cardId));
+    const updatedCards = cards.filter((c) => c.id !== cardId);
+    setCards(updatedCards);
+    onSubmit({
+      cards: updatedCards,
+      columns: columns.map((c) => c.label),
+      timestamp: Date.now(),
+    });
   };
 
   const getCardsForColumn = (columnId: "todo" | "inprogress" | "done") => {
@@ -305,26 +476,32 @@ export function KanbanTool({
     const activeCard = cards.find((c) => c.id === active.id);
     if (!activeCard) return;
 
+    let targetColumn: "todo" | "inprogress" | "done" | null = null;
+
     // If dropped on a card, move to that card's column
     const overCard = cards.find((c) => c.id === over.id);
     if (overCard) {
-      setCards((prevCards) =>
-        prevCards.map((card) =>
-          card.id === activeCard.id
-            ? { ...card, column: overCard.column, updatedAt: Date.now() }
-            : card,
-        ),
-      );
+      targetColumn = overCard.column;
     }
 
     // If dropped on a column container
     const overColumn = columns.find((col) => col.id === over.id);
     if (overColumn) {
-      setCards((prevCards) =>
-        prevCards.map((card) =>
-          card.id === activeCard.id ? { ...card, column: overColumn.id, updatedAt: Date.now() } : card,
-        ),
+      targetColumn = overColumn.id;
+    }
+
+    if (targetColumn && targetColumn !== activeCard.column) {
+      const updatedCards = cards.map((card) =>
+        card.id === activeCard.id
+          ? { ...card, column: targetColumn!, updatedAt: Date.now() }
+          : card
       );
+      setCards(updatedCards);
+      onSubmit({
+        cards: updatedCards,
+        columns: columns.map((c) => c.label),
+        timestamp: Date.now(),
+      });
     }
   };
 
@@ -348,7 +525,7 @@ export function KanbanTool({
           <div />
         )}
         <Button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openModal}
           size="sm"
           className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-300 shrink-0 text-xs"
           title="Add New Card"
@@ -422,7 +599,7 @@ export function KanbanTool({
         </p>
         <Button
           onClick={handleSubmit}
-          disabled={cards.length === 0 || isSubmitting}
+          disabled={isSubmitting}
           className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
@@ -475,22 +652,82 @@ export function KanbanTool({
                 </button>
               </div>
 
-              <div className="space-y-3 py-2">
+              <div className="space-y-3.5 py-2">
+                {/* Task Title */}
                 <div className="space-y-1">
                   <Label htmlFor="task-title" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                    Task Title
+                    Title <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="task-title"
-                    placeholder="What needs to be done?"
+                    placeholder="Task title..."
                     value={newCardTitle}
                     onChange={(e) => setNewCardTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addCard()}
-                    autoFocus
-                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm"
                   />
                 </div>
 
+                {/* Assign To */}
+                <div className="space-y-1">
+                  <Label htmlFor="task-assignee" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Assign To
+                  </Label>
+                  <Select value={newCardAssignee} onValueChange={setNewCardAssignee}>
+                    <SelectTrigger id="task-assignee" className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm">
+                      <SelectValue placeholder="Assign to..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0D111A] border-white/10 text-white z-[10100]">
+                      <SelectItem value="unassigned">
+                        <span className="text-slate-300">Unassigned</span>
+                      </SelectItem>
+                      {contributors.map((user) => (
+                        <SelectItem key={user._id} value={user._id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-5 w-5 shrink-0">
+                              <AvatarImage src={user.avatar} />
+                              <AvatarFallback className="text-[9px] bg-primary/15 text-primary font-bold">
+                                {(user.displayName || user.username || "?").charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-slate-200">{user.displayName || user.username}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Deadline */}
+                <div className="space-y-1">
+                  <Label htmlFor="task-deadline" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Deadline
+                  </Label>
+                  <Input
+                    id="task-deadline"
+                    type="date"
+                    value={newCardDeadline}
+                    onChange={(e) => setNewCardDeadline(e.target.value)}
+                    min={new Date().toISOString().slice(0, 10)}
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm [color-scheme:dark]"
+                  />
+                </div>
+
+                {/* Target (optional) */}
+                <div className="space-y-1">
+                  <Label htmlFor="task-target" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Target <span className="text-[10px] text-zinc-500 font-normal">(optional)</span>
+                  </Label>
+                  <Textarea
+                    id="task-target"
+                    placeholder="What needs to be completed..."
+                    value={newCardCompletionTarget}
+                    onChange={(e) => setNewCardCompletionTarget(e.target.value)}
+                    rows={3}
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm resize-none"
+                  />
+                </div>
+
+                {/* Initial Status */}
                 <div className="space-y-1">
                   <Label htmlFor="task-column" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
                     Initial Status

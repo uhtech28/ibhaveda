@@ -480,11 +480,12 @@ export class WorldMapScene extends Phaser.Scene {
       }
     });
 
-    // 5. Force load the current stage (active stage) immediately
-    this.loadStage(this.currentStage);
+    // 5. Force load all stage biomes immediately during startup for zero scroll stutter
+    for (let s = 1; s <= this.activeBiomeConfigs.length; s++) {
+      this.loadStage(s);
+    }
 
     // 6. Run checkBiomeLoading to check camera proximity immediately
-    this.checkBiomeLoading();
 
     // 7. Corruption overlays on every stage (not tied to lazy tile loading)
     this.time.delayedCall(0, () => {
@@ -1320,7 +1321,7 @@ export class WorldMapScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     const camX = cam.scrollX + cam.width / 2;
-    const loadBuffer = 2000; // Load buffer zone around the camera center
+    const loadBuffer = 1400; // Load buffer zone around the camera center
 
     for (let i = 0; i < this.activeBiomeConfigs.length; i++) {
       const stageId = i + 1;
@@ -1421,6 +1422,21 @@ export class WorldMapScene extends Phaser.Scene {
       ((y - centerY) * (y - centerY)) / (radiusY * radiusY) <
       1;
 
+    const rt = this.add.renderTexture(panelX, panelOffsetY, cols * 16, rows * 16);
+    rt.setOrigin(0, 0);
+    rt.setScale(scale);
+    rt.setDepth(3);
+    this.backgroundLayer.add(rt);
+
+    const tempGfx = this.make.graphics({}, false);
+    const tempSprite = this.make.sprite({ key: "sprout_grass_sheet" }, false);
+    tempSprite.setOrigin(0.5);
+
+    // Draw the base ground onto the RenderTexture at 1x scale
+    tempGfx.fillStyle(style.baseTint, 0.98);
+    tempGfx.fillRect(0, 0, cols * 16, rows * 16);
+    rt.draw(tempGfx, 0, 0);
+
     const addFrameSprite = (
       texture: string,
       frame: number,
@@ -1430,18 +1446,11 @@ export class WorldMapScene extends Phaser.Scene {
       tint = 0xffffff,
       alpha = 1,
     ) => {
-      const tile = this.add.sprite(
-        panelX + x * tileSize + tileSize / 2,
-        panelOffsetY + y * tileSize + tileSize / 2,
-        texture,
-        frame,
-      );
-      tile.setOrigin(0.5);
-      tile.setScale(scale);
-      tile.setTint(tint);
-      tile.setAlpha(alpha);
-      tile.setDepth(depth);
-      this.backgroundLayer.add(tile);
+      tempSprite.setTexture(texture);
+      tempSprite.setFrame(frame);
+      tempSprite.setTint(tint);
+      tempSprite.setAlpha(alpha);
+      rt.draw(tempSprite, x * 16 + 8, y * 16 + 8);
     };
 
     const addForestProp = (
@@ -1474,12 +1483,6 @@ export class WorldMapScene extends Phaser.Scene {
         this.registerTreeForCorruptionBlur(biome.id, sprite);
       }
     };
-
-    const ground = this.add.graphics();
-    ground.fillStyle(style.baseTint, 0.98);
-    ground.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
-    ground.setDepth(1);
-    this.backgroundLayer.add(ground);
 
     for (let row = 0; row < rows; row += 1) {
       const riverCenter = riverCenterAtRow(row);
@@ -1590,11 +1593,10 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    const humidShade = this.add.graphics();
-    humidShade.fillStyle(style.canopyTint, 0.06);
-    humidShade.fillRect(panelX, panelOffsetY, cols * tileSize, rows * tileSize);
-    humidShade.setDepth(1);
-    this.backgroundLayer.add(humidShade);
+    tempGfx.clear();
+    tempGfx.fillStyle(style.canopyTint, 0.06);
+    tempGfx.fillRect(0, 0, cols * 16, rows * 16);
+    rt.draw(tempGfx, 0, 0);
 
     const bridgeCenter = Math.round(riverCenterAtRow(bridgeRow));
     for (let frame = 0; frame < 5; frame += 1) {
@@ -1844,6 +1846,8 @@ export class WorldMapScene extends Phaser.Scene {
         0.9,
       );
     });
+    tempSprite.destroy();
+    tempGfx.destroy();
   }
 
   private createVentureStageTwoForestPanel(
@@ -1858,7 +1862,6 @@ export class WorldMapScene extends Phaser.Scene {
     const panelH = rows * tileSize;
     const grassFrames = [12, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69, 70, 71];
     const grassAccentFrames = [16, 17, 27, 28];
-    const pathFrames = [0, 1, 4, 5, 10, 11, 12, 15];
     const treeKeys = [
       "Tree_Emerald_1",
       "Tree_Emerald_2",
@@ -1911,6 +1914,16 @@ export class WorldMapScene extends Phaser.Scene {
     const isInside = (col: number, row: number) =>
       col >= 0 && col < cols && row >= 0 && row < rows;
 
+    const rt = this.add.renderTexture(panelX, panelOffsetY, cols * 16, rows * 16);
+    rt.setOrigin(0, 0);
+    rt.setScale(scale);
+    rt.setDepth(3);
+    this.backgroundLayer.add(rt);
+
+    const tempGfx = this.make.graphics({}, false);
+    const tempSprite = this.make.sprite({ key: "sprout_grass_sheet" }, false);
+    tempSprite.setOrigin(0.5);
+
     const addFrameSprite = (
       texture: string,
       frame: number,
@@ -1920,18 +1933,11 @@ export class WorldMapScene extends Phaser.Scene {
       tint = 0xffffff,
       alpha = 1,
     ) => {
-      const tile = this.add.sprite(
-        toX(col) + tileSize / 2,
-        toY(row) + tileSize / 2,
-        texture,
-        frame,
-      );
-      tile.setOrigin(0.5);
-      tile.setScale(scale);
-      tile.setTint(tint);
-      tile.setAlpha(alpha);
-      tile.setDepth(depth);
-      this.backgroundLayer.add(tile);
+      tempSprite.setTexture(texture);
+      tempSprite.setFrame(frame);
+      tempSprite.setTint(tint);
+      tempSprite.setAlpha(alpha);
+      rt.draw(tempSprite, col * 16 + 8, row * 16 + 8);
     };
 
     const addGroundPatch = (
@@ -1942,11 +1948,10 @@ export class WorldMapScene extends Phaser.Scene {
       color: number,
       alpha: number,
     ) => {
-      const patch = this.add.graphics();
-      patch.setDepth(1.25);
-      patch.fillStyle(color, alpha);
-      patch.fillEllipse(toX(x), toY(y), radiusX * tileSize, radiusY * tileSize);
-      this.backgroundLayer.add(patch);
+      tempGfx.clear();
+      tempGfx.fillStyle(color, alpha);
+      tempGfx.fillEllipse(x * 16, y * 16, radiusX * 16, radiusY * 16);
+      rt.draw(tempGfx, 0, 0);
     };
 
     const addCanopyTree = (
@@ -2032,11 +2037,10 @@ export class WorldMapScene extends Phaser.Scene {
       return false;
     };
 
-    const ground = this.add.graphics();
-    ground.fillStyle(0x86c96b, 1);
-    ground.fillRect(panelX, panelOffsetY, panelW, panelH);
-    ground.setDepth(1);
-    this.backgroundLayer.add(ground);
+    // Draw base ground onto RenderTexture
+    tempGfx.fillStyle(0x86c96b, 1);
+    tempGfx.fillRect(0, 0, cols * 16, rows * 16);
+    rt.draw(tempGfx, 0, 0);
 
     addGroundPatch(4, 7, 9.5, 12.5, 0x3f7c45, 0.18);
     addGroundPatch(38, 10, 8.5, 11.5, 0x2f6f3e, 0.2);
@@ -2098,138 +2102,56 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    const pathShadow = this.add.graphics();
-    pathShadow.setDepth(4);
-    pathShadow.fillStyle(0x8e6c46, 0.24);
+    const drawSandTrail = () => {
+      const points = trail.map(({ x, y }) => ({
+        px: x * 16 + 8,
+        py: y * 16 + 8,
+      }));
+      if (points.length < 2) return;
 
-    const pathBase = this.add.graphics();
-    pathBase.setDepth(5);
-    pathBase.fillStyle(0xe9c486, 1);
+      const strokeSandPath = (
+        width: number,
+        color: number,
+        alpha: number,
+      ) => {
+        tempGfx.clear();
+        tempGfx.lineStyle(width, color, alpha);
+        tempGfx.beginPath();
+        tempGfx.moveTo(points[0].px, points[0].py);
+        for (let i = 1; i < points.length; i += 1) {
+          tempGfx.lineTo(points[i].px, points[i].py);
+        }
+        tempGfx.strokePath();
+        rt.draw(tempGfx, 0, 0);
+      };
 
-    const pathInner = this.add.graphics();
-    pathInner.setDepth(5.2);
-    pathInner.fillStyle(0xf4d39a, 0.82);
-
-    const pathEdge = this.add.graphics();
-    pathEdge.setDepth(5.4);
-    pathEdge.fillStyle(0xcfab70, 0.7);
-
-    const drawSegment = (
-      start: { x: number; y: number },
-      end: { x: number; y: number },
-    ) => {
-      const startX = toX(start.x);
-      const startY = toY(start.y);
-      const endX = toX(end.x);
-      const endY = toY(end.y);
-      const horizontal = start.y === end.y;
-      const minX = Math.min(startX, endX);
-      const minY = Math.min(startY, endY);
-      const length = horizontal
-        ? Math.abs(endX - startX) + tileSize
-        : Math.abs(endY - startY) + tileSize;
-      const thickness = tileSize * 2.9;
-      const innerThickness = tileSize * 2.08;
-      const edgeThickness = tileSize * 3.28;
-
-      if (horizontal) {
-        const baseY = startY - tileSize * 1.05;
-        pathShadow.fillRoundedRect(minX + 8, baseY + 10, length, thickness, 14);
-        pathEdge.fillRoundedRect(minX, baseY, length, edgeThickness, 16);
-        pathBase.fillRoundedRect(
-          minX + tileSize * 0.12,
-          baseY + tileSize * 0.12,
-          length - tileSize * 0.24,
-          thickness - tileSize * 0.24,
-          14,
-        );
-        pathInner.fillRoundedRect(
-          minX + tileSize * 0.35,
-          baseY + tileSize * 0.35,
-          length - tileSize * 0.7,
-          innerThickness,
-          12,
-        );
-      } else {
-        const baseX = startX - tileSize * 1.05;
-        pathShadow.fillRoundedRect(baseX + 8, minY + 10, thickness, length, 14);
-        pathEdge.fillRoundedRect(baseX, minY, edgeThickness, length, 16);
-        pathBase.fillRoundedRect(
-          baseX + tileSize * 0.12,
-          minY + tileSize * 0.12,
-          thickness - tileSize * 0.24,
-          length - tileSize * 0.24,
-          14,
-        );
-        pathInner.fillRoundedRect(
-          baseX + tileSize * 0.35,
-          minY + tileSize * 0.35,
-          innerThickness,
-          length - tileSize * 0.7,
-          12,
-        );
-      }
+      strokeSandPath(16 * 2.85, 0xcfab70, 1);
+      strokeSandPath(16 * 2.35, 0xe9c486, 1);
+      strokeSandPath(16 * 1.55, 0xf4d39a, 0.82);
     };
 
-    for (let i = 0; i < trail.length - 1; i += 1) {
-      drawSegment(trail[i], trail[i + 1]);
-    }
+    drawSandTrail();
 
-    trail.forEach(({ x, y }) => {
-      const cx = toX(x) + tileSize / 2;
-      const cy = toY(y) + tileSize / 2;
-      pathShadow.fillCircle(cx + 8, cy + 10, tileSize * 1.46);
-      pathEdge.fillCircle(cx, cy, tileSize * 1.55);
-      pathBase.fillCircle(cx, cy, tileSize * 1.36);
-      pathInner.fillCircle(cx, cy, tileSize * 0.96);
-    });
-
-    this.backgroundLayer.add(pathShadow);
-    this.backgroundLayer.add(pathEdge);
-    this.backgroundLayer.add(pathBase);
-    this.backgroundLayer.add(pathInner);
-
+    tempGfx.clear();
+    tempGfx.fillStyle(0xc48f55, 0.28);
     pathTiles.forEach((key) => {
       const [col, row] = key.split(",").map(Number);
-      if ((col + row) % 3 !== 0) return;
-      addFrameSprite(
-        "sprout_paths_sheet",
-        pathFrames[(col + row * 3) % pathFrames.length],
-        col,
-        row,
-        5.6,
-        0xd7a55f,
-        0.12,
+      if ((col * 5 + row * 7) % 11 !== 0) return;
+      tempGfx.fillCircle(
+        col * 16 + 16 * 0.38,
+        row * 16 + 16 * 0.42,
+        16 * 0.08,
       );
     });
+    rt.draw(tempGfx, 0, 0);
 
-    const pathSpeckles = this.add.graphics();
-    pathSpeckles.setDepth(5.8);
-    pathSpeckles.fillStyle(0xc48f55, 0.34);
-    pathTiles.forEach((key) => {
-      const [col, row] = key.split(",").map(Number);
-      if ((col * 5 + row * 7) % 9 !== 0) return;
-      pathSpeckles.fillCircle(
-        toX(col) + tileSize * 0.38,
-        toY(row) + tileSize * 0.42,
-        tileSize * 0.1,
-      );
-      pathSpeckles.fillCircle(
-        toX(col) + tileSize * 0.68,
-        toY(row) + tileSize * 0.62,
-        tileSize * 0.07,
-      );
-    });
-    this.backgroundLayer.add(pathSpeckles);
-
-    const canopyWash = this.add.graphics();
-    canopyWash.setDepth(6.1);
-    canopyWash.fillStyle(0x113c25, 0.1);
-    canopyWash.fillRect(panelX, panelOffsetY, panelW, tileSize * 4);
-    canopyWash.fillRect(panelX, panelOffsetY + panelH - tileSize * 4, panelW, tileSize * 4);
-    canopyWash.fillRect(panelX, panelOffsetY, tileSize * 3.2, panelH);
-    canopyWash.fillRect(panelX + panelW - tileSize * 3.2, panelOffsetY, tileSize * 3.2, panelH);
-    this.backgroundLayer.add(canopyWash);
+    tempGfx.clear();
+    tempGfx.fillStyle(0x113c25, 0.1);
+    tempGfx.fillRect(0, 0, cols * 16, 16 * 4);
+    tempGfx.fillRect(0, (rows - 4) * 16, cols * 16, 16 * 4);
+    tempGfx.fillRect(0, 0, 16 * 3.2, rows * 16);
+    tempGfx.fillRect((cols - 3.2) * 16, 0, 16 * 3.2, rows * 16);
+    rt.draw(tempGfx, 0, 0);
 
     [
       [2.0, 5.2, 0, 0.86, 0.96],
@@ -2435,6 +2357,8 @@ export class WorldMapScene extends Phaser.Scene {
       this.monkeys.push(monkey);
       this.midgroundLayer.add(monkey);
     });
+    tempSprite.destroy();
+    tempGfx.destroy();
   }
 
   private createArenaTilePanel(
@@ -3541,14 +3465,19 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Optional tiled cave backdrop
     if (this.textures.exists("mine_bg_cave")) {
-      for (let row = 0; row < rows; row += 1) {
-        for (let col = 0; col < cols; col += 1) {
-          const tile = this.add.image(tx(col) + tileSize / 2, ty(row) + tileSize / 2, "mine_bg_cave");
-          tile.setOrigin(0.5).setScale(scale).setAlpha(0.55).setDepth(1.2);
-          tile.setTint(0xc8b8a0);
-          this.backgroundLayer.add(tile);
-        }
-      }
+      const tileSprite = this.add.tileSprite(
+        panelX,
+        panelOffsetY,
+        panelW,
+        panelH,
+        "mine_bg_cave",
+      );
+      tileSprite.setOrigin(0, 0);
+      tileSprite.setTileScale(scale);
+      tileSprite.setAlpha(0.55);
+      tileSprite.setTint(0xc8b8a0);
+      tileSprite.setDepth(1.2);
+      this.backgroundLayer.add(tileSprite);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -4542,9 +4471,21 @@ export class WorldMapScene extends Phaser.Scene {
       }),
     );
 
-    // Render tiles from enhanced 2D array
+    // Render tiles from enhanced 2D array using single graphics objects for performance
     const toX = (col: number) => panelX + col * tileSize + tileSize / 2;
     const toY = (row: number) => panelOffsetY + row * tileSize + tileSize / 2;
+
+    const floorGfx = this.add.graphics();
+    floorGfx.setDepth(2);
+    this.backgroundLayer.add(floorGfx);
+
+    const detailGfx = this.add.graphics();
+    detailGfx.setDepth(4);
+    this.backgroundLayer.add(detailGfx);
+
+    const shadowGfx = this.add.graphics();
+    shadowGfx.setDepth(7);
+    this.midgroundLayer.add(shadowGfx);
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
@@ -4554,81 +4495,37 @@ export class WorldMapScene extends Phaser.Scene {
 
         switch (tileType) {
           case GROUND: {
-            // Let the gorgeous mystical twilight gradient base ground show through
             break;
           }
 
           case GRASS: {
-            // Semi-transparent grass to blend with the glowing background gradient
-            const tile = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.grass,
-              0.75,
-            );
-            tile.setDepth(1);
-            this.backgroundLayer.add(tile);
+            floorGfx.fillStyle(colors.grass, 0.75);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Add grass texture
-            const grassDot = this.add.circle(
-              x + (row % 3) - 1,
-              y + (col % 3) - 1,
-              1,
-              colors.grassDark,
-              0.5,
-            );
-            grassDot.setDepth(2);
-            this.backgroundLayer.add(grassDot);
+            floorGfx.fillStyle(colors.grassDark, 0.5);
+            floorGfx.fillCircle(x + (row % 3) - 1, y + (col % 3) - 1, 1);
             break;
           }
 
           case PATH_H:
           case PATH_V: {
-            const tile = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.path,
-              1,
-            );
-            tile.setDepth(2);
-            this.backgroundLayer.add(tile);
+            floorGfx.fillStyle(colors.path, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Path edge highlights
             if (
               tileType === PATH_H &&
               (row === midRow - 1 || row === midRow + 1)
             ) {
-              const edge = this.add.rectangle(
-                x,
-                y,
-                tileSize,
-                2,
-                colors.pathEdge,
-                0.4,
-              );
-              edge.setDepth(3);
-              this.backgroundLayer.add(edge);
+              floorGfx.fillStyle(colors.pathEdge, 0.4);
+              floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, 2);
             }
             break;
           }
 
           case HOUSE: {
-            const ground = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.grass,
-              1,
-            );
-            ground.setDepth(1);
-            this.backgroundLayer.add(ground);
+            floorGfx.fillStyle(colors.grass, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Use existing house sprites if available
             if (
               this.textures.exists("House_Hay_1") ||
               this.textures.exists("House_Hay_2")
@@ -4643,20 +4540,15 @@ export class WorldMapScene extends Phaser.Scene {
                 house.setDepth(8);
                 this.midgroundLayer.add(house);
 
-                // Add shadow
-                const shadow = this.add.ellipse(
+                shadowGfx.fillStyle(0x000000, 0.3);
+                shadowGfx.fillEllipse(
                   x,
                   y + tileSize / 2,
                   tileSize * 0.8,
                   tileSize * 0.3,
-                  0x000000,
-                  0.3,
                 );
-                shadow.setDepth(7);
-                this.midgroundLayer.add(shadow);
               }
             } else {
-              // Fallback: simple house shape
               const houseBody = this.add.rectangle(
                 x,
                 y,
@@ -4682,7 +4574,6 @@ export class WorldMapScene extends Phaser.Scene {
               roof.setDepth(9);
               this.midgroundLayer.add(roof);
 
-              // Window glow
               const window1 = this.add.rectangle(
                 x - 4,
                 y,
@@ -4698,43 +4589,24 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case GARDEN: {
-            const tile = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.grass,
-              1,
-            );
-            tile.setDepth(1);
-            this.backgroundLayer.add(tile);
+            floorGfx.fillStyle(colors.grass, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Garden flowers
             const flowerColors = [
               colors.flower,
               colors.flowerGlow,
               colors.highlight,
             ];
             const flowerColor = flowerColors[(row + col) % 3];
-            const flower = this.add.circle(x, y, 2, flowerColor, 0.7);
-            flower.setDepth(4);
-            this.backgroundLayer.add(flower);
+            detailGfx.fillStyle(flowerColor, 0.7);
+            detailGfx.fillCircle(x, y, 2);
             break;
           }
 
           case TREE: {
-            const ground = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.grass,
-              1,
-            );
-            ground.setDepth(1);
-            this.backgroundLayer.add(ground);
+            floorGfx.fillStyle(colors.grass, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Use existing tree sprites if available
             if (this.textures.exists("Tree_Emerald_1")) {
               const tree = this.add.sprite(
                 x,
@@ -4747,19 +4619,14 @@ export class WorldMapScene extends Phaser.Scene {
               tree.setDepth(6);
               this.midgroundLayer.add(tree);
 
-              // Shadow
-              const shadow = this.add.ellipse(
+              shadowGfx.fillStyle(0x000000, 0.35);
+              shadowGfx.fillEllipse(
                 x,
                 y + tileSize / 2,
-                tileSize * 0.6,
-                tileSize * 0.2,
-                0x000000,
-                0.3,
+                tileSize * 0.7,
+                tileSize * 0.25,
               );
-              shadow.setDepth(5);
-              this.midgroundLayer.add(shadow);
             } else {
-              // Fallback tree
               const canopy = this.add.ellipse(
                 x,
                 y - 4,
@@ -4786,18 +4653,9 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case FLOWER: {
-            const ground = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.grass,
-              1,
-            );
-            ground.setDepth(1);
-            this.backgroundLayer.add(ground);
+            floorGfx.fillStyle(colors.grass, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Glowing flower
             const flower = this.add.circle(x, y, 3, colors.flower, 0.8);
             flower.setDepth(4);
             flower.setBlendMode(Phaser.BlendModes.ADD);
@@ -4811,18 +4669,9 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case LAMP: {
-            const ground = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.path,
-              1,
-            );
-            ground.setDepth(2);
-            this.backgroundLayer.add(ground);
+            floorGfx.fillStyle(colors.path, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Use existing lamp post if available
             if (this.textures.exists("LampPost_3")) {
               const lamp = this.add.sprite(x, y + tileSize / 2, "LampPost_3");
               lamp.setOrigin(0.5, 1);
@@ -4831,7 +4680,6 @@ export class WorldMapScene extends Phaser.Scene {
               lamp.setDepth(9);
               this.midgroundLayer.add(lamp);
 
-              // Lamp glow
               const lampGlow = this.add.circle(
                 x,
                 y - tileSize / 2,
@@ -4843,7 +4691,6 @@ export class WorldMapScene extends Phaser.Scene {
               lampGlow.setBlendMode(Phaser.BlendModes.ADD);
               this.midgroundLayer.add(lampGlow);
             } else {
-              // Fallback lamp
               const post = this.add.rectangle(x, y, 2, tileSize, 0x4a4a4a, 1);
               post.setDepth(9);
               this.midgroundLayer.add(post);
@@ -4863,48 +4710,21 @@ export class WorldMapScene extends Phaser.Scene {
           }
 
           case BUSH: {
-            const ground = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.grass,
-              1,
-            );
-            ground.setDepth(1);
-            this.backgroundLayer.add(ground);
+            floorGfx.fillStyle(colors.grass, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Decorative bush
-            const bush = this.add.ellipse(x, y, 10, 8, colors.tree, 0.8);
-            bush.setDepth(4);
-            this.backgroundLayer.add(bush);
+            detailGfx.fillStyle(colors.tree, 0.8);
+            detailGfx.fillEllipse(x, y, 10, 8);
 
-            const bushHighlight = this.add.ellipse(
-              x - 2,
-              y - 2,
-              4,
-              3,
-              colors.grass,
-              0.6,
-            );
-            bushHighlight.setDepth(5);
-            this.backgroundLayer.add(bushHighlight);
+            detailGfx.fillStyle(colors.grass, 0.6);
+            detailGfx.fillEllipse(x - 2, y - 2, 4, 3);
             break;
           }
 
           case ROCK: {
-            const ground = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.grass,
-              1,
-            );
-            ground.setDepth(1);
-            this.backgroundLayer.add(ground);
+            floorGfx.fillStyle(colors.grass, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Use existing rock sprite if available
             if (this.textures.exists("Rock_Brown_1")) {
               const rock = this.add.sprite(x, y, "Rock_Brown_1");
               rock.setOrigin(0.5, 0.5);
@@ -4913,42 +4733,22 @@ export class WorldMapScene extends Phaser.Scene {
               rock.setDepth(4);
               this.backgroundLayer.add(rock);
             } else {
-              // Fallback rock
-              const rock = this.add.ellipse(x, y, 8, 6, 0x4a3a5a, 1);
-              rock.setDepth(4);
-              this.backgroundLayer.add(rock);
+              detailGfx.fillStyle(0x4a3a5a, 1);
+              detailGfx.fillEllipse(x, y, 8, 6);
             }
             break;
           }
 
           case WELL: {
-            const ground = this.add.rectangle(
-              x,
-              y,
-              tileSize,
-              tileSize,
-              colors.path,
-              1,
-            );
-            ground.setDepth(2);
-            this.backgroundLayer.add(ground);
+            floorGfx.fillStyle(colors.path, 1);
+            floorGfx.fillRect(x - tileSize / 2, y - tileSize / 2, tileSize, tileSize);
 
-            // Town well/fountain
-            const wellBase = this.add.circle(x, y, tileSize * 0.6, 0x6a5a4a, 1);
-            wellBase.setDepth(7);
-            this.backgroundLayer.add(wellBase);
+            shadowGfx.fillStyle(0x6a5a4a, 1);
+            shadowGfx.fillCircle(x, y, tileSize * 0.6);
 
-            const wellTop = this.add.circle(
-              x,
-              y,
-              tileSize * 0.4,
-              colors.accent,
-              0.8,
-            );
-            wellTop.setDepth(8);
-            this.backgroundLayer.add(wellTop);
+            shadowGfx.fillStyle(colors.accent, 0.8);
+            shadowGfx.fillCircle(x, y, tileSize * 0.4);
 
-            // Water glow
             const waterGlow = this.add.circle(
               x,
               y,
@@ -4969,47 +4769,19 @@ export class WorldMapScene extends Phaser.Scene {
     const plazaSize = tileSize * 3;
 
     // Outer plaza circle
-    const plazaOuter = this.add.circle(
-      toX(midCol),
-      toY(midRow),
-      plazaSize / 2,
-      colors.accent,
-      0.2,
-    );
-    plazaOuter.setDepth(3);
-    this.backgroundLayer.add(plazaOuter);
+    floorGfx.fillStyle(colors.accent, 0.2);
+    floorGfx.fillCircle(toX(midCol), toY(midRow), plazaSize / 2);
 
     // Middle plaza ring
-    const plazaMiddle = this.add.circle(
-      toX(midCol),
-      toY(midRow),
-      plazaSize / 3,
-      colors.highlight,
-      0.3,
-    );
-    plazaMiddle.setDepth(4);
-    this.backgroundLayer.add(plazaMiddle);
+    detailGfx.fillStyle(colors.highlight, 0.3);
+    detailGfx.fillCircle(toX(midCol), toY(midRow), plazaSize / 3);
 
     // Center fountain/monument
-    const monumentBase = this.add.circle(
-      toX(midCol),
-      toY(midRow),
-      tileSize * 0.8,
-      0x6a5a4a,
-      1,
-    );
-    monumentBase.setDepth(7);
-    this.backgroundLayer.add(monumentBase);
+    shadowGfx.fillStyle(0x6a5a4a, 1);
+    shadowGfx.fillCircle(toX(midCol), toY(midRow), tileSize * 0.8);
 
-    const monument = this.add.circle(
-      toX(midCol),
-      toY(midRow),
-      tileSize * 0.6,
-      colors.highlight,
-      0.8,
-    );
-    monument.setDepth(8);
-    this.backgroundLayer.add(monument);
+    shadowGfx.fillStyle(colors.highlight, 0.8);
+    shadowGfx.fillCircle(toX(midCol), toY(midRow), tileSize * 0.6);
 
     // Monument glow (pulsing effect)
     const monumentGlow = this.add.circle(
@@ -6692,11 +6464,9 @@ export class WorldMapScene extends Phaser.Scene {
       // Venture stages 3 and 4 use bespoke plaza layouts, so skip the generic
       // wooden connector there. Stage 2 draws a tile trail inside the forest
       // panel. Stage 7 Crossroads does not need the wooden plank overlay.
-      const shouldSkipGenericConnector =
-        (this.currentTemplateId === "venture" &&
-          [1, 2, 3, 4].includes(stage.id)) ||
-        stage.id === 1 ||
-        stage.id === 7;
+      // Every stage features its own themed road/path textures or vectors,
+      // so we skip drawing the generic vector line connector to prevent double rendering.
+      const shouldSkipGenericConnector = true;
       if (!shouldSkipGenericConnector && stagePositions.length > 1 && biome) {
         this.drawStagePathConnector(stagePositions, biome.colors.path, 0.9);
       }

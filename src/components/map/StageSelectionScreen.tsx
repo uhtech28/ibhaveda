@@ -81,9 +81,9 @@ export function StageSelectionScreen({ onSelectStage, onBack }: StageSelectionSc
       {/* Main content scrollable container */}
       <div className="absolute inset-0 overflow-y-auto no-scrollbar flex">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
           className="relative z-10 w-full max-w-6xl m-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col items-center min-h-[min-content]"
         >
           {/* Back Button */}

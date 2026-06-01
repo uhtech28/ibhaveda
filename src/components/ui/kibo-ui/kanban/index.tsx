@@ -28,6 +28,7 @@ import {
   useContext,
   useEffect,
   useState,
+  memo,
 } from "react";
 import { createPortal } from "react-dom";
 import tunnel from "tunnel-rat";
@@ -248,7 +249,7 @@ export type KanbanCardProps<T extends KanbanItemProps = KanbanItemProps> = T & {
   className?: string;
 };
 
-export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
+const KanbanCardInner = <T extends KanbanItemProps = KanbanItemProps>({
   id,
   name,
   assignedTo,
@@ -286,12 +287,17 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
 
   const cardContent = (
     <Card
+      style={{
+        transitionProperty: "transform, box-shadow, border-color, background-color, opacity",
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        transitionDuration: "200ms",
+      }}
       className={cn(
         // overflow-hidden — keeps icon buttons inside the card border on
         // narrow PC columns where flex children were bleeding past the
         // right edge. w-full + box-border ensure the card always matches
         // the column width exactly.
-        "cursor-default rounded-xl p-2.5 pr-2 shadow-sm transition-all hover:shadow-md border-border/50 bg-card group relative w-full box-border overflow-hidden",
+        "cursor-default rounded-xl p-2.5 pr-2 shadow-sm hover:shadow-md border-border/50 bg-card group relative w-full box-border overflow-hidden will-change-[transform,box-shadow]",
         isDragging && "pointer-events-none cursor-grabbing opacity-50 scale-105 shadow-xl rotate-2",
         status === "done" && "opacity-70",
         className
@@ -396,6 +402,24 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
     </>
   );
 };
+
+export const KanbanCard = memo(KanbanCardInner, (prevProps: any, nextProps: any) => {
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.name === nextProps.name &&
+    prevProps.status === nextProps.status &&
+    prevProps.deadline === nextProps.deadline &&
+    prevProps.completionTarget === nextProps.completionTarget &&
+    prevProps.canEdit === nextProps.canEdit &&
+    prevProps.className === nextProps.className &&
+    prevProps.assignedTo?._id === nextProps.assignedTo?._id &&
+    prevProps.assignedTo?.avatar === nextProps.assignedTo?.avatar &&
+    prevProps.assignedTo?.name === nextProps.assignedTo?.name &&
+    prevProps.onEditClick === nextProps.onEditClick
+  );
+}) as <T extends KanbanItemProps = KanbanItemProps>(
+  props: KanbanCardProps<T> & { canEdit?: boolean; onEditClick?: (id: string) => void }
+) => React.ReactElement;
 
 export type KanbanCardsProps<T extends KanbanItemProps = KanbanItemProps> = Omit<HTMLAttributes<HTMLDivElement>, "children" | "id"> & {
   children: (item: T) => ReactNode;

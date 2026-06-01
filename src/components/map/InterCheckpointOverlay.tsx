@@ -496,10 +496,10 @@ export function InterCheckpointOverlay({
     <AnimatePresence>
       <div className={`fixed inset-0 z-[${isBossCombat ? 130 : 120}] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 sm:p-6`}>
         <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 30 }}
+          initial={{ opacity: 0, scale: 0.97, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 30 }}
-          transition={{ type: "spring", damping: 25, stiffness: 180 }}
+          exit={{ opacity: 0, scale: 0.97, y: 8 }}
+          transition={{ duration: 0.12, ease: "easeOut" }}
           className={`relative w-full max-w-lg overflow-hidden rounded-2xl border bg-gradient-to-b ${theme.bg} ${theme.border} p-6 shadow-2xl backdrop-blur-xl`}
         >
           {/* Header */}

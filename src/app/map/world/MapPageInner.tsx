@@ -852,12 +852,12 @@ function TaskCard({
             </motion.button>
           )}
         </div>
-        {evaluationSummary?.isPending && (
+        {task.done && evaluationSummary?.isPending && (
           <p className="mt-1.5 sm:mt-2 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-300">
             AI evaluating...
           </p>
         )}
-        {evaluationSummary?.evaluation && (
+        {task.done && evaluationSummary?.evaluation && (
           <p className="mt-1.5 sm:mt-2 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">
             {evaluationSummary.evaluation.qualityTier} ·{" "}
             {evaluationSummary.evaluation.totalScore}/12
