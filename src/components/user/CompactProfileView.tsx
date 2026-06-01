@@ -262,7 +262,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                 </div>
               </div>
               </div>
-
+              <div className="space-y-4 sm:ml-[6.25rem]">
                 {profile.bio && (
                   <p className="text-foreground/80 text-base leading-relaxed max-w-3xl line-clamp-3">
                     {profile.bio}
@@ -336,6 +336,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                   {/* Level / Points / Day Streak progress bars */}
                   <ProfileProgress userId={profile._id} />
                 </div>
+              </div>
             </div>
           </CardContent>
         </Card>
