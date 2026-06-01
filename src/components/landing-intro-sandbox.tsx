@@ -174,7 +174,6 @@ export default function LandingIntroSandbox({
     window.addEventListener("touchstart", unlock, { once: true, passive: true });
     window.addEventListener("pointerdown", unlock, { once: true });
     window.addEventListener("keydown",     unlock, { once: true });
-    window.addEventListener("mousemove",   unlock, { once: true, passive: true });
 
     // Also attempt autoplay in parallel; cancel listeners if it succeeds
     (async () => {
@@ -186,7 +185,6 @@ export default function LandingIntroSandbox({
           window.removeEventListener("touchstart", unlock);
           window.removeEventListener("pointerdown", unlock);
           window.removeEventListener("keydown",     unlock);
-          window.removeEventListener("mousemove",   unlock);
           ctx = probe;
           play(ctx);
           return;
@@ -200,7 +198,6 @@ export default function LandingIntroSandbox({
       window.removeEventListener("touchstart", unlock);
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown",     unlock);
-      window.removeEventListener("mousemove",   unlock);
       ctx?.close().catch(() => undefined);
     };
   }, []);
