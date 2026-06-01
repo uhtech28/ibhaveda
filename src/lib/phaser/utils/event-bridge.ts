@@ -160,7 +160,9 @@ export type ReactToPhaserEvent =
   /** Boss retreated mid-stage after player defeated it at a checkpoint */
   | { type: "BOSS_COMBAT_RETREAT"; stage: number; checkpoint: number }
   /** Final boss outcome at stage completion — slain (gold) or retreated permanently */
-  | { type: "BOSS_FINAL_OUTCOME"; stage: number; outcome: "slay_gold" | "retreat_permanent" };
+  | { type: "BOSS_FINAL_OUTCOME"; stage: number; outcome: "slay_gold" | "retreat_permanent" }
+  /** Live corruption meter sync (0–100) — updates map visuals without full venture reload */
+  | { type: "UPDATE_CORRUPTION"; corruptionLevel: number };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phaser → React events

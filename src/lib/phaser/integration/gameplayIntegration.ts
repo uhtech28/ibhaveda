@@ -15,9 +15,8 @@
  * INVARIANT: Does NOT rewrite existing systems. Only coordinates them.
  */
 
-import {
-  getBiomeConfig,
-} from "../config/biomeEngine";
+import { getBiomeConfig } from "../config/biomeEngine";
+import { resolveCorruptionProfile } from "../systems/corruptionSystem";
 import { audioManager, type BiomeId } from "@/lib/audio/audioManager";
 import { eventBridge } from "../utils/event-bridge";
 import type { TemplateId } from "@/config/templates";
@@ -63,7 +62,7 @@ export function updateBiomeState(
   const stageChanged = currentState.currentStage !== stageNumber;
   const templateChanged = currentState.templateId !== templateId;
   const corruptionChanged =
-    Math.abs(currentState.corruptionLevel - corruptionLevel) > 5;
+    Math.abs(currentState.corruptionLevel - corruptionLevel) >= 1;
 
   if (!stageChanged && !templateChanged && !corruptionChanged) {
     return; // No significant change
@@ -82,8 +81,7 @@ export function updateBiomeState(
   // ── 2. Apply scene background color ───────────────────────────────────────
   scene.cameras.main.setBackgroundColor(biomeConfig.bgColor);
 
-  // Keep the canvas at full brightness — no corruption wash or shader dimming.
-  clearCorruptionVisuals(scene);
+  applyGlobalCorruptionFilter(corruptionLevel);
 
   // ── 5. Update audio ambience (with crossfade) ─────────────────────────────
   if (stageChanged || templateChanged) {
@@ -98,9 +96,20 @@ export function updateBiomeState(
   // TODO: Implement corruption audio layering when dedicated SFX are available
 }
 
+/** Apply venture-wide CSS color grading from corruption level (0–100). */
+export function applyGlobalCorruptionFilter(corruptionLevel: number): void {
+  const profile = resolveCorruptionProfile(corruptionLevel);
+  const canvasWrapper = document.querySelector(
+    ".phaser-canvas-wrapper",
+  ) as HTMLElement | null;
+  if (!canvasWrapper) return;
+  canvasWrapper.style.filter =
+    profile.cssFilter === "none" ? "" : profile.cssFilter;
+}
+
 /**
- * Remove corruption dark overlays and canvas dimming filters.
- * The map stays at full brightness regardless of corruption level.
+ * Reset legacy corruption objects and canvas filters.
+ * Per-stage corruption is owned by CorruptionRenderer in WorldMapScene.
  */
 export function clearCorruptionVisuals(scene: Phaser.Scene): void {
   if (!scene?.cameras?.main) return;
@@ -116,13 +125,7 @@ export function clearCorruptionVisuals(scene: Phaser.Scene): void {
   existingVignette?.destroy();
 
   scene.cameras.main.setAlpha(1);
-
-  const canvasWrapper = document.querySelector(
-    ".phaser-canvas-wrapper",
-  ) as HTMLElement | null;
-  if (canvasWrapper) {
-    canvasWrapper.style.filter = "none";
-  }
+  applyGlobalCorruptionFilter(0);
 }
 
 /**
@@ -376,12 +379,10 @@ export function updateAudioLayers(
   corruptionLevel: number,
   bossProximity: number, // 0–1, how close player is to boss
 ): void {
-  // Layer corruption ducking on ambient music
-  if (corruptionLevel >= 60) {
-    audioManager.setMusicVolume(0.4); // Duck music when corruption is high
-  } else {
-    audioManager.setMusicVolume(0.7); // Normal music volume
-  }
+  const t = Math.max(0, Math.min(1, corruptionLevel / 100));
+  const volume = 0.72 - t * 0.38;
+  audioManager.setMusicVolume(volume);
+  applyGlobalCorruptionFilter(corruptionLevel);
 
   // Boss proximity audio cue (heartbeat, tension)
   // TODO: Implement boss proximity SFX when assets are available
@@ -467,6 +468,7 @@ export function updateBossVisuals(
 
 export const gameplayIntegration = {
   updateBiomeState,
+  applyGlobalCorruptionFilter,
   clearCorruptionVisuals,
   executeCheckpointFlow,
   applyBiomeParticles,

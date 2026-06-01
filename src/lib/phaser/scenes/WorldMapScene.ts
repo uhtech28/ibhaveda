@@ -17,8 +17,17 @@ import {
   type AnimationVariant,
   type BaseCheckpointAnimation,
 } from "./animations";
-import { brightnessToPhaser } from "../utils/brightness-calculator";
+import {
+  brightnessToPhaser,
+  calculateBrightness,
+} from "../utils/brightness-calculator";
 import { gameplayIntegration } from "../integration/gameplayIntegration";
+import { CorruptionRenderer } from "../systems/CorruptionRenderer";
+import { resolveCorruptionProfile } from "../systems/corruptionSystem";
+import {
+  StageEnvironmentBlur,
+  type CheckpointWorldPosition,
+} from "../systems/StageEnvironmentBlur";
 import { getTemplate, type TemplateId } from "@/config/templates";
 
 /**
@@ -305,6 +314,7 @@ export class WorldMapScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap;
   private backgroundLayer!: Phaser.GameObjects.Container;
   private midgroundLayer!: Phaser.GameObjects.Container;
+  private corruptionLayer!: Phaser.GameObjects.Container;
   private environmentalCracksGraphics!: Phaser.GameObjects.Graphics;
   private gameLayer!: Phaser.GameObjects.Container;
   private animationLayer!: Phaser.GameObjects.Container;
@@ -361,6 +371,7 @@ export class WorldMapScene extends Phaser.Scene {
     bossCombatDismiss?: (event: { stage: number }) => void;
     bossCombatRetreat?: (event: { stage: number; checkpoint: number }) => void;
     bossFinalOutcome?: (event: { stage: number; outcome: "slay_gold" | "retreat_permanent" }) => void;
+    updateCorruption?: (event: { corruptionLevel: number }) => void;
   };
 
   // Map dimensions — every stage shares the same world frame (40×40 tiles @ 16px).
@@ -396,6 +407,8 @@ export class WorldMapScene extends Phaser.Scene {
   private latestCheckpointsState: CheckpointState[] | null = null;
 
   private particleEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  private corruptionRenderer: CorruptionRenderer | null = null;
+  private stageEnvironmentBlur: StageEnvironmentBlur | null = null;
   private updateHandlers: Array<() => void> = [];
   private resizeHandler?: (
     gameSize: Phaser.Structs.Size,
@@ -429,12 +442,14 @@ export class WorldMapScene extends Phaser.Scene {
   private initializeWorldLayers(): void {
     this.backgroundLayer = this.add.container(0, 0);
     this.midgroundLayer = this.add.container(0, 0);
+    this.corruptionLayer = this.add.container(0, 0);
     this.environmentalCracksGraphics = this.add.graphics();
     this.gameLayer = this.add.container(0, 0);
     this.animationLayer = this.add.container(0, 0);
 
     this.backgroundLayer.setDepth(0);
     this.midgroundLayer.setDepth(10);
+    this.corruptionLayer.setDepth(18);
     this.environmentalCracksGraphics.setDepth(15);
     this.gameLayer.setDepth(20);
     this.animationLayer.setDepth(100);
@@ -470,6 +485,13 @@ export class WorldMapScene extends Phaser.Scene {
 
     // 6. Run checkBiomeLoading to check camera proximity immediately
     this.checkBiomeLoading();
+
+    // 7. Corruption overlays on every stage (not tied to lazy tile loading)
+    this.time.delayedCall(0, () => {
+      if (this.sys.isActive()) {
+        this.syncCorruptionVisuals();
+      }
+    });
   }
 
   private rebuildWorldForTemplate(): void {
@@ -483,6 +505,7 @@ export class WorldMapScene extends Phaser.Scene {
 
     this.backgroundLayer?.destroy(true);
     this.midgroundLayer?.destroy(true);
+    this.corruptionLayer?.destroy(true);
     this.environmentalCracksGraphics?.destroy();
     this.gameLayer?.destroy(true);
     this.animationLayer?.destroy(true);
@@ -494,6 +517,10 @@ export class WorldMapScene extends Phaser.Scene {
     this.stageFogOverlays.clear();
     this.residualMarkers.clear();
     this.particleEmitters = [];
+    this.corruptionRenderer?.destroy();
+    this.stageEnvironmentBlur?.destroy();
+    this.corruptionRenderer = new CorruptionRenderer(this);
+    this.stageEnvironmentBlur = new StageEnvironmentBlur();
 
     this.initializeWorldLayers();
     this.buildWorldForCurrentTemplate();
@@ -529,9 +556,8 @@ export class WorldMapScene extends Phaser.Scene {
     // Set up event listeners
     this.setupEventListeners();
 
-    // Apply full brightness (100%) - no darkness
-    this.updateBrightnessFilter(100);
-    gameplayIntegration.clearCorruptionVisuals(this);
+    this.corruptionRenderer = new CorruptionRenderer(this);
+    this.stageEnvironmentBlur = new StageEnvironmentBlur();
 
     // Camera setup with responsive zoom
     this.cameras.main.roundPixels = true;
@@ -1150,6 +1176,7 @@ export class WorldMapScene extends Phaser.Scene {
 
     // 3. Load stage landmarks
     this.loadStageLandmarks(stageId);
+    this.registerStageTreesFromLayer(stageId);
 
     // 4. Create stage mini-boss
     this.createMiniBossForStage(stageId);
@@ -1157,6 +1184,122 @@ export class WorldMapScene extends Phaser.Scene {
     // 5. Update the new mini-boss state if checkpoints have been loaded
     if (this.latestCheckpointsState) {
       this.updateMiniBossProgress(this.latestCheckpointsState);
+    }
+
+    this.syncCorruptionVisuals();
+  }
+
+  /** All stage IDs on the map (each stage has its own CP corruption layer). */
+  private getAllStageIds(): number[] {
+    return this.activeBiomeConfigs.map((biome) => biome.id);
+  }
+
+  private registerTreeForCorruptionBlur(
+    stageId: number,
+    gameObject: Phaser.GameObjects.GameObject,
+  ): void {
+    this.stageEnvironmentBlur?.register(stageId, gameObject);
+  }
+
+  private isTreeGameObject(obj: Phaser.GameObjects.GameObject): boolean {
+    if (
+      !(obj instanceof Phaser.GameObjects.Sprite) &&
+      !(obj instanceof Phaser.GameObjects.Image)
+    ) {
+      return false;
+    }
+    const key = obj.texture?.key ?? "";
+    if (key.startsWith("Tree_")) return true;
+    if (key === "sprout_forest_decor_sheet" && obj.scale >= 1.15) {
+      return true;
+    }
+    return false;
+  }
+
+  /** Pick up canopy sprites after a stage finishes loading. */
+  private registerStageTreesFromLayer(stageId: number): void {
+    const minX = (stageId - 1) * this.BIOME_WIDTH;
+    const maxX = stageId * this.BIOME_WIDTH;
+    const scan = (obj: Phaser.GameObjects.GameObject) => {
+      if (obj.x < minX || obj.x > maxX) return;
+      if (this.isTreeGameObject(obj)) {
+        this.registerTreeForCorruptionBlur(stageId, obj);
+      }
+    };
+    this.midgroundLayer.list.forEach(scan);
+    this.backgroundLayer.list.forEach(scan);
+  }
+
+  private getCheckpointWorldPositions(): CheckpointWorldPosition[] {
+    const statusByKey = new Map<string, CheckpointState["status"]>();
+    for (const cp of this.latestCheckpointsState ?? []) {
+      statusByKey.set(`${cp.stage}-${cp.checkpoint}`, cp.status);
+    }
+
+    const positions: CheckpointWorldPosition[] = [];
+    for (const node of this.checkpointNodes.values()) {
+      const key = `${node.stage}-${node.checkpoint}`;
+      positions.push({
+        stage: node.stage,
+        checkpoint: node.checkpoint,
+        x: node.x,
+        y: node.y,
+        status: statusByKey.get(key) ?? "locked",
+      });
+    }
+    return positions;
+  }
+
+  /** Push venture + per-checkpoint corruption to every stage on the map. */
+  private syncCorruptionVisuals(): void {
+    if (!this.corruptionRenderer || !this.corruptionLayer) return;
+
+    this.corruptionRenderer.sync(
+      {
+        ventureCorruption: this.currentCorruptionLevel,
+        checkpoints: this.latestCheckpointsState ?? [],
+        currentStage: this.currentStage,
+        slainStages: this.slainMiniBossStages,
+        stageWidth: this.BIOME_WIDTH,
+        mapWidth: this.MAP_WIDTH,
+        mapHeight: this.getWorldHeight(),
+        totalStages: this.activeBiomeConfigs.length,
+        stageIds: this.getAllStageIds(),
+        checkpointPositions: this.getCheckpointWorldPositions(),
+        environmentBlur: this.stageEnvironmentBlur,
+      },
+      this.corruptionLayer,
+    );
+
+    this.applyCorruptionCameraFx();
+    gameplayIntegration.applyGlobalCorruptionFilter(this.currentCorruptionLevel);
+    gameplayIntegration.updateAudioLayers(this.currentCorruptionLevel, 0);
+  }
+
+  /** Camera post-FX: progress brightness × corruption desaturation/dim. */
+  private applyCorruptionCameraFx(): void {
+    if (!this.brightnessFilter) return;
+
+    const { worldBrightness } = calculateBrightness({
+      completedStages: this.completedStages,
+      tasksDoneInCurrentStage: this.stageTasksCompleted,
+      totalTasksInCurrentStage: this.stageTasksTotal,
+    });
+    this.currentBrightness = worldBrightness;
+
+    const profile = resolveCorruptionProfile(this.currentCorruptionLevel);
+    const fx = brightnessToPhaser(worldBrightness);
+
+    if (typeof this.brightnessFilter.reset === "function") {
+      this.brightnessFilter.reset();
+    }
+    this.brightnessFilter.brightness(fx.brightness * profile.brightness);
+    this.brightnessFilter.contrast(fx.contrast * profile.contrast);
+    if (profile.desaturate > 0.02) {
+      this.brightnessFilter.grayscale(profile.desaturate);
+    }
+    if (profile.t > 0.35 && typeof this.brightnessFilter.hue === "function") {
+      this.brightnessFilter.hue(profile.t > 0.65 ? -0.08 : -0.04);
     }
   }
 
@@ -1322,6 +1465,9 @@ export class WorldMapScene extends Phaser.Scene {
       sprite.setAlpha(alpha);
       sprite.setDepth(depth);
       this.midgroundLayer.add(sprite);
+      if (propScale >= 1.05) {
+        this.registerTreeForCorruptionBlur(biome.id, sprite);
+      }
     };
 
     const ground = this.add.graphics();
@@ -1825,6 +1971,7 @@ export class WorldMapScene extends Phaser.Scene {
       tree.setAlpha(alpha);
       tree.setDepth(13 + row * 0.01);
       this.midgroundLayer.add(tree);
+      this.registerTreeForCorruptionBlur(2, tree);
     };
 
     const addForestFloorProp = (
@@ -6982,6 +7129,8 @@ export class WorldMapScene extends Phaser.Scene {
       this.handleBossCombatRetreat.bind(this);
     this.boundHandlers.bossFinalOutcome =
       this.handleBossFinalOutcome.bind(this);
+    this.boundHandlers.updateCorruption =
+      this.handleUpdateCorruption.bind(this);
 
     eventBridge.onPhaser(
       "UPDATE_BRIGHTNESS",
@@ -7023,6 +7172,10 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "BOSS_FINAL_OUTCOME",
       this.boundHandlers.bossFinalOutcome,
+    );
+    eventBridge.onPhaser(
+      "UPDATE_CORRUPTION",
+      this.boundHandlers.updateCorruption,
     );
 
     // Handle checkpoint clicks (emitted by CheckpointNode)
@@ -7107,9 +7260,15 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
 
-  private handleUpdateBrightness(event?: { brightness: number }): void {
-    // Always keep full brightness - no darkness overlay
-    this.updateBrightnessFilter(100);
+  private handleUpdateCorruption(event: { corruptionLevel: number }): void {
+    this.currentCorruptionLevel = event.corruptionLevel;
+    this.syncCorruptionVisuals();
+    const superBossObj = this.bosses.get("super_boss");
+    superBossObj?.updateCorruptionAura(this.currentCorruptionLevel);
+  }
+
+  private handleUpdateBrightness(_event?: { brightness: number }): void {
+    this.applyCorruptionCameraFx();
   }
 
   /**
@@ -7187,11 +7346,11 @@ export class WorldMapScene extends Phaser.Scene {
       ease: "Linear",
       onUpdate: () => {
         this.currentBrightness = state.value;
-        this.updateBrightnessFilter(state.value);
+        this.applyCorruptionCameraFx();
       },
       onComplete: () => {
         this.currentBrightness = targetBrightness;
-        this.updateBrightnessFilter(targetBrightness);
+        this.applyCorruptionCameraFx();
         this.brightnessTween = null;
       },
     });
@@ -7275,6 +7434,7 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Update mini-boss progress
     this.updateMiniBossProgress(checkpoints);
+    this.syncCorruptionVisuals();
   }
 
   /**
@@ -7369,6 +7529,7 @@ export class WorldMapScene extends Phaser.Scene {
             // Did all tasks -> Boss dies!
             miniBoss.slayGold();
             this.transformBiomeGold(stage);
+            this.syncCorruptionVisuals();
           } else {
             // Did bare minimum (2 tasks) -> Boss retreats permanently!
             this.tweens.killTweensOf(miniBoss);
@@ -7385,6 +7546,7 @@ export class WorldMapScene extends Phaser.Scene {
               }
             });
             this.restoreBiome(stage);
+            this.syncCorruptionVisuals();
           }
           this.slainMiniBossStages.add(stage);
           this.retreatedStages.delete(stage); // slay/retreat-permanent supersedes temporary retreat
@@ -7415,44 +7577,6 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    this.drawEnvironmentalCracks(this.currentCorruptionLevel);
-  }
-
-  private drawEnvironmentalCracks(level: number): void {
-    if (!this.environmentalCracksGraphics) return;
-    this.environmentalCracksGraphics.clear();
-
-    if (level < 20) return; // Only show cracks if corruption is at least 20%
-
-    // Draw branching cracks across the biomes
-    const numCracks = Math.floor(level / 10);
-    this.environmentalCracksGraphics.lineStyle(
-      2 + (level / 100) * 3,
-      0x11081a,
-      0.45 + (level / 100) * 0.4,
-    );
-
-    for (let i = 0; i < numCracks; i++) {
-      // Seeded random positions across the map based on index i to keep them stable
-      const seedX = (Math.sin(i * 12345.67) * 0.5 + 0.5) * this.MAP_WIDTH;
-      const seedY = (Math.cos(i * 98765.43) * 0.5 + 0.5) * this.MAP_HEIGHT;
-
-      this.environmentalCracksGraphics.beginPath();
-      this.environmentalCracksGraphics.moveTo(seedX, seedY);
-
-      // Create a branching jagged crack path
-      let currX = seedX;
-      let currY = seedY;
-      const segments = 4 + Math.floor((level / 100) * 4);
-      for (let s = 0; s < segments; s++) {
-        const angle = Math.sin(i * 10 + s) * Math.PI * 2;
-        const length = 20 + Math.floor(Math.cos(i * 5 + s) * 15) + level / 10;
-        currX += Math.cos(angle) * length;
-        currY += Math.sin(angle) * length;
-        this.environmentalCracksGraphics.lineTo(currX, currY);
-      }
-      this.environmentalCracksGraphics.strokePath();
-    }
   }
 
   /**
@@ -7488,8 +7612,10 @@ export class WorldMapScene extends Phaser.Scene {
         this.rebuildWorldForTemplate();
       }
 
-      // ── Phase 17: Update corruption visuals ────────────────────────────────
-      if (Math.abs(previousCorruption - this.currentCorruptionLevel) > 5) {
+      if (
+        Math.abs(previousCorruption - this.currentCorruptionLevel) >= 1 ||
+        ventureChanged
+      ) {
         gameplayIntegration.updateBiomeState(
           this,
           this.currentTemplateId,
@@ -7576,6 +7702,8 @@ export class WorldMapScene extends Phaser.Scene {
           this.autoScrollToActive();
         });
       }
+
+      this.syncCorruptionVisuals();
     } catch (error) {
       // Silently handle venture setup errors
     }

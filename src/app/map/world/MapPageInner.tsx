@@ -2216,6 +2216,15 @@ function MapPageInner() {
     return () => eventBridge.off("BADGE_AWARDED", handleBadge);
   }, []);
 
+  // ── Live corruption meter → Phaser map visuals ─────────────────────────────
+  useEffect(() => {
+    if (!phaserReady || !venture) return;
+    eventBridge.dispatchToPhaser({
+      type: "UPDATE_CORRUPTION",
+      corruptionLevel,
+    });
+  }, [phaserReady, venture?._id, corruptionLevel]);
+
   // ── Sync Convex checkpoint data → Phaser ───────────────────────────────────
   useEffect(() => {
     if (!phaserReady || !venture || checkpoints.length === 0) return;

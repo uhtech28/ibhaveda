@@ -25,14 +25,25 @@ import {
 } from "@/config/templates";
 import type { BiomeThemeConfig, ParticleStyle, ShaderType, WeatherEffect } from "@/config/templates/templateTypes";
 
-// Inline corruption phase helpers (mirrors corruptionEngine.ts for client use)
-export type CorruptionPhase = "calm" | "creeping" | "desaturated" | "urgent" | "critical";
+import {
+  getCorruptionPhase as getUniversalCorruptionPhase,
+  resolveCorruptionProfile,
+} from "../systems/corruptionSystem";
+
+/** @deprecated Use universal corruption phases from corruptionSystem */
+export type CorruptionPhase =
+  | "calm"
+  | "creeping"
+  | "desaturated"
+  | "urgent"
+  | "critical";
 
 export function getCorruptionPhase(level: number): CorruptionPhase {
-  if (level >= 81) return "critical";
-  if (level >= 61) return "urgent";
-  if (level >= 41) return "desaturated";
-  if (level >= 21) return "creeping";
+  const phase = getUniversalCorruptionPhase(level);
+  if (phase === "pure") return "calm";
+  if (phase === "stressed") return "creeping";
+  if (phase === "corrupted") return "desaturated";
+  if (phase === "critical") return "critical";
   return "calm";
 }
 
@@ -224,18 +235,18 @@ export interface CorruptionVisualState {
 }
 
 export function getCorruptionVisualState(corruptionLevel: number): CorruptionVisualState {
+  const profile = resolveCorruptionProfile(corruptionLevel);
   const phase = getCorruptionPhase(corruptionLevel);
-  const t = corruptionLevel / 100;
 
   return {
     phase,
-    overlayAlpha: Math.min(0.6, t * 0.6),
-    overlayColor: corruptionLevel >= 60 ? 0x800000 : 0x3b0060,
-    showCracks: corruptionLevel >= 40,
-    showFlicker: corruptionLevel >= 70,
-    vignetteIntensity: Math.min(1, t * 1.2),
-    grayscalePct: Math.max(0, (corruptionLevel - 30) * 1.5),
-    showBossGlow: corruptionLevel >= 80,
+    overlayAlpha: profile.overlayAlpha,
+    overlayColor: profile.overlayColor,
+    showCracks: profile.showCracks,
+    showFlicker: profile.showFlicker,
+    vignetteIntensity: profile.vignetteIntensity,
+    grayscalePct: Math.round(profile.desaturate * 100),
+    showBossGlow: profile.showBossGlow,
     bossGlowColor: 0xff0000,
   };
 }

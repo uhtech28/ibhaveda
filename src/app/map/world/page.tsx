@@ -2406,7 +2406,7 @@ function MapPageInner() {
   useEffect(() => {
     if (!phaserReady || !venture) return;
 
-    const corruptionBucket = Math.floor(corruptionLevel / 5);
+    const corruptionBucket = Math.round(corruptionLevel);
     const superBossKey = superBoss
       ? `${superBoss.bossSlug}:${superBoss.visualStatus}:${superBoss.status}`
       : "none";
@@ -2471,6 +2471,15 @@ function MapPageInner() {
     currentUser?.displayName,
     currentUser?.username,
   ]);
+
+  // ── Live corruption meter → Phaser map visuals ─────────────────────────────
+  useEffect(() => {
+    if (!phaserReady || !venture) return;
+    eventBridge.dispatchToPhaser({
+      type: "UPDATE_CORRUPTION",
+      corruptionLevel,
+    });
+  }, [phaserReady, venture?._id, corruptionLevel]);
 
   // ── Sync checkpoint progress → Phaser (deduped by signature) ───────────────
   useEffect(() => {
