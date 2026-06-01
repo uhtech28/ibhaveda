@@ -18,7 +18,9 @@ import {
   Trash2,
   LayoutDashboard,
   GripVertical,
+  X,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext,
   DragEndEvent,
@@ -42,6 +44,7 @@ interface KanbanCard {
   id: string;
   title: string;
   column: "todo" | "inprogress" | "done";
+  updatedAt?: number;
 }
 
 interface KanbanToolProps {
@@ -195,11 +198,12 @@ export function KanbanTool({
   >("todo");
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   const [activeColTab, setActiveColTab] = useState<"todo" | "inprogress" | "done">("todo");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleMoveCard = (cardId: string, newColumn: "todo" | "inprogress" | "done") => {
     setCards((prevCards) =>
       prevCards.map((card) =>
-        card.id === cardId ? { ...card, column: newColumn } : card
+        card.id === cardId ? { ...card, column: newColumn, updatedAt: Date.now() } : card
       )
     );
   };
@@ -239,9 +243,11 @@ export function KanbanTool({
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: newCardTitle.trim(),
       column: activeColumn,
+      updatedAt: Date.now(),
     };
     setCards([...cards, newCard]);
     setNewCardTitle("");
+    setIsModalOpen(false);
   };
 
   const deleteCard = (cardId: string) => {
@@ -273,7 +279,7 @@ export function KanbanTool({
       setCards((prevCards) =>
         prevCards.map((card) =>
           card.id === activeCard.id
-            ? { ...card, column: overCard.column }
+            ? { ...card, column: overCard.column, updatedAt: Date.now() }
             : card,
         ),
       );
@@ -284,7 +290,7 @@ export function KanbanTool({
     if (overColumn && overColumn.id !== activeCard.column) {
       setCards((prevCards) =>
         prevCards.map((card) =>
-          card.id === activeCard.id ? { ...card, column: overColumn.id } : card,
+          card.id === activeCard.id ? { ...card, column: overColumn.id, updatedAt: Date.now() } : card,
         ),
       );
     }
@@ -305,7 +311,7 @@ export function KanbanTool({
       setCards((prevCards) =>
         prevCards.map((card) =>
           card.id === activeCard.id
-            ? { ...card, column: overCard.column }
+            ? { ...card, column: overCard.column, updatedAt: Date.now() }
             : card,
         ),
       );
@@ -316,7 +322,7 @@ export function KanbanTool({
     if (overColumn) {
       setCards((prevCards) =>
         prevCards.map((card) =>
-          card.id === activeCard.id ? { ...card, column: overColumn.id } : card,
+          card.id === activeCard.id ? { ...card, column: overColumn.id, updatedAt: Date.now() } : card,
         ),
       );
     }
@@ -331,131 +337,203 @@ export function KanbanTool({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <LayoutDashboard className="h-5 w-5" />
-          <CardTitle>Kanban Board</CardTitle>
-        </div>
-        <CardDescription>{prompt}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Add Card Section */}
-        <div className="space-y-2">
-          <Label>Add New Card</Label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter task or item..."
-              value={newCardTitle}
-              onChange={(e) => setNewCardTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addCard()}
-            />
-            <select
-              value={activeColumn}
-              onChange={(e) =>
-                setActiveColumn(
-                  e.target.value as "todo" | "inprogress" | "done",
-                )
-              }
-              className="px-3 py-2 border rounded-md text-sm bg-background"
-            >
-              {columns.map((col) => (
-                <option key={col.id} value={col.id}>
-                  {col.label}
-                </option>
-              ))}
-            </select>
-            <Button
-              onClick={addCard}
-              size="icon"
-              disabled={!newCardTitle.trim()}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Kanban Board with Drag and Drop */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
+    <div className="space-y-4 py-1">
+      {/* Top Action Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/5">
+        {prompt ? (
+          <p className="text-xs text-zinc-400 font-medium leading-relaxed">
+            {prompt}
+          </p>
+        ) : (
+          <div />
+        )}
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          size="sm"
+          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-300 shrink-0 text-xs"
+          title="Add New Card"
         >
-          {/* Column selector for small screens / drawers */}
-          <div className="flex md:hidden gap-1 mb-3 bg-black/20 p-1 rounded-xl border border-white/5">
-            {columns.map((col) => (
-              <button
-                key={col.id}
-                type="button"
-                onClick={() => setActiveColTab(col.id)}
-                className={cn(
-                  "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all uppercase tracking-widest text-center",
-                  activeColTab === col.id
-                    ? "bg-indigo-500 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
-                )}
-              >
-                {col.label}
-              </button>
-            ))}
-          </div>
+          <Plus className="h-3.5 w-3.5" />
+          <span>Add Task</span>
+        </Button>
+      </div>
 
-          <div className="w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pb-2">
-              {columns.map((column) => {
-                const isVisible = activeColTab === column.id;
-                return (
-                  <div key={column.id} className={cn("md:block", isVisible ? "block" : "hidden")}>
-                    <DroppableColumn
-                      column={column}
-                      cards={getCardsForColumn(column.id)}
-                      onDelete={deleteCard}
-                      onMove={handleMoveCard}
-                    />
-                  </div>
-                );
-              })}
+      {/* Kanban Board with Drag and Drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        {/* Column selector for small screens / drawers */}
+        <div className="flex md:hidden gap-1 mb-3 bg-black/20 p-1 rounded-xl border border-white/5">
+          {columns.map((col) => (
+            <button
+              key={col.id}
+              type="button"
+              onClick={() => setActiveColTab(col.id)}
+              className={cn(
+                "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all uppercase tracking-widest text-center",
+                activeColTab === col.id
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              )}
+            >
+              {col.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="w-full">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pb-2">
+            {columns.map((column) => {
+              const isVisible = activeColTab === column.id;
+              return (
+                <div key={column.id} className={cn("md:block", isVisible ? "block" : "hidden")}>
+                  <DroppableColumn
+                    column={column}
+                    cards={getCardsForColumn(column.id)}
+                    onDelete={deleteCard}
+                    onMove={handleMoveCard}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Drag Overlay - Shows the card being dragged */}
+        <DragOverlay>
+          {activeCard ? (
+            <div className="p-3 border rounded-md bg-background shadow-lg opacity-90 cursor-grabbing">
+              <div className="flex items-start gap-2">
+                <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="text-sm flex-1">{activeCard.title}</div>
+              </div>
             </div>
-          </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
-          {/* Drag Overlay - Shows the card being dragged */}
-          <DragOverlay>
-            {activeCard ? (
-              <div className="p-3 border rounded-md bg-background shadow-lg opacity-90 cursor-grabbing">
-                <div className="flex items-start gap-2">
-                  <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div className="text-sm flex-1">{activeCard.title}</div>
+      <div className="pt-3 border-t border-white/5">
+        <p className="text-xs text-muted-foreground mb-3">
+          Total cards: {cards.length} | Drag and drop cards between columns
+        </p>
+        <Button
+          onClick={handleSubmit}
+          disabled={cards.length === 0 || isSubmitting}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{isStandalone ? "Saving..." : "Submitting..."}</span>
+            </>
+          ) : (
+            <>
+              <Check className="h-4 w-4" />
+              <span>{isStandalone ? "Save Board" : "Submit Board"}</span>
+            </>
+          )}
+        </Button>
+      </div>
+
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative w-full max-w-md bg-[#0D111A]/95 border border-white/10 rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                <div className="space-y-0.5">
+                  <h3 className="text-md font-bold text-white flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-emerald-400" />
+                    Add Kanban Card
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 font-medium">Create a new task for your venture board.</p>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 py-2">
+                <div className="space-y-1">
+                  <Label htmlFor="task-title" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Task Title
+                  </Label>
+                  <Input
+                    id="task-title"
+                    placeholder="What needs to be done?"
+                    value={newCardTitle}
+                    onChange={(e) => setNewCardTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addCard()}
+                    autoFocus
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="task-column" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Initial Status
+                  </Label>
+                  <select
+                    id="task-column"
+                    value={activeColumn}
+                    onChange={(e) =>
+                      setActiveColumn(
+                        e.target.value as "todo" | "inprogress" | "done",
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm bg-[#121824] text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
+                  >
+                    {columns.map((col) => (
+                      <option key={col.id} value={col.id}>
+                        {col.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
 
-        <div className="pt-2 border-t">
-          <p className="text-xs text-muted-foreground mb-3">
-            Total cards: {cards.length} | Drag and drop cards between columns
-          </p>
-          <Button
-            onClick={handleSubmit}
-            disabled={cards.length === 0 || isSubmitting}
-            className="w-full"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isStandalone ? "Saving..." : "Submitting..."}
-              </>
-            ) : (
-              <>
-                <Check className="mr-2 h-4 w-4" />
-                {isStandalone ? "Save Board" : "Submit Board"}
-              </>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 px-4 py-2 rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={addCard}
+                  disabled={!newCardTitle.trim()}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-300"
+                >
+                  Add Task
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

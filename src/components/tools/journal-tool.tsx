@@ -3,16 +3,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, Check, BookOpen, Users, Lock } from "lucide-react";
+import { Loader2, Check, Users, Lock } from "lucide-react";
 
 interface JournalEntry {
   id: string;
@@ -41,7 +34,7 @@ function ToggleSwitch({
   label: string;
 }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
+    <label className="flex items-center gap-2 cursor-pointer select-none">
       <div className="relative">
         <input
           type="checkbox"
@@ -51,17 +44,17 @@ function ToggleSwitch({
         />
         <div
           className={`w-11 h-6 rounded-full transition-colors ${
-            checked ? "bg-primary" : "bg-muted-foreground/30"
+            checked ? "bg-violet-500" : "bg-white/10"
           }`}
         >
           <div
-            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${
               checked ? "translate-x-5" : "translate-x-0"
             }`}
           />
         </div>
       </div>
-      <span className="text-sm font-medium">{label}</span>
+      {label && <span className="text-sm font-medium text-white">{label}</span>}
     </label>
   );
 }
@@ -72,26 +65,27 @@ export function JournalTool({
   initialContent,
   isSubmitting,
 }: JournalToolProps) {
-  const [entries, setEntries] = useState<JournalEntry[]>(
-    initialContent?.entries || [],
+  const [title, setTitle] = useState(initialContent?.entries?.[0]?.title || "");
+  const [entry, setEntry] = useState(initialContent?.entries?.[0]?.entry || "");
+  const [sharedWithTeam, setSharedWithTeam] = useState(
+    initialContent?.entries?.[0]?.sharedWithTeam || false
   );
 
   useEffect(() => {
-    if (initialContent?.entries) {
-      setEntries(initialContent.entries);
+    if (initialContent?.entries?.[0]) {
+      setTitle(initialContent.entries[0].title);
+      setEntry(initialContent.entries[0].entry);
+      setSharedWithTeam(initialContent.entries[0].sharedWithTeam);
     }
   }, [initialContent]);
-  const [title, setTitle] = useState("");
-  const [entry, setEntry] = useState("");
-  const [sharedWithTeam, setSharedWithTeam] = useState(false);
 
   const wordCount = entry.trim() ? entry.trim().split(/\s+/).length : 0;
 
-  const addEntry = () => {
+  const handleSubmit = () => {
     if (!entry.trim()) return;
 
-    const newEntry: JournalEntry = {
-      id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const singleEntry: JournalEntry = {
+      id: initialContent?.entries?.[0]?.id || `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: title.trim() || "Untitled Entry",
       entry: entry.trim(),
       wordCount,
@@ -99,219 +93,102 @@ export function JournalTool({
       sharedWithTeam,
     };
 
-    setEntries([...entries, newEntry]);
-    setTitle("");
-    setEntry("");
-    setSharedWithTeam(false);
-  };
-
-  const deleteEntry = (id: string) => {
-    setEntries(entries.filter((e) => e.id !== id));
-  };
-
-  const toggleEntryShare = (id: string) => {
-    setEntries(
-      entries.map((e) =>
-        e.id === id ? { ...e, sharedWithTeam: !e.sharedWithTeam } : e,
-      ),
-    );
-  };
-
-  const handleSubmit = () => {
-    if (entries.length === 0) return;
     onSubmit({
-      entries,
+      entries: [singleEntry],
       timestamp: Date.now(),
     });
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" />
-          <CardTitle>Journal Entry</CardTitle>
+    <div className="space-y-5 py-2">
+      {prompt && (
+        <p className="text-xs text-zinc-400 font-medium leading-relaxed">
+          {prompt}
+        </p>
+      )}
+
+      <div className="space-y-4">
+        {/* Title Input */}
+        <div className="space-y-1.5">
+          <Label htmlFor="journal-title" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+            Entry Title (optional)
+          </Label>
+          <Input
+            id="journal-title"
+            placeholder="Give your entry a title..."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 placeholder:text-zinc-600"
+          />
         </div>
-        <CardDescription>{prompt}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* New Entry Form */}
-        <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-          <div className="space-y-2">
-            <Label htmlFor="journal-title">Entry Title (optional)</Label>
-            <Input
-              id="journal-title"
-              placeholder="Give your entry a title..."
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="journal-entry">Your Journal Entry</Label>
-            <Textarea
-              id="journal-entry"
-              placeholder="What's on your mind? Reflect on your progress, challenges, insights, or learnings..."
-              value={entry}
-              onChange={(e) => setEntry(e.target.value)}
-              className="min-h-[200px] resize-y"
-            />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{wordCount} words</span>
-              <span>
-                💡 Tip: Use markdown formatting (# headers, **bold**, *italic*)
-              </span>
-            </div>
+        {/* Textarea Input */}
+        <div className="space-y-1.5">
+          <Label htmlFor="journal-entry" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+            Your Journal Entry
+          </Label>
+          <Textarea
+            id="journal-entry"
+            placeholder="What's on your mind? Reflect on your progress, challenges, insights, or learnings..."
+            value={entry}
+            onChange={(e) => setEntry(e.target.value)}
+            className="min-h-[220px] bg-[#121824] border-white/10 text-white rounded-lg focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 placeholder:text-zinc-600 resize-none text-sm leading-relaxed"
+          />
+          <div className="flex items-center justify-between text-[11px] text-zinc-500 font-medium">
+            <span>{wordCount} words</span>
+            <span>
+              💡 Tip: Use markdown formatting (# headers, **bold**, *italic*)
+            </span>
           </div>
+        </div>
 
-          {/* Share Toggle */}
-          <div className="flex items-center justify-between p-3 border rounded-md bg-background">
-            <div className="flex items-center gap-2">
+        {/* Share Switch */}
+        <div className="flex items-center justify-between p-3.5 border border-white/10 rounded-xl bg-[#121824]/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-white/5">
               {sharedWithTeam ? (
-                <Users className="h-4 w-4 text-primary" />
+                <Users className="h-4 w-4 text-violet-400" />
               ) : (
-                <Lock className="h-4 w-4 text-muted-foreground" />
+                <Lock className="h-4 w-4 text-zinc-500" />
               )}
-              <div>
-                <div className="text-sm font-medium">Share with team</div>
-                <div className="text-xs text-muted-foreground">
-                  {sharedWithTeam
-                    ? "This entry will be visible to your team"
-                    : "This entry will remain private"}
-                </div>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">Share with team</div>
+              <div className="text-[10px] text-zinc-500 font-medium">
+                {sharedWithTeam
+                  ? "This entry will be visible to your team members"
+                  : "This entry will remain private to you"}
               </div>
             </div>
-            <ToggleSwitch
-              checked={sharedWithTeam}
-              onCheckedChange={setSharedWithTeam}
-              label=""
-            />
           </div>
-
-          <Button
-            onClick={addEntry}
-            disabled={!entry.trim()}
-            className="w-full"
-          >
-            <Check className="mr-2 h-4 w-4" />
-            Add Entry
-          </Button>
+          <ToggleSwitch
+            checked={sharedWithTeam}
+            onCheckedChange={setSharedWithTeam}
+            label=""
+          />
         </div>
+      </div>
 
-        {/* Existing Entries List */}
-        {entries.length > 0 && (
-          <div className="space-y-3">
-            <Label className="text-base">Your Entries ({entries.length})</Label>
-            <div className="space-y-3 max-h-[400px] overflow-y-auto">
-              {entries.map((journalEntry) => (
-                <div
-                  key={journalEntry.id}
-                  className={`p-4 border rounded-lg ${
-                    journalEntry.sharedWithTeam
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-background"
-                  }`}
-                >
-                  {/* Entry Header */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-base">
-                        {journalEntry.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(journalEntry.timestamp).toLocaleString()} •{" "}
-                        {journalEntry.wordCount} words
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteEntry(journalEntry.id)}
-                      title="Delete entry"
-                    >
-                      ×
-                    </Button>
-                  </div>
-
-                  {/* Entry Content */}
-                  <div className="text-sm whitespace-pre-wrap mb-3 p-3 bg-muted/30 rounded">
-                    {journalEntry.entry}
-                  </div>
-
-                  {/* Share Toggle for Existing Entry */}
-                  <div className="flex items-center justify-between p-2 border-t">
-                    <div className="flex items-center gap-2 text-sm">
-                      {journalEntry.sharedWithTeam ? (
-                        <>
-                          <Users className="h-4 w-4 text-primary" />
-                          <span className="font-medium text-primary">
-                            Shared with team
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Private</span>
-                        </>
-                      )}
-                    </div>
-                    <ToggleSwitch
-                      checked={journalEntry.sharedWithTeam}
-                      onCheckedChange={() => toggleEntryShare(journalEntry.id)}
-                      label=""
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Summary */}
-        <div className="flex items-center justify-between text-sm border-t pt-3">
-          <div className="flex gap-4">
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Lock className="h-3 w-3" />
-              <span>
-                {entries.filter((e) => !e.sharedWithTeam).length} Private
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-primary">
-              <Users className="h-3 w-3" />
-              <span>
-                {entries.filter((e) => e.sharedWithTeam).length} Shared
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Submit Button */}
+      {/* Action Button */}
+      <div className="pt-3 border-t border-white/5">
         <Button
           onClick={handleSubmit}
-          disabled={entries.length === 0 || isSubmitting}
-          className="w-full"
+          disabled={!entry.trim() || isSubmitting}
+          className="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 rounded-xl shadow-lg hover:shadow-violet-500/20 transition-all duration-300 flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Saving Entry...</span>
             </>
           ) : (
             <>
-              <Check className="mr-2 h-4 w-4" />
-              Submit Journal ({entries.length}{" "}
-              {entries.length === 1 ? "entry" : "entries"})
+              <Check className="h-4 w-4" />
+              <span>Submit Journal Entry</span>
             </>
           )}
         </Button>
-
-        {entries.length === 0 && (
-          <p className="text-xs text-center text-muted-foreground">
-            Add at least one journal entry to submit
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

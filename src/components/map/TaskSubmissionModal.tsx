@@ -340,22 +340,9 @@ export function TaskSubmissionModal({
               <div className="p-3 sm:px-5 sm:py-3.5 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/15 to-[#8B5CF6]/15 flex-shrink-0">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-base sm:text-lg font-bold text-white mb-0.5 truncate">
-                      {task.title}
-                    </h2>
-                    <div className="flex items-center gap-2 flex-wrap text-[11px] sm:text-xs">
-                      <span className="text-indigo-400 font-semibold uppercase tracking-wider text-[10px]">
-                        {task.toolType.replace(/_/g, " ")}
-                      </span>
-                      <span className="text-gray-500">•</span>
-                      <span className="text-gray-300">
-                        {getMinRequirementLabel(task.toolType)}
-                      </span>
-                      <span className="text-gray-500">•</span>
-                      <span className="text-[#6366F1] font-bold">
-                        +{task.points} pts
-                      </span>
-                    </div>
+                    <p className="text-sm sm:text-base font-semibold text-white leading-relaxed">
+                      {task.description}
+                    </p>
                   </div>
                   <button
                     onClick={() => {

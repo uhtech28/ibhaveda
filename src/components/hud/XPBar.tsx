@@ -117,23 +117,8 @@ const XPBarComponent = ({
             />
           </div>
 
-          {/* Score row */}
+          {/* Value row */}
           <div className="flex items-center gap-2 mt-0.5">
-            <div className="flex items-baseline gap-1 shrink-0">
-              <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wider">Score:</span>
-              <motion.span
-                key={projectScore}
-                initial={{ opacity: 0, y: -3 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className={`text-[10.5px] font-black font-mono leading-none ${scoreColors.text}`}
-              >
-                {projectScore.toFixed(1)}
-              </motion.span>
-            </div>
-            
-            <span className="text-zinc-700 font-bold text-[9px] shrink-0">|</span>
-            
             <div className="flex items-baseline gap-1 shrink-0">
               <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wider">Value:</span>
               <span className={`text-[10px] font-black font-mono leading-none ${scoreColors.text}`}>
@@ -212,13 +197,7 @@ const XPBarComponent = ({
           </div>
 
           {/* HP info row */}
-          <div className="flex items-center justify-between mt-0.5">
-            <div className="flex items-baseline gap-1 shrink-0">
-              <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">Threat:</span>
-              <span className="text-[9px] font-black uppercase tracking-wider text-rose-400 shrink-0">
-                {corruption.phase || "calm"}
-              </span>
-            </div>
+          <div className="flex items-center justify-end mt-0.5">
             <div className="flex items-baseline gap-1 shrink-0">
               <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">HP:</span>
               <span className="text-[10.5px] font-black font-mono leading-none text-rose-400 shrink-0">
@@ -271,12 +250,6 @@ const XPBarComponent = ({
 
         {/* Scores Display */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex flex-col items-end justify-center">
-            <span className="text-[10px] font-black font-mono leading-none text-zinc-400">
-              Score: <span className="text-white text-[11px] font-mono">{projectScore.toFixed(1)}</span>
-            </span>
-          </div>
-          
           <div className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-white/10 text-[9px] font-mono font-bold text-zinc-300 leading-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
             Valuation: <span className="text-cyan-300 font-black font-mono text-[10px]">{formatINR(valuationScore)}</span>
           </div>
@@ -307,12 +280,9 @@ const XPBarComponent = ({
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-            <div className="flex flex-col">
+            <div className="flex flex-col justify-center">
               <span className="text-[10px] font-black uppercase tracking-widest text-cyan-200 truncate max-w-[140px]" title={projectName}>
                 {projectName}
-              </span>
-              <span className={`text-[8px] font-bold ${scoreColors.text}`}>
-                Score {projectScore.toFixed(1)}
               </span>
             </div>
           </div>
@@ -354,8 +324,7 @@ const XPBarComponent = ({
               </motion.div>
               <div className="absolute inset-0 rounded-lg" style={{ boxShadow: `inset 0 0 12px ${scoreColors.glow}30` }} />
             </div>
-            <div className="flex justify-between text-[9px] font-bold font-mono">
-              <span className={scoreColors.text}>Score: {projectScore.toFixed(1)}</span>
+            <div className="flex justify-end text-[9px] font-bold font-mono">
               <span className="text-white/40">Valuation: <span className={scoreColors.text}>{formatINR(valuationScore)}</span></span>
             </div>
           </div>

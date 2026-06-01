@@ -46,7 +46,7 @@ import { ContributionDashboard } from "@/components/requests/ContributionDashboa
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
-import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon } from "lucide-react";
+import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon, ListTodo } from "lucide-react";
 import { CalendarTool } from "@/components/tools/calendar-tool";
 import { KanbanTool } from "@/components/tools/kanban-tool";
 import { JournalTool } from "@/components/tools/journal-tool";
@@ -3103,7 +3103,7 @@ function MapPageInner() {
             onMouseEnter={() => {
               if (viewingStage > 1) audioManager.playUI("hover");
             }}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0 ${
+            className={`flex items-center justify-center p-2 rounded-lg border transition-all duration-300 shrink-0 ${
               viewingStage > 1
                 ? "border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25 hover:text-white"
                 : "border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50"
@@ -3114,8 +3114,7 @@ function MapPageInner() {
                 : "You are on the first stage"
             }
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            <span>Prev. Stage</span>
+            <ChevronLeft className="w-4 h-4" />
           </button>
 
           <button
@@ -3124,7 +3123,7 @@ function MapPageInner() {
             onMouseEnter={() => {
               if (viewingStage < activeStage) audioManager.playUI("hover");
             }}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0 ${
+            className={`flex items-center justify-center p-2 rounded-lg border transition-all duration-300 shrink-0 ${
               viewingStage < activeStage
                 ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 hover:text-white"
                 : "border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50"
@@ -3135,8 +3134,7 @@ function MapPageInner() {
                 : "You are on your latest unlocked stage"
             }
           >
-            <span>Next Stage</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
 
           {viewingStage < activeStage && (
@@ -3182,14 +3180,14 @@ function MapPageInner() {
                 }
               }
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0 ${
+            className={`flex items-center justify-center p-2 rounded-lg border transition-all duration-300 shrink-0 ${
               !selectedDetail
                 ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 hover:text-white shadow-[0_0_12px_rgba(99,102,241,0.2)] animate-[pulse_2s_infinite]"
                 : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
             }`}
+            title="Tasks"
           >
-            <JournalIcon className={`w-3.5 h-3.5 ${!selectedDetail ? "text-indigo-400" : "text-slate-400"}`} />
-            <span>Tasks</span>
+            <ListTodo className={`w-4 h-4 ${!selectedDetail ? "text-indigo-400" : "text-slate-400"}`} />
           </button>
 
           <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
@@ -3693,6 +3691,8 @@ function MapPageInner() {
                       <CalendarTool
                         prompt="Plan your venture milestones and team syncs."
                         initialContent={calendarData}
+                        kanbanData={kanbanData}
+                        journalData={journalData}
                         onSubmit={(data) => handleToolSubmit("calendar", data)}
                       />
                     </div>

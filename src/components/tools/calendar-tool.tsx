@@ -4,15 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2,
@@ -24,6 +16,11 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
+  X,
+  BookOpen,
+  Users,
+  Lock,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   format,
@@ -35,6 +32,7 @@ import {
   endOfMonth,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface CalendarEvent {
   id: string;
@@ -55,6 +53,14 @@ interface CalendarToolProps {
   initialContent?: { events: CalendarEvent[]; view: string; timestamp: number };
   isSubmitting?: boolean;
   isStandalone?: boolean;
+  kanbanData?: {
+    cards: Array<{ id: string; title: string; column: "todo" | "inprogress" | "done"; updatedAt?: number }>;
+    timestamp: number;
+  } | null;
+  journalData?: {
+    entries: Array<{ id: string; title: string; entry: string; timestamp: number; sharedWithTeam: boolean }>;
+    timestamp: number;
+  } | null;
 }
 
 export function CalendarTool({
@@ -63,6 +69,8 @@ export function CalendarTool({
   initialContent,
   isSubmitting,
   isStandalone,
+  kanbanData,
+  journalData,
 }: CalendarToolProps) {
   const [view, setView] = useState<"week" | "month">("month");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -70,6 +78,9 @@ export function CalendarTool({
     initialContent?.events?.map((e) => ({ ...e, date: new Date(e.date) })) ||
       [],
   );
+
+  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
+  const [outlineDate, setOutlineDate] = useState<Date | null>(null);
 
   useEffect(() => {
     if (initialContent?.events) {
@@ -92,6 +103,12 @@ export function CalendarTool({
     description: "",
   });
 
+  // Sync dates when selectedDate changes so new forms pre-populate correctly
+  useEffect(() => {
+    setEventFormData((prev) => ({ ...prev, date: selectedDate }));
+    setMilestoneFormData((prev) => ({ ...prev, date: selectedDate }));
+  }, [selectedDate]);
+
   const addEvent = () => {
     if (!eventFormData.title.trim()) return;
 
@@ -106,7 +123,7 @@ export function CalendarTool({
 
     setEvents([...events, newEvent]);
     setEventFormData({
-      date: new Date(),
+      date: selectedDate,
       time: "",
       title: "",
       description: "",
@@ -126,7 +143,7 @@ export function CalendarTool({
     };
 
     setEvents([...events, newMilestone]);
-    setMilestoneFormData({ date: new Date(), title: "", description: "" });
+    setMilestoneFormData({ date: selectedDate, title: "", description: "" });
     setShowMilestoneForm(false);
   };
 
@@ -134,8 +151,32 @@ export function CalendarTool({
     setEvents(events.filter((e) => e.id !== id));
   };
 
-  const getEventsForDate = (date: Date) => {
-    return events.filter((e) => isSameDay(e.date, date));
+  const getItemsForDate = (date: Date) => {
+    const dayEvents = events.filter((e) => isSameDay(e.date, date));
+    
+    const dayJournals = journalData?.entries
+      ? journalData.entries.filter((entry) => isSameDay(new Date(entry.timestamp), date))
+      : [];
+      
+    const dayKanbans = kanbanData?.cards
+      ? kanbanData.cards.filter((card) => {
+          const cardTime = card.updatedAt || kanbanData.timestamp;
+          return isSameDay(new Date(cardTime), date);
+        })
+      : [];
+
+    return {
+      events: dayEvents,
+      journals: dayJournals,
+      kanban: dayKanbans,
+      totalCount: dayEvents.length + dayJournals.length + dayKanbans.length
+    };
+  };
+
+  const handleDayClick = (day: Date) => {
+    setSelectedDate(day);
+    setOutlineDate(day);
+    setIsOutlineOpen(true);
   };
 
   const getWeekDays = () => {
@@ -156,11 +197,9 @@ export function CalendarTool({
   const sortedEvents = [...events].sort(
     (a, b) => a.date.getTime() - b.date.getTime(),
   );
-  const hasEvents = events.some((e) => e.type === "event");
-  const hasMilestones = events.some((e) => e.type === "milestone");
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       {/* Premium Header - Super Compact */}
       <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-white/10 shadow-lg flex items-center justify-between relative overflow-hidden">
         <div className="relative z-10">
@@ -197,7 +236,7 @@ export function CalendarTool({
         {view === "month" ? (
           <div className="p-2.5">
             {/* Custom Month Header */}
-            <div className="flex items-center justify-between mb-2 px-1">
+            <div className="flex items-center justify-between mb-2.5 px-1">
               <h3 className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
                 {format(selectedDate, "MMMM yyyy")}
               </h3>
@@ -217,7 +256,7 @@ export function CalendarTool({
               </div>
             </div>
 
-            <div className="grid grid-cols-7 mb-1">
+            <div className="grid grid-cols-7 mb-1.5">
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
                 <div key={day} className="text-[9px] font-black uppercase tracking-widest text-slate-500 text-center py-1">
                   {day}
@@ -225,7 +264,7 @@ export function CalendarTool({
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-0.5">
+            <div className="grid grid-cols-7 gap-1">
               {(() => {
                 const start = startOfMonth(selectedDate);
                 const end = endOfMonth(selectedDate);
@@ -237,26 +276,64 @@ export function CalendarTool({
                   const isSelected = isSameDay(day, selectedDate);
                   const isToday = isSameDay(day, new Date());
                   const isCurrentMonth = day.getMonth() === selectedDate.getMonth();
-                  const dayEvents = getEventsForDate(day);
+                  
+                  const dayItems = getItemsForDate(day);
+                  const allItems = [
+                    ...dayItems.events.map(e => ({ id: e.id, title: e.title, type: "event" })),
+                    ...dayItems.kanban.map(k => ({ id: k.id, title: k.title, type: "kanban" })),
+                    ...dayItems.journals.map(j => ({ id: j.id, title: j.title || "Untitled Entry", type: "journal" }))
+                  ];
 
                   return (
                     <button
                       key={day.toISOString()}
-                      onClick={() => setSelectedDate(day)}
+                      onClick={() => handleDayClick(day)}
                       className={cn(
-                        "h-8 w-full rounded-lg flex flex-col items-center justify-center text-xs font-bold transition-all duration-200 relative",
+                        "min-h-[64px] w-full rounded-lg flex flex-col items-stretch justify-between p-1.5 text-xs font-bold transition-all duration-200 relative border text-left select-none overflow-hidden",
                         isSelected
-                          ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 scale-105 z-10"
+                          ? "bg-indigo-500/10 border-indigo-500/50 text-white shadow-lg shadow-indigo-500/10 z-10"
                           : isToday
-                            ? "bg-indigo-500/10 border border-indigo-500/30 text-indigo-400"
+                            ? "bg-indigo-500/5 border border-indigo-500/20 text-indigo-400"
                             : isCurrentMonth
-                              ? "hover:bg-white/10 text-slate-300"
-                              : "text-slate-700 opacity-20"
+                              ? "bg-white/[0.01] border-white/5 hover:bg-white/5 hover:border-white/10 text-slate-300"
+                              : "border-transparent text-slate-700 opacity-20 hover:opacity-40"
                       )}
                     >
-                      <span>{format(day, "d")}</span>
-                      {dayEvents.length > 0 && !isSelected && (
-                        <div className="absolute bottom-1 w-1 h-1 rounded-full bg-indigo-400" />
+                      <div className="flex items-center justify-between w-full">
+                        <span className={cn(
+                          "w-5 h-5 rounded-full flex items-center justify-center text-[10px]",
+                          isToday && "bg-indigo-500 text-white font-black"
+                        )}>
+                          {format(day, "d")}
+                        </span>
+                        {allItems.length > 0 && !isCurrentMonth && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/40" />
+                        )}
+                      </div>
+
+                      {isCurrentMonth && allItems.length > 0 && (
+                        <div className="flex-1 flex flex-col gap-0.5 mt-1 justify-end w-full overflow-hidden">
+                          {allItems.slice(0, 2).map((item) => (
+                            <div
+                              key={item.id}
+                              className={cn(
+                                "text-[8px] px-1 py-0.5 rounded truncate font-bold uppercase tracking-wider leading-none w-full border",
+                                item.type === "event"
+                                  ? "bg-indigo-500/15 border-indigo-500/20 text-indigo-300"
+                                  : item.type === "kanban"
+                                    ? "bg-emerald-500/15 border-emerald-500/20 text-emerald-300"
+                                    : "bg-violet-500/15 border-violet-500/20 text-violet-300"
+                              )}
+                            >
+                              {item.title}
+                            </div>
+                          ))}
+                          {allItems.length > 2 && (
+                            <div className="text-[7.5px] text-zinc-500 font-bold pl-0.5 leading-none">
+                              +{allItems.length - 2} more
+                            </div>
+                          )}
+                        </div>
                       )}
                     </button>
                   );
@@ -271,22 +348,28 @@ export function CalendarTool({
             </div>
             <div className="grid grid-cols-7 gap-1">
               {getWeekDays().map((day) => {
-                const dayEvents = getEventsForDate(day);
                 const isToday = isSameDay(day, new Date());
                 const isSelected = isSameDay(day, selectedDate);
+
+                const dayItems = getItemsForDate(day);
+                const allItems = [
+                  ...dayItems.events.map(e => ({ id: e.id, type: "event" })),
+                  ...dayItems.kanban.map(k => ({ id: k.id, type: "kanban" })),
+                  ...dayItems.journals.map(j => ({ id: j.id, type: "journal" }))
+                ];
 
                 return (
                   <div
                     key={day.toISOString()}
                     className={cn(
-                      "flex flex-col items-center py-2 rounded-lg cursor-pointer transition-all duration-300 border",
+                      "flex flex-col items-center py-2 rounded-lg cursor-pointer transition-all duration-300 border select-none",
                       isSelected
                         ? "bg-indigo-500 text-white border-indigo-500 shadow-lg shadow-indigo-500/20 scale-105 z-10"
                         : isToday
                           ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400"
                           : "bg-white/5 border-white/5 hover:bg-white/10 text-slate-400"
                     )}
-                    onClick={() => setSelectedDate(day)}
+                    onClick={() => handleDayClick(day)}
                   >
                     <span className="text-[7.5px] font-black uppercase tracking-wider mb-0.5 opacity-60">
                       {format(day, "EEE")}
@@ -294,17 +377,24 @@ export function CalendarTool({
                     <span className="text-xs font-black">
                       {format(day, "d")}
                     </span>
-                    {dayEvents.length > 0 && (
-                      <div className="mt-1 flex gap-0.5">
-                        {dayEvents.slice(0, 3).map((evt) => (
+                    {allItems.length > 0 && (
+                      <div className="mt-1 flex gap-0.5 flex-wrap justify-center max-w-full px-0.5">
+                        {allItems.slice(0, 4).map((item) => (
                           <div
-                            key={evt.id}
+                            key={item.id}
                             className={cn(
-                              "w-1 h-1 rounded-full",
-                              evt.type === "event" ? "bg-blue-400" : "bg-amber-400"
+                              "w-1.5 h-1.5 rounded-full",
+                              item.type === "event" 
+                                ? "bg-indigo-400" 
+                                : item.type === "kanban" 
+                                  ? "bg-emerald-400" 
+                                  : "bg-violet-400"
                             )}
                           />
                         ))}
+                        {allItems.length > 4 && (
+                          <div className="w-1 h-1 rounded-full bg-slate-500" />
+                        )}
                       </div>
                     )}
                   </div>
@@ -356,7 +446,7 @@ export function CalendarTool({
           <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/20 space-y-3 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-2">
               <Clock className="h-3.5 w-3.5 text-indigo-400" />
-              <h3 className="text-xs font-black text-white uppercase tracking-wider">New Event</h3>
+              <h3 className="text-xs font-black text-white uppercase tracking-wider">New Event for {format(eventFormData.date, "MMM d")}</h3>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -399,7 +489,7 @@ export function CalendarTool({
           <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-2">
               <MilestoneIcon className="h-3.5 w-3.5 text-amber-400" />
-              <h3 className="text-xs font-black text-white uppercase tracking-wider">New Milestone</h3>
+              <h3 className="text-xs font-black text-white uppercase tracking-wider">New Milestone for {format(milestoneFormData.date, "MMM d")}</h3>
             </div>
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Title</Label>
@@ -501,6 +591,204 @@ export function CalendarTool({
           )}
         </div>
       </div>
+
+      {/* Registry Outline Popup Modal */}
+      <AnimatePresence>
+        {isOutlineOpen && outlineDate && (() => {
+          const dayItems = getItemsForDate(outlineDate);
+          const formattedDate = format(outlineDate, "EEEE, MMMM d, yyyy");
+          
+          return (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsOutlineOpen(false)}
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              />
+
+              {/* Modal Content */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ type: "spring", duration: 0.4 }}
+                className="relative w-full max-w-lg bg-[#0D111A]/98 border border-white/10 rounded-2xl p-6 shadow-2xl z-10 flex flex-col max-h-[80vh] gap-4"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3.5 border-b border-white/10">
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] font-black uppercase tracking-[0.15em] text-indigo-400">
+                      Date Outline
+                    </p>
+                    <h3 className="text-md font-bold text-white">
+                      {formattedDate}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setIsOutlineOpen(false)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Outline content list (scrolling area) */}
+                <div className="flex-1 overflow-y-auto pr-1 space-y-4 no-scrollbar">
+                  {/* Calendar Scheduled Events & Milestones */}
+                  {dayItems.events.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                        <CalendarIcon className="w-3.5 h-3.5 text-indigo-400" />
+                        Calendar &amp; Syncs ({dayItems.events.length})
+                      </h4>
+                      <div className="space-y-1.5">
+                        {dayItems.events.map((item) => (
+                          <div
+                            key={item.id}
+                            className="p-3 border rounded-xl bg-indigo-950/20 border-indigo-500/20"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  {item.type === "event" ? (
+                                    <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                                  ) : (
+                                    <MilestoneIcon className="w-3.5 h-3.5 text-amber-400" />
+                                  )}
+                                  {item.title}
+                                </h5>
+                                {item.description && (
+                                  <p className="text-xs text-zinc-400 mt-1 font-medium leading-relaxed">
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+                              {item.time && (
+                                <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                  {item.time}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kanban Board Task Updates */}
+                  {dayItems.kanban.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <LayoutDashboard className="w-3.5 h-3.5 text-emerald-400" />
+                        Kanban Tasks ({dayItems.kanban.length})
+                      </h4>
+                      <div className="space-y-1.5">
+                        {dayItems.kanban.map((card) => (
+                          <div
+                            key={card.id}
+                            className="p-3 border border-emerald-500/20 bg-emerald-950/10 rounded-xl flex items-center justify-between gap-3"
+                          >
+                            <span className="text-xs font-bold text-white">{card.title}</span>
+                            <span className={cn(
+                              "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border leading-none shrink-0",
+                              card.column === "done" 
+                                ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400" 
+                                : card.column === "inprogress"
+                                  ? "bg-blue-500/20 border-blue-500/30 text-blue-400"
+                                  : "bg-zinc-500/20 border-zinc-500/30 text-zinc-400"
+                            )}>
+                              {card.column === "done" ? "Done" : card.column === "inprogress" ? "In Progress" : "Todo"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Journal Logs */}
+                  {dayItems.journals.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-violet-400 flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-violet-400" />
+                        Journal Entries ({dayItems.journals.length})
+                      </h4>
+                      <div className="space-y-1.5">
+                        {dayItems.journals.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="p-3 border border-violet-500/20 bg-violet-950/10 rounded-xl space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-xs font-bold text-white">{entry.title || "Untitled Entry"}</h5>
+                              <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-medium">
+                                {entry.sharedWithTeam ? (
+                                  <Users className="w-3 h-3 text-violet-400" />
+                                ) : (
+                                  <Lock className="w-3 h-3" />
+                                )}
+                                <span>{entry.sharedWithTeam ? "Shared" : "Private"}</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-zinc-400 font-medium leading-relaxed bg-[#121824] p-2.5 rounded-lg border border-white/5 whitespace-pre-wrap">
+                              {entry.entry}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {dayItems.totalCount === 0 && (
+                    <div className="py-8 flex flex-col items-center justify-center text-center gap-3">
+                      <div className="p-4 rounded-full bg-white/5 text-slate-500 animate-pulse">
+                        <CalendarIcon className="w-8 h-8" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white">No items logged on this date</p>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">Click "Event" or "Milestone" below to schedule an activity.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick actions for this date inside modal */}
+                <div className="flex gap-2 pt-3.5 border-t border-white/10">
+                  <Button
+                    onClick={() => {
+                      setEventFormData((prev) => ({ ...prev, date: outlineDate }));
+                      setShowEventForm(true);
+                      setShowMilestoneForm(false);
+                      setIsOutlineOpen(false);
+                    }}
+                    size="sm"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-9 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Event</span>
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setMilestoneFormData((prev) => ({ ...prev, date: outlineDate }));
+                      setShowMilestoneForm(true);
+                      setShowEventForm(false);
+                      setIsOutlineOpen(false);
+                    }}
+                    size="sm"
+                    className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold h-9 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Milestone</span>
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
     </div>
   );
 }
