@@ -125,23 +125,6 @@ export default function LandingIntroSandbox({
     let ctx: AudioContext | null = null;
     let done = false;
 
-    const tryAutoplay = async () => {
-      if (done) return;
-      try {
-        ctx = new AC();
-        await ctx.resume();
-        if (ctx.state === "running") {
-          done = true;
-          play(ctx);
-          return;
-        }
-      } catch { /* autoplay blocked */ }
-      // Autoplay blocked — register gesture listeners as fallback
-      window.addEventListener("touchstart", unlock, { once: true, passive: true });
-      window.addEventListener("pointerdown", unlock, { once: true });
-      window.addEventListener("keydown",     unlock, { once: true });
-    };
-
     const play = (audioCtx: AudioContext) => {
       const masterGain = audioCtx.createGain();
       const t0 = audioCtx.currentTime + 0.05;
@@ -171,28 +154,44 @@ export default function LandingIntroSandbox({
       }
     };
 
+    // Gesture fallback: create fresh ctx synchronously inside the handler (required for iOS)
     const unlock = () => {
       if (done) return;
       done = true;
-
       try {
-        // Reuse suspended ctx from autoplay attempt, or create fresh one
-        const resume = ctx ? ctx.resume() : Promise.resolve().then(() => { ctx = new AC(); return ctx.resume(); });
-        resume.then(() => {
-          if (ctx && ctx.state !== "closed") {
-            // Play silent buffer synchronously to unfreeze iOS currentTime
-            const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.connect(ctx.destination);
-            src.start(0);
-            setTimeout(() => { if (ctx && ctx.state !== "closed") play(ctx); }, 50);
-          }
-        }).catch(() => undefined);
+        ctx = new AC();
+        const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+        ctx.resume().catch(() => undefined);
+        setTimeout(() => { if (ctx && ctx.state !== "closed") play(ctx); }, 50);
       } catch { /* not available */ }
     };
 
-    tryAutoplay();
+    // Register gesture listeners immediately (synchronous — no race window)
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown",     unlock, { once: true });
+
+    // Also attempt autoplay in parallel; cancel listeners if it succeeds
+    (async () => {
+      try {
+        const probe = new AC();
+        await probe.resume();
+        if (!done && probe.state === "running") {
+          done = true;
+          window.removeEventListener("touchstart", unlock);
+          window.removeEventListener("pointerdown", unlock);
+          window.removeEventListener("keydown",     unlock);
+          ctx = probe;
+          play(ctx);
+          return;
+        }
+        probe.close().catch(() => undefined);
+      } catch { /* autoplay blocked — gesture listeners will handle it */ }
+    })();
 
     return () => {
       done = true;
