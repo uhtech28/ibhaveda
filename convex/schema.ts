@@ -108,6 +108,7 @@ export default defineSchema({
     content: v.string(), // Comment content
     createdAt: v.number(), // Unix timestamp
     parentCommentId: v.optional(v.id("comments")), // Optional parent comment for nested replies
+    sparkCount: v.optional(v.number()), // Number of sparks on this comment
   })
     .index("by_idea", ["ideaId"])
     .index("by_author", ["authorId"])
@@ -124,6 +125,16 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_idea", ["ideaId"])
     .index("by_user_idea", ["userId", "ideaId"]),
+
+  // User comment sparks table - tracks which users have sparked which comments
+  userCommentSparks: defineTable({
+    userId: v.id("users"),
+    commentId: v.id("comments"),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_comment", ["commentId"])
+    .index("by_user_comment", ["userId", "commentId"]),
 
   // Social proof engine — per-post spark delivery schedules
   socialProofSchedules: defineTable({

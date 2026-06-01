@@ -1284,7 +1284,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
     titlePoints: 150,
     requirements: [
       "Leave a detailed comment on 2 ideas (min. 30 words each)",
-      "Receive at least 1 upvote on any comment",
+      "Receive at least 1 spark on any comment",
       "Complete 2 checkpoints on your first idea",
       "Earn 150 points",
       "Resolve at least 1 flare you fired",
@@ -1393,7 +1393,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
     title: "Catalyst",
     phase: "mid",
     titlePoints: 7200,
-    requirements: ["10,500 points", "Any idea received 15+ upvotes"],
+    requirements: ["10,500 points", "Any idea received 15+ sparks"],
   },
   {
     level: 18,
@@ -1402,7 +1402,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
     titlePoints: 8600,
     requirements: [
       "13,000 points",
-      "Given 25 upvoted comments or reviews",
+      "Given 25 sparked comments or reviews",
       "Respond helpfully to at least 5 flares",
     ],
   },
@@ -1523,7 +1523,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
     title: "Champion",
     phase: "senior",
     titlePoints: 49200,
-    requirements: ["100,500 points", "Any idea earned 50+ total upvotes"],
+    requirements: ["100,500 points", "Any idea earned 50+ total sparks"],
   },
   {
     level: 33,
@@ -1556,7 +1556,7 @@ export const LEVEL_DEFINITIONS: LevelDef[] = [
     titlePoints: 68000,
     requirements: [
       "143,500 points",
-      "Given 75 upvoted reviews or comments",
+      "Given 75 sparked reviews or comments",
       "Respond helpfully to at least 20 flares total",
     ],
   },
@@ -2094,7 +2094,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     iconDescription:
       "An open upward-facing hand with a small star above the palm",
     tagline: "You saw something worth backing and you backed it.",
-    requirement: "Upvote 25 ideas",
+    requirement: "Spark 25 ideas",
   },
   {
     id: 29,
@@ -2108,7 +2108,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     tagline:
       "Honest eyes are the most valuable gift you can give a fellow maker.",
     requirement:
-      "Give 10 reviews or detailed comments that receive at least one upvote",
+      "Give 10 reviews or detailed comments that receive at least one spark",
   },
   {
     id: 30,
@@ -2121,7 +2121,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     iconDescription:
       "A wax seal with a quill at its centre — the mark of the trusted correspondent",
     tagline: "Your words carry weight. Others wait to hear them.",
-    requirement: "Give 50 upvoted reviews or comments",
+    requirement: "Give 50 sparked reviews or comments",
   },
   {
     id: 31,
@@ -2185,7 +2185,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     secondaryColor: "#92400E",
     iconDescription: "A laurel wreath surrounding a small upward arrow",
     tagline: "The community has spoken. Your idea deserved to rise.",
-    requirement: "Have an idea receive 25 upvotes",
+    requirement: "Have an idea receive 25 sparks",
   },
   {
     id: 36,
@@ -2197,7 +2197,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     secondaryColor: "#9D174D",
     iconDescription: "A crown sitting above a heart — beloved by the community",
     tagline: "Fifty voices, one direction. They all pointed at your work.",
-    requirement: "Have an idea receive 50 upvotes",
+    requirement: "Have an idea receive 50 sparks",
   },
   {
     id: 37,
@@ -2275,6 +2275,8 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     requirement:
       "Be active on the platform in all four calendar quarters of a single year",
   },
+  // League-based badges are disabled until league mechanics are finalized.
+  /*
   {
     id: 43,
     name: "The Weekly Champion",
@@ -2325,6 +2327,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     tagline: "Others rose and fell. You held.",
     requirement: "Remain in Diamond league for 4 consecutive weeks",
   },
+  */
   // Hidden (8)
   {
     id: 47,
@@ -2405,7 +2408,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
       "A very faint translucent figure — present but barely visible",
     tagline: "You were here more than anyone knew.",
     requirement:
-      "Complete 50 upvotes given without receiving a single upvote on your own content",
+      "Complete 50 sparks given without receiving a single spark on your own content",
   },
   {
     id: 53,
@@ -2523,7 +2526,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     iconDescription:
       "The Roman numeral M (1000) engraved on dark stone with gold inlay",
     tagline: "One thousand voices helped. One thousand ideas moved forward.",
-    requirement: "Give 1,000 upvoted reviews or comments across the platform",
+    requirement: "Give 1,000 sparked reviews or comments across the platform",
   },
   {
     id: 62,
@@ -2714,10 +2717,11 @@ export function getVentureBadgeEmoji(badgeId: number, name: string): string {
   if (badgeId === 40) return "🔥";
   if (badgeId === 41) return "🛡️";
   if (badgeId === 42) return "🍂";
-  if (badgeId === 43) return "🏆";
-  if (badgeId === 44) return "📈";
-  if (badgeId === 45) return "💎";
-  if (badgeId === 46) return "🧱";
+  // League-based badges are disabled until league mechanics are finalized.
+  // if (badgeId === 43) return "🏆";
+  // if (badgeId === 44) return "📈";
+  // if (badgeId === 45) return "💎";
+  // if (badgeId === 46) return "🧱";
   if (badgeId === 47) return "🌙";
   if (badgeId === 48) return "⏳";
   if (badgeId === 49) return "⭐";

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { createContributionRequest, updateRequestStatus, getRequestsByIdea, getIncomingRequests } from "./contributionRequests";
 
 // Create a new idea (root or with parent) with proper authorization checks
@@ -739,6 +739,14 @@ export const getComments = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 100;
+    const identity = await ctx.auth.getUserIdentity();
+    const currentUser = identity
+      ? await ctx.db
+          .query("users")
+          .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+          .unique()
+      : null;
+
     const comments = await ctx.db
       .query("comments")
       .withIndex("by_idea_created", (q) => q.eq("ideaId", args.ideaId))
@@ -749,8 +757,18 @@ export const getComments = query({
     const commentsWithAuthors = await Promise.all(
       comments.map(async (comment) => {
         const author = await ctx.db.get(comment.authorId);
+        const commentSparks = await ctx.db
+          .query("userCommentSparks")
+          .withIndex("by_comment", (q) => q.eq("commentId", comment._id))
+          .collect();
+        const userHasSparked = currentUser
+          ? commentSparks.some((spark) => spark.userId === currentUser._id)
+          : false;
+
         return {
           ...comment,
+          sparkCount: comment.sparkCount ?? commentSparks.length,
+          userHasSparked,
           author: author ? {
             ...author,
             name: author.displayName,
@@ -813,6 +831,7 @@ export const addComment = mutation({
       content: args.content.trim(),
       createdAt: now,
       parentCommentId: args.parentCommentId,
+      sparkCount: 0,
     });
 
     // Increment comment count
@@ -883,6 +902,139 @@ export const addComment = mutation({
   },
 });
 
+// Toggle spark for a comment (used by comment-based badge requirements)
+export const toggleCommentSpark = mutation({
+  args: {
+    commentId: v.id("comments"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const comment = await ctx.db.get(args.commentId);
+    if (!comment) {
+      throw new Error("Comment not found");
+    }
+
+    const existingSpark = await ctx.db
+      .query("userCommentSparks")
+      .withIndex("by_user_comment", (q) =>
+        q.eq("userId", user._id).eq("commentId", args.commentId)
+      )
+      .unique();
+    const commentSparks = await ctx.db
+      .query("userCommentSparks")
+      .withIndex("by_comment", (q) => q.eq("commentId", args.commentId))
+      .collect();
+    const nonAuthorSparkCount = commentSparks.filter(
+      (spark) => spark.userId !== comment.authorId
+    ).length;
+
+    const currentSparkCount = comment.sparkCount ?? 0;
+    const now = Date.now();
+    const shouldUpdateAuthorCounter = comment.authorId !== user._id;
+
+    const updateCommentAuthorSparkedCount = async (delta: number) => {
+      if (!shouldUpdateAuthorCounter) return;
+
+      const authorLevel = await ctx.db
+        .query("userLevels")
+        .withIndex("by_user", (q) => q.eq("userId", comment.authorId))
+        .unique();
+
+      if (authorLevel) {
+        await ctx.db.patch(authorLevel._id, {
+          upvotedCommentsCount: Math.max(0, (authorLevel.upvotedCommentsCount || 0) + delta),
+          updatedAt: now,
+        });
+      } else if (delta > 0) {
+        await ctx.db.insert("userLevels", {
+          userId: comment.authorId,
+          currentLevel: 1,
+          titlePoints: 0,
+          totalPoints: 0,
+          goldCheckpoints: 0,
+          fullLifecycles: 0,
+          helpfulFlareResponses: 0,
+          flaresResolved: 0,
+          menteesCount: 0,
+          menteeCheckpointAdvances: 0,
+          menteeLevelAchievements: 0,
+          ideasLaunched: 0,
+          ideasScaled: 0,
+          collaboratorsRecruited: 0,
+          collaboratorsJoined: 0,
+          commentsCount: 0,
+          upvotedCommentsCount: 1,
+          ideasCreated: 0,
+          ideasWithStage6: 0,
+          ideasWithStage8: 0,
+          activeIdeaTypes: [],
+          updatedAt: now,
+        });
+      }
+    };
+
+    if (existingSpark) {
+      await ctx.db.delete(existingSpark._id);
+      const nextSparkCount = Math.max(0, currentSparkCount - 1);
+      await ctx.db.patch(comment._id, { sparkCount: nextSparkCount });
+
+      if (shouldUpdateAuthorCounter && nonAuthorSparkCount === 1) {
+        await updateCommentAuthorSparkedCount(-1);
+      }
+
+      await ctx.scheduler.runAfter(0, api.badges.recalculateUserBadges, {
+        userId: comment.authorId,
+      });
+
+      return { action: "removed", sparkCount: nextSparkCount };
+    }
+
+    await ctx.db.insert("userCommentSparks", {
+      userId: user._id,
+      commentId: args.commentId,
+      createdAt: now,
+    });
+
+    const nextSparkCount = currentSparkCount + 1;
+    await ctx.db.patch(comment._id, { sparkCount: nextSparkCount });
+
+    if (shouldUpdateAuthorCounter && nonAuthorSparkCount === 0) {
+      await updateCommentAuthorSparkedCount(1);
+    }
+
+    if (shouldUpdateAuthorCounter) {
+      await ctx.db.insert("notifications", {
+        recipientId: comment.authorId,
+        senderId: user._id,
+        type: "comment_spark_received",
+        message: `${user.displayName} sparked your comment`,
+        relatedId: args.commentId,
+        isRead: false,
+        createdAt: now,
+      });
+    }
+
+    await ctx.scheduler.runAfter(0, api.badges.recalculateUserBadges, {
+      userId: comment.authorId,
+    });
+
+    return { action: "added", sparkCount: nextSparkCount };
+  },
+});
+
 // Delete a comment (if needed)
 export const deleteComment = mutation({
   args: {
@@ -914,6 +1066,31 @@ export const deleteComment = mutation({
     // Check if user is the author
     if (comment.authorId !== user._id) {
       throw new Error("Not authorized to delete this comment");
+    }
+
+    const commentSparks = await ctx.db
+      .query("userCommentSparks")
+      .withIndex("by_comment", (q) => q.eq("commentId", args.commentId))
+      .collect();
+    const nonAuthorSparkCount = commentSparks.filter(
+      (spark) => spark.userId !== comment.authorId
+    ).length;
+
+    for (const spark of commentSparks) {
+      await ctx.db.delete(spark._id);
+    }
+
+    if (nonAuthorSparkCount > 0) {
+      const authorLevel = await ctx.db
+        .query("userLevels")
+        .withIndex("by_user", (q) => q.eq("userId", comment.authorId))
+        .unique();
+      if (authorLevel) {
+        await ctx.db.patch(authorLevel._id, {
+          upvotedCommentsCount: Math.max(0, (authorLevel.upvotedCommentsCount || 0) - 1),
+          updatedAt: Date.now(),
+        });
+      }
     }
 
     // Delete the comment

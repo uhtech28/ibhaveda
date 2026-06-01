@@ -8,7 +8,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Trash2, Send, MessageSquare } from "lucide-react";
+import { Trash2, Send, MessageSquare, Sparkles } from "lucide-react";
 import Link from "next/link";
 function compactAge(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -30,6 +30,8 @@ type Comment = {
   content: string;
   createdAt: number;
   parentCommentId?: string;
+  sparkCount?: number;
+  userHasSparked?: boolean;
   author: {
     _id: string;
     name?: string;
@@ -217,8 +219,10 @@ const CommentItem: React.FC<{
   const [replyContent, setReplyContent] = useState("");
   const [isReplying, setIsReplying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSparking, setIsSparking] = useState(false);
   const addCommentMutation = useMutation(api.ideas.addComment);
   const deleteCommentMutation = useMutation(api.ideas.deleteComment);
+  const toggleCommentSparkMutation = useMutation(api.ideas.toggleCommentSpark);
 
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,6 +256,19 @@ const CommentItem: React.FC<{
   };
 
   const isMine = userId === comment.authorId;
+  const sparkCount = comment.sparkCount ?? 0;
+
+  const handleSpark = async () => {
+    if (!userId || isSparking) return;
+    setIsSparking(true);
+    try {
+      await toggleCommentSparkMutation({ commentId: comment._id as Id<"comments"> });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSparking(false);
+    }
+  };
 
   return (
     <div className={`group ${level > 0 ? "ml-9" : ""}`}>
@@ -299,8 +316,23 @@ const CommentItem: React.FC<{
             </p>
           </div>
 
-          {userId && (
-            <div className="flex items-center gap-3 px-1 pt-1.5">
+          <div className="flex items-center gap-3 px-1 pt-1.5">
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors ${
+                comment.userHasSparked
+                  ? "text-orange-400"
+                  : "text-[#9CA3AF] hover:text-orange-400"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+              onClick={handleSpark}
+              disabled={!userId || isSparking}
+              title={userId ? "Spark this comment" : "Sign in to spark comments"}
+              aria-label={`${comment.userHasSparked ? "Remove spark from" : "Spark"} comment`}
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>{sparkCount}</span>
+            </button>
+            {userId && (
               <button
                 type="button"
                 className="text-[11px] font-medium text-[#9CA3AF] transition-colors hover:text-[#A5B4FC]"
@@ -308,13 +340,13 @@ const CommentItem: React.FC<{
               >
                 {showReply ? "Cancel" : "Reply"}
               </button>
-              {replies.length > 0 && (
-                <span className="text-[11px] text-[#6B7280]">
-                  {replies.length} {replies.length === 1 ? "reply" : "replies"}
-                </span>
-              )}
-            </div>
-          )}
+            )}
+            {replies.length > 0 && (
+              <span className="text-[11px] text-[#6B7280]">
+                {replies.length} {replies.length === 1 ? "reply" : "replies"}
+              </span>
+            )}
+          </div>
 
           {showReply && (
             <form

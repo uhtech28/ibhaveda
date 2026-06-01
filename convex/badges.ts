@@ -8,6 +8,8 @@ import {
   LEVEL_DEFINITIONS,
 } from "./ventureConstants";
 
+const RENAMED_GOLD_STAGE_BADGE_IDS = new Set([11, 71, 72, 73, 74, 75, 76, 77, 78]);
+
 const INITIAL_BADGES = [
   {
     slug: "first-idea",
@@ -451,7 +453,7 @@ export const getVentureBadges = query({
       if (isLevelBadge) {
         const corr = badge.metadata?.corruptionLevel !== undefined ? badge.metadata.corruptionLevel : fallbackCorruption;
         if (corr <= 30) {
-          name = `${def.name} (Gold)`;
+          name = RENAMED_GOLD_STAGE_BADGE_IDS.has(def.id) ? def.name : `${def.name} (Gold)`;
           rarity = "legendary";
           primaryColor = "#FBBF24";
           secondaryColor = "#92400E";
@@ -526,7 +528,7 @@ export const getVentureBadgeProgress = query({
       if (isLevelBadge) {
         const corr = record?.metadata?.corruptionLevel !== undefined ? record.metadata.corruptionLevel : fallbackCorruption;
         if (corr <= 30) {
-          name = `${def.name} (Gold)`;
+          name = RENAMED_GOLD_STAGE_BADGE_IDS.has(def.id) ? def.name : `${def.name} (Gold)`;
           rarity = "legendary";
           primaryColor = "#FBBF24";
           secondaryColor = "#92400E";
@@ -868,10 +870,11 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
   }
   const hasSeasonal = Object.values(quartersByYear).some((qs) => qs.size >= 4);
 
-  const leaderboardWins = await ctx.db
-    .query("dailyLeaderboardWinners")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
-    .collect();
+  // League-based badges are disabled until league mechanics are finalized.
+  // const leaderboardWins = await ctx.db
+  //   .query("dailyLeaderboardWinners")
+  //   .withIndex("by_user", (q: any) => q.eq("userId", userId))
+  //   .collect();
 
   // Midnight Oil
   let midnightOilCount = 0;
@@ -1085,10 +1088,11 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     { id: 40, shouldAward: longestStreak >= 30 || currentStreak >= 30 }, // The Devoted
     { id: 41, shouldAward: longestStreak >= 90 || currentStreak >= 90 }, // The Unbroken
     { id: 42, shouldAward: hasSeasonal }, // The Seasonal
-    { id: 43, shouldAward: leaderboardWins.some((w: any) => w.rank <= 5) || userLevel.currentLevel >= 12 }, // The Weekly Champion
-    { id: 44, shouldAward: userLevel.currentLevel >= 5 }, // The Promoted
-    { id: 45, shouldAward: userLevel.currentLevel >= 25 }, // The Diamond
-    { id: 46, shouldAward: userLevel.currentLevel >= 35 }, // The Immovable
+    // League-based badges are disabled until league mechanics are finalized.
+    // { id: 43, shouldAward: leaderboardWins.some((w: any) => w.rank <= 5) || userLevel.currentLevel >= 12 }, // The Weekly Champion
+    // { id: 44, shouldAward: userLevel.currentLevel >= 5 }, // The Promoted
+    // { id: 45, shouldAward: userLevel.currentLevel >= 25 }, // The Diamond
+    // { id: 46, shouldAward: userLevel.currentLevel >= 35 }, // The Immovable
     
     // Hidden (47-54)
     { id: 47, shouldAward: hasMidnightOil }, // The Midnight Oil
@@ -1232,7 +1236,7 @@ export const getUserProfileBadges = query({
         if (isLevelBadge) {
           const corr = vb.metadata?.corruptionLevel !== undefined ? vb.metadata.corruptionLevel : fallbackCorruption;
           if (corr <= 30) {
-            name = `${def.name} (Gold)`;
+            name = RENAMED_GOLD_STAGE_BADGE_IDS.has(def.id) ? def.name : `${def.name} (Gold)`;
             rarity = "legendary";
             primaryColor = "#FBBF24";
             secondaryColor = "#92400E";

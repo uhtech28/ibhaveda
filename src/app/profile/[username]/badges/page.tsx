@@ -63,8 +63,8 @@ export default function ProfileBadgesPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <HeroHeader />
 
-      <main className="flex-1 container mx-auto px-4 py-12 pt-32 max-w-5xl">
-        <div className="mb-6 flex items-center gap-3">
+      <main className="flex-1 container mx-auto px-4 py-6 pt-24 max-w-5xl">
+        <div className="mb-4 -ml-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
             <ArrowLeft className="w-4 h-4" />
           </Button>

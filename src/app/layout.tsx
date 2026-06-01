@@ -120,11 +120,11 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <ConvexClientProvider>
-        <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
-          <body
-            className="font-sans antialiased"
-          >
+      <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
+        <body
+          className="font-sans antialiased"
+        >
+          <ConvexClientProvider>
             <ThemeProvider>
               <ChatProvider>
                 {children}
@@ -133,9 +133,9 @@ export default function RootLayout({
                 <ChatWidget />
               </ChatProvider>
             </ThemeProvider>
-          </body>
-        </html>
-      </ConvexClientProvider>
+          </ConvexClientProvider>
+        </body>
+      </html>
     </ClerkProvider>
   );
 }
