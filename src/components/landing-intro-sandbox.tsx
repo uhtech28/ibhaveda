@@ -117,37 +117,34 @@ export default function LandingIntroSandbox({
       { f: 311, d: 0.40 }, { f: 294, d: 0.40 }, { f: 262, d: 1.50 },
     ];
 
-    const AudioCtor =
+    const AC: typeof AudioContext =
       window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtor) return;
+      (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
 
-    // Pre-create context on mount. On desktop, navigating to the page counts
-    // as a user gesture so the context starts in "running" state immediately.
-    let ctx: AudioContext;
-    try { ctx = new AudioCtor(); } catch { return; }
+    let ctx: AudioContext | null = null;
+    let done = false;
 
-    let started = false;
-    let stopped = false;
-
-    const scheduleNotes = () => {
-      const masterGain = ctx.createGain();
-      const t0 = ctx.currentTime + 0.1;
+    const play = (audioCtx: AudioContext) => {
+      const masterGain = audioCtx.createGain();
+      const t0 = audioCtx.currentTime + 0.05;
       const tEnd = t0 + TOTAL_RUNTIME_MS / 1000;
-      masterGain.gain.setValueAtTime(0.035, t0);
-      masterGain.gain.setValueAtTime(0.035, tEnd - 1.5);
+      masterGain.gain.setValueAtTime(0.022, t0);
+      masterGain.gain.setValueAtTime(0.022, tEnd - 1.5);
       masterGain.gain.linearRampToValueAtTime(0.001, tEnd - 0.1);
-      masterGain.connect(ctx.destination);
+      masterGain.connect(audioCtx.destination);
+
       let t = t0;
       for (const { f, d } of notes) {
         if (f > 0 && t < tEnd) {
-          const osc = ctx.createOscillator();
-          const g = ctx.createGain();
+          const osc = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
           osc.type = "square";
           osc.frequency.setValueAtTime(f, t);
+          const atk = Math.min(0.025, d * 0.12);
           g.gain.setValueAtTime(0, t);
-          g.gain.linearRampToValueAtTime(0.8, t + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.001, t + d * 0.88);
+          g.gain.linearRampToValueAtTime(0.75, t + atk);
+          g.gain.exponentialRampToValueAtTime(0.001, t + Math.max(d - 0.03, d * 0.88));
           osc.connect(g);
           g.connect(masterGain);
           osc.start(t);
@@ -157,27 +154,48 @@ export default function LandingIntroSandbox({
       }
     };
 
-    // Synchronous start — no async/await so the gesture context is preserved.
-    const startAudio = () => {
-      if (started || stopped) return;
-      started = true;
-      ctx.resume().then(scheduleNotes).catch(() => undefined);
+    const unlock = () => {
+      if (done) return;
+      done = true;
+
+      try {
+        ctx = new AC();
+
+        // iOS requires a silent buffer played synchronously inside the gesture
+        // to unfreeze currentTime. We then wait 50ms (via setTimeout) before
+        // scheduling real notes — by then the clock is reliably ticking.
+        const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+
+        // resume() in case context started suspended (Chrome autoplay policy)
+        ctx.resume().catch(() => undefined);
+
+        setTimeout(() => {
+          if (ctx && ctx.state !== "closed") play(ctx);
+        }, 50);
+      } catch { /* not available */ }
     };
 
-    // If already running (desktop after page navigation) play immediately.
-    // Otherwise wait for the first user interaction.
-    if (ctx.state === "running") {
-      startAudio();
-    } else {
-      window.addEventListener("pointerdown", startAudio, { once: true });
-      window.addEventListener("keydown", startAudio, { once: true });
+    // Attempt immediate autoplay — works on desktop where navigating to the
+    // page counts as a user gesture (context starts in "running" state).
+    unlock();
+
+    // Fallback listeners for cases where autoplay is blocked
+    if (!done) {
+      window.addEventListener("touchstart", unlock, { once: true, passive: true });
+      window.addEventListener("pointerdown", unlock, { once: true });
+      window.addEventListener("keydown",     unlock, { once: true });
     }
 
     return () => {
-      stopped = true;
-      window.removeEventListener("pointerdown", startAudio);
-      window.removeEventListener("keydown", startAudio);
-      ctx.close().catch(() => undefined);
+      done = true;
+      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown",     unlock);
+      ctx?.close().catch(() => undefined);
     };
   }, []);
 
@@ -191,7 +209,10 @@ export default function LandingIntroSandbox({
       role="dialog"
       aria-label={ariaLabel}
       className="fixed inset-0 z-[9999] overflow-hidden bg-[#070A0F] text-white"
-      style={{ opacity: closing ? 0 : 1, transition: "opacity 700ms ease" }}
+      style={{
+        opacity: closing ? 0 : 1,
+        transition: "opacity 700ms ease",
+      }}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(247,214,109,0.12),transparent_26%),radial-gradient(circle_at_74%_78%,rgba(124,58,237,0.15),transparent_34%),linear-gradient(180deg,#070A0F_0%,#0A0D12_58%,#05070B_100%)]" />
       <PixelField />
