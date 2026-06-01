@@ -26,7 +26,7 @@ export default function Loading() {
               >
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-indigo-400 motion-safe:animate-pulse"
-                  style={{ animationDelay: `${item * 140}ms` }}
+                  style={{ animationDelay: `${item * 60}ms`, animationDuration: "0.55s" }}
                 />
               </div>
             ))}

@@ -22,6 +22,12 @@ import {
   calculateBrightness,
 } from "../utils/brightness-calculator";
 import { gameplayIntegration } from "../integration/gameplayIntegration";
+import { MAP_PERF } from "../map-performance";
+import {
+  ensureAssetPacks,
+  markPackLoaded,
+  packsForVisualTheme,
+} from "../utils/asset-packs";
 import { CorruptionRenderer } from "../systems/CorruptionRenderer";
 import { resolveCorruptionProfile } from "../systems/corruptionSystem";
 import {
@@ -399,6 +405,9 @@ export class WorldMapScene extends Phaser.Scene {
   private revealedStages: Set<number> = new Set([1]);
   private stageEntryInProgress: Set<number> = new Set();
   private loadedStages: Set<number> = new Set();
+  private loadingStages: Set<number> = new Set();
+  private static readonly STAGE_LOAD_BUFFER_PX = 1400;
+  private static readonly STAGE_UNLOAD_BUFFER_PX = 3600;
   private monkeys: ProceduralMonkey[] = [];
   private phaserTilesets: Phaser.Tilemaps.Tileset[] = [];
   private panelOffsetX = 0;
@@ -480,12 +489,18 @@ export class WorldMapScene extends Phaser.Scene {
       }
     });
 
-    // 5. Force load all stage biomes immediately during startup for zero scroll stutter
-    for (let s = 1; s <= this.activeBiomeConfigs.length; s++) {
-      this.loadStage(s);
+    // 5. Load only the focused stage + neighbors (packs load on demand)
+    const focus = Phaser.Math.Clamp(
+      this.viewingStageId,
+      1,
+      this.activeBiomeConfigs.length,
+    );
+    for (const delta of [-1, 0, 1]) {
+      const stageId = focus + delta;
+      if (stageId >= 1 && stageId <= this.activeBiomeConfigs.length) {
+        this.loadStageWhenReady(stageId);
+      }
     }
-
-    // 6. Run checkBiomeLoading to check camera proximity immediately
 
     // 7. Corruption overlays on every stage (not tied to lazy tile loading)
     this.time.delayedCall(0, () => {
@@ -532,16 +547,13 @@ export class WorldMapScene extends Phaser.Scene {
     AssetLoader.preloadAssets(this);
     // Generate procedural textures after file loads so preload stays non-blocking.
     this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      markPackLoaded(this, "core");
       AssetLoader.createAllTextures(this);
     });
   }
 
   create(): void {
-    // Initialize audio
-    audioManager.init();
-
-    // Initialize gameplay integration audio
-    gameplayIntegration.initializeAudio();
+    this.tweens.timeScale = MAP_PERF.SCENE_TWEEN_TIME_SCALE;
 
     // Create scene layers
     this.initializeWorldLayers();
@@ -641,9 +653,9 @@ export class WorldMapScene extends Phaser.Scene {
       ) {
         this.tweens.add({
           targets: this.cameras.main,
-          scrollX: this.cameras.main.scrollX + dragVelocityX * 3,
-          scrollY: this.cameras.main.scrollY + dragVelocityY * 3,
-          duration: 400,
+          scrollX: this.cameras.main.scrollX + dragVelocityX * MAP_PERF.DRAG_INERTIA_MULT,
+          scrollY: this.cameras.main.scrollY + dragVelocityY * MAP_PERF.DRAG_INERTIA_MULT,
+          duration: MAP_PERF.DRAG_INERTIA_MS,
           ease: "Cubic.easeOut",
           onUpdate: () => this.clampCameraToStagePanel(this.viewingStageId),
           onComplete: () => this.clampCameraToStagePanel(this.viewingStageId),
@@ -654,7 +666,7 @@ export class WorldMapScene extends Phaser.Scene {
     this.wheelHandler = (e: WheelEvent) => {
       e.preventDefault();
       const zoom = this.cameras.main.zoom;
-      const scrollSpeed = 1.5;
+      const scrollSpeed = MAP_PERF.SCROLL_WHEEL_SPEED;
 
       if (e.shiftKey) {
         this.cameras.main.scrollY += (e.deltaY / zoom) * scrollSpeed;
@@ -749,10 +761,10 @@ export class WorldMapScene extends Phaser.Scene {
       this.tweens.add({
         targets: this.cameras.main,
         zoom,
-        duration: 320,
-        ease: "Sine.easeInOut",
+        duration: MAP_PERF.CAMERA_RESIZE_MS,
+        ease: "Quad.easeOut",
       });
-      this.cameras.main.pan(targetX, targetY, 320, "Sine.easeInOut", false, (_cam, progress) => {
+      this.cameras.main.pan(targetX, targetY, MAP_PERF.CAMERA_RESIZE_MS, "Quad.easeOut", false, (_cam, progress) => {
         if (progress === 1) {
           this.clampCameraToStagePanel(this.viewingStageId);
         }
@@ -1159,6 +1171,26 @@ export class WorldMapScene extends Phaser.Scene {
     miniBoss.hideUntilCombat();
   }
 
+  /** Loads biome asset packs, then builds stage content. */
+  private loadStageWhenReady(stageId: number): void {
+    if (
+      this.loadedStages.has(stageId) ||
+      this.loadingStages.has(stageId)
+    ) {
+      return;
+    }
+    const biome = this.activeBiomeConfigs[stageId - 1];
+    if (!biome) return;
+
+    this.loadingStages.add(stageId);
+    const packs = packsForVisualTheme(biome.visualTheme);
+    void ensureAssetPacks(this, packs).then(() => {
+      this.loadingStages.delete(stageId);
+      if (!this.sys?.isActive()) return;
+      this.loadStage(stageId);
+    });
+  }
+
   /**
    * Loads a stage dynamically (called on startup and as camera approaches)
    */
@@ -1321,21 +1353,50 @@ export class WorldMapScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     const camX = cam.scrollX + cam.width / 2;
-    const loadBuffer = 1400; // Load buffer zone around the camera center
+    const loadBuffer = WorldMapScene.STAGE_LOAD_BUFFER_PX;
+    const unloadBuffer = WorldMapScene.STAGE_UNLOAD_BUFFER_PX;
 
     for (let i = 0; i < this.activeBiomeConfigs.length; i++) {
       const stageId = i + 1;
-      if (this.loadedStages.has(stageId)) {
-        continue;
-      }
-
       const stageCenterX = i * this.BIOME_WIDTH + this.BIOME_WIDTH / 2;
       const distance = Math.abs(camX - stageCenterX);
 
       if (distance < loadBuffer) {
-        this.loadStage(stageId);
+        this.loadStageWhenReady(stageId);
+      } else if (
+        distance > unloadBuffer &&
+        this.loadedStages.has(stageId) &&
+        Math.abs(stageId - this.viewingStageId) > 2
+      ) {
+        this.unloadStage(stageId);
       }
     }
+  }
+
+  /** Drop distant stage visuals to free GPU memory (path/checkpoints stay global). */
+  private unloadStage(stageId: number): void {
+    if (!this.loadedStages.has(stageId)) return;
+
+    const container = this.biomeContainers.get(stageId);
+    container?.destroy(true);
+    this.biomeContainers.delete(stageId);
+
+    const fog = this.stageFogOverlays.get(stageId);
+    fog?.destroy(true);
+    this.stageFogOverlays.delete(stageId);
+
+    const miniBoss = this.miniBosses.get(stageId);
+    if (miniBoss) {
+      miniBoss.destroy();
+      this.miniBosses.delete(stageId);
+    }
+
+    if (stageId === 2 && this.monkeys.length > 0) {
+      this.monkeys.forEach((m) => m.destroy());
+      this.monkeys = [];
+    }
+
+    this.loadedStages.delete(stageId);
   }
 
   private createForestTilePanel(
@@ -7749,7 +7810,7 @@ export class WorldMapScene extends Phaser.Scene {
     );
 
     if (smooth) {
-      cam.pan(targetX, targetY, 800, "Sine.easeInOut", false, (_cam, progress) => {
+      cam.pan(targetX, targetY, MAP_PERF.CAMERA_PAN_MS, "Quad.easeOut", false, (_cam, progress) => {
         if (progress === 1) {
           this.clampCameraToStagePanel(node.stage);
         }
@@ -7784,7 +7845,7 @@ export class WorldMapScene extends Phaser.Scene {
     );
 
     if (smooth) {
-      cam.pan(x, y, 800, "Sine.easeInOut", false, (_cam, progress) => {
+      cam.pan(x, y, MAP_PERF.CAMERA_PAN_MS, "Quad.easeOut", false, (_cam, progress) => {
         if (progress === 1) {
           this.clampCameraToStagePanel(focusStage);
           eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
@@ -7890,13 +7951,17 @@ export class WorldMapScene extends Phaser.Scene {
     return total;
   }
 
-  /** Jog pace between checkpoints (~400 px/s), synced to walk-cycle animation. */
+  /** Jog pace between checkpoints — synced to walk-cycle animation. */
   private getPersonaJogDuration(pathDistancePx: number): number {
-    if (pathDistancePx <= 3) return 400;
+    if (pathDistancePx <= 3) return MAP_PERF.PERSONA_JOG_MIN_MS;
 
-    const JOG_SPEED_PX_PER_SEC = 400;
-    const ms = (pathDistancePx / JOG_SPEED_PX_PER_SEC) * 1000;
-    return Phaser.Math.Clamp(ms, 450, 3200);
+    const ms =
+      (pathDistancePx / MAP_PERF.PERSONA_JOG_PX_PER_SEC) * 1000;
+    return Phaser.Math.Clamp(
+      ms,
+      MAP_PERF.PERSONA_JOG_MIN_MS,
+      MAP_PERF.PERSONA_JOG_MAX_MS,
+    );
   }
 
   /**

@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { MAP_PERF } from "../../map-performance";
 
 export type AnimationVariant = "standard" | "gold";
 
@@ -19,7 +20,7 @@ export abstract class BaseCheckpointAnimation {
   protected skipTimer: Phaser.Time.TimerEvent | null = null;
   protected mainTween: Phaser.Tweens.Tween | null = null;
 
-  protected readonly SKIP_DELAY = 500;
+  protected readonly SKIP_DELAY = MAP_PERF.CHECKPOINT_SKIP_DELAY_MS;
   protected readonly calculatedDuration: number;
 
   constructor(scene: Phaser.Scene, config: AnimationConfig) {
@@ -27,11 +28,14 @@ export abstract class BaseCheckpointAnimation {
     this.config = config;
     this.container = scene.add.container(config.x, config.y);
 
-    // Standard: 0.8-1.2s, Gold: 1.2-1.8s
-    this.calculatedDuration =
+    const base =
       config.variant === "gold"
         ? Phaser.Math.Between(1200, 1800)
         : Phaser.Math.Between(800, 1200);
+    this.calculatedDuration = Math.max(
+      280,
+      Math.round(base * MAP_PERF.CHECKPOINT_ANIM_FACTOR),
+    );
   }
 
   abstract create(): void;

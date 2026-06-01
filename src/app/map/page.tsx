@@ -11,6 +11,10 @@ import { WelcomeOverlay } from "@/components/map/WelcomeOverlay";
 import { MapIntroOverlay } from "@/components/map/MapIntroOverlay";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { warmPhaserBoot } from "@/lib/phaser/phaser-boot";
+
+warmPhaserBoot();
+
 type TutorialStep = "gender" | "welcome" | "map-intro" | "complete";
 
 // ── Inner component that reads searchParams (requires Suspense in Next.js App Router) ─
@@ -204,22 +208,29 @@ function MapIntroInner() {
       <div className="fixed inset-0 bg-[#050810] flex flex-col items-center justify-center gap-4">
         <motion.div
           animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+          transition={{ duration: 0.7, repeat: Infinity }}
           className="text-xs tracking-[0.3em] uppercase font-black text-indigo-400"
         >
           {isCreatingVenture ? "Creating Venture Map…" : "Loading…"}
         </motion.div>
         {isCreatingVenture && (
           <div
-            className="h-[3px] w-40 rounded-full overflow-hidden"
+            className="relative h-[3px] w-40 rounded-full overflow-hidden"
             style={{ background: "rgba(255,255,255,0.05)" }}
           >
-            <motion.div
-              className="h-full"
-              style={{ background: "linear-gradient(90deg, #4f46e5, #818cf8)" }}
-              animate={{ x: ["-100%", "100%"] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            <div
+              className="absolute inset-y-0 left-0 w-[55%] rounded-full"
+              style={{
+                background: "linear-gradient(90deg, #4f46e5, #818cf8)",
+                animation: "map-load-bar 0.65s ease-in-out infinite",
+              }}
             />
+            <style>{`
+              @keyframes map-load-bar {
+                0% { transform: translate3d(-120%, 0, 0); }
+                100% { transform: translate3d(220%, 0, 0); }
+              }
+            `}</style>
           </div>
         )}
       </div>
@@ -258,7 +269,7 @@ export default function MapIntroPage() {
         <div className="fixed inset-0 bg-[#050810] flex items-center justify-center">
           <motion.div
             animate={{ opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
+            transition={{ duration: 0.7, repeat: Infinity }}
             className="text-xs tracking-[0.3em] uppercase font-black text-indigo-400"
           >
             Loading…

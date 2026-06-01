@@ -70,7 +70,7 @@ export function createGameConfig(
         width: 3840,
         height: 2160,
       },
-      resizeInterval: 250,
+      resizeInterval: 100,
     },
     physics: {
       default: "arcade",

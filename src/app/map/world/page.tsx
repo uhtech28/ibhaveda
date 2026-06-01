@@ -275,6 +275,8 @@ const PHASE_ONE_STAGE_LIMIT = 2;
 // HOOK — Phaser game lifecycle
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { phaserBootPromise } from "@/lib/phaser/phaser-boot";
+
 function useMapGame() {
   const gameRef = useRef<import("phaser").Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -287,10 +289,7 @@ function useMapGame() {
 
     eventBridge.onReact("PHASER_READY", handleReady);
 
-    Promise.all([
-      import("phaser"),
-      import("@/lib/phaser/game-config"),
-    ]).then(([Phaser, { createGameConfig }]) => {
+    phaserBootPromise.then(([Phaser, { createGameConfig }]) => {
       if (!containerRef.current || gameRef.current) return;
       const game = new Phaser.Game(createGameConfig(containerRef.current));
       gameRef.current = game;
@@ -362,7 +361,7 @@ function StageStrip({
     <motion.div
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ delay: 0.5, duration: 0.5 }}
+      transition={{ delay: 0.08, duration: 0.22 }}
       className="no-scrollbar fixed bottom-4 left-1/2 z-20 flex w-[calc(100vw-1rem)] max-w-full -translate-x-1/2 gap-1.5 overflow-x-auto rounded-full border border-white/10 bg-[#0a0d14]/85 p-2 shadow-[0_0_30px_rgba(30,20,50,0.6)] backdrop-blur-xl sm:bottom-6 sm:w-auto sm:max-w-[calc(100vw-2rem)] sm:gap-2 sm:p-2.5 md:bottom-8 md:max-w-3xl lg:bottom-8 lg:max-w-4xl xl:max-w-5xl"
     >
       {stages.map((st, i) => {
@@ -1079,10 +1078,19 @@ function LoadingScreen() {
         style={{ background: "rgba(255,255,255,0.05)" }}
       >
         <div
-          className="h-full w-1/2 rounded-full"
-          style={{ background: "linear-gradient(90deg, #4f46e5, #818cf8)" }}
+          className="absolute inset-y-0 left-0 w-[55%] rounded-full"
+          style={{
+            background: "linear-gradient(90deg, #4f46e5, #818cf8)",
+            animation: "map-load-bar 0.65s ease-in-out infinite",
+          }}
         />
       </div>
+      <style>{`
+        @keyframes map-load-bar {
+          0% { transform: translate3d(-120%, 0, 0); }
+          100% { transform: translate3d(220%, 0, 0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -1838,12 +1846,18 @@ function MapPageInner() {
     });
   }, [activeVenture?._id, ensureVentureStructure]);
 
+  const backfillDoneForVentureRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeVenture?._id) return;
+    if (backfillDoneForVentureRef.current === activeVenture._id) return;
+    backfillDoneForVentureRef.current = activeVenture._id;
     backfillPendingEvaluations().catch((error) => {
       console.error("[MapPage] Failed to backfill pending evaluations:", error);
+      backfillDoneForVentureRef.current = null;
     });
   }, [activeVenture?._id, backfillPendingEvaluations]);
+
+  const goldNotifHandledRef = useRef<Set<string>>(new Set());
 
   // ── Detect gold checkpoint notifications ──────────────────────────────────
   useEffect(() => {
@@ -1860,6 +1874,8 @@ function MapPageInner() {
     if (goldNotifications.length > 0) {
       // Use the most recent notification
       const latestNotif = goldNotifications[0];
+      if (goldNotifHandledRef.current.has(latestNotif._id)) return;
+      goldNotifHandledRef.current.add(latestNotif._id);
 
       // Try to find the actual checkpoint that earned gold by looking in our
       // in-memory checkpoints for the most recently gold-completed one.
@@ -1892,15 +1908,7 @@ function MapPageInner() {
 
       return () => window.clearTimeout(autoDismissTimer);
     }
-  }, [
-    notifications,
-    venture,
-    checkpoints,
-    activeStage,
-    activeCP,
-    ideaTitle,
-    markNotificationRead,
-  ]);
+  }, [notifications, venture?._id, markNotificationRead]);
 
   const completedCount = checkpoints.filter(
     (cp) =>
@@ -3102,7 +3110,7 @@ function MapPageInner() {
                 handleAnimationDone,
               );
               resolve();
-            }, 4000);
+            }, 2200);
 
             eventBridge.onReact(
               "CHECKPOINT_ANIMATION_COMPLETE",
@@ -3587,7 +3595,7 @@ function MapPageInner() {
           <motion.div
             key="loading"
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.12 }}
           >
             <LoadingScreen />
           </motion.div>

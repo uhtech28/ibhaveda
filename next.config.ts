@@ -1,8 +1,19 @@
 import type { NextConfig } from "next";
 
+const staticCache = "public, max-age=31536000, immutable";
+
 const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
+  },
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "framer-motion",
+      "date-fns",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-tooltip",
+    ],
   },
   async headers() {
     return [
@@ -11,6 +22,18 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Content-Type", value: "text/vcard; charset=utf-8" },
         ],
+      },
+      {
+        source: "/assets/:path*",
+        headers: [{ key: "Cache-Control", value: staticCache }],
+      },
+      {
+        source: "/audio/:path*",
+        headers: [{ key: "Cache-Control", value: staticCache }],
+      },
+      {
+        source: "/_next/static/:path*",
+        headers: [{ key: "Cache-Control", value: staticCache }],
       },
     ];
   },

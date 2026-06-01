@@ -1129,6 +1129,7 @@ const C = {
 
 export class AssetLoader {
   static createAllTextures(scene: Phaser.Scene): void {
+    AssetLoader.aliasPersonaSheets(scene);
     AssetLoader.createCheckpointTextures(scene);
     AssetLoader.createPersonaTextures(scene);
     AssetLoader.createPathTextures(scene);
@@ -1139,17 +1140,51 @@ export class AssetLoader {
     AssetLoader.createEnemyTextures(scene);
   }
 
-  static preloadAssets(scene: Phaser.Scene): void {
-    scene.load.image("skeld_floor", "/assets/skeld/floor.png");
-    scene.load.image("guide_male", "/assets/skeld/guide_male.png");
-    scene.load.image("guide_female", "/assets/skeld/guide_female.png");
+  /** Duplicate shared persona art under female texture keys (halves persona fetches). */
+  static aliasPersonaSheets(scene: Phaser.Scene): void {
+    const pairs: [string, string][] = [
+      ["persona_male_idle_sheet", "persona_female_idle_sheet"],
+      ["persona_male_walk_sheet", "persona_female_walk_sheet"],
+    ];
+    for (const [srcKey, destKey] of pairs) {
+      if (!scene.textures.exists(srcKey) || scene.textures.exists(destKey)) continue;
+      const src = scene.textures.get(srcKey);
+      const source = src.getSourceImage();
+      if (source instanceof HTMLImageElement) {
+        scene.textures.addImage(destKey, source);
+      }
+    }
+  }
 
+  static preloadAssets(scene: Phaser.Scene): void {
+    AssetLoader.attachOptionalLoadHandler(scene);
+    AssetLoader.queuePack(scene, "core");
+  }
+
+  static queuePack(
+    scene: Phaser.Scene,
+    pack: import("./asset-packs").AssetPackId,
+  ): void {
+    switch (pack) {
+      case "core":
+        AssetLoader.queueCorePack(scene);
+        break;
+      case "sprout":
+        AssetLoader.queueSproutPack(scene);
+        break;
+      case "mine":
+        AssetLoader.queueMinePack(scene);
+        break;
+      case "tropical":
+        AssetLoader.queueTropicalPack(scene);
+        break;
+    }
+  }
+
+  private static attachOptionalLoadHandler(scene: Phaser.Scene): void {
     const optionalSheetKeys = new Set([
       "persona_male_idle_sheet",
       "persona_male_walk_sheet",
-      "persona_female_idle_sheet",
-      "persona_female_walk_sheet",
-      // Mine cave tiles are optional — the scene has texture-exists guards
       "mine_bg_cave",
       "mine_cave_rail",
       "mine_cave_rock",
@@ -1167,56 +1202,69 @@ export class AssetLoader {
     scene.load.once("complete", () => {
       scene.load.off("loaderror", onLoadError);
     });
+  }
+
+  private static queueCorePack(scene: Phaser.Scene): void {
+    const fanTasyPath = "/assets/fan-tasy";
 
     scene.load.spritesheet(
       "persona_male_idle_sheet",
-      "/assets/fan-tasy/Character_Idle.png",
+      `${fanTasyPath}/Character_Idle.png`,
       { frameWidth: 32, frameHeight: 48 },
     );
     scene.load.spritesheet(
       "persona_male_walk_sheet",
-      "/assets/fan-tasy/Character_Walk.png",
-      { frameWidth: 32, frameHeight: 48 },
-    );
-    scene.load.spritesheet(
-      "persona_female_idle_sheet",
-      "/assets/fan-tasy/Character_Idle.png",
-      { frameWidth: 32, frameHeight: 48 },
-    );
-    scene.load.spritesheet(
-      "persona_female_walk_sheet",
-      "/assets/fan-tasy/Character_Walk.png",
+      `${fanTasyPath}/Character_Walk.png`,
       { frameWidth: 32, frameHeight: 48 },
     );
 
-    // --- Fan-tasy Tileset Assets ---
-    const fanTasyPath = "/assets/fan-tasy";
-    const sproutPath = "/assets/sprout";
-
-    // Core Tilesets
     scene.load.image("Tileset_Ground", `${fanTasyPath}/Tileset_Ground.png`);
-    scene.load.spritesheet(
-      "Tileset_Ground_Sheet",
-      `${fanTasyPath}/Tileset_Ground.png`,
-      { frameWidth: 16, frameHeight: 16 },
-    );
     scene.load.image("Tileset_Water", `${fanTasyPath}/Tileset_Water.png`);
-    scene.load.spritesheet(
-      "Tileset_Water_Sheet",
-      `${fanTasyPath}/Tileset_Water.png`,
-      { frameWidth: 16, frameHeight: 16 },
-    );
     scene.load.image("Tileset_RockSlope", `${fanTasyPath}/Tileset_RockSlope.png`);
     scene.load.image("Tileset_RockSlope_Simple", `${fanTasyPath}/Tileset_RockSlope_Simple.png`);
     scene.load.image("Tileset_Road", `${fanTasyPath}/Tileset_Road.png`);
-    scene.load.spritesheet(
-      "Tileset_Road_Sheet",
-      `${fanTasyPath}/Tileset_Road.png`,
-      { frameWidth: 16, frameHeight: 16 },
-    );
     scene.load.image("Tileset_Shadow", `${fanTasyPath}/Tileset_Shadow.png`);
 
-    // --- Sprout Lands forest biome sheets ---
+    scene.load.image("Buildings", `${fanTasyPath}/Buildings.png`);
+    scene.load.image("Props", `${fanTasyPath}/Props.png`);
+    scene.load.image("Rocks", `${fanTasyPath}/Rocks.png`);
+    scene.load.image("Trees_Bushes", `${fanTasyPath}/Trees_Bushes.png`);
+
+    scene.load.image("Animation_Flowers_Red", `${fanTasyPath}/Flowers_Red.png`);
+    scene.load.image("Animation_Flowers_White", `${fanTasyPath}/Flowers_White.png`);
+    scene.load.image("Animation_Campfire", `${fanTasyPath}/Animation_Campfire.png`);
+
+    const objects = [
+      "House_Hay_1", "House_Hay_2", "House_Hay_3", "House_Hay_4_Purple", "Forest_Hut_1",
+      "CityWall_Gate_1", "Well_Hay_1", "Sign_1", "Sign_2", "Table_Medium_1",
+      "Bench_1", "Bench_3", "Barrel_Small_Empty", "Basket_Empty",
+      "Crate_Large_Empty", "Crate_Medium_Closed", "Crate_Water_1",
+      "LampPost_3", "BulletinBoard_1", "HayStack_2", "Plant_2", "Sack_3",
+      "Fireplace_1",
+      "Rock_Brown_1", "Rock_Brown_2", "Rock_Brown_4", "Rock_Brown_6", "Rock_Brown_9",
+      "Tree_Emerald_1", "Tree_Emerald_2", "Tree_Emerald_3", "Tree_Emerald_4",
+      "Bush_Emerald_1", "Bush_Emerald_2", "Bush_Emerald_3", "Bush_Emerald_4",
+      "Bush_Emerald_5", "Bush_Emerald_6", "Bush_Emerald_7",
+      "Shadow_Round_16x16_Flat_Black", "Shadow_Round_16x16_Long_Black", "Shadow_Round_16x16_Medium_Black", "Shadow_Round_16x16_Short_Black",
+      "Shadow_Round_16x32_Flat_Black", "Shadow_Round_16x32_Long_Black", "Shadow_Round_16x32_Medium_Black", "Shadow_Round_16x32_Short_Black",
+      "Shadow_Round_24x24_Flat_Black", "Shadow_Round_24x24_Long_Black", "Shadow_Round_24x24_Medium_Black", "Shadow_Round_24x24_Short_Black",
+      "Shadow_Round_24x48_Flat_Black", "Shadow_Round_24x48_Long_Black", "Shadow_Round_24x48_Medium_Black", "Shadow_Round_24x48_Short_Black",
+      "Shadow_Round_32x16_Flat_Black", "Shadow_Round_32x16_Long_Black", "Shadow_Round_32x16_Medium_Black", "Shadow_Round_32x16_Short_Black",
+      "Shadow_Round_32x32_Flat_Black", "Shadow_Round_32x32_Long_Black", "Shadow_Round_32x32_Medium_Black", "Shadow_Round_32x32_Short_Black",
+      "Shadow_Round_40x40_Flat_Black", "Shadow_Round_40x40_Long_Black", "Shadow_Round_40x40_Medium_Black", "Shadow_Round_40x40_Short_Black",
+      "Shadow_Round_48x24_Flat_Black", "Shadow_Round_48x24_Long_Black", "Shadow_Round_48x24_Medium_Black", "Shadow_Round_48x24_Short_Black",
+      "Shadow_Round_48x48_Flat_Black", "Shadow_Round_48x48_Long_Black", "Shadow_Round_48x48_Medium_Black", "Shadow_Round_48x48_Short_Black",
+    ];
+    objects.forEach((obj) => scene.load.image(obj, `${fanTasyPath}/${obj}.png`));
+
+    scene.load.tilemapTiledJSON(
+      "beginning_fields",
+      `${fanTasyPath}/Beginning Fields.tmj`,
+    );
+  }
+
+  private static queueSproutPack(scene: Phaser.Scene): void {
+    const sproutPath = "/assets/sprout";
     scene.load.spritesheet("sprout_grass_sheet", `${sproutPath}/grass.png`, {
       frameWidth: 16,
       frameHeight: 16,
@@ -1251,43 +1299,9 @@ export class AssetLoader {
       frameWidth: 16,
       frameHeight: 16,
     });
+  }
 
-    // Atlases
-    scene.load.image("Buildings", `${fanTasyPath}/Buildings.png`);
-    scene.load.image("Props", `${fanTasyPath}/Props.png`);
-    scene.load.image("Rocks", `${fanTasyPath}/Rocks.png`);
-    scene.load.image("Trees_Bushes", `${fanTasyPath}/Trees_Bushes.png`);
-
-    // Animations
-    scene.load.image("Animation_Flowers_Red", `${fanTasyPath}/Flowers_Red.png`);
-    scene.load.image("Animation_Flowers_White", `${fanTasyPath}/Flowers_White.png`);
-    scene.load.image("Animation_Campfire", `${fanTasyPath}/Animation_Campfire.png`);
-
-    // Image Collections (Individual objects)
-    const objects = [
-      "House_Hay_1", "House_Hay_2", "House_Hay_3", "House_Hay_4_Purple", "Forest_Hut_1",
-      "CityWall_Gate_1", "Well_Hay_1", "Sign_1", "Sign_2", "Table_Medium_1",
-      "Bench_1", "Bench_3", "Barrel_Small_Empty", "Basket_Empty",
-      "Crate_Large_Empty", "Crate_Medium_Closed", "Crate_Water_1",
-      "LampPost_3", "BulletinBoard_1", "HayStack_2", "Plant_2", "Sack_3",
-      "Fireplace_1", "Crate_Water_1",
-      "Rock_Brown_1", "Rock_Brown_2", "Rock_Brown_4", "Rock_Brown_6", "Rock_Brown_9",
-      "Tree_Emerald_1", "Tree_Emerald_2", "Tree_Emerald_3", "Tree_Emerald_4",
-      "Bush_Emerald_1", "Bush_Emerald_2", "Bush_Emerald_3", "Bush_Emerald_4",
-      "Bush_Emerald_5", "Bush_Emerald_6", "Bush_Emerald_7",
-      "Shadow_Round_16x16_Flat_Black", "Shadow_Round_16x16_Long_Black", "Shadow_Round_16x16_Medium_Black", "Shadow_Round_16x16_Short_Black",
-      "Shadow_Round_16x32_Flat_Black", "Shadow_Round_16x32_Long_Black", "Shadow_Round_16x32_Medium_Black", "Shadow_Round_16x32_Short_Black",
-      "Shadow_Round_24x24_Flat_Black", "Shadow_Round_24x24_Long_Black", "Shadow_Round_24x24_Medium_Black", "Shadow_Round_24x24_Short_Black",
-      "Shadow_Round_24x48_Flat_Black", "Shadow_Round_24x48_Long_Black", "Shadow_Round_24x48_Medium_Black", "Shadow_Round_24x48_Short_Black",
-      "Shadow_Round_32x16_Flat_Black", "Shadow_Round_32x16_Long_Black", "Shadow_Round_32x16_Medium_Black", "Shadow_Round_32x16_Short_Black",
-      "Shadow_Round_32x32_Flat_Black", "Shadow_Round_32x32_Long_Black", "Shadow_Round_32x32_Medium_Black", "Shadow_Round_32x32_Short_Black",
-      "Shadow_Round_40x40_Flat_Black", "Shadow_Round_40x40_Long_Black", "Shadow_Round_40x40_Medium_Black", "Shadow_Round_40x40_Short_Black",
-      "Shadow_Round_48x24_Flat_Black", "Shadow_Round_48x24_Long_Black", "Shadow_Round_48x24_Medium_Black", "Shadow_Round_48x24_Short_Black",
-      "Shadow_Round_48x48_Flat_Black", "Shadow_Round_48x48_Long_Black", "Shadow_Round_48x48_Medium_Black", "Shadow_Round_48x48_Short_Black"
-    ];
-    objects.forEach(obj => scene.load.image(obj, `${fanTasyPath}/${obj}.png`));
-
-    // --- Deep Mine biome tiles ---
+  private static queueMinePack(scene: Phaser.Scene): void {
     const minePath = "/assets/mine";
     scene.load.image("mine_bg_cave", `${minePath}/bg_cave.png`);
     scene.load.image("mine_cave_rail", `${minePath}/tile_cave_rail.png`);
@@ -1300,43 +1314,30 @@ export class AssetLoader {
     scene.load.image("mine_truck_2", `${minePath}/mine_truck_2.png`);
     scene.load.image("mine_truck_3", `${minePath}/mine_truck_3.png`);
     scene.load.image("mine_truck_red", `${minePath}/mine_truck_red.png`);
+  }
 
-
-
-    // Load main Tilemap (JSON with embedded tilesets)
-    scene.load.tilemapTiledJSON("beginning_fields", `${fanTasyPath}/Beginning Fields.tmj`);
-
-    // --- Tropical Medieval City Tileset (Stage 8) ---
+  private static queueTropicalPack(scene: Phaser.Scene): void {
     const tropicalPath = "/assets/tropical-city";
-
-    // Load buildings
     for (let i = 1; i <= 18; i++) {
-      scene.load.image(`tropical_building_${i}`, `${tropicalPath}/buildings/building_${i}/building_1.png`);
+      scene.load.image(
+        `tropical_building_${i}`,
+        `${tropicalPath}/buildings/building_${i}/building_1.png`,
+      );
     }
-
-    // Load decorations
     for (let i = 1; i <= 18; i++) {
-      scene.load.image(`tropical_decor_${i}`, `${tropicalPath}/decor/decor_${i}.png`);
+      scene.load.image(
+        `tropical_decor_${i}`,
+        `${tropicalPath}/decor/decor_${i}.png`,
+      );
     }
-
-    // Load greenery
     for (let i = 1; i <= 5; i++) {
-      scene.load.image(`tropical_greenery_${i}`, `${tropicalPath}/decor/greenery_${i}.png`);
+      scene.load.image(
+        `tropical_greenery_${i}`,
+        `${tropicalPath}/decor/greenery_${i}.png`,
+      );
     }
-
-    // Load trees
     scene.load.image("tropical_tree_1", `${tropicalPath}/decor/tree_1.png`);
     scene.load.image("tropical_tree_2", `${tropicalPath}/decor/tree_2.png`);
-
-    // Load land tiles
-    for (let i = 1; i <= 26; i++) {
-      scene.load.image(`tropical_land_${i}`, `${tropicalPath}/land/land_${i}.png`);
-    }
-
-    // Load road tiles
-    for (let i = 1; i <= 17; i++) {
-      scene.load.image(`tropical_road_${i}`, `${tropicalPath}/road/road_${i}.png`);
-    }
   }
 
   // ── Persona sprite sheets ─────────────────────────────────────────────────

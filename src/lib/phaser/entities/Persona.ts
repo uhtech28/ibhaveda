@@ -46,9 +46,9 @@ export class Persona extends Phaser.GameObjects.Container {
   private static readonly JOG_STRIDE_PX = 52;
   private static readonly WALK_ANIM_FRAMES = 8;
   private static readonly WALK_ANIM_FPS = 16;
-  private static readonly JOG_ANIM_FPS = 22;
-  private static readonly WALK_MAX_TIME_SCALE = 3.5;
-  private static readonly JOG_MAX_TIME_SCALE = 5.2;
+  private static readonly JOG_ANIM_FPS = 26;
+  private static readonly WALK_MAX_TIME_SCALE = 4.2;
+  private static readonly JOG_MAX_TIME_SCALE = 8.5;
 
   // ── Public readonly ───────────────────────────────────────────────────────
 

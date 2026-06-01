@@ -8,6 +8,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
+import { warmPhaserBoot } from "@/lib/phaser/phaser-boot";
+
+warmPhaserBoot();
+
 // ── Stage definitions ──────────────────────────────────────────────────────
 const STAGES = [
   {
@@ -265,7 +269,7 @@ function StageCard({
     <motion.button
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: index * 0.12, ease: "easeOut" }}
+      transition={{ duration: 0.28, delay: index * 0.04, ease: "easeOut" }}
       whileHover={!isLocked ? { y: -6, scale: 1.015 } : {}}
       whileTap={!isLocked ? { scale: 0.98 } : {}}
       onClick={!isLocked ? onClick : undefined}
@@ -474,7 +478,7 @@ export default function MapStagesPage() {
       <div className="fixed inset-0 bg-[#050810] flex items-center justify-center">
         <motion.div
           animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+          transition={{ duration: 0.7, repeat: Infinity }}
           className="text-xs tracking-[0.3em] uppercase font-black text-indigo-400"
         >
           Loading…

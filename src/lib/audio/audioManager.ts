@@ -783,8 +783,8 @@ class AudioManager {
       loop: true,
       volume: 0, // starts silent; crossfade handles the fade-in
       html5: false, // use Web Audio API for small files to avoid HTML5 Audio pool exhaustion
-      preload: true,
-      onloaderror: (id, err) => {
+      preload: false,
+      onloaderror: (_id, err) => {
         console.warn(`[AudioManager] Ambience load error (${biome}):`, err);
       },
     });
@@ -810,7 +810,7 @@ class AudioManager {
         src,
         loop: options.loop ?? false,
         volume: options.volume ?? 1,
-        preload: true,
+        preload: false,
         onloaderror: (_id, err) => {
           console.warn(`[AudioManager] Load error (${key}):`, err);
         },
