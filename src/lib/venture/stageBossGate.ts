@@ -18,6 +18,11 @@ export function countDoneTasks(cp: StageBossCheckpoint): number {
     .length;
 }
 
+/** UI + server: at least two of three tasks marked complete. */
+export function hasMinimumTasksForAdvance(doneCount: number): boolean {
+  return doneCount >= 2;
+}
+
 export function checkpointBossKey(stage: number, checkpoint: number): string {
   return `${stage}-${checkpoint}`;
 }

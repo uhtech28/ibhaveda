@@ -41,6 +41,8 @@ import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
   checkpointBossKey,
+  countDoneTasks,
+  hasMinimumTasksForAdvance,
   isActiveVentureCheckpoint,
   isLastCheckpointInStage,
   mergeBossDefeatedState,
@@ -56,6 +58,7 @@ import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { ContributionDashboard } from "@/components/requests/ContributionDashboard";
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
 import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon, ListTodo } from "lucide-react";
 import { CalendarTool } from "@/components/tools/calendar-tool";
@@ -502,7 +505,9 @@ function CheckpointPanel({
   activeStage,
   activeCheckpoint,
   showBossGateHint = false,
-  isCurrentMapCheckpoint = false,
+  isActiveMapCheckpoint = false,
+  serverDoneTasks = 0,
+  onGoToActiveCheckpoint,
   totalCheckpointsInStage = 4,
 }: {
   detail: CheckpointDetail | null;
@@ -511,7 +516,9 @@ function CheckpointPanel({
   onTaskToggle: (taskIdx: number) => void;
   onTaskRedo: (taskIdx: number) => void;
   showBossGateHint?: boolean;
-  isCurrentMapCheckpoint?: boolean;
+  isActiveMapCheckpoint?: boolean;
+  serverDoneTasks?: number;
+  onGoToActiveCheckpoint?: () => void;
   totalCheckpointsInStage?: number;
   evaluationSummary?: Array<{
     taskLevel: "t1" | "t2" | "t3";
@@ -530,11 +537,33 @@ function CheckpointPanel({
   if (!detail) return null;
 
   const totalTasks = detail.tasks.length;
-  const doneTasks = detail.tasks.filter((t) => t.done).length;
-  const canAdvance = doneTasks >= 2 && isCurrentMapCheckpoint;
-  const isGold = doneTasks >= totalTasks && totalTasks > 0;
+  const uiDoneTasks = detail.tasks.filter((t) => t.done).length;
+  const effectiveDone = Math.max(uiDoneTasks, serverDoneTasks);
+  const tasksRemaining = Math.max(0, 2 - effectiveDone);
+  const hasMinimumTasks = hasMinimumTasksForAdvance(effectiveDone);
+  const canAdvance = hasMinimumTasks && isActiveMapCheckpoint;
+  const needsActiveCheckpoint = hasMinimumTasks && !isActiveMapCheckpoint;
+  const isGold = effectiveDone >= totalTasks && totalTasks > 0;
   const isLocked = detail.status === "locked";
   const bossEncounterNumber = detail.checkpointIndex;
+
+  const primaryEnabled =
+    !isAdvancing &&
+    (canAdvance || (needsActiveCheckpoint && !!onGoToActiveCheckpoint));
+  const primaryAction = () => {
+    if (isAdvancing) return;
+    if (needsActiveCheckpoint && onGoToActiveCheckpoint) {
+      audioManager.playTouch("confirm");
+      onGoToActiveCheckpoint();
+      return;
+    }
+    if (canAdvance) {
+      audioManager.playTouch("confirm");
+      onAdvance();
+      return;
+    }
+    audioManager.playTouch("error");
+  };
 
   return (
     <motion.div
@@ -612,105 +641,83 @@ function CheckpointPanel({
 
           </div>
 
-          {/* Advance + boss counter — shown on every unlocked checkpoint */}
+          {/* Advance + boss — shown on every unlocked checkpoint */}
           {!isLocked && (
               <div className="p-2.5 sm:p-3 pt-0 flex flex-col gap-2">
-                {isGold && (
-                  <div
-                    className="rounded-lg border px-3 py-2.5 flex flex-col gap-2"
-                    style={{
-                      borderColor: "rgba(234, 179, 8, 0.35)",
-                      background:
-                        "linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(120, 53, 15, 0.08))",
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-amber-200/80">
-                        Tasks complete
-                      </span>
-                      <span className="text-[10px] font-black text-amber-300 tabular-nums">
-                        {doneTasks}/{totalTasks}
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      {detail.tasks.map((task, i) => (
-                        <div
-                          key={i}
-                          className="h-1.5 flex-1 rounded-full transition-colors"
-                          style={{
-                            background: task.done
-                              ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
-                              : "rgba(255,255,255,0.08)",
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <div
-                      className="flex items-center justify-between gap-2 pt-1 border-t"
-                      style={{ borderColor: "rgba(234, 179, 8, 0.2)" }}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Swords className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-red-300/90">
-                          Boss encounter
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-black text-amber-200 tabular-nums">
-                        CP {bossEncounterNumber}/{totalCheckpointsInStage}
-                      </span>
-                    </div>
+
+                {hasMinimumTasks && isActiveMapCheckpoint && showBossGateHint && !isAdvancing && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-400/35 bg-amber-500/10 px-2.5 py-2">
+                    <Swords className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
+                    <p className="text-[10px] leading-snug text-amber-100/90 normal-case tracking-normal font-medium">
+                      Tasks ready. Tap <strong className="text-amber-200">Advance</strong> to fight the checkpoint boss, then continue to the next stop.
+                    </p>
                   </div>
                 )}
+
+                {needsActiveCheckpoint && !isAdvancing && (
+                  <p className="text-[10px] leading-snug text-slate-400 normal-case tracking-normal px-0.5">
+                    You finished tasks here, but your active map stop is checkpoint{" "}
+                    <strong className="text-indigo-300">{activeCheckpoint}</strong> in stage{" "}
+                    <strong className="text-indigo-300">{activeStage}</strong>.
+                  </p>
+                )}
+
                 {!isGold && canAdvance && (
                   <div className="flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-wider text-indigo-300/70">
-                    <span>Tasks {doneTasks}/{totalTasks}</span>
+                    <span>Tasks {effectiveDone}/{totalTasks}</span>
                     <span className="flex items-center gap-1">
                       <Swords className="w-3 h-3" />
-                      Boss on advance
+                      {showBossGateHint ? "Boss fight next" : "Ready to advance"}
                     </span>
                   </div>
                 )}
                 <motion.button
-                  onClick={() => {
-                    audioManager.playTouch(canAdvance ? "confirm" : "error");
-                    if (canAdvance && !isAdvancing) onAdvance();
-                  }}
-                  disabled={isAdvancing}
-                  aria-disabled={!canAdvance || isAdvancing}
+                  onClick={primaryAction}
+                  disabled={!primaryEnabled}
+                  aria-disabled={!primaryEnabled}
                   onMouseEnter={() => {
-                    if (canAdvance && !isAdvancing) audioManager.playUI("hover");
+                    if (primaryEnabled) audioManager.playUI("hover");
                   }}
-                  whileHover={
-                    canAdvance && !isAdvancing ? { scale: 1.02, y: -1 } : {}
-                  }
-                  whileTap={canAdvance && !isAdvancing ? { scale: 0.98 } : {}}
+                  whileHover={primaryEnabled ? { scale: 1.02, y: -1 } : {}}
+                  whileTap={primaryEnabled ? { scale: 0.98 } : {}}
                   className="w-full py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-[11px] tracking-[0.08em] uppercase font-black transition-all duration-300 relative overflow-hidden"
                   style={{
                     background: isGold
                       ? "linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.1))"
-                      : canAdvance
-                        ? "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(79, 70, 229, 0.1))"
-                        : "rgba(255, 255, 255, 0.03)",
+                      : needsActiveCheckpoint
+                        ? "linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(217, 119, 6, 0.12))"
+                        : canAdvance
+                          ? showBossGateHint
+                            ? "linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(234, 88, 12, 0.12))"
+                            : "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(79, 70, 229, 0.1))"
+                          : "rgba(255, 255, 255, 0.03)",
                     border: isGold
                       ? "1px solid rgba(234, 179, 8, 0.4)"
-                      : canAdvance
-                        ? "1px solid rgba(99, 102, 241, 0.4)"
-                        : "1px solid rgba(255, 255, 255, 0.1)",
+                      : needsActiveCheckpoint
+                        ? "1px solid rgba(245, 158, 11, 0.45)"
+                        : canAdvance
+                          ? showBossGateHint
+                            ? "1px solid rgba(251, 191, 36, 0.5)"
+                            : "1px solid rgba(99, 102, 241, 0.4)"
+                          : "1px solid rgba(255, 255, 255, 0.1)",
                     color: isGold
                       ? "#fde047"
-                      : canAdvance
-                        ? "#818cf8"
-                        : "#64748b",
-                    cursor:
-                      canAdvance && !isAdvancing ? "pointer" : "not-allowed",
-                    boxShadow: isGold
-                      ? "0 4px 20px rgba(234, 179, 8, 0.15)"
-                      : canAdvance
-                        ? "0 4px 20px rgba(99, 102, 241, 0.15)"
-                        : "none",
+                      : needsActiveCheckpoint
+                        ? "#fcd34d"
+                        : canAdvance
+                          ? showBossGateHint
+                            ? "#fde68a"
+                            : "#818cf8"
+                          : "#64748b",
+                    cursor: primaryEnabled ? "pointer" : "not-allowed",
+                    boxShadow: primaryEnabled
+                      ? needsActiveCheckpoint || showBossGateHint
+                        ? "0 4px 20px rgba(245, 158, 11, 0.2)"
+                        : "0 4px 20px rgba(99, 102, 241, 0.15)"
+                      : "none",
                   }}
                 >
-                  {canAdvance && (
+                  {primaryEnabled && (
                     <motion.div
                       className="absolute inset-0 bg-white/10"
                       initial={{ x: "-100%" }}
@@ -722,25 +729,23 @@ function CheckpointPanel({
                     <span>
                       {isAdvancing
                         ? "Processing checkpoint..."
-                        : isGold
-                          ? "Proceed to Next Step →"
-                          : canAdvance
-                            ? "Advance Checkpoint →"
-                            : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
+                        : needsActiveCheckpoint
+                          ? `Go to checkpoint ${activeCheckpoint} →`
+                          : isGold
+                            ? showBossGateHint
+                              ? "Face Boss & Continue →"
+                              : "Next Step →"
+                            : canAdvance
+                              ? showBossGateHint
+                                ? "Advance — Face Boss →"
+                                : "Advance Checkpoint →"
+                              : tasksRemaining > 0
+                                ? `Complete ${tasksRemaining} more task${tasksRemaining !== 1 ? "s" : ""} to advance`
+                                : "Syncing task progress…"}
                     </span>
-                    {!isCurrentMapCheckpoint && doneTasks >= 2 && !isAdvancing && (
-                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-70 text-amber-400/90">
-                        Move to this checkpoint on the map to advance
-                      </span>
-                    )}
-                    {isGold && canAdvance && !isAdvancing && showBossGateHint && (
-                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-80 text-amber-200/90">
-                        Face the stage boss, then advance to the next checkpoint
-                      </span>
-                    )}
-                    {canAdvance && !isGold && !isAdvancing && showBossGateHint && (
-                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-70">
-                        Boss encounter opens when you advance
+                    {canAdvance && !isAdvancing && showBossGateHint && (
+                      <span className="text-[9px] font-semibold normal-case tracking-normal opacity-85 text-amber-100/90">
+                        Mini-boss appears on the map when you advance
                       </span>
                     )}
                   </span>
@@ -1734,23 +1739,64 @@ function MapPageInner() {
     void handleAdvanceRef.current(true, true, true);
   }, []);
 
-  const showBossGateHint = useMemo(() => {
+  const selectedConvexCheckpoint = useMemo(
+    () =>
+      selectedDetail
+        ? checkpoints.find((c) => c._id === selectedDetail.id)
+        : undefined,
+    [selectedDetail, checkpoints],
+  );
+
+  const selectedServerDoneTasks = selectedConvexCheckpoint
+    ? countDoneTasks(selectedConvexCheckpoint)
+    : 0;
+
+  const isSelectedActiveMapCheckpoint = useMemo(() => {
     if (!selectedDetail) return false;
-    const cp = checkpoints.find((c) => c._id === selectedDetail.id);
-    if (!cp) return false;
-    const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
-      Boolean,
-    ).length;
+    return (
+      selectedDetail.stage === activeStage &&
+      selectedDetail.checkpointIndex === activeCP
+    );
+  }, [selectedDetail, activeStage, activeCP]);
+
+  const goToActiveCheckpoint = useCallback(() => {
+    const cp = checkpoints.find(
+      (c) => c.stage === activeStage && c.checkpoint === activeCP,
+    );
+    if (!cp) return;
+    updateUrlParams({ checkpointId: cp._id, panel: null, tab: null });
+    eventBridge.dispatchToPhaser({ type: "FOCUS_STAGE", stage: activeStage });
+    if (phaserReady) {
+      window.requestAnimationFrame(() => {
+        eventBridge.dispatchToPhaser({
+          type: "SCROLL_TO_CHECKPOINT",
+          checkpointId: cp._id,
+        });
+      });
+    }
+  }, [
+    checkpoints,
+    activeStage,
+    activeCP,
+    updateUrlParams,
+    phaserReady,
+  ]);
+
+  const showBossGateHint = useMemo(() => {
+    if (!selectedConvexCheckpoint) return false;
+    const uiDone =
+      selectedDetail?.tasks.filter((t) => t.done).length ?? 0;
+    const doneTasks = Math.max(uiDone, countDoneTasks(selectedConvexCheckpoint));
     return needsCheckpointBossCombat(
-      cp,
+      selectedConvexCheckpoint,
       doneTasks,
       bossDefeatedAtCheckpoint,
       activeStage,
       activeCP,
     );
   }, [
-    selectedDetail,
-    checkpoints,
+    selectedConvexCheckpoint,
+    selectedDetail?.tasks,
     bossDefeatedAtCheckpoint,
     activeStage,
     activeCP,
@@ -2710,6 +2756,36 @@ function MapPageInner() {
 
       // Look up target checkpoint and task details dynamically
       const matchedCheckpoint = checkpoints.find((c) => c._id === checkpointId);
+
+      if (matchedCheckpoint) {
+        const wasDone = countDoneTasks(matchedCheckpoint);
+        const levelKey =
+          taskLevel === "t1"
+            ? "t1Completed"
+            : taskLevel === "t2"
+              ? "t2Completed"
+              : "t3Completed";
+        const addsTask =
+          !matchedCheckpoint[levelKey] && !optimisticCompletedTaskIds[taskId];
+        const projectedDone = wasDone + (addsTask ? 1 : 0);
+        if (
+          projectedDone >= 2 &&
+          isActiveVentureCheckpoint(
+            matchedCheckpoint,
+            activeStage,
+            activeCP,
+          ) &&
+          phaserReady
+        ) {
+          window.requestAnimationFrame(() => {
+            eventBridge.dispatchToPhaser({
+              type: "SCROLL_TO_CHECKPOINT",
+              checkpointId: matchedCheckpoint._id,
+            });
+          });
+        }
+      }
+
       const cpTitle = matchedCheckpoint?.checkpointName || "Task";
       const matchedTask = matchedCheckpoint?.tasks?.find(
         (t) => t._id === taskId || t.taskLevel === taskLevel,
@@ -2904,6 +2980,9 @@ function MapPageInner() {
       setBadgeQueue,
       corruptionLevel,
       checkpoints,
+      activeStage,
+      activeCP,
+      phaserReady,
     ],
   );
 
@@ -3713,10 +3792,9 @@ function MapPageInner() {
                 activeStage={activeStage}
                 activeCheckpoint={activeCP}
                 showBossGateHint={showBossGateHint}
-                isCurrentMapCheckpoint={
-                  selectedDetail.stage === activeStage &&
-                  selectedDetail.checkpointIndex === activeCP
-                }
+                isActiveMapCheckpoint={isSelectedActiveMapCheckpoint}
+                serverDoneTasks={selectedServerDoneTasks}
+                onGoToActiveCheckpoint={goToActiveCheckpoint}
                 totalCheckpointsInStage={
                   templateStages[selectedDetail.stage - 1]?.checkpoints ?? 4
                 }
@@ -4204,13 +4282,13 @@ function MapPageInner() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MapFeedComposer — inline feed post composer for the Project Contributions popup
-// Posts via api.ideas.addComment with auto-prepended project name + tags header
+// Posts via api.ideas.addComment
 // ─────────────────────────────────────────────────────────────────────────────
 function MapFeedComposer({
   ideaId,
   ideaTitle,
-  ideaCategory,
-  ideaTags,
+  ideaCategory: _ideaCategory,
+  ideaTags: _ideaTags,
   onPosted,
 }: {
   ideaId: Id<"ideas">;
@@ -4220,6 +4298,7 @@ function MapFeedComposer({
   onPosted?: () => void;
 }) {
   const { userId } = useAuth();
+  const currentUser = useQuery(api.users.getCurrentUser);
   const addCommentMutation = useMutation(api.ideas.addComment);
   const comments = useQuery(api.ideas.getComments, { ideaId, limit: 50 });
 
@@ -4229,12 +4308,15 @@ function MapFeedComposer({
   const [sharingPost, setSharingPost] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const tagsArr: string[] = ideaTags ?? (ideaCategory ? [ideaCategory] : []);
 
-  // Build the feed header that gets auto-prepended
-  const buildTagHeader = () => {
-    const tagLine = tagsArr.length > 0 ? tagsArr.map(t => `#${t}`).join(" ") : "";
-    return `📌 ${ideaTitle}${tagLine ? `  ${tagLine}` : ""}\n\n`;
+  const cleanContent = (text: string) => {
+    if (text.startsWith("📌")) {
+      const index = text.indexOf("\n\n");
+      if (index !== -1) {
+        return text.substring(index + 2);
+      }
+    }
+    return text;
   };
 
   const handlePost = async (e: React.FormEvent) => {
@@ -4242,7 +4324,7 @@ function MapFeedComposer({
     if (!content.trim() || !userId || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const fullContent = buildTagHeader() + content.trim();
+      const fullContent = content.trim();
       await addCommentMutation({ ideaId, content: fullContent });
       setContent("");
       setPosted(true);
@@ -4274,7 +4356,7 @@ function MapFeedComposer({
   };
 
   const shareUrls = (text: string) => {
-    const cleanText = text.replace(/📌/g, "").trim();
+    const cleanText = cleanContent(text);
     const shareText = `${cleanText}\n\nCheck out our venture:`;
     const shareLink = typeof window !== "undefined" ? `${window.location.origin}/idea/${ideaId}` : "";
     return {
@@ -4286,83 +4368,72 @@ function MapFeedComposer({
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-3 relative">
-      {/* Auto-tag preview bar */}
-      <div className="flex flex-wrap items-center gap-2 px-1 shrink-0">
-        <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Auto-tagged:</span>
-        <span className="inline-flex items-center gap-1.5 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold rounded-full px-2.5 py-0.5">
-          📌 {ideaTitle}
-        </span>
-        {tagsArr.map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center bg-white/5 border border-white/10 text-slate-300 text-[11px] rounded-full px-2 py-0.5"
-          >
-            #{tag}
-          </span>
-        ))}
-      </div>
-
-      {/* Composer box */}
-      <div className="shrink-0">
-        <form onSubmit={handlePost}>
-          <div className="relative rounded-xl border border-white/10 bg-white/[0.03] focus-within:border-indigo-500/40 focus-within:bg-white/[0.05] transition-all">
+    <div className="flex flex-col h-full min-h-0 relative">
+      {/* Composer Section - Single cohesive container layout */}
+      <form onSubmit={handlePost} className="shrink-0 pb-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 shrink-0 border border-white/10">
+            <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+            <AvatarFallback className="bg-indigo-500/10 text-indigo-300 font-semibold uppercase text-xs">
+              {currentUser?.displayName?.charAt(0) || "?"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 space-y-2">
             <textarea
-              placeholder="Share an update, insight, or file with the team... (posts publicly to the idea feed)"
+              placeholder="Share an update or insight with the team..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               maxLength={1200}
-              rows={4}
-              className="w-full resize-none rounded-xl bg-transparent px-4 pt-3.5 pb-10 text-sm text-white placeholder:text-slate-500 outline-none focus:ring-0 leading-relaxed"
+              rows={3}
+              className="w-full resize-none bg-transparent text-sm text-white placeholder:text-slate-500 outline-none border-0 focus:ring-0 p-0 leading-relaxed"
               disabled={isSubmitting}
             />
-            <div className="absolute bottom-3 left-4 text-[10px] text-slate-500 tabular-nums pointer-events-none">
-              {content.length}/1200
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[10px] text-slate-500 tabular-nums">
+                {content.length}/1200
+              </span>
+              <button
+                type="submit"
+                disabled={!content.trim() || isSubmitting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
+              >
+                {isSubmitting ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Post to Feed
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={!content.trim() || isSubmitting}
-              className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
-            >
-              {isSubmitting ? (
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
-              Post to Feed
-            </button>
           </div>
-        </form>
+        </div>
         {posted && (
           <motion.p
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="text-xs text-emerald-400 mt-1.5 px-1"
+            className="text-xs text-emerald-400 mt-1.5 pl-12"
           >
-            ✓ Posted successfully to the project feed!
+            ✓ Shared with the team successfully!
           </motion.p>
         )}
-      </div>
+      </form>
 
-      {/* Feed divider */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="h-px flex-1 bg-white/8" />
-        <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Recent Posts</span>
-        <div className="h-px flex-1 bg-white/8" />
-      </div>
+      {/* Feed Divider Line */}
+      <div className="border-t border-white/5 shrink-0" />
 
-      {/* Past posts scroll list */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3 pr-0.5">
+      {/* Scrollable Timeline */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar py-3 space-y-4">
         {comments === undefined ? (
           <div className="flex items-center justify-center h-24 gap-2 text-slate-500">
             <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
             <span className="text-xs">Loading posts…</span>
           </div>
         ) : comments.filter(c => !c.parentCommentId).length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-24 gap-2 text-center">
-            <Rss className="w-5 h-5 text-slate-600" />
-            <p className="text-xs text-slate-500">No posts yet. Be the first to contribute!</p>
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
+            <Rss className="w-6 h-6 text-slate-600" />
+            <p className="text-sm text-slate-400 font-medium">No posts yet</p>
+            <p className="text-xs text-slate-500 max-w-[240px]">Be the first to share an update or insight with the team!</p>
           </div>
         ) : (
           comments
@@ -4370,23 +4441,35 @@ function MapFeedComposer({
             .slice()
             .reverse()
             .map(c => (
-              <div key={c._id} className="rounded-xl border border-white/8 bg-white/[0.02] px-3.5 py-3 space-y-2 transition-all hover:bg-white/[0.04]">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-white truncate">
-                      {c.author?.name || c.author?.username || "Someone"}
-                    </span>
-                    <span className="text-[10px] text-slate-500 shrink-0">{formatRelative(c.createdAt)}</span>
+              <div key={c._id} className="flex gap-3 group py-2 border-b border-white/[0.03] last:border-b-0">
+                <Avatar className="h-8 w-8 shrink-0 border border-white/5">
+                  <AvatarImage src={c.author?.avatar} alt={c.author?.name} />
+                  <AvatarFallback className="bg-white/5 text-slate-400 font-semibold uppercase text-[10px]">
+                    {c.author?.name?.charAt(0) || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs font-semibold text-white truncate">
+                        {c.author?.name || c.author?.username || "Someone"}
+                      </span>
+                      <span className="text-[10px] text-slate-500 truncate">@{c.author?.username || "user"}</span>
+                      <span className="text-[10px] text-slate-400 shrink-0">·</span>
+                      <span className="text-[10px] text-slate-500 shrink-0">{formatRelative(c.createdAt)}</span>
+                    </div>
+                    <button
+                      onClick={() => setSharingPost(c.content)}
+                      className="p-1 rounded hover:bg-white/5 text-slate-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                      title="Share Post"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setSharingPost(c.content)}
-                    className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                    title="Share Post"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
+                  <p className="text-xs sm:text-sm text-slate-300 whitespace-pre-wrap break-words leading-relaxed">
+                    {cleanContent(c.content)}
+                  </p>
                 </div>
-                <p className="text-sm text-slate-300 whitespace-pre-wrap break-words leading-relaxed">{c.content}</p>
               </div>
             ))
         )}
@@ -4409,7 +4492,7 @@ function MapFeedComposer({
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-xl p-3 mb-5 max-h-[140px] overflow-y-auto no-scrollbar">
-              <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed italic">{sharingPost}</p>
+              <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed italic">{cleanContent(sharingPost)}</p>
             </div>
 
             {/* Social Grid */}
@@ -4440,7 +4523,7 @@ function MapFeedComposer({
               </a>
               <button
                 onClick={() => {
-                  handleCopyLink(sharingPost);
+                  handleCopyLink(cleanContent(sharingPost));
                   window.open(shareUrls(sharingPost).instagram, "_blank");
                 }}
                 className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-[#833AB4]/20 via-[#FD1D1D]/20 to-[#F56040]/20 border border-[#FD1D1D]/30 hover:opacity-90 text-white font-semibold text-xs transition-colors"
@@ -4452,7 +4535,7 @@ function MapFeedComposer({
             {/* Copy Link Actions */}
             <div className="flex gap-2 shrink-0">
               <button
-                onClick={() => handleCopyLink(sharingPost)}
+                onClick={() => handleCopyLink(cleanContent(sharingPost))}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
               >
                 {copied ? (
@@ -4483,6 +4566,7 @@ function MapFeedComposer({
         )}
       </AnimatePresence>
     </div>
+
   );
 }
 
