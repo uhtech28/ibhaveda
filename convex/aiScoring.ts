@@ -1038,10 +1038,15 @@ export const getCheckpointEvaluationSummary = query({
 
     const evaluations = await Promise.all(
       tasks.map(async (task) => {
-        const evaluation = await ctx.db
-          .query("aiEvaluations")
-          .withIndex("by_task", (q) => q.eq("taskId", task._id))
-          .first();
+        // Only surface evaluation for completed tasks; if a task is reset/redo,
+        // the UI should not keep showing a stale score.
+        const evaluation =
+          task.status === "completed"
+            ? await ctx.db
+                .query("aiEvaluations")
+                .withIndex("by_task", (q) => q.eq("taskId", task._id))
+                .first()
+            : null;
 
         return {
           taskId: task._id,

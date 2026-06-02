@@ -8262,6 +8262,12 @@ export class WorldMapScene extends Phaser.Scene {
     if (this.boundHandlers.bossFinalOutcome) {
       eventBridge.off("BOSS_FINAL_OUTCOME", this.boundHandlers.bossFinalOutcome);
     }
+    if (this.boundHandlers.updateCorruption) {
+      eventBridge.off(
+        "UPDATE_CORRUPTION",
+        this.boundHandlers.updateCorruption,
+      );
+    }
     if (this.resizeHandler) {
       this.scale.off("resize", this.resizeHandler);
       this.resizeHandler = undefined;

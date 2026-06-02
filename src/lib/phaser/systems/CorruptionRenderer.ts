@@ -178,6 +178,18 @@ export class CorruptionRenderer {
     ctx: CorruptionRendererContext,
     parent: Phaser.GameObjects.Container,
   ): void {
+    if (
+      !this.scene ||
+      !this.scene.sys ||
+      !this.scene.sys.isActive() ||
+      !parent ||
+      !parent.scene ||
+      !parent.scene.sys ||
+      !parent.active
+    ) {
+      return;
+    }
+
     this.mapWidth = ctx.mapWidth;
     this.mapHeight = ctx.mapHeight;
 

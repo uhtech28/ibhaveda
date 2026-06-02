@@ -19,6 +19,9 @@ import {
   LayoutDashboard,
   GripVertical,
   X,
+  Pencil,
+  Calendar,
+  User,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -39,17 +42,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useParams, useSearchParams } from "next/navigation";
+import type { Id } from "@convex/_generated/dataModel";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 
 interface KanbanCard {
@@ -57,15 +55,9 @@ interface KanbanCard {
   title: string;
   column: "todo" | "inprogress" | "done";
   updatedAt?: number;
-  assignedTo?: {
-    _id: string;
-    name?: string;
-    avatar?: string;
-    username?: string;
-    displayName?: string;
-  };
-  deadline?: number;
-  completionTarget?: string;
+  assignedTo?: string; // User ID
+  deadline?: number; // timestamp
+  completionTarget?: string; // target description text
 }
 
 interface KanbanToolProps {
@@ -82,19 +74,22 @@ interface KanbanToolProps {
   };
   isSubmitting?: boolean;
   isStandalone?: boolean;
-  activeVentureId?: Id<"ventures">;
 }
 
 // Draggable Card Component
-const DraggableCard = React.memo(({
+function DraggableCard({
   card,
   onDelete,
   onMove,
+  onEdit,
+  contributors = [],
 }: {
   card: KanbanCard;
   onDelete: (id: string) => void;
   onMove?: (id: string, newColumn: "todo" | "inprogress" | "done") => void;
-}) => {
+  onEdit?: (card: KanbanCard) => void;
+  contributors?: any[];
+}) {
   const {
     attributes,
     listeners,
@@ -113,86 +108,109 @@ const DraggableCard = React.memo(({
     cursor: isDragging ? "grabbing" : "grab",
   };
 
+  // Find assigned user profile
+  const assignee = contributors.find((u) => u._id === card.assignedTo);
+
   return (
     <div
       ref={setNodeRef}
-      style={{
-        ...style,
-        transitionProperty: transition ? "transform, box-shadow, opacity" : "box-shadow, opacity",
-        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
-        transitionDuration: "200ms",
-      }}
-      className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md will-change-[transform,box-shadow]"
+      style={style}
+      className="p-3 border border-white/10 rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div
-          className="flex items-start gap-2 flex-1 min-w-0"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 cursor-grab shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold leading-snug text-white break-words">{card.title}</div>
-            
-            {card.completionTarget && (
-              <p className="mt-1 text-xs text-slate-400 line-clamp-2 leading-relaxed break-words">
-                {card.completionTarget}
-              </p>
+      <div className="flex flex-col gap-2">
+        {/* Top Row: Drag Handle + Deadline + Assignee + Edit */}
+        <div className="flex items-center justify-between gap-1 w-full">
+          <div
+            className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-medium cursor-grab active:cursor-grabbing flex-1 min-w-0"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+            {card.deadline ? (
+              <div className="flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full text-[10px] text-zinc-300 truncate">
+                <Calendar className="w-2.5 h-2.5 text-indigo-455 shrink-0" />
+                <span>{format(new Date(card.deadline), "MMM dd")}</span>
+              </div>
+            ) : (
+              <span className="text-[10px] text-zinc-500">No deadline</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Assignee Avatar */}
+            {assignee ? (
+              <Avatar className="h-5 w-5 shrink-0 ring-1 ring-white/10" title={assignee.displayName || assignee.username}>
+                <AvatarImage src={assignee.avatar} alt={assignee.displayName} />
+                <AvatarFallback className="text-[8px] bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold">
+                  {assignee.displayName
+                    ? assignee.displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+                    : assignee.username.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <span className="inline-flex h-5 w-5 items-center justify-center text-zinc-600 shrink-0" title="Unassigned">
+                <User className="h-3 w-3" />
+              </span>
             )}
 
-            {(card.assignedTo || card.deadline) && (
-              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-                {card.assignedTo && (
-                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full pl-1 pr-2 py-0.5 text-[9px] font-bold text-zinc-300">
-                    <Avatar className="h-4 w-4 shrink-0">
-                      {card.assignedTo.avatar ? (
-                        <AvatarImage src={card.assignedTo.avatar} alt={card.assignedTo.displayName || card.assignedTo.username} />
-                      ) : null}
-                      <AvatarFallback className="text-[7px] bg-primary/10 text-primary font-semibold flex items-center justify-center">
-                        {(card.assignedTo.displayName || card.assignedTo.username || "?").charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="max-w-[70px] truncate">
-                      {card.assignedTo.displayName || card.assignedTo.username}
-                    </span>
-                  </div>
-                )}
-                {card.deadline && (
-                  <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full text-[9px] font-medium">
-                    📅 {new Date(card.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                  </span>
-                )}
-              </div>
+            {/* Edit Button */}
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-zinc-400 hover:text-white"
+                onClick={() => onEdit(card)}
+                title="Edit task"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          {card.column !== "todo" && onMove && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-white"
-              onClick={() => onMove(card.id, card.column === "done" ? "inprogress" : "todo")}
-              title="Move left"
-            >
-              <span className="text-xs">←</span>
-            </Button>
-          )}
-          {card.column !== "done" && onMove && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-white"
-              onClick={() => onMove(card.id, card.column === "todo" ? "inprogress" : "done")}
-              title="Move right"
-            >
-              <span className="text-xs">→</span>
-            </Button>
-          )}
+
+        {/* Title */}
+        <div className="text-sm font-semibold text-white leading-snug break-words">
+          {card.title}
+        </div>
+
+        {/* Target Description */}
+        {card.completionTarget && (
+          <p className="text-[11px] text-zinc-400 leading-normal border-t border-white/5 pt-1.5 italic line-clamp-2">
+            {card.completionTarget}
+          </p>
+        )}
+
+        {/* Bottom Row: Move Actions & Delete */}
+        <div className="flex items-center justify-between border-t border-white/5 pt-2 mt-1">
+          <div className="flex items-center gap-0.5">
+            {card.column !== "todo" && onMove && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-md"
+                onClick={() => onMove(card.id, card.column === "done" ? "inprogress" : "todo")}
+                title="Move left"
+              >
+                <span className="text-[10px]">←</span>
+              </Button>
+            )}
+            {card.column !== "done" && onMove && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-md"
+                onClick={() => onMove(card.id, card.column === "todo" ? "inprogress" : "done")}
+                title="Move right"
+              >
+                <span className="text-[10px]">→</span>
+              </Button>
+            )}
+          </div>
+
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+            className="h-5 w-5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-md"
             onClick={() => onDelete(card.id)}
             title="Delete card"
           >
@@ -202,36 +220,24 @@ const DraggableCard = React.memo(({
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  return (
-    prevProps.card.id === nextProps.card.id &&
-    prevProps.card.title === nextProps.card.title &&
-    prevProps.card.column === nextProps.card.column &&
-    prevProps.card.updatedAt === nextProps.card.updatedAt &&
-    prevProps.card.completionTarget === nextProps.card.completionTarget &&
-    prevProps.card.deadline === nextProps.card.deadline &&
-    prevProps.card.assignedTo?._id === nextProps.card.assignedTo?._id &&
-    prevProps.card.assignedTo?.avatar === nextProps.card.assignedTo?.avatar &&
-    prevProps.card.assignedTo?.displayName === nextProps.card.assignedTo?.displayName &&
-    prevProps.onDelete === nextProps.onDelete &&
-    prevProps.onMove === nextProps.onMove
-  );
-});
-
-DraggableCard.displayName = "DraggableCard";
+}
 
 // Droppable Column Component
-const DroppableColumn = React.memo(({
+function DroppableColumn({
   column,
   cards,
   onDelete,
   onMove,
+  onEdit,
+  contributors = [],
 }: {
   column: { id: "todo" | "inprogress" | "done"; label: string; color: string };
   cards: KanbanCard[];
   onDelete: (id: string) => void;
   onMove?: (id: string, newColumn: "todo" | "inprogress" | "done") => void;
-}) => {
+  onEdit?: (card: KanbanCard) => void;
+  contributors?: any[];
+}) {
   return (
     <div className="space-y-2">
       <div className={`p-2 rounded-md ${column.color}`}>
@@ -251,43 +257,21 @@ const DroppableColumn = React.memo(({
             </div>
           ) : (
             cards.map((card) => (
-              <DraggableCard key={card.id} card={card} onDelete={onDelete} onMove={onMove} />
+              <DraggableCard
+                key={card.id}
+                card={card}
+                onDelete={onDelete}
+                onMove={onMove}
+                onEdit={onEdit}
+                contributors={contributors}
+              />
             ))
           )}
         </div>
       </SortableContext>
     </div>
   );
-}, (prevProps, nextProps) => {
-  if (
-    prevProps.column.id !== nextProps.column.id ||
-    prevProps.column.label !== nextProps.column.label ||
-    prevProps.column.color !== nextProps.column.color ||
-    prevProps.onDelete !== nextProps.onDelete ||
-    prevProps.onMove !== nextProps.onMove
-  ) {
-    return false;
-  }
-  if (prevProps.cards.length !== nextProps.cards.length) return false;
-  for (let i = 0; i < prevProps.cards.length; i++) {
-    const pc = prevProps.cards[i];
-    const nc = prevProps.cards[i];
-    if (
-      pc.id !== nc.id ||
-      pc.title !== nc.title ||
-      pc.column !== nc.column ||
-      pc.updatedAt !== nc.updatedAt ||
-      pc.completionTarget !== nc.completionTarget ||
-      pc.deadline !== nc.deadline ||
-      pc.assignedTo?._id !== nc.assignedTo?._id
-    ) {
-      return false;
-    }
-  }
-  return true;
-});
-
-DroppableColumn.displayName = "DroppableColumn";
+}
 
 export function KanbanTool({
   prompt,
@@ -295,10 +279,13 @@ export function KanbanTool({
   initialContent,
   isSubmitting,
   isStandalone,
-  activeVentureId,
 }: KanbanToolProps) {
   const [cards, setCards] = useState<KanbanCard[]>(initialContent?.cards || []);
   const [newCardTitle, setNewCardTitle] = useState("");
+  const [newCardAssignee, setNewCardAssignee] = useState("unassigned");
+  const [newCardDeadline, setNewCardDeadline] = useState("");
+  const [newCardTarget, setNewCardTarget] = useState("");
+
   const [activeColumn, setActiveColumn] = useState<
     "todo" | "inprogress" | "done"
   >("todo");
@@ -306,32 +293,45 @@ export function KanbanTool({
   const [activeColTab, setActiveColTab] = useState<"todo" | "inprogress" | "done">("todo");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // New state variables for form inputs
-  const [newCardAssignee, setNewCardAssignee] = useState("unassigned");
-  const [newCardDeadline, setNewCardDeadline] = useState("");
-  const [newCardCompletionTarget, setNewCardCompletionTarget] = useState("");
+  // Edit states
+  const [editingCard, setEditingCard] = useState<KanbanCard | null>(null);
+  const [editCardTitle, setEditCardTitle] = useState("");
+  const [editCardAssignee, setEditCardAssignee] = useState("unassigned");
+  const [editCardDeadline, setEditCardDeadline] = useState("");
+  const [editCardTarget, setEditCardTarget] = useState("");
 
-  // Queries to fetch venture & contributors list
+  // URL Parameters for dynamic Venture/Contributor matching
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const urlVentureId = (params?.id as string) || (searchParams?.get("ventureId") as string);
+
+  // Get Venture + Idea ID
   const venture = useQuery(
     api.ventures.getVenture,
-    activeVentureId ? { ventureId: activeVentureId } : "skip"
+    urlVentureId ? { ventureId: urlVentureId as Id<"ventures"> } : "skip"
   );
   const ideaId = venture?.ideaId;
 
+  // Get Contributors List
   const allUsers = useQuery(api.users.getAllUsers) || [];
   const acceptedRequests = useQuery(
     api.contributionRequests.getAcceptedContributors,
-    ideaId ? { ideaId } : "skip"
+    ideaId ? { ideaId: ideaId as Id<"ideas"> } : "skip"
   ) || [];
 
-  const contributors = venture && ideaId
-    ? allUsers.filter((u) => u._id === venture.userId || acceptedRequests.some((req) => req.userId === u._id)).map((u) => ({
-        _id: u._id,
-        username: u.username,
-        displayName: u.displayName,
-        avatar: u.avatar,
-      }))
-    : [];
+  const contributors = allUsers
+    .filter(
+      (u) =>
+        u._id === venture?.userId ||
+        acceptedRequests.some((req) => req.userId === u._id)
+    )
+    .map((u) => ({
+      _id: u._id,
+      clerkId: u.clerkId,
+      username: u.username,
+      displayName: u.displayName,
+      avatar: u.avatar,
+    }));
 
   const handleMoveCard = (cardId: string, newColumn: "todo" | "inprogress" | "done") => {
     setCards((prevCards) =>
@@ -346,6 +346,19 @@ export function KanbanTool({
       setCards(initialContent.cards);
     }
   }, [initialContent]);
+
+  useEffect(() => {
+    if (editingCard) {
+      setEditCardTitle(editingCard.title);
+      setEditCardAssignee(editingCard.assignedTo || "unassigned");
+      setEditCardDeadline(
+        editingCard.deadline
+          ? format(new Date(editingCard.deadline), "yyyy-MM-dd")
+          : ""
+      );
+      setEditCardTarget(editingCard.completionTarget || "");
+    }
+  }, [editingCard]);
 
   const columns: {
     id: "todo" | "inprogress" | "done";
@@ -365,64 +378,51 @@ export function KanbanTool({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // 8px movement required before drag starts
+        distance: 8,
       },
     }),
   );
 
   const addCard = () => {
     if (!newCardTitle.trim()) return;
-
-    const assigneeUser = contributors.find((u) => u._id === newCardAssignee);
-    const assignedTo = assigneeUser
-      ? {
-          _id: assigneeUser._id,
-          name: assigneeUser.displayName || assigneeUser.username,
-          displayName: assigneeUser.displayName,
-          username: assigneeUser.username,
-          avatar: assigneeUser.avatar,
-        }
-      : undefined;
-
     const newCard: KanbanCard = {
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: newCardTitle.trim(),
       column: activeColumn,
       updatedAt: Date.now(),
-      assignedTo,
+      assignedTo: newCardAssignee === "unassigned" ? undefined : newCardAssignee,
       deadline: newCardDeadline ? new Date(newCardDeadline).getTime() : undefined,
-      completionTarget: newCardCompletionTarget.trim() || undefined,
+      completionTarget: newCardTarget.trim() || undefined,
     };
-    const updatedCards = [...cards, newCard];
-    setCards(updatedCards);
-    onSubmit({
-      cards: updatedCards,
-      columns: columns.map((c) => c.label),
-      timestamp: Date.now(),
-    });
+    setCards([...cards, newCard]);
     setNewCardTitle("");
     setNewCardAssignee("unassigned");
     setNewCardDeadline("");
-    setNewCardCompletionTarget("");
+    setNewCardTarget("");
     setIsModalOpen(false);
   };
 
-  const openModal = () => {
-    setNewCardTitle("");
-    setNewCardAssignee("unassigned");
-    setNewCardDeadline("");
-    setNewCardCompletionTarget("");
-    setIsModalOpen(true);
+  const deleteCard = (cardId: string) => {
+    setCards(cards.filter((c) => c.id !== cardId));
   };
 
-  const deleteCard = (cardId: string) => {
-    const updatedCards = cards.filter((c) => c.id !== cardId);
-    setCards(updatedCards);
-    onSubmit({
-      cards: updatedCards,
-      columns: columns.map((c) => c.label),
-      timestamp: Date.now(),
-    });
+  const saveEditedCard = () => {
+    if (!editingCard || !editCardTitle.trim()) return;
+    setCards((prevCards) =>
+      prevCards.map((card) =>
+        card.id === editingCard.id
+          ? {
+              ...card,
+              title: editCardTitle.trim(),
+              assignedTo: editCardAssignee === "unassigned" ? undefined : editCardAssignee,
+              deadline: editCardDeadline ? new Date(editCardDeadline).getTime() : undefined,
+              completionTarget: editCardTarget.trim() || undefined,
+              updatedAt: Date.now(),
+            }
+          : card
+      )
+    );
+    setEditingCard(null);
   };
 
   const getCardsForColumn = (columnId: "todo" | "inprogress" | "done") => {
@@ -444,7 +444,6 @@ export function KanbanTool({
     const activeCard = cards.find((c) => c.id === active.id);
     if (!activeCard) return;
 
-    // Check if we're over a different column by checking the card's column
     const overCard = cards.find((c) => c.id === over.id);
     if (overCard && overCard.column !== activeCard.column) {
       setCards((prevCards) =>
@@ -456,7 +455,6 @@ export function KanbanTool({
       );
     }
 
-    // Check if we're over a column (by checking if over.id matches column id)
     const overColumn = columns.find((col) => col.id === over.id);
     if (overColumn && overColumn.id !== activeCard.column) {
       setCards((prevCards) =>
@@ -476,32 +474,24 @@ export function KanbanTool({
     const activeCard = cards.find((c) => c.id === active.id);
     if (!activeCard) return;
 
-    let targetColumn: "todo" | "inprogress" | "done" | null = null;
-
-    // If dropped on a card, move to that card's column
     const overCard = cards.find((c) => c.id === over.id);
     if (overCard) {
-      targetColumn = overCard.column;
+      setCards((prevCards) =>
+        prevCards.map((card) =>
+          card.id === activeCard.id
+            ? { ...card, column: overCard.column, updatedAt: Date.now() }
+            : card,
+        ),
+      );
     }
 
-    // If dropped on a column container
     const overColumn = columns.find((col) => col.id === over.id);
     if (overColumn) {
-      targetColumn = overColumn.id;
-    }
-
-    if (targetColumn && targetColumn !== activeCard.column) {
-      const updatedCards = cards.map((card) =>
-        card.id === activeCard.id
-          ? { ...card, column: targetColumn!, updatedAt: Date.now() }
-          : card
+      setCards((prevCards) =>
+        prevCards.map((card) =>
+          card.id === activeCard.id ? { ...card, column: overColumn.id, updatedAt: Date.now() } : card,
+        ),
       );
-      setCards(updatedCards);
-      onSubmit({
-        cards: updatedCards,
-        columns: columns.map((c) => c.label),
-        timestamp: Date.now(),
-      });
     }
   };
 
@@ -525,10 +515,10 @@ export function KanbanTool({
           <div />
         )}
         <Button
-          onClick={openModal}
+          onClick={() => setIsModalOpen(true)}
           size="sm"
           className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-300 shrink-0 text-xs"
-          title="Add New Card"
+          title="Add New Todo"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>Add Task</span>
@@ -573,6 +563,8 @@ export function KanbanTool({
                     cards={getCardsForColumn(column.id)}
                     onDelete={deleteCard}
                     onMove={handleMoveCard}
+                    onEdit={setEditingCard}
+                    contributors={contributors}
                   />
                 </div>
               );
@@ -583,10 +575,24 @@ export function KanbanTool({
         {/* Drag Overlay - Shows the card being dragged */}
         <DragOverlay>
           {activeCard ? (
-            <div className="p-3 border rounded-md bg-background shadow-lg opacity-90 cursor-grabbing">
-              <div className="flex items-start gap-2">
-                <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5" />
-                <div className="text-sm flex-1">{activeCard.title}</div>
+            <div className="p-3 border border-white/10 rounded-xl bg-card shadow-lg opacity-90 cursor-grabbing">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-medium">
+                    <GripVertical className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                    {activeCard.deadline ? (
+                      <div className="flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full text-[10px] text-zinc-300">
+                        <Calendar className="w-2.5 h-2.5 text-indigo-400" />
+                        <span>{format(new Date(activeCard.deadline), "MMM dd")}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-zinc-500">No deadline</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-sm font-semibold text-white leading-snug">
+                  {activeCard.title}
+                </div>
               </div>
             </div>
           ) : null}
@@ -599,7 +605,7 @@ export function KanbanTool({
         </p>
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={cards.length === 0 || isSubmitting}
           className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
@@ -616,6 +622,7 @@ export function KanbanTool({
         </Button>
       </div>
 
+      {/* Add Task Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -640,9 +647,9 @@ export function KanbanTool({
                 <div className="space-y-0.5">
                   <h3 className="text-md font-bold text-white flex items-center gap-2">
                     <Plus className="w-4 h-4 text-emerald-400" />
-                    Add Kanban Card
+                    Add New Todo
                   </h3>
-                  <p className="text-[11px] text-zinc-500 font-medium">Create a new task for your venture board.</p>
+                  <p className="text-[11px] text-zinc-500 font-medium">Create a new task on the Kanban board.</p>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
@@ -652,18 +659,20 @@ export function KanbanTool({
                 </button>
               </div>
 
-              <div className="space-y-3.5 py-2">
-                {/* Task Title */}
+              <div className="space-y-3 py-2">
+                {/* Title */}
                 <div className="space-y-1">
                   <Label htmlFor="task-title" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                    Title <span className="text-destructive">*</span>
+                    Title <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="task-title"
                     placeholder="Task title..."
                     value={newCardTitle}
                     onChange={(e) => setNewCardTitle(e.target.value)}
-                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm"
+                    onKeyDown={(e) => e.key === "Enter" && addCard()}
+                    autoFocus
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
                   />
                 </div>
 
@@ -672,29 +681,19 @@ export function KanbanTool({
                   <Label htmlFor="task-assignee" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
                     Assign To
                   </Label>
-                  <Select value={newCardAssignee} onValueChange={setNewCardAssignee}>
-                    <SelectTrigger id="task-assignee" className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm">
-                      <SelectValue placeholder="Assign to..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#0D111A] border-white/10 text-white z-[10100]">
-                      <SelectItem value="unassigned">
-                        <span className="text-slate-300">Unassigned</span>
-                      </SelectItem>
-                      {contributors.map((user) => (
-                        <SelectItem key={user._id} value={user._id}>
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-5 w-5 shrink-0">
-                              <AvatarImage src={user.avatar} />
-                              <AvatarFallback className="text-[9px] bg-primary/15 text-primary font-bold">
-                                {(user.displayName || user.username || "?").charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-slate-200">{user.displayName || user.username}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    id="task-assignee"
+                    value={newCardAssignee}
+                    onChange={(e) => setNewCardAssignee(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm bg-[#121824] text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
+                  >
+                    <option value="unassigned">Unassigned</option>
+                    {contributors.map((user) => (
+                      <option key={user._id} value={user._id}>
+                        {user.displayName || user.username}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Deadline */}
@@ -707,23 +706,21 @@ export function KanbanTool({
                     type="date"
                     value={newCardDeadline}
                     onChange={(e) => setNewCardDeadline(e.target.value)}
-                    min={new Date().toISOString().slice(0, 10)}
-                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm [color-scheme:dark]"
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50"
                   />
                 </div>
 
-                {/* Target (optional) */}
+                {/* Target */}
                 <div className="space-y-1">
                   <Label htmlFor="task-target" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                    Target <span className="text-[10px] text-zinc-500 font-normal">(optional)</span>
+                    Target <span className="text-xs text-zinc-500 font-normal">(optional)</span>
                   </Label>
                   <Textarea
                     id="task-target"
                     placeholder="What needs to be completed..."
-                    value={newCardCompletionTarget}
-                    onChange={(e) => setNewCardCompletionTarget(e.target.value)}
-                    rows={3}
-                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 text-sm resize-none"
+                    value={newCardTarget}
+                    onChange={(e) => setNewCardTarget(e.target.value)}
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 min-h-[80px]"
                   />
                 </div>
 
@@ -762,9 +759,133 @@ export function KanbanTool({
                 <Button
                   onClick={addCard}
                   disabled={!newCardTitle.trim()}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-300"
+                  className="bg-[#3b82f6] hover:bg-[#2563eb] text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg hover:shadow-blue-500/20 transition-all duration-300"
                 >
-                  Add Task
+                  Create Task
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Task Modal */}
+      <AnimatePresence>
+        {editingCard && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setEditingCard(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative w-full max-w-md bg-[#0D111A]/95 border border-white/10 rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                <div className="space-y-0.5">
+                  <h3 className="text-md font-bold text-white flex items-center gap-2">
+                    <Pencil className="w-4 h-4 text-indigo-400" />
+                    Edit Kanban Card
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 font-medium">Update task details on the Kanban board.</p>
+                </div>
+                <button
+                  onClick={() => setEditingCard(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 py-2">
+                {/* Title */}
+                <div className="space-y-1">
+                  <Label htmlFor="edit-task-title" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Title <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-task-title"
+                    placeholder="Task title..."
+                    value={editCardTitle}
+                    onChange={(e) => setEditCardTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveEditedCard()}
+                    autoFocus
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
+                  />
+                </div>
+
+                {/* Assign To */}
+                <div className="space-y-1">
+                  <Label htmlFor="edit-task-assignee" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Assign To
+                  </Label>
+                  <select
+                    id="edit-task-assignee"
+                    value={editCardAssignee}
+                    onChange={(e) => setEditCardAssignee(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm bg-[#121824] text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
+                  >
+                    <option value="unassigned">Unassigned</option>
+                    {contributors.map((user) => (
+                      <option key={user._id} value={user._id}>
+                        {user.displayName || user.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Deadline */}
+                <div className="space-y-1">
+                  <Label htmlFor="edit-task-deadline" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Deadline
+                  </Label>
+                  <Input
+                    id="edit-task-deadline"
+                    type="date"
+                    value={editCardDeadline}
+                    onChange={(e) => setEditCardDeadline(e.target.value)}
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
+                  />
+                </div>
+
+                {/* Target */}
+                <div className="space-y-1">
+                  <Label htmlFor="edit-task-target" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Target <span className="text-xs text-zinc-500 font-normal">(optional)</span>
+                  </Label>
+                  <Textarea
+                    id="edit-task-target"
+                    placeholder="What needs to be completed..."
+                    value={editCardTarget}
+                    onChange={(e) => setEditCardTarget(e.target.value)}
+                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 min-h-[80px]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                <Button
+                  variant="ghost"
+                  onClick={() => setEditingCard(null)}
+                  className="text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 px-4 py-2 rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={saveEditedCard}
+                  disabled={!editCardTitle.trim()}
+                  className="bg-[#3b82f6] hover:bg-[#2563eb] text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg hover:shadow-blue-500/20 transition-all duration-300"
+                >
+                  Save Changes
                 </Button>
               </div>
             </motion.div>
