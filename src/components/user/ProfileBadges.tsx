@@ -228,6 +228,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
   const equippedBadges = displayBadgesList.filter(
     (b) => b.awardedAt && equippedBadgeIds.includes(b.id)
   );
+  const validEquippedBadgeIds = equippedBadges.map((badge) => badge.id);
 
   // 3. Filtering logic
   const filteredBadges = displayBadgesList.filter((b) => {
@@ -296,7 +297,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
 
   // Toggle Equip Mutator
   const handleEquipToggle = async (badgeId: string) => {
-    let currentEquipped = [...equippedBadgeIds];
+    let currentEquipped = [...validEquippedBadgeIds];
     if (currentEquipped.includes(badgeId)) {
       currentEquipped = currentEquipped.filter((id) => id !== badgeId);
     } else {
@@ -339,8 +340,8 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
           isOpen={!!selectedBadge}
           onClose={() => setSelectedBadge(null)}
           isOwner={isOwner}
-          isEquipped={equippedBadgeIds.includes(selectedBadge.id)}
-          canEquipMore={equippedBadgeIds.length < 3}
+          isEquipped={validEquippedBadgeIds.includes(selectedBadge.id)}
+          canEquipMore={validEquippedBadgeIds.length < 3}
           onEquipToggle={() => handleEquipToggle(selectedBadge.id)}
         />
       )}
@@ -354,13 +355,13 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
               Select one of your earned achievements to showcase on your profile.
             </DialogDescription>
             <div className="max-h-[300px] overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
-              {displayBadgesList.filter(b => b.awardedAt && !equippedBadgeIds.includes(b.id)).length === 0 ? (
+              {displayBadgesList.filter(b => b.awardedAt && !validEquippedBadgeIds.includes(b.id)).length === 0 ? (
                 <div className="text-center py-8 text-sm text-slate-500 font-semibold border border-dashed border-slate-800 rounded-2xl">
                   No unequipped achievements available.
                 </div>
               ) : (
                 displayBadgesList
-                  .filter(b => b.awardedAt && !equippedBadgeIds.includes(b.id))
+                  .filter(b => b.awardedAt && !validEquippedBadgeIds.includes(b.id))
                   .map((badge) => {
                     const norm = getNormalizedRarity(badge.rarity);
                     return (
@@ -627,7 +628,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
           <AnimatePresence mode="popLayout">
             {sortedBadges.map((badge) => {
               const isEarned = !!badge.awardedAt;
-              const isEquipped = equippedBadgeIds.includes(badge.id);
+              const isEquipped = validEquippedBadgeIds.includes(badge.id);
 
               return (
                 <BadgeCard
