@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Crown, Flame, Gem, Hammer, Pickaxe, Ship, Swords, Trees } from "lucide-react";
 
 const TOTAL_RUNTIME_MS = 24950;
@@ -59,6 +59,8 @@ export default function LandingIntroSandbox({
 }) {
   const [stage, setStage] = useState(0);
   const [closing, setClosing] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioStartedRef = useRef(false);
 
   useEffect(() => {
     setStage(0);
@@ -122,20 +124,16 @@ export default function LandingIntroSandbox({
       (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
 
-    let ctx: AudioContext | null = null;
-    let started = false;
-    let stopped = false;
+    // Use refs so the AudioContext and started flag survive React StrictMode's
+    // double-mount in development. Without this, StrictMode consumes the
+    // navigation user-gesture on the first mount, closes the context in cleanup,
+    // and the second mount can never autoplay.
+    if (!audioCtxRef.current) {
+      try { audioCtxRef.current = new AC(); } catch { return; }
+    }
+    const ctx = audioCtxRef.current;
 
-    const startAudio = async () => {
-      if (started || stopped) return;
-      // Create context once; reuse on subsequent calls (gesture retry)
-      if (!ctx) { try { ctx = new AC(); } catch { return; } }
-      await ctx.resume().catch(() => undefined);
-      // If still suspended (autoplay blocked and no gesture yet), bail out silently.
-      // The gesture listeners below will retry and this time resume() will succeed.
-      if (ctx.state !== "running") return;
-      started = true;
-
+    const scheduleNotes = () => {
       const masterGain = ctx.createGain();
       const t0 = ctx.currentTime + 0.1;
       const tEnd = t0 + TOTAL_RUNTIME_MS / 1000;
@@ -164,20 +162,47 @@ export default function LandingIntroSandbox({
       }
     };
 
-    // Attempt autoplay immediately — works when browser permits it.
-    // Gesture listeners are always registered so they can retry if blocked.
+    const startAudio = () => {
+      if (audioStartedRef.current) return;
+      if (ctx.state === "running") {
+        audioStartedRef.current = true;
+        scheduleNotes();
+      } else {
+        ctx.resume().then(() => {
+          if (ctx.state === "running" && !audioStartedRef.current) {
+            audioStartedRef.current = true;
+            scheduleNotes();
+          }
+        }).catch(() => undefined);
+      }
+    };
+
+    // Attempt autoplay immediately on mount. If browser allows it (e.g. user
+    // navigated here by clicking a link), this plays with the animation.
     startAudio();
+
+    // Always register gesture listeners — they retry if autoplay was blocked.
     window.addEventListener("touchstart", startAudio, { once: true, passive: true });
     window.addEventListener("pointerdown", startAudio, { once: true });
     window.addEventListener("keydown",     startAudio, { once: true });
 
     return () => {
-      stopped = true;
+      // Do NOT close ctx here — it must survive StrictMode's cleanup/remount cycle.
+      // It will be closed when the component truly unmounts (below).
       window.removeEventListener("touchstart", startAudio);
       window.removeEventListener("pointerdown", startAudio);
       window.removeEventListener("keydown",     startAudio);
-      ctx?.close().catch(() => undefined);
     };
+  }, [audioCtxRef, audioStartedRef]);
+
+  // Close AudioContext on true unmount
+  useEffect(() => {
+    return () => {
+      audioCtxRef.current?.close().catch(() => undefined);
+      audioCtxRef.current = null;
+      audioStartedRef.current = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const closeIntro = () => {
