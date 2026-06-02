@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { Trophy, Flame } from "lucide-react";
+import { Flame } from "lucide-react";
 
 // Mirrors convex/ventureConstants.ts and the official "level_table_with_flare"
 // spec — single source of truth for level → title / threshold / phase. Lv 1-3
@@ -176,26 +176,31 @@ export const ProfileProgress: React.FC<ProfileProgressProps> = ({ userId }) => {
 
   return (
     <div className="pt-3 space-y-4">
-      {/* Level — single combined bar with individual XP progress */}
-      <ProgressBar
-        icon={<Trophy className="w-3.5 h-3.5 text-amber-400" />}
-        iconBgClass="bg-amber-500/15 ring-1 ring-amber-500/30"
-        label={`Lv ${level} — ${title}`}
-        detail={xpDetail}
-        value={xpProgress}
-        max={100}
-        fillClass="bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.45)]"
-      />
-
-      {/* Streak — count only, no progress bar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-orange-500/15 ring-1 ring-orange-500/30">
-            <Flame className="w-3.5 h-3.5 text-orange-300" />
-          </span>
-          <span className="text-sm font-medium text-foreground truncate">Day Streak</span>
+      {/* Level — single combined bar with gold circle level indicator */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-center h-7 w-7 rounded-full bg-amber-400 shrink-0">
+              <span className="text-sm font-bold text-black">{level}</span>
+            </div>
+            <span className="text-sm font-semibold text-foreground truncate">{title}</span>
+          </div>
+          <span className="text-xs text-muted-foreground tabular-nums shrink-0">{xpDetail}</span>
         </div>
-        <span className="text-sm font-semibold text-orange-200 tabular-nums shrink-0">
+        <div className="relative h-2 w-full rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.45)]"
+            style={{ width: `${Math.min(100, Math.round((xpProgress / 100) * 100))}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Streak — flame icon and streak text on right */}
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-orange-500/15 ring-1 ring-orange-500/30 shrink-0">
+          <Flame className="w-3.5 h-3.5 text-orange-300" />
+        </span>
+        <span className="text-sm font-semibold text-orange-200 tabular-nums shrink-0 ml-auto">
           {streakDetail}
         </span>
       </div>
