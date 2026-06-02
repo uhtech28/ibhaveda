@@ -354,8 +354,8 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const hiddenSkillCount = Math.max(0, user.skills.length - visibleSkills.length);
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 flex h-[218px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
-      <div className="grid flex-1 grid-rows-[42px_22px_24px_24px_50px] px-4 pb-0.5 pt-2">
+    <Card className="group hover:shadow-lg transition-all duration-300 flex h-[268px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+      <div className="grid shrink-0 grid-rows-[42px_22px_24px_24px_50px] px-4 pb-0.5 pt-2">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
           <div className="flex items-center gap-3">
@@ -451,7 +451,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
       {/* Footer Actions */}
       {!isCurrentUser && currentUserId && (
-        <div className="flex h-[42px] items-start gap-2 px-3 pt-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex h-[48px] shrink-0 items-start gap-2 px-3 pt-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1">
             <InvitationButton
               targetUser={{
