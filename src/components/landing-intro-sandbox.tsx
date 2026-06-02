@@ -122,14 +122,20 @@ export default function LandingIntroSandbox({
       (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
 
-    // Create context once on mount — reused for both the autoplay check and gesture fallback
-    let ctx: AudioContext;
-    try { ctx = new AC(); } catch { return; }
-
+    let ctx: AudioContext | null = null;
     let started = false;
     let stopped = false;
 
-    const scheduleNotes = () => {
+    const startAudio = async () => {
+      if (started || stopped) return;
+      // Create context once; reuse on subsequent calls (gesture retry)
+      if (!ctx) { try { ctx = new AC(); } catch { return; } }
+      await ctx.resume().catch(() => undefined);
+      // If still suspended (autoplay blocked and no gesture yet), bail out silently.
+      // The gesture listeners below will retry and this time resume() will succeed.
+      if (ctx.state !== "running") return;
+      started = true;
+
       const masterGain = ctx.createGain();
       const t0 = ctx.currentTime + 0.1;
       const tEnd = t0 + TOTAL_RUNTIME_MS / 1000;
@@ -158,21 +164,12 @@ export default function LandingIntroSandbox({
       }
     };
 
-    const startAudio = () => {
-      if (started || stopped) return;
-      started = true;
-      ctx.resume().then(scheduleNotes).catch(() => undefined);
-    };
-
-    // If context is already running (page loaded via navigation gesture or
-    // browser has prior media engagement), play immediately with the animation.
-    if (ctx.state === "running") {
-      startAudio();
-    } else {
-      window.addEventListener("touchstart", startAudio, { once: true, passive: true });
-      window.addEventListener("pointerdown", startAudio, { once: true });
-      window.addEventListener("keydown",     startAudio, { once: true });
-    }
+    // Attempt autoplay immediately — works when browser permits it.
+    // Gesture listeners are always registered so they can retry if blocked.
+    startAudio();
+    window.addEventListener("touchstart", startAudio, { once: true, passive: true });
+    window.addEventListener("pointerdown", startAudio, { once: true });
+    window.addEventListener("keydown",     startAudio, { once: true });
 
     return () => {
       stopped = true;
