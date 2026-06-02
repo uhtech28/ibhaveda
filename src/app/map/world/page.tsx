@@ -615,38 +615,6 @@ function CheckpointPanel({
           {/* Advance + boss counter — shown on every unlocked checkpoint */}
           {!isLocked && (
               <div className="p-2.5 sm:p-3 pt-0 flex flex-col gap-2">
-                {isGold && (
-                  <div
-                    className="rounded-lg border px-3 py-2.5 flex flex-col gap-2"
-                    style={{
-                      borderColor: "rgba(234, 179, 8, 0.35)",
-                      background:
-                        "linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(120, 53, 15, 0.08))",
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-amber-200/80">
-                        Tasks complete
-                      </span>
-                      <span className="text-[10px] font-black text-amber-300 tabular-nums">
-                        {doneTasks}/{totalTasks}
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      {detail.tasks.map((task, i) => (
-                        <div
-                          key={i}
-                          className="h-1.5 flex-1 rounded-full transition-colors"
-                          style={{
-                            background: task.done
-                              ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
-                              : "rgba(255,255,255,0.08)",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {!isGold && canAdvance && (
                   <div className="flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-wider text-indigo-300/70">
                     <span>Tasks {doneTasks}/{totalTasks}</span>
