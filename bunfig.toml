@@ -1,0 +1,5 @@
+[install]
+# Increase network timeout to 120s for heavy native packages in CI
+networkTimeout = 120000
+# Retry failed downloads up to 5 times
+retries = 5
