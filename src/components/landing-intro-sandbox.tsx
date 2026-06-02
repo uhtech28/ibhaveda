@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, Crown, Flame, Gem, Hammer, Pickaxe, Ship, Swords, Trees } from "lucide-react";
 
 const TOTAL_RUNTIME_MS = 24950;
@@ -59,8 +59,6 @@ export default function LandingIntroSandbox({
 }) {
   const [stage, setStage] = useState(0);
   const [closing, setClosing] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const audioStartedRef = useRef(false);
 
   useEffect(() => {
     setStage(0);
@@ -124,16 +122,14 @@ export default function LandingIntroSandbox({
       (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
 
-    // Use refs so the AudioContext and started flag survive React StrictMode's
-    // double-mount in development. Without this, StrictMode consumes the
-    // navigation user-gesture on the first mount, closes the context in cleanup,
-    // and the second mount can never autoplay.
-    if (!audioCtxRef.current) {
-      try { audioCtxRef.current = new AC(); } catch { return; }
-    }
-    const ctx = audioCtxRef.current;
+    let ctx: AudioContext;
+    try { ctx = new AC(); } catch { return; }
+
+    let started = false;
 
     const scheduleNotes = () => {
+      if (started) return;
+      started = true;
       const masterGain = ctx.createGain();
       const t0 = ctx.currentTime + 0.1;
       const tEnd = t0 + TOTAL_RUNTIME_MS / 1000;
@@ -141,7 +137,6 @@ export default function LandingIntroSandbox({
       masterGain.gain.setValueAtTime(0.022, tEnd - 1.5);
       masterGain.gain.linearRampToValueAtTime(0.001, tEnd - 0.1);
       masterGain.connect(ctx.destination);
-
       let t = t0;
       for (const { f, d } of notes) {
         if (f > 0 && t < tEnd) {
@@ -162,43 +157,22 @@ export default function LandingIntroSandbox({
       }
     };
 
-    const startAudio = () => {
-      if (audioStartedRef.current) return;
-      // Always call resume() even if already running — the .then() gives the
-      // context clock one async tick to stabilise before notes are scheduled.
-      ctx.resume().then(() => {
-        if (ctx.state === "running" && !audioStartedRef.current) {
-          audioStartedRef.current = true;
-          scheduleNotes();
-        }
-      }).catch(() => undefined);
-    };
+    // resume() works both when context is already running (Firefox, link-nav)
+    // and when called inside a user gesture (Chrome fallback).
+    // The .then() ensures currentTime is ticking before notes are scheduled.
+    const startAudio = () => ctx.resume().then(scheduleNotes).catch(() => undefined);
 
-    // Try immediately — works when the page was reached via any user gesture
-    // (clicking a link, pressing Enter in the address bar, etc.).
     startAudio();
-
-    // Fallback: start on first interaction with the page.
-    // The intro is full-screen so any click/tap/key anywhere triggers this.
     window.addEventListener("pointerdown", startAudio, { once: true });
     window.addEventListener("touchstart",  startAudio, { once: true, passive: true });
     window.addEventListener("keydown",     startAudio, { once: true });
 
     return () => {
+      ctx.close().catch(() => undefined);
       window.removeEventListener("pointerdown", startAudio);
       window.removeEventListener("touchstart",  startAudio);
       window.removeEventListener("keydown",     startAudio);
     };
-  }, [audioCtxRef, audioStartedRef]);
-
-  // Close AudioContext on true unmount
-  useEffect(() => {
-    return () => {
-      audioCtxRef.current?.close().catch(() => undefined);
-      audioCtxRef.current = null;
-      audioStartedRef.current = false;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const closeIntro = () => {
