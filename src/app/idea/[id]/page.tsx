@@ -8,7 +8,7 @@ import { HeroHeader } from "@/components/header";
 import FooterSection from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Eye, Trash2, Pencil, Check, Plus, X, Lightbulb, Menu } from "lucide-react";
+import { Eye, Trash2, Pencil, Check, Plus, X, Lightbulb, Menu, MessageCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMutation, useQuery } from "convex/react";
 import { cn } from "@/lib/utils";
@@ -363,11 +363,25 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
               </Dialog>
 
               <Dialog open={showComments} onOpenChange={setShowComments}>
-                <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-4 sm:p-6 w-full">
-                  <DialogHeader>
-                    <DialogTitle>Comments</DialogTitle>
-                  </DialogHeader>
-                  <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
+                <DialogContent
+                  className="
+                    grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
+                    w-full max-w-[640px]
+                    h-[100dvh] max-h-[100dvh] rounded-none
+                    sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
+                  "
+                >
+                  <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
+                      <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
+                    </div>
+                    <DialogTitle className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
+                      {ideaQuery.title}
+                    </DialogTitle>
+                  </header>
+                  <div className="min-h-0 px-5 py-4 overflow-hidden">
+                    <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
+                  </div>
                 </DialogContent>
               </Dialog>
 

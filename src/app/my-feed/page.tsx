@@ -11,6 +11,7 @@ import { IdeaForgeExperience } from "@/components/ideaforge/experience";
 import { IdeaForgeIdea } from "@/components/ideaforge/shared";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MessageCircle } from "lucide-react";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useToast } from "@/components/ui/use-toast";
@@ -107,16 +108,20 @@ export default function MyFeedPage() {
       <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
         <DialogContent
           className="
-            grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#111827] p-0 text-white
-            w-full max-w-[600px]
+            grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
+            w-full max-w-[640px]
             h-[100dvh] max-h-[100dvh] rounded-none
             sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
           "
         >
-          <div className="border-b border-white/8 px-5 py-4">
-            <DialogTitle className="text-xl font-semibold">Comments</DialogTitle>
-            <p className="mt-0.5 truncate text-sm text-[#9CA3AF]">{activeCommentIdea?.title}</p>
-          </div>
+          <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
+              <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
+            </div>
+            <DialogTitle className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
+              {activeCommentIdea?.title}
+            </DialogTitle>
+          </header>
           <div className="min-h-0 px-5 py-4 overflow-hidden">
             {activeCommentIdea && (
               <CommentsSection
