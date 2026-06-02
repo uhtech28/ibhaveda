@@ -354,7 +354,27 @@ export const getPublicIdeas = query({
       })
     );
 
-    return ideasWithAuthors;
+    // Interleave: first 3 human posts, then groups of (2 agent + 2 human) until
+    // human posts run out, then all remaining agent posts.
+    const agentIdSet = new Set(
+      (await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "agent")).collect())
+        .map((u) => String(u._id))
+    );
+
+    const humanPosts = ideasWithAuthors.filter((i) => !agentIdSet.has(String(i.authorId)));
+    const agentPosts = ideasWithAuthors.filter((i) => agentIdSet.has(String(i.authorId)));
+
+    const interleaved: typeof ideasWithAuthors = [];
+    let hi = 0, ai = 0;
+
+    while (hi < 3 && hi < humanPosts.length) interleaved.push(humanPosts[hi++]);
+
+    while (hi < humanPosts.length || ai < agentPosts.length) {
+      for (let n = 0; n < 2 && ai < agentPosts.length; n++) interleaved.push(agentPosts[ai++]);
+      for (let n = 0; n < 2 && hi < humanPosts.length; n++) interleaved.push(humanPosts[hi++]);
+    }
+
+    return interleaved;
   },
 });
 

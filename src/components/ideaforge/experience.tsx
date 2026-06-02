@@ -178,29 +178,11 @@ export function IdeaForgeExperience({
       });
     }
 
-    const scored = [...searchable].sort((a, b) => {
+    return [...searchable].sort((a, b) => {
       const aScore = (a.sparkCount || 0) * 4 + Math.round((Date.now() - a.createdAt) / -3600000);
       const bScore = (b.sparkCount || 0) * 4 + Math.round((Date.now() - b.createdAt) / -3600000);
       return bScore - aScore;
     });
-
-    // Interleave: first 3 human posts, then groups of (2 agent, 2 human) until
-    // human posts run out, then all remaining agent posts at the end.
-    const human = scored.filter((i) => i.author?.role !== "agent");
-    const agents = scored.filter((i) => i.author?.role === "agent");
-    const result: typeof scored = [];
-    let hi = 0, ai = 0;
-
-    // Initial 3 human
-    while (hi < 3 && hi < human.length) result.push(human[hi++]);
-
-    // Interleaved groups of 2 agent + 2 human
-    while (hi < human.length || ai < agents.length) {
-      for (let n = 0; n < 2 && ai < agents.length; n++) result.push(agents[ai++]);
-      for (let n = 0; n < 2 && hi < human.length; n++) result.push(human[hi++]);
-    }
-
-    return result;
   }, [currentUser?.industry, currentUser?.industries, currentUser?.skills, feedTab, ideas, searchQuery]);
 
   const searchedMyIdeas = useMemo(() => {
