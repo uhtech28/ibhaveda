@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Lightbulb, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle, Trophy } from "lucide-react"
+import { Lightbulb, UserPlus, Users, Sparkles, MapPin, Link2, ChevronRight, Edit2, MessageCircle, Trophy } from "lucide-react"
 import { ProfileStatsDialog } from "./ProfileStatsDialog";
 import { ProfileProgress } from "./ProfileProgress";
 import { Id } from "@convex/_generated/dataModel";
@@ -263,10 +263,12 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
               </div>
               </div>
               <div className="space-y-4 sm:ml-[6.25rem]">
-                {profile.bio && (
+                {profile.bio ? (
                   <p className="text-foreground/80 text-base leading-relaxed max-w-3xl line-clamp-3">
                     {profile.bio}
                   </p>
+                ) : (
+                  <div className="hidden min-h-[1.75rem] sm:block" aria-hidden="true" />
                 )}
 
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground items-center pt-0.5">
@@ -386,7 +388,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
             <CardContent className="p-4 flex items-center justify-between h-full">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-500/10 rounded-full group-hover:bg-green-500/20 transition-colors">
-                  <Users className="w-4 h-4 text-green-500" />
+                  <UserPlus className="w-4 h-4 text-green-500" />
                 </div>
                 <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Contributed</span>
               </div>

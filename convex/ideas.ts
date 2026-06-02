@@ -327,8 +327,8 @@ export const getPublicIdeas = query({
           console.error("Error fetching author for idea:", idea._id, e);
         }
 
-        // Count accepted contribution requests
-        let contributionCount = 0;
+        // Count accepted contribution requests + creator
+        let contributionCount = 1; // Start with 1 to include the creator
         try {
           const acceptedContributions = await ctx.db
             .query("contributionRequests")
@@ -336,7 +336,7 @@ export const getPublicIdeas = query({
               q.eq("ideaId", idea._id).eq("status", "accepted")
             )
             .collect();
-          contributionCount = acceptedContributions.length;
+          contributionCount = 1 + acceptedContributions.length;
         } catch (e) {
           console.error("Error fetching contribution count for idea:", idea._id, e);
         }

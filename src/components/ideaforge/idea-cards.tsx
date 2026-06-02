@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, Users, Repeat2, Bookmark, Swords } from "lucide-react";
+import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, UserPlus, Repeat2, Bookmark, Swords } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 
@@ -211,11 +211,11 @@ function ContributorsAction({
   const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
     ideaId: ideaId as Id<"ideas">,
   });
-  const count = contributors?.length ?? 0;
+  const count = (contributors?.length ?? 0) + 1;
 
   return (
     <StoryAction
-      icon={Users}
+      icon={UserPlus}
       label="Contribute"
       count={count}
       onClick={onClick}
@@ -667,7 +667,7 @@ export function CompactIdeaCard({
               <span className="tabular-nums">{idea.sparkCount || 0}</span>
             </span>
             <span className="inline-flex items-center gap-1">
-              <Users className="h-3 w-3 text-fuchsia-300" />
+              <UserPlus className="h-3 w-3 text-fuchsia-300" />
               <span className="tabular-nums">{idea.contributionCount || 0}</span>
             </span>
           </div>

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Edit2, MapPin, Link2, Lightbulb, Sparkles, Users, ChevronRight } from "lucide-react";
+import { Edit2, MapPin, Link2, Lightbulb, Sparkles, UserPlus, ChevronRight } from "lucide-react";
 import { RequestStatusCard, ContributionRequest } from "@/components/requests/request-status-card";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -260,7 +260,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
               <CardContent className="p-4 flex items-center justify-between h-full">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-500/10 rounded-full">
-                    <Users className="w-4 h-4 text-green-500" />
+                    <UserPlus className="w-4 h-4 text-green-500" />
                   </div>
                   <span className="text-sm font-medium text-muted-foreground">Contributed</span>
                 </div>

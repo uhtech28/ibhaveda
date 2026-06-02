@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Sparkles, Users } from "lucide-react";
+import { MessageCircle, Sparkles, UserPlus } from "lucide-react";
 import ParticleButton from "@/components/kokonutui/particle-button";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -40,7 +40,7 @@ export function IdeaBottomBar({
   const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
     ideaId: ideaId as Id<"ideas">,
   });
-  const contributorCount = contributors?.length ?? 0;
+  const contributorCount = (contributors?.length ?? 0) + 1;
 
   const [isSparking, setIsSparking] = useState(false);
   const [currentSparkCount, setCurrentSparkCount] = useState(initialSparkCount);
@@ -118,7 +118,7 @@ export function IdeaBottomBar({
         title={isAuthor ? "Contribution requests" : "Contributors"}
         className="rounded-full px-4 h-10 gap-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 transition-colors relative"
       >
-        <Users className="w-4 h-4" />
+        <UserPlus className="w-4 h-4" />
         <span className="font-semibold text-sm">{contributorCount}</span>
         {isAuthor && requestCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold ring-2 ring-background">
