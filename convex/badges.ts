@@ -1112,7 +1112,8 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     { id: 59, shouldAward: experimentalLifecycles >= 3 }, // The Grand Artificer
     { id: 60, shouldAward: creativeLifecycles >= 3 }, // The Master
     { id: 61, shouldAward: commentsCount >= 1000 }, // The Thousand
-    { id: 62, shouldAward: goldCheckpoints >= 50 || userLevel.currentLevel >= 45 }, // The Architect of Ages / Walled City
+    // Monument-based badges are disabled until monument mechanics are finalized.
+    // { id: 62, shouldAward: goldCheckpoints >= 50 || userLevel.currentLevel >= 45 }, // The Architect of Ages / Walled City
   ];
 
   // Find the active venture's corruption level to store at the time of award

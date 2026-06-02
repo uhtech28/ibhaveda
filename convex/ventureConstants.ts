@@ -2528,6 +2528,8 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     tagline: "One thousand voices helped. One thousand ideas moved forward.",
     requirement: "Give 1,000 sparked reviews or comments across the platform",
   },
+  // Monument-based badges are disabled until monument mechanics are finalized.
+  /*
   {
     id: 62,
     name: "The Architect of Ages",
@@ -2542,6 +2544,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
       "You have left something in the world that will outlast the making of it.",
     requirement: "Have 10 monuments placed on the shared world map",
   },
+  */
   {
     id: 71,
     name: "The Spark Struck",

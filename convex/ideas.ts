@@ -991,7 +991,7 @@ export const toggleCommentSpark = mutation({
       const nextSparkCount = Math.max(0, currentSparkCount - 1);
       await ctx.db.patch(comment._id, { sparkCount: nextSparkCount });
 
-      if (shouldUpdateAuthorCounter && nonAuthorSparkCount === 1) {
+      if (shouldUpdateAuthorCounter) {
         await updateCommentAuthorSparkedCount(-1);
       }
 
@@ -1011,7 +1011,7 @@ export const toggleCommentSpark = mutation({
     const nextSparkCount = currentSparkCount + 1;
     await ctx.db.patch(comment._id, { sparkCount: nextSparkCount });
 
-    if (shouldUpdateAuthorCounter && nonAuthorSparkCount === 0) {
+    if (shouldUpdateAuthorCounter) {
       await updateCommentAuthorSparkedCount(1);
     }
 

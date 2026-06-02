@@ -220,6 +220,10 @@ const CommentItem: React.FC<{
   const [isReplying, setIsReplying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSparking, setIsSparking] = useState(false);
+  const [localSparkState, setLocalSparkState] = useState<{
+    count: number;
+    hasSparked: boolean;
+  } | null>(null);
   const addCommentMutation = useMutation(api.ideas.addComment);
   const deleteCommentMutation = useMutation(api.ideas.deleteComment);
   const toggleCommentSparkMutation = useMutation(api.ideas.toggleCommentSpark);
@@ -256,13 +260,22 @@ const CommentItem: React.FC<{
   };
 
   const isMine = userId === comment.authorId;
-  const sparkCount = comment.sparkCount ?? 0;
+  const sparkCount = localSparkState?.count ?? comment.sparkCount ?? 0;
+  const hasSparked = localSparkState?.hasSparked ?? !!comment.userHasSparked;
+
+  useEffect(() => {
+    setLocalSparkState(null);
+  }, [comment.sparkCount, comment.userHasSparked]);
 
   const handleSpark = async () => {
     if (!userId || isSparking) return;
     setIsSparking(true);
     try {
-      await toggleCommentSparkMutation({ commentId: comment._id as Id<"comments"> });
+      const result = await toggleCommentSparkMutation({ commentId: comment._id as Id<"comments"> });
+      setLocalSparkState({
+        count: result.sparkCount,
+        hasSparked: result.action === "added",
+      });
     } catch (err) {
       console.error(err);
     } finally {
@@ -320,16 +333,17 @@ const CommentItem: React.FC<{
             <button
               type="button"
               className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors ${
-                comment.userHasSparked
+                hasSparked
                   ? "text-orange-400"
                   : "text-[#9CA3AF] hover:text-orange-400"
               } disabled:cursor-not-allowed disabled:opacity-60`}
               onClick={handleSpark}
               disabled={!userId || isSparking}
               title={userId ? "Spark this comment" : "Sign in to spark comments"}
-              aria-label={`${comment.userHasSparked ? "Remove spark from" : "Spark"} comment`}
+              aria-label={`${hasSparked ? "Remove spark from" : "Spark"} comment`}
+              aria-pressed={hasSparked}
             >
-              <Sparkles className="h-3 w-3" />
+              <Sparkles className={`h-3 w-3 ${hasSparked ? "fill-current" : ""}`} />
               <span>{sparkCount}</span>
             </button>
             {userId && (

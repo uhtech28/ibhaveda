@@ -164,8 +164,8 @@ describe("Venture Constants", () => {
   });
 
   describe("BADGE_DEFINITIONS", () => {
-    it("should have 66 active badges", () => {
-      expect(BADGE_DEFINITIONS).toHaveLength(66);
+    it("should have 65 active badges", () => {
+      expect(BADGE_DEFINITIONS).toHaveLength(65);
     });
 
     it("should have unique sequential IDs", () => {
@@ -246,7 +246,7 @@ describe("Venture Constants", () => {
       expect(categoryCounts.community).toBe(12);
       expect(categoryCounts.consistency).toBe(4);
       expect(categoryCounts.hidden).toBe(8);
-      expect(categoryCounts.aspirational).toBe(8);
+      expect(categoryCounts.aspirational).toBe(7);
     });
   });
 
