@@ -118,6 +118,9 @@ export function needsCheckpointBossCombat(
   currentStage: number,
   currentCheckpoint: number,
 ): boolean {
+  if (!isActiveVentureCheckpoint(cp, currentStage, currentCheckpoint)) {
+    return false;
+  }
   if (doneTasks < 2) return false;
 
   const key = checkpointBossKey(cp.stage, cp.checkpoint);
