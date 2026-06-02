@@ -123,7 +123,11 @@ function IdeaRow({
   const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
     ideaId: idea._id as Id<"ideas">,
   });
-  const contributorCount = contributors?.length ?? idea.contributionCount ?? 0;
+  // +1 to include the idea creator. Fall back to contributionCount (which the
+  // backend already returns inclusive of the creator) while the live query loads.
+  const contributorCount = contributors !== undefined
+    ? contributors.length + 1
+    : idea.contributionCount ?? 1;
 
   return (
     <button
