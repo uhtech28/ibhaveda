@@ -164,13 +164,8 @@ export default function LandingIntroSandbox({
 
     const startAudio = () => {
       if (audioStartedRef.current) return;
-      // If already running (navigation gesture / prior engagement), play now.
-      if (ctx.state === "running") {
-        audioStartedRef.current = true;
-        scheduleNotes();
-        return;
-      }
-      // Otherwise try to resume — succeeds when called inside a user gesture.
+      // Always call resume() even if already running — the .then() gives the
+      // context clock one async tick to stabilise before notes are scheduled.
       ctx.resume().then(() => {
         if (ctx.state === "running" && !audioStartedRef.current) {
           audioStartedRef.current = true;
