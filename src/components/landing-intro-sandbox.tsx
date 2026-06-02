@@ -164,33 +164,34 @@ export default function LandingIntroSandbox({
 
     const startAudio = () => {
       if (audioStartedRef.current) return;
+      // If already running (navigation gesture / prior engagement), play now.
       if (ctx.state === "running") {
         audioStartedRef.current = true;
         scheduleNotes();
-      } else {
-        ctx.resume().then(() => {
-          if (ctx.state === "running" && !audioStartedRef.current) {
-            audioStartedRef.current = true;
-            scheduleNotes();
-          }
-        }).catch(() => undefined);
+        return;
       }
+      // Otherwise try to resume — succeeds when called inside a user gesture.
+      ctx.resume().then(() => {
+        if (ctx.state === "running" && !audioStartedRef.current) {
+          audioStartedRef.current = true;
+          scheduleNotes();
+        }
+      }).catch(() => undefined);
     };
 
-    // Attempt autoplay immediately on mount. If browser allows it (e.g. user
-    // navigated here by clicking a link), this plays with the animation.
+    // Try immediately — works when the page was reached via any user gesture
+    // (clicking a link, pressing Enter in the address bar, etc.).
     startAudio();
 
-    // Always register gesture listeners — they retry if autoplay was blocked.
-    window.addEventListener("touchstart", startAudio, { once: true, passive: true });
+    // Fallback: start on first interaction with the page.
+    // The intro is full-screen so any click/tap/key anywhere triggers this.
     window.addEventListener("pointerdown", startAudio, { once: true });
+    window.addEventListener("touchstart",  startAudio, { once: true, passive: true });
     window.addEventListener("keydown",     startAudio, { once: true });
 
     return () => {
-      // Do NOT close ctx here — it must survive StrictMode's cleanup/remount cycle.
-      // It will be closed when the component truly unmounts (below).
-      window.removeEventListener("touchstart", startAudio);
       window.removeEventListener("pointerdown", startAudio);
+      window.removeEventListener("touchstart",  startAudio);
       window.removeEventListener("keydown",     startAudio);
     };
   }, [audioCtxRef, audioStartedRef]);
