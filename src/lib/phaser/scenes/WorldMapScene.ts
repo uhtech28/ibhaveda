@@ -408,8 +408,8 @@ export class WorldMapScene extends Phaser.Scene {
   private stageEntryInProgress: Set<number> = new Set();
   private loadedStages: Set<number> = new Set();
   private loadingStages: Set<number> = new Set();
-  private static readonly STAGE_LOAD_BUFFER_PX = 1400;
-  private static readonly STAGE_UNLOAD_BUFFER_PX = 3600;
+  private static readonly STAGE_LOAD_BUFFER_PX = 1600;
+  private static readonly STAGE_UNLOAD_BUFFER_PX = 2200;
   private monkeys: ProceduralMonkey[] = [];
   private phaserTilesets: Phaser.Tilemaps.Tileset[] = [];
   private panelOffsetX = 0;
@@ -1402,7 +1402,7 @@ export class WorldMapScene extends Phaser.Scene {
       } else if (
         distance > unloadBuffer &&
         this.loadedStages.has(stageId) &&
-        Math.abs(stageId - this.viewingStageId) > 2
+        Math.abs(stageId - this.viewingStageId) > 1
       ) {
         this.unloadStage(stageId);
       }
@@ -8124,14 +8124,16 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Update accepted contributor companion sprites follow tracking
     if (this.persona && this.companions && this.companions.size > 0) {
-      const companionsArray = Array.from(this.companions.values());
-      companionsArray.forEach((companion, index) => {
+      const totalCompanions = this.companions.size;
+      let index = 0;
+      this.companions.forEach((companion) => {
         companion.updateCompanion(
           this.persona!.x,
           this.persona!.y,
           index,
-          companionsArray.length,
+          totalCompanions,
         );
+        index++;
       });
     }
   }
