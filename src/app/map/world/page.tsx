@@ -34,7 +34,7 @@ import {
   mapCheckpointsToPhaserState,
 } from "@/lib/phaser/checkpoint-sync";
 import { CommentsSection } from "@/components/comments/CommentsSection";
-import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords } from "lucide-react";
+import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords, Zap } from "lucide-react";
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { getTemplate, type TemplateId } from "@/config/templates";
@@ -4221,6 +4221,7 @@ function MapFeedComposer({
 }) {
   const { userId } = useAuth();
   const addCommentMutation = useMutation(api.ideas.addComment);
+  const toggleCommentSpark = useMutation(api.ideas.toggleCommentSpark);
   const comments = useQuery(api.ideas.getComments, { ideaId, limit: 50 });
 
   const [content, setContent] = useState("");
@@ -4231,18 +4232,12 @@ function MapFeedComposer({
   const scrollRef = useRef<HTMLDivElement>(null);
   const tagsArr: string[] = ideaTags ?? (ideaCategory ? [ideaCategory] : []);
 
-  // Build the feed header that gets auto-prepended
-  const buildTagHeader = () => {
-    const tagLine = tagsArr.length > 0 ? tagsArr.map(t => `#${t}`).join(" ") : "";
-    return `📌 ${ideaTitle}${tagLine ? `  ${tagLine}` : ""}\n\n`;
-  };
-
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim() || !userId || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const fullContent = buildTagHeader() + content.trim();
+      const fullContent = content.trim();
       await addCommentMutation({ ideaId, content: fullContent });
       setContent("");
       setPosted(true);
@@ -4274,7 +4269,7 @@ function MapFeedComposer({
   };
 
   const shareUrls = (text: string) => {
-    const cleanText = text.replace(/📌/g, "").trim();
+    const cleanText = text.trim();
     const shareText = `${cleanText}\n\nCheck out our venture:`;
     const shareLink = typeof window !== "undefined" ? `${window.location.origin}/idea/${ideaId}` : "";
     return {
@@ -4285,51 +4280,44 @@ function MapFeedComposer({
     };
   };
 
+  const getInitials = (name?: string) => {
+    if (!name) return "?";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 gap-3 relative">
-      {/* Auto-tag preview bar */}
-      <div className="flex flex-wrap items-center gap-2 px-1 shrink-0">
-        <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Auto-tagged:</span>
-        <span className="inline-flex items-center gap-1.5 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold rounded-full px-2.5 py-0.5">
-          📌 {ideaTitle}
-        </span>
-        {tagsArr.map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center bg-white/5 border border-white/10 text-slate-300 text-[11px] rounded-full px-2 py-0.5"
-          >
-            #{tag}
-          </span>
-        ))}
-      </div>
-
       {/* Composer box */}
       <div className="shrink-0">
         <form onSubmit={handlePost}>
-          <div className="relative rounded-xl border border-white/10 bg-white/[0.03] focus-within:border-indigo-500/40 focus-within:bg-white/[0.05] transition-all">
+          <div className="relative rounded-2xl border border-white/10 bg-white/[0.02] focus-within:border-indigo-500/40 focus-within:bg-white/[0.04] focus-within:shadow-[0_0_20px_rgba(99,102,241,0.05)] transition-all duration-300">
             <textarea
-              placeholder="Share an update, insight, or file with the team... (posts publicly to the idea feed)"
+              placeholder="What's on your mind? Share an update, insight, or files with the team..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               maxLength={1200}
               rows={4}
-              className="w-full resize-none rounded-xl bg-transparent px-4 pt-3.5 pb-10 text-sm text-white placeholder:text-slate-500 outline-none focus:ring-0 leading-relaxed"
+              className="w-full resize-none rounded-2xl bg-transparent px-4.5 pt-4 pb-12 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-0 leading-relaxed"
               disabled={isSubmitting}
             />
-            <div className="absolute bottom-3 left-4 text-[10px] text-slate-500 tabular-nums pointer-events-none">
-              {content.length}/1200
+            <div className="absolute bottom-3.5 left-4.5 text-[10px] text-zinc-500 font-medium tracking-wide tabular-nums pointer-events-none">
+              {content.length} / 1200
             </div>
             <button
               type="submit"
               disabled={!content.trim() || isSubmitting}
-              className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
+              className="absolute bottom-3 right-3 flex items-center gap-1.5 px-4 py-1.8 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:from-zinc-800 disabled:to-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md shadow-indigo-900/20 active:scale-[0.98] transition-all"
             >
               {isSubmitting ? (
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Send className="w-3.5 h-3.5" />
               )}
-              Post to Feed
+              <span>Post Update</span>
             </button>
           </div>
         </form>
@@ -4338,57 +4326,126 @@ function MapFeedComposer({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="text-xs text-emerald-400 mt-1.5 px-1"
+            className="text-xs text-emerald-400 mt-2 px-1 font-medium flex items-center gap-1"
           >
-            ✓ Posted successfully to the project feed!
+            <span>✓</span> Post published successfully!
           </motion.p>
         )}
       </div>
 
       {/* Feed divider */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="h-px flex-1 bg-white/8" />
-        <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Recent Posts</span>
-        <div className="h-px flex-1 bg-white/8" />
+      <div className="flex items-center gap-3 shrink-0 py-1">
+        <div className="h-[1px] flex-1 bg-white/5" />
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+          </span>
+          <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Team Updates</span>
+        </div>
+        <div className="h-[1px] flex-1 bg-white/5" />
       </div>
 
       {/* Past posts scroll list */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3 pr-0.5">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3.5 pr-0.5">
         {comments === undefined ? (
-          <div className="flex items-center justify-center h-24 gap-2 text-slate-500">
-            <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs">Loading posts…</span>
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-zinc-500">
+            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-medium">Loading activity feed…</span>
           </div>
         ) : comments.filter(c => !c.parentCommentId).length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-24 gap-2 text-center">
-            <Rss className="w-5 h-5 text-slate-600" />
-            <p className="text-xs text-slate-500">No posts yet. Be the first to contribute!</p>
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-center border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
+            <Rss className="w-6 h-6 text-zinc-600 animate-pulse" />
+            <div className="space-y-0.5">
+              <p className="text-xs font-semibold text-zinc-300">No activity yet</p>
+              <p className="text-[10px] text-zinc-500">Be the first to share an update with the team.</p>
+            </div>
           </div>
         ) : (
           comments
             .filter(c => !c.parentCommentId)
             .slice()
             .reverse()
-            .map(c => (
-              <div key={c._id} className="rounded-xl border border-white/8 bg-white/[0.02] px-3.5 py-3 space-y-2 transition-all hover:bg-white/[0.04]">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-white truncate">
-                      {c.author?.name || c.author?.username || "Someone"}
-                    </span>
-                    <span className="text-[10px] text-slate-500 shrink-0">{formatRelative(c.createdAt)}</span>
+            .map(c => {
+              const hasSparked = c.userHasSparked;
+              return (
+                <div 
+                  key={c._id} 
+                  className="group relative flex gap-3 rounded-2xl border border-white/5 bg-white/[0.01] p-4 transition-all duration-300 hover:bg-white/[0.02] hover:border-white/10"
+                >
+                  {/* Left: Avatar */}
+                  <div className="shrink-0">
+                    {c.author?.avatar ? (
+                      <img 
+                        src={c.author.avatar} 
+                        className="w-9.5 h-9.5 rounded-full object-cover border border-white/10 shadow-sm" 
+                        alt={c.author.name || "User"}
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-9.5 h-9.5 rounded-full bg-gradient-to-br from-indigo-500/20 to-violet-600/20 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-300 shadow-sm uppercase">
+                        {getInitials(c.author?.name || c.author?.username)}
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => setSharingPost(c.content)}
-                    className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                    title="Share Post"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
+
+                  {/* Right: Content details */}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {/* Header bar */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <span className="text-xs font-bold text-zinc-100 truncate hover:text-indigo-400 transition-colors">
+                          {c.author?.name || c.author?.username || "Someone"}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-medium shrink-0">
+                          {formatRelative(c.createdAt)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button
+                          onClick={() => {
+                            audioManager.playUI("click");
+                            setSharingPost(c.content);
+                          }}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-zinc-200 transition-colors border border-white/5"
+                          title="Share post"
+                        >
+                          <Share2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Post Text */}
+                    <p className="text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words">
+                      {c.content}
+                    </p>
+
+                    {/* Bottom Actions Row */}
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        onClick={async () => {
+                          audioManager.playUI(hasSparked ? "click" : "confirm");
+                          try {
+                            await toggleCommentSpark({ commentId: c._id });
+                          } catch (err) {
+                            console.error("Failed to toggle comment spark:", err);
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all duration-300 ${
+                          hasSparked
+                            ? "bg-amber-400/10 border-amber-400/30 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:bg-amber-400/25"
+                            : "bg-white/5 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-white/10"
+                        }`}
+                        title={hasSparked ? "Unspark this comment" : "Spark this comment"}
+                      >
+                        <Zap className={`w-3 h-3 ${hasSparked ? "fill-amber-300 stroke-amber-400 animate-pulse" : ""}`} />
+                        <span className="tabular-nums">{c.sparkCount || 0}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-slate-300 whitespace-pre-wrap break-words leading-relaxed">{c.content}</p>
-              </div>
-            ))
+              );
+            })
         )}
       </div>
 

@@ -1032,6 +1032,17 @@ export const redoTask = mutation({
       status: "not_started",
     });
 
+    // ── Clear any prior AI evaluation(s) for this task ────────────────────────
+    // Redo should return the task to a "fresh" state in the UI; leaving the
+    // old evaluation row(s) causes the score/feedback to linger after reset.
+    const priorEvaluations = await ctx.db
+      .query("aiEvaluations")
+      .withIndex("by_task", (q) => q.eq("taskId", task._id))
+      .collect();
+    for (const evaluation of priorEvaluations) {
+      await ctx.db.delete(evaluation._id);
+    }
+
     // ── Reset checkpoint flag ─────────────────────────────────────────────────
     const cpPatch: Record<string, unknown> = {
       [flagField]: false,
