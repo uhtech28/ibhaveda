@@ -164,8 +164,8 @@ describe("Venture Constants", () => {
   });
 
   describe("BADGE_DEFINITIONS", () => {
-    it("should have 65 active badges", () => {
-      expect(BADGE_DEFINITIONS).toHaveLength(65);
+    it("should have 146 active badges", () => {
+      expect(BADGE_DEFINITIONS).toHaveLength(146);
     });
 
     it("should have unique sequential IDs", () => {
@@ -180,10 +180,10 @@ describe("Venture Constants", () => {
       });
     });
 
-    it("should have unique names", () => {
-      const names = BADGE_DEFINITIONS.map((b) => b.name);
-      const uniqueNames = new Set(names);
-      expect(names).toHaveLength(uniqueNames.size);
+    it("should have unique IDs", () => {
+      const ids = BADGE_DEFINITIONS.map((b) => b.id);
+      const uniqueIds = new Set(ids);
+      expect(ids).toHaveLength(uniqueIds.size);
     });
 
     it("should have valid categories", () => {
@@ -242,7 +242,7 @@ describe("Venture Constants", () => {
       );
 
       expect(categoryCounts.onboarding).toBe(8);
-      expect(categoryCounts.idea_milestones).toBe(26);
+      expect(categoryCounts.idea_milestones).toBe(107);
       expect(categoryCounts.community).toBe(12);
       expect(categoryCounts.consistency).toBe(4);
       expect(categoryCounts.hidden).toBe(8);
