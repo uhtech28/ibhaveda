@@ -33,7 +33,33 @@ const GENERAL_BADGES_DEFS = [
 ];
 
 const DISABLED_BADGE_REQUIREMENT_PATTERN = /\b(?:league|leagues|monument|monuments)\b/i;
-const DISABLED_BADGE_IDS = new Set(["venture_43", "venture_44", "venture_45", "venture_46", "venture_62"]);
+const DISABLED_BADGE_IDS = new Set([
+  "venture_9",
+  "venture_10",
+  "venture_11",
+  "venture_12",
+  "venture_13",
+  "venture_14",
+  "venture_15",
+  "venture_16",
+  "venture_17",
+  "venture_18",
+  "venture_19",
+  "venture_20",
+  "venture_43",
+  "venture_44",
+  "venture_45",
+  "venture_46",
+  "venture_62",
+  "venture_71",
+  "venture_72",
+  "venture_73",
+  "venture_74",
+  "venture_75",
+  "venture_76",
+  "venture_77",
+  "venture_78",
+]);
 
 const normalizeSparkCopy = (text?: string) =>
   text
@@ -49,6 +75,9 @@ const shouldHideDisabledBadge = (badge: Partial<BadgeItem>) =>
   [badge.requirement, badge.description, badge.tagline].some((text) =>
     DISABLED_BADGE_REQUIREMENT_PATTERN.test(text || "")
   );
+
+const isLockedHiddenBadge = (badge: BadgeItem) =>
+  !badge.awardedAt && (badge.category === "hidden" || badge.rarity === "hidden");
 
 export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, profile }) => {
   const [activeCategory, setActiveCategory] = useState<"all" | "onboarding" | "idea_milestones" | "community" | "consistency" | "skill" | "locked">("all");
@@ -218,6 +247,8 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
 
     // Search Query Filter
     if (searchQuery.trim() !== "") {
+      if (isLockedHiddenBadge(b)) return false;
+
       const q = searchQuery.toLowerCase();
       const nameMatch = b.name.toLowerCase().includes(q);
       const descMatch = b.description.toLowerCase().includes(q);

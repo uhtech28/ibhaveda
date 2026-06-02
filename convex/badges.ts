@@ -3,13 +3,45 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import {
   BADGE_DEFINITIONS,
-  VENTURE_STAGES,
   getVentureBadgeEmoji,
   LEVEL_DEFINITIONS,
 } from "./ventureConstants";
+import {
+  LEGACY_STAGE_BADGE_EQUIVALENTS,
+  LEGACY_STAGE_BADGE_IDS,
+  STAGE_BADGE_DEFINITIONS,
+  type StageBadgeTemplate,
+} from "./stageBadgeDefinitions";
+import { getCheckpointDefinitions, type TemplateId } from "./templateEngine";
 
-const RENAMED_GOLD_STAGE_BADGE_IDS = new Set([11, 71, 72, 73, 74, 75, 76, 77, 78]);
-const DISABLED_BADGE_IDS = new Set([43, 44, 45, 46, 62]);
+const DISABLED_BADGE_IDS = new Set([43, 44, 45, 46, 62, ...LEGACY_STAGE_BADGE_IDS]);
+
+function canonicalBadgeId(badgeId: number) {
+  return LEGACY_STAGE_BADGE_EQUIVALENTS.get(badgeId) ?? badgeId;
+}
+
+function isDisplayableBadgeId(badgeId: number) {
+  return !DISABLED_BADGE_IDS.has(badgeId) || LEGACY_STAGE_BADGE_EQUIVALENTS.has(badgeId);
+}
+
+function normalizeVentureTemplate(value: unknown): StageBadgeTemplate {
+  if (value === "academic" || value === "lab" || value === "creative") return value;
+  if (value === "experimental") return "lab";
+  return "venture";
+}
+
+function findStageBadge(
+  template: StageBadgeTemplate,
+  stage: number,
+  badgeType: "A" | "B" | "C",
+) {
+  return STAGE_BADGE_DEFINITIONS.find(
+    (badge) =>
+      badge.template === template &&
+      badge.stage === stage &&
+      badge.badgeType === badgeType,
+  );
+}
 
 const INITIAL_BADGES = [
   {
@@ -148,7 +180,7 @@ export const getMyBadges = query({
           name: badge.name,
           description: badge.description,
           icon: badge.icon,
-          // Map category → rarity for the BadgeAwardSequence component
+          // Map category ? rarity for the BadgeAwardSequence component
           rarity: categoryToRarity(badge.category),
         };
       }),
@@ -372,9 +404,9 @@ async function checkAndAward(ctx: any, userId: Id<"users">, slug: string) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // VENTURE BADGES (62-badge system)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const awardVentureBadge = mutation({
   args: {
@@ -426,63 +458,33 @@ export const getVentureBadges = query({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    const ventures = await ctx.db
-      .query("ventures")
-      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
-      .collect();
-    const sortedVentures = [...ventures].sort((a: any, b: any) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-    const activeVenture = sortedVentures[0];
-    const fallbackCorruption = activeVenture ? (activeVenture.corruptionLevel ?? 0) : 0;
+    const seen = new Set<number>();
 
-    return badges.filter((badge) => !DISABLED_BADGE_IDS.has(badge.badgeId)).map((badge) => {
-      const def = BADGE_DEFINITIONS.find((b) => b.id === badge.badgeId);
+    return badges
+      .filter((badge) => isDisplayableBadgeId(badge.badgeId))
+      .map((badge) => {
+      const badgeId = canonicalBadgeId(badge.badgeId);
+      if (seen.has(badgeId)) return null;
+      seen.add(badgeId);
+
+      const def = BADGE_DEFINITIONS.find((b) => b.id === badgeId);
       if (!def) return { ...badge, definition: undefined };
 
-      const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 71, 72, 73, 74, 75, 76, 77, 78].includes(badge.badgeId);
-      const isTaskBadge = def.category === "idea_milestones" && !isLevelBadge;
-
       let shape = def.shape;
-      if (isTaskBadge) {
+      if (def.category === "idea_milestones") {
         shape = "shield";
-      }
-
-      let name = def.name;
-      let rarity = def.rarity;
-      let primaryColor = def.primaryColor;
-      let secondaryColor = def.secondaryColor;
-
-      if (isLevelBadge) {
-        const corr = badge.metadata?.corruptionLevel !== undefined ? badge.metadata.corruptionLevel : fallbackCorruption;
-        if (corr <= 30) {
-          name = RENAMED_GOLD_STAGE_BADGE_IDS.has(def.id) ? def.name : `${def.name} (Gold)`;
-          rarity = "legendary";
-          primaryColor = "#FBBF24";
-          secondaryColor = "#92400E";
-        } else if (corr <= 70) {
-          name = `${def.name} (Silver)`;
-          rarity = "rare";
-          primaryColor = "#94A3B8";
-          secondaryColor = "#334155";
-        } else {
-          name = `${def.name} (Bronze)`;
-          rarity = "common";
-          primaryColor = "#F59E0B";
-          secondaryColor = "#78350F";
-        }
       }
 
       return {
         ...badge,
+        badgeId,
         definition: {
           ...def,
-          name,
-          rarity,
           shape,
-          primaryColor,
-          secondaryColor,
         }
       };
-    });
+    })
+    .filter((badge) => badge !== null);
   },
 });
 
@@ -499,64 +501,21 @@ export const getVentureBadgeProgress = query({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    const earnedIds = new Set(earnedBadges.map((b) => b.badgeId));
-
-    const ventures = await ctx.db
-      .query("ventures")
-      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
-      .collect();
-    const sortedVentures = [...ventures].sort((a: any, b: any) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-    const activeVenture = sortedVentures[0];
-    const fallbackCorruption = activeVenture ? (activeVenture.corruptionLevel ?? 0) : 0;
+    const earnedIds = new Set(earnedBadges.map((b) => canonicalBadgeId(b.badgeId)));
 
     return BADGE_DEFINITIONS.filter((def) => !DISABLED_BADGE_IDS.has(def.id)).map((def) => {
-      const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 71, 72, 73, 74, 75, 76, 77, 78].includes(def.id);
-      const isTaskBadge = def.category === "idea_milestones" && !isLevelBadge;
       const earned = earnedIds.has(def.id);
-      const record = earnedBadges.find((b) => b.badgeId === def.id);
+      const record = earnedBadges.find((b) => canonicalBadgeId(b.badgeId) === def.id);
 
       let shape = def.shape;
-      if (isTaskBadge) {
+      if (def.category === "idea_milestones") {
         shape = "shield";
-      }
-
-      let name = def.name;
-      let rarity = def.rarity;
-      let primaryColor = def.primaryColor;
-      let secondaryColor = def.secondaryColor;
-      let icon = "";
-
-      if (isLevelBadge) {
-        const corr = record?.metadata?.corruptionLevel !== undefined ? record.metadata.corruptionLevel : fallbackCorruption;
-        if (corr <= 30) {
-          name = RENAMED_GOLD_STAGE_BADGE_IDS.has(def.id) ? def.name : `${def.name} (Gold)`;
-          rarity = "legendary";
-          primaryColor = "#FBBF24";
-          secondaryColor = "#92400E";
-          icon = "🥇";
-        } else if (corr <= 70) {
-          name = `${def.name} (Silver)`;
-          rarity = "rare";
-          primaryColor = "#94A3B8";
-          secondaryColor = "#334155";
-          icon = "🥈";
-        } else {
-          name = `${def.name} (Bronze)`;
-          rarity = "common";
-          primaryColor = "#F59E0B";
-          secondaryColor = "#78350F";
-          icon = "🥉";
-        }
       }
 
       return {
         ...def,
-        name,
-        rarity,
         shape,
-        primaryColor,
-        secondaryColor,
-        icon: icon || undefined,
+        icon: getVentureBadgeEmoji(def.id, def.name),
         earned,
         awardedAt: record?.awardedAt,
       };
@@ -698,7 +657,9 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     .query("ventureBadges")
     .withIndex("by_user", (q: any) => q.eq("userId", userId))
     .collect();
-  const existingVentureIds = new Set(existingVentureBadges.map((b: any) => b.badgeId));
+  const existingVentureIds = new Set(
+    existingVentureBadges.map((b: any) => canonicalBadgeId(b.badgeId)),
+  );
 
   const existingUserBadges = await ctx.db
     .query("userBadges")
@@ -752,10 +713,7 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
   const allCompletedCheckpoints: any[] = [];
   const allCheckpointIds: any[] = [];
   const completedStageNumbers = new Set<number>();
-
-  const stageCheckpointCounts = new Map(
-    VENTURE_STAGES.map((stage) => [stage.id, stage.checkpoints]),
-  );
+  const stageBadgeAwardIds = new Set<number>();
 
   for (const venture of ventures) {
     if ((venture.currentStage ?? 1) > maxStage) {
@@ -775,33 +733,46 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     const gpCompleted = cpList.filter((c: any) => c.goldBonusEarned || (c.t1Completed && c.t2Completed && c.t3Completed));
     goldCheckpoints += gpCompleted.length;
 
+    const templateId = normalizeVentureTemplate(venture.templateId);
+    const checkpointDefinitions = getCheckpointDefinitions(templateId as TemplateId);
+    const stageCheckpointCounts = new Map<number, number>();
+    for (const checkpointDef of checkpointDefinitions) {
+      const currentCount = stageCheckpointCounts.get(checkpointDef.stage) ?? 0;
+      stageCheckpointCounts.set(
+        checkpointDef.stage,
+        Math.max(currentCount, checkpointDef.checkpoint),
+      );
+    }
+
     // Check completed stages for this venture
     let completedStagesForVenture = 0;
     let perfectStagesForVenture = 0;
-    for (const stageDef of VENTURE_STAGES) {
-      const s = stageDef.id;
+    for (const [s, reqCount] of stageCheckpointCounts) {
       const stageCps = cpList.filter((c: any) => c.stage === s);
-      const reqCount = stageCheckpointCounts.get(s) ?? stageDef.checkpoints;
+      const firstCheckpoint = stageCps.find((c: any) => c.checkpoint === 1);
+      if (firstCheckpoint?.t1Completed) {
+        const badge = findStageBadge(templateId, s, "A");
+        if (badge) stageBadgeAwardIds.add(badge.id);
+      }
+
       if (stageCps.length >= reqCount && stageCps.every((c: any) => isCheckpointComplete(c))) {
         completedStagesForVenture++;
         completedStages++;
         completedStageNumbers.add(s);
         if (s > highestCompletedStage) highestCompletedStage = s;
-        if (s >= 6) hasVentureStage6 = true;
+        if (templateId === "venture" && s >= 6) hasVentureStage6 = true;
+        const clearBadge = findStageBadge(templateId, s, "B");
+        if (clearBadge) stageBadgeAwardIds.add(clearBadge.id);
         
-        const finalCheckpoint = [...stageCps].sort(
-          (left: any, right: any) => right.checkpoint - left.checkpoint,
-        )[0];
-        if (
-          finalCheckpoint?.goldBonusEarned ||
-          checkpointTaskCount(finalCheckpoint ?? {}) === 3
-        ) {
+        if (stageCps.every((c: any) => checkpointTaskCount(c) === 3)) {
           perfectStagesForVenture++;
+          const perfectBadge = findStageBadge(templateId, s, "C");
+          if (perfectBadge) stageBadgeAwardIds.add(perfectBadge.id);
         }
       }
     }
 
-    if (completedStagesForVenture >= 8) {
+    if (completedStagesForVenture >= stageCheckpointCounts.size) {
       lifecyclesCompleted++;
       
       const idea = await ctx.db.get(venture.ideaId);
@@ -813,7 +784,7 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
       else if (ideaCategory === "creative") creativeLifecycles++;
       else if (ideaCategory === "venture") ventureLifecycles++;
 
-      if (perfectStagesForVenture >= 8) {
+      if (perfectStagesForVenture >= stageCheckpointCounts.size) {
         perfectLifecycles++;
       }
     }
@@ -1037,30 +1008,32 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     { id: 6, shouldAward: ideasCreated >= 1 }, // The Seedling
     { id: 7, shouldAward: invites.length >= 1 }, // The Outstretched Hand
     { id: 8, shouldAward: userLevel.currentLevel >= 7 }, // Gate Crossed (passed tutorial levels 1-6)
-    { id: 9, shouldAward: completedCheckpoints >= 1 }, // The First Checkpoint
-    { id: 10, shouldAward: goldCheckpoints >= 1 }, // Gilded
-    { id: 11, shouldAward: completedStages >= 1 }, // Stage Clear
-    { id: 12, shouldAward: maxStage >= 4 }, // The Long Road
-    { id: 13, shouldAward: highestCompletedStage >= 5 }, // The Heartland
-    { id: 14, shouldAward: hasVentureStage6 }, // The Launcher
-    { id: 15, shouldAward: lifecyclesCompleted >= 1 }, // The Full Circle
-    { id: 16, shouldAward: perfectLifecycles >= 1 }, // The Gilded Path
+    // Legacy stage badges (9-20) are replaced by the spreadsheet stage badges.
+    // Existing earned copies are displayed through LEGACY_STAGE_BADGE_EQUIVALENTS.
+    // { id: 9, shouldAward: completedCheckpoints >= 1 }, // The First Checkpoint
+    // { id: 10, shouldAward: goldCheckpoints >= 1 }, // Gilded
+    // { id: 11, shouldAward: completedStages >= 1 }, // Stage Clear
+    // { id: 12, shouldAward: maxStage >= 4 }, // The Long Road
+    // { id: 13, shouldAward: highestCompletedStage >= 5 }, // The Heartland
+    // { id: 14, shouldAward: hasVentureStage6 }, // The Launcher
+    // { id: 15, shouldAward: lifecyclesCompleted >= 1 }, // The Full Circle
+    // { id: 16, shouldAward: perfectLifecycles >= 1 }, // The Gilded Path
     
-    // Stage-specific completion medals (71-78)
-    { id: 71, shouldAward: completedStageNumbers.has(1) },
-    { id: 72, shouldAward: completedStageNumbers.has(2) },
-    { id: 73, shouldAward: completedStageNumbers.has(3) },
-    { id: 74, shouldAward: completedStageNumbers.has(4) },
-    { id: 75, shouldAward: completedStageNumbers.has(5) },
-    { id: 76, shouldAward: completedStageNumbers.has(6) },
-    { id: 77, shouldAward: completedStageNumbers.has(7) },
-    { id: 78, shouldAward: completedStageNumbers.has(8) },
+    // Legacy stage-specific medals (71-78) are replaced by the spreadsheet stage badges.
+    // { id: 71, shouldAward: completedStageNumbers.has(1) },
+    // { id: 72, shouldAward: completedStageNumbers.has(2) },
+    // { id: 73, shouldAward: completedStageNumbers.has(3) },
+    // { id: 74, shouldAward: completedStageNumbers.has(4) },
+    // { id: 75, shouldAward: completedStageNumbers.has(5) },
+    // { id: 76, shouldAward: completedStageNumbers.has(6) },
+    // { id: 77, shouldAward: completedStageNumbers.has(7) },
+    // { id: 78, shouldAward: completedStageNumbers.has(8) },
     
     // Templates (17-22)
-    { id: 17, shouldAward: academicLifecycles >= 1 }, // The Archaeologist
-    { id: 18, shouldAward: experimentalLifecycles >= 1 }, // The Artificer
-    { id: 19, shouldAward: creativeLifecycles >= 1 }, // The Author
-    { id: 20, shouldAward: ventureLifecycles >= 1 }, // The Founder
+    // { id: 17, shouldAward: academicLifecycles >= 1 }, // The Archaeologist
+    // { id: 18, shouldAward: experimentalLifecycles >= 1 }, // The Artificer
+    // { id: 19, shouldAward: creativeLifecycles >= 1 }, // The Author
+    // { id: 20, shouldAward: ventureLifecycles >= 1 }, // The Founder
     { id: 21, shouldAward: REQUIRED_TEMPLATE_CATEGORIES.every((category) => postedCategories.has(category) && completedCategories.has(category)) }, // The Polymath
     { id: 22, shouldAward: REQUIRED_TEMPLATE_CATEGORIES.every((category) => postedCategories.has(category)) }, // The Cartographer
     
@@ -1115,6 +1088,10 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
     { id: 61, shouldAward: commentsCount >= 1000 }, // The Thousand
     // Monument-based badges are disabled until monument mechanics are finalized.
     // { id: 62, shouldAward: goldCheckpoints >= 50 || userLevel.currentLevel >= 45 }, // The Architect of Ages / Walled City
+    ...STAGE_BADGE_DEFINITIONS.map((badge) => ({
+      id: badge.id,
+      shouldAward: stageBadgeAwardIds.has(badge.id),
+    })),
   ];
 
   // Find the active venture's corruption level to store at the time of award
@@ -1215,71 +1192,36 @@ export const getUserProfileBadges = query({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    const ventures = await ctx.db
-      .query("ventures")
-      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
-      .collect();
-    const sortedVentures = [...ventures].sort((a: any, b: any) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-    const activeVenture = sortedVentures[0];
-    const fallbackCorruption = activeVenture ? (activeVenture.corruptionLevel ?? 0) : 0;
-
+    const seenVentureBadgeIds = new Set<number>();
     const ventureBadgesDetails = ventureBadges
-      .filter((vb) => !DISABLED_BADGE_IDS.has(vb.badgeId))
+      .filter((vb) => isDisplayableBadgeId(vb.badgeId))
       .map((vb) => {
-        const def = BADGE_DEFINITIONS.find((b) => b.id === vb.badgeId);
+        const badgeId = canonicalBadgeId(vb.badgeId);
+        if (seenVentureBadgeIds.has(badgeId)) return null;
+        seenVentureBadgeIds.add(badgeId);
+
+        const def = BADGE_DEFINITIONS.find((b) => b.id === badgeId);
         if (!def) return null;
 
-        const isLevelBadge = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 71, 72, 73, 74, 75, 76, 77, 78].includes(vb.badgeId);
-        const isTaskBadge = (def.category === "idea_milestones" || def.category === "onboarding") && !isLevelBadge;
-
         let shape = def.shape;
-        if (isTaskBadge) {
+        if (def.category === "idea_milestones" || def.category === "onboarding") {
           shape = "shield";
-        }
-
-        let name = def.name;
-        let rarity = def.rarity;
-        let primaryColor = def.primaryColor;
-        let secondaryColor = def.secondaryColor;
-        let icon = getVentureBadgeEmoji(def.id, def.name);
-
-        if (isLevelBadge) {
-          const corr = vb.metadata?.corruptionLevel !== undefined ? vb.metadata.corruptionLevel : fallbackCorruption;
-          if (corr <= 30) {
-            name = RENAMED_GOLD_STAGE_BADGE_IDS.has(def.id) ? def.name : `${def.name} (Gold)`;
-            rarity = "legendary";
-            primaryColor = "#FBBF24";
-            secondaryColor = "#92400E";
-            icon = "🥇";
-          } else if (corr <= 70) {
-            name = `${def.name} (Silver)`;
-            rarity = "rare";
-            primaryColor = "#94A3B8";
-            secondaryColor = "#334155";
-            icon = "🥈";
-          } else {
-            name = `${def.name} (Bronze)`;
-            rarity = "common";
-            primaryColor = "#F59E0B";
-            secondaryColor = "#78350F";
-            icon = "🥉";
-          }
         }
 
         return {
           id: `venture_${def.id}`,
-          name,
+          name: def.name,
           description: def.tagline,
           category: def.category,
-          rarity: rarity as "common" | "uncommon" | "rare" | "epic" | "legendary" | "hidden",
+          rarity: def.rarity as "common" | "uncommon" | "rare" | "epic" | "legendary" | "hidden",
           shape,
-          primaryColor,
-          secondaryColor,
+          primaryColor: def.primaryColor,
+          secondaryColor: def.secondaryColor,
           tagline: def.tagline,
           requirement: def.requirement,
           awardedAt: vb.awardedAt,
           type: "venture" as const,
-          icon,
+          icon: getVentureBadgeEmoji(def.id, def.name),
         };
       })
       .filter((b) => b !== null);

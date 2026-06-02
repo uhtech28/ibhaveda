@@ -1,5 +1,6 @@
 // Venture system constants — stages, checkpoints, tasks, bosses, levels, badges
 // These are immutable definitions that drive the entire progression system.
+import { STAGE_BADGE_DEFINITIONS } from "./stageBadgeDefinitions";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOOL TYPES
@@ -2641,6 +2642,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     tagline: "You built a fortress that stands the test of time.",
     requirement: "Complete Stage 8: Scale on any venture",
   },
+  ...STAGE_BADGE_DEFINITIONS,
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
