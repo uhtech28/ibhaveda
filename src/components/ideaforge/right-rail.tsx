@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
-import { ArrowUpRight, Flame, MessageCircle, Sparkles, Users } from "lucide-react";
+import { ArrowUpRight, Flame, MessageCircle, Sparkles, UserPlus } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export function IdeaForgeRightRail({
     : "skip");
   const allUsers = useQuery(api.users.getAllUsers);
 
-  const TRENDING_LIMIT = 7;
+  const TRENDING_LIMIT = 5;
   const trendingIdeas = useMemo(() => {
     return [...publicIdeas]
       .filter((idea) => !isAgentRole(idea.author?.role))
@@ -128,13 +128,13 @@ export function IdeaForgeRightRail({
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-sm font-semibold text-[#F9FAFB]">{idea.title}</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#111827] px-1.5 text-[11px] font-medium text-orange-300">
+                  <div className="grid shrink-0 grid-cols-[48px_48px] items-center gap-1">
+                    <span className="inline-flex h-6 w-12 items-center justify-center gap-1 rounded-full bg-[#111827] px-1.5 text-[11px] font-medium tabular-nums text-orange-300">
                       <Sparkles className="h-3.5 w-3.5" />
                       {idea.sparkCount || 0}
                     </span>
-                    <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#111827] px-1.5 text-[11px] font-medium text-emerald-300">
-                      <Users className="h-3.5 w-3.5" />
+                    <span className="inline-flex h-6 w-12 items-center justify-center gap-1 rounded-full bg-[#111827] px-1.5 text-[11px] font-medium tabular-nums text-emerald-300">
+                      <UserPlus className="h-3.5 w-3.5" />
                       {idea.contributionCount || 0}
                     </span>
                   </div>

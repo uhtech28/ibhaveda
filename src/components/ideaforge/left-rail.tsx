@@ -120,13 +120,6 @@ export function IdeaForgeLeftRail({
       : "1 Day Streak";
 
   const nonAgentUserIdeas = isAgentRole(currentUser?.role) ? [] : userIdeas;
-  const profileIndustries = currentUser?.industries?.length
-    ? currentUser.industries
-    : currentUser?.industry
-      ? [currentUser.industry]
-      : [];
-  const profileSkillTags = (currentUser?.skills || []).slice(0, 2);
-  const profileIndustryTags = profileIndustries.slice(0, 1);
   const activeTags = Array.from(
     nonAgentUserIdeas
       .flatMap((idea) => [
@@ -188,39 +181,6 @@ export function IdeaForgeLeftRail({
                   <p className="truncate text-xs text-[#9CA3AF]">@{currentUser.username}</p>
                 )}
               </Link>
-            </div>
-
-            <p className="mt-4 line-clamp-2 min-h-[36px] text-sm leading-5 text-[#D1D5DB]">
-              {currentUser?.bio || "\u00A0"}
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {profileIndustryTags.map((tag) => (
-                <button
-                  key={`profile-industry-${tag}`}
-                  type="button"
-                  onClick={() => onTagSelect(tag)}
-                  className={cn(
-                    transitionBase,
-                    "rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-2.5 py-1 text-[10px] font-medium text-fuchsia-300 hover:bg-fuchsia-500/18"
-                  )}
-                >
-                  {tag}
-                </button>
-              ))}
-              {profileSkillTags.map((tag) => (
-                <button
-                  key={`profile-skill-${tag}`}
-                  type="button"
-                  onClick={() => onTagSelect(tag)}
-                  className={cn(
-                    transitionBase,
-                    "rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-2.5 py-1 text-[10px] font-medium text-sky-300 hover:bg-sky-500/16"
-                  )}
-                >
-                  {tag}
-                </button>
-              ))}
             </div>
 
             <div className="mt-4">
