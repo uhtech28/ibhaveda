@@ -325,42 +325,39 @@ export const getPublicIdeas = query({
       })
       .slice(0, limit);
 
-    // Get author information and contribution count for each idea
-    const ideasWithAuthors = await Promise.all(
-      finalIdeas.map(async (idea) => {
-        let author: any = null;
-        try {
-          author = await ctx.db.get(idea.authorId);
-        } catch (e) {
-          console.error("Error fetching author for idea:", idea._id, e);
-        }
+    // Batch-fetch unique authors (one lookup per unique authorId, not per idea)
+    const uniqueAuthorIds = [...new Set(finalIdeas.map((i) => String(i.authorId)))];
+    const authorDocs = await Promise.all(uniqueAuthorIds.map((id) => ctx.db.get(id as any)));
+    const authorMap = new Map<string, any>();
+    for (let i = 0; i < uniqueAuthorIds.length; i++) {
+      const doc = authorDocs[i];
+      if (doc) authorMap.set(uniqueAuthorIds[i], doc);
+    }
 
-        // Count accepted contribution requests + creator
-        let contributionCount = 1; // Start with 1 to include the creator
-        try {
-          const acceptedContributions = await ctx.db
-            .query("contributionRequests")
-            .withIndex("by_idea_status_created", (q) =>
-              q.eq("ideaId", idea._id).eq("status", "accepted")
-            )
-            .collect();
-          contributionCount = 1 + acceptedContributions.length;
-        } catch (e) {
-          console.error("Error fetching contribution count for idea:", idea._id, e);
-        }
-
-        return {
-          ...idea,
-          author: author ? {
-            ...author,
-            // These fields should match the schema naming
-            name: author.displayName,
-            username: author.username,
-          } : null,
-          contributionCount: contributionCount,
-        };
-      })
+    // Batch-fetch contribution counts for all ideas in parallel
+    const contributionCounts = await Promise.all(
+      finalIdeas.map((idea) =>
+        ctx.db
+          .query("contributionRequests")
+          .withIndex("by_idea_status_created", (q) =>
+            q.eq("ideaId", idea._id).eq("status", "accepted")
+          )
+          .collect()
+          .then((rows) => 1 + rows.length)
+          .catch(() => 1)
+      )
     );
+
+    const ideasWithAuthors = finalIdeas.map((idea, idx) => {
+      const author = authorMap.get(String(idea.authorId)) ?? null;
+      return {
+        ...idea,
+        author: author
+          ? { ...author, name: author.displayName, username: author.username }
+          : null,
+        contributionCount: contributionCounts[idx],
+      };
+    });
 
     return ideasWithAuthors;
   },
