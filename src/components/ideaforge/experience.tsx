@@ -125,7 +125,6 @@ export function IdeaForgeExperience({
   hasMore?: boolean;
 }) {
   const router = useRouter();
-  const userIdeas = useQuery(api.ideas.getUserIdeas) || [];
   const publicIdeas = useQuery(api.ideas.getPublicIdeas, { limit: 60 }) || [];
   const showSkeleton = useDelayedLoading(isLoading);
 
@@ -236,15 +235,15 @@ export function IdeaForgeExperience({
       />
 
       <main className={cn(shellMax, "px-4 pb-12 pt-16 sm:px-6 lg:pt-28 xl:px-8")}>
-        <div className="flex items-stretch gap-8">
+        <div className="flex items-start justify-center gap-6">
           <IdeaForgeLeftRail
             currentUser={currentUser}
-            userIdeas={userIdeas as IdeaForgeIdea[]}
+            userIdeas={ideas}
             onTagSelect={onSearchChange}
           />
 
-          <section className="min-w-0 flex-1">
-            <div className="w-full max-w-[720px] space-y-5">
+          <section className="min-w-0 w-full max-w-[720px] flex-none">
+            <div className="w-full space-y-5">
               {mode === "feed" ? (
                 <>
                   {!isProfileComplete && (
@@ -412,7 +411,12 @@ export function IdeaForgeExperience({
             </div>
           </section>
 
-          <IdeaForgeRightRail currentUser={currentUser} publicIdeas={publicIdeas as IdeaForgeIdea[]} />
+          <IdeaForgeRightRail
+            currentUser={currentUser}
+            publicIdeas={publicIdeas as IdeaForgeIdea[]}
+            ideas={ideas}
+            onTagSelect={onSearchChange}
+          />
         </div>
       </main>
 

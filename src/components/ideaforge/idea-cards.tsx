@@ -265,15 +265,6 @@ export function IdeaStoryCard({
   const description = idea.description || "No description yet.";
   const shouldClamp = description.length > 220;
 
-  const comments = useQuery(api.ideas.getComments, {
-    ideaId: idea._id as Id<"ideas">,
-    limit: 10,
-  });
-  const rootComments = useMemo(
-    () => (comments || []).filter((c) => !c.parentCommentId),
-    [comments]
-  );
-
   // Whole-card click-to-open. Skip when the click originated from any inner
   // interactive element (button, link, input, etc.) so Spark / Save /
   // Collaborate / tag chips keep working normally.
@@ -387,8 +378,8 @@ export function IdeaStoryCard({
                 className={cn(
                   codeFontClass,
                   transitionBase,
-                  "cursor-pointer rounded-full px-3 py-1.5 border whitespace-nowrap max-w-full truncate",
-                  "border-purple-400/30 bg-purple-500/15 text-purple-200",
+                  "cursor-pointer rounded-[8px] px-2.5 py-1 border whitespace-nowrap max-w-full truncate text-[11px] font-medium",
+                  "border-fuchsia-500/35 bg-fuchsia-500/12 text-fuchsia-300",
                   onSelectTag && "hover:bg-purple-500/30 hover:border-purple-400/60 active:scale-95",
                   !onSelectTag && "cursor-default opacity-90"
                 )}
@@ -404,7 +395,7 @@ export function IdeaStoryCard({
                   event.stopPropagation();
                   setIndustriesExpanded(true);
                 }}
-                className={cn(transitionBase, "rounded-full border border-white/10 bg-white/[0.04] text-[#D1D5DB] px-3 py-1.5 hover:bg-white/[0.08] hover:text-white")}
+                className={cn(transitionBase, "rounded-[8px] border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-[#D1D5DB] hover:bg-white/[0.08] hover:text-white")}
               >
                 +{hiddenIndustries} more
               </button>
@@ -416,7 +407,7 @@ export function IdeaStoryCard({
                   event.stopPropagation();
                   setIndustriesExpanded(false);
                 }}
-                className={cn(transitionBase, "rounded-full border border-white/10 bg-white/[0.04] text-[#D1D5DB] px-3 py-1.5 hover:bg-white/[0.08] hover:text-white")}
+                className={cn(transitionBase, "rounded-[8px] border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-[#D1D5DB] hover:bg-white/[0.08] hover:text-white")}
               >
                 Show less
               </button>
@@ -442,8 +433,8 @@ export function IdeaStoryCard({
                 className={cn(
                   codeFontClass,
                   transitionBase,
-                  "cursor-pointer rounded-full px-3 py-1.5 border whitespace-nowrap max-w-full truncate",
-                  "border-blue-400/30 bg-blue-500/15 text-blue-200",
+                  "cursor-pointer rounded-[8px] px-2.5 py-1 border whitespace-nowrap max-w-full truncate text-[11px] font-medium",
+                  "border-sky-500/35 bg-sky-500/10 text-sky-300",
                   onSelectTag && "hover:bg-blue-500/30 hover:border-blue-400/60 active:scale-95",
                   !onSelectTag && "cursor-default opacity-90"
                 )}
@@ -459,7 +450,7 @@ export function IdeaStoryCard({
                   event.stopPropagation();
                   setSkillsExpanded(true);
                 }}
-                className={cn(transitionBase, "rounded-full border border-white/10 bg-white/[0.04] text-[#D1D5DB] px-3 py-1.5 hover:bg-white/[0.08] hover:text-white")}
+                className={cn(transitionBase, "rounded-[8px] border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-[#D1D5DB] hover:bg-white/[0.08] hover:text-white")}
               >
                 +{hiddenSkills} more
               </button>
@@ -471,7 +462,7 @@ export function IdeaStoryCard({
                   event.stopPropagation();
                   setSkillsExpanded(false);
                 }}
-                className={cn(transitionBase, "rounded-full border border-white/10 bg-white/[0.04] text-[#D1D5DB] px-3 py-1.5 hover:bg-white/[0.08] hover:text-white")}
+                className={cn(transitionBase, "rounded-[8px] border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-[#D1D5DB] hover:bg-white/[0.08] hover:text-white")}
               >
                 Show less
               </button>
@@ -493,50 +484,6 @@ export function IdeaStoryCard({
           />
         </div>
       </div>
-
-      {/* Recent Updates & Contributions Preview */}
-      {rootComments.length > 0 && (
-        <div className="mt-4 border-t border-white/5 pt-4 space-y-2.5">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-              Latest Venture Feed
-            </span>
-          </div>
-          <div className="space-y-2">
-            {rootComments.slice(-2).reverse().map((c) => (
-              <div
-                key={c._id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onComment(idea._id);
-                }}
-                className="flex gap-2.5 items-start rounded-xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/[0.08] p-3 transition-all duration-200 cursor-pointer"
-              >
-                <Avatar className="h-6.5 w-6.5 shrink-0 ring-1 ring-white/10">
-                  <AvatarImage src={c.author?.avatar} alt={c.author?.name} />
-                  <AvatarFallback className="bg-[#1B2440] text-[9px] text-white font-bold">
-                    {getInitials(c.author?.name || c.author?.username)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold text-slate-300 truncate">
-                      {c.author?.name || c.author?.username || "Builder"}
-                    </span>
-                    <span className="text-[9px] text-slate-500 font-medium shrink-0">
-                      {formatRelativeTime(c.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed break-words whitespace-pre-wrap">
-                    {c.content}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {bannerImage && (
         <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
@@ -643,7 +590,7 @@ export function CompactIdeaCard({
           {industryTags.map((tag) => (
             <span
               key={`ind-${tag}`}
-              className={cn(codeFontClass, "rounded-full border border-purple-400/30 bg-purple-500/15 text-purple-200 px-3 py-1")}
+              className={cn(codeFontClass, "rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-2.5 py-1 text-[11px] font-medium text-fuchsia-300")}
               title={`Industry: ${tag}`}
             >
               {tag}
@@ -652,7 +599,7 @@ export function CompactIdeaCard({
           {skillTags.map((tag) => (
             <span
               key={`skl-${tag}`}
-              className={cn(codeFontClass, "rounded-full border border-blue-400/30 bg-blue-500/15 text-blue-200 px-3 py-1")}
+              className={cn(codeFontClass, "rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-300")}
               title={`Skill: ${tag}`}
             >
               {tag}

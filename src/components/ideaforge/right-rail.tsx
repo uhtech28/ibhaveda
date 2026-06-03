@@ -2,75 +2,42 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
-import { ArrowUpRight, Flame, MessageCircle, Sparkles, UserPlus } from "lucide-react";
+import { BriefcaseBusiness, Flame, Sparkles, Tag, UserPlus } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
-import { useChat } from "@/components/chat/ChatContext";
 import {
-  BuilderSuggestion,
   cardSurface,
   CurrentUserProfile,
   displayFontClass,
-  getInitials,
+  industryOptions,
   IdeaForgeIdea,
   isAgentRole,
+  parseTags,
+  skillOptions,
   transitionBase,
 } from "@/components/ideaforge/shared";
 
-function SuggestedBuilderCard({ builder }: { builder: BuilderSuggestion }) {
-  const displayName = builder.displayName || builder.username || "Builder";
-  const profileHref = builder.username ? `/profile/${builder.username}` : "/community";
-  const builderId = (builder._id || builder.id) as Id<"users"> | undefined;
-  const { openChatWithUser } = useChat();
+const normalizedSkills = new Set(skillOptions.map((entry) => entry.toLowerCase()));
+const normalizedIndustries = new Set(industryOptions.map((entry) => entry.toLowerCase()));
 
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <Link href={profileHref} className="shrink-0" aria-label={`View ${displayName}'s profile`}>
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={builder.avatar} alt={displayName} />
-          <AvatarFallback className="bg-[#1B2440] text-xs text-white">{getInitials(displayName)}</AvatarFallback>
-        </Avatar>
-      </Link>
-      <Link href={profileHref} className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-[#F9FAFB] hover:text-[#C7D2FE] transition-colors">{displayName}</p>
-      </Link>
-      <Button
-        type="button"
-        size="icon"
-        onClick={() => { if (builderId) openChatWithUser(builderId); }}
-        disabled={!builderId}
-        aria-label={`Message ${displayName}`}
-        title={`Message ${displayName}`}
-        className="h-8 w-8 rounded-[9px] border-0 bg-[#26306A] p-0 text-[#C7D2FE] shadow-none hover:bg-[#3B45A0] hover:text-white disabled:opacity-50"
-      >
-        <MessageCircle className="h-4 w-4" />
-      </Button>
-    </div>
-  );
+function classifyActiveTag(label: string, source: "category" | "industries") {
+  const key = label.toLowerCase();
+  if (normalizedSkills.has(key)) return "skill" as const;
+  if (normalizedIndustries.has(key)) return "industry" as const;
+  return source === "industries" ? "industry" as const : "skill" as const;
 }
 
 export function IdeaForgeRightRail({
   currentUser,
   publicIdeas,
+  ideas,
+  onTagSelect,
 }: {
   currentUser: CurrentUserProfile | null | undefined;
   publicIdeas: IdeaForgeIdea[];
+  ideas: IdeaForgeIdea[];
+  onTagSelect: (value: string) => void;
 }) {
-  const suggested = useQuery(api.users.getSuggestedCollaborators, currentUser
-    ? {
-        skills: currentUser.skills || [],
-        industries: currentUser.industries || (currentUser.industry ? [currentUser.industry] : []),
-        limit: 8,
-        excludeUserId: currentUser.clerkId,
-      }
-    : "skip");
-  const allUsers = useQuery(api.users.getAllUsers);
-
   const TRENDING_LIMIT = 5;
   const trendingIdeas = useMemo(() => {
     return [...publicIdeas]
@@ -84,24 +51,29 @@ export function IdeaForgeRightRail({
       .slice(0, TRENDING_LIMIT);
   }, [publicIdeas]);
 
-  const builders = useMemo(() => {
-    const isNonAgent = (user: BuilderSuggestion | CurrentUserProfile) => !isAgentRole(user.role);
-
-    if (suggested && suggested.length > 0) {
-      return suggested.filter(isNonAgent).slice(0, 5);
-    }
-    return (allUsers || [])
-      .filter((user) => user._id !== currentUser?._id && isNonAgent(user))
-      .slice(0, 5)
-      .map((user) => ({
-        _id: user._id,
-        username: user.username,
-        displayName: user.displayName,
-        avatar: user.avatar,
-        skills: user.skills,
-        role: user.role,
-      }));
-  }, [allUsers, currentUser?._id, suggested]);
+  const activeTags = useMemo(() => {
+    if (isAgentRole(currentUser?.role)) return [];
+    return Array.from(
+      ideas
+        .flatMap((idea) => [
+          ...parseTags(idea.category).map((label) => ({
+            label,
+            type: classifyActiveTag(label, "category"),
+          })),
+          ...parseTags(idea.industries).map((label) => ({
+            label,
+            type: classifyActiveTag(label, "industries"),
+          })),
+        ])
+        .filter((tag) => tag.label)
+        .reduce((tags, tag) => {
+          const key = tag.label.toLowerCase();
+          if (!tags.has(key)) tags.set(key, tag);
+          return tags;
+        }, new Map<string, { label: string; type: "skill" | "industry" }>())
+        .values()
+    ).slice(0, 8);
+  }, [currentUser?.role, ideas]);
 
   return (
     <aside className="hidden xl:block xl:w-[280px] xl:flex-shrink-0">
@@ -147,13 +119,36 @@ export function IdeaForgeRightRail({
         </section>
 
         <section className={cn(cardSurface, "p-4")}>
-          <div className="flex items-center justify-between">
-            <h3 className={cn(displayFontClass, "text-base font-semibold text-[#F9FAFB]")}>Suggested Builders</h3>
-            <ArrowUpRight className="h-4 w-4 text-[#9CA3AF]" />
+          <div className="flex items-center gap-2 text-sm text-[#F9FAFB]">
+            <Tag className="h-4 w-4 text-[#6366F1]" />
+            <span className={cn(displayFontClass, "font-semibold")}>Your Active Tags</span>
           </div>
-          <div className="mt-3 space-y-1">
-            {builders.length > 0 ? builders.map((builder) => <SuggestedBuilderCard key={builder._id?.toString() || builder.username} builder={builder as BuilderSuggestion} />) : (
-              <p className="text-sm text-[#9CA3AF]">We are lining up collaborators based on your profile and recent ideas.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {activeTags.length > 0 ? (
+              activeTags.map((tag) => {
+                const isSkill = tag.type === "skill";
+                return (
+                  <button
+                    key={`${tag.type}-${tag.label}`}
+                    type="button"
+                    onClick={() => onTagSelect(tag.label)}
+                    className={cn(
+                      transitionBase,
+                      "inline-flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[11px] font-medium",
+                      isSkill
+                        ? "border-sky-500/35 bg-sky-500/10 text-sky-300 hover:bg-sky-500/16"
+                        : "border-fuchsia-500/35 bg-fuchsia-500/12 text-fuchsia-300 hover:bg-fuchsia-500/18"
+                    )}
+                  >
+                    {isSkill ? <Sparkles className="h-3 w-3" /> : <BriefcaseBusiness className="h-3 w-3" />}
+                    {tag.label}
+                  </button>
+                );
+              })
+            ) : (
+              <p className="text-sm text-[#9CA3AF]">
+                Post a few ideas and your strongest topics will show up here.
+              </p>
             )}
           </div>
         </section>
