@@ -5,16 +5,18 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id, Doc } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
-import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { MessageCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { CheckCircle2, Clock, XCircle, UserPlus } from "lucide-react";
 import { notifyRequestSent } from "@/components/requests/notification-toast";
 
 interface ContributionRequestModalProps {
   ideaId: Id<"ideas">;
   ideaTitle: string;
   authorName?: string;
+  authorUsername?: string;
+  authorAvatar?: string;
   onClose: () => void;
 }
 
@@ -22,6 +24,8 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
   ideaId, 
   ideaTitle, 
   authorName,
+  authorUsername,
+  authorAvatar,
   onClose 
 }) => {
   const createRequestMutation = useMutation(api.contributionRequests.createContributionRequest);
@@ -31,6 +35,15 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [existingRequest, setExistingRequest] = useState<Doc<"contributionRequests"> | null>(null);
+  const isOverMessageLimit = message.length > 1200;
+  const displayAuthorName = authorName || "the author";
+  const displayUsername = authorUsername ? `@${authorUsername}` : "";
+  const initials = displayAuthorName
+    .split(/\s+/)
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   useEffect(() => {
     if (userRequests) {
@@ -49,7 +62,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || isSubmitting) return;
+    if (!message.trim() || isSubmitting || isOverMessageLimit) return;
 
     setIsSubmitting(true);
     setError("");
@@ -86,9 +99,9 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
       <div className="space-y-6">
         <DialogHeader>
           <DialogTitle>Contribution Status</DialogTitle>
-          <DialogDescription>
+          <p className="text-sm text-muted-foreground">
             You have already requested to contribute to "{ideaTitle}".
-          </DialogDescription>
+          </p>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -128,39 +141,57 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
     <form onSubmit={handleSubmit} className="space-y-6">
       <DialogHeader>
         <DialogTitle>Request to Contribute</DialogTitle>
-        <DialogDescription>
-          Let {authorName || 'the author'} know how you'd like to help with "{ideaTitle}".
-        </DialogDescription>
       </DialogHeader>
 
       <div className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="message" className="text-sm font-medium">
-            How can you help?
-          </label>
-          <Textarea
-            id="message"
-            placeholder="I can help with frontend development..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="min-h-[120px] resize-none"
-            maxLength={1200}
-            autoFocus
-            required
-          />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{error && <span className="text-destructive">{error}</span>}</span>
-            <span>{message.length}/1200</span>
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white" title={ideaTitle}>
+            {ideaTitle}
+          </p>
+          <div className="flex min-w-0 shrink-0 flex-row-reverse items-center gap-3 text-right">
+            <Avatar className="h-10 w-10 shrink-0">
+              <AvatarImage src={authorAvatar} alt={displayAuthorName} />
+              <AvatarFallback className="bg-[#1B2440] text-white text-xs">{initials || "U"}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{displayAuthorName}</p>
+              {displayUsername && (
+                <p className="mt-0.5 truncate text-xs text-[#9CA3AF]">{displayUsername}</p>
+              )}
+            </div>
           </div>
+        </div>
+
+        <div>
+          <div
+            className={`relative rounded-[22px] border bg-[#0A0D12] transition-colors focus-within:bg-[#111827] ${
+              isOverMessageLimit
+                ? "border-rose-500/80 focus-within:border-rose-400"
+                : "border-white/10 focus-within:border-[#6366F1]/45"
+            }`}
+          >
+            <textarea
+              id="message"
+              placeholder={`Tell ${displayAuthorName} how you can help!`}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="block min-h-[120px] w-full resize-none rounded-[22px] bg-transparent p-4 text-sm leading-5 text-white placeholder:text-[#6B7280] outline-none focus:ring-0"
+              autoFocus
+              required
+            />
+          </div>
+          {isOverMessageLimit && (
+            <p className="mt-1.5 pl-3 text-[11px] font-medium text-rose-400">
+              Max character count reached
+            </p>
+          )}
+          {error && <p className="mt-2 pl-3 text-[11px] text-rose-400">{error}</p>}
         </div>
       </div>
 
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={!message.trim() || isSubmitting}>
-          {isSubmitting ? <div className="mr-2"><Spinner size={16} /></div> : <MessageCircle className="w-4 h-4 mr-2" />}
+        <Button type="submit" disabled={!message.trim() || isSubmitting || isOverMessageLimit} className="gap-2">
+          {isSubmitting ? <Spinner size={16} /> : <UserPlus className="w-4 h-4" />}
           Send Request
         </Button>
       </DialogFooter>

@@ -15,9 +15,7 @@ import {
   Compass,
   Loader2,
   MessageSquare,
-  Pencil,
   Sparkles,
-  Trash2,
   Trophy,
   Users,
 } from "lucide-react";
@@ -363,35 +361,6 @@ export function IdeaForgeExperience({
                         onRepost={openComposerWithDraft}
                         onSelectTag={onSearchChange}
                         hideAuthor
-                        ownerAction={
-                          <div className="flex flex-wrap items-center gap-2">
-                            {idea.visibility === "private" && (
-                              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold text-amber-300">
-                                Private
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => onIdeaClick(idea._id)}
-                              aria-label="Edit idea"
-                              title="Edit"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.03] text-[#D1D5DB] hover:border-[#6366F1]/35 hover:text-white transition-colors"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            {onDeleteIdea && (
-                              <button
-                                type="button"
-                                onClick={() => onDeleteIdea(idea._id)}
-                                aria-label="Delete idea"
-                                title="Delete"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-red-500/25 bg-red-500/10 text-red-200 hover:bg-red-500/20 transition-colors"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        }
                       />
                     ))}
                   </div>

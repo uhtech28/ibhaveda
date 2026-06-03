@@ -2,9 +2,10 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, UserPlus, Repeat2, Bookmark, Swords } from "lucide-react";
+import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, UserPlus, Repeat2, Bookmark, Shield, Skull } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
+import { motion } from "framer-motion";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,6 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { IdeaVentureBadge } from "@/components/venture/idea-venture-badge";
 import {
   cardSurface,
   codeFontClass,
@@ -239,6 +239,141 @@ function ContributorsAction({
   );
 }
 
+function IdeaVentureProgressBar({
+  ideaId,
+  title,
+}: {
+  ideaId: string;
+  title: string;
+}) {
+  const router = useRouter();
+  const venture = useQuery(api.worldMap.getVentureByIdea, {
+    ideaId: ideaId as Id<"ideas">,
+  });
+  const summary = useQuery(
+    api.ventures.getVentureSummary,
+    venture?._id ? { ventureId: venture._id as Id<"ventures"> } : "skip",
+  );
+
+  if (!venture || !summary) return null;
+
+  const progressPercentage = summary.totalCheckpoints > 0
+    ? Math.min(100, Math.round((summary.completedCheckpoints / summary.totalCheckpoints) * 100))
+    : 0;
+  const bossName = summary.superBoss?.definition?.name ?? summary.superBoss?.bossName ?? "Boss";
+  const bossHp = summary.superBoss?.currentHp ?? 100;
+  const bossBaseHp = summary.superBoss?.baseHp ?? 100;
+  const bossPercentage = bossBaseHp > 0 ? Math.min(100, Math.round((bossHp / bossBaseHp) * 100)) : 0;
+
+  const openMap = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    router.push(`/map?ideaId=${ideaId}`);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={openMap}
+      aria-label={`Open venture map for ${title}`}
+      title={`Open venture map for ${title}`}
+      className={cn(
+        transitionBase,
+        "mt-3 block w-full overflow-hidden rounded-xl border border-white/8 text-left hover:border-[#6366F1]/40 hover:shadow-[0_0_24px_rgba(99,102,241,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1]/50",
+      )}
+      style={{
+        background: "linear-gradient(135deg, rgba(6,14,35,0.95) 0%, rgba(10,10,20,0.98) 50%, rgba(35,6,10,0.95) 100%)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}
+    >
+      <div className="relative flex min-w-0 items-stretch overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute bottom-0 left-0 top-0 w-1/3 bg-gradient-to-r from-cyan-500/8 to-transparent" />
+          <div className="absolute bottom-0 right-0 top-0 w-1/3 bg-gradient-to-l from-rose-500/8 to-transparent" />
+        </div>
+
+        <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
+          <div className="flex items-center gap-1.5">
+            <Shield className="h-3 w-3 shrink-0 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+            <span className="truncate text-[9.5px] font-black uppercase leading-none tracking-wider text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
+              {title}
+            </span>
+          </div>
+          <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
+            <motion.div
+              className="h-full origin-left rounded-full bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-300"
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercentage}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+            <motion.div
+              className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+              animate={{ x: ["-100%", "350%"] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
+            />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-400">Progress:</span>
+            <span className="font-mono text-[10px] font-black leading-none text-cyan-300">
+              {progressPercentage}%
+            </span>
+          </div>
+        </div>
+
+        <div className="relative z-10 flex shrink-0 flex-col items-center justify-center px-2 py-2">
+          <div
+            className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2"
+            style={{ background: "linear-gradient(to bottom, transparent, rgba(245,158,11,0.3), rgba(245,158,11,0.65), rgba(245,158,11,0.3), transparent)" }}
+          />
+          <motion.div
+            className="relative z-10 flex h-4 w-4 items-center justify-center rounded-full"
+            style={{
+              background: "linear-gradient(135deg, #f59e0b 0%, #b45309 50%, #92400e 100%)",
+              border: "1px solid rgba(253,230,138,0.8)",
+              boxShadow: "0 0 8px rgba(245,158,11,0.7), inset 0 1px 0 rgba(255,255,255,0.3)",
+            }}
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <span className="select-none text-[7.5px] font-black italic leading-none tracking-tighter text-black">
+              VS
+            </span>
+          </motion.div>
+        </div>
+
+        <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
+          <div className="flex flex-row-reverse items-center gap-1.5">
+            <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}>
+              <Skull className="h-3 w-3 shrink-0 text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+            </motion.div>
+            <span className="truncate text-right text-[9.5px] font-black uppercase leading-none tracking-wider text-rose-200 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]">
+              {bossName}
+            </span>
+          </div>
+          <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
+            <motion.div
+              className="h-full origin-left rounded-full bg-gradient-to-r from-rose-700 via-red-500 to-rose-300"
+              initial={{ width: 0 }}
+              animate={{ width: `${bossPercentage}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+            <motion.div
+              className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              animate={{ x: ["-100%", "350%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            />
+          </div>
+          <div className="flex items-baseline justify-end gap-1">
+            <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-500">HP:</span>
+            <span className="font-mono text-[10.5px] font-black leading-none text-rose-400">
+              {bossPercentage}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export function IdeaStoryCard({
   idea,
   saved,
@@ -271,7 +406,6 @@ export function IdeaStoryCard({
   showAllTags?: boolean;
   disableCardOpen?: boolean;
 }) {
-  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [industriesExpanded, setIndustriesExpanded] = useState(false);
@@ -340,21 +474,8 @@ export function IdeaStoryCard({
           <button type="button" onClick={() => !disableCardOpen && onOpenIdea(idea._id)} className="text-left">
             <h2 className={cn(displayFontClass, "text-[18px] font-semibold leading-tight text-[#F9FAFB] hover:text-[#C7D2FE]")}>{idea.title}</h2>
           </button>
-          {ownerAction && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/map?ideaId=${idea._id}`);
-              }}
-              aria-label="View Map"
-              title="View Map"
-              className="inline-flex items-center justify-center p-2 rounded-xl border border-[#6366F1]/30 bg-[#6366F1]/10 text-[#C7D2FE] hover:bg-[#6366F1]/20 hover:text-white hover:border-[#6366F1]/50 transition-all duration-200 shrink-0 group/mapbtn"
-            >
-              <Swords className="h-5 w-5 transition-transform duration-200 group-hover/mapbtn:scale-110" />
-            </button>
-          )}
         </div>
+        <IdeaVentureProgressBar ideaId={idea._id} title={idea.title} />
         <div className="mt-3 text-[15px] leading-7 text-[#D1D5DB]">
           <p className={cn(!showFullContent && !expanded && shouldClamp && "line-clamp-3")}>{description}</p>
           {!showFullContent && shouldClamp && (
@@ -635,7 +756,6 @@ export function CompactIdeaCard({
               {tag}
             </span>
           ))}
-          <IdeaVentureBadge ideaId={idea._id} />
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-[#9CA3AF]">
           <div className="inline-flex items-center gap-3">

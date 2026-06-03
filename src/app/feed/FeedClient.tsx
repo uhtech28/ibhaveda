@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, usePreloadedQuery } from "convex/react";
@@ -127,7 +127,9 @@ export function FeedClient({
             <ContributionRequestModal
               ideaId={activeContributeIdea._id as Id<"ideas">}
               ideaTitle={activeContributeIdea.title}
-              authorName={activeContributeIdea.author?.name || activeContributeIdea.author?.username}
+              authorName={activeContributeIdea.author?.displayName || activeContributeIdea.author?.name || activeContributeIdea.author?.username}
+              authorUsername={activeContributeIdea.author?.username}
+              authorAvatar={activeContributeIdea.author?.avatar}
               onClose={() => setActiveContributeIdea(null)}
             />
           )}

@@ -5,7 +5,6 @@ import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
 import { api } from "@convex/_generated/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Id } from "@convex/_generated/dataModel";
@@ -26,6 +25,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
 
   const [selectedIdeas, setSelectedIdeas] = useState<Id<"ideas">[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const isOverMessageLimit = invitationMessage.length > 500;
 
   const { toast } = useToast();
 
@@ -203,12 +203,14 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
                   >
                     <span className="text-sm font-medium truncate flex-1 min-w-0">{idea.title}</span>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Visibility tags are temporarily hidden; keep this block for later restoration.
                       <Badge
                         variant={idea.visibility === "public" ? "default" : "outline"}
                         className="text-[10px] py-0 h-4"
                       >
                         {idea.visibility}
                       </Badge>
+                      */}
                       <div className={`h-4 w-4 rounded-sm border flex items-center justify-center ${isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-input bg-background'}`}>
                         {isSelected && <Check className="h-3 w-3" />}
                       </div>
@@ -218,24 +220,33 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
               })}
             </div>
 
-            <div className="relative">
-              <textarea
-                className="w-full p-3 pb-7 border border-border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                rows={3}
-                placeholder={`Hi ${targetUser.displayName}, I'd love for you to contribute to this idea...`}
-                value={invitationMessage}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInvitationMessage(e.target.value)}
-                maxLength={500}
-              />
-              <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] text-muted-foreground">
-                {invitationMessage.length}/500
-              </span>
+            <div>
+              <div
+                className={`relative rounded-md border bg-background transition-colors focus-within:bg-background ${
+                  isOverMessageLimit
+                    ? "border-rose-500/80 focus-within:border-rose-400"
+                    : "border-border focus-within:border-primary/45"
+                }`}
+              >
+                <textarea
+                  className="block w-full resize-none rounded-md bg-transparent p-3 text-sm outline-none focus:ring-0"
+                  rows={3}
+                  placeholder={`Hi ${targetUser.displayName}, I'd love for you to contribute to this idea...`}
+                  value={invitationMessage}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInvitationMessage(e.target.value)}
+                />
+              </div>
+              {isOverMessageLimit && (
+                <p className="mt-1.5 pl-3 text-[11px] font-medium text-rose-400">
+                  Max character count reached
+                </p>
+              )}
             </div>
 
             <Button
               className="w-full mt-2"
               onClick={handleSendInvitations}
-              disabled={selectedIdeas.length === 0 || isSending}
+              disabled={selectedIdeas.length === 0 || isSending || isOverMessageLimit}
             >
               {isSending ? (
                 <>
