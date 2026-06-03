@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "convex/react";
-import { BriefcaseBusiness, Sparkles, Tag } from "lucide-react";
+import { BriefcaseBusiness, Flame, Sparkles, Tag } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
@@ -93,8 +93,8 @@ export function IdeaForgeLeftRail({
     currentUser?._id ? { userId: currentUser._id as any } : "skip"
   );
 
-  const ventureSummaries = useQuery(
-    api.ventures.getUserVentureSummaries,
+  const streak = useQuery(
+    api.gamification.getUserStreak,
     currentUser?._id ? { userId: currentUser._id as any } : "skip"
   );
 
@@ -104,28 +104,42 @@ export function IdeaForgeLeftRail({
   const title = (levelProgress?.title && levelProgress.title !== "Unknown")
     ? levelProgress.title
     : titleFor(level);
-
-  // Calculate average progress across all user ideas/ventures
-  const averageProgress = (() => {
-    if (!ventureSummaries || ventureSummaries.length === 0) return 0;
-    const totalPercentage = ventureSummaries.reduce((sum, v) => {
-      const total = v.totalCheckpoints || 36;
-      const completed = v.completedCheckpoints || 0;
-      return sum + (completed / total) * 100;
-    }, 0);
-    return Math.round(totalPercentage / ventureSummaries.length);
-  })();
+  const titlePoints = levelProgress?.titlePoints ?? 0;
+  const nextLevelPoints = levelProgress?.nextLevelPoints ?? null;
+  const xpDetail = levelProgress === undefined
+    ? "Loading..."
+    : nextLevelPoints && nextLevelPoints > 0
+      ? `${titlePoints} / ${nextLevelPoints} XP`
+      : `${titlePoints} XP`;
+  const xpProgress = levelProgress?.progress ?? 0;
+  const currentStreak = streak?.currentStreak ?? 0;
+  const streakDetail = streak === undefined
+    ? "Loading..."
+    : currentStreak > 0
+      ? `${currentStreak} ${currentStreak === 1 ? "day" : "days"}`
+      : "1 Day Streak";
 
   const nonAgentUserIdeas = isAgentRole(currentUser?.role) ? [] : userIdeas;
+  const profileIndustries = currentUser?.industries?.length
+    ? currentUser.industries
+    : currentUser?.industry
+      ? [currentUser.industry]
+      : [];
+  const profileSkillTags = (currentUser?.skills || []).slice(0, 2);
+  const profileIndustryTags = profileIndustries.slice(0, 1);
   const activeTags = Array.from(
-    new Set(
-      nonAgentUserIdeas
-        .flatMap((idea) => [
-          ...parseTags(idea.category),
-          ...parseTags(idea.industries),
-        ])
-        .filter(Boolean)
-    )
+    nonAgentUserIdeas
+      .flatMap((idea) => [
+        ...parseTags(idea.category).map((label) => ({ label, type: "skill" as const })),
+        ...parseTags(idea.industries).map((label) => ({ label, type: "industry" as const })),
+      ])
+      .filter((tag) => tag.label)
+      .reduce((tags, tag) => {
+        const key = tag.label.toLowerCase();
+        if (!tags.has(key)) tags.set(key, tag);
+        return tags;
+      }, new Map<string, { label: string; type: "skill" | "industry" }>())
+      .values()
   ).slice(0, 8);
 
   return (
@@ -144,46 +158,93 @@ export function IdeaForgeLeftRail({
       >
         {/* Profile card */}
         <section className={cn(cardSurface, "relative overflow-hidden p-4")}>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.35),transparent_42%),linear-gradient(135deg,rgba(17,24,39,0.98),rgba(17,24,39,0.9))]" />
-          <div className="relative flex items-center gap-3">
-            <Link
-              href={currentUser?.username ? `/profile/${currentUser.username}` : "/profile-setup"}
-              className="shrink-0 group focus:outline-none"
-              aria-label="Open my profile"
-            >
-              <Avatar className="h-12 w-12 ring-2 ring-[#6366F1] ring-offset-2 ring-offset-[#111827] transition-transform duration-200 group-hover:scale-[1.03]">
-                <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
-                <AvatarFallback className="bg-[#1B2440] text-white text-base">
-                  {getInitials(currentUser?.displayName)}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-            <Link
-              href={currentUser?.username ? `/profile/${currentUser.username}` : "/profile-setup"}
-              className="min-w-0 flex-1 group focus:outline-none"
-              aria-label="Open my profile"
-            >
-              <div>
-                <h2 className={cn(displayFontClass, "text-base font-semibold text-[#F9FAFB] truncate group-hover:text-white")}>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.22),transparent_38%),linear-gradient(135deg,rgba(17,24,39,0.98),rgba(17,24,39,0.92))]" />
+          <div className="relative">
+            <div className="flex items-start gap-3">
+              <Link
+                href={currentUser?.username ? `/profile/${currentUser.username}` : "/profile-setup"}
+                className="shrink-0 group focus:outline-none"
+                aria-label="Open my profile"
+              >
+                <div className="relative">
+                  <Avatar className="h-14 w-14 border-2 border-black/70 ring-2 ring-[#6D5DF6] transition-transform duration-200 group-hover:scale-[1.03]">
+                    <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                    <AvatarFallback className="bg-[#4D2DB5] text-2xl text-white">
+                      {getInitials(currentUser?.displayName).slice(0, 1)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#111827] bg-emerald-500" />
+                </div>
+              </Link>
+              <Link
+                href={currentUser?.username ? `/profile/${currentUser.username}` : "/profile-setup"}
+                className="min-w-0 flex-1 group focus:outline-none"
+                aria-label="Open my profile"
+              >
+                <h2 className={cn(displayFontClass, "truncate text-base font-semibold text-[#F9FAFB] group-hover:text-white")}>
                   {currentUser?.displayName || "Ibhaveda Member"}
                 </h2>
-                <div className="mt-1.5 flex items-end justify-between gap-3">
-                  <span className="flex flex-col text-[#F9FAFB]">
-                    <span className="font-semibold">Level {level}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-[#7C86A2]">
-                      {title}
-                    </span>
+                {currentUser?.username && (
+                  <p className="truncate text-xs text-[#9CA3AF]">@{currentUser.username}</p>
+                )}
+              </Link>
+            </div>
+
+            <p className="mt-4 line-clamp-2 min-h-[36px] text-sm leading-5 text-[#D1D5DB]">
+              {currentUser?.bio || "\u00A0"}
+            </p>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {profileIndustryTags.map((tag) => (
+                <button
+                  key={`profile-industry-${tag}`}
+                  type="button"
+                  onClick={() => onTagSelect(tag)}
+                  className={cn(
+                    transitionBase,
+                    "rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-2.5 py-1 text-[10px] font-medium text-fuchsia-300 hover:bg-fuchsia-500/18"
+                  )}
+                >
+                  {tag}
+                </button>
+              ))}
+              {profileSkillTags.map((tag) => (
+                <button
+                  key={`profile-skill-${tag}`}
+                  type="button"
+                  onClick={() => onTagSelect(tag)}
+                  className={cn(
+                    transitionBase,
+                    "rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-2.5 py-1 text-[10px] font-medium text-sky-300 hover:bg-sky-500/16"
+                  )}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-sm font-bold text-black">
+                    {level}
                   </span>
-                  <span className="text-[#9CA3AF] tabular-nums text-xs font-medium">
-                    {averageProgress}% Avg Progress
-                  </span>
+                  <span className="truncate text-sm font-semibold text-[#F9FAFB]">{title}</span>
                 </div>
-                <Progress
-                  value={averageProgress}
-                  className="mt-2 h-1.5 bg-[#20293B] [&>div]:bg-[linear-gradient(90deg,#6366F1,#8B5CF6)]"
-                />
+                <span className="shrink-0 text-[11px] text-[#9CA3AF] tabular-nums">{xpDetail}</span>
               </div>
-            </Link>
+              <Progress
+                value={Math.min(100, Math.round((xpProgress / 100) * 100))}
+                className="mt-2 h-1.5 bg-white/[0.06] [&>div]:bg-[linear-gradient(90deg,#FBBF24,#F97316,#FDE047)]"
+              />
+            </div>
+
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-orange-500/15 ring-1 ring-orange-500/30">
+                <Flame className="h-3.5 w-3.5 text-orange-300" />
+              </span>
+              <span className="text-sm font-semibold text-orange-200 tabular-nums">{streakDetail}</span>
+            </div>
           </div>
         </section>
 
@@ -197,23 +258,23 @@ export function IdeaForgeLeftRail({
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             {activeTags.length > 0 ? (
-              activeTags.map((tag, index) => {
-                const accent = index === 0 ? "purple" : "blue";
+              activeTags.map((tag) => {
+                const isSkill = tag.type === "skill";
                 return (
                   <button
-                    key={tag}
+                    key={`${tag.type}-${tag.label}`}
                     type="button"
-                    onClick={() => onTagSelect(tag)}
+                    onClick={() => onTagSelect(tag.label)}
                     className={cn(
                       transitionBase,
                       "inline-flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[11px] font-medium",
-                      accent === "purple"
+                      isSkill
                         ? "border-fuchsia-500/35 bg-fuchsia-500/12 text-fuchsia-300 hover:bg-fuchsia-500/18"
                         : "border-sky-500/35 bg-sky-500/10 text-sky-300 hover:bg-sky-500/16"
                     )}
                   >
-                    {index === 0 ? <Sparkles className="h-3 w-3" /> : <BriefcaseBusiness className="h-3 w-3" />}
-                    {tag}
+                    {isSkill ? <Sparkles className="h-3 w-3" /> : <BriefcaseBusiness className="h-3 w-3" />}
+                    {tag.label}
                   </button>
                 );
               })

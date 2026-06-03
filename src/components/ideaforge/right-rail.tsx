@@ -46,7 +46,7 @@ function SuggestedBuilderCard({ builder }: { builder: BuilderSuggestion }) {
         disabled={!builderId}
         aria-label={`Message ${displayName}`}
         title={`Message ${displayName}`}
-        className="h-8 w-8 rounded-full bg-transparent p-0 text-[#C7D2FE] hover:bg-[#6366F1]/15 hover:text-white disabled:opacity-50"
+        className="h-8 w-8 rounded-[9px] border-0 bg-[#26306A] p-0 text-[#C7D2FE] shadow-none hover:bg-[#3B45A0] hover:text-white disabled:opacity-50"
       >
         <MessageCircle className="h-4 w-4" />
       </Button>
@@ -111,26 +111,29 @@ export function IdeaForgeRightRail({
             <h3 className={cn(displayFontClass, "text-base font-semibold text-[#F9FAFB]")}>Trending Ideas This Week</h3>
             <Flame className="h-4 w-4 text-[#F59E0B]" />
           </div>
-          <div className="mt-4 space-y-2.5">
+          <div className="mt-3 space-y-1.5">
             {trendingIdeas.length > 0 ? (
-              trendingIdeas.map((idea) => (
+              trendingIdeas.map((idea, index) => (
                 <Link
                   key={idea._id}
                   href={`/idea/${idea._id}`}
                   className={cn(
                     transitionBase,
-                    "flex items-center gap-3 rounded-[12px] border border-white/7 bg-[#0B101A]/70 px-3 py-3 hover:border-[#6366F1]/35 hover:bg-white/[0.04]"
+                    "flex items-center gap-2 rounded-[10px] px-1 py-1.5 hover:bg-white/[0.03]"
                   )}
                 >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#6366F1]/14 text-[11px] font-semibold text-[#C7D2FE]">
+                    {index + 1}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-sm font-semibold text-[#F9FAFB]">{idea.title}</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="inline-flex h-7 items-center gap-1 rounded-full bg-[#111827] px-2 text-[11px] font-medium text-orange-300">
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#111827] px-1.5 text-[11px] font-medium text-orange-300">
                       <Sparkles className="h-3.5 w-3.5" />
                       {idea.sparkCount || 0}
                     </span>
-                    <span className="inline-flex h-7 items-center gap-1 rounded-full bg-[#111827] px-2 text-[11px] font-medium text-emerald-300">
+                    <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#111827] px-1.5 text-[11px] font-medium text-emerald-300">
                       <Users className="h-3.5 w-3.5" />
                       {idea.contributionCount || 0}
                     </span>

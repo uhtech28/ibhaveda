@@ -353,7 +353,7 @@ const CommentItem: React.FC<{
                 hasSparked
                   ? "text-orange-400"
                   : "text-[#9CA3AF] hover:text-orange-400"
-              } disabled:cursor-not-allowed disabled:opacity-60`}
+              } disabled:cursor-default disabled:opacity-80`}
               onClick={handleSpark}
               disabled={!userId || isSparking}
               title={userId ? "Spark this comment" : "Sign in to spark comments"}

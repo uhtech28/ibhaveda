@@ -190,6 +190,7 @@ export type CurrentUserProfile = {
   displayName: string;
   avatar?: string;
   role?: string;
+  bio?: string;
   skills?: string[];
   industries?: string[];
   industry?: string;
