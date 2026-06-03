@@ -8,6 +8,8 @@ import { ArrowUpRight, Flame, MessageCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { BadgeItem, getNormalizedRarity, getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
@@ -81,6 +83,20 @@ const LEVEL_TABLE: Array<{ level: number; title: string; pts: number; phase: Pha
 
 const titleFor = (lv: number) => LEVEL_TABLE.find((l) => l.level === lv)?.title ?? "—";
 
+const rarityRank: Record<string, number> = {
+  mythic: 6,
+  legendary: 5,
+  hidden: 5,
+  diamond: 4,
+  epic: 4,
+  gold: 3,
+  rare: 3,
+  silver: 2,
+  uncommon: 2,
+  bronze: 1,
+  common: 1,
+};
+
 function SuggestedBuilderCard({ builder }: { builder: BuilderSuggestion }) {
   const displayName = builder.displayName || builder.username || "Builder";
   const profileHref = builder.username ? `/profile/${builder.username}` : "/community";
@@ -128,6 +144,11 @@ export function IdeaForgeLeftRail({
 
   const streak = useQuery(
     api.gamification.getUserStreak,
+    currentUser?._id ? { userId: currentUser._id as any } : "skip"
+  );
+
+  const earnedBadges = useQuery(
+    api.badges.getUserProfileBadges,
     currentUser?._id ? { userId: currentUser._id as any } : "skip"
   );
 
@@ -180,6 +201,29 @@ export function IdeaForgeLeftRail({
       }));
   }, [allUsers, currentUser?._id, suggested]);
 
+  const profileBadges = useMemo(() => {
+    if (!earnedBadges) return [] as BadgeItem[];
+
+    const equippedBadgeIds = currentUser?.equippedBadges || [];
+    const equipped = earnedBadges.filter((badge) => equippedBadgeIds.includes(badge.id));
+    const list = [...equipped];
+
+    if (list.length < 3) {
+      const remaining = earnedBadges
+        .filter((badge) => !equipped.some((equippedBadge) => equippedBadge.id === badge.id))
+        .sort((a, b) => {
+          const rankA = rarityRank[a.rarity] || 0;
+          const rankB = rarityRank[b.rarity] || 0;
+          if (rankA !== rankB) return rankB - rankA;
+          return (b.awardedAt || 0) - (a.awardedAt || 0);
+        });
+
+      list.push(...remaining.slice(0, 3 - list.length));
+    }
+
+    return list.slice(0, 3) as BadgeItem[];
+  }, [currentUser?.equippedBadges, earnedBadges]);
+
   return (
     <aside className="hidden xl:block xl:w-[280px] xl:flex-shrink-0">
       <div
@@ -214,19 +258,57 @@ export function IdeaForgeLeftRail({
                   <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#111827] bg-emerald-500" />
                 </div>
               </Link>
-              <Link
-                href={currentUser?.username ? `/profile/${currentUser.username}` : "/profile-setup"}
-                className="min-w-0 flex-1 group focus:outline-none"
-                aria-label="Open my profile"
-              >
-                <h2 className={cn(displayFontClass, "truncate text-base font-semibold text-[#F9FAFB] group-hover:text-white")}>
-                  {currentUser?.displayName || "Ibhaveda Member"}
-                </h2>
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <Link
+                    href={currentUser?.username ? `/profile/${currentUser.username}` : "/profile-setup"}
+                    className="min-w-0 group focus:outline-none"
+                    aria-label="Open my profile"
+                  >
+                    <h2 className={cn(displayFontClass, "truncate text-base font-semibold text-[#F9FAFB] group-hover:text-white")}>
+                      {currentUser?.displayName || "Ibhaveda Member"}
+                    </h2>
+                  </Link>
+                  {profileBadges.length > 0 && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      {profileBadges.map((badge) => {
+                        const norm = getNormalizedRarity(badge.rarity);
+                        const accentColor = badge.secondaryColor || norm.accentColor;
+
+                        return (
+                          <span
+                            key={badge.id}
+                            title={`${badge.name}: ${badge.description}`}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-[6px]"
+                            style={{
+                              backgroundColor: `${accentColor}20`,
+                              border: `1px solid ${accentColor}80`,
+                              color: accentColor,
+                              boxShadow: `0 0 8px ${accentColor}45`,
+                            }}
+                          >
+                            <PremiumIcon
+                              name={badge.icon || getVentureBadgeEmoji(badge.id, badge.name)}
+                              className="h-3 w-3"
+                              strokeWidth={1.7}
+                            />
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 {currentUser?.username && (
                   <p className="truncate text-xs text-[#9CA3AF]">@{currentUser.username}</p>
                 )}
-              </Link>
+              </div>
             </div>
+
+            {currentUser?.bio && (
+              <p className="mt-3 truncate text-sm text-[#D1D5DB]">
+                {currentUser.bio}
+              </p>
+            )}
 
             <div className="mt-4">
               <div className="flex items-center justify-between gap-3">

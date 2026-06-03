@@ -172,6 +172,7 @@ export type IdeaForgeIdea = {
   category: string;
   visibility: string;
   sparkCount: number;
+  hasSparked?: boolean;
   commentCount: number;
   createdAt: number;
   updatedAt: number;
@@ -191,6 +192,7 @@ export type CurrentUserProfile = {
   avatar?: string;
   role?: string;
   bio?: string;
+  equippedBadges?: string[];
   skills?: string[];
   industries?: string[];
   industry?: string;

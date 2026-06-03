@@ -168,6 +168,23 @@ export function IdeaCardSkeleton() {
 
 function StoryAction({ icon: Icon, label, count, active = false, onClick, animateOnClick = false, iconOnly = false }: { icon: React.ComponentType<{ className?: string }>; label: string; count?: number; active?: boolean; onClick?: () => void; animateOnClick?: boolean; iconOnly?: boolean }) {
   const [pulse, setPulse] = useState(false);
+  const tone = label === "Spark"
+    ? {
+        base: "text-orange-300 hover:bg-[#111827] hover:text-orange-300",
+        active: "bg-[#111827] text-orange-300 shadow-[0_0_12px_rgba(251,146,60,0.12)]",
+        icon: "text-orange-300",
+      }
+    : label === "Comment"
+      ? {
+          base: "text-blue-300 hover:bg-[#111827] hover:text-blue-300",
+          active: "bg-[#111827] text-blue-300",
+          icon: "text-blue-300",
+        }
+      : {
+          base: "text-emerald-300 hover:bg-[#111827] hover:text-emerald-300",
+          active: "bg-[#111827] text-emerald-300",
+          icon: "text-emerald-300",
+        };
   const handleClick = () => {
     if (animateOnClick) {
       setPulse(true);
@@ -184,12 +201,10 @@ function StoryAction({ icon: Icon, label, count, active = false, onClick, animat
       className={cn(
         transitionBase,
         "flex flex-1 min-w-0 items-center justify-center gap-1.5 rounded-[10px] px-2 py-2 text-xs sm:text-sm",
-        active
-          ? "bg-[#6366F1]/14 text-[#C7D2FE]"
-          : "text-[#9CA3AF] hover:bg-[#6366F1]/10 hover:text-[#C7D2FE]"
+        active ? tone.active : tone.base
       )}
     >
-      <Icon className={cn("h-4 w-4 shrink-0", pulse && "animate-[ping_0.45s_ease-out]")} />
+      <Icon className={cn("h-4 w-4 shrink-0", tone.icon, active && label === "Spark" && "fill-current", pulse && "animate-[ping_0.45s_ease-out]")} />
       {!iconOnly && <span className="truncate">{label}</span>}
       {typeof count === "number" && <span className="text-xs tabular-nums">{count}</span>}
     </button>
@@ -236,6 +251,9 @@ export function IdeaStoryCard({
   onSelectTag,
   ownerAction,
   hideAuthor,
+  showFullContent = false,
+  showAllTags = false,
+  disableCardOpen = false,
 }: {
   idea: IdeaForgeIdea;
   saved: boolean;
@@ -249,6 +267,9 @@ export function IdeaStoryCard({
   ownerAction?: React.ReactNode;
   /** When true, hide the author profile header on mobile (still visible on lg+). */
   hideAuthor?: boolean;
+  showFullContent?: boolean;
+  showAllTags?: boolean;
+  disableCardOpen?: boolean;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
@@ -257,8 +278,10 @@ export function IdeaStoryCard({
   const [skillsExpanded, setSkillsExpanded] = useState(false);
   const skillTags = useMemo(() => parseTags(idea.category), [idea.category]);
   const industryTags = useMemo(() => parseTags(idea.industries || ""), [idea.industries]);
-  const visibleIndustries = industriesExpanded ? industryTags : industryTags.slice(0, 2);
-  const visibleSkills = skillsExpanded ? skillTags : skillTags.slice(0, 2);
+  const industriesAreExpanded = showAllTags || industriesExpanded;
+  const skillsAreExpanded = showAllTags || skillsExpanded;
+  const visibleIndustries = industriesAreExpanded ? industryTags : industryTags.slice(0, 2);
+  const visibleSkills = skillsAreExpanded ? skillTags : skillTags.slice(0, 2);
   const hiddenIndustries = Math.max(0, industryTags.length - visibleIndustries.length);
   const hiddenSkills = Math.max(0, skillTags.length - visibleSkills.length);
   const bannerImage = getBannerImage(idea);
@@ -269,6 +292,7 @@ export function IdeaStoryCard({
   // interactive element (button, link, input, etc.) so Spark / Save /
   // Collaborate / tag chips keep working normally.
   const handleCardClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (disableCardOpen) return;
     const target = event.target as HTMLElement;
     if (target.closest('button, a, input, textarea, select, [role="button"]')) return;
     onOpenIdea(idea._id);
@@ -313,7 +337,7 @@ export function IdeaStoryCard({
 
       <div className="mt-5">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onOpenIdea(idea._id)} className="text-left">
+          <button type="button" onClick={() => !disableCardOpen && onOpenIdea(idea._id)} className="text-left">
             <h2 className={cn(displayFontClass, "text-[18px] font-semibold leading-tight text-[#F9FAFB] hover:text-[#C7D2FE]")}>{idea.title}</h2>
           </button>
           {ownerAction && (
@@ -332,8 +356,8 @@ export function IdeaStoryCard({
           )}
         </div>
         <div className="mt-3 text-[15px] leading-7 text-[#D1D5DB]">
-          <p className={cn(!expanded && shouldClamp && "line-clamp-3")}>{description}</p>
-          {shouldClamp && (
+          <p className={cn(!showFullContent && !expanded && shouldClamp && "line-clamp-3")}>{description}</p>
+          {!showFullContent && shouldClamp && (
             <button
               type="button"
               onClick={() => setExpanded((current) => !current)}
@@ -388,19 +412,22 @@ export function IdeaStoryCard({
                 {tag}
               </button>
             ))}
-            {hiddenIndustries > 0 && !industriesExpanded && (
+            {hiddenIndustries > 0 && !industriesAreExpanded && (
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   setIndustriesExpanded(true);
                 }}
-                className={cn(transitionBase, "rounded-[8px] border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-[#D1D5DB] hover:bg-white/[0.08] hover:text-white")}
+                className={cn(
+                  transitionBase,
+                  "rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-2.5 py-1 text-[11px] font-medium text-fuchsia-300 hover:bg-fuchsia-500/18 hover:border-fuchsia-400/55"
+                )}
               >
                 +{hiddenIndustries} more
               </button>
             )}
-            {industriesExpanded && industryTags.length > 2 && (
+            {!showAllTags && industriesExpanded && industryTags.length > 2 && (
               <button
                 type="button"
                 onClick={(event) => {
@@ -443,19 +470,22 @@ export function IdeaStoryCard({
                 {tag}
               </button>
             ))}
-            {hiddenSkills > 0 && !skillsExpanded && (
+            {hiddenSkills > 0 && !skillsAreExpanded && (
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   setSkillsExpanded(true);
                 }}
-                className={cn(transitionBase, "rounded-[8px] border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-[#D1D5DB] hover:bg-white/[0.08] hover:text-white")}
+                className={cn(
+                  transitionBase,
+                  "rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-300 hover:bg-sky-500/16 hover:border-sky-400/55"
+                )}
               >
                 +{hiddenSkills} more
               </button>
             )}
-            {skillsExpanded && skillTags.length > 2 && (
+            {!showAllTags && skillsExpanded && skillTags.length > 2 && (
               <button
                 type="button"
                 onClick={(event) => {
@@ -473,7 +503,7 @@ export function IdeaStoryCard({
 
       <div className="mt-5 border-t border-white/8 pt-3">
         <div className="flex flex-nowrap items-center gap-1">
-          <StoryAction icon={Sparkles} label="Spark" count={idea.sparkCount || 0} onClick={() => onSpark(idea._id)} animateOnClick iconOnly />
+          <StoryAction icon={Sparkles} label="Spark" count={idea.sparkCount || 0} active={!!idea.hasSparked} onClick={() => onSpark(idea._id)} animateOnClick iconOnly />
           <StoryAction icon={MessageCircle} label="Comment" count={idea.commentCount || 0} onClick={() => onComment(idea._id)} iconOnly />
           <ContributorsAction
             ideaId={idea._id}

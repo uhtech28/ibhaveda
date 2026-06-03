@@ -91,10 +91,10 @@ export function IdeaForgeRightRail({
                   href={`/idea/${idea._id}`}
                   className={cn(
                     transitionBase,
-                    "flex items-center gap-2 rounded-[10px] px-1 py-1.5 hover:bg-white/[0.03]"
+                    "flex items-center gap-2 rounded-[10px] py-1.5 pl-0 pr-1 hover:bg-white/[0.03]"
                   )}
                 >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#6366F1]/14 text-[11px] font-semibold text-[#C7D2FE]">
+                  <span className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#6366F1]/14 text-[11px] font-semibold text-[#C7D2FE]">
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">

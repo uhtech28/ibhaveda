@@ -64,6 +64,8 @@ import { IdeaBottomBar } from "@/components/IdeaBottomBar";
 import { CreateSubIdeaDialog } from "@/components/ideas/CreateSubIdeaDialog";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { IdeaBreadcrumb, IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
+import { IdeaStoryCard } from "@/components/ideaforge/idea-cards";
+import { IdeaForgeIdea } from "@/components/ideaforge/shared";
 
 type ConvexIdea = {
   _id: string;
@@ -138,6 +140,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
   const ideaQuery = useQuery(api.ideas.getIdeaById, { ideaId: id as Id<"ideas"> });
   const ideaTreeQuery = useQuery(api.ideas.getIdeaTree, { rootIdeaId: id as Id<"ideas"> });
   const addSubIdeaMutation = useMutation(api.ideas.addSubIdea);
+  const toggleSparkMutation = useMutation(api.ideas.toggleSpark);
   const userRequestsQuery = useQuery(api.contributionRequests.getMyRequests);
   const todosQuery = useQuery(api.todos.getTodosForIdea, { ideaId: id as Id<"ideas"> });
   const createTodoMutation = useMutation(api.todos.createTodo);
@@ -197,14 +200,14 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
         onOpenCalendar={() => setShowCalendar(true)}
       />
 
-      <main className="flex-1 w-full py-12 pt-24 lg:pr-40">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <main className="flex-1 w-full py-12 pt-24">
+        <div className="mx-auto w-full max-w-[900px] px-4 sm:px-6 lg:px-8 relative">
           {/* Breadcrumb — always shows Feed > root > ... > current so
               the user never loses context. */}
-          <IdeaBreadcrumb ideaId={id as Id<"ideas">} className="mb-3" />
+          <IdeaBreadcrumb ideaId={id as Id<"ideas">} className="mb-4 justify-center" />
 
           {/* Desktop: persistent right rail — pulled ~3-4 cm in from the right edge */}
-          <div className="hidden lg:block">
+          <div className="hidden">
             <IdeaSideNav
               className="fixed right-32 top-1/2 -translate-y-1/2 z-40 rounded-2xl border border-white/10 bg-[#0F1726]/95 backdrop-blur-xl p-2 shadow-[0_18px_44px_rgba(3,7,18,0.55)]"
               onOpenHierarchy={() => setShowHierarchy(true)}
@@ -223,7 +226,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
               <button
                 type="button"
                 aria-label="Open idea actions"
-                className="lg:hidden fixed top-[60px] right-3 z-40 inline-flex h-8 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground border border-white/10 hover:bg-primary/90 active:scale-95 transition-colors"
+                className="hidden"
               >
                 <Menu className="h-4 w-4" strokeWidth={2.5} />
               </button>
@@ -264,12 +267,20 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
           ) : (
             <>
               <div className="pb-8">
-                <IdeaContent
-                  idea={ideaQuery as ConvexIdea}
-                  onTagClick={setSearchQuery}
-                  onOpenComments={() => setShowComments(true)}
-                  onOpenRequests={() => setShowRequests(true)}
-                  requestCount={userRequestsQuery?.filter((r) => r.ideaId === ideaQuery._id && r.status === "pending").length || 0}
+                <IdeaStoryCard
+                  idea={ideaQuery as IdeaForgeIdea}
+                  saved={false}
+                  onToggleSave={() => undefined}
+                  onOpenIdea={() => undefined}
+                  onSpark={async (ideaId) => {
+                    await toggleSparkMutation({ ideaId: ideaId as Id<"ideas"> });
+                  }}
+                  onComment={() => setShowComments(true)}
+                  onContribute={() => setShowRequests(true)}
+                  onSelectTag={setSearchQuery}
+                  showFullContent
+                  showAllTags
+                  disableCardOpen
                 />
               </div>
 
