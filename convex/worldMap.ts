@@ -1309,13 +1309,18 @@ export const getVentureByIdea = query({
       .first();
     if (!user) return null;
 
+    const idea = await ctx.db.get(args.ideaId);
+    if (!idea || idea.isDeleted) return null;
+
     const venture = await ctx.db
       .query("ventures")
       .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
-      .filter((q) => q.eq(q.field("userId"), user._id))
       .first();
 
     if (!venture) return null;
+
+    const canView = idea.visibility === "public" || venture.userId === user._id || idea.authorId === user._id;
+    if (!canView) return null;
 
     return {
       ...venture,

@@ -122,7 +122,7 @@ export function FeedClient({
       </Dialog>
 
       <Dialog open={!!activeContributeIdea} onOpenChange={(open) => !open && setActiveContributeIdea(null)}>
-        <DialogContent className="max-w-[500px] border-white/10 bg-[#111827] text-white">
+        <DialogContent className="w-[min(92vw,560px)] max-w-[560px] overflow-hidden border-white/10 bg-[#111827] text-white">
           {activeContributeIdea && (
             <ContributionRequestModal
               ideaId={activeContributeIdea._id as Id<"ideas">}

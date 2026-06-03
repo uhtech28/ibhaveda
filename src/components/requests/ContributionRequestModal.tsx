@@ -138,22 +138,22 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-6 overflow-hidden">
       <DialogHeader>
         <DialogTitle>Request to Contribute</DialogTitle>
       </DialogHeader>
 
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white" title={ideaTitle}>
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+          <p className="min-w-0 truncate text-sm font-semibold text-white" title={ideaTitle}>
             {ideaTitle}
           </p>
-          <div className="flex min-w-0 shrink-0 flex-row-reverse items-center gap-3 text-right">
+          <div className="flex max-w-[220px] min-w-0 shrink-0 flex-row-reverse items-center gap-3 text-right">
             <Avatar className="h-10 w-10 shrink-0">
               <AvatarImage src={authorAvatar} alt={displayAuthorName} />
               <AvatarFallback className="bg-[#1B2440] text-white text-xs">{initials || "U"}</AvatarFallback>
             </Avatar>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{displayAuthorName}</p>
               {displayUsername && (
                 <p className="mt-0.5 truncate text-xs text-[#9CA3AF]">{displayUsername}</p>

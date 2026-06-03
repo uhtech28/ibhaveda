@@ -1020,6 +1020,85 @@ export const getVentureSummary = query({
 });
 
 /**
+ * Lightweight venture summary by idea for feed/list cards.
+ * Public ideas expose their attached venture summary; private ideas only expose
+ * it to the owner.
+ */
+export const getVentureSummaryByIdea = query({
+  args: {
+    ideaId: v.id("ideas"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) return null;
+
+    const idea = await ctx.db.get(args.ideaId);
+    if (!idea || idea.isDeleted) return null;
+
+    const venture = await ctx.db
+      .query("ventures")
+      .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
+      .first();
+    if (!venture) return null;
+
+    const canView = idea.visibility === "public" || idea.authorId === user._id || venture.userId === user._id;
+    if (!canView) return null;
+
+    const normalizedVenture = {
+      ...venture,
+      corruptionLevel: venture.corruptionLevel ?? 0,
+      lastActivityAt: venture.lastActivityAt ?? venture.updatedAt,
+    };
+
+    const checkpoints = await ctx.db
+      .query("ventureCheckpoints")
+      .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
+      .collect();
+
+    const bosses = await ctx.db
+      .query("ventureBosses")
+      .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
+      .collect();
+
+    const completedCheckpoints = checkpoints.filter(
+      (cp) => cp.status === "completed",
+    ).length;
+    const goldCheckpoints = checkpoints.filter(
+      (cp) => cp.goldBonusEarned,
+    ).length;
+    const enrichedBosses = bosses.map((boss) => {
+      const def = BOSS_DEFINITIONS.find((b) => b.id === boss.bossId);
+      return {
+        ...boss,
+        corruptionLevel: normalizedVenture.corruptionLevel,
+        bossSlug: getBossSlug(boss.bossId),
+        visualStatus: getBossVisualStatus(normalizedVenture.corruptionLevel),
+        definition: def,
+      };
+    });
+    const stageStates = buildStageStates(checkpoints);
+
+    return {
+      ...normalizedVenture,
+      completedCheckpoints,
+      goldCheckpoints,
+      totalCheckpoints: checkpoints.length,
+      bosses: enrichedBosses,
+      superBoss: await buildSuperBossState(ctx, normalizedVenture, bosses[0] ?? null),
+      stageStates,
+      projectState: getProjectOutcome(stageStates, normalizedVenture.status),
+      slainBosses: buildSlainBosses(enrichedBosses),
+    };
+  },
+});
+
+/**
  * Get venture summaries for all user ventures (for My Ventures page).
  * Lightweight — no tasks or evidence.
  */

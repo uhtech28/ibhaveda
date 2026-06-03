@@ -247,15 +247,11 @@ function IdeaVentureProgressBar({
   title: string;
 }) {
   const router = useRouter();
-  const venture = useQuery(api.worldMap.getVentureByIdea, {
+  const summary = useQuery(api.ventures.getVentureSummaryByIdea, {
     ideaId: ideaId as Id<"ideas">,
   });
-  const summary = useQuery(
-    api.ventures.getVentureSummary,
-    venture?._id ? { ventureId: venture._id as Id<"ventures"> } : "skip",
-  );
 
-  if (!venture || !summary) return null;
+  if (!summary) return null;
 
   const progressPercentage = summary.totalCheckpoints > 0
     ? Math.min(100, Math.round((summary.completedCheckpoints / summary.totalCheckpoints) * 100))

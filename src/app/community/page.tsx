@@ -356,7 +356,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const emptyProfileText = "No bio yet - this builder hasn't introduced themselves";
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 flex h-[248px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+    <Card className="group hover:shadow-lg transition-all duration-300 flex h-[268px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
       <div className="grid shrink-0 grid-rows-[42px_22px_24px_24px_42px] px-4 pb-0.5 pt-2">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
@@ -453,7 +453,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
       {/* Footer Actions */}
       {!isCurrentUser && currentUserId && (
-        <div className="flex h-[40px] shrink-0 items-start gap-2 px-3 pt-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex h-[48px] shrink-0 items-start gap-2 px-3 pt-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1">
             <InvitationButton
               targetUser={{
