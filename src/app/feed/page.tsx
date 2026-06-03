@@ -69,7 +69,10 @@ export default function FeedPage() {
 
   const ideas = useMemo(() => (ideasQuery || []) as IdeaForgeIdea[], [ideasQuery]);
 
-  if (!isLoaded || !userId) {
+  // While Clerk is still loading, keep rendering the feed shell so the
+  // Convex subscription (already started above) can resolve in parallel.
+  // Once loaded, redirect unauthenticated users.
+  if (isLoaded && !userId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0A0D12]">
         <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-[#6366F1]" />

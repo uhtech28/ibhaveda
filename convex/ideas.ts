@@ -263,31 +263,23 @@ export const getPublicIdeas = query({
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
 
-    // 1. Identify agent vs human users
-    const agentUsers = await ctx.db
-      .query("users")
-      .withIndex("by_role", (q) => q.eq("role", "agent"))
-      .collect();
-    const agentIdSet = new Set(agentUsers.map((u) => String(u._id)));
+    // 1-3. Run all independent fetches in parallel
+    const [agentUsers, topWallets, recentPublicIdeas] = await Promise.all([
+      ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "agent")).collect(),
+      ctx.db.query("wallets").withIndex("by_balance").order("desc").take(5),
+      ctx.db
+        .query("ideas")
+        .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
+        .filter((q) => q.neq(q.field("isDeleted"), true))
+        .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
+        .order("desc")
+        .take(limit * 6),
+    ]);
 
-    // 2. Top 5 leaderboard users (non-agents only) for the boost
-    const topWallets = await ctx.db
-      .query("wallets")
-      .withIndex("by_balance")
-      .order("desc")
-      .take(5);
+    const agentIdSet = new Set(agentUsers.map((u) => String(u._id)));
     const topUserIds = new Set(
       topWallets.map((w) => String(w.userId)).filter((id) => !agentIdSet.has(id))
     );
-
-    // 3. Single scan: fetch recent public top-level ideas (covers both humans and agents)
-    const recentPublicIdeas = await ctx.db
-      .query("ideas")
-      .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
-      .filter((q) => q.neq(q.field("isDeleted"), true))
-      .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
-      .order("desc")
-      .take(limit * 6);
 
     const humanIdeasRaw = recentPublicIdeas.filter((i) => !agentIdSet.has(String(i.authorId)));
     const recentAgentIdeas = recentPublicIdeas.filter((i) => agentIdSet.has(String(i.authorId)));
