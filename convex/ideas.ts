@@ -280,39 +280,19 @@ export const getPublicIdeas = query({
       topWallets.map((w) => String(w.userId)).filter((id) => !agentIdSet.has(id))
     );
 
-    // 3. Fetch recent agent posts
-    const recentAgentIdeas = await ctx.db
+    // 3. Single scan: fetch recent public top-level ideas (covers both humans and agents)
+    const recentPublicIdeas = await ctx.db
       .query("ideas")
       .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
       .filter((q) => q.neq(q.field("isDeleted"), true))
       .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
       .order("desc")
-      .take(limit * 4);
+      .take(limit * 6);
 
-    // 4. Fetch recent ideas from every human user explicitly (guarantees they appear)
-    const humanUsers = await ctx.db.query("users").collect();
-    const humanUserIds = humanUsers
-      .filter((u) => !agentIdSet.has(String(u._id)))
-      .map((u) => u._id);
+    const humanIdeasRaw = recentPublicIdeas.filter((i) => !agentIdSet.has(String(i.authorId)));
+    const recentAgentIdeas = recentPublicIdeas.filter((i) => agentIdSet.has(String(i.authorId)));
 
-    const humanIdeasArrays = await Promise.all(
-      humanUserIds.map((userId) =>
-        ctx.db
-          .query("ideas")
-          .withIndex("by_author_visibility", (q) =>
-            q.eq("authorId", userId).eq("visibility", "public")
-          )
-          .filter((q) => q.neq(q.field("isDeleted"), true))
-          .filter((q) =>
-            q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null))
-          )
-          .order("desc")
-          .take(5)
-      )
-    );
-    const humanIdeasRaw = humanIdeasArrays.flat();
-
-    // 5. Build separate sorted pools
+    // 4. Build separate sorted pools
     const BOOST_AMOUNT = 86400000;
 
     const score = (idea: { authorId: any; createdAt: number }) =>

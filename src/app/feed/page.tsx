@@ -29,6 +29,16 @@ export default function FeedPage() {
   const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit });
   const toggleSpark = useMutation(api.ideas.toggleSpark);
 
+  // Temporary: measure feed load time
+  const feedLoadStart = useRef<number | null>(null);
+  useEffect(() => { feedLoadStart.current = performance.now(); }, []);
+  useEffect(() => {
+    if (ideasQuery !== undefined && feedLoadStart.current !== null) {
+      console.log(`[Feed] Data arrived in ${Math.round(performance.now() - feedLoadStart.current)}ms`);
+      feedLoadStart.current = null;
+    }
+  }, [ideasQuery]);
+
   // Track whether there are more ideas to load
   const hasMore = ideasQuery !== undefined && ideasQuery.length >= limit;
 
