@@ -1319,7 +1319,17 @@ export const getVentureByIdea = query({
 
     if (!venture) return null;
 
-    const canView = idea.visibility === "public" || venture.userId === user._id || idea.authorId === user._id;
+    const acceptedContribution = await ctx.db
+      .query("contributionRequests")
+      .withIndex("by_idea_contributor", (q) =>
+        q.eq("ideaId", args.ideaId).eq("contributorId", user._id),
+      )
+      .first();
+    const canView =
+      idea.visibility === "public" ||
+      venture.userId === user._id ||
+      idea.authorId === user._id ||
+      acceptedContribution?.status === "accepted";
     if (!canView) return null;
 
     return {

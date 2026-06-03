@@ -1029,72 +1029,70 @@ export const getVentureSummaryByIdea = query({
     ideaId: v.id("ideas"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) return null;
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-    if (!user) return null;
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .first();
+      if (!user) return null;
 
-    const idea = await ctx.db.get(args.ideaId);
-    if (!idea || idea.isDeleted) return null;
+      const idea = await ctx.db.get(args.ideaId);
+      if (!idea || idea.isDeleted) return null;
 
-    const venture = await ctx.db
-      .query("ventures")
-      .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
-      .first();
-    if (!venture) return null;
+      const venture = await ctx.db
+        .query("ventures")
+        .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
+        .first();
+      if (!venture) return null;
 
-    const canView = idea.visibility === "public" || idea.authorId === user._id || venture.userId === user._id;
-    if (!canView) return null;
+      const acceptedContribution = await ctx.db
+        .query("contributionRequests")
+        .withIndex("by_idea_contributor", (q) =>
+          q.eq("ideaId", args.ideaId).eq("contributorId", user._id),
+        )
+        .first();
+      const canView =
+        idea.visibility === "public" ||
+        idea.authorId === user._id ||
+        venture.userId === user._id ||
+        acceptedContribution?.status === "accepted";
+      if (!canView) return null;
 
-    const normalizedVenture = {
-      ...venture,
-      corruptionLevel: venture.corruptionLevel ?? 0,
-      lastActivityAt: venture.lastActivityAt ?? venture.updatedAt,
-    };
+      const checkpoints = await ctx.db
+        .query("ventureCheckpoints")
+        .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
+        .collect();
 
-    const checkpoints = await ctx.db
-      .query("ventureCheckpoints")
-      .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
-      .collect();
+      const completedCheckpoints = checkpoints.filter(
+        (cp) => cp.status === "completed",
+      ).length;
 
-    const bosses = await ctx.db
-      .query("ventureBosses")
-      .withIndex("by_venture", (q) => q.eq("ventureId", venture._id))
-      .collect();
+      const superBoss = await buildSuperBossState(
+        ctx,
+        {
+          _id: venture._id,
+          corruptionLevel: venture.corruptionLevel ?? 0,
+        },
+      );
 
-    const completedCheckpoints = checkpoints.filter(
-      (cp) => cp.status === "completed",
-    ).length;
-    const goldCheckpoints = checkpoints.filter(
-      (cp) => cp.goldBonusEarned,
-    ).length;
-    const enrichedBosses = bosses.map((boss) => {
-      const def = BOSS_DEFINITIONS.find((b) => b.id === boss.bossId);
       return {
-        ...boss,
-        corruptionLevel: normalizedVenture.corruptionLevel,
-        bossSlug: getBossSlug(boss.bossId),
-        visualStatus: getBossVisualStatus(normalizedVenture.corruptionLevel),
-        definition: def,
+        _id: venture._id,
+        ideaId: venture.ideaId,
+        userId: venture.userId,
+        status: venture.status,
+        currentStage: venture.currentStage,
+        currentCheckpoint: venture.currentCheckpoint,
+        completedCheckpoints,
+        totalCheckpoints: checkpoints.length,
+        superBoss,
       };
-    });
-    const stageStates = buildStageStates(checkpoints);
-
-    return {
-      ...normalizedVenture,
-      completedCheckpoints,
-      goldCheckpoints,
-      totalCheckpoints: checkpoints.length,
-      bosses: enrichedBosses,
-      superBoss: await buildSuperBossState(ctx, normalizedVenture, bosses[0] ?? null),
-      stageStates,
-      projectState: getProjectOutcome(stageStates, normalizedVenture.status),
-      slainBosses: buildSlainBosses(enrichedBosses),
-    };
+    } catch (error) {
+      console.warn("getVentureSummaryByIdea failed", error);
+      return null;
+    }
   },
 });
 
