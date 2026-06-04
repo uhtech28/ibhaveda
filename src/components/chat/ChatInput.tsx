@@ -30,7 +30,7 @@ const ChatInput: React.FC<ChatInputProps> = memo(({ onSend, typingUsers, placeho
   };
 
   return (
-    <div className="bg-[#0B101B] px-4 py-3">
+    <div className="bg-[#0B101B] px-4 py-2">
       {typingUsers.length > 0 && (
         <div className="mb-2 text-sm text-muted-foreground">
           {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing...
@@ -42,13 +42,13 @@ const ChatInput: React.FC<ChatInputProps> = memo(({ onSend, typingUsers, placeho
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="block max-h-[84px] min-h-[44px] w-full resize-none rounded-[22px] border-0 bg-transparent py-3 pl-4 pr-14 text-sm leading-5 text-white placeholder:text-[#6B7280] shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="block max-h-[84px] min-h-[40px] w-full resize-none rounded-[22px] border-0 bg-transparent py-2.5 pl-4 pr-14 text-sm leading-5 text-white placeholder:text-[#6B7280] shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
           rows={1}
         />
         <Button
           onClick={handleSubmit}
           size="icon"
-          className="absolute bottom-1.5 right-1.5 h-8 w-8 rounded-full bg-[#4F46E5] text-white hover:bg-[#6366F1] disabled:opacity-40 disabled:hover:bg-[#4F46E5]"
+          className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-[#4F46E5] text-white hover:bg-[#6366F1] disabled:opacity-40 disabled:hover:bg-[#4F46E5]"
           disabled={!message.trim()}
         >
           <Send className="w-4 h-4" />

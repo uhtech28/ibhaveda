@@ -31,7 +31,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, variant = "
   return (
     <div
       className={cn(
-        "flex w-full max-w-full min-w-0",
+        "flex w-full max-w-full min-w-0 items-center gap-2",
         isCurrentUser ? "justify-end" : "justify-start"
       )}
     >
@@ -46,7 +46,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, variant = "
 
       <div
         className={cn(
-          "max-w-[15rem] rounded-2xl px-3.5 py-2 shadow-sm",
+          "max-w-[15rem] rounded-2xl px-3.5 py-2.5 shadow-sm",
           isCurrentUser
             ? "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-br-sm"
             : "bg-[#1a2030] text-foreground border border-white/[0.06] rounded-bl-sm"

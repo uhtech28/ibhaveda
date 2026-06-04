@@ -152,7 +152,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
   return (
     <div className="flex flex-col h-full bg-[#0B101B] max-w-full overflow-hidden">
-      <div className="relative flex min-h-[72px] items-center border-b border-white/10 bg-[#0B101B] px-4 py-3">
+      <div className="relative flex h-14 shrink-0 items-center border-b border-white/10 bg-[#0B101B] px-4 py-0">
         <div className="absolute left-4 top-1/2 flex -translate-y-1/2 items-center">
           <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 hover:bg-white/[0.08] shrink-0">
             <ArrowLeft className="w-4 h-4" />
@@ -214,46 +214,48 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
         </div>
       </div>
       <div className="flex-1 max-w-full overflow-y-auto bg-[#0B101B]" ref={scrollAreaRef}>
-        <div className="max-w-full overflow-x-auto">
+        <div className="min-h-full max-w-full overflow-x-auto">
           {displayedMessages === undefined ? (
             receiverId && !conversationId && directConversationId === undefined ? (
-              <div className="text-center text-muted-foreground text-sm">
+              <div className="flex min-h-full items-center justify-center text-center text-muted-foreground text-sm">
                 Loading conversation...
               </div>
             ) : receiverId && !conversationId && directConversationId === null ? (
-              <div className="text-center text-muted-foreground text-sm">
+              <div className="flex min-h-full items-center justify-center text-center text-muted-foreground text-sm">
                 No messages yet. Start the conversation!
               </div>
             ) : (
-              <div className="text-center text-muted-foreground text-sm">
+              <div className="flex min-h-full items-center justify-center text-center text-muted-foreground text-sm">
                 Loading messages...
               </div>
             )
           ) : displayedMessages.length === 0 ? (
-            <div className="text-center text-muted-foreground text-sm">
+            <div className="flex min-h-full items-center justify-center text-center text-muted-foreground text-sm">
               No messages yet. Start the conversation!
             </div>
           ) : (
-            displayedMessages.map((message) => {
-              const senderUser = users?.find(u => u.id === message.senderId);
-              return (
-                <MessageBubble
-                  key={message._id}
-                  variant={ideaId ? "group" : "direct"}
-                  message={{
-                    id: message._id,
-                    text: message.content,
-                    sender: {
-                      id: message.senderId,
-                      name: senderUser?.displayName || "Unknown",
-                      avatar: senderUser?.avatar || null,
-                    },
-                    timestamp: new Date(message.createdAt),
-                    isCurrentUser: message.senderId === currentUserId,
-                  }}
-                />
-              );
-            })
+            <div className="space-y-3 p-4">
+              {displayedMessages.map((message) => {
+                const senderUser = users?.find(u => u.id === message.senderId);
+                return (
+                  <MessageBubble
+                    key={message._id}
+                    variant={ideaId ? "group" : "direct"}
+                    message={{
+                      id: message._id,
+                      text: message.content,
+                      sender: {
+                        id: message.senderId,
+                        name: senderUser?.displayName || "Unknown",
+                        avatar: senderUser?.avatar || null,
+                      },
+                      timestamp: new Date(message.createdAt),
+                      isCurrentUser: message.senderId === currentUserId,
+                    }}
+                  />
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

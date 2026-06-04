@@ -63,7 +63,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
   };
 
   const projectProfileHeader = (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
       <Link
         href={ideaHref}
         className="min-w-0 truncate text-sm font-semibold text-white transition-colors hover:text-[#C7D2FE]"
@@ -77,13 +77,13 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
           className="shrink-0 rounded-full transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1]/50"
           aria-label={`Open ${displayAuthorName}'s profile`}
         >
-          <Avatar className="h-10 w-10">
+          <Avatar className="h-9 w-9">
             <AvatarImage src={authorAvatar} alt={displayAuthorName} />
             <AvatarFallback className="bg-[#1B2440] text-xs text-white">{initials || "U"}</AvatarFallback>
           </Avatar>
         </Link>
       ) : (
-        <Avatar className="h-10 w-10 shrink-0">
+        <Avatar className="h-9 w-9 shrink-0">
           <AvatarImage src={authorAvatar} alt={displayAuthorName} />
           <AvatarFallback className="bg-[#1B2440] text-xs text-white">{initials || "U"}</AvatarFallback>
         </Avatar>

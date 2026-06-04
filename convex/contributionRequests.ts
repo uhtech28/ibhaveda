@@ -301,9 +301,14 @@ export const updateRequestStatus = mutation({
 
       const request = await ctx.db.get(args.requestId);
       if (!request) throw new Error("Request not found or has been removed");
-      if (request.authorId !== user._id) throw new Error("Not authorized to update this request");
-      if (request.status !== "pending") {
+      const isAuthorAction = request.authorId === user._id;
+      const isContributorDismiss = args.status === "rejected" && request.contributorId === user._id;
+      if (!isAuthorAction && !isContributorDismiss) throw new Error("Not authorized to update this request");
+      if (isAuthorAction && request.status !== "pending" && !(request.status === "accepted" && args.status === "rejected")) {
         throw new Error(`Cannot ${args.status} a request that is already ${request.status}`);
+      }
+      if (isContributorDismiss && request.status !== "pending" && request.status !== "accepted") {
+        throw new Error(`Cannot withdraw a request that is already ${request.status}`);
       }
 
       await ctx.db.patch(args.requestId, { status: args.status, updatedAt: Date.now() });
@@ -314,7 +319,7 @@ export const updateRequestStatus = mutation({
         const current = ideaForCount.contributionRequestCount ?? 0;
         if (args.status === "accepted") {
           await ctx.db.patch(request.ideaId, { contributionRequestCount: current + 1 });
-        } else if (args.status === "rejected" && current > 0) {
+        } else if (args.status === "rejected" && request.status === "accepted" && current > 0) {
           await ctx.db.patch(request.ideaId, { contributionRequestCount: current - 1 });
         }
       }
@@ -322,6 +327,10 @@ export const updateRequestStatus = mutation({
       const updatedRequest = await ctx.db.get(args.requestId);
       if (updatedRequest?.status !== args.status) {
         throw new Error("Request status update failed due to concurrent modification");
+      }
+
+      if (isContributorDismiss) {
+        return { message: "Request withdrawn successfully" };
       }
 
       await ctx.db.insert("notifications", {

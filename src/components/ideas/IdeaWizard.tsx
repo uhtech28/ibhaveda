@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import {
   Sparkles,
   ArrowLeft,
+  ArrowRight,
   AlertCircle,
   Globe,
   Lock,
@@ -33,6 +34,7 @@ import {
   Palette,
   FlaskConical,
   Microscope,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import { displayFontClass } from "@/components/ideaforge/shared";
@@ -110,6 +112,7 @@ export function IdeaWizard({
 }: IdeaWizardProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const generateFromOutline = useAction(api.ai.generateIdeaFromOutline);
   const createIdea = useMutation(api.ideas.createIdea);
@@ -121,6 +124,8 @@ export function IdeaWizard({
   const [step, setStep] = useState<Step>("template");
   const [selectedTemplate, setSelectedTemplate] =
     useState<TemplateId>("venture");
+  const [templateAutoAdvanceReady, setTemplateAutoAdvanceReady] =
+    useState(false);
 
   // ── Step 2: outline ──
   const [outline, setOutline] = useState("");
@@ -132,6 +137,7 @@ export function IdeaWizard({
   const [skills, setSkills] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [files, setFiles] = useState<File[]>([]);
+  const [fileUploadError, setFileUploadError] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -142,6 +148,7 @@ export function IdeaWizard({
   const reset = () => {
     setStep("template");
     setSelectedTemplate("venture");
+    setTemplateAutoAdvanceReady(false);
     setOutline("");
     setTitle("");
     setDescription("");
@@ -149,6 +156,7 @@ export function IdeaWizard({
     setSkills([]);
     setVisibility("public");
     setFiles([]);
+    setFileUploadError("");
     setIsSubmitting(false);
     setSubmitError("");
     setAiHadError(false);
@@ -158,6 +166,28 @@ export function IdeaWizard({
   const close = () => {
     onOpenChange(false);
     setTimeout(reset, 300);
+  };
+
+  useEffect(() => {
+    if (!isOpen || step !== "template") {
+      setTemplateAutoAdvanceReady(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setTemplateAutoAdvanceReady(true);
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen, step]);
+
+  const handleTemplateSelect = (templateId: TemplateId) => {
+    audioManager.playTouch(templateAutoAdvanceReady ? "confirm" : "click");
+    setSelectedTemplate(templateId);
+
+    if (templateAutoAdvanceReady) {
+      setStep("outline");
+    }
   };
 
   // Populate fields from initialDraft (skips template + outline steps)
@@ -209,7 +239,7 @@ export function IdeaWizard({
 
   // ── AI handlers ──
   const handleGenerate = async () => {
-    if (!outline.trim()) return;
+    if (!outline.trim() || outline.length > 500) return;
     setAiHadError(false);
     setStep("generating");
     try {
@@ -242,6 +272,21 @@ export function IdeaWizard({
   const handleSkipAI = () => {
     setDescription(outline.trim());
     setStep("preview");
+  };
+
+  const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 50 * 1024 * 1024) {
+      setFiles([]);
+      setFileUploadError("Please restrict file uploads to less than 50MB");
+      event.target.value = "";
+      return;
+    }
+
+    setFiles([file]);
+    setFileUploadError("");
   };
 
   // Auto-generate tags when AI had an error
@@ -294,6 +339,10 @@ export function IdeaWizard({
       setSubmitError("Description is required.");
       return;
     }
+    if (description.length > 1200) {
+      setSubmitError("Description must be 1200 characters or less.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -304,7 +353,7 @@ export function IdeaWizard({
         category: skills.length > 0 ? JSON.stringify(skills) : "",
         industries:
           industries.length > 0 ? JSON.stringify(industries) : undefined,
-        visibility,
+        visibility: "public",
       });
       const newIdeaId = res.ideaId as Id<"ideas">;
 
@@ -350,11 +399,8 @@ export function IdeaWizard({
       }
 
       toast({
-        title: visibility === "public" ? "Idea posted!" : "Saved as private",
-        description:
-          visibility === "public"
-            ? "Loading your world map…"
-            : "Only you can see it — toggle to Public any time.",
+        title: "Idea posted!",
+        description: "Loading your world map…",
       });
       close();
       router.push(`/map/world?ventureId=${ventureId}`);
@@ -369,6 +415,8 @@ export function IdeaWizard({
 
   // ── Derived (used in outline + preview badge) ──
   const activeDef = TEMPLATE_DEFS[selectedTemplate];
+  const isOverOutlineLimit = outline.length > 500;
+  const isOverDescriptionLimit = description.length > 1200;
 
   // ───────────────────────────────────────────────────────────────────────────
   return (
@@ -391,7 +439,7 @@ export function IdeaWizard({
                 What are you working on?
               </DialogTitle>
               <DialogDescription className="text-xs text-[#6B7280] mt-0.5">
-                Pick a path — this shapes your world map.
+                Pick a Path to begin shaping your World.
               </DialogDescription>
             </DialogHeader>
 
@@ -403,10 +451,7 @@ export function IdeaWizard({
                   <button
                     key={templateId}
                     type="button"
-                    onClick={() => {
-                      audioManager.playTouch("click");
-                      setSelectedTemplate(templateId);
-                    }}
+                    onClick={() => handleTemplateSelect(templateId)}
                     className={cn(
                       "relative flex flex-col gap-2 rounded-xl border px-3 py-3 text-left transition-all duration-200",
                       isSelected
@@ -453,17 +498,7 @@ export function IdeaWizard({
               })}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-white/5 px-4 pt-3 pb-4 sm:pb-3 bg-[#0A0E1A] shrink-0 pb-safe">
-              <button
-                type="button"
-                onClick={() => {
-                  audioManager.playTouch("click");
-                  close();
-                }}
-                className="text-sm text-[#6B7280] hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
+            <div className="flex items-center justify-end gap-3 border-t border-white/5 px-4 pt-3 pb-4 sm:pb-3 bg-[#0A0E1A] shrink-0 pb-safe">
               <Button
                 type="button"
                 onClick={() => {
@@ -484,56 +519,50 @@ export function IdeaWizard({
           <>
             <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
               <div className="flex items-center gap-2.5">
-                <Sparkles className="h-5 w-5 text-[#8B5CF6] animate-pulse" />
+                <button
+                  type="button"
+                  onClick={() => setStep("template")}
+                  className="shrink-0 transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/50"
+                  aria-label="Change path"
+                  title={`Change ${activeDef.title}`}
+                >
+                  <activeDef.icon
+                    strokeWidth={1.8}
+                    style={{ width: 22, height: 22, color: activeDef.color }}
+                  />
+                </button>
                 <DialogTitle
                   className={cn(
                     displayFontClass,
                     "text-lg font-semibold text-white",
                   )}
                 >
-                  Describe your idea
+                  Describe Your Idea
                 </DialogTitle>
               </div>
-              {/* Template badge */}
-              <div className="mt-1.5 flex items-center gap-2">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                  style={{
-                    borderColor: `${activeDef.color}50`,
-                    color: activeDef.color,
-                    background: `${activeDef.color}15`,
-                  }}
-                >
-                  <activeDef.icon strokeWidth={1.5} style={{ width: 10, height: 10 }} />
-                  {activeDef.title}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setStep("template")}
-                  className="text-[10px] text-[#6B7280] hover:text-white transition-colors underline underline-offset-2"
-                >
-                  change
-                </button>
-              </div>
               <DialogDescription className="text-xs text-[#9CA3AF] mt-1">
-                Briefly describe your idea. AI will generate the full form.
+                Briefly describe your idea. We&apos;ll do the rest!
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 flex flex-col px-5 py-4 min-h-0">
-              <div className="relative flex-1">
+            <div className="px-5 py-4">
+              <div className="relative">
                 <Textarea
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
                   placeholder="e.g. An app that helps remote teams pick a meet-up city based on flight cost and weather. Built for distributed startup teams that retreat 2-3 times a year."
-                  className="h-full resize-none rounded-[12px] border-white/5 bg-[#0D1117] text-sm text-white placeholder:text-[#6B7280] focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-0 focus-visible:border-transparent p-4"
-                  maxLength={500}
+                  className={cn(
+                    "min-h-[136px] resize-none rounded-[12px] border-white/5 bg-[#0D1117] p-4 pr-4 text-sm leading-6 text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-0",
+                    isOverOutlineLimit && "border-rose-500/80 focus-visible:ring-rose-400",
+                  )}
                   autoFocus
                 />
-                <div className="absolute bottom-3 right-4 text-xs text-[#6B7280]">
-                  {outline.length}/500
-                </div>
               </div>
+              {isOverOutlineLimit && (
+                <p className="mt-1.5 pl-3 text-[11px] font-medium text-rose-400">
+                  Max character count reached
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 pt-3 pb-4 sm:pb-3 bg-[#0D1117] shrink-0 pb-safe">
@@ -544,9 +573,10 @@ export function IdeaWizard({
                     audioManager.playTouch("click");
                     setStep("template");
                   }}
-                  className="text-xs text-[#9CA3AF] hover:text-white transition-colors flex items-center gap-1"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-white/[0.06] hover:text-white"
+                  aria-label="Back"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5" /> Back
+                  <ArrowLeft className="h-4 w-4" />
                 </button>
                 <button
                   type="button"
@@ -554,35 +584,23 @@ export function IdeaWizard({
                     audioManager.playTouch("click");
                     handleSkipAI();
                   }}
-                  className="text-xs font-medium text-[#C7D2FE] hover:text-white transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-[#C7D2FE] transition-colors hover:text-white"
                 >
-                  Skip AI, fill manually →
+                  Fill Manually <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
               <div className="flex gap-2.5">
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={() => {
-                    audioManager.playTouch("click");
-                    close();
-                  }}
-                  className="h-9 rounded-[10px] border-white/5 bg-[#0D1117] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
                   onClick={() => {
                     audioManager.playTouch(
-                      outline.trim() ? "confirm" : "error",
+                      outline.trim() && !isOverOutlineLimit ? "confirm" : "error",
                     );
-                    if (outline.trim()) handleGenerate();
+                    if (outline.trim() && !isOverOutlineLimit) handleGenerate();
                   }}
-                  disabled={!outline.trim()}
+                  disabled={!outline.trim() || isOverOutlineLimit}
                   className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Sparkles className="h-4 w-4 mr-2" />
                   Generate
                 </Button>
               </div>
@@ -630,22 +648,19 @@ export function IdeaWizard({
                     "text-lg font-semibold text-white",
                   )}
                 >
-                  Review and post
+                  Your Idea
                 </DialogTitle>
-                {/* Template badge */}
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                  style={{
-                    borderColor: `${activeDef.color}50`,
-                    color: activeDef.color,
-                    background: `${activeDef.color}15`,
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setStep("template")}
+                  className="inline-flex items-center justify-center rounded-full p-1 transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1]/50"
+                  aria-label="Change path"
+                  title={`Change ${activeDef.title}`}
                 >
-                  <activeDef.icon strokeWidth={1.5} style={{ width: 10, height: 10 }} />
-                  {activeDef.title}
-                </span>
+                  <activeDef.icon strokeWidth={1.7} style={{ width: 17, height: 17, color: activeDef.color }} />
+                </button>
               </div>
-              <DialogDescription className="text-xs text-[#9CA3AF] mt-1">
+              <DialogDescription className="text-xs text-[#9CA3AF] mt-0.5">
                 {aiHadError
                   ? "AI couldn't fill the form this time — please fill it in below."
                   : !aiHadError && title && description
@@ -654,87 +669,94 @@ export function IdeaWizard({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-2.5 sm:px-5 sm:py-3 space-y-2 min-h-0">
-              <div className="space-y-1">
-                <Label
-                  htmlFor="wiz-title"
-                  className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider"
-                >
-                  Title <span className="text-destructive">*</span>
-                </Label>
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0">
+              <div>
                 <Input
                   id="wiz-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="A short, specific title"
                   maxLength={100}
-                  className="h-9 rounded-[10px] border-white/5 bg-[#0D1117] text-sm text-white placeholder:text-[#6B7280] focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0 focus-visible:border-transparent px-3"
+                  className="h-11 rounded-[10px] border-white/5 bg-[#0D1117] px-3 text-sm text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0"
                   required
                   autoFocus
                 />
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="wiz-description"
-                    className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider"
+              <div>
+                <div className="relative">
+                  <Textarea
+                    id="wiz-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="What's the idea? Who is it for?"
+                    className={cn(
+                      "h-[136px] resize-none overflow-y-auto rounded-[10px] border-white/5 bg-[#0D1117] p-4 pb-12 pr-14 text-sm leading-6 text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent",
+                      isOverDescriptionLimit && "border-rose-500/80 focus-visible:ring-rose-400",
+                    )}
+                    required
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/jpg,image/png,image/gif,video/mp4,.pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.mp4"
+                    className="sr-only"
+                    onChange={handleFileSelection}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={cn(
+                      "absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-[#9CA3AF] transition-colors hover:bg-white/[0.1] hover:text-white",
+                      files.length > 0 && "bg-[#6366F1]/20 text-[#C7D2FE]",
+                    )}
+                    aria-label="Upload attachment"
+                    title={files[0]?.name || "Upload attachment"}
                   >
-                    Description <span className="text-destructive">*</span>
-                  </Label>
-                  <span className="text-[10px] text-[#6B7280]">
-                    {description.length}/1200
-                  </span>
+                    <Upload className="h-4 w-4" />
+                  </button>
                 </div>
-                <Textarea
-                  id="wiz-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What's the idea? Who is it for?"
-                  className="min-h-[56px] max-h-[72px] rounded-[10px] border-white/5 bg-[#0D1117] text-sm text-white placeholder:text-[#6B7280] focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0 focus-visible:border-transparent p-3"
-                  maxLength={1200}
-                  required
-                />
+                {isOverDescriptionLimit && (
+                  <p className="mt-1.5 pl-3 text-[11px] font-medium text-rose-400">
+                    Max character count reached
+                  </p>
+                )}
+                {fileUploadError && (
+                  <p className="mt-1.5 pl-3 text-[11px] font-medium text-rose-400">
+                    {fileUploadError}
+                  </p>
+                )}
+                <p className="mt-1.5 pl-3 text-[9px] leading-none text-[#6B7280]">
+                  PDF, DOCX, PPTX, XLSX, JPG, PNG, GIF, MP4 (&lt;50 MB)
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider flex items-center gap-1.5">
-                    Industries
-                    {isGeneratingTags && (
-                      <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />
-                    )}
-                  </Label>
+                <div>
                   <IndustriesMultiSelect
                     selectedIndustries={industries}
                     onChange={setIndustries}
                     placeholder={
                       isGeneratingTags
                         ? "AI is selecting..."
-                        : "Select industries..."
+                        : "Industries Impacted..."
                     }
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider flex items-center gap-1.5">
-                    Skills needed
-                    {isGeneratingTags && (
-                      <Sparkles className="h-3 w-3 text-[#8B5CF6] animate-pulse" />
-                    )}
-                  </Label>
+                <div>
                   <SkillsMultiSelect
                     selectedSkills={skills}
                     onChange={setSkills}
                     placeholder={
                       isGeneratingTags
                         ? "AI is selecting..."
-                        : "Select skills..."
+                        : "Skills Needed..."
                     }
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="hidden">
                 {/* Visibility */}
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
@@ -850,28 +872,17 @@ export function IdeaWizard({
                   audioManager.playTouch("click");
                   setStep("outline");
                 }}
-                className="text-xs text-[#9CA3AF] hover:text-white transition-colors flex items-center gap-1.5"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-white/[0.06] hover:text-white"
                 disabled={isSubmitting}
+                aria-label="Back to outline"
               >
-                <ArrowLeft className="h-3.5 w-3.5" /> Back to outline
+                <ArrowLeft className="h-4 w-4" />
               </button>
               <div className="flex gap-2.5">
                 <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    audioManager.playTouch("click");
-                    close();
-                  }}
-                  disabled={isSubmitting}
-                  className="h-9 rounded-[10px] border-white/5 bg-[#0A0E1A] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
-                >
-                  Cancel
-                </Button>
-                <Button
                   type="submit"
                   disabled={
-                    isSubmitting || !title.trim() || !description.trim()
+                    isSubmitting || !title.trim() || !description.trim() || isOverDescriptionLimit
                   }
                   className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
