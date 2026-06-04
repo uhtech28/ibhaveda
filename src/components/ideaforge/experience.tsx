@@ -123,7 +123,8 @@ export function IdeaForgeExperience({
   hasMore?: boolean;
 }) {
   const router = useRouter();
-  const publicIdeas = useQuery(api.ideas.getPublicIdeas, { limit: 60 }) || [];
+  const seed = useMemo(() => Math.floor(Math.random() * 5), []);
+  const publicIdeas = useQuery(api.ideas.getPublicIdeas, { limit: 60, seed }) || [];
   const showSkeleton = useDelayedLoading(isLoading);
 
   // Infinite scroll sentinel

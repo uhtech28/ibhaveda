@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -25,8 +25,11 @@ export function FeedClient() {
 
   const PAGE_SIZE = 20;
   const [limit, setLimit] = useState(PAGE_SIZE);
+  // Generated once per page load — controls human-pool shuffle order and
+  // rare agent injection (seed 0 = ~20% chance of one agent post mid-feed).
+  const seed = useMemo(() => Math.floor(Math.random() * 5), []);
 
-  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit });
+  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit, seed });
   const toggleSpark = useMutation(api.ideas.toggleSpark);
 
   // Keep a stable copy so the list never disappears while the next page loads.

@@ -257,11 +257,27 @@ export const attachFileToIdea = mutation({
   },
 });
 
+// Deterministic Fisher-Yates shuffle seeded by a small integer (0–4).
+// Same seed → same order, different seed → different order.
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const a = [...arr];
+  let s = (seed + 1) * 1664525 + 1013904223;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+    const j = s % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // Get all root public ideas (for feed) - excludes sub-ideas with limit-based pagination
 export const getPublicIdeas = query({
-  args: { limit: v.optional(v.number()) },
+  args: { limit: v.optional(v.number()), seed: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
+    // seed is 0–4, generated client-side once per page load.
+    // Controls human-pool shuffle order and rare agent injection (seed === 0 → ~20%).
+    const seed = args.seed ?? 1;
 
     // 1-3. Run all independent fetches in parallel
     const [agentUsers, topWallets, recentPublicIdeas] = await Promise.all([
@@ -292,18 +308,31 @@ export const getPublicIdeas = query({
         ? idea.createdAt + BOOST_AMOUNT
         : idea.createdAt;
 
-    const humanPool = humanIdeasRaw.sort((a, b) => score(b) - score(a));
+    // Sort each pool by score, then shuffle the human pool so returning users
+    // don't see the same posts at the top every visit.
+    const humanSorted = humanIdeasRaw.sort((a, b) => score(b) - score(a));
+    const humanPool = seededShuffle(humanSorted, seed);
     const agentPool = recentAgentIdeas
       .filter((i) => agentIdSet.has(String(i.authorId)))
       .sort((a, b) => score(b) - score(a));
 
-    // 6. Interleave: first 3 human → (2 agent, 2 human) groups → remaining agents
+    // Interleave: first 3 human → (2 agent, 2 human) groups → remaining agents
     const interleaved: typeof humanPool = [];
     let hi = 0, ai = 0;
     while (hi < 3 && hi < humanPool.length) interleaved.push(humanPool[hi++]);
     while (hi < humanPool.length || ai < agentPool.length) {
       for (let n = 0; n < 2 && ai < agentPool.length; n++) interleaved.push(agentPool[ai++]);
       for (let n = 0; n < 2 && hi < humanPool.length; n++) interleaved.push(humanPool[hi++]);
+    }
+
+    // Rare agent injection (~20%): when seed === 0, splice one agent post into
+    // position 2 so it appears mid-screen without dominating the top.
+    if (seed === 0 && agentPool.length > 0) {
+      const agentPost = agentPool[0];
+      // Only inject if it isn't already sitting at position 2 from the interleave
+      if (String(interleaved[2]?._id) !== String(agentPost._id)) {
+        interleaved.splice(2, 0, agentPost);
+      }
     }
 
     // Deduplicate (human and agent pools are disjoint, but leader ideas could overlap)
