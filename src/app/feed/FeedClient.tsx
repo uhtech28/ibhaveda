@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -29,6 +29,17 @@ export function FeedClient() {
   const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit });
   const toggleSpark = useMutation(api.ideas.toggleSpark);
 
+  // Keep a stable copy so the list never disappears while the next page loads.
+  // useQuery returns undefined while re-fetching new args, which would collapse
+  // ideas to [] and trigger the skeleton — scrolling the user back to the top.
+  const [stableIdeas, setStableIdeas] = useState<IdeaForgeIdea[]>([]);
+  useEffect(() => {
+    if (ideasQuery !== undefined) {
+      setStableIdeas(ideasQuery as IdeaForgeIdea[]);
+    }
+  }, [ideasQuery]);
+
+  const isInitialLoading = ideasQuery === undefined && stableIdeas.length === 0;
   const hasMore = ideasQuery !== undefined && ideasQuery.length >= limit;
 
   function loadMore() {
@@ -56,7 +67,7 @@ export function FeedClient() {
     }
   }, [isLoaded, isProfileComplete, isProfileLoading, router, toast, userId]);
 
-  const ideas = useMemo(() => (ideasQuery || []) as IdeaForgeIdea[], [ideasQuery]);
+  const ideas = stableIdeas;
 
   return (
     <>
@@ -64,7 +75,7 @@ export function FeedClient() {
         mode="feed"
         currentUser={currentUser || null}
         ideas={ideas}
-        isLoading={ideasQuery === undefined}
+        isLoading={isInitialLoading}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onSpark={async (ideaId) => {
