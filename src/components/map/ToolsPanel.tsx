@@ -125,6 +125,7 @@ interface ToolsPanelProps {
   onOpenCalendar?: () => void;
   onOpenKanban?: () => void;
   onOpenJournal?: () => void;
+  canSubmitTasks?: boolean;
 }
 
 export function ToolsPanel({
@@ -140,6 +141,7 @@ export function ToolsPanel({
   onOpenCalendar,
   onOpenKanban,
   onOpenJournal,
+  canSubmitTasks = false,
 }: ToolsPanelProps) {
   const [stageInfo] = useAtom(stageInfoAtom);
   const [searchQuery, setSearchQuery] = useState("");
@@ -327,6 +329,7 @@ export function ToolsPanel({
                     onOpenCalendar={onOpenCalendar}
                     onOpenKanban={onOpenKanban}
                     onOpenJournal={onOpenJournal}
+                    canSubmitTasks={canSubmitTasks}
                   />
                 )}
 
@@ -412,6 +415,7 @@ function AllToolsGrid({
   onOpenCalendar,
   onOpenKanban,
   onOpenJournal,
+  canSubmitTasks = false,
 }: {
   searchQuery: string;
   onToolSelect: (id: TabType) => void;
@@ -423,6 +427,7 @@ function AllToolsGrid({
   onOpenCalendar?: () => void;
   onOpenKanban?: () => void;
   onOpenJournal?: () => void;
+  canSubmitTasks?: boolean;
 }) {
   const router = useRouter();
   const venture = useQuery(
@@ -470,6 +475,7 @@ function AllToolsGrid({
       desc: "Schedule milestones",
       icon: CalendarIcon,
       color: "#fbbf24",
+      contributorOnly: true,
     },
     {
       id: "kanban",
@@ -477,6 +483,7 @@ function AllToolsGrid({
       desc: "Manage task workflow",
       icon: LayoutDashboard,
       color: "#34d399",
+      contributorOnly: true,
     },
     {
       id: "journal",
@@ -484,6 +491,7 @@ function AllToolsGrid({
       desc: "Private progress log",
       icon: Scroll,
       color: "#a78bfa",
+      contributorOnly: true,
     },
   ];
 
@@ -495,50 +503,62 @@ function AllToolsGrid({
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      {filteredTools.map((tool) => (
-        <motion.button
-          key={tool.id}
-          onClick={() => {
-            if (tool.id === "chat" && onOpenGroupChat) {
-              onOpenGroupChat();
-            } else if (tool.id === "contributors" && onOpenContributors) {
-              onOpenContributors();
-            } else if (tool.id === "feed" && onOpenContributions) {
-              onOpenContributions();
-            } else if (tool.id === "hierarchy" && onOpenHierarchy) {
-              onOpenHierarchy();
-            } else if (tool.id === "calendar" && onOpenCalendar) {
-              onOpenCalendar();
-            } else if (tool.id === "kanban" && onOpenKanban) {
-              onOpenKanban();
-            } else if (tool.id === "journal" && onOpenJournal) {
-              onOpenJournal();
-            } else if (tool.isExternal && activeVentureId) {
-              window.open(`/venture/${activeVentureId}/${(tool as any).path}`, "_blank");
-            } else {
-              onToolSelect(tool.id as TabType);
-            }
-          }}
-          whileHover={{ y: -2, scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all text-left group"
-        >
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
-            style={{
-              backgroundColor: `${tool.color}12`,
-              border: `1px solid ${tool.color}25`,
+      {filteredTools.map((tool) => {
+        const isLocked = !!(tool as any).contributorOnly && !canSubmitTasks;
+        return (
+          <motion.button
+            key={tool.id}
+            onClick={() => {
+              if (isLocked) return;
+              if (tool.id === "chat" && onOpenGroupChat) {
+                onOpenGroupChat();
+              } else if (tool.id === "contributors" && onOpenContributors) {
+                onOpenContributors();
+              } else if (tool.id === "feed" && onOpenContributions) {
+                onOpenContributions();
+              } else if (tool.id === "hierarchy" && onOpenHierarchy) {
+                onOpenHierarchy();
+              } else if (tool.id === "calendar" && onOpenCalendar) {
+                onOpenCalendar();
+              } else if (tool.id === "kanban" && onOpenKanban) {
+                onOpenKanban();
+              } else if (tool.id === "journal" && onOpenJournal) {
+                onOpenJournal();
+              } else if ((tool as any).isExternal && activeVentureId) {
+                window.open(`/venture/${activeVentureId}/${(tool as any).path}`, "_blank");
+              } else {
+                onToolSelect(tool.id as TabType);
+              }
             }}
+            whileHover={isLocked ? undefined : { y: -2, scale: 1.02 }}
+            whileTap={isLocked ? undefined : { scale: 0.98 }}
+            title={isLocked ? "Join as a contributor to access this tool" : undefined}
+            className={`relative flex items-center gap-2.5 p-2 rounded-xl border transition-all text-left group ${
+              isLocked
+                ? "bg-white/[0.01] border-white/5 opacity-50 cursor-not-allowed"
+                : "bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10 cursor-pointer"
+            }`}
           >
-            <tool.icon className="w-4 h-4" style={{ color: tool.color }} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-xs font-bold text-white truncate leading-tight group-hover:text-indigo-300 transition-colors">
-              {tool.name}
-            </h3>
-          </div>
-        </motion.button>
-      ))}
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
+              style={{
+                backgroundColor: `${tool.color}12`,
+                border: `1px solid ${tool.color}25`,
+              }}
+            >
+              {isLocked
+                ? <Lock className="w-4 h-4 text-white/30" />
+                : <tool.icon className="w-4 h-4" style={{ color: tool.color }} />
+              }
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className={`text-xs font-bold truncate leading-tight transition-colors ${isLocked ? "text-white/30" : "text-white group-hover:text-indigo-300"}`}>
+                {tool.name}
+              </h3>
+            </div>
+          </motion.button>
+        );
+      })}
     </div>
   );
 }

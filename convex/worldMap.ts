@@ -1750,10 +1750,21 @@ export const submitTaskContent = mutation({
     if (!checkpoint) throw new Error("Checkpoint not found");
     const checkpointBeforeUpdate = checkpoint as WorldMapCheckpointDoc;
 
-    // ── Verify ownership ──────────────────────────────────────────────────────
+    // ── Verify ownership or contributor status ────────────────────────────────
     const venture = await ctx.db.get(checkpoint.ventureId);
     if (!venture) throw new Error("Venture not found");
-    if (venture.userId !== user._id) throw new Error("Not your venture");
+
+    const isOwner = venture.userId === user._id;
+    if (!isOwner) {
+      const contribution = await ctx.db
+        .query("contributionRequests")
+        .withIndex("by_idea_contributor", (q) =>
+          q.eq("ideaId", venture.ideaId).eq("contributorId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "accepted"))
+        .first();
+      if (!contribution) throw new Error("Only contributors can submit tasks");
+    }
 
     // ── Check if already completed ────────────────────────────────────────────
     const flagField =
