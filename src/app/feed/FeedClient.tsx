@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -29,6 +29,16 @@ export function FeedClient() {
   // rare agent injection (seed 0 = ~20% chance of one agent post mid-feed).
   const seed = useMemo(() => Math.floor(Math.random() * 5), []);
 
+  // ── Feed load performance timing ──────────────────────────────────────────
+  const feedTimerRef = useRef<number | null>(null);
+  const feedMeasuredRef = useRef(false);
+  useEffect(() => {
+    feedTimerRef.current = performance.now();
+    feedMeasuredRef.current = false;
+    console.log("%c⏱ [Feed] Query started", "color:#7dd3fc;font-weight:bold");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit, seed });
   const toggleSpark = useMutation(api.ideas.toggleSpark);
 
@@ -39,6 +49,12 @@ export function FeedClient() {
   useEffect(() => {
     if (ideasQuery !== undefined) {
       setStableIdeas(ideasQuery as IdeaForgeIdea[]);
+      if (!feedMeasuredRef.current && feedTimerRef.current !== null) {
+        feedMeasuredRef.current = true;
+        const ms = Math.round(performance.now() - feedTimerRef.current);
+        const color = ms > 2000 ? "#f87171" : ms > 800 ? "#facc15" : "#4ade80";
+        console.log(`%c⏱ [Feed] Data arrived: ${ms}ms (${ideasQuery.length} posts)`, `color:${color};font-weight:bold;font-size:13px`);
+      }
     }
   }, [ideasQuery]);
 
