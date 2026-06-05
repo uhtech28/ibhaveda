@@ -83,6 +83,12 @@ export function FeedTutorial({ show, initialStep = 0, onClose }: Props) {
     setUnlocked(false);
   }, [index]);
 
+  // Stable reference so lesson effects with [onUnlock] in their deps don't
+  // re-run on every parent re-render. Re-runs would cause time-based
+  // lessons (chat scripts, world walker, league climb) to replay from
+  // scratch and push duplicate items into their internal state.
+  const handleUnlock = useCallback(() => setUnlocked(true), []);
+
   if (!show) return null;
 
   const current = LESSONS[index];
@@ -103,12 +109,6 @@ export function FeedTutorial({ show, initialStep = 0, onClose }: Props) {
     void skip({}).catch(() => {});
     onClose();
   };
-
-  // Stable reference so lesson effects with [onUnlock] in their deps don't
-  // re-run on every parent re-render. Re-runs would cause time-based
-  // lessons (chat scripts, world walker, league climb) to replay from
-  // scratch and push duplicate items into their internal state.
-  const handleUnlock = useCallback(() => setUnlocked(true), []);
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[#05080F] text-[#F9FAFB]">
