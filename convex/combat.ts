@@ -460,14 +460,17 @@ export const generateNextQuestion = internalAction({
     );
     if (!context) return;
 
-    const { getCombatAi } = await import("./combatAiProvider");
-    const ai = getCombatAi();
-
     const persona: CombatPersona = nextOrder % 2 === 1 ? "villain" : "mentor";
     const preferredComplexity: ComplexityTier =
       nextOrder <= 2 ? "low" : nextOrder <= 4 ? "medium" : "high";
 
     try {
+      // Provider lookup must live inside the try block so missing API
+      // keys hit the hard-coded fallback path instead of bubbling out
+      // and leaving the user staring at a blank prompt.
+      const { getCombatAi } = await import("./combatAiProvider");
+      const ai = getCombatAi();
+
       // No-repeat policy: regenerate up to MAX_DEDUP_RETRIES times if
       // the AI hands us a prompt that the user has already seen, in
       // this round or any prior round. The dedup check uses the
