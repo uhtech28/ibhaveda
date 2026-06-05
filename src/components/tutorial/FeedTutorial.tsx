@@ -558,6 +558,35 @@ function ContributeStep({
   onFinish: () => void;
   onSkip: () => void;
 }) {
+  const [showFinale, setShowFinale] = useState(false);
+  const router = useRouter();
+
+  const goToFeed = () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/feed")
+    ) {
+      router.push("/feed");
+    }
+  };
+
+  if (showFinale) {
+    return (
+      <GuidedStep
+        eyebrow="You're ready"
+        title="Time to ship something real"
+        body="That's the loop — post an idea, walk the map, defeat the doubt, help others ship. The platform is yours now. All the best, builder."
+        icon={<PartyPopper className="h-6 w-6 text-amber-300" />}
+        cta="Start building"
+        onCtaClick={() => {
+          goToFeed();
+          onFinish();
+        }}
+        onSkip={onFinish}
+      />
+    );
+  }
+
   return (
     <GuidedStep
       selector="[data-tutorial='contribute']"
@@ -566,7 +595,10 @@ function ContributeStep({
       body="Scroll the feed. When you find an idea you can help with, tap Contribute to join their project."
       icon={<HandHelping className="h-6 w-6 text-emerald-300" />}
       cta="I understand"
-      onCtaClick={onFinish}
+      onCtaClick={() => {
+        goToFeed();
+        setShowFinale(true);
+      }}
       onSkip={onSkip}
     />
   );
