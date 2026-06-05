@@ -21,7 +21,7 @@ import {
   MapPin,
   Swords,
   HandHelping,
-  Check,
+  PartyPopper,
 } from "lucide-react";
 
 interface Props {
