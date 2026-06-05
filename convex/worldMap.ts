@@ -1981,17 +1981,20 @@ export const submitTaskContent = mutation({
         : null;
       const projectLabel = ideaForPost?.title ?? "my venture";
       const tierLabel = String(args.taskLevel).toUpperCase();
-      const taskTitle = task.title ?? `Task ${tierLabel}`;
+      const checkpointOutcome = checkpointDefForScore?.outcome ?? "";
+      const taskLabel = checkpointOutcome
+        ? `${tierLabel} · ${checkpointOutcome}`
+        : `${tierLabel} task`;
       const summary =
         typeof args.content === "string"
           ? args.content.trim().slice(0, 400)
           : "";
       await ctx.db.insert("ideas", {
         authorId: user._id,
-        title: `✅ Completed: ${taskTitle}`,
+        title: `✅ Completed: ${taskLabel}`,
         description: summary
-          ? `${summary}\n\n— from "${projectLabel}", Stage ${checkpoint.stage} · Checkpoint ${checkpoint.checkpoint} (${tierLabel})`
-          : `Cleared "${taskTitle}" in "${projectLabel}" — Stage ${checkpoint.stage}, Checkpoint ${checkpoint.checkpoint} (${tierLabel}).`,
+          ? `${summary}\n\n— from "${projectLabel}", Stage ${checkpoint.stage} · Checkpoint ${checkpoint.checkpoint}`
+          : `Cleared a ${tierLabel} task in "${projectLabel}" — Stage ${checkpoint.stage}, Checkpoint ${checkpoint.checkpoint}.`,
         category: "milestone",
         visibility: "public",
         sparkCount: 0,
