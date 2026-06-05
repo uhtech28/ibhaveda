@@ -346,7 +346,35 @@ export const getPublicIdeas = query({
   },
 });
 
-// Get a single idea by ID
+// Minimal projection of an idea used to render OG / Twitter Card
+// previews on the /idea/[id] layout. Returns null for private or
+// deleted ideas so the page falls back to the generic site card.
+export const getIdeaForShare = query({
+  args: { ideaId: v.id("ideas") },
+  handler: async (ctx, args) => {
+    const idea = await ctx.db.get(args.ideaId);
+    if (!idea || idea.isDeleted || idea.visibility !== "public") return null;
+
+    const author = await ctx.db.get(idea.authorId);
+    const attachments = Array.isArray(idea.attachments) ? idea.attachments : [];
+    const firstImage = attachments.find((a) =>
+      (a.type || "").toLowerCase().startsWith("image/"),
+    );
+    const firstVideo = attachments.find((a) =>
+      (a.type || "").toLowerCase().startsWith("video/"),
+    );
+
+    return {
+      title: idea.title,
+      description: idea.description,
+      authorDisplayName: author?.displayName ?? author?.username ?? "A builder",
+      imageUrl: firstImage?.url ?? null,
+      videoUrl: firstVideo?.url ?? null,
+      videoMimeType: firstVideo?.type ?? null,
+    };
+  },
+});
+
 export const getIdeaById = query({
   args: {
     ideaId: v.id("ideas"),

@@ -1,21 +1,56 @@
 "use client";
 
-// Cross-post destination selector (PRD §7). The parent fires
-// `fireCrossPosts(selected, payload)` on submit.
+// Chips for choosing which external platforms to cross-post to. The
+// share panel renders one button per selected platform after the user
+// hits Post.
 
 import React from "react";
-import { Check } from "lucide-react";
+import { Check, Instagram, Linkedin, Facebook } from "lucide-react";
 import type { SharePlatform } from "@/lib/share/types";
+
+function XLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M18.244 2H21.5l-7.5 8.57L22.5 22h-6.91l-5.42-7.09L4.27 22H1l8.02-9.17L1.5 2h7.09l4.9 6.49L18.24 2Zm-1.21 18h1.91L7.06 4H5.07l11.96 16Z" />
+    </svg>
+  );
+}
 
 const PLATFORMS: ReadonlyArray<{
   id: SharePlatform;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   accent: string;
 }> = [
-  { id: "twitter",   label: "X",         icon: "𝕏",  accent: "text-white" },
-  { id: "linkedin",  label: "LinkedIn",  icon: "in", accent: "text-sky-300" },
-  { id: "instagram", label: "Instagram", icon: "📷", accent: "text-pink-300" },
+  {
+    id: "twitter",
+    label: "X",
+    icon: <XLogo className="h-3.5 w-3.5" />,
+    accent: "text-white",
+  },
+  {
+    id: "linkedin",
+    label: "LinkedIn",
+    icon: <Linkedin className="h-3.5 w-3.5" fill="currentColor" />,
+    accent: "text-sky-300",
+  },
+  {
+    id: "instagram",
+    label: "Instagram",
+    icon: <Instagram className="h-3.5 w-3.5" />,
+    accent: "text-pink-300",
+  },
+  {
+    id: "facebook",
+    label: "Facebook",
+    icon: <Facebook className="h-3.5 w-3.5" fill="currentColor" />,
+    accent: "text-blue-300",
+  },
 ];
 
 interface Props {
@@ -57,8 +92,10 @@ export function CrossPostSelector({ selected, onChange }: Props) {
               }`}
             >
               <span
-                className={`grid h-5 w-5 place-items-center rounded-md font-mono text-[11px] ${
-                  isSelected ? "bg-[#6366F1]/30 text-white" : `bg-white/[0.04] ${p.accent}`
+                className={`grid h-5 w-5 place-items-center rounded-md ${
+                  isSelected
+                    ? "bg-[#6366F1]/30 text-white"
+                    : `bg-white/[0.04] ${p.accent}`
                 }`}
               >
                 {p.icon}
@@ -70,9 +107,9 @@ export function CrossPostSelector({ selected, onChange }: Props) {
         })}
       </div>
       <p className="text-[10px] text-[#6B7280] leading-snug">
-        You'll be sent to each platform's composer to confirm before posting —
-        nothing goes out automatically. Instagram has no web composer, so we
-        copy the caption to your clipboard for you to paste into a new post.
+        After you post, you'll see one button per platform — tap each to open
+        its composer. Instagram has no web composer, so we copy the caption to
+        your clipboard for you to paste into a new post.
       </p>
     </div>
   );

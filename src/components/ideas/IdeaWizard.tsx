@@ -39,8 +39,8 @@ import { displayFontClass } from "@/components/ideaforge/shared";
 import { audioManager } from "@/lib/audio/audioManager";
 import { type TemplateId } from "@/config/templates";
 import { CrossPostSelector } from "@/components/share/CrossPostSelector";
-import { fireCrossPosts, summariseOutcomes } from "@/lib/share/crossPost";
-import type { SharePlatform } from "@/lib/share/types";
+import { CrossPostSharePanel } from "@/components/share/CrossPostSharePanel";
+import type { ShareablePayload, SharePlatform } from "@/lib/share/types";
 
 // ─── Template display metadata ─────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ const TEMPLATE_ORDER: TemplateId[] = ["venture", "creative", "academic", "lab"];
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type Step = "template" | "outline" | "generating" | "preview";
+type Step = "template" | "outline" | "generating" | "preview" | "share";
 type Visibility = "public" | "private";
 
 interface IdeaWizardProps {
@@ -135,15 +135,17 @@ export function IdeaWizard({
   const [skills, setSkills] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [files, setFiles] = useState<File[]>([]);
-  // PRD §7 — cross-post destinations. Product decision (overrides
-  // PRD §7 AC2 "off by default"): all three platforms pre-selected
-  // so the default action is "build in public everywhere". The user
-  // can deselect any platform they don't want before posting. Still
-  // opt-in in the sense that the user can deselect — but the friction
-  // is shifted from opt-in to opt-out.
+  // All four platforms selected by default. The user can deselect any
+  // before posting.
   const [crossPostTargets, setCrossPostTargets] = useState<Set<SharePlatform>>(
-    new Set(["twitter", "linkedin", "instagram"]),
+    new Set(["twitter", "linkedin", "instagram", "facebook"]),
   );
+  // Set after a public post so the share step can render its buttons.
+  const [sharePayload, setSharePayload] = useState<{
+    payload: ShareablePayload;
+    platforms: SharePlatform[];
+    ventureId: string;
+  } | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -165,6 +167,7 @@ export function IdeaWizard({
     setSubmitError("");
     setAiHadError(false);
     setIsGeneratingTags(false);
+    setSharePayload(null);
   };
 
   const close = () => {
@@ -311,6 +314,9 @@ export function IdeaWizard({
       return;
     }
 
+    const willCrossPost =
+      visibility === "public" && crossPostTargets.size > 0;
+
     setIsSubmitting(true);
     try {
       // 1. Create the idea
@@ -369,31 +375,31 @@ export function IdeaWizard({
         title: visibility === "public" ? "Idea posted!" : "Saved as private",
         description:
           visibility === "public"
-            ? "Loading your world map…"
+            ? willCrossPost
+              ? "Now pick where else to share it."
+              : "Loading your world map…"
             : "Only you can see it — toggle to Public any time.",
       });
 
-      // PRD §7 — fire cross-posts AFTER the internal idea exists, so
-      // AC6 holds: the internal post succeeds regardless of any
-      // external destination outcome. Only fires when at least one
-      // destination was selected (opt-in per post, AC2). Public ideas
-      // only — private posts shouldn't leak to external platforms.
-      if (visibility === "public" && crossPostTargets.size > 0) {
+      // Hand off to the share step. We can't open the platform tabs
+      // here because the click gesture is gone after the awaits above;
+      // browsers would block everything past the first popup. Each
+      // button on the share step opens its own tab from a fresh click.
+      if (willCrossPost) {
         const origin =
           typeof window !== "undefined" ? window.location.origin : "";
-        const outcomes = fireCrossPosts(Array.from(crossPostTargets), {
-          title: title.trim(),
-          text: description.trim().slice(0, 600),
-          url: origin ? `${origin}/idea/${newIdeaId}` : undefined,
+        setSharePayload({
+          payload: {
+            title: title.trim(),
+            text: description.trim().slice(0, 600),
+            url: origin ? `${origin}/idea/${newIdeaId}` : undefined,
+          },
+          platforms: Array.from(crossPostTargets),
+          ventureId,
         });
-        const summary = summariseOutcomes(outcomes);
-        const anyFail = outcomes.some((o) => o.status === "failed");
-        toast({
-          title: anyFail ? "Cross-post: partial" : "Cross-post initiated",
-          description: summary,
-          variant: anyFail ? "destructive" : "default",
-          duration: 6000,
-        });
+        setStep("share");
+        setIsSubmitting(false);
+        return;
       }
 
       close();
@@ -875,7 +881,7 @@ export function IdeaWizard({
                 </div>
               </div>
 
-              {/* PRD §7 — opt-in cross-post selector */}
+              {/* Cross-post destinations */}
               <CrossPostSelector
                 selected={crossPostTargets}
                 onChange={setCrossPostTargets}
@@ -927,6 +933,34 @@ export function IdeaWizard({
               </div>
             </div>
           </form>
+        )}
+
+        {step === "share" && sharePayload && (
+          <div className="flex flex-col w-full max-h-[85dvh] sm:max-h-[90vh] overflow-hidden">
+            <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
+              <DialogTitle
+                className={cn(
+                  displayFontClass,
+                  "text-lg font-semibold text-white",
+                )}
+              >
+                Share your idea
+              </DialogTitle>
+            </DialogHeader>
+            <div className="overflow-y-auto px-5 py-5">
+              <CrossPostSharePanel
+                payload={sharePayload.payload}
+                platforms={sharePayload.platforms}
+                onDone={() => {
+                  const vId = sharePayload.ventureId;
+                  setSharePayload(null);
+                  setStep("template");
+                  close();
+                  router.push(`/map/world?ventureId=${vId}`);
+                }}
+              />
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>
