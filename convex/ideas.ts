@@ -155,6 +155,10 @@ export const createIdea = mutation({
       description: "Created a new idea"
     });
 
+    // PRD §9 — posting an idea no longer advances the streak. The
+    // qualifying-action set is narrowed to: made_contribution,
+    // submitted_task, fired_flare, responded_to_flare.
+
     return { ideaId, message: "Idea created successfully" };
   },
 });
@@ -558,6 +562,8 @@ export const toggleSpark = mutation({
         });
       }
 
+      // PRD §9 — sparking no longer advances the streak.
+
       return { action: "added", sparkCount: idea.sparkCount + 1 };
     }
   },
@@ -881,6 +887,8 @@ export const addComment = mutation({
         description: `Received comment on ${idea.visibility} idea`
       });
     }
+
+    // PRD §9 — commenting no longer advances the streak.
 
     return { commentId, message: "Comment added successfully" };
   },

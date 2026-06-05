@@ -27,6 +27,19 @@ export default defineSchema({
     level: v.optional(v.number()), // User level
     lastLoginAt: v.optional(v.number()), // Last login timestamp
     equippedBadges: v.optional(v.array(v.string())), // Array of equipped badge IDs (e.g. "venture_1", "general_chatterbox")
+    // PRD §6 — first-time user feed walkthrough state.
+    // not_started → auto-launches on first feed visit
+    // in_progress → resumes from feedTutorialStep
+    // completed / skipped → never auto-launches; manual replay only
+    feedTutorialState: v.optional(
+      v.union(
+        v.literal("not_started"),
+        v.literal("in_progress"),
+        v.literal("completed"),
+        v.literal("skipped"),
+      ),
+    ),
+    feedTutorialStep: v.optional(v.number()), // Last viewed step index
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
   })
@@ -197,11 +210,18 @@ export default defineSchema({
   messages: defineTable({
     senderId: v.id("users"), // Reference to users table
     receiverId: v.optional(v.id("users")), // Reference to users table (optional for group chats)
-    content: v.string(), // Message content
+    content: v.string(), // Message content (may be empty for image-only messages)
     createdAt: v.number(), // Unix timestamp
     read: v.boolean(), // Read status
     conversationId: v.id("conversations"), // Reference to conversations table
     messageType: v.optional(v.string()), // Message type (e.g., 'text', 'image')
+    // PRD §10.2 — image attachments. `imageStorageId` references
+    // Convex storage; the bytes themselves are never inline. Width /
+    // height let the client reserve aspect ratio space before the
+    // image loads, preventing layout shift.
+    imageStorageId: v.optional(v.id("_storage")),
+    imageWidth: v.optional(v.number()),
+    imageHeight: v.optional(v.number()),
   })
     .index("by_sender", ["senderId"])
     .index("by_receiver", ["receiverId"])
@@ -246,6 +266,8 @@ export default defineSchema({
         v.id("ventureCheckpoints"),
         v.id("ventureTasks"),
         v.id("ventureEvidence"),
+        v.id("flares"),
+        v.id("flareResponses"),
       ),
     ), // ID of related item
     isRead: v.boolean(), // Read status
@@ -320,9 +342,31 @@ export default defineSchema({
     userId: v.id("users"),
     currentStreak: v.number(),
     longestStreak: v.number(),
-    lastLoginDate: v.string(), // ISO date string "YYYY-MM-DD"
+    lastLoginDate: v.string(), // ISO date string "YYYY-MM-DD" (legacy)
     lastStreakUpdate: v.number(),
     recoveryAvailable: v.optional(v.boolean()),
+    // Streak v2 — action-based, not login-based (PRD §9)
+    lastActionDate: v.optional(v.string()), // ISO "YYYY-MM-DD" in user's local TZ
+    lastActionType: v.optional(
+      v.union(
+        // PRD §9 qualifying actions (kept narrow per §9.2).
+        v.literal("made_contribution"),
+        v.literal("submitted_task"),
+        v.literal("fired_flare"),
+        v.literal("responded_to_flare"),
+        // Legacy action types — never written by v2 but accepted for
+        // backward compatibility with rows persisted before §9 landed.
+        // Once the data is migrated, these can be dropped.
+        v.literal("sparked_idea"),
+        v.literal("posted_idea"),
+        v.literal("commented"),
+        v.literal("completed_checkpoint"),
+        v.literal("won_combat"),
+      ),
+    ),
+    // PRD §9 AC4 — user's IANA timezone, e.g. "America/New_York".
+    // Persisted by `streaks.setMyTimezone` and read by `recordAction`.
+    timezone: v.optional(v.string()),
   }).index("by_user", ["userId"]),
 
   // Badges Definitions
@@ -564,10 +608,23 @@ export default defineSchema({
     ideasWithStage8: v.number(),
     activeIdeaTypes: v.array(v.string()),
     updatedAt: v.number(),
+    // Leagues v1 — 5-tier weekly individual ladder
+    currentLeagueTier: v.optional(
+      v.union(
+        v.literal("bronze"),
+        v.literal("silver"),
+        v.literal("gold"),
+        v.literal("platinum"),
+        v.literal("diamond"),
+      ),
+    ),
+    weeklyLeagueXp: v.optional(v.number()),
+    lastLeagueResetAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_level", ["currentLevel"])
-    .index("by_total_points", ["totalPoints"]),
+    .index("by_total_points", ["totalPoints"])
+    .index("by_league_tier_xp", ["currentLeagueTier", "weeklyLeagueXp"]),
 
   // ─────────────────────────────────────────────────────────────────────────
   // FLARE SYSTEM (Help Requests)
@@ -782,4 +839,227 @@ export default defineSchema({
   })
     .index("by_venture", ["ventureId"])
     .index("by_venture_stage_cp", ["ventureId", "stage", "checkpoint"]),
+  combatRounds: defineTable({
+    userId: v.id("users"),
+    ventureId: v.id("ventures"),
+    checkpointId: v.id("ventureCheckpoints"),
+    tier: v.union(v.literal("free"), v.literal("pro")),
+    totalQuestions: v.number(),
+    bossHpInitial: v.number(),
+    playerHpInitial: v.number(),
+    bossHpCurrent: v.number(),
+    playerHpCurrent: v.number(),
+    attemptNumber: v.number(),
+    status: v.union(
+      v.literal("active"),
+      v.literal("won"),
+      v.literal("lost"),
+      v.literal("abandoned"),
+      v.literal("cap_exhausted"),
+    ),
+    outcomeScore: v.optional(v.number()),
+    individualPointsAwarded: v.optional(v.number()),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    monthBucket: v.string(),
+  })
+    .index("by_user_month", ["userId", "monthBucket"])
+    .index("by_user_checkpoint", ["userId", "checkpointId"])
+    .index("by_user_status", ["userId", "status"]),
+
+  combatQuestions: defineTable({
+    roundId: v.id("combatRounds"),
+    userId: v.id("users"),
+    order: v.number(),
+    prompt: v.string(),
+    normalizedPrompt: v.string(),
+    persona: v.union(v.literal("villain"), v.literal("mentor")),
+    complexityTier: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    durationMs: v.number(),
+    answer: v.optional(v.string()),
+    answerStartedAt: v.optional(v.number()),
+    answerSubmittedAt: v.optional(v.number()),
+    score1to5: v.optional(v.number()),
+    bossHpAfter: v.optional(v.number()),
+    playerHpAfter: v.optional(v.number()),
+    aiDetectionConfidence: v.optional(v.number()),
+    aiDetectionSignals: v.optional(v.array(v.string())),
+    expiredFlag: v.optional(v.boolean()),
+  })
+    .index("by_round_order", ["roundId", "order"])
+    .index("by_user_normalized", ["userId", "normalizedPrompt"]),
+
+  combatAiSuspicions: defineTable({
+    userId: v.id("users"),
+    // roundId + questionId only present for combat-sourced strikes.
+    // Henchman / task / other sources omit them.
+    roundId: v.optional(v.id("combatRounds")),
+    questionId: v.optional(v.id("combatQuestions")),
+    confidence: v.number(),
+    signals: v.array(v.string()),
+    detectedAt: v.number(),
+    action: v.union(v.literal("warning"), v.literal("ban")),
+    // Where the strike came from — used to give support context
+    // when reviewing suspensions.
+    source: v.optional(
+      v.union(
+        v.literal("combat"),
+        v.literal("henchman_encounter"),
+        v.literal("task_submission"),
+      ),
+    ),
+    textSample: v.optional(v.string()),
+  })
+    .index("by_user_detected", ["userId", "detectedAt"])
+    .index("by_user", ["userId"]),
+
+  userAccountSuspensions: defineTable({
+    userId: v.id("users"),
+    reason: v.string(),
+    scope: v.union(v.literal("game"), v.literal("account")),
+    isPermanent: v.boolean(),
+    banStartAt: v.number(),
+    banEndAt: v.number(),
+    evidenceRoundId: v.optional(v.id("combatRounds")),
+  }).index("by_user_active", ["userId", "banEndAt"]),
+
+  leagueWeeklyHistory: defineTable({
+    userId: v.id("users"),
+    weekStartAt: v.number(),
+    tier: v.union(
+      v.literal("bronze"),
+      v.literal("silver"),
+      v.literal("gold"),
+      v.literal("platinum"),
+      v.literal("diamond"),
+    ),
+    rankInTier: v.number(),
+    weeklyXp: v.number(),
+    outcome: v.union(
+      v.literal("promoted"),
+      v.literal("relegated"),
+      v.literal("held"),
+    ),
+    nextTier: v.union(
+      v.literal("bronze"),
+      v.literal("silver"),
+      v.literal("gold"),
+      v.literal("platinum"),
+      v.literal("diamond"),
+    ),
+  })
+    .index("by_user_week", ["userId", "weekStartAt"])
+    .index("by_week_tier", ["weekStartAt", "tier"]),
+
+  /**
+   * PRD §4 — Team (project) league. One row per (idea, point-source
+   * event). The Team-board query sums points where
+   * `awardedAt >= now - 7d` to produce the trailing-7-day score (AC5).
+   *
+   * Kept as an append-only ledger so the score is reconstructable
+   * even if the rolling sum drifts. Old rows can be GC'd after a
+   * comfortable retention window — they don't affect the 7-day
+   * computation.
+   */
+  projectWeeklyPoints: defineTable({
+    ideaId: v.id("ideas"),
+    /** The user whose action attributed the points (e.g. contributor). */
+    contributorId: v.optional(v.id("users")),
+    amount: v.number(),
+    awardedAt: v.number(),
+    /**
+     * Free-text reason for the award. Mirrors the
+     * `gamification.internalAwardPoints.description` convention so
+     * Team-board grants are visible in the same ledger format as
+     * individual XP.
+     */
+    reason: v.string(),
+  })
+    .index("by_idea_awarded", ["ideaId", "awardedAt"])
+    .index("by_awarded", ["awardedAt"]),
+
+  miniGameSessions: defineTable({
+    userId: v.id("users"),
+    spawnPointId: v.string(),
+    archetype: v.union(
+      v.literal("pattern_match"),
+      v.literal("reflex_tap"),
+      v.literal("decrypt"),
+    ),
+    difficulty: v.union(
+      v.literal(1), v.literal(2), v.literal(3), v.literal(4), v.literal(5),
+    ),
+    ventureId: v.optional(v.id("ventures")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("abandoned"),
+    ),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    scoreNormalized: v.optional(v.number()),
+    integrityFlagged: v.optional(v.boolean()),
+    integrityFlagReason: v.optional(v.string()),
+  })
+    .index("by_user_started", ["userId", "startedAt"])
+    .index("by_user_active", ["userId", "status"]),
+
+  miniGameCompletions: defineTable({
+    userId: v.id("users"),
+    spawnPointId: v.string(),
+    sessionId: v.id("miniGameSessions"),
+    completedAt: v.number(),
+    xpAwarded: v.number(),
+  })
+    .index("by_user_spawn", ["userId", "spawnPointId"])
+    .index("by_user_completed", ["userId", "completedAt"]),
+
+  videos: defineTable({
+    uploaderId: v.id("users"),
+    // ── Provider abstraction (PRD §5.3) ────────────────────────────
+    // v1: "convex" = raw bytes in Convex storage (v0 / dev path).
+    //     "mux"    = Mux managed service (target / prod).
+    //     "cloudflare" = Cloudflare Stream (alternative managed service).
+    // The platform stores ONLY metadata + a playback identifier from the
+    // managed provider; raw bytes never sit on app infra in prod.
+    provider: v.optional(
+      v.union(
+        v.literal("convex"),
+        v.literal("mux"),
+        v.literal("cloudflare"),
+      ),
+    ),
+    // Convex storage path (v0)
+    storageId: v.optional(v.id("_storage")),
+    posterStorageId: v.optional(v.id("_storage")),
+    // Managed-service path (Mux / Cloudflare Stream)
+    playbackId: v.optional(v.string()), // Mux playback id / Cloudflare uid
+    playbackUrl: v.optional(v.string()), // HLS .m3u8 URL
+    thumbnailUrl: v.optional(v.string()), // Service-generated poster
+    // Service-reported processing state — "ready" before the player
+    // can stream. PRD §5.4: card shows processing state until ready.
+    processingStatus: v.optional(
+      v.union(
+        v.literal("uploading"),
+        v.literal("processing"),
+        v.literal("ready"),
+        v.literal("errored"),
+      ),
+    ),
+    // ── Common metadata ────────────────────────────────────────────
+    durationMs: v.number(),
+    width: v.number(),
+    height: v.number(),
+    mimeType: v.string(),
+    bytes: v.number(),
+    caption: v.optional(v.string()),
+    ideaId: v.optional(v.id("ideas")),
+    ventureId: v.optional(v.id("ventures")),
+    visibility: v.union(v.literal("public"), v.literal("unlisted")),
+    isDeleted: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_uploader_created", ["uploaderId", "createdAt"])
+    .index("by_visibility_created", ["visibility", "createdAt"]),
 });

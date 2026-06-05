@@ -294,6 +294,18 @@ export function getBannerImage(idea: IdeaForgeIdea) {
     : undefined;
 }
 
+/** First video attachment on an idea, if any. Used to render an
+ *  inline player in the feed card (PRD §5.4). */
+export function getBannerVideo(idea: IdeaForgeIdea) {
+  if (!Array.isArray(idea.attachments)) return undefined;
+  const video = idea.attachments.find((item) => {
+    const t = (item.type || "").toLowerCase();
+    return t.startsWith("video/");
+  });
+  if (!video) return undefined;
+  return { url: video.url, type: video.type, name: video.name };
+}
+
 export function matchesSearch(idea: IdeaForgeIdea, searchQuery: string) {
   if (!searchQuery.trim()) return true;
   const needle = searchQuery.toLowerCase();

@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { SparkersDialog, ContributorsDialog } from "@/components/engagement";
 import { cn } from "@/lib/utils";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
@@ -21,6 +22,7 @@ import {
   feedTabs,
   formatRelativeTime,
   getBannerImage,
+  getBannerVideo,
   getDisplayName,
   getIdeaStage,
   getInitials,
@@ -166,7 +168,27 @@ export function IdeaCardSkeleton() {
   );
 }
 
-function StoryAction({ icon: Icon, label, count, active = false, onClick, animateOnClick = false, iconOnly = false }: { icon: React.ComponentType<{ className?: string }>; label: string; count?: number; active?: boolean; onClick?: () => void; animateOnClick?: boolean; iconOnly?: boolean }) {
+function StoryAction({
+  icon: Icon,
+  label,
+  count,
+  active = false,
+  onClick,
+  animateOnClick = false,
+  iconOnly = false,
+  onCountClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count?: number;
+  active?: boolean;
+  onClick?: () => void;
+  animateOnClick?: boolean;
+  iconOnly?: boolean;
+  /** Optional separate handler when the user taps the count itself
+   *  (PRD §8 — opens the sparkers / contributors popup). */
+  onCountClick?: () => void;
+}) {
   const [pulse, setPulse] = useState(false);
   const tone = label === "Spark"
     ? {
@@ -206,7 +228,31 @@ function StoryAction({ icon: Icon, label, count, active = false, onClick, animat
     >
       <Icon className={cn("h-4 w-4 shrink-0", tone.icon, active && label === "Spark" && "fill-current", pulse && "animate-[ping_0.45s_ease-out]")} />
       {!iconOnly && <span className="truncate">{label}</span>}
-      {typeof count === "number" && <span className="text-xs tabular-nums">{count}</span>}
+      {typeof count === "number" && (
+        onCountClick && count > 0 ? (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCountClick();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                onCountClick();
+              }
+            }}
+            className="text-xs tabular-nums hover:underline cursor-pointer"
+            title={`See who ${label === "Spark" ? "sparked" : "contributes to"} this`}
+          >
+            {count}
+          </span>
+        ) : (
+          <span className="text-xs tabular-nums">{count}</span>
+        )
+      )}
     </button>
   );
 }
@@ -219,9 +265,12 @@ function StoryAction({ icon: Icon, label, count, active = false, onClick, animat
 function ContributorsAction({
   ideaId,
   onClick,
+  onCountClick,
 }: {
   ideaId: string;
   onClick?: () => void;
+  /** Tapping the count opens the contributors popup (PRD §8 AC2). */
+  onCountClick?: () => void;
 }) {
   const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
     ideaId: ideaId as Id<"ideas">,
@@ -234,6 +283,7 @@ function ContributorsAction({
       label="Contribute"
       count={count}
       onClick={onClick}
+      onCountClick={onCountClick}
       iconOnly
     />
   );
@@ -405,6 +455,9 @@ export function IdeaStoryCard({
   const [expanded, setExpanded] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [industriesExpanded, setIndustriesExpanded] = useState(false);
+  // PRD §8 popup state
+  const [sparkersOpen, setSparkersOpen] = useState(false);
+  const [contributorsOpen, setContributorsOpen] = useState(false);
   const [skillsExpanded, setSkillsExpanded] = useState(false);
   const skillTags = useMemo(() => parseTags(idea.category), [idea.category]);
   const industryTags = useMemo(() => parseTags(idea.industries || ""), [idea.industries]);
@@ -415,6 +468,7 @@ export function IdeaStoryCard({
   const hiddenIndustries = Math.max(0, industryTags.length - visibleIndustries.length);
   const hiddenSkills = Math.max(0, skillTags.length - visibleSkills.length);
   const bannerImage = getBannerImage(idea);
+  const bannerVideo = getBannerVideo(idea);
   const description = idea.description || "No description yet.";
   const shouldClamp = description.length > 220;
 
@@ -498,6 +552,12 @@ export function IdeaStoryCard({
         >
           <img src={bannerImage} alt={idea.title} className="aspect-[16/9] w-full rounded-[18px] border border-white/8 object-cover cursor-zoom-in" />
         </button>
+      )}
+
+      {bannerVideo && (
+        <div className="mt-5">
+          <IdeaInlineVideo src={bannerVideo.url} mimeType={bannerVideo.type} />
+        </div>
       )}
 
       <div className="mt-5 flex flex-col gap-2 text-xs text-[#9CA3AF]">
@@ -620,7 +680,16 @@ export function IdeaStoryCard({
 
       <div className="mt-5 border-t border-white/8 pt-3">
         <div className="flex flex-nowrap items-center gap-1">
-          <StoryAction icon={Sparkles} label="Spark" count={idea.sparkCount || 0} active={!!idea.hasSparked} onClick={() => onSpark(idea._id)} animateOnClick iconOnly />
+          <StoryAction
+            icon={Sparkles}
+            label="Spark"
+            count={idea.sparkCount || 0}
+            active={!!idea.hasSparked}
+            onClick={() => onSpark(idea._id)}
+            onCountClick={() => setSparkersOpen(true)}
+            animateOnClick
+            iconOnly
+          />
           <StoryAction icon={MessageCircle} label="Comment" count={idea.commentCount || 0} onClick={() => onComment(idea._id)} iconOnly />
           <ContributorsAction
             ideaId={idea._id}
@@ -628,6 +697,7 @@ export function IdeaStoryCard({
               if (onContribute) onContribute(idea._id);
               else onOpenIdea(idea._id);
             }}
+            onCountClick={() => setContributorsOpen(true)}
           />
         </div>
       </div>
@@ -647,6 +717,16 @@ export function IdeaStoryCard({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* PRD §8 — engagement popups for this story card */}
+      <SparkersDialog
+        ideaId={sparkersOpen ? (idea._id as Id<"ideas">) : null}
+        onOpenChange={(open) => setSparkersOpen(open)}
+      />
+      <ContributorsDialog
+        ideaId={contributorsOpen ? (idea._id as Id<"ideas">) : null}
+        onOpenChange={(open) => setContributorsOpen(open)}
+      />
     </article>
   );
 }
@@ -813,6 +893,114 @@ export function EmptyState({
       <Button type="button" onClick={onAction} className="mt-6 rounded-[10px] bg-[#6366F1] px-5 text-white hover:bg-[#8B5CF6]">
         {actionLabel}
       </Button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Inline video player for idea feed cards (PRD §5.4)
+//
+// Autoplay-muted on scroll-into-view via IntersectionObserver.
+// Pauses on scroll-out. One-at-a-time enforced by pause-all-others on
+// play. Tap to unmute. Falls back to thumbnail + tap-to-play when
+// browser autoplay policy refuses.
+// ─────────────────────────────────────────────────────────────────────
+
+function IdeaInlineVideo({ src, mimeType }: { src: string; mimeType?: string }) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const [muted, setMuted] = React.useState(true);
+  const [playing, setPlaying] = React.useState(false);
+
+  React.useEffect(() => {
+    const wrap = wrapperRef.current;
+    const v = videoRef.current;
+    if (!wrap || !v) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.intersectionRatio >= 0.6) {
+            // One-at-a-time: pause every other video on the page first.
+            document
+              .querySelectorAll<HTMLVideoElement>("video[data-idea-inline]")
+              .forEach((other) => {
+                if (other !== v) other.pause();
+              });
+            v.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+          } else if (entry.intersectionRatio < 0.4) {
+            v.pause();
+            setPlaying(false);
+          }
+        }
+      },
+      { threshold: [0, 0.4, 0.6, 1] },
+    );
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, []);
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMuted((m) => !m);
+  };
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) v.play();
+    else v.pause();
+  };
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="relative w-full overflow-hidden rounded-[18px] border border-white/8 bg-black"
+      style={{ fontSize: 0, lineHeight: 0 }}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        muted={muted}
+        loop
+        playsInline
+        preload="auto"
+        data-idea-inline
+        onClick={togglePlay}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        className="mx-auto block max-h-[75vh] max-w-full"
+        style={{
+          imageRendering: "high-quality",
+          // @ts-ignore — vendor-prefix smoothing hints
+          WebkitBackfaceVisibility: "hidden",
+          backfaceVisibility: "hidden",
+          transform: "translateZ(0)",
+          filter: "none",
+          willChange: "transform",
+        }}
+      >
+        {mimeType ? <source src={src} type={mimeType} /> : null}
+      </video>
+
+      {/* Mute toggle */}
+      <button
+        type="button"
+        onClick={toggleMute}
+        aria-label={muted ? "Unmute" : "Mute"}
+        className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-xs text-white backdrop-blur-sm transition hover:bg-black/80"
+      >
+        {muted ? "🔇" : "🔊"}
+      </button>
+
+      {/* Tap-to-play overlay when paused (autoplay-blocked fallback) */}
+      {!playing && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white backdrop-blur-sm">
+            ▶
+          </span>
+        </div>
+      )}
     </div>
   );
 }

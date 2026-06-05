@@ -159,16 +159,29 @@ export function StageClearModal({
   return (
     <AnimatePresence>
       {show && (
-        <div className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+          {/* Backdrop — clickable to dismiss */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/85 backdrop-blur-md"
+            onClick={() => onComplete?.()}
+            className="absolute inset-0 cursor-pointer bg-slate-950/85 backdrop-blur-md"
             style={{
               background: `radial-gradient(circle at center, ${medal.glow}24 0%, ${stageColors.primary}14 34%, rgba(2,6,23,0.92) 76%)`,
             }}
+            aria-label="Dismiss ceremony"
           />
+
+          {/* Close X button in top-right corner */}
+          <button
+            type="button"
+            onClick={() => onComplete?.()}
+            aria-label="Close"
+            className="absolute right-6 top-6 z-[10000] flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/60 text-lg text-white/80 transition hover:border-white hover:bg-black/80 hover:text-white"
+          >
+            ✕
+          </button>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.75 }}
@@ -367,6 +380,19 @@ export function StageClearModal({
                         ✨ Final checkpoint completed at gold standard
                       </p>
                     )}
+
+                    {/* Manual continue button — auto-dismiss is 5.2s
+                        but the user shouldn't have to wait. */}
+                    <button
+                      type="button"
+                      onClick={() => onComplete?.()}
+                      className="mt-8 rounded-full border-2 border-white/40 bg-white/10 px-8 py-3 font-mono text-sm font-bold uppercase tracking-widest text-white transition hover:border-white hover:bg-white/20"
+                      style={{
+                        boxShadow: `0 0 24px ${medal.glow}44`,
+                      }}
+                    >
+                      {hasNextStage ? `Continue → ${nextBiome || nextStageName}` : "Continue"}
+                    </button>
                   </motion.div>
                 </div>
               </div>

@@ -18,6 +18,7 @@ import { ContributionRequestModal } from "@/components/requests/ContributionRequ
 import { useToast } from "@/components/ui/use-toast";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
 import { useQuery } from "convex/react";
+import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 
 export function FeedClient({
   preloadedIdeas,
@@ -53,16 +54,31 @@ export function FeedClient({
     }
   }, [isLoaded, router, userId]);
 
+  // PRD §6 AC6 — Profile-completion toast is superseded by the
+  // first-time-user FeedTutorial below. We still need to route users
+  // through profile setup if they haven't completed it, but the
+  // tutorial only mounts AFTER profile setup, so the explicit nag
+  // here is no longer required.
   useEffect(() => {
     if (isLoaded && userId && !isProfileLoading && !isProfileComplete) {
-      toast({
-        title: "Complete your profile",
-        description: "Add a bit more context so builders can discover and trust your ideas.",
-        action: <Button size="sm" onClick={() => router.push("/profile-setup")}>Complete Profile</Button>,
-        duration: 8000,
-      });
+      router.push("/profile-setup");
     }
-  }, [isLoaded, isProfileComplete, isProfileLoading, router, toast, userId]);
+  }, [isLoaded, isProfileComplete, isProfileLoading, router, userId]);
+
+  // PRD §6 — feed walkthrough state. Auto-launches once per user
+  // (not_started state), resumes from the saved step, never re-fires
+  // after completion or skip (AC5).
+  const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  useEffect(() => {
+    if (!tutorialState) return;
+    if (tutorialState.state === "not_started" || tutorialState.state === "in_progress") {
+      // Defer a beat so the feed has time to render its cards
+      // (the tutorial spotlights need real DOM targets).
+      const t = window.setTimeout(() => setTutorialOpen(true), 700);
+      return () => window.clearTimeout(t);
+    }
+  }, [tutorialState]);
 
   const ideas = useMemo(() => (ideasQuery || []) as IdeaForgeIdea[], [ideasQuery]);
 
@@ -135,6 +151,13 @@ export function FeedClient({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* PRD §6 — first-time user walkthrough */}
+      <FeedTutorial
+        show={tutorialOpen}
+        initialStep={tutorialState?.step ?? 0}
+        onClose={() => setTutorialOpen(false)}
+      />
     </>
   );
 }

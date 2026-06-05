@@ -359,8 +359,8 @@ export const internalAwardXP = internalMutation({
         amount: v.number(),
         action: v.string(),
     },
-    handler: async ({ db }, args) => {
-        const user = await db.get(args.userId);
+    handler: async (ctx, args) => {
+        const user = await ctx.db.get(args.userId);
         if (!user) return; // Fail silently for background tasks
 
         const currentXP = user.xp || 0;
@@ -368,10 +368,21 @@ export const internalAwardXP = internalMutation({
 
         const newLevel = calculateLevelFromXP(newXP);
 
-        await db.patch(args.userId, {
+        await ctx.db.patch(args.userId, {
             xp: newXP,
             level: newLevel,
         });
+
+        // Leagues v1 — roll positive XP awards into the weekly league standings.
+        // Wrapped so a league failure never blocks the primary XP grant.
+        if (args.amount > 0) {
+            try {
+                await ctx.scheduler.runAfter(0, internal.leagues.bumpWeeklyXp, {
+                    userId: args.userId,
+                    amount: args.amount,
+                });
+            } catch { /* league rollup must never block XP grant */ }
+        }
     },
 });
 

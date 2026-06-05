@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 
@@ -380,6 +380,35 @@ export const updateRequestStatus = mutation({
               });
             }
           }
+
+          // PRD §9.2 — "Makes a contribution to a project" advances
+          // the contributor's streak. Credit lands the moment the
+          // contribution becomes real (the request is accepted), not
+          // when it was first sent. Per §9 edge-case "backfilled or
+          // queued action that resolves on a later day: streak credits
+          // the day the action actually completed."
+          try {
+            await ctx.scheduler.runAfter(0, internal.streaks.recordAction, {
+              userId: request.contributorId,
+              actionType: "made_contribution",
+            });
+          } catch { /* streak failure must never block primary mutation */ }
+
+          // PRD §4 — project-lane points feed the Team league board's
+          // trailing-7-day total. Same `contributorPoints` figure used
+          // above for individual XP so the two boards stay in sync.
+          try {
+            await ctx.scheduler.runAfter(
+              0,
+              internal.teamLeagues.bumpProjectWeeklyPoints,
+              {
+                ideaId: idea._id,
+                contributorId: request.contributorId,
+                amount: contributorPoints,
+                reason: "Contribution accepted",
+              },
+            );
+          } catch { /* team-points failure must never block primary mutation */ }
         } else if (args.status === "rejected") {
           const authorPoints = isPublic ? 1 : 0;
           if (authorPoints > 0) {
@@ -488,5 +517,53 @@ export const repairReceivedNotificationLinks = mutation({
     }
 
     return { scanned, repaired, skipped, unresolvable };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// PRD §10.3 edge case — cascade-remove from channels
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * When a contributor is removed from a project, drop their channel
+ * membership from every conversation owned by that project.
+ *
+ * No public mutation removes an accepted contributor today, so this
+ * helper is unreferenced at deploy time. It exists so the future
+ * removal endpoint can call it without re-implementing the cascade:
+ *
+ *   await ctx.runMutation(
+ *     internal.contributionRequests.cascadeRemoveFromProjectChannels,
+ *     { ideaId, userId },
+ *   );
+ *
+ * Safe to call when the user has no channel memberships (no-op).
+ * Idempotent.
+ */
+export const cascadeRemoveFromProjectChannels = internalMutation({
+  args: {
+    ideaId: v.id("ideas"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, { ideaId, userId }) => {
+    const conversations = await ctx.db
+      .query("conversations")
+      .withIndex("by_idea", (q) => q.eq("ideaId", ideaId))
+      .collect();
+
+    let removed = 0;
+    for (const conv of conversations) {
+      const membership = await ctx.db
+        .query("conversationMembers")
+        .withIndex("by_user_conversation", (q) =>
+          q.eq("userId", userId).eq("conversationId", conv._id),
+        )
+        .first();
+      if (membership) {
+        await ctx.db.delete(membership._id);
+        removed += 1;
+      }
+    }
+    return { removed, scannedConversations: conversations.length };
   },
 });

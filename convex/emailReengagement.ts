@@ -275,7 +275,7 @@ export const sendReengagementEmails = internalAction({
         const html = buildFarewellEmail(
           firstName,
           inactiveDays,
-          unreadNotifications.map((n) => ({ message: n.message, type: n.type })),
+          unreadNotifications.map((n: { message: string; type: string }) => ({ message: n.message, type: n.type })),
           sparkedVentureUpdates,
           { newVenturesThisWeek }
         );
@@ -372,7 +372,7 @@ export const sendReengagementEmails = internalAction({
         const html = buildReengagementEmail(
           firstName,
           inactiveDays,
-          unreadNotifications.map((n) => ({ message: n.message, type: n.type })),
+          unreadNotifications.map((n: { message: string; type: string }) => ({ message: n.message, type: n.type })),
           sparkedVentureUpdates,
           { newVenturesThisWeek }
         );

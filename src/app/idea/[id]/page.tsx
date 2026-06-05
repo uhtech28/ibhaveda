@@ -131,6 +131,46 @@ function parseCategoryDisplay(raw?: string): string {
   return `${items[0]}, ${items[1]} (+${items.length - 2} more)`;
 }
 
+/**
+ * Video player for the idea-detail page. The wrapper hugs the video
+ * tightly — no black gutters around the player, no fixed aspect-ratio
+ * box. Portrait clips render in a phone-frame width; landscape fills
+ * the available width.
+ */
+function IdeaDetailVideo({ src, mimeType }: { src: string; mimeType?: string }) {
+  return (
+    // Full card width, black background. Height shrinks to fit the
+    // video — no top/bottom gutter. Video centered horizontally;
+    // left/right empty space is filled by the bg-black.
+    <div
+      className="w-full overflow-hidden rounded-xl border border-white/8 bg-black"
+      style={{ fontSize: 0, lineHeight: 0 }}
+    >
+      <video
+        src={src}
+        controls
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        className="mx-auto block max-h-[85vh] max-w-full"
+        style={{
+          imageRendering: "high-quality",
+          // @ts-ignore — vendor-prefix smoothing hints
+          WebkitBackfaceVisibility: "hidden",
+          backfaceVisibility: "hidden",
+          transform: "translateZ(0)",
+          filter: "none",
+          willChange: "transform",
+        }}
+      >
+        {mimeType ? <source src={src} type={mimeType} /> : null}
+      </video>
+    </div>
+  );
+}
+
 export default function IdeaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
@@ -656,7 +696,7 @@ const IdeaContent: React.FC<{
                 }
                 if (mime.startsWith("video/") || mime.includes("mp4")) {
                   return (
-                    <video key={key} src={att.url} className="w-full max-h-[75vh] rounded-xl" controls autoPlay muted loop playsInline preload="metadata" />
+                    <IdeaDetailVideo key={key} src={att.url} mimeType={att.type} />
                   );
                 }
                 if (mime.includes("pdf")) return <div key={key} className="rounded-xl border bg-muted/30 p-4"><PdfViewer url={att.url} fileName={att.name} /></div>;

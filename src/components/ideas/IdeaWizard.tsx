@@ -38,6 +38,9 @@ import {
 import { displayFontClass } from "@/components/ideaforge/shared";
 import { audioManager } from "@/lib/audio/audioManager";
 import { type TemplateId } from "@/config/templates";
+import { CrossPostSelector } from "@/components/share/CrossPostSelector";
+import { fireCrossPosts, summariseOutcomes } from "@/lib/share/crossPost";
+import type { SharePlatform } from "@/lib/share/types";
 
 // ─── Template display metadata ─────────────────────────────────────────────
 
@@ -132,6 +135,15 @@ export function IdeaWizard({
   const [skills, setSkills] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [files, setFiles] = useState<File[]>([]);
+  // PRD §7 — cross-post destinations. Product decision (overrides
+  // PRD §7 AC2 "off by default"): all three platforms pre-selected
+  // so the default action is "build in public everywhere". The user
+  // can deselect any platform they don't want before posting. Still
+  // opt-in in the sense that the user can deselect — but the friction
+  // is shifted from opt-in to opt-out.
+  const [crossPostTargets, setCrossPostTargets] = useState<Set<SharePlatform>>(
+    new Set(["twitter", "linkedin", "instagram"]),
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -214,7 +226,11 @@ export function IdeaWizard({
     setStep("generating");
     try {
       const result = await generateFromOutline({ outline: outline.trim() });
-      setDescription(outline.trim());
+      // Prefer the AI-generated description; fall back to the user's
+      // outline only if the action returns nothing usable.
+      setDescription(
+        result.description?.trim() ? result.description.trim() : outline.trim(),
+      );
       if (!result.title?.trim()) {
         setAiHadError(true);
         setTitle("");
@@ -356,6 +372,30 @@ export function IdeaWizard({
             ? "Loading your world map…"
             : "Only you can see it — toggle to Public any time.",
       });
+
+      // PRD §7 — fire cross-posts AFTER the internal idea exists, so
+      // AC6 holds: the internal post succeeds regardless of any
+      // external destination outcome. Only fires when at least one
+      // destination was selected (opt-in per post, AC2). Public ideas
+      // only — private posts shouldn't leak to external platforms.
+      if (visibility === "public" && crossPostTargets.size > 0) {
+        const origin =
+          typeof window !== "undefined" ? window.location.origin : "";
+        const outcomes = fireCrossPosts(Array.from(crossPostTargets), {
+          title: title.trim(),
+          text: description.trim().slice(0, 600),
+          url: origin ? `${origin}/idea/${newIdeaId}` : undefined,
+        });
+        const summary = summariseOutcomes(outcomes);
+        const anyFail = outcomes.some((o) => o.status === "failed");
+        toast({
+          title: anyFail ? "Cross-post: partial" : "Cross-post initiated",
+          description: summary,
+          variant: anyFail ? "destructive" : "default",
+          duration: 6000,
+        });
+      }
+
       close();
       router.push(`/map/world?ventureId=${ventureId}`);
     } catch (err) {
@@ -834,6 +874,12 @@ export function IdeaWizard({
                   </p>
                 </div>
               </div>
+
+              {/* PRD §7 — opt-in cross-post selector */}
+              <CrossPostSelector
+                selected={crossPostTargets}
+                onChange={setCrossPostTargets}
+              />
 
               {submitError && (
                 <div className="flex items-center gap-2 p-2.5 rounded-[10px] bg-red-500/10 border border-red-500/20">

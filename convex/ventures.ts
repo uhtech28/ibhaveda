@@ -28,6 +28,31 @@ import { finalizeCompletedStageScores } from "./cumulativeVentureScore";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AGENT_SHOWCASE_CATEGORY = "__agent_showcase_map__";
+
+/**
+ * Throws unless the user is the venture owner OR an accepted
+ * contributor on the underlying idea. Used by every mutation that
+ * touches venture state — the previous owner-only checks blocked
+ * collaborators from interacting with shared ventures.
+ */
+async function assertVentureAccess(
+  ctx: { db: any },
+  venture: { userId: Id<"users">; ideaId?: Id<"ideas"> },
+  userId: Id<"users">,
+): Promise<void> {
+  if (venture.userId === userId) return;
+  if (venture.ideaId) {
+    const accepted = await ctx.db
+      .query("contributionRequests")
+      .withIndex("by_contributor_status", (q: any) =>
+        q.eq("contributorId", userId).eq("status", "accepted"),
+      )
+      .filter((q: any) => q.eq(q.field("ideaId"), venture.ideaId))
+      .first();
+    if (accepted) return;
+  }
+  throw new Error("You don't have access to this venture");
+}
 const AGENT_SHOWCASE_TITLE = "AI Agent Idea Map";
 const AGENT_SHOWCASE_DESCRIPTION =
   "A shared showcase map used for AI agent ideas so every generated post can reveal the core gamification experience without creating separate task workstreams.";
@@ -432,9 +457,7 @@ export const ensureVentureStructure = mutation({
     if (!venture) throw new Error("Venture not found");
 
     const user = await getUserByClerkId(ctx, identity.subject);
-    if (venture.userId !== user._id) {
-      throw new Error("Not your venture");
-    }
+    await assertVentureAccess(ctx, venture, user._id);
 
     const existingCheckpoints = await ctx.db
       .query("ventureCheckpoints")
@@ -591,9 +614,7 @@ export const startCheckpoint = mutation({
     if (!venture) throw new Error("Venture not found");
 
     const user = await getUserByClerkId(ctx, identity.subject);
-    if (venture.userId !== user._id) {
-      throw new Error("Not your venture");
-    }
+    await assertVentureAccess(ctx, venture, user._id);
 
     if (checkpoint.status === "not_started") {
       await ctx.db.patch(args.checkpointId, {
@@ -739,9 +760,7 @@ export const submitEvidence = mutation({
     if (!venture) throw new Error("Venture not found");
 
     const user = await getUserByClerkId(ctx, identity.subject);
-    if (venture.userId !== user._id) {
-      throw new Error("Not your venture");
-    }
+    await assertVentureAccess(ctx, venture, user._id);
 
     // Validate contribution requirements
     const validation = validateContributionRequirement(
@@ -1001,9 +1020,7 @@ export const advanceCheckpoint = mutation({
     if (!venture) throw new Error("Venture not found");
 
     const user = await getUserByClerkId(ctx, identity.subject);
-    if (venture.userId !== user._id) {
-      throw new Error("Not your venture");
-    }
+    await assertVentureAccess(ctx, venture, user._id);
 
     const completedCount = getCompletedTaskCount(
       checkpoint as CheckpointProgressDoc,
@@ -1034,6 +1051,8 @@ export const advanceCheckpoint = mutation({
         now,
       );
     }
+
+    // PRD §9 — completing a checkpoint no longer advances the streak.
   },
 });
 
@@ -1053,9 +1072,7 @@ export const advanceStage = mutation({
     if (!venture) throw new Error("Venture not found");
 
     const user = await getUserByClerkId(ctx, identity.subject);
-    if (venture.userId !== user._id) {
-      throw new Error("Not your venture");
-    }
+    await assertVentureAccess(ctx, venture, user._id);
 
     await tryAdvanceStage(ctx, venture, venture.currentStage);
   },

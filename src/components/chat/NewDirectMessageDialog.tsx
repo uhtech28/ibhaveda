@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,20 +32,34 @@ export const NewDirectMessagePanel: React.FC<NewDirectMessagePanelProps> = ({
 }) => {
   const [rawQuery, setRawQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedQuery(rawQuery.trim()), 200);
     return () => window.clearTimeout(handle);
   }, [rawQuery]);
 
-  const shouldSearch = debouncedQuery.length > 0;
+  // Focus the input deterministically on mount. `autoFocus` alone can
+  // race with the parent sheet's focus-trap on first paint and lose
+  // focus, which leaves users unable to type.
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
 
-  const results = useQuery(
-    api.users.searchUsers,
-    shouldSearch ? { query: debouncedQuery, limit: 20 } : "skip"
-  );
+  // Always run the search — when the query is empty, `searchUsers`
+  // returns a suggestion list (online first, then recently active).
+  // Showing suggestions immediately means the user can pick someone
+  // even before typing.
+  const results = useQuery(api.users.searchUsers, {
+    query: debouncedQuery,
+    limit: 20,
+  });
 
-  const isLoading = shouldSearch && results === undefined;
+  const hasQuery = debouncedQuery.length > 0;
+  const isLoading = results === undefined;
   const safeResults = useMemo(() => results ?? [], [results]);
 
   return (
@@ -71,7 +85,7 @@ export const NewDirectMessagePanel: React.FC<NewDirectMessagePanelProps> = ({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
-            autoFocus
+            ref={inputRef}
             placeholder="Search by username..."
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
@@ -87,28 +101,29 @@ export const NewDirectMessagePanel: React.FC<NewDirectMessagePanelProps> = ({
       <div className="flex-1 min-h-0 border-t border-border/40">
         <ScrollArea className="h-full w-full">
           <div className="p-2">
-            {!shouldSearch && (
-              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                <Search className="w-6 h-6 mx-auto mb-2 opacity-50" />
-                Start typing to find people.
-              </div>
-            )}
-
             {isLoading && (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Searching...
+                {hasQuery ? "Searching..." : "Loading suggestions..."}
               </div>
             )}
 
-            {shouldSearch && !isLoading && safeResults.length === 0 && (
+            {!isLoading && safeResults.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                No users found for &quot;{debouncedQuery}&quot;.
+                {hasQuery
+                  ? `No users found for "${debouncedQuery}".`
+                  : "No people to suggest yet."}
               </div>
             )}
 
             {!isLoading && safeResults.length > 0 && (
-              <ul className="space-y-1">
+              <>
+                {!hasQuery && (
+                  <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Suggested
+                  </p>
+                )}
+                <ul className="space-y-1">
                 {safeResults.map((u) => (
                   <li key={u.id}>
                     <button
@@ -135,7 +150,8 @@ export const NewDirectMessagePanel: React.FC<NewDirectMessagePanelProps> = ({
                     </button>
                   </li>
                 ))}
-              </ul>
+                </ul>
+              </>
             )}
           </div>
         </ScrollArea>

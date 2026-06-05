@@ -38,6 +38,7 @@ import {
   XPBar,
 } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
+import { CombatPanel } from "@/components/combat/CombatPanel";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
@@ -1506,6 +1507,41 @@ function MapPageInner() {
     isLastInStage: boolean;
     isGold: boolean;
   } | null>(null);
+
+  // HP-based Cross-Question Combat round id, fetched when a boss
+  // combat target is set. Null while the start mutation is in flight.
+  const [activeCombatRoundId, setActiveCombatRoundId] = useState<
+    string | null
+  >(null);
+  const [combatStartError, setCombatStartError] = useState<string | null>(null);
+  const startCombatRoundMutation = useMutation(api.combat.startCombatRound);
+
+  // When a boss combat target is set, open a fresh round automatically.
+  useEffect(() => {
+    if (!bossCombatTarget) {
+      setActiveCombatRoundId(null);
+      return;
+    }
+    let cancelled = false;
+    setCombatStartError(null);
+    (async () => {
+      try {
+        const result = await startCombatRoundMutation({
+          checkpointId: bossCombatTarget.checkpointId as Id<"ventureCheckpoints">,
+        });
+        if (!cancelled) setActiveCombatRoundId(result.roundId);
+      } catch (err) {
+        if (!cancelled) {
+          setCombatStartError(
+            err instanceof Error ? err.message : "Failed to start combat",
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bossCombatTarget, startCombatRoundMutation]);
 
   useEffect(() => {
     if (!activeVenture) return;
@@ -3303,20 +3339,16 @@ function MapPageInner() {
             }}
           />
 
-          {/* ── Boss combat gate overlay — fires for every checkpoint at 2/3 tasks ── */}
-          {bossCombatTarget && activeVenture && (
-            <InterCheckpointOverlay
-              isOpen={true}
-              events={["henchman"]}
-              templateId={activeVenture.templateId as any}
-              stage={bossCombatTarget.stage}
-              checkpoint={bossCombatTarget.checkpoint}
-              ventureId={activeVenture._id}
-              checkpointId={checkpoints.find((cp) => cp.stage === bossCombatTarget.stage && cp.checkpoint === bossCombatTarget.checkpoint)?._id as any}
-              isBossCombat={true}
-              isLastCheckpointInStage={bossCombatTarget.isLastInStage}
-              isGoldCheckpoint={bossCombatTarget.isGold}
-              onBossVictory={() => {
+          {/* ── HP-based Cross-Question Combat — fires when player walks
+                into a boss checkpoint with 2/3 tasks completed.
+                Replaces the old single-question Doubt Imp overlay. ── */}
+          {bossCombatTarget && activeVenture && activeCombatRoundId && (
+            <CombatPanel
+              roundId={activeCombatRoundId as Id<"combatRounds">}
+              checkpointId={bossCombatTarget.checkpointId as Id<"ventureCheckpoints">}
+              onAdvanceCheckpoint={() => {
+                // Boss defeated — mirror the legacy victory bookkeeping
+                // so the world-map state stays consistent.
                 const stage = bossCombatTarget.stage;
                 const checkpoint = bossCombatTarget.checkpoint;
                 const key = checkpointBossKey(stage, checkpoint);
@@ -3332,7 +3364,9 @@ function MapPageInner() {
                   eventBridge.dispatchToPhaser({
                     type: "BOSS_FINAL_OUTCOME",
                     stage,
-                    outcome: bossCombatTarget.isGold ? "slay_gold" : "retreat_permanent",
+                    outcome: bossCombatTarget.isGold
+                      ? "slay_gold"
+                      : "retreat_permanent",
                   });
                 } else {
                   eventBridge.dispatchToPhaser({
@@ -3342,43 +3376,46 @@ function MapPageInner() {
                   });
                 }
                 setBossCombatTarget(null);
+                setActiveCombatRoundId(null);
                 setTimeout(() => handleAdvance(true), 300);
               }}
-              onBossSkip={() => {
-                const stage = bossCombatTarget.stage;
-                const checkpoint = bossCombatTarget.checkpoint;
-                const key = checkpointBossKey(stage, checkpoint);
-                setBossDefeatedAtCheckpoint((prev) => {
-                  const next = new Set(prev);
-                  next.add(key);
-                  if (venture?._id) {
-                    persistCheckpointBossDefeated(venture._id, next);
-                  }
-                  return next;
-                });
-                if (bossCombatTarget.isLastInStage) {
-                  eventBridge.dispatchToPhaser({
-                    type: "BOSS_FINAL_OUTCOME",
-                    stage,
-                    outcome: "retreat_permanent",
-                  });
-                } else {
-                  eventBridge.dispatchToPhaser({
-                    type: "BOSS_COMBAT_RETREAT",
-                    stage,
-                    checkpoint,
-                  });
-                }
+              onClose={() => {
+                // Player retreated / closed the panel — do NOT advance.
+                // The boss is still alive; player can re-engage by walking
+                // back into the same checkpoint.
                 setBossCombatTarget(null);
-                setTimeout(() => handleAdvance(true), 300);
+                setActiveCombatRoundId(null);
               }}
-              onBossRetreat={() => {
-                // Player failed — close overlay, do NOT advance
-                setBossCombatTarget(null);
-              }}
-              onComplete={() => setBossCombatTarget(null)}
-              onClose={() => setBossCombatTarget(null)}
             />
+          )}
+
+          {/* Loading or error state while the combat round is being created */}
+          {bossCombatTarget && activeVenture && !activeCombatRoundId && (
+            <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950 p-8 text-center text-white">
+                {combatStartError ? (
+                  <>
+                    <p className="text-sm text-red-400">
+                      Failed to summon the boss: {combatStartError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setBossCombatTarget(null)}
+                      className="rounded-md border border-white/20 px-4 py-1.5 text-sm hover:bg-white/5"
+                    >
+                      Retreat
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-rose-400 border-t-transparent" />
+                    <p className="text-sm text-white/70">
+                      The boss is awakening…
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
           )}
 
           {/* Inter-checkpoint passage events overlay (treasure/shield/insight only) */}

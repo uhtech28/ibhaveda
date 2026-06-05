@@ -7,6 +7,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { useAuth } from "@clerk/nextjs";
 import { Spinner } from "@/components/ui/spinner";
+import { SparkersDialog, ContributorsDialog } from "@/components/engagement";
 
 
 interface IdeaBottomBarProps {
@@ -46,6 +47,10 @@ export function IdeaBottomBar({
   const [currentSparkCount, setCurrentSparkCount] = useState(initialSparkCount);
   const [currentHasSparked, setCurrentHasSparked] = useState(initialHasSparked);
 
+  // PRD §8 popups
+  const [sparkersOpen, setSparkersOpen] = useState(false);
+  const [contributorsOpen, setContributorsOpen] = useState(false);
+
   useEffect(() => {
     setCurrentSparkCount(initialSparkCount);
     setCurrentHasSparked(initialHasSparked);
@@ -73,29 +78,41 @@ export function IdeaBottomBar({
 
   return (
     <div className={containerClasses}>
-      {/* Spark Button */}
-      <ParticleButton
-        variant="ghost"
-        size="sm"
-        onSuccess={handleSpark}
-        disabled={!userId || isSparking}
-        className={`
-          rounded-full px-4 h-10 transition-all duration-300
-          ${currentHasSparked
-            ? 'bg-[#111827] text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.12)] hover:bg-[#172033] hover:text-orange-200'
-            : 'bg-transparent text-orange-300 hover:bg-[#111827] hover:text-orange-200'
-          }
-        `}
-      >
-        {isSparking ? (
-          <Spinner size={16} className="text-orange-300" />
-        ) : (
-          <div className="flex items-center gap-2">
+      {/* Spark cluster — icon sparks; count opens the sparkers popup (PRD §8 AC1) */}
+      <div className="flex items-center gap-0.5">
+        <ParticleButton
+          variant="ghost"
+          size="sm"
+          onSuccess={handleSpark}
+          disabled={!userId || isSparking}
+          aria-label={currentHasSparked ? "Remove spark" : "Spark this idea"}
+          title={currentHasSparked ? "Remove spark" : "Spark this idea"}
+          className={`
+            rounded-full h-10 w-10 p-0 transition-all duration-300
+            ${currentHasSparked
+              ? 'bg-[#111827] text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.12)] hover:bg-[#172033] hover:text-orange-200'
+              : 'bg-transparent text-orange-300 hover:bg-[#111827] hover:text-orange-200'
+            }
+          `}
+        >
+          {isSparking ? (
+            <Spinner size={16} className="text-orange-300" />
+          ) : (
             <Sparkles className={`w-4 h-4 text-orange-300 ${currentHasSparked ? "fill-current" : ""}`} />
-            <span className="font-semibold text-sm">{currentSparkCount}</span>
-          </div>
-        )}
-      </ParticleButton>
+          )}
+        </ParticleButton>
+        <button
+          type="button"
+          onClick={() => {
+            if (currentSparkCount > 0) setSparkersOpen(true);
+          }}
+          disabled={currentSparkCount === 0}
+          title={currentSparkCount > 0 ? "See who sparked this" : undefined}
+          className="rounded-full h-10 px-3 text-sm font-semibold text-orange-300 hover:bg-[#111827] hover:text-orange-200 hover:underline transition-colors disabled:cursor-default disabled:opacity-70 disabled:no-underline disabled:hover:bg-transparent disabled:hover:text-orange-300"
+        >
+          {currentSparkCount}
+        </button>
+      </div>
 
       <div className="w-px h-6 bg-border/40 mx-1" />
 
@@ -112,25 +129,43 @@ export function IdeaBottomBar({
 
       <div className="w-px h-6 bg-border/40 mx-1" />
 
-      {/* Contribute / Requests Button — same Users icon as the feed card,
-       * regardless of whether the viewer is the author. The red dot in the
-       * top-right surfaces pending request count for authors. */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onOpenRequests}
-        aria-label={isAuthor ? "View contribution requests" : "Contributors"}
-        title={isAuthor ? "Contribution requests" : "Contributors"}
-        className="rounded-full px-4 h-10 gap-2 bg-transparent text-emerald-300 hover:bg-[#111827] hover:text-emerald-200 transition-colors relative"
-      >
-        <UserPlus className="w-4 h-4 text-emerald-300" />
-        <span className="font-semibold text-sm">{contributorCount}</span>
-        {isAuthor && requestCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold ring-2 ring-background">
-            {requestCount}
-          </span>
-        )}
-      </Button>
+      {/* Contribute cluster — icon opens requests/contribute flow,
+       * count opens the contributor popup (PRD §8 AC2). */}
+      <div className="flex items-center gap-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onOpenRequests}
+          aria-label={isAuthor ? "View contribution requests" : "Contribute"}
+          title={isAuthor ? "Contribution requests" : "Contribute"}
+          className="rounded-full h-10 w-10 p-0 bg-transparent text-emerald-300 hover:bg-[#111827] hover:text-emerald-200 transition-colors relative"
+        >
+          <UserPlus className="w-4 h-4 text-emerald-300" />
+          {isAuthor && requestCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold ring-2 ring-background">
+              {requestCount}
+            </span>
+          )}
+        </Button>
+        <button
+          type="button"
+          onClick={() => setContributorsOpen(true)}
+          title="See who's contributing"
+          className="rounded-full h-10 px-3 text-sm font-semibold text-emerald-300 hover:bg-[#111827] hover:text-emerald-200 hover:underline transition-colors"
+        >
+          {contributorCount}
+        </button>
+      </div>
+
+      {/* PRD §8 popups */}
+      <SparkersDialog
+        ideaId={sparkersOpen ? (ideaId as Id<"ideas">) : null}
+        onOpenChange={(open) => setSparkersOpen(open)}
+      />
+      <ContributorsDialog
+        ideaId={contributorsOpen ? (ideaId as Id<"ideas">) : null}
+        onOpenChange={(open) => setContributorsOpen(open)}
+      />
     </div>
   );
 }

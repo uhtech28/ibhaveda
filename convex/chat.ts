@@ -40,19 +40,53 @@ export const getUserConversations = query({
       .withIndex("by_participant2", (q) => q.eq("participant2", userId))
       .collect();
 
+    // A self-DM (or any row where the user is both participant1 and
+    // participant2) appears in BOTH index queries — dedupe by _id
+    // before mapping, otherwise React renders duplicate keys.
+    const seen = new Set<string>();
     const allConvos = [...convos1, ...convos2]
-      .filter((c) => c.type !== "group")
+      .filter((c) => {
+        if (c.type === "group") return false;
+        const key = String(c._id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     const enhancedConvos = await Promise.all(
       allConvos.map(async (convo) => {
-        const lastMessage = convo.lastMessageId ? await ctx.db.get(convo.lastMessageId) : null;
+        // Fall back to the most recent message in the conversation if
+        // the canonical `lastMessageId` pointer is missing or stale —
+        // some early test rows never had it patched after a send.
+        let lastMessage: Doc<"messages"> | null = convo.lastMessageId
+          ? await ctx.db.get(convo.lastMessageId)
+          : null;
+        if (!lastMessage) {
+          const recent = await ctx.db
+            .query("messages")
+            .withIndex("by_conversation_created", (q) =>
+              q.eq("conversationId", convo._id),
+            )
+            .order("desc")
+            .first();
+          lastMessage = recent ?? null;
+        }
         const otherParticipantId = convo.participant1 === userId ? convo.participant2 : convo.participant1;
         if (!otherParticipantId) return null;
         const otherUser = await ctx.db.get(otherParticipantId);
         return {
           ...convo,
-          lastMessage: lastMessage ? { content: lastMessage.content, createdAt: lastMessage.createdAt, senderId: lastMessage.senderId } : null,
+          lastMessage: lastMessage
+            ? {
+                content: lastMessage.content,
+                createdAt: lastMessage.createdAt,
+                senderId: lastMessage.senderId,
+                messageType: lastMessage.messageType ?? "text",
+                // Frontend uses these to render "You: …" vs "Alice: …"
+                isFromMe: lastMessage.senderId === userId,
+              }
+            : null,
           otherUser: otherUser ? { id: otherUser._id, username: otherUser.username, displayName: otherUser.displayName, avatar: otherUser.avatar } : null,
         };
       })
@@ -136,16 +170,74 @@ export const getGroupConversationsList = query({
   },
 });
 
+/**
+ * PRD §10.3 edge case: a newly added channel member sees messages
+ * from their join point forward by default. The rule is mirrored
+ * here from `src/lib/chat/config.ts` — flip both if you change the
+ * policy.
+ */
+const CHAT_HISTORY_FROM_JOIN_FORWARD = true;
+
 export const getConversationMessages = query({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) return [];
+
+    // History-visibility cutoff. Only applies to explicit named
+    // channels (those with a `creatorId`). For direct (1:1)
+    // conversations and implicit community channels, every message
+    // is visible.
+    let visibilityCutoff = 0;
+    if (CHAT_HISTORY_FROM_JOIN_FORWARD && conversation.creatorId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (identity) {
+        const viewer = await ctx.db
+          .query("users")
+          .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+          .first();
+        if (viewer) {
+          // Project author and channel creator are never cut off — they
+          // see the full thread.
+          const isCreator = conversation.creatorId === viewer._id;
+          let isProjectAuthor = false;
+          if (conversation.ideaId) {
+            const idea = await ctx.db.get(conversation.ideaId);
+            isProjectAuthor = !!idea && idea.authorId === viewer._id;
+          }
+          if (!isCreator && !isProjectAuthor) {
+            const membership = await ctx.db
+              .query("conversationMembers")
+              .withIndex("by_user_conversation", (q) =>
+                q.eq("userId", viewer._id).eq("conversationId", args.conversationId),
+              )
+              .first();
+            if (membership) {
+              visibilityCutoff = membership.joinedAt;
+            }
+            // If `membership` is null and we got this far, the user
+            // is reading a channel they're not in (shouldn't happen
+            // through the UI). We don't throw — we just return no
+            // messages by setting the cutoff to a future timestamp.
+            else {
+              visibilityCutoff = Number.MAX_SAFE_INTEGER;
+            }
+          }
+        }
+      }
+    }
+
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_conversation_created", (q) => q.eq("conversationId", args.conversationId))
       .order("asc")
       .collect();
 
-    const enhancedMessages = await Promise.all(messages.map(async (msg) => {
+    const filtered = visibilityCutoff > 0
+      ? messages.filter((m) => m.createdAt >= visibilityCutoff)
+      : messages;
+
+    const enhancedMessages = await Promise.all(filtered.map(async (msg) => {
       const sender = await ctx.db.get(msg.senderId);
       return { ...msg, senderName: sender?.displayName, senderAvatar: sender?.avatar };
     }));
@@ -393,11 +485,44 @@ export const addGroupMember = mutation({
     const isMember = !!userMembership;
     if (!isCreator && !isMember) throw new Error("You must be a member of the group to add others");
 
+    // PRD §10.3 AC4 — only existing project contributors can be
+    // added to a project channel. This is the server-side gate; the
+    // UI filter on its own is bypassable by a hand-rolled mutation
+    // call, so the check must live here. Idempotent: the same rule
+    // implicitly allows the idea author + every accepted contributor.
+    if (conversation.ideaId) {
+      const idea = await ctx.db.get(conversation.ideaId);
+      if (!idea) throw new Error("Parent project no longer exists");
+
+      const isAuthor = idea.authorId === args.userId;
+      if (!isAuthor) {
+        const acceptedContribution = await ctx.db
+          .query("contributionRequests")
+          .withIndex("by_idea_status_created", (q) =>
+            q.eq("ideaId", conversation.ideaId!).eq("status", "accepted"),
+          )
+          .filter((q) => q.eq(q.field("contributorId"), args.userId))
+          .first();
+
+        if (!acceptedContribution) {
+          throw new Error(
+            "Only existing project contributors can be added to this channel. " +
+              "Add the user to the project first.",
+          );
+        }
+      }
+    }
+
     const targetMembership = await ctx.db
       .query("conversationMembers")
       .withIndex("by_user_conversation", (q) => q.eq("userId", args.userId).eq("conversationId", args.conversationId))
       .first();
-    if (targetMembership) throw new Error("User is already a member");
+    if (targetMembership) {
+      // PRD §10 edge case "duplicate-add: no-op, no error". Silently
+      // return rather than throwing so the UI doesn't surface a
+      // spurious error if two admins click "add" near-simultaneously.
+      return;
+    }
 
     await ctx.db.insert("conversationMembers", {
       conversationId: args.conversationId,

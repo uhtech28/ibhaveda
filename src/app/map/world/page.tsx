@@ -37,6 +37,7 @@ import { CommentsSection } from "@/components/comments/CommentsSection";
 import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords, Zap } from "lucide-react";
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
+import { CombatPanel } from "@/components/combat/CombatPanel";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
@@ -85,6 +86,14 @@ import {
   templateIdAtom,
   templateMetricAtom,
 } from "@/lib/stores/hudStore";
+import { useMiniGameLifecycle } from "@/lib/minigames/useMiniGameLifecycle";
+import {
+  MiniGameOverlay,
+  MiniGamePromptDialog,
+  MiniGameResultPanel,
+  MiniGamesPanel,
+} from "@/components/minigames";
+import { MINIGAME_SPAWNS } from "@convex/miniGameConstants";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -1385,6 +1394,9 @@ function MapPageInner() {
 
   // Group chat popup modal state
   const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
+  // PRD §2 v1.1 — sidebar-driven mini-games panel (replaced the
+  // floating-dot easter-egg UX on the world map).
+  const [isMiniGamesPanelOpen, setIsMiniGamesPanelOpen] = useState(false);
   const [isContributorsOpen, setIsContributorsOpen] = useState(false);
   const [isContributionsOpen, setIsContributionsOpen] = useState(false);
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
@@ -1533,6 +1545,54 @@ function MapPageInner() {
     isLastInStage: boolean;
     isGold: boolean;
   } | null>(null);
+
+  // HP-based Cross-Question Combat round id, fetched when boss combat target is set.
+  const [activeCombatRoundId, setActiveCombatRoundId] = useState<string | null>(null);
+  const [combatStartError, setCombatStartError] = useState<string | null>(null);
+  const startCombatRoundMutation = useMutation(api.combat.startCombatRound);
+
+  useEffect(() => {
+    if (!bossCombatTarget) {
+      setActiveCombatRoundId(null);
+      setCombatStartError(null);
+      return;
+    }
+    let cancelled = false;
+    setCombatStartError(null);
+    (async () => {
+      try {
+        const result = await startCombatRoundMutation({
+          checkpointId: bossCombatTarget.checkpointId as Id<"ventureCheckpoints">,
+        });
+        if (!cancelled) setActiveCombatRoundId(result.roundId);
+      } catch (err) {
+        if (!cancelled) {
+          setCombatStartError(
+            err instanceof Error ? err.message : "Failed to start combat",
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bossCombatTarget, startCombatRoundMutation]);
+
+  // CombatPanel emits a `combat:retry-started` window event when the
+  // player clicks "Retry Combat" on the defeat screen. The event detail
+  // carries the new roundId from the server. We swap the active round
+  // id here so the panel remounts with the new round and a fresh first
+  // question.
+  useEffect(() => {
+    const onRetry = (e: Event) => {
+      const detail = (e as CustomEvent<{ newRoundId: string }>).detail;
+      if (detail?.newRoundId) {
+        setActiveCombatRoundId(detail.newRoundId);
+      }
+    };
+    window.addEventListener("combat:retry-started", onRetry);
+    return () => window.removeEventListener("combat:retry-started", onRetry);
+  }, []);
 
   const dismissBossCombatVisual = useCallback((stage: number) => {
     eventBridge.dispatchToPhaser({
@@ -2466,6 +2526,43 @@ function MapPageInner() {
       ),
     });
   }, [phaserReady, venture?._id, checkpoints, activeStage, activeCP]);
+
+  // ── PRD §2 — mini-game lifecycle hook + Phaser sync ───────────────────────
+  const miniGameLifecycle = useMiniGameLifecycle(
+    venture?._id as Id<"ventures"> | undefined,
+  );
+  const miniGamePhase = miniGameLifecycle.phase;
+  const miniGameCompletedSpawnIds = miniGameLifecycle.completedSpawnIds;
+
+  // The "completed-checkpoint" set Phaser uses to gate spawn visibility.
+  // Format mirrors the Phaser-side node-key: "{stage}-{checkpoint}".
+  const miniGameCheckpointGate = useMemo(() => {
+    return checkpoints
+      .filter((c) => deriveCheckpointStatus(c, activeStage, activeCP) === "completed"
+        || deriveCheckpointStatus(c, activeStage, activeCP) === "gold")
+      .map((c) => `${c.stage}-${c.checkpoint}`);
+  }, [checkpoints, activeStage, activeCP]);
+
+  useEffect(() => {
+    if (!phaserReady) return;
+    eventBridge.dispatchToPhaser({
+      type: "MINIGAME_SYNC_STATE",
+      completedCheckpointIds: miniGameCheckpointGate,
+      completedSpawnIds: miniGameCompletedSpawnIds,
+    });
+  }, [phaserReady, miniGameCheckpointGate, miniGameCompletedSpawnIds]);
+
+  // Bridge: Phaser fires MINIGAME_SPAWN_ACTIVATED → hook opens the prompt.
+  useEffect(() => {
+    const handler = (e: {
+      spawnPointId: string;
+    }) => {
+      const cfg = MINIGAME_SPAWNS.find((s) => s.id === e.spawnPointId);
+      if (cfg) miniGameLifecycle.engageWithSpawn(cfg);
+    };
+    eventBridge.onReact("MINIGAME_SPAWN_ACTIVATED", handler);
+    return () => eventBridge.off("MINIGAME_SPAWN_ACTIVATED", handler);
+  }, [miniGameLifecycle]);
 
   // ── Sync world brightness → Phaser ─────────────────────────────────────────
   useEffect(() => {
@@ -3545,34 +3642,59 @@ function MapPageInner() {
             onDismiss={() => setGoldCheckpointNotification(null)}
           />
 
-          {/* ── Boss combat gate overlay — fires for every checkpoint at 2/3 tasks ── */}
-          {bossCombatTarget && activeVenture && (
-            <InterCheckpointOverlay
-              isOpen={true}
-              events={["henchman"]}
-              templateId={activeVenture.templateId as any}
-              stage={bossCombatTarget.stage}
-              checkpoint={bossCombatTarget.checkpoint}
-              ventureId={activeVenture._id}
-              checkpointId={checkpoints.find((cp) => cp.stage === bossCombatTarget.stage && cp.checkpoint === bossCombatTarget.checkpoint)?._id as any}
-              isBossCombat={true}
-              isLastCheckpointInStage={bossCombatTarget.isLastInStage}
-              isGoldCheckpoint={bossCombatTarget.isGold}
-              onBossVictory={finishBossCombatAndAdvance}
-              onBossSkip={finishBossCombatAndAdvance}
-              onBossRetreat={() => {
-                dismissBossCombatVisual(bossCombatTarget.stage);
-                setBossCombatTarget(null);
+          {/* ── HP-based Cross-Question Combat — replaces the old single-question
+                Doubt Imp overlay. Fires when player walks into a boss checkpoint. ── */}
+          {bossCombatTarget && activeVenture && activeCombatRoundId && (
+            <CombatPanel
+              key={activeCombatRoundId}
+              roundId={activeCombatRoundId as Id<"combatRounds">}
+              checkpointId={bossCombatTarget.checkpointId as Id<"ventureCheckpoints">}
+              onRetryStarted={(newRoundId) => {
+                // Direct swap to the new round. The key prop above
+                // forces a clean CombatPanel remount when activeCombatRoundId changes.
+                console.log("[combat] retry: swapping roundId from", activeCombatRoundId, "→", newRoundId);
+                setActiveCombatRoundId(newRoundId);
               }}
-              onComplete={() => {
-                dismissBossCombatVisual(bossCombatTarget.stage);
-                setBossCombatTarget(null);
+              onAdvanceCheckpoint={() => {
+                setActiveCombatRoundId(null);
+                finishBossCombatAndAdvance();
               }}
               onClose={() => {
                 dismissBossCombatVisual(bossCombatTarget.stage);
                 setBossCombatTarget(null);
+                setActiveCombatRoundId(null);
               }}
             />
+          )}
+
+          {/* Loading / error state while the combat round is being created */}
+          {bossCombatTarget && activeVenture && !activeCombatRoundId && (
+            <div className="pointer-events-auto fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-sm">
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950 p-8 text-center text-white">
+                {combatStartError ? (
+                  <>
+                    <p className="text-sm text-red-400">
+                      Failed to summon the boss: {combatStartError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dismissBossCombatVisual(bossCombatTarget.stage);
+                        setBossCombatTarget(null);
+                      }}
+                      className="rounded-md border border-white/20 px-4 py-1.5 text-sm hover:bg-white/5"
+                    >
+                      Retreat
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-rose-400 border-t-transparent" />
+                    <p className="text-sm text-white/70">The boss is awakening…</p>
+                  </>
+                )}
+              </div>
+            </div>
           )}
 
           {/* Inter-checkpoint passage events overlay */}
@@ -3604,6 +3726,70 @@ function MapPageInner() {
             );
           })()}
 
+          {/* PRD §2 v1.1 — sidebar entry-point for mini-games (the
+           *  floating dot UX was replaced because it felt visually
+           *  noisy alongside the snake-path checkpoints). Selecting a
+           *  game here calls `engageWithSpawn` → prompt → overlay →
+           *  result, same downstream flow. */}
+          <MiniGamesPanel
+            open={isMiniGamesPanelOpen}
+            onClose={() => setIsMiniGamesPanelOpen(false)}
+            completedSpawnIds={miniGameCompletedSpawnIds}
+            onPlay={(spawn) => {
+              setIsMiniGamesPanelOpen(false);
+              miniGameLifecycle.engageWithSpawn(spawn);
+            }}
+          />
+
+          {/* Lifecycle surfaces — same as before. */}
+          <MiniGamePromptDialog
+            spawn={miniGamePhase.kind === "prompt" ? miniGamePhase.spawn : null}
+            onEngage={miniGameLifecycle.acceptPrompt}
+            onDismiss={miniGameLifecycle.dismissPrompt}
+          />
+          {miniGamePhase.kind === "playing" && (
+            <MiniGameOverlay
+              spawn={miniGamePhase.spawn}
+              onResult={miniGameLifecycle.settle}
+              onAbandon={miniGameLifecycle.abandon}
+            />
+          )}
+          {miniGamePhase.kind === "result" && (() => {
+            // Pick the next un-cleared spawn. Preference order:
+            //   1. Same archetype, next-higher difficulty in catalogue.
+            //   2. Any other un-cleared spawn.
+            const completedIds = new Set(miniGameCompletedSpawnIds);
+            const lastSpawnId = miniGamePhase.completion.spawnPointId;
+            const lastSpawn = MINIGAME_SPAWNS.find((s) => s.id === lastSpawnId);
+            const candidates = MINIGAME_SPAWNS.filter(
+              (s) => !completedIds.has(s.id),
+            );
+            const sameArchetypeNext = lastSpawn
+              ? candidates
+                  .filter((s) => s.archetype === lastSpawn.archetype)
+                  .sort((a, b) => a.difficulty - b.difficulty)[0]
+              : undefined;
+            const anyNext = candidates[0];
+            const nextSpawn = sameArchetypeNext ?? anyNext ?? null;
+
+            return (
+              <MiniGameResultPanel
+                completion={miniGamePhase.completion}
+                onClose={miniGameLifecycle.closeResult}
+                nextSpawn={nextSpawn}
+                onPlayNext={(spawn) => {
+                  miniGameLifecycle.closeResult();
+                  // Tiny delay so the result panel finishes its exit
+                  // before the prompt opens — avoids two stacked
+                  // modals in the same frame.
+                  setTimeout(() => {
+                    miniGameLifecycle.engageWithSpawn(spawn);
+                  }, 120);
+                }}
+              />
+            );
+          })()}
+
           {/* Left Sidebar & Floating Popup Tools Panel Wrapper */}
           <div id="left-control-panel" className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
             <LeftSidebar
@@ -3626,6 +3812,8 @@ function MapPageInner() {
                   setIsKanbanOpen(true);
                 } else if (tab === "journal") {
                   setIsJournalOpen(true);
+                } else if (tab === "minigames") {
+                  setIsMiniGamesPanelOpen(true);
                 } else {
                   updateUrlParams({ panel: "tools", tab, checkpointId: null });
                 }

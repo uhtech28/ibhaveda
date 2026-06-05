@@ -88,9 +88,11 @@ export default function ProfileSetupPage() {
       setValidationUsername('');
       return;
     }
-    const regexTest = /^[a-z0-9_]+$/.test(username);
+    // Allow letters, numbers, and a broad set of special chars.
+    // Disallows whitespace and URL-routing chars (/ ? # & = : @ < > " ' \ space).
+    const regexTest = /^[^\s\/\\?#&=:@<>"'`]+$/.test(username);
     if (!regexTest) {
-      setUsernameValidation({ checking: false, available: null, error: 'Username must only use lowercase characters, numbers, and underscores', suggestions: [] });
+      setUsernameValidation({ checking: false, available: null, error: 'Username can\'t contain spaces or URL chars (/ ? # & = : @ < > " \')', suggestions: [] });
       setValidationUsername('');
       return;
     }
@@ -98,7 +100,10 @@ export default function ProfileSetupPage() {
   }, []);
 
   const handleUsernameChange = useCallback((username: string) => {
-    const normalizedUsername = username.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    // Strip disallowed chars but keep everything else (special chars OK).
+    const normalizedUsername = username
+      .toLowerCase()
+      .replace(/[\s\/\\?#&=:@<>"'`]/g, '');
     setFormData(prev => ({ ...prev, username: normalizedUsername }));
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => { validateUsername(normalizedUsername); }, 500);
@@ -110,7 +115,9 @@ export default function ProfileSetupPage() {
 
   useEffect(() => {
     if (user) {
-      const suggestedUsername = (user.username || user.firstName || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '');
+      const suggestedUsername = (user.username || user.firstName || 'user')
+        .toLowerCase()
+        .replace(/[\s\/\\?#&=:@<>"'`]/g, '');
       const suggestedName = user.fullName || suggestedUsername;
       // Auto-pull avatar from Clerk if available, so first-time setup
       // doesn't have to ask the user to upload one.

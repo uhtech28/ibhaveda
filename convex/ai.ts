@@ -29,18 +29,71 @@ type GeneratedDraft = {
   visibility: "public" | "private";
 };
 
+// Keyword → industry/skill mappings used by the offline fallback.
+// Hand-curated to cover the common startup categories in the platform's
+// taxonomy. If no keyword matches, we leave the arrays empty (rather
+// than guessing).
+const INDUSTRY_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
+  [/\b(e[- ]?commerce|retail|shop|store|cart|checkout|merchant)\b/i, "E-commerce"],
+  [/\b(saas|b2b|enterprise|cloud platform)\b/i, "SaaS"],
+  [/\b(ai|artificial intelligence|machine learning|ml|llm|gpt|gemini)\b/i, "AI/ML"],
+  [/\b(health|wellness|medical|clinic|patient|therapy|fitness)\b/i, "Healthcare"],
+  [/\b(edu|education|learn|tutor|school|student|course)\b/i, "Education"],
+  [/\b(fintech|finance|banking|payment|wallet|invest|crypto)\b/i, "Fintech"],
+  [/\b(consumer|d2c|direct to consumer|lifestyle|community)\b/i, "Consumer"],
+  [/\b(climate|sustainability|green|carbon|renewable)\b/i, "Climate"],
+  [/\b(food|beverage|restaurant|delivery|cafe|dining)\b/i, "Food & Beverage"],
+  [/\b(travel|tourism|hotel|booking|flight)\b/i, "Travel"],
+  [/\b(real estate|property|housing|rent)\b/i, "Real Estate"],
+];
+
+const SKILL_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
+  [/\b(frontend|react|next\.?js|ui|html|css|tailwind)\b/i, "Frontend"],
+  [/\b(backend|api|server|node|python|rust|go|java)\b/i, "Backend"],
+  [/\b(design|ui\/?ux|figma|prototyp|wireframe)\b/i, "Design"],
+  [/\b(product management|product manager|pm|roadmap)\b/i, "Product Management"],
+  [/\b(marketing|growth|seo|content|copy|brand)\b/i, "Marketing"],
+  [/\b(data|analytic|sql|warehouse|dashboard)\b/i, "Data Science"],
+  [/\b(mobile|ios|android|react native|flutter|swift|kotlin)\b/i, "Mobile"],
+  [/\b(devops|infrastructure|ci\/?cd|kubernetes|docker|cloud)\b/i, "DevOps"],
+  [/\b(ml|machine learning|model|training|pytorch|tensorflow)\b/i, "Data Science"],
+];
+
+function detectFromKeywords(
+  outline: string,
+  mappings: ReadonlyArray<[RegExp, string]>,
+  max: number,
+): string[] {
+  const hits = new Set<string>();
+  for (const [re, label] of mappings) {
+    if (re.test(outline)) hits.add(label);
+    if (hits.size >= max) break;
+  }
+  return Array.from(hits);
+}
+
 const fallback = (outline: string): GeneratedDraft => {
   // Extract a basic title from the outline (first sentence or first 60 chars)
   const firstSentence = outline.split(/[.!?]/)[0].trim();
-  const basicTitle = firstSentence.length > 0 && firstSentence.length <= 80 
-    ? firstSentence 
+  const basicTitle = firstSentence.length > 0 && firstSentence.length <= 80
+    ? firstSentence
     : outline.slice(0, 60).trim() + (outline.length > 60 ? "..." : "");
-  
+
+  // When the AI is unavailable (rate limit / no key / network), still
+  // give the user a meaningful description rather than echoing their
+  // outline verbatim. Pad the outline with a contextual second sentence
+  // so they get a useful starting point to edit.
+  const trimmed = outline.trim().replace(/[.!?]+$/, "");
+  const synthesizedDescription =
+    trimmed.length > 0
+      ? `${trimmed}. The platform aims to deliver this to its target users with a focus on simplicity, reliability, and measurable value. The next step is to validate the core problem with real users before building.`
+      : "Describe your idea, the problem it solves, who it's for, and how it works.";
+
   return {
     title: basicTitle || "New Idea",
-    description: outline,
-    industries: [],
-    skills: [],
+    description: synthesizedDescription,
+    industries: detectFromKeywords(outline, INDUSTRY_KEYWORDS, 3),
+    skills: detectFromKeywords(outline, SKILL_KEYWORDS, 4),
     visibility: "public",
   };
 };
@@ -53,7 +106,10 @@ Your task: Generate a structured JSON object based on the user's outline. EXPAND
 
 CRITICAL REQUIREMENTS:
 1. Title MUST be catchy, specific, and 5-80 characters (NEVER empty)
-2. Description MUST be 2-4 clear sentences that expand on the outline
+2. Description MUST be 2-4 clear sentences (at least 80 characters) that EXPAND on the outline.
+   - Do NOT copy the outline verbatim.
+   - Describe what the product/idea actually does, who it's for, and the core value.
+   - The description field is REQUIRED and must always be present.
 3. Industries MUST include 1-3 relevant tags
 4. Skills MUST include 1-4 relevant tags
 
@@ -120,17 +176,44 @@ function parseDraft(raw: string, outline: string): GeneratedDraft | null {
     return null;
   }
 
+  // Description fallback ladder:
+  //   1. Use Gemini's description if it's meaningfully different from the outline
+  //   2. If Gemini omitted/echoed the outline, synthesize from title + outline
+  //      so the user never sees their raw input shown back at them verbatim.
+  const rawDescription =
+    typeof parsed.description === "string" ? parsed.description.trim() : "";
+
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/\s+/g, " ").trim();
+  const echoedOutline =
+    rawDescription.length > 0 &&
+    normalize(rawDescription) === normalize(outline);
+
+  const description =
+    rawDescription.length === 0 || echoedOutline
+      ? synthesizeDescription(title, outline)
+      : rawDescription.slice(0, 1200);
+
   return {
     title,
-    description:
-      typeof parsed.description === "string" &&
-      parsed.description.trim().length > 0
-        ? parsed.description.slice(0, 1200).trim()
-        : outline,
+    description,
     industries: onlyStrings(parsed.industries).slice(0, 3),
     skills: onlyStrings(parsed.skills).slice(0, 4),
     visibility: parsed.visibility === "private" ? "private" : "public",
   };
+}
+
+/**
+ * Build a one-sentence description when the AI provider drops the
+ * `description` field or echoes the user's outline. Combines the
+ * AI-generated title (which is usually decent) with the user's outline
+ * so the resulting copy is at least richer than the raw input.
+ */
+function synthesizeDescription(title: string, outline: string): string {
+  const trimmedOutline = outline.trim().replace(/[.!?]+$/, "");
+  if (!trimmedOutline) return title;
+  // "A platform for retailers — retlify an online e commerce platform."
+  return `${title} — ${trimmedOutline}.`.slice(0, 1200);
 }
 
 // Try OpenAI gpt-4o-mini with strict JSON mode. Returns null on any error
