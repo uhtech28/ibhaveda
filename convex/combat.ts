@@ -760,10 +760,8 @@ export const evaluateAnswer = internalAction({
     );
     if (!context) return;
 
-    const { getCombatAi } = await import("./combatAiProvider");
     const { scoreAnswer } = await import("./combatAntiCheat");
 
-    const ai = getCombatAi();
     const answer = context.answer;
 
     // Heuristic fallback when the AI scorer fails (rate limit / network).
@@ -783,6 +781,12 @@ export const evaluateAnswer = internalAction({
     const safeScoreAnswer = async (): Promise<{ score: 1 | 2 | 3 | 4 | 5; rationale: string }> => {
       if (answer.trim().length === 0) return { score: 1, rationale: "empty answer" };
       try {
+        // Provider lookup lives inside the try so a missing API key
+        // (or any transient AI error) falls through to the heuristic
+        // scorer instead of crashing the whole evaluation and trapping
+        // the round between questions.
+        const { getCombatAi } = await import("./combatAiProvider");
+        const ai = getCombatAi();
         const result = await ai.scoreAnswer({
           questionPrompt: context.questionPrompt,
           userAnswer: answer,
