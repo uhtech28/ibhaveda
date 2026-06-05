@@ -363,7 +363,10 @@ function PhaseSwitch({
           question={phase.view.currentQuestion ?? {
             _id: "transition" as never,
             order: phase.view.currentQuestionIndex + 1,
-            prompt: "* Your answer struck home. Bracing for the next question…",
+            prompt:
+              phase.view.currentQuestionIndex === 0
+                ? "* The Doubt Imp is preparing its first challenge…"
+                : "* Your answer struck home. Bracing for the next question…",
             persona: "villain",
             complexityTier: "medium",
             durationMs: 90_000,
