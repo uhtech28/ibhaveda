@@ -128,7 +128,6 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                       {profile.displayName?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background"></div>
                 </div>
 
                 <div className="flex-1 space-y-3">
@@ -261,8 +260,8 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
             <Card className="shadow-sm border-border/40 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-4 flex items-center justify-between h-full">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-500/10 rounded-full">
-                    <UserPlus className="w-4 h-4 text-green-500" />
+                  <div className="p-2 bg-violet-500/10 rounded-full">
+                    <UserPlus className="w-4 h-4 text-violet-500" />
                   </div>
                   <span className="text-sm font-medium text-muted-foreground">Contributed</span>
                 </div>

@@ -182,7 +182,7 @@ const VENTURE_STAGES: StageConfig[] = [
   {
     id: 1,
     name: "Ideation",
-    biomeName: "Ideation Hub",
+    biomeName: "The Village",
     subtitle: "Stage 1 · Birth of Ideas",
     checkpoints: 4,
     monster: VENTURE_MONSTERS[0],

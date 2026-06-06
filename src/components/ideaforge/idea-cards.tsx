@@ -35,6 +35,7 @@ import {
 } from "@/components/ideaforge/shared";
 
 type VentureSummary = {
+  _id?: Id<"ventures">;
   totalCheckpoints: number;
   completedCheckpoints: number;
   currentStage?: number;
@@ -54,6 +55,11 @@ const clampNumber = (value: number, min: number, max: number) => Math.min(max, M
 function getProgressPercentage(summary: VentureSummary) {
   if (!summary || summary.totalCheckpoints <= 0) return 0;
   return Math.min(100, Math.round((summary.completedCheckpoints / summary.totalCheckpoints) * 100));
+}
+
+function formatDollarValue(value?: number) {
+  const safeValue = Math.max(0, Math.round(value ?? 0));
+  return `Value: $${safeValue.toLocaleString("en-US")}`;
 }
 
 function getStageSummary(summary: VentureSummary) {
@@ -210,16 +216,16 @@ function StoryAction({ icon: Icon, label, count, active = false, onClick, animat
         active: "bg-[#111827] text-orange-300 shadow-[0_0_12px_rgba(251,146,60,0.12)]",
         icon: "text-orange-300",
       }
-    : label === "Comment"
-      ? {
+      : label === "Comment"
+        ? {
           base: "text-blue-300 hover:bg-[#111827] hover:text-blue-300",
           active: "bg-[#111827] text-blue-300",
           icon: "text-blue-300",
         }
       : {
-          base: "text-emerald-300 hover:bg-[#111827] hover:text-emerald-300",
-          active: "bg-[#111827] text-emerald-300",
-          icon: "text-emerald-300",
+          base: "text-violet-300 hover:bg-[#111827] hover:text-violet-300",
+          active: "bg-[#111827] text-violet-300",
+          icon: "text-violet-300",
         };
   const handleClick = () => {
     if (animateOnClick) {
@@ -240,7 +246,7 @@ function StoryAction({ icon: Icon, label, count, active = false, onClick, animat
         active ? tone.active : tone.base
       )}
     >
-      <Icon className={cn("h-4 w-4 shrink-0", tone.icon, active && label === "Spark" && "fill-current", pulse && "animate-[ping_0.45s_ease-out]")} />
+      <Icon className={cn("h-4 w-4 shrink-0", tone.icon, active && "fill-current", pulse && "animate-[ping_0.45s_ease-out]")} />
       {!iconOnly && <span className="truncate">{label}</span>}
       {typeof count === "number" && <span className="text-xs tabular-nums">{count}</span>}
     </button>
@@ -262,13 +268,20 @@ function ContributorsAction({
   const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
     ideaId: ideaId as Id<"ideas">,
   });
+  const myRequests = useQuery(api.contributionRequests.getMyRequests, {});
   const count = (contributors?.length ?? 0) + 1;
+  const hasRequestedOrAccepted = (myRequests ?? []).some(
+    (request) =>
+      request.ideaId === ideaId &&
+      (request.status === "pending" || request.status === "accepted"),
+  );
 
   return (
     <StoryAction
       icon={UserPlus}
       label="Contribute"
       count={count}
+      active={hasRequestedOrAccepted}
       onClick={onClick}
       iconOnly
     />
@@ -293,6 +306,7 @@ function IdeaVentureProgressBar({
   const progressPercentage = getProgressPercentage(summary);
   const stageSummary = getStageSummary(summary);
   const authorName = getDisplayName(author);
+  const authorHref = author?.username ? `/profile/${author.username}` : null;
   const bossName = summary.superBoss?.definition?.name ?? summary.superBoss?.bossName ?? "Boss";
   const bossHp = summary.superBoss?.currentHp ?? 100;
   const bossBaseHp = summary.superBoss?.baseHp ?? 100;
@@ -301,6 +315,12 @@ function IdeaVentureProgressBar({
   const openMap = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     router.push(`/map?ideaId=${ideaId}`);
+  };
+
+  const openAuthor = (event: React.MouseEvent<HTMLElement>) => {
+    if (!authorHref) return;
+    event.stopPropagation();
+    router.push(authorHref);
   };
 
   return (
@@ -320,25 +340,34 @@ function IdeaVentureProgressBar({
     >
       <div className="relative flex min-w-0 items-stretch overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute bottom-0 left-0 top-0 w-1/3 bg-gradient-to-r from-cyan-500/8 to-transparent" />
+          <div className="absolute bottom-0 left-0 top-0 w-1/3 bg-gradient-to-r from-violet-500/10 to-transparent" />
           <div className="absolute bottom-0 right-0 top-0 w-1/3 bg-gradient-to-l from-rose-500/8 to-transparent" />
         </div>
 
         <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
-          <div className="flex items-center gap-1.5">
-            <Avatar className="h-5 w-5 shrink-0 border border-cyan-300/25">
+          <div
+            role={authorHref ? "link" : undefined}
+            tabIndex={authorHref ? 0 : undefined}
+            onClick={openAuthor}
+            onKeyDown={(event) => {
+              if (authorHref && (event.key === "Enter" || event.key === " ")) openAuthor(event as unknown as React.MouseEvent<HTMLElement>);
+            }}
+            className={cn("flex min-w-0 items-center gap-1.5", authorHref && "cursor-pointer")}
+            title={authorHref ? `View ${authorName}'s profile` : authorName}
+          >
+            <Avatar className="h-5 w-5 shrink-0 border border-violet-300/30">
               <AvatarImage src={author?.avatar} alt={authorName} />
-              <AvatarFallback className="bg-[#17233C] text-[8px] font-bold text-cyan-100">
+              <AvatarFallback className="bg-[#241A3C] text-[8px] font-bold text-violet-100">
                 {getInitials(authorName)}
               </AvatarFallback>
             </Avatar>
-            <span className="truncate text-[9.5px] font-black leading-none text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.45)]">
+            <span className="truncate text-[9.5px] font-black leading-none text-violet-100 drop-shadow-[0_0_8px_rgba(167,139,250,0.45)]">
               {authorName}
             </span>
           </div>
           <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
             <motion.div
-              className="h-full origin-left rounded-full bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-300"
+              className="h-full origin-left rounded-full bg-gradient-to-r from-violet-700 via-fuchsia-500 to-violet-300"
               initial={{ width: 0 }}
               animate={{ width: `${progressPercentage}%` }}
               transition={{ duration: 0.8, ease: "easeOut" }}
@@ -350,10 +379,10 @@ function IdeaVentureProgressBar({
             />
           </div>
           <div className="flex min-w-0 items-baseline gap-1">
-            <span className="truncate text-[8px] font-bold uppercase tracking-wider text-cyan-300/85">
+            <span className="truncate text-[8px] font-bold uppercase tracking-wider text-violet-300/90">
               {stageSummary.label}
             </span>
-            <span className="shrink-0 font-mono text-[10px] font-black leading-none text-cyan-300">
+            <span className="shrink-0 font-mono text-[10px] font-black leading-none text-violet-300">
               ({stageSummary.currentStage}/{stageSummary.totalStages})
             </span>
           </div>
@@ -463,7 +492,10 @@ export function IdeaStoryCard({
   const ventureSummary = useQuery(api.ventures.getVentureSummaryByIdea, {
     ideaId: idea._id as Id<"ideas">,
   });
-  const progressPercentage = getProgressPercentage(ventureSummary);
+  const cumulativeScores = useQuery(
+    api.aiScoring.getVentureCumulativeHUDScores,
+    ventureSummary?._id ? { ventureId: ventureSummary._id as Id<"ventures"> } : "skip",
+  );
 
   // Whole-card click-to-open. Skip when the click originated from any inner
   // interactive element (button, link, input, etc.) so Spark / Save /
@@ -491,8 +523,8 @@ export function IdeaStoryCard({
           </button>
           <div className="flex shrink-0 items-center gap-2">
             {ventureSummary && (
-              <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200">
-                Progress: <span className="font-mono text-cyan-100">{progressPercentage}%</span>
+              <span className="rounded-full border border-amber-300/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-200">
+                {formatDollarValue(cumulativeScores?.valuationScore)}
               </span>
             )}
             {ownerAction && (
@@ -652,7 +684,7 @@ export function IdeaStoryCard({
       <div className="mt-5 border-t border-white/8 pt-3">
         <div className="flex flex-nowrap items-center gap-1">
           <StoryAction icon={Sparkles} label="Spark" count={idea.sparkCount || 0} active={!!idea.hasSparked} onClick={() => onSpark(idea._id)} animateOnClick iconOnly />
-          <StoryAction icon={MessageCircle} label="Comment" count={idea.commentCount || 0} onClick={() => onComment(idea._id)} iconOnly />
+          <StoryAction icon={MessageCircle} label="Comment" count={idea.commentCount || 0} active={(idea.commentCount || 0) > 0} onClick={() => onComment(idea._id)} iconOnly />
           <ContributorsAction
             ideaId={idea._id}
             onClick={() => {

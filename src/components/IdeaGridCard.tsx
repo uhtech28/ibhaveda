@@ -280,7 +280,7 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
                 className="p-1.5 rounded-full hover:bg-blue-50 text-muted-foreground hover:text-blue-500 transition-colors"
                 title="View comments"
               >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className={`w-4 h-4 ${idea.commentCount > 0 ? "fill-current" : ""}`} />
               </button>
               <button
                 onClick={(e) => {
@@ -300,7 +300,7 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
                   e.stopPropagation();
                   onContributeClick?.(idea._id);
                 }}
-                className="p-1.5 rounded-full hover:bg-green-50 text-muted-foreground hover:text-green-500 transition-colors"
+                className="p-1.5 rounded-full hover:bg-violet-50 text-muted-foreground hover:text-violet-500 transition-colors"
                 title="Contributors"
               >
                 <UserPlus className="w-4 h-4" />

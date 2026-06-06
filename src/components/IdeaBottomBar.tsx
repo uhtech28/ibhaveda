@@ -40,7 +40,13 @@ export function IdeaBottomBar({
   const contributors = useQuery(api.contributionRequests.getAcceptedContributors, {
     ideaId: ideaId as Id<"ideas">,
   });
+  const myRequests = useQuery(api.contributionRequests.getMyRequests);
   const contributorCount = (contributors?.length ?? 0) + 1;
+  const hasRequestedOrAccepted = (myRequests ?? []).some(
+    (request) =>
+      request.ideaId === ideaId &&
+      (request.status === "pending" || request.status === "accepted"),
+  );
 
   const [isSparking, setIsSparking] = useState(false);
   const [currentSparkCount, setCurrentSparkCount] = useState(initialSparkCount);
@@ -106,7 +112,7 @@ export function IdeaBottomBar({
         onClick={onOpenComments}
         className="rounded-full px-4 h-10 gap-2 bg-[#111827] text-blue-300 hover:bg-[#172033] hover:text-blue-200 transition-colors"
       >
-        <MessageCircle className="w-4 h-4 text-blue-300" />
+        <MessageCircle className={`w-4 h-4 text-blue-300 ${commentCount > 0 ? "fill-current" : ""}`} />
         <span className="font-semibold text-sm">{commentCount}</span>
       </Button>
 
@@ -121,9 +127,9 @@ export function IdeaBottomBar({
         onClick={onOpenRequests}
         aria-label={isAuthor ? "View contribution requests" : "Contributors"}
         title={isAuthor ? "Contribution requests" : "Contributors"}
-        className="rounded-full px-4 h-10 gap-2 bg-transparent text-emerald-300 hover:bg-[#111827] hover:text-emerald-200 transition-colors relative"
+        className="rounded-full px-4 h-10 gap-2 bg-transparent text-violet-300 hover:bg-[#111827] hover:text-violet-200 transition-colors relative"
       >
-        <UserPlus className="w-4 h-4 text-emerald-300" />
+        <UserPlus className={`w-4 h-4 text-violet-300 ${hasRequestedOrAccepted ? "fill-current" : ""}`} />
         <span className="font-semibold text-sm">{contributorCount}</span>
         {isAuthor && requestCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold ring-2 ring-background">

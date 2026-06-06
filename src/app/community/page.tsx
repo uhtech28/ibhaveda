@@ -488,10 +488,10 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
             <button
               type="button"
               onClick={() => openStatsDialog("contributed")}
-              className="flex flex-col items-center justify-center rounded-md border-l border-border/40 py-1 text-center transition-colors hover:bg-green-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
+              className="flex flex-col items-center justify-center rounded-md border-l border-border/40 py-1 text-center transition-colors hover:bg-violet-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
               aria-label={`${user.displayName} contributed ideas`}
             >
-              <Users className="w-3 h-3 text-green-500 mb-0.5" />
+              <Users className="w-3 h-3 text-violet-500 mb-0.5" />
               <span className="text-[9px] font-bold leading-none">{user.ideasContributed || 0}</span>
             </button>
           </div>

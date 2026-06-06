@@ -191,7 +191,6 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                     {profile.displayName?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background"></div>
               </div>
 
               <div className="flex-1 min-w-0">
@@ -389,8 +388,8 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
           >
             <CardContent className="p-4 flex items-center justify-between h-full">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-full group-hover:bg-green-500/20 transition-colors">
-                  <UserPlus className="w-4 h-4 text-green-500" />
+                <div className="p-2 bg-violet-500/10 rounded-full group-hover:bg-violet-500/20 transition-colors">
+                  <UserPlus className="w-4 h-4 text-violet-500" />
                 </div>
                 <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Contributed</span>
               </div>
@@ -441,7 +440,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
               className="h-14 w-full justify-between gap-3 rounded-xl px-4"
             >
               <span className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500/10 text-green-500">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
                   <UserPlus className="h-4 w-4" />
                 </span>
                 <span className="text-sm font-semibold">Manage Contribution Requests</span>

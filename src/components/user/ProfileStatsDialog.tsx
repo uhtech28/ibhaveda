@@ -157,7 +157,7 @@ function IdeaRow({
           className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-full"
           title="Contributors"
         >
-          <UserPlus className="w-3 h-3 text-green-500" />
+          <UserPlus className="w-3 h-3 text-violet-500" />
           {contributorCount}
         </span>
       </div>

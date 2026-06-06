@@ -17,12 +17,7 @@ import { ContributionRequestModal } from "@/components/requests/ContributionRequ
 import { useToast } from "@/components/ui/use-toast";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
 
-interface FeedClientProps {
-  initialIdeas: IdeaForgeIdea[];
-  seed: number;
-}
-
-export function FeedClient({ initialIdeas, seed }: FeedClientProps) {
+export function FeedClient() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -31,6 +26,7 @@ export function FeedClient({ initialIdeas, seed }: FeedClientProps) {
 
   const PAGE_SIZE = 20;
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const seed = useMemo(() => Math.floor(Math.random() * 5), []);
 
   // ── Feed load performance timing ──────────────────────────────────────────
   const feedTimerRef = useRef<number | null>(null);
@@ -38,38 +34,28 @@ export function FeedClient({ initialIdeas, seed }: FeedClientProps) {
   useEffect(() => {
     feedTimerRef.current = performance.now();
     feedMeasuredRef.current = false;
-    console.log("%c⏱ [Feed] Client mounted (initial data from server cache)", "color:#7dd3fc;font-weight:bold");
+    console.log("%c⏱ [Feed] Query started", "color:#7dd3fc;font-weight:bold");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live query — "skip" on first page so we don't re-fetch what the server already gave us.
-  // Kicks in for load-more pages or when Convex pushes a real-time update.
-  const liveQuery = useQuery(
-    api.ideas.getPublicIdeas,
-    limit > PAGE_SIZE ? { limit, seed } : "skip"
-  );
-
+  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit, seed });
   const toggleSpark = useMutation(api.ideas.toggleSpark);
 
-  // Initialise with server-cached data so the feed renders immediately on mount.
-  // When liveQuery resolves (Convex WebSocket), it takes over seamlessly.
-  const [stableIdeas, setStableIdeas] = useState<IdeaForgeIdea[]>(initialIdeas);
+  const [stableIdeas, setStableIdeas] = useState<IdeaForgeIdea[]>([]);
   useEffect(() => {
-    const latest = liveQuery ?? (limit === PAGE_SIZE ? initialIdeas : undefined);
-    if (latest !== undefined) {
-      setStableIdeas(latest as IdeaForgeIdea[]);
+    if (ideasQuery !== undefined) {
+      setStableIdeas(ideasQuery as IdeaForgeIdea[]);
       if (!feedMeasuredRef.current && feedTimerRef.current !== null) {
         feedMeasuredRef.current = true;
         const ms = Math.round(performance.now() - feedTimerRef.current);
-        const color = ms > 500 ? "#facc15" : "#4ade80";
-        console.log(`%c⏱ [Feed] Live sync: ${ms}ms after mount (${(latest as any[]).length} posts)`, `color:${color};font-weight:bold;font-size:13px`);
+        const color = ms > 2000 ? "#f87171" : ms > 800 ? "#facc15" : "#4ade80";
+        console.log(`%c⏱ [Feed] Data arrived: ${ms}ms (${ideasQuery.length} posts)`, `color:${color};font-weight:bold;font-size:13px`);
       }
     }
-  }, [liveQuery, initialIdeas, limit]);
+  }, [ideasQuery]);
 
-  // Never show loading state — we always have server-cached initial data
-  const isInitialLoading = false;
-  const hasMore = stableIdeas.length >= limit;
+  const isInitialLoading = ideasQuery === undefined && stableIdeas.length === 0;
+  const hasMore = ideasQuery !== undefined && ideasQuery.length >= limit;
 
   function loadMore() {
     if (hasMore) setLimit((l) => l + PAGE_SIZE);

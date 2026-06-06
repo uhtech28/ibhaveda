@@ -63,7 +63,7 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
       case 'contribution_request_received':
       case 'contribution_request_accepted':
       case 'contribution_request_rejected':
-        return <UserPlus className="h-3 w-3 text-green-500" />
+        return <UserPlus className="h-3 w-3 text-violet-500" />
       case 'invitation_received':
       case 'invitation_rejected':
         return <Bell className="h-3 w-3 text-purple-500" />

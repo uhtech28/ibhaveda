@@ -105,7 +105,7 @@ export function IdeaForgeRightRail({
                       <Sparkles className="h-3 w-3" />
                       {idea.sparkCount || 0}
                     </span>
-                    <span className="inline-flex h-6 w-9 items-center justify-center gap-0.5 rounded-full bg-[#111827] px-1 text-[11px] font-medium tabular-nums text-emerald-300">
+                    <span className="inline-flex h-6 w-9 items-center justify-center gap-0.5 rounded-full bg-[#111827] px-1 text-[11px] font-medium tabular-nums text-violet-300">
                       <UserPlus className="h-3 w-3" />
                       {idea.contributionCount || 0}
                     </span>
