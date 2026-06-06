@@ -122,6 +122,7 @@ export function FeedClient({ preloadedIdeas, seed }: FeedClientProps) {
           if (idea) setActiveContributeIdea(idea);
         }}
         isProfileComplete={isProfileComplete}
+        isProfileLoading={isProfileLoading}
         onCompleteProfile={() => router.push("/profile-setup")}
         onLoadMore={loadMore}
         hasMore={hasMore}

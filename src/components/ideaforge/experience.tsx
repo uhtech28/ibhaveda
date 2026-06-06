@@ -102,6 +102,7 @@ export function IdeaForgeExperience({
   onContributeClick,
   onDeleteIdea,
   isProfileComplete,
+  isProfileLoading = true,
   onCompleteProfile,
   onLoadMore,
   hasMore = false,
@@ -118,6 +119,7 @@ export function IdeaForgeExperience({
   onContributeClick?: (ideaId: string) => void;
   onDeleteIdea?: (ideaId: string) => void;
   isProfileComplete: boolean;
+  isProfileLoading?: boolean;
   onCompleteProfile: () => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
@@ -245,7 +247,7 @@ export function IdeaForgeExperience({
             <div className="w-full space-y-5">
               {mode === "feed" ? (
                 <>
-                  {!isProfileComplete && (
+                  {!isProfileLoading && !isProfileComplete && (
                     <section className="rounded-[16px] border border-[#F59E0B]/20 bg-[#2A1A07]/70 p-5 text-[#FCD34D]">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
