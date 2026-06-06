@@ -88,7 +88,7 @@ export function IdeaBottomBar({
         className={`
           rounded-full px-4 h-10 transition-all duration-300
           ${currentHasSparked
-            ? 'bg-[#111827] text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.12)] hover:bg-[#172033] hover:text-orange-200'
+            ? 'bg-[#111827] text-orange-300 hover:bg-[#172033] hover:text-orange-200'
             : 'bg-transparent text-orange-300 hover:bg-[#111827] hover:text-orange-200'
           }
         `}

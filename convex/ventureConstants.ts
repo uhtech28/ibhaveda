@@ -2182,9 +2182,9 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
     category: "community",
     rarity: "uncommon",
     shape: "laurel_wreath",
-    primaryColor: "#FDE68A",
-    secondaryColor: "#92400E",
-    iconDescription: "A laurel wreath surrounding a small upward arrow",
+    primaryColor: "#0EA5E9",
+    secondaryColor: "#0284C7",
+    iconDescription: "A clean trophy mark for a celebrated idea",
     tagline: "The community has spoken. Your idea deserved to rise.",
     requirement: "Have an idea receive 25 sparks",
   },
@@ -2714,7 +2714,7 @@ export function getVentureBadgeEmoji(badgeId: number, name: string): string {
   if (badgeId === 32) return "👥";
   if (badgeId === 33) return "⚡";
   if (badgeId === 34) return "📣";
-  if (badgeId === 35) return "🙌";
+  if (badgeId === 35) return "Trophy";
   if (badgeId === 36) return "❤️";
   if (badgeId === 37) return "🧲";
   if (badgeId === 38) return "🔗";

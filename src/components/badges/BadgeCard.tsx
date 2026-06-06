@@ -164,7 +164,7 @@ export function getVentureBadgeEmoji(id: string | number, name: string): string 
   if (badgeId === 32) return "👥";
   if (badgeId === 33) return "⚡";
   if (badgeId === 34) return "👣";
-  if (badgeId === 35) return "🏆";
+  if (badgeId === 35) return "Trophy";
   if (badgeId === 36) return "💖";
   if (badgeId === 37) return "🧲";
   if (badgeId === 38) return "🌉";

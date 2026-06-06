@@ -214,7 +214,7 @@ function StoryAction({ icon: Icon, label, count, active = false, onClick, animat
   const tone = label === "Spark"
     ? {
         base: "text-orange-300 hover:bg-[#111827] hover:text-orange-300",
-        active: "bg-[#111827] text-orange-300 shadow-[0_0_12px_rgba(251,146,60,0.12)]",
+        active: "bg-[#111827] text-orange-300",
         icon: "text-orange-300",
       }
       : label === "Comment"
