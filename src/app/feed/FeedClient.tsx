@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePreloadedQuery, useQuery } from "convex/react";
+import { Preloaded } from "convex/react";
 
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
@@ -16,7 +17,11 @@ import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useToast } from "@/components/ui/use-toast";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
-export function FeedClient() {
+interface FeedClientProps {
+  preloadedIdeas: Preloaded<typeof api.ideas.getPublicIdeas>;
+}
+
+export function FeedClient({ preloadedIdeas }: FeedClientProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -25,9 +30,8 @@ export function FeedClient() {
 
   const PAGE_SIZE = 20;
   const [limit, setLimit] = useState(PAGE_SIZE);
-  // Generated once per page load — controls human-pool shuffle order and
-  // rare agent injection (seed 0 = ~20% chance of one agent post mid-feed).
-  const seed = useMemo(() => Math.floor(Math.random() * 5), []);
+  // seed=1 matches SSR prefetch; after hydration live updates flow via WebSocket
+  const seed = useMemo(() => 1, []);
 
   // ── Feed load performance timing ──────────────────────────────────────────
   const feedTimerRef = useRef<number | null>(null);
@@ -35,25 +39,33 @@ export function FeedClient() {
   useEffect(() => {
     feedTimerRef.current = performance.now();
     feedMeasuredRef.current = false;
-    console.log("%c⏱ [Feed] Query started", "color:#7dd3fc;font-weight:bold");
+    console.log("%c⏱ [Feed] Client mounted (data already preloaded server-side)", "color:#7dd3fc;font-weight:bold");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit, seed });
+  // usePreloadedQuery uses server-fetched data immediately, then stays live via WebSocket
+  const preloadedData = usePreloadedQuery(preloadedIdeas);
+  // For "load more" pages beyond the first, fall back to a live query
+  const extraQuery = useQuery(
+    api.ideas.getPublicIdeas,
+    limit > PAGE_SIZE ? { limit, seed } : "skip"
+  );
+  const ideasQuery = limit > PAGE_SIZE ? extraQuery : preloadedData;
+
   const toggleSpark = useMutation(api.ideas.toggleSpark);
 
   // Keep a stable copy so the list never disappears while the next page loads.
-  // useQuery returns undefined while re-fetching new args, which would collapse
-  // ideas to [] and trigger the skeleton — scrolling the user back to the top.
-  const [stableIdeas, setStableIdeas] = useState<IdeaForgeIdea[]>([]);
+  const [stableIdeas, setStableIdeas] = useState<IdeaForgeIdea[]>(() =>
+    Array.isArray(preloadedData) ? (preloadedData as IdeaForgeIdea[]) : []
+  );
   useEffect(() => {
     if (ideasQuery !== undefined) {
       setStableIdeas(ideasQuery as IdeaForgeIdea[]);
       if (!feedMeasuredRef.current && feedTimerRef.current !== null) {
         feedMeasuredRef.current = true;
         const ms = Math.round(performance.now() - feedTimerRef.current);
-        const color = ms > 2000 ? "#f87171" : ms > 800 ? "#facc15" : "#4ade80";
-        console.log(`%c⏱ [Feed] Data arrived: ${ms}ms (${ideasQuery.length} posts)`, `color:${color};font-weight:bold;font-size:13px`);
+        const color = ms > 500 ? "#facc15" : "#4ade80";
+        console.log(`%c⏱ [Feed] Ready: ${ms}ms after mount (${(ideasQuery as any[]).length} posts — preloaded)`, `color:${color};font-weight:bold;font-size:13px`);
       }
     }
   }, [ideasQuery]);
