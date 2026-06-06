@@ -194,7 +194,7 @@ const VENTURE_STAGES: StageConfig[] = [
   {
     id: 2,
     name: "Research",
-    biomeName: "Research Lab",
+    biomeName: "The Forest",
     subtitle: "Stage 2 · Climb to Knowledge",
     checkpoints: 5,
     monster: VENTURE_MONSTERS[1],

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -60,11 +60,15 @@ export function SkillsMultiSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-start min-w-0"
+            className="w-full justify-between gap-2 min-w-0"
           >
             <span className="truncate text-left flex-1 min-w-0">
               {selectedSkills.length > 0 ? `${selectedSkills.length} selected` : placeholder}
             </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
           </Button>
         </PopoverTrigger>
         <PopoverContent

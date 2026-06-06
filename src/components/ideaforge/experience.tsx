@@ -113,7 +113,7 @@ export function IdeaForgeExperience({
   isLoading: boolean;
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  onSpark: (ideaId: string) => void;
+  onSpark: (ideaId: string) => void | Promise<{ action: string; sparkCount: number } | void>;
   onIdeaClick: (ideaId: string) => void;
   onCommentClick: (ideaId: string) => void;
   onContributeClick?: (ideaId: string) => void;

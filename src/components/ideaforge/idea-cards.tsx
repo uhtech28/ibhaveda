@@ -460,7 +460,7 @@ export function IdeaStoryCard({
   saved: boolean;
   onToggleSave: (ideaId: string) => void;
   onOpenIdea: (ideaId: string) => void;
-  onSpark: (ideaId: string) => void;
+  onSpark: (ideaId: string) => void | Promise<{ action: string; sparkCount: number } | void>;
   onComment: (ideaId: string) => void;
   onContribute?: (ideaId: string) => void;
   onRepost?: (draft: Partial<ComposerDraft>) => void;
@@ -476,6 +476,7 @@ export function IdeaStoryCard({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [industriesExpanded, setIndustriesExpanded] = useState(false);
   const [skillsExpanded, setSkillsExpanded] = useState(false);
+  const [isSparkPending, setIsSparkPending] = useState(false);
   const [optimisticSpark, setOptimisticSpark] = useState({
     count: idea.sparkCount || 0,
     hasSparked: !!idea.hasSparked,
@@ -500,18 +501,40 @@ export function IdeaStoryCard({
   );
 
   useEffect(() => {
+    if (isSparkPending) return;
     setOptimisticSpark({
       count: idea.sparkCount || 0,
       hasSparked: !!idea.hasSparked,
     });
-  }, [idea.hasSparked, idea.sparkCount]);
+  }, [idea.hasSparked, idea.sparkCount, isSparkPending]);
 
-  const handleSpark = () => {
-    setOptimisticSpark((current) => ({
-      count: current.hasSparked ? Math.max(0, current.count - 1) : current.count + 1,
-      hasSparked: !current.hasSparked,
-    }));
-    onSpark(idea._id);
+  const handleSpark = async () => {
+    if (isSparkPending) return;
+
+    const nextSpark = {
+      count: optimisticSpark.hasSparked ? Math.max(0, optimisticSpark.count - 1) : optimisticSpark.count + 1,
+      hasSparked: !optimisticSpark.hasSparked,
+    };
+    setOptimisticSpark(nextSpark);
+    setIsSparkPending(true);
+
+    try {
+      const result = await onSpark(idea._id);
+      if (result && typeof result.sparkCount === "number" && result.action) {
+        setOptimisticSpark({
+          count: result.sparkCount,
+          hasSparked: result.action === "added",
+        });
+      }
+    } catch (error) {
+      setOptimisticSpark({
+        count: idea.sparkCount || 0,
+        hasSparked: !!idea.hasSparked,
+      });
+      console.error("Failed to toggle spark", error);
+    } finally {
+      setIsSparkPending(false);
+    }
   };
 
   // Whole-card click-to-open. Skip when the click originated from any inner
@@ -540,7 +563,7 @@ export function IdeaStoryCard({
           </button>
           <div className="flex shrink-0 items-center gap-2">
             {ventureSummary && (
-              <span className="rounded-full border border-amber-300/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-200">
+              <span className={cn(displayFontClass, "shrink-0 text-[18px] font-semibold leading-tight text-orange-300")}>
                 {formatDollarValue(cumulativeScores?.valuationScore)}
               </span>
             )}

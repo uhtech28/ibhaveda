@@ -261,6 +261,24 @@ const REQUIRED_TEMPLATE_CATEGORIES = [
   "experimental",
 ] as const;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureGeneralBadgeDefinition(ctx: any, slug: string) {
+  let badge = await ctx.db
+    .query("badges")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .withIndex("by_slug", (q: any) => q.eq("slug", slug))
+    .first();
+
+  if (badge) return badge;
+
+  const fallback = INITIAL_BADGES.find((entry) => entry.slug === slug);
+  if (!fallback) return null;
+
+  const badgeId = await ctx.db.insert("badges", fallback);
+  badge = await ctx.db.get(badgeId);
+  return badge;
+}
+
 // Internal: Award a badge if not already owned
 export const awardBadge = internalMutation({
   args: {
@@ -268,18 +286,8 @@ export const awardBadge = internalMutation({
     slug: v.string(),
   },
   handler: async (ctx, args) => {
-    let badge = await ctx.db
-      .query("badges")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .first();
-
-    if (!badge) {
-      const fallback = INITIAL_BADGES.find((entry) => entry.slug === args.slug);
-      if (!fallback) return;
-      const badgeId = await ctx.db.insert("badges", fallback);
-      badge = await ctx.db.get(badgeId);
-      if (!badge) return;
-    }
+    const badge = await ensureGeneralBadgeDefinition(ctx, args.slug);
+    if (!badge) return;
 
     const existing = await ctx.db
       .query("userBadges")
@@ -368,12 +376,7 @@ export const checkBadges = internalMutation({
 // Helper for awarding
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkAndAward(ctx: any, userId: Id<"users">, slug: string) {
-  const badge = await ctx.db
-    .query("badges")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .withIndex("by_slug", (q: any) => q.eq("slug", slug))
-    .first();
-
+  const badge = await ensureGeneralBadgeDefinition(ctx, slug);
   if (!badge) return;
 
   const existing = await ctx.db
@@ -970,10 +973,7 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
   if (hasTrendsetter) generalBadgesToAward.push("trendsetter");
 
   for (const slug of generalBadgesToAward) {
-    const badge = await ctx.db
-      .query("badges")
-      .withIndex("by_slug", (q: any) => q.eq("slug", slug))
-      .first();
+    const badge = await ensureGeneralBadgeDefinition(ctx, slug);
 
     if (badge && !existingUserBadgeIds.has(badge._id)) {
       await ctx.db.insert("userBadges", {
@@ -1145,6 +1145,19 @@ export const recalculateUserBadges = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     await recalculateAndAwardBadgesHelper(ctx, args.userId);
+  },
+});
+
+export const recalculateAllUserBadges = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+
+    for (const user of users) {
+      await recalculateAndAwardBadgesHelper(ctx, user._id);
+    }
+
+    return { processed: users.length };
   },
 });
 
