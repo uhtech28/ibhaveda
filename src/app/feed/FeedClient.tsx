@@ -19,9 +19,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
 interface FeedClientProps {
   preloadedIdeas: Preloaded<typeof api.ideas.getPublicIdeas>;
+  seed: number;
 }
 
-export function FeedClient({ preloadedIdeas }: FeedClientProps) {
+export function FeedClient({ preloadedIdeas, seed }: FeedClientProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -30,8 +31,7 @@ export function FeedClient({ preloadedIdeas }: FeedClientProps) {
 
   const PAGE_SIZE = 20;
   const [limit, setLimit] = useState(PAGE_SIZE);
-  // seed=1 matches SSR prefetch; after hydration live updates flow via WebSocket
-  const seed = useMemo(() => 1, []);
+  // seed comes from the server so SSR and client match — no hydration mismatch
 
   // ── Feed load performance timing ──────────────────────────────────────────
   const feedTimerRef = useRef<number | null>(null);
