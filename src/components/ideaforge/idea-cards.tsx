@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, UserPlus, Repeat2, Bookmark, Skull } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -477,6 +477,7 @@ export function IdeaStoryCard({
   const [industriesExpanded, setIndustriesExpanded] = useState(false);
   const [skillsExpanded, setSkillsExpanded] = useState(false);
   const [isSparkPending, setIsSparkPending] = useState(false);
+  const isSparkPendingRef = useRef(false);
   const [optimisticSpark, setOptimisticSpark] = useState({
     count: idea.sparkCount || 0,
     hasSparked: !!idea.hasSparked,
@@ -501,12 +502,12 @@ export function IdeaStoryCard({
   );
 
   useEffect(() => {
-    if (isSparkPending) return;
+    if (isSparkPendingRef.current) return;
     setOptimisticSpark({
       count: idea.sparkCount || 0,
       hasSparked: !!idea.hasSparked,
     });
-  }, [idea.hasSparked, idea.sparkCount, isSparkPending]);
+  }, [idea.hasSparked, idea.sparkCount]);
 
   const handleSpark = async () => {
     if (isSparkPending) return;
@@ -516,6 +517,7 @@ export function IdeaStoryCard({
       hasSparked: !optimisticSpark.hasSparked,
     };
     setOptimisticSpark(nextSpark);
+    isSparkPendingRef.current = true;
     setIsSparkPending(true);
 
     try {
@@ -533,6 +535,7 @@ export function IdeaStoryCard({
       });
       console.error("Failed to toggle spark", error);
     } finally {
+      isSparkPendingRef.current = false;
       setIsSparkPending(false);
     }
   };

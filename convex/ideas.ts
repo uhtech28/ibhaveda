@@ -4,6 +4,54 @@ import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { createContributionRequest, updateRequestStatus, getRequestsByIdea, getIncomingRequests } from "./contributionRequests";
 
+async function getIdeaSparkCount(ctx: any, ideaId: Id<"ideas">) {
+  const sparks = await ctx.db
+    .query("userIdeaSparks")
+    .withIndex("by_idea", (q: any) => q.eq("ideaId", ideaId))
+    .collect();
+
+  return sparks.length;
+}
+
+async function getCurrentUserFromAuth(ctx: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+
+  return await ctx.db
+    .query("users")
+    .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+    .unique();
+}
+
+async function enrichIdeasWithSparkState(ctx: any, ideas: any[]) {
+  const currentUser = await getCurrentUserFromAuth(ctx);
+
+  return await Promise.all(
+    ideas.map(async (idea) => {
+      const [sparks, currentUserSpark] = await Promise.all([
+        ctx.db
+          .query("userIdeaSparks")
+          .withIndex("by_idea", (q: any) => q.eq("ideaId", idea._id))
+          .collect(),
+        currentUser
+          ? ctx.db
+              .query("userIdeaSparks")
+              .withIndex("by_user_idea", (q: any) =>
+                q.eq("userId", currentUser._id).eq("ideaId", idea._id),
+              )
+              .first()
+          : Promise.resolve(null),
+      ]);
+
+      return {
+        ...idea,
+        sparkCount: sparks.length,
+        hasSparked: currentUserSpark !== null,
+      };
+    }),
+  );
+}
+
 // Create a new idea (root or with parent) with proper authorization checks
 export const createIdea = mutation({
   args: {
@@ -153,6 +201,11 @@ export const createIdea = mutation({
       amount: 50,
       type: "create_idea",
       description: "Created a new idea"
+    });
+
+    await ctx.scheduler.runAfter(0, internal.badges.checkBadges, {
+      userId: user._id,
+      trigger: "create_idea",
     });
 
     return { ideaId, message: "Idea created successfully" };
@@ -305,7 +358,9 @@ export const getPublicIdeasFast = query({
       }
     }
 
-    return ideas.map((idea) => ({
+    const enrichedIdeas = await enrichIdeasWithSparkState(ctx, ideas);
+
+    return enrichedIdeas.map((idea) => ({
       ...idea,
       author: authorMap.get(String(idea.authorId)) ?? null,
       contributionCount: 1 + (idea.contributionRequestCount ?? 0),
@@ -399,7 +454,8 @@ export const getPublicIdeas = query({
     }
 
     // Use denormalized contributionRequestCount — no extra queries needed
-    const ideasWithAuthors = finalIdeas.map((idea) => {
+    const enrichedIdeas = await enrichIdeasWithSparkState(ctx, finalIdeas);
+    const ideasWithAuthors = enrichedIdeas.map((idea) => {
       const author = authorMap.get(String(idea.authorId)) ?? null;
       return {
         ...idea,
@@ -550,17 +606,20 @@ export const toggleSpark = mutation({
       )
       .unique();
 
+    const currentSparkCount = await getIdeaSparkCount(ctx, idea._id);
+
     if (existingSpark) {
       // Remove spark
       await ctx.db.delete(existingSpark._id);
 
       // Decrement spark count
+      const nextSparkCount = Math.max(0, currentSparkCount - 1);
       await ctx.db.patch(idea._id, {
-        sparkCount: Math.max(0, idea.sparkCount - 1),
+        sparkCount: nextSparkCount,
         updatedAt: Date.now(),
       });
 
-      return { action: "removed", sparkCount: Math.max(0, idea.sparkCount - 1) };
+      return { action: "removed", sparkCount: nextSparkCount };
     } else {
       // Add spark
       const now = Date.now();
@@ -571,8 +630,9 @@ export const toggleSpark = mutation({
       });
 
       // Increment spark count
+      const nextSparkCount = currentSparkCount + 1;
       await ctx.db.patch(idea._id, {
-        sparkCount: idea.sparkCount + 1,
+        sparkCount: nextSparkCount,
         updatedAt: now,
       });
 
@@ -630,7 +690,7 @@ export const toggleSpark = mutation({
         });
       }
 
-      return { action: "added", sparkCount: idea.sparkCount + 1 };
+      return { action: "added", sparkCount: nextSparkCount };
     }
   },
 });

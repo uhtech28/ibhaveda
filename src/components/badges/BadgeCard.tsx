@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { Lock, Check, ShieldAlert, Award, Star, Compass, Code, Flame, UserPlus, Calendar } from "lucide-react";
+import { Lock, Check, ShieldAlert, Award, Star, Compass, Code, Flame, UserPlus, Calendar, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
@@ -283,6 +283,21 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
   const ringColor = badge.secondaryColor || norm.accentColor;
   const isMythic = norm.key === "mythic";
   const isLegendary = norm.key === "legendary";
+  const normalizedCategory = badge.category === "creation"
+    ? "onboarding"
+    : badge.category === "social" || badge.category === "collaboration"
+      ? "community"
+      : badge.category === "milestones"
+        ? "idea_milestones"
+        : badge.category;
+  const CategoryIcon =
+    normalizedCategory === "onboarding" ? Compass :
+    normalizedCategory === "community" ? UserPlus :
+    normalizedCategory === "consistency" ? Flame :
+    normalizedCategory === "skill" ? Code :
+    normalizedCategory === "idea_milestones" || normalizedCategory === "aspirational" ? Award :
+    normalizedCategory === "hidden" ? EyeOff :
+    Award;
 
   return (
     <motion.div
@@ -385,11 +400,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
       {/* 4. Category Indicator Icon floating top-right (unlocked) */}
       {!isLocked && (
         <div className="absolute top-3 right-3 z-10 grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-slate-950/70 text-violet-300 shadow-[0_0_14px_rgba(139,92,246,0.12)] transition-colors duration-300 group-hover:border-violet-400/35 group-hover:bg-violet-500/12 group-hover:text-violet-200">
-          {badge.category === "onboarding" && <Compass className="w-3.5 h-3.5" />}
-          {badge.category === "community" && <UserPlus className="w-3.5 h-3.5" />}
-          {badge.category === "consistency" && <Flame className="w-3.5 h-3.5" />}
-          {badge.category === "skill" && <Code className="w-3.5 h-3.5" />}
-          {badge.category === "idea_milestones" && <Award className="w-3.5 h-3.5" />}
+          <CategoryIcon className="w-3.5 h-3.5" />
         </div>
       )}
 
