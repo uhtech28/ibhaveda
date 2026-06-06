@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import Link from "next/link";
-import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, UserPlus, Repeat2, Bookmark, Shield, Skull } from "lucide-react";
+import { Lightbulb, MessageCircle, PencilLine, Send, Sparkles, Trash2, UserPlus, Repeat2, Bookmark, Skull } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
@@ -13,6 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { getTemplateSafe, type TemplateId } from "@/config/templates";
 import {
   cardSurface,
   codeFontClass,
@@ -26,12 +26,48 @@ import {
   getInitials,
   getReadTime,
   getRoleBadge,
+  IdeaAuthor,
   IdeaForgeIdea,
   myIdeaTabs,
   parseTags,
   transitionBase,
   ViewMode,
 } from "@/components/ideaforge/shared";
+
+type VentureSummary = {
+  totalCheckpoints: number;
+  completedCheckpoints: number;
+  currentStage?: number;
+  templateId?: TemplateId;
+  superBoss?: {
+    currentHp?: number;
+    baseHp?: number;
+    bossName?: string;
+    definition?: {
+      name?: string;
+    } | null;
+  } | null;
+} | null | undefined;
+
+const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+function getProgressPercentage(summary: VentureSummary) {
+  if (!summary || summary.totalCheckpoints <= 0) return 0;
+  return Math.min(100, Math.round((summary.completedCheckpoints / summary.totalCheckpoints) * 100));
+}
+
+function getStageSummary(summary: VentureSummary) {
+  const template = getTemplateSafe(summary?.templateId);
+  const totalStages = Math.max(1, template.stages.length);
+  const currentStage = clampNumber(summary?.currentStage ?? 1, 1, totalStages);
+  const stage = template.stages[currentStage - 1];
+
+  return {
+    currentStage,
+    totalStages,
+    label: stage?.biomeName ?? stage?.name ?? `Stage ${currentStage}`,
+  };
+}
 
 function MeshBanner({ title }: { title: string }) {
   return (
@@ -242,20 +278,21 @@ function ContributorsAction({
 function IdeaVentureProgressBar({
   ideaId,
   title,
+  author,
+  summary,
 }: {
   ideaId: string;
   title: string;
+  author?: IdeaAuthor | null;
+  summary: VentureSummary;
 }) {
   const router = useRouter();
-  const summary = useQuery(api.ventures.getVentureSummaryByIdea, {
-    ideaId: ideaId as Id<"ideas">,
-  });
 
   if (!summary) return null;
 
-  const progressPercentage = summary.totalCheckpoints > 0
-    ? Math.min(100, Math.round((summary.completedCheckpoints / summary.totalCheckpoints) * 100))
-    : 0;
+  const progressPercentage = getProgressPercentage(summary);
+  const stageSummary = getStageSummary(summary);
+  const authorName = getDisplayName(author);
   const bossName = summary.superBoss?.definition?.name ?? summary.superBoss?.bossName ?? "Boss";
   const bossHp = summary.superBoss?.currentHp ?? 100;
   const bossBaseHp = summary.superBoss?.baseHp ?? 100;
@@ -289,9 +326,14 @@ function IdeaVentureProgressBar({
 
         <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
           <div className="flex items-center gap-1.5">
-            <Shield className="h-3 w-3 shrink-0 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
-            <span className="truncate text-[9.5px] font-black uppercase leading-none tracking-wider text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
-              {title}
+            <Avatar className="h-5 w-5 shrink-0 border border-cyan-300/25">
+              <AvatarImage src={author?.avatar} alt={authorName} />
+              <AvatarFallback className="bg-[#17233C] text-[8px] font-bold text-cyan-100">
+                {getInitials(authorName)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="truncate text-[9.5px] font-black leading-none text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.45)]">
+              {authorName}
             </span>
           </div>
           <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
@@ -307,10 +349,12 @@ function IdeaVentureProgressBar({
               transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
             />
           </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-400">Progress:</span>
-            <span className="font-mono text-[10px] font-black leading-none text-cyan-300">
-              {progressPercentage}%
+          <div className="flex min-w-0 items-baseline gap-1">
+            <span className="truncate text-[8px] font-bold uppercase tracking-wider text-cyan-300/85">
+              {stageSummary.label}
+            </span>
+            <span className="shrink-0 font-mono text-[10px] font-black leading-none text-cyan-300">
+              ({stageSummary.currentStage}/{stageSummary.totalStages})
             </span>
           </div>
         </div>
@@ -381,7 +425,6 @@ export function IdeaStoryCard({
   onRepost,
   onSelectTag,
   ownerAction,
-  hideAuthor,
   showFullContent = false,
   showAllTags = false,
   disableCardOpen = false,
@@ -417,6 +460,10 @@ export function IdeaStoryCard({
   const bannerImage = getBannerImage(idea);
   const description = idea.description || "No description yet.";
   const shouldClamp = description.length > 220;
+  const ventureSummary = useQuery(api.ventures.getVentureSummaryByIdea, {
+    ideaId: idea._id as Id<"ideas">,
+  });
+  const progressPercentage = getProgressPercentage(ventureSummary);
 
   // Whole-card click-to-open. Skip when the click originated from any inner
   // interactive element (button, link, input, etc.) so Spark / Save /
@@ -437,41 +484,25 @@ export function IdeaStoryCard({
         "cursor-pointer overflow-hidden p-5 hover:border-[#6366F1]/50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]"
       )}
     >
-      <div className={cn("flex items-start justify-between gap-3", hideAuthor && "lg:flex")}>
-        <Link
-          href={idea.author?.username ? `/profile/${idea.author.username}` : `/profile/${idea.authorId}`}
-          onClick={(event) => event.stopPropagation()}
-          aria-label={`View profile of ${getDisplayName(idea.author)}`}
-          className={cn(
-            "group flex min-w-0 items-start gap-3 rounded-lg -m-1 p-1 transition-colors hover:bg-white/[0.03]",
-            hideAuthor && "hidden lg:flex"
-          )}
-        >
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={idea.author?.avatar} alt={getDisplayName(idea.author)} />
-            <AvatarFallback className="bg-[#1B2440] text-white">{getInitials(getDisplayName(idea.author))}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[#F9FAFB] group-hover:text-[#C7D2FE]">{getDisplayName(idea.author)}</p>
-            {idea.author?.username && (
-              <p className="mt-0.5 text-xs text-[#6B7280] truncate">@{idea.author.username}</p>
-            )}
-          </div>
-        </Link>
-        {ownerAction && (
-          <div className="flex items-center gap-2">
-            {ownerAction}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-5">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => !disableCardOpen && onOpenIdea(idea._id)} className="text-left">
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <button type="button" onClick={() => !disableCardOpen && onOpenIdea(idea._id)} className="min-w-0 flex-1 text-left">
             <h2 className={cn(displayFontClass, "text-[18px] font-semibold leading-tight text-[#F9FAFB] hover:text-[#C7D2FE]")}>{idea.title}</h2>
           </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {ventureSummary && (
+              <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200">
+                Progress: <span className="font-mono text-cyan-100">{progressPercentage}%</span>
+              </span>
+            )}
+            {ownerAction && (
+              <div className="flex items-center gap-2">
+                {ownerAction}
+              </div>
+            )}
+          </div>
         </div>
-        <IdeaVentureProgressBar ideaId={idea._id} title={idea.title} />
+        <IdeaVentureProgressBar ideaId={idea._id} title={idea.title} author={idea.author} summary={ventureSummary} />
         <div className="mt-3 text-[15px] leading-7 text-[#D1D5DB]">
           <p className={cn(!showFullContent && !expanded && shouldClamp && "line-clamp-3")}>{description}</p>
           {!showFullContent && shouldClamp && (

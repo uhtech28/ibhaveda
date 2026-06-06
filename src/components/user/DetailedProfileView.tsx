@@ -134,8 +134,11 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                 <div className="flex-1 space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h1 className="text-xl font-bold text-foreground leading-tight flex items-center gap-2">
+                      <h1 className="text-xl font-bold text-foreground leading-tight">
                         {profile.displayName}
+                      </h1>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="text-muted-foreground font-medium text-sm truncate">@{profile.username}</p>
                         {equippedBadgesList.slice(0, 3).map((badge) => {
                           const norm = getNormalizedRarity(badge.rarity);
                           const accentColor = badge.secondaryColor || norm.accentColor;
@@ -160,8 +163,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
                             </span>
                           );
                         })}
-                      </h1>
-                      <p className="text-muted-foreground font-medium text-sm">@{profile.username}</p>
+                      </div>
                     </div>
                     <Button
                       variant="outline"

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -71,10 +71,9 @@ export function IndustriesMultiSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between min-w-0"
+            className="w-full justify-start min-w-0"
           >
             <span className="truncate text-left flex-1 min-w-0">{displayValue}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -101,24 +100,26 @@ export function IndustriesMultiSelect({
                       key={item.value}
                       value={item.value}
                       onSelect={() => handleSelect(item.value)}
-                      className="cursor-pointer"
+                      className="flex cursor-pointer items-center gap-3"
                     >
                       {singleSelect ? (
                         <>
-                          {selectedIndustries.includes(item.value) && (
-                            <Check className="mr-2 h-4 w-4 opacity-50" />
-                          )}
-                          {item.label}
+                          <span className="min-w-0 flex-1 truncate pr-2">{item.label}</span>
+                          <span className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center">
+                            {selectedIndustries.includes(item.value) && (
+                              <Check className="h-4 w-4 opacity-70" />
+                            )}
+                          </span>
                         </>
                       ) : (
                         <>
+                          <span className="min-w-0 flex-1 truncate pr-2">{item.label}</span>
                           <input
                             type="checkbox"
                             checked={selectedIndustries.includes(item.value)}
-                            className="mr-2"
+                            className="ml-auto shrink-0"
                             readOnly
                           />
-                          {item.label}
                         </>
                       )}
                     </CommandItem>

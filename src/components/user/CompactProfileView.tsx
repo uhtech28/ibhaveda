@@ -197,8 +197,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
                   <div className="min-w-0">
-                    <h1 className="text-xl font-bold text-foreground leading-tight flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-foreground leading-tight">
                       {profile.displayName}
+                    </h1>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="text-muted-foreground font-medium text-sm truncate">@{profile.username}</p>
                       {equippedBadgesList.slice(0, 3).map((badge) => {
                         const norm = getNormalizedRarity(badge.rarity);
                         const accentColor = badge.secondaryColor || norm.accentColor;
@@ -223,8 +226,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                           </span>
                         );
                       })}
-                    </h1>
-                    <p className="text-muted-foreground font-medium text-sm">@{profile.username}</p>
+                    </div>
                   </div>
                   {isOwner ? (
                     <Button

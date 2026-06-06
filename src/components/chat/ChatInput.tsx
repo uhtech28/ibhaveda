@@ -30,7 +30,7 @@ const ChatInput: React.FC<ChatInputProps> = memo(({ onSend, typingUsers, placeho
   };
 
   return (
-    <div className="flex min-h-[60px] flex-col justify-center bg-[#0B101B] px-4 py-1.5">
+    <div className="flex h-full w-full flex-col justify-center bg-[#0B101B] px-4 py-0">
       {typingUsers.length > 0 && (
         <div className="mb-2 text-sm text-muted-foreground">
           {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing...

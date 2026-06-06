@@ -541,6 +541,14 @@ export function IdeaWizard({
           <>
             <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
               <div className="flex items-center gap-2.5">
+                <DialogTitle
+                  className={cn(
+                    displayFontClass,
+                    "text-lg font-semibold text-white",
+                  )}
+                >
+                  Describe Your Idea
+                </DialogTitle>
                 <button
                   type="button"
                   onClick={() => setStep("template")}
@@ -553,14 +561,6 @@ export function IdeaWizard({
                     style={{ width: 22, height: 22, color: activeDef.color }}
                   />
                 </button>
-                <DialogTitle
-                  className={cn(
-                    displayFontClass,
-                    "text-lg font-semibold text-white",
-                  )}
-                >
-                  Describe Your Idea
-                </DialogTitle>
               </div>
               <DialogDescription className="text-xs text-[#9CA3AF] mt-1">
                 Briefly describe your idea. We&apos;ll do the rest!

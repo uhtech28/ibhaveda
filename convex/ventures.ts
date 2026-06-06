@@ -1321,6 +1321,7 @@ export const getVentureSummaryByIdea = query({
         ideaId: venture.ideaId,
         userId: venture.userId,
         status: venture.status,
+        templateId: venture.templateId ?? "venture",
         currentStage: venture.currentStage,
         currentCheckpoint: venture.currentCheckpoint,
         completedCheckpoints,

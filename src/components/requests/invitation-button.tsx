@@ -9,6 +9,7 @@ import { api } from "@convex/_generated/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Id } from "@convex/_generated/dataModel";
 import { UserPlus, Check, X, Clock, UserCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface InvitationButtonProps {
   targetUser: {
@@ -17,9 +18,10 @@ interface InvitationButtonProps {
     displayName: string;
   };
   iconOnly?: boolean;
+  iconOnlyClassName?: string;
 }
 
-export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, iconOnly }) => {
+export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, iconOnly, iconOnlyClassName }) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [invitationMessage, setInvitationMessage] = useState("");
 
@@ -28,6 +30,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
   const isOverMessageLimit = invitationMessage.length > 500;
 
   const { toast } = useToast();
+  const iconButtonClassName = cn("h-8 w-8 rounded-full flex-shrink-0", iconOnlyClassName);
 
   // Get current user's ideas
   const myIdeas = useQuery(api.ideas.getUserIdeas);
@@ -98,7 +101,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
 
   if (!myIdeas) {
     return (
-      <Button variant="outline" size={iconOnly ? "icon" : "sm"} disabled className={iconOnly ? "h-8 w-8 rounded-full flex-shrink-0" : "w-full"}>
+      <Button variant="outline" size={iconOnly ? "icon" : "sm"} disabled className={iconOnly ? iconButtonClassName : "w-full"}>
         <Spinner size={14} className={iconOnly ? "" : "mr-2"} />
         {!iconOnly && "Loading..."}
       </Button>
@@ -118,7 +121,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
         aria-label="Invitation pending"
         className={
           iconOnly
-            ? "h-8 w-8 rounded-full flex-shrink-0 opacity-60 cursor-not-allowed"
+            ? cn(iconButtonClassName, "opacity-60 cursor-not-allowed")
             : "w-full opacity-60 cursor-not-allowed"
         }
       >
@@ -138,7 +141,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
         aria-label="Already collaborating"
         className={
           iconOnly
-            ? "h-8 w-8 rounded-full flex-shrink-0 opacity-60 cursor-not-allowed"
+            ? cn(iconButtonClassName, "opacity-60 cursor-not-allowed")
             : "w-full opacity-60 cursor-not-allowed"
         }
       >
@@ -155,7 +158,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
         size={iconOnly ? "icon" : "sm"}
         disabled
         title="Create an idea first to send invitations"
-        className={iconOnly ? "h-8 w-8 rounded-full flex-shrink-0" : "w-full"}
+        className={iconOnly ? iconButtonClassName : "w-full"}
       >
         <UserPlus className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
         {!iconOnly && "Send Invitation"}
@@ -170,7 +173,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
           <Button
             variant="outline"
             size={iconOnly ? "icon" : "sm"}
-            className={iconOnly ? "h-8 w-8 rounded-full flex-shrink-0" : "w-full"}
+            className={iconOnly ? iconButtonClassName : "w-full"}
             title="Send Invitation"
           >
             <UserPlus className={`w-4 h-4 ${!iconOnly ? "mr-2" : ""}`} />
@@ -178,7 +181,13 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="relative w-[min(92vw,384px)] max-h-[80vh] overflow-y-auto pr-3 pt-3" align="start">
+        <PopoverContent
+          side="right"
+          align="center"
+          sideOffset={12}
+          collisionPadding={16}
+          className="relative w-[min(92vw,384px)] max-h-[80vh] overflow-y-auto pr-3 pt-3"
+        >
           <button
             type="button"
             onClick={() => setIsPopoverOpen(false)}

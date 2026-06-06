@@ -17,6 +17,8 @@ import { InvitationButton } from "@/components/requests/invitation-button";
 import { useChat } from "@/components/chat/ChatContext";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { ProfileStatsDialog } from "@/components/user/ProfileStatsDialog";
+import { PremiumIcon } from "@/components/ui/PremiumIcon";
+import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 
 import { UserProfile } from "../../../convex/users";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -354,13 +356,38 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const hiddenSkillCount = Math.max(0, user.skills.length - visibleSkills.length);
   const bio = user.bio?.trim();
   const emptyProfileText = "No bio yet - this builder hasn't introduced themselves";
+  const showcaseBadgeIds = (user.equippedBadges || []).slice(0, 3);
+  const showcaseBadgeColors = ["#10B981", "#F97316", "#06B6D4"];
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 flex h-[268px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+    <Card className="group hover:shadow-lg transition-all duration-300 relative flex h-[220px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+      {!isCurrentUser && currentUserId && (
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <InvitationButton
+            targetUser={{
+              _id: user._id,
+              username: user.username,
+              displayName: user.displayName,
+            }}
+            iconOnly
+            iconOnlyClassName="h-7 w-7 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 shrink-0 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
+            onClick={handleMessageClick}
+            title="Message"
+            aria-label={`Message ${user.displayName}`}
+          >
+            <Send className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
       <div className="grid shrink-0 grid-rows-[42px_22px_24px_24px_42px] px-4 pb-0.5 pt-2">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pr-20">
             <Avatar className="w-8 h-8 border-2 border-background shadow-sm shrink-0">
               <AvatarImage src={user.avatar} alt={user.displayName} className="object-cover" />
               <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
@@ -371,9 +398,28 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               <h3 className="font-bold text-sm leading-tight truncate group-hover:text-primary transition-colors">
                 {user.displayName}
               </h3>
-              <p className="text-[10px] text-muted-foreground truncate">
-                @{user.username}
-              </p>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">
+                  @{user.username}
+                </p>
+                {showcaseBadgeIds.map((badgeId, index) => {
+                  const accentColor = showcaseBadgeColors[index % showcaseBadgeColors.length];
+                  return (
+                    <span
+                      key={badgeId}
+                      title="Showcase badge"
+                      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] text-[10px]"
+                      style={{
+                        backgroundColor: `${accentColor}20`,
+                        border: `1px solid ${accentColor}80`,
+                        color: accentColor,
+                      }}
+                    >
+                      <PremiumIcon name={getVentureBadgeEmoji(badgeId, badgeId)} className="h-2.5 w-2.5" strokeWidth={1.5} />
+                    </span>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -450,30 +496,6 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
             </button>
           </div>
       </div>
-
-      {/* Footer Actions */}
-      {!isCurrentUser && currentUserId && (
-        <div className="flex h-[48px] shrink-0 items-start gap-2 px-3 pt-2" onClick={(e) => e.stopPropagation()}>
-          <div className="flex-1">
-            <InvitationButton
-              targetUser={{
-                _id: user._id,
-                username: user.username,
-                displayName: user.displayName,
-              }}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
-            onClick={handleMessageClick}
-            title="Message"
-          >
-            <Send className="w-3 h-3" />
-          </Button>
-        </div>
-      )}
 
       <ProfileStatsDialog
         userId={user._id as Id<"users">}
