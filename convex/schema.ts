@@ -99,8 +99,7 @@ export default defineSchema({
     .index("by_category_created", ["category", "createdAt"])
     .index("by_industries_created", ["industries", "createdAt"])
     .index("by_is_deleted", ["isDeleted"])
-    .index("by_parent", ["parentId"])
-    .index("by_visibility_parent_created", ["visibility", "parentId", "createdAt"]),
+    .index("by_parent", ["parentId"]),
 
   // Comments table - stores comments on ideas
   comments: defineTable({

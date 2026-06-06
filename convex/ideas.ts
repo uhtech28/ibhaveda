@@ -279,13 +279,12 @@ export const getPublicIdeasFast = query({
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
 
-    // Compound index: visibility + parentId + createdAt — no post-filters needed
+    // Use existing visibility index, filter parentId/isDeleted in memory
     const ideas = await ctx.db
       .query("ideas")
-      .withIndex("by_visibility_parent_created", (q) =>
-        q.eq("visibility", "public").eq("parentId", undefined)
-      )
+      .withIndex("by_visibility", (q) => q.eq("visibility", "public"))
       .filter((q) => q.neq(q.field("isDeleted"), true))
+      .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
       .order("desc")
       .take(limit);
 
