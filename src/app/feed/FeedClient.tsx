@@ -3,8 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useMutation, usePreloadedQuery, useQuery } from "convex/react";
-import { Preloaded } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
@@ -17,12 +16,13 @@ import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useToast } from "@/components/ui/use-toast";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
+
 interface FeedClientProps {
-  preloadedIdeas: Preloaded<typeof api.ideas.getPublicIdeas>;
+  initialIdeas: IdeaForgeIdea[];
   seed: number;
 }
 
-export function FeedClient({ preloadedIdeas, seed }: FeedClientProps) {
+export function FeedClient({ initialIdeas, seed }: FeedClientProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -31,7 +31,6 @@ export function FeedClient({ preloadedIdeas, seed }: FeedClientProps) {
 
   const PAGE_SIZE = 20;
   const [limit, setLimit] = useState(PAGE_SIZE);
-  // seed comes from the server so SSR and client match — no hydration mismatch
 
   // ── Feed load performance timing ──────────────────────────────────────────
   const feedTimerRef = useRef<number | null>(null);
@@ -39,39 +38,38 @@ export function FeedClient({ preloadedIdeas, seed }: FeedClientProps) {
   useEffect(() => {
     feedTimerRef.current = performance.now();
     feedMeasuredRef.current = false;
-    console.log("%c⏱ [Feed] Client mounted (data already preloaded server-side)", "color:#7dd3fc;font-weight:bold");
+    console.log("%c⏱ [Feed] Client mounted (initial data from server cache)", "color:#7dd3fc;font-weight:bold");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // usePreloadedQuery uses server-fetched data immediately, then stays live via WebSocket
-  const preloadedData = usePreloadedQuery(preloadedIdeas);
-  // For "load more" pages beyond the first, fall back to a live query
-  const extraQuery = useQuery(
+  // Live query — "skip" on first page so we don't re-fetch what the server already gave us.
+  // Kicks in for load-more pages or when Convex pushes a real-time update.
+  const liveQuery = useQuery(
     api.ideas.getPublicIdeas,
     limit > PAGE_SIZE ? { limit, seed } : "skip"
   );
-  const ideasQuery = limit > PAGE_SIZE ? extraQuery : preloadedData;
 
   const toggleSpark = useMutation(api.ideas.toggleSpark);
 
-  // Keep a stable copy so the list never disappears while the next page loads.
-  const [stableIdeas, setStableIdeas] = useState<IdeaForgeIdea[]>(() =>
-    Array.isArray(preloadedData) ? (preloadedData as IdeaForgeIdea[]) : []
-  );
+  // Initialise with server-cached data so the feed renders immediately on mount.
+  // When liveQuery resolves (Convex WebSocket), it takes over seamlessly.
+  const [stableIdeas, setStableIdeas] = useState<IdeaForgeIdea[]>(initialIdeas);
   useEffect(() => {
-    if (ideasQuery !== undefined) {
-      setStableIdeas(ideasQuery as IdeaForgeIdea[]);
+    const latest = liveQuery ?? (limit === PAGE_SIZE ? initialIdeas : undefined);
+    if (latest !== undefined) {
+      setStableIdeas(latest as IdeaForgeIdea[]);
       if (!feedMeasuredRef.current && feedTimerRef.current !== null) {
         feedMeasuredRef.current = true;
         const ms = Math.round(performance.now() - feedTimerRef.current);
         const color = ms > 500 ? "#facc15" : "#4ade80";
-        console.log(`%c⏱ [Feed] Ready: ${ms}ms after mount (${(ideasQuery as any[]).length} posts — preloaded)`, `color:${color};font-weight:bold;font-size:13px`);
+        console.log(`%c⏱ [Feed] Live sync: ${ms}ms after mount (${(latest as any[]).length} posts)`, `color:${color};font-weight:bold;font-size:13px`);
       }
     }
-  }, [ideasQuery]);
+  }, [liveQuery, initialIdeas, limit]);
 
-  const isInitialLoading = ideasQuery === undefined && stableIdeas.length === 0;
-  const hasMore = ideasQuery !== undefined && ideasQuery.length >= limit;
+  // Never show loading state — we always have server-cached initial data
+  const isInitialLoading = false;
+  const hasMore = stableIdeas.length >= limit;
 
   function loadMore() {
     if (hasMore) setLimit((l) => l + PAGE_SIZE);
