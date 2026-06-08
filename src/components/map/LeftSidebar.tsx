@@ -13,6 +13,7 @@ import {
   Users,
   GitFork,
   Scroll,
+  Gamepad2,
 } from "lucide-react";
 import {
   Tooltip,
@@ -34,6 +35,7 @@ interface LeftSidebarProps {
       | "calendar"
       | "kanban"
       | "journal"
+      | "minigames"
       | "settings"
       | "help",
   ) => void;
@@ -98,6 +100,14 @@ export function LeftSidebar({ onOpenPanel, className, ventureName }: LeftSidebar
       colorClass: "text-violet-300 group-hover:text-violet-200",
       bgClass: "bg-violet-500/10 hover:bg-violet-500/20",
       borderClass: "border-violet-500/20 hover:border-violet-500/40",
+    },
+    {
+      id: "minigames",
+      icon: Gamepad2,
+      label: "Mini Games",
+      colorClass: "text-fuchsia-300 group-hover:text-fuchsia-200",
+      bgClass: "bg-fuchsia-500/10 hover:bg-fuchsia-500/20",
+      borderClass: "border-fuchsia-500/20 hover:border-fuchsia-500/40",
     },
   ] as const;
 

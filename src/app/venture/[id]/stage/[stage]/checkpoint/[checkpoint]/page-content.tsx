@@ -27,8 +27,11 @@ import {
   ExternalLink,
   HelpCircle,
   CalendarDays,
+  Swords,
   type LucideIcon,
 } from "lucide-react";
+import { CombatPanel } from "@/components/combat/CombatPanel";
+import type { Id as ConvexId } from "@convex/_generated/dataModel";
 import {
   CHECKPOINT_DEFINITIONS,
   VENTURE_STAGES,
@@ -104,7 +107,17 @@ export default function CheckpointPageContent() {
   const submitEvidence = useMutation(api.ventures.submitEvidence);
   const advanceCheckpoint = useMutation(api.ventures.advanceCheckpoint);
   const startCheckpoint = useMutation(api.ventures.startCheckpoint);
+  const startCombatRound = useMutation(api.combat.startCombatRound);
   const [advancing, setAdvancing] = useState(false);
+
+  // HP-based Cross-Question Combat — when the user clicks "Engage AI
+  // Combat" we open a round and mount CombatPanel above this page.
+  const [activeCombatRound, setActiveCombatRound] = useState<{
+    roundId: ConvexId<"combatRounds">;
+    checkpointId: ConvexId<"ventureCheckpoints">;
+  } | null>(null);
+  const [combatStarting, setCombatStarting] = useState(false);
+  const [combatError, setCombatError] = useState<string | null>(null);
 
   const checkpoint = venture?.checkpoints?.find(
     (cp) => cp.stage === stageNum && cp.checkpoint === checkpointNum,
@@ -151,6 +164,31 @@ export default function CheckpointPageContent() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEngageCombat = async () => {
+    if (!checkpoint) return;
+    setCombatStarting(true);
+    setCombatError(null);
+    try {
+      const result = await startCombatRound({ checkpointId: checkpoint._id });
+      setActiveCombatRound({
+        roundId: result.roundId,
+        checkpointId: checkpoint._id,
+      });
+    } catch (err) {
+      setCombatError(
+        err instanceof Error ? err.message : "Failed to start combat",
+      );
+    } finally {
+      setCombatStarting(false);
+    }
+  };
+
+  const handleCombatVictory = async () => {
+    // Boss defeated — auto-advance the checkpoint and route forward.
+    setActiveCombatRound(null);
+    await handleAdvance();
   };
 
   const handleAdvance = async () => {
@@ -244,6 +282,17 @@ export default function CheckpointPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* HP-based Cross-Question Combat overlay. Mounts above the
+          checkpoint view when the user clicks Engage AI Combat. */}
+      {activeCombatRound && (
+        <CombatPanel
+          roundId={activeCombatRound.roundId}
+          checkpointId={activeCombatRound.checkpointId}
+          onAdvanceCheckpoint={handleCombatVictory}
+          onClose={() => setActiveCombatRound(null)}
+        />
+      )}
+
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="flex items-center gap-4 mb-8">
           <Button
@@ -339,23 +388,51 @@ export default function CheckpointPageContent() {
 
         {canAdvance && checkpoint.status !== "completed" && (
           <div className="mt-8 flex flex-col items-center gap-3">
+            {/* Primary path: Engage AI Combat. The boss has to be
+                defeated before the checkpoint advances. */}
             <Button
               size="lg"
-              className="gap-2"
+              className="gap-2 bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-lg shadow-rose-500/30 hover:from-rose-400 hover:to-amber-400"
+              onClick={handleEngageCombat}
+              disabled={combatStarting || advancing}
+            >
+              {combatStarting ? (
+                <>
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Summoning boss...
+                </>
+              ) : (
+                <>
+                  <Swords className="h-5 w-5" />
+                  Engage AI Combat
+                </>
+              )}
+            </Button>
+            {combatError && (
+              <p className="text-xs text-red-400">{combatError}</p>
+            )}
+
+            {/* Secondary path: skip combat and just advance. Useful for
+                checkpoints whose tasks have already been thoroughly
+                vetted, or as a fallback while the AI providers are down. */}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-2 text-white/60 hover:text-white"
               onClick={handleAdvance}
-              disabled={advancing}
+              disabled={advancing || combatStarting}
             >
               {advancing ? (
                 <>
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Advancing...
                 </>
               ) : (
                 <>
-                  <Check className="h-5 w-5" />
+                  <Check className="h-4 w-4" />
                   {fromMap
-                    ? "Advance Checkpoint & Return to Map"
-                    : "Advance to Next Checkpoint"}
+                    ? "Skip combat & return to map"
+                    : "Skip combat & advance"}
                 </>
               )}
             </Button>

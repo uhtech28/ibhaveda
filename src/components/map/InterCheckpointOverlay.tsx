@@ -139,9 +139,99 @@ export function InterCheckpointOverlay({
   const [error, setError] = useState<string | null>(null);
 
   // Q/A Boss Challenge state
-  const [timeLeft, setTimeLeft] = useState(20);
+  const [timeLeft, setTimeLeft] = useState(90);
   const [answer, setAnswer] = useState("");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Combat animation choreography ────────────────────────────────────────
+  // Full reaction set mirrors the Phaser MiniBoss vocabulary plus the
+  // counter-attack / damage / victory / defeat sequences that wrap
+  // around the per-hit reactions.
+  //
+  // bossReaction         — short reaction on the boss icon (hit, crit, etc)
+  // sequencePhase        — full-screen choreography (victory burst, defeat fade)
+  // playerDamageFlash    — full-panel red flash for damage feedback
+  type BossReactionKind =
+    | "idle"
+    | "hit"
+    | "block"
+    | "crit"
+    | "counter"
+    | "victory"
+    | "defeated";
+  type SequencePhase =
+    | "idle"
+    | "victory_burst"
+    | "defeat_fade";
+
+  const [bossReaction, setBossReaction] = useState<BossReactionKind>("idle");
+  const [sequencePhase, setSequencePhase] = useState<SequencePhase>("idle");
+  const [playerDamageFlash, setPlayerDamageFlash] = useState(false);
+  const [damageNumber, setDamageNumber] = useState<number | null>(null);
+
+  const reactionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sequenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const damageFlashTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerBossReaction = (
+    kind: Exclude<BossReactionKind, "idle">,
+    durationMs = 700,
+  ) => {
+    setBossReaction(kind);
+    if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
+    reactionTimerRef.current = setTimeout(
+      () => setBossReaction("idle"),
+      durationMs,
+    );
+  };
+
+  /** Briefly flash a damage number above the boss icon. */
+  const showDamageNumber = (amount: number, durationMs = 900) => {
+    setDamageNumber(amount);
+    if (damageFlashTimerRef.current) clearTimeout(damageFlashTimerRef.current);
+    damageFlashTimerRef.current = setTimeout(
+      () => setDamageNumber(null),
+      durationMs,
+    );
+  };
+
+  /** Trigger the full-panel red flash for player damage feedback. */
+  const triggerPlayerDamage = (durationMs = 450) => {
+    setPlayerDamageFlash(true);
+    setTimeout(() => setPlayerDamageFlash(false), durationMs);
+  };
+
+  /** Multi-stage victory sequence: hit → boss falls → victory burst. */
+  const playVictorySequence = (hitKind: "hit" | "crit", damage: number) => {
+    triggerBossReaction(hitKind, 700);
+    showDamageNumber(damage, 900);
+    if (sequenceTimerRef.current) clearTimeout(sequenceTimerRef.current);
+    sequenceTimerRef.current = setTimeout(() => {
+      setBossReaction("victory");
+      setSequencePhase("victory_burst");
+      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
+      reactionTimerRef.current = setTimeout(() => {
+        setBossReaction("idle");
+        setSequencePhase("idle");
+      }, 1100);
+    }, 650);
+  };
+
+  /** Multi-stage defeat sequence: counter → player damage → defeat fade. */
+  const playDefeatSequence = () => {
+    triggerBossReaction("counter", 550);
+    if (sequenceTimerRef.current) clearTimeout(sequenceTimerRef.current);
+    sequenceTimerRef.current = setTimeout(() => {
+      triggerPlayerDamage(500);
+      setBossReaction("defeated");
+      setSequencePhase("defeat_fade");
+      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
+      reactionTimerRef.current = setTimeout(() => {
+        setBossReaction("idle");
+        setSequencePhase("idle");
+      }, 1200);
+    }, 500);
+  };
   const onBossVictoryRef = useRef(onBossVictory);
   const onBossSkipRef = useRef(onBossSkip);
 
@@ -221,6 +311,9 @@ export function InterCheckpointOverlay({
       timerRef.current = null;
     }
 
+    // Player out of time → boss counter-attacks → player defeated.
+    playDefeatSequence();
+
     setIsSubmitting(true);
     setError(null);
 
@@ -239,7 +332,7 @@ export function InterCheckpointOverlay({
           outcome: "retreat",
           xpEarned: res.xpEarned,
           corruptionReduction: res.corruptionReduction,
-          message: `Time expired! The ${henchmanInfo.name} overwhelmed you before you could formulate your answer.`,
+          message: `Time's up. The ${henchmanInfo.name} struck while you were still thinking. Try again with a sharper answer.`,
         });
         setPhase("result");
       }
@@ -253,7 +346,9 @@ export function InterCheckpointOverlay({
   // Run combat countdown timer loop
   useEffect(() => {
     if (activeEvent === "henchman" && phase === "action") {
-      setTimeLeft(20);
+      // 90 seconds (1.5 min) — enough time to think and write a meaningful
+      // answer without making the encounter feel dragged out.
+      setTimeLeft(90);
       setAnswer("");
       setError(null);
 
@@ -281,6 +376,16 @@ export function InterCheckpointOverlay({
     };
   }, [activeEvent, phase]);
 
+  // Clean up reaction + sequence timers on unmount so stale setTimeouts
+  // don't try to set state after the component is gone.
+  useEffect(() => {
+    return () => {
+      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
+      if (sequenceTimerRef.current) clearTimeout(sequenceTimerRef.current);
+      if (damageFlashTimerRef.current) clearTimeout(damageFlashTimerRef.current);
+    };
+  }, []);
+
   if (!isOpen || activeEvent === "clear") return null;
 
   const handleSubmitAnswer = async () => {
@@ -306,13 +411,49 @@ export function InterCheckpointOverlay({
         checkpoint,
         outcome: "victory",
         henchmanName: henchmanInfo.name,
+        answerText: answer,
       });
+
+      // Server-side anti-cheat caught an AI-generated submission.
+      // Two outcomes: first strike → final warning. Second strike →
+      // permanent account suspension (server already wrote the ban row).
+      if (res && "aiDetected" in res && res.aiDetected) {
+        playDefeatSequence();
+        setResultData({
+          outcome: "retreat",
+          xpEarned: 0,
+          corruptionReduction: 0,
+          message: res.message,
+        });
+        setPhase("result");
+        return;
+      }
 
       if (res) {
         const answerWords = answer.trim().split(/\s+/).length;
         const relevance = Math.min(98, 72 + (answerWords * 2) + (timeLeft > 10 ? 8 : 4));
         const completeness = answer.trim().length > 35 ? "Exceptional" : "Proficient";
         const timeBonus = timeLeft * 10;
+
+        // Reaction ladder mirrors MiniBoss reaction set:
+        //   relevance >= 90  → critical strike → big victory burst
+        //   relevance >= 80  → solid hit → standard victory burst
+        //   relevance <  80  → blocked then counter-hit → still wins but shows struggle
+        if (relevance >= 90) {
+          // Damage is purely cosmetic — derived from the answer's
+          // relevance + word count so the number on-screen feels
+          // proportional to the strength of the answer.
+          playVictorySequence("crit", Math.round(relevance + answerWords * 2));
+        } else if (relevance >= 80) {
+          playVictorySequence("hit", Math.round(relevance));
+        } else {
+          // Blocked first (boss parries), then player follows through.
+          triggerBossReaction("block", 450);
+          if (sequenceTimerRef.current) clearTimeout(sequenceTimerRef.current);
+          sequenceTimerRef.current = setTimeout(() => {
+            playVictorySequence("hit", Math.round(relevance));
+          }, 480);
+        }
 
         // Boss combat gate: determine victory message based on stage position
         const victoryMsg = isBossCombat
@@ -502,6 +643,74 @@ export function InterCheckpointOverlay({
           transition={{ duration: 0.12, ease: "easeOut" }}
           className={`relative w-full max-w-lg overflow-hidden rounded-2xl border bg-gradient-to-b ${theme.bg} ${theme.border} p-6 shadow-2xl backdrop-blur-xl`}
         >
+          {/* ── Full-panel choreography overlays ──────────────────────── */}
+          {/* Player damage flash — red wash + brief shake on the dialog */}
+          <AnimatePresence>
+            {playerDamageFlash && (
+              <motion.div
+                key="player-damage"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.55, 0] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.45, times: [0, 0.25, 1] }}
+                className="pointer-events-none absolute inset-0 z-30 rounded-2xl bg-red-500 mix-blend-overlay"
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Victory burst — green-gold radial flash + sparkles */}
+          <AnimatePresence>
+            {sequencePhase === "victory_burst" && (
+              <>
+                <motion.div
+                  key="victory-flash"
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: [0, 0.7, 0], scale: [0.6, 1.4, 1.6] }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.05, ease: "easeOut" }}
+                  className="pointer-events-none absolute inset-0 z-30 rounded-2xl"
+                  style={{
+                    background:
+                      "radial-gradient(circle, rgba(52,211,153,0.7) 0%, rgba(253,224,71,0.3) 40%, transparent 70%)",
+                  }}
+                />
+                {/* Six radiating sparkle particles */}
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <motion.span
+                    key={`spark-${i}`}
+                    initial={{ opacity: 0, x: 0, y: 0, scale: 0.5 }}
+                    animate={{
+                      opacity: [0, 1, 0],
+                      x: Math.cos((i * Math.PI) / 3) * 120,
+                      y: Math.sin((i * Math.PI) / 3) * 120,
+                      scale: [0.5, 1.2, 0.4],
+                    }}
+                    transition={{ duration: 0.95, ease: "easeOut" }}
+                    className="pointer-events-none absolute left-1/2 top-1/2 z-30 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-200 shadow-[0_0_12px_#fde047]"
+                  />
+                ))}
+              </>
+            )}
+          </AnimatePresence>
+
+          {/* Defeat fade — heavy red vignette closing in from the edges */}
+          <AnimatePresence>
+            {sequencePhase === "defeat_fade" && (
+              <motion.div
+                key="defeat-vignette"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.75, 0.4] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.15, ease: "easeInOut" }}
+                className="pointer-events-none absolute inset-0 z-30 rounded-2xl"
+                style={{
+                  background:
+                    "radial-gradient(circle, transparent 30%, rgba(239,68,68,0.55) 90%)",
+                }}
+              />
+            )}
+          </AnimatePresence>
+
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-6">
             <span className="text-xs font-bold uppercase tracking-widest text-white/40">
@@ -559,13 +768,225 @@ export function InterCheckpointOverlay({
               {phase === "action" && (
                 <div className="w-full flex flex-col items-stretch text-left">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl select-none">{henchmanInfo.icon}</span>
+                    <div className="flex items-center gap-2 relative">
+                      {/* Ambient aura ring — pulses behind the boss icon
+                          so even the idle state has visible motion. */}
+                      <motion.span
+                        aria-hidden
+                        className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-rose-500/20 blur-md"
+                        animate={{
+                          opacity: [0.35, 0.8, 0.35],
+                          scale: [0.9, 1.15, 0.9],
+                        }}
+                        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                      {/* Two slow orbiting sparks for extra life signal */}
+                      {[0, 1].map((i) => (
+                        <motion.span
+                          key={`spark-orbit-${i}`}
+                          aria-hidden
+                          className="pointer-events-none absolute left-3 top-1/2 h-1 w-1 rounded-full bg-amber-300 shadow-[0_0_6px_#fbbf24]"
+                          animate={{
+                            x: [
+                              Math.cos(i * Math.PI) * 14,
+                              Math.cos(i * Math.PI + Math.PI) * 14,
+                              Math.cos(i * Math.PI + 2 * Math.PI) * 14,
+                            ],
+                            y: [
+                              Math.sin(i * Math.PI) * 14,
+                              Math.sin(i * Math.PI + Math.PI) * 14,
+                              Math.sin(i * Math.PI + 2 * Math.PI) * 14,
+                            ],
+                            opacity: [0.4, 0.9, 0.4],
+                          }}
+                          transition={{
+                            duration: 3 + i * 0.6,
+                            repeat: Infinity,
+                            ease: "linear",
+                            delay: i * 0.5,
+                          }}
+                        />
+                      ))}
+                      <motion.span
+                        className="text-2xl select-none inline-block relative z-10"
+                        // Subtle idle breath + drop-shadow pulse — keeps
+                        // the boss visually "alive" while the player is
+                        // typing their answer. Suspends as soon as a
+                        // reaction kicks in.
+                        animate={
+                          bossReaction === "idle"
+                            ? {
+                                y: [0, -3, 0],
+                                scale: [1, 1.05, 1],
+                                filter: [
+                                  "drop-shadow(0 0 4px rgba(244,114,182,0.3))",
+                                  "drop-shadow(0 0 10px rgba(244,114,182,0.55))",
+                                  "drop-shadow(0 0 4px rgba(244,114,182,0.3))",
+                                ],
+                              }
+                            : bossReaction === "hit"
+                            ? {
+                                x: [0, -6, 6, -4, 4, 0],
+                                filter: ["brightness(1)", "brightness(1.6)", "brightness(1)"],
+                              }
+                            : bossReaction === "crit"
+                              ? {
+                                  x: [0, -10, 10, -8, 8, 0],
+                                  rotate: [0, -8, 8, -6, 6, 0],
+                                  scale: [1, 1.18, 1],
+                                  filter: [
+                                    "brightness(1)",
+                                    "brightness(2) drop-shadow(0 0 12px #fb7185)",
+                                    "brightness(1)",
+                                  ],
+                                }
+                              : bossReaction === "block"
+                                ? {
+                                    x: [0, -2, 2, 0],
+                                    filter: ["brightness(1)", "brightness(0.7)", "brightness(1)"],
+                                  }
+                                : bossReaction === "counter"
+                                  ? {
+                                      // Boss lunges to the right (toward player),
+                                      // glowing red — classic counter-attack tell.
+                                      x: [0, 18, -2, 0],
+                                      scale: [1, 1.25, 1],
+                                      filter: [
+                                        "brightness(1)",
+                                        "brightness(1.4) drop-shadow(0 0 8px #ef4444)",
+                                        "brightness(1)",
+                                      ],
+                                    }
+                                  : bossReaction === "victory"
+                                    ? {
+                                        // Boss is falling — slumps, rotates, fades.
+                                        scale: [1, 1.1, 0.4],
+                                        rotate: [0, 12, -90],
+                                        opacity: [1, 1, 0],
+                                        y: [0, 4, 18],
+                                        filter: [
+                                          "brightness(1)",
+                                          "brightness(0.4)",
+                                          "brightness(0.1)",
+                                        ],
+                                      }
+                                    : bossReaction === "defeated"
+                                      ? {
+                                          // Boss roars in triumph — player got defeated.
+                                          scale: [1, 1.35, 1.15],
+                                          rotate: [0, -6, 6, 0],
+                                          filter: [
+                                            "brightness(1)",
+                                            "brightness(1.8) drop-shadow(0 0 16px #ef4444)",
+                                            "brightness(1.2)",
+                                          ],
+                                        }
+                                      : { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1, filter: "brightness(1)" }
+                        }
+                        transition={
+                          bossReaction === "idle"
+                            ? {
+                                // Idle breath loops forever at a calm cadence.
+                                duration: 3,
+                                ease: "easeInOut",
+                                repeat: Infinity,
+                              }
+                            : {
+                                duration:
+                                  bossReaction === "victory"
+                                    ? 1.1
+                                    : bossReaction === "defeated"
+                                      ? 0.9
+                                      : bossReaction === "crit"
+                                        ? 0.7
+                                        : bossReaction === "counter"
+                                          ? 0.55
+                                          : 0.5,
+                                ease: "easeOut",
+                              }
+                        }
+                      >
+                        {henchmanInfo.icon}
+
+                        {/* Floating damage number — rises off the boss
+                            with size and color tuned to the reaction.
+                            Matches the Phaser MiniBoss damage-number cue. */}
+                        <AnimatePresence>
+                          {damageNumber !== null && (bossReaction === "hit" || bossReaction === "crit") && (
+                            <motion.span
+                              key={`dmg-${damageNumber}-${bossReaction}`}
+                              initial={{ opacity: 0, y: 0, scale: 0.6 }}
+                              animate={{ opacity: 1, y: -32, scale: bossReaction === "crit" ? 1.5 : 1.1 }}
+                              exit={{ opacity: 0, y: -48 }}
+                              transition={{ duration: 0.85, ease: "easeOut" }}
+                              className={`pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 font-black font-mono ${
+                                bossReaction === "crit"
+                                  ? "text-rose-300 drop-shadow-[0_0_10px_#fb7185] text-sm"
+                                  : "text-amber-300 drop-shadow-[0_0_6px_#fbbf24] text-xs"
+                              }`}
+                            >
+                              -{damageNumber}{bossReaction === "crit" ? "!!" : ""}
+                            </motion.span>
+                          )}
+
+                          {bossReaction === "block" && (
+                            <motion.span
+                              key="block"
+                              initial={{ opacity: 0, scale: 0.8, y: 0 }}
+                              animate={{ opacity: 1, scale: 1, y: -8 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.4 }}
+                              className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 text-[10px] font-black font-mono text-slate-300 tracking-wider"
+                            >
+                              BLOCKED
+                            </motion.span>
+                          )}
+
+                          {bossReaction === "counter" && (
+                            <motion.span
+                              key="counter"
+                              initial={{ opacity: 0, scale: 0.6, x: 0 }}
+                              animate={{ opacity: 1, scale: 1.1, x: 28 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.55, ease: "easeOut" }}
+                              className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 text-[10px] font-black font-mono text-red-400 tracking-widest drop-shadow-[0_0_4px_#ef4444]"
+                            >
+                              COUNTER!
+                            </motion.span>
+                          )}
+
+                          {bossReaction === "victory" && (
+                            <motion.span
+                              key="victory"
+                              initial={{ opacity: 0, scale: 0.5, y: 0 }}
+                              animate={{ opacity: 1, scale: 1.3, y: -22 }}
+                              exit={{ opacity: 0, y: -36 }}
+                              transition={{ duration: 0.9, ease: "easeOut" }}
+                              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-xs font-black font-mono text-emerald-300 tracking-widest drop-shadow-[0_0_10px_#34d399]"
+                            >
+                              VICTORY
+                            </motion.span>
+                          )}
+
+                          {bossReaction === "defeated" && (
+                            <motion.span
+                              key="defeated"
+                              initial={{ opacity: 0, scale: 0.6, y: 0 }}
+                              animate={{ opacity: 1, scale: 1.2, y: -22 }}
+                              exit={{ opacity: 0, y: -36 }}
+                              transition={{ duration: 0.9, ease: "easeOut" }}
+                              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-xs font-black font-mono text-red-500 tracking-widest drop-shadow-[0_0_10px_#ef4444]"
+                            >
+                              DEFEAT
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </motion.span>
                       <h4 className="text-sm font-extrabold text-white">Boss Challenge: {henchmanInfo.name}</h4>
                     </div>
                     {/* Real-time Ticking Timer */}
                     <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20">
-                      <span className={`text-[11px] font-bold font-mono tracking-widest transition-all ${timeLeft <= 5 ? "text-red-500 animate-pulse scale-105" : "text-red-400"}`}>
+                      <span className={`text-[11px] font-bold font-mono tracking-widest transition-all ${timeLeft <= 10 ? "text-red-500 animate-pulse scale-105" : "text-red-400"}`}>
                         ⏳ {timeLeft}s Left
                       </span>
                     </div>
@@ -575,9 +996,9 @@ export function InterCheckpointOverlay({
                   <div className="w-full h-1.5 rounded-full bg-white/5 border border-white/10 overflow-hidden mb-4">
                     <motion.div
                       initial={{ width: "100%" }}
-                      animate={{ width: `${(timeLeft / 20) * 100}%` }}
+                      animate={{ width: `${(timeLeft / 90) * 100}%` }}
                       transition={{ duration: 1, ease: "linear" }}
-                      className={`h-full rounded-full transition-colors ${timeLeft <= 5 ? "bg-red-500 shadow-[0_0_8px_#ef4444]" : "bg-indigo-500"}`}
+                      className={`h-full rounded-full transition-colors ${timeLeft <= 10 ? "bg-red-500 shadow-[0_0_8px_#ef4444]" : "bg-indigo-500"}`}
                     />
                   </div>
 

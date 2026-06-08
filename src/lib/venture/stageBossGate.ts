@@ -122,11 +122,15 @@ export function needsCheckpointBossCombat(
   bossDefeatedAtCheckpoint: Set<string>,
   currentStage: number,
   currentCheckpoint: number,
+  tourActive = false,
 ): boolean {
   if (!isActiveVentureCheckpoint(cp, currentStage, currentCheckpoint)) {
     return false;
   }
-  if (doneTasks < 2) return false;
+  // First-run tour can fire combat at any task count so the dedicated
+  // "Start the fight" CTA works even on a fresh checkpoint.
+  const minTasks = tourActive ? 0 : 2;
+  if (doneTasks < minTasks) return false;
 
   const key = checkpointBossKey(cp.stage, cp.checkpoint);
   return !bossDefeatedAtCheckpoint.has(key);

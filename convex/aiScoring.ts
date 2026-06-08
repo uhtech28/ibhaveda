@@ -8,6 +8,129 @@ import {
 } from "./cumulativeVentureScore";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AI-GENERATED CONTENT DETECTION (text-only signals — no model call)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Mirrors the combat anti-cheat's text-only signals so standard task
+// submissions get the same prompt-security treatment as combat answers.
+// Two cheap pure-function signals:
+//
+//   1. vocabularyFingerprint — count of marketing/AI-tell phrases
+//   2. burstinessScore       — sentence-length variance (uniform = AI)
+//
+// Composite >= TASK_AI_DETECTION_THRESHOLD → submission is rejected
+// with a zero score and a warning feedback string. The user is asked
+// to rewrite in their own words.
+//
+// Threshold is deliberately tuned tighter than combat (which has 6
+// signals); here we only have 2, so the bar to flag is lower.
+
+const TASK_AI_DETECTION_THRESHOLD = 0.4;
+
+// Marketing-AI / generic-LLM phrasal tells. Hits saturate at 4.
+const TASK_AI_FLAG_PHRASES: readonly string[] = [
+  // Classic LLM connectives
+  "furthermore",
+  "moreover",
+  "in conclusion",
+  "in summary",
+  "it is important to note",
+  "it's worth noting",
+  "it should be noted",
+  "on the one hand",
+  "on the other hand",
+  "that being said",
+  // Polish-mode buzzword tells
+  "comprehensive understanding",
+  "comprehensive suite",
+  "multifaceted approach",
+  "multifaceted needs",
+  "paradigm shift",
+  "leverage synergies",
+  "leverages cutting-edge",
+  "leveraging cutting-edge",
+  "robust framework",
+  "robust customer engagement",
+  "user-centric approach",
+  "user-centric design",
+  "data-driven insights",
+  "data-driven decisions",
+  "harnessing the power",
+  "harness the power",
+  "cutting-edge artificial intelligence",
+  "machine learning algorithms",
+  "deliver exceptional value",
+  "exceptional value to",
+  "delivering exceptional",
+  "rapidly evolving digital landscape",
+  "rapidly evolving landscape",
+  "ever-rising consumer expectations",
+  "in today's competitive",
+  "in today's rapidly evolving",
+  "in today's digital",
+  "in the realm of",
+  "navigate the complexities",
+  "tapestry of",
+  "delve into",
+  "unlock new growth",
+  "unlock the potential",
+  "streamline their workflows",
+  "streamline operations",
+  "thrive in an increasingly competitive",
+  "commitment to excellence",
+  "innovative platform",
+  "innovative solution",
+  "innovative approach",
+  "revolutionize how",
+  "transform the way",
+];
+
+function taskVocabularyFingerprintSignal(text: string): number {
+  const lower = text.toLowerCase();
+  let hits = 0;
+  for (const phrase of TASK_AI_FLAG_PHRASES) {
+    if (lower.includes(phrase)) hits++;
+  }
+  return Math.min(1, hits / 4);
+}
+
+function taskBurstinessSignal(text: string): number {
+  const sentences = text
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (sentences.length < 3) return 0;
+  const wordCounts = sentences.map((s) => s.split(/\s+/).length);
+  const mean = wordCounts.reduce((a, b) => a + b, 0) / wordCounts.length;
+  if (mean <= 0) return 0;
+  const variance =
+    wordCounts.reduce((acc, w) => acc + (w - mean) ** 2, 0) /
+    wordCounts.length;
+  const cv = Math.sqrt(variance) / mean;
+  if (cv >= 0.5) return 0;
+  if (cv <= 0.15) return 1;
+  return 1 - (cv - 0.15) / (0.5 - 0.15);
+}
+
+/**
+ * Returns 0-1 confidence that the submission was AI-generated.
+ * Pure-function signals only (no model call).
+ */
+function classifyTaskSubmissionAi(text: string): {
+  confidence: number;
+  signals: { vocab: number; burstiness: number };
+} {
+  if (text.trim().length < 30) {
+    return { confidence: 0, signals: { vocab: 0, burstiness: 0 } };
+  }
+  const vocab = taskVocabularyFingerprintSignal(text);
+  const burstiness = taskBurstinessSignal(text);
+  // Equal weight; vocabulary fingerprint is the more reliable cheap signal.
+  const confidence = vocab * 0.6 + burstiness * 0.4;
+  return { confidence, signals: { vocab, burstiness } };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -812,11 +935,55 @@ export const evaluateTaskSubmission = action({
   handler: async (ctx, args) => {
     const { content, checkpointOutcome, userTier } = args;
 
+    // ── Prompt-security gate ──────────────────────────────────────────────────
+    // Mirrors combat anti-cheat: text-only AI-generation classification.
+    // Flagged submissions short-circuit the expensive model scoring and
+    // get a zero score with feedback explaining what to do.
+    const aiVerdict = classifyTaskSubmissionAi(content);
+    if (aiVerdict.confidence >= TASK_AI_DETECTION_THRESHOLD) {
+      console.warn(
+        `[aiScoring] Submission flagged as AI-generated (confidence ${aiVerdict.confidence.toFixed(3)}, vocab ${aiVerdict.signals.vocab.toFixed(3)}, burstiness ${aiVerdict.signals.burstiness.toFixed(3)})`,
+      );
+      const flaggedResult: EvaluationResult = {
+        completeness: 0,
+        specificity: 0,
+        evidence: 0,
+        originality: 0,
+        totalScore: 0,
+        qualityTier: "low",
+        feedback:
+          "This submission was flagged by our prompt-security system as AI-generated. " +
+          "Rewrite the answer in your own words — concrete, specific, and grounded in your own experience or research. " +
+          "Submissions that rely on generic marketing language, perfectly uniform sentence structure, or boilerplate LLM phrasing will not score.",
+        modelUsed: "anti-cheat:text-only",
+        valuationScore: VALUATION_MAP.low,
+      };
+
+      await ctx.runMutation(internal.aiScoring.saveEvaluationResult, {
+        taskId: args.taskId,
+        checkpointId: args.checkpointId,
+        ventureId: args.ventureId,
+        stageNumber: args.stageNumber,
+        content,
+        completeness: 0,
+        specificity: 0,
+        evidence: 0,
+        originality: 0,
+        totalScore: 0,
+        qualityTier: "low",
+        valuationScore: VALUATION_MAP.low,
+        feedback: flaggedResult.feedback,
+        modelUsed: flaggedResult.modelUsed,
+      });
+
+      return flaggedResult;
+    }
+
     // ── Fetch Idea Context Deterministically ──────────────────────────────────
     const ideaContext = await ctx.runQuery(internal.aiScoring.getVentureIdeaContext, {
       ventureId: args.ventureId,
     });
-    
+
     const ideaTitle = ideaContext?.ideaTitle ?? "Unknown Idea";
     const ideaDescription = ideaContext?.ideaDescription ?? "Startup concept development";
     const averageConsistencyScore = ideaContext?.averageConsistencyScore ?? 12.0;

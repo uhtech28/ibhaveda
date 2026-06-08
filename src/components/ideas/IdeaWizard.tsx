@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
@@ -41,6 +41,9 @@ import {
 import { displayFontClass } from "@/components/ideaforge/shared";
 import { audioManager } from "@/lib/audio/audioManager";
 import { type TemplateId } from "@/config/templates";
+import { CrossPostSelector } from "@/components/share/CrossPostSelector";
+import { CrossPostSharePanel } from "@/components/share/CrossPostSharePanel";
+import type { ShareablePayload, SharePlatform } from "@/lib/share/types";
 
 // ─── Template display metadata ─────────────────────────────────────────────
 
@@ -87,7 +90,7 @@ const TEMPLATE_ORDER: TemplateId[] = ["venture", "creative", "academic", "lab"];
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type Step = "template" | "outline" | "generating" | "preview";
+type Step = "template" | "outline" | "generating" | "preview" | "share";
 type Visibility = "public" | "private";
 
 interface IdeaWizardProps {
@@ -102,6 +105,12 @@ interface IdeaWizardProps {
     industries?: string[];
     visibility?: "public" | "private";
   };
+  /**
+   * When set, the wizard runs in tutorial mode: shows a countdown over
+   * the Post button and auto-fires submit when it hits zero. Used by
+   * the first-run product tour.
+   */
+  tutorialMode?: boolean;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -110,6 +119,7 @@ export function IdeaWizard({
   isOpen,
   onOpenChange,
   initialDraft,
+  tutorialMode = false,
 }: IdeaWizardProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -138,6 +148,15 @@ export function IdeaWizard({
   const [skills, setSkills] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [files, setFiles] = useState<File[]>([]);
+  // Cross-post share targets — all four platforms selected by default.
+  const [crossPostTargets, setCrossPostTargets] = useState<Set<SharePlatform>>(
+    new Set(["twitter", "linkedin", "instagram", "facebook"]),
+  );
+  const [sharePayload, setSharePayload] = useState<{
+    payload: ShareablePayload;
+    platforms: SharePlatform[];
+    ventureId: string;
+  } | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState("");
   const [fileUploadError, setFileUploadError] = useState("");
 
@@ -145,6 +164,12 @@ export function IdeaWizard({
   const [submitError, setSubmitError] = useState("");
   const [aiHadError, setAiHadError] = useState(false);
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
+
+  // Tutorial countdown state. The countdown number itself lives in a
+  // leaf component (TutorialCountdownBanner) so its 1-Hz tick doesn't
+  // re-render the whole 1000-line wizard. We only track the pause flag
+  // and the active boolean up here.
+  const [tutorialPaused, setTutorialPaused] = useState(false);
 
   // ── Helpers ──
   const reset = () => {
@@ -164,6 +189,7 @@ export function IdeaWizard({
     setSubmitError("");
     setAiHadError(false);
     setIsGeneratingTags(false);
+    setSharePayload(null);
   };
 
   const close = () => {
@@ -202,15 +228,23 @@ export function IdeaWizard({
         setVisibility(initialDraft.visibility || "public");
 
         let mappedSkills: string[] = [];
-        if (initialDraft.skills && initialDraft.skills.length > 0) {
-          mappedSkills = initialDraft.skills;
-        } else if (initialDraft.tags && initialDraft.tags.length > 0) {
-          mappedSkills = initialDraft.tags;
-        } else if (initialDraft.category) {
+        if (Array.isArray(initialDraft.skills)) {
+          mappedSkills = initialDraft.skills.filter(
+            (entry): entry is string =>
+              typeof entry === "string" && entry.length > 0,
+          );
+        } else if (Array.isArray(initialDraft.tags)) {
+          mappedSkills = initialDraft.tags.filter(
+            (entry): entry is string =>
+              typeof entry === "string" && entry.length > 0,
+          );
+        } else if (typeof initialDraft.category === "string") {
           try {
             const parsed = JSON.parse(initialDraft.category);
             mappedSkills = Array.isArray(parsed)
-              ? parsed
+              ? parsed.filter(
+                  (entry): entry is string => typeof entry === "string",
+                )
               : [initialDraft.category];
           } catch {
             mappedSkills = [initialDraft.category];
@@ -219,16 +253,25 @@ export function IdeaWizard({
         setSkills(mappedSkills);
 
         let mappedIndustries: string[] = [];
-        if (initialDraft.industries && initialDraft.industries.length > 0) {
-          mappedIndustries = initialDraft.industries;
-        } else if (initialDraft.industries) {
+        if (Array.isArray(initialDraft.industries)) {
+          // Already a normalised array. Filter any junk (empty strings or
+          // accidental nested arrays) so the downstream string validator
+          // doesn't reject it.
+          mappedIndustries = initialDraft.industries.filter(
+            (entry): entry is string =>
+              typeof entry === "string" && entry.length > 0,
+          );
+        } else if (typeof initialDraft.industries === "string") {
+          // Legacy JSON-string payload.
           try {
-            const parsed = JSON.parse(initialDraft.industries as any);
+            const parsed = JSON.parse(initialDraft.industries);
             mappedIndustries = Array.isArray(parsed)
-              ? parsed
-              : [initialDraft.industries as any];
+              ? parsed.filter(
+                  (entry): entry is string => typeof entry === "string",
+                )
+              : [initialDraft.industries];
           } catch {
-            mappedIndustries = [initialDraft.industries as any];
+            mappedIndustries = [initialDraft.industries];
           }
         }
         setIndustries(mappedIndustries);
@@ -236,9 +279,15 @@ export function IdeaWizard({
         setStep("preview");
       } else {
         reset();
+        // Tutorial mode: skip the template chooser and drop the user
+        // straight onto the AI-description step so the tour highlight
+        // has something to point at.
+        if (tutorialMode) {
+          setStep("outline");
+        }
       }
     }
-  }, [isOpen, initialDraft]);
+  }, [isOpen, initialDraft, tutorialMode]);
 
   // ── AI handlers ──
   const handleGenerate = async () => {
@@ -247,7 +296,11 @@ export function IdeaWizard({
     setStep("generating");
     try {
       const result = await generateFromOutline({ outline: outline.trim() });
-      setDescription(outline.trim());
+      // Prefer the AI-generated description; fall back to the user's
+      // outline only if the action returns nothing usable.
+      setDescription(
+        result.description?.trim() ? result.description.trim() : outline.trim(),
+      );
       if (!result.title?.trim()) {
         setAiHadError(true);
         setTitle("");
@@ -347,6 +400,14 @@ export function IdeaWizard({
     generateFromOutline,
   ]);
 
+  // Whether the countdown should be live. The leaf banner owns the
+  // actual timer; we only feed it derived booleans.
+  const countdownActive =
+    tutorialMode &&
+    step === "preview" &&
+    !!title.trim() &&
+    !!description.trim();
+
   // ── Submit ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,6 +424,9 @@ export function IdeaWizard({
       setSubmitError("Description must be 1200 characters or less.");
       return;
     }
+
+    const willCrossPost =
+      visibility === "public" && crossPostTargets.size > 0;
 
     setIsSubmitting(true);
     try {
@@ -419,9 +483,36 @@ export function IdeaWizard({
       }
 
       toast({
-        title: "Idea posted!",
-        description: "Loading your world map…",
+        title: visibility === "public" ? "Idea posted!" : "Saved as private",
+        description:
+          visibility === "public"
+            ? willCrossPost
+              ? "Now pick where else to share it."
+              : "Loading your world map…"
+            : "Only you can see it — toggle to Public any time.",
       });
+
+      // Hand off to the share step. We can't open the platform tabs
+      // here because the click gesture is gone after the awaits above;
+      // browsers would block everything past the first popup. Each
+      // button on the share step opens its own tab from a fresh click.
+      if (willCrossPost) {
+        const origin =
+          typeof window !== "undefined" ? window.location.origin : "";
+        setSharePayload({
+          payload: {
+            title: title.trim(),
+            text: description.trim().slice(0, 600),
+            url: origin ? `${origin}/idea/${newIdeaId}` : undefined,
+          },
+          platforms: Array.from(crossPostTargets),
+          ventureId,
+        });
+        setStep("share");
+        setIsSubmitting(false);
+        return;
+      }
+
       close();
       router.push(`/map/world?ventureId=${ventureId}`);
     } catch (err) {
@@ -442,11 +533,23 @@ export function IdeaWizard({
 
   // ───────────────────────────────────────────────────────────────────────────
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        // Tutorial mode locks the wizard: no Escape, no backdrop click,
+        // no X. The user can only progress via the highlighted button.
+        if (tutorialMode) return;
+        if (!open) close();
+      }}
+    >
       <DialogContent
+        showCloseButton={!tutorialMode}
         className={cn(
           "w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[85dvh] sm:max-h-[90vh]",
         )}
+        onEscapeKeyDown={(e) => tutorialMode && e.preventDefault()}
+        onPointerDownOutside={(e) => tutorialMode && e.preventDefault()}
+        onInteractOutside={(e) => tutorialMode && e.preventDefault()}
       >
         {/* ── STEP 0: Template selector ───────────────────────────────────── */}
         {step === "template" && (
@@ -567,8 +670,16 @@ export function IdeaWizard({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="px-5 py-4">
-              <div className="relative">
+            <div className="flex-1 flex flex-col px-5 py-4 min-h-0">
+              <div className="relative flex-1">
+                {tutorialMode && !outline.trim() && (
+                  <>
+                    <span className="pointer-events-none absolute -inset-1.5 rounded-[14px] border-2 border-amber-300 shadow-[0_0_45px_rgba(251,191,36,0.55)] z-10" />
+                    <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 z-20 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0A0E1A] shadow-[0_8px_24px_rgba(251,191,36,0.5)]">
+                      ↓ Describe your idea
+                    </span>
+                  </>
+                )}
                 <Textarea
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
@@ -614,17 +725,39 @@ export function IdeaWizard({
               <div className="flex gap-2.5">
                 <Button
                   type="button"
+                  variant="outline"
                   onClick={() => {
-                    audioManager.playTouch(
-                      outline.trim() && !isOverOutlineLimit ? "confirm" : "error",
-                    );
-                    if (outline.trim() && !isOverOutlineLimit) handleGenerate();
+                    audioManager.playTouch("click");
+                    close();
                   }}
-                  disabled={!outline.trim() || isOverOutlineLimit}
-                  className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-9 rounded-[10px] border-white/5 bg-[#0D1117] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
                 >
-                  Generate
+                  Cancel
                 </Button>
+                <div className="relative">
+                  {tutorialMode && outline.trim() && (
+                    <>
+                      <span className="pointer-events-none absolute -inset-1.5 rounded-[12px] border-2 border-amber-300 shadow-[0_0_45px_rgba(251,191,36,0.55)]" />
+                      <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0A0E1A] shadow-[0_8px_24px_rgba(251,191,36,0.5)]">
+                        ↓ Tap to generate
+                      </span>
+                    </>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      audioManager.playTouch(
+                        outline.trim() && !isOverOutlineLimit ? "confirm" : "error",
+                      );
+                      if (outline.trim() && !isOverOutlineLimit) handleGenerate();
+                    }}
+                    disabled={!outline.trim() || isOverOutlineLimit}
+                    className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate
+                  </Button>
+                </div>
               </div>
             </div>
           </>
@@ -934,6 +1067,12 @@ export function IdeaWizard({
                 </div>
               </div>
 
+              {/* Cross-post destinations */}
+              <CrossPostSelector
+                selected={crossPostTargets}
+                onChange={setCrossPostTargets}
+              />
+
               {submitError && (
                 <div className="flex items-center gap-2 p-2.5 rounded-[10px] bg-red-500/10 border border-red-500/20">
                   <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
@@ -967,10 +1106,94 @@ export function IdeaWizard({
                   Post Idea
                 </Button>
               </div>
+              {countdownActive && !isSubmitting && (
+                <TutorialCountdownBanner
+                  paused={tutorialPaused}
+                  onTogglePause={() => setTutorialPaused((p) => !p)}
+                  onFire={() => {
+                    void handleSubmit(
+                      { preventDefault: () => {} } as React.FormEvent,
+                    );
+                  }}
+                />
+              )}
             </div>
           </form>
         )}
+
+        {step === "share" && sharePayload && (
+          <div className="flex flex-col w-full max-h-[85dvh] sm:max-h-[90vh] overflow-hidden">
+            <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
+              <DialogTitle
+                className={cn(
+                  displayFontClass,
+                  "text-lg font-semibold text-white",
+                )}
+              >
+                Share your idea
+              </DialogTitle>
+            </DialogHeader>
+            <div className="overflow-y-auto px-5 py-5">
+              <CrossPostSharePanel
+                payload={sharePayload.payload}
+                platforms={sharePayload.platforms}
+                tutorialMode={tutorialMode}
+                onDone={() => {
+                  const vId = sharePayload.ventureId;
+                  setSharePayload(null);
+                  setStep("template");
+                  close();
+                  router.push(`/map/world?ventureId=${vId}`);
+                }}
+              />
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Self-contained 3-second countdown banner. Lives in its own component
+// so the per-second tick only re-renders this banner, not the entire
+// 1000-line wizard.
+function TutorialCountdownBanner({
+  paused,
+  onTogglePause,
+  onFire,
+}: {
+  paused: boolean;
+  onTogglePause: () => void;
+  onFire: () => void;
+}) {
+  const [seconds, setSeconds] = useState(3);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (paused || firedRef.current) return;
+    if (seconds === 0) {
+      firedRef.current = true;
+      onFire();
+      return;
+    }
+    const id = window.setTimeout(() => setSeconds((s) => s - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [seconds, paused, onFire]);
+
+  return (
+    <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-2.5 text-xs">
+      <span className="font-medium text-amber-200">
+        {paused
+          ? "Auto-post paused. Edit anything you want, then hit Post."
+          : `We'll post this for you in ${seconds}s.`}
+      </span>
+      <button
+        type="button"
+        onClick={onTogglePause}
+        className="rounded-lg bg-white/10 px-3 py-1 text-[11px] font-semibold text-white transition hover:bg-white/15"
+      >
+        {paused ? "Resume" : "Pause"}
+      </button>
+    </div>
   );
 }

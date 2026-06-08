@@ -30,6 +30,11 @@ import {
 } from "../utils/asset-packs";
 import { CorruptionRenderer } from "../systems/CorruptionRenderer";
 import { resolveCorruptionProfile } from "../systems/corruptionSystem";
+import { MiniGameSpawnPoint } from "../entities/MiniGameSpawnPoint";
+import {
+  MINIGAME_SPAWNS,
+  type MiniGameSpawnConfig,
+} from "@convex/miniGameConstants";
 import {
   StageEnvironmentBlur,
   type CheckpointWorldPosition,
@@ -281,6 +286,17 @@ const MINE_CP_GRID: [number, number][] = [
 export class WorldMapScene extends Phaser.Scene {
   // Core entities
   private checkpointNodes: Map<string, CheckpointNode>;
+  /**
+   * PRD §2 — easter-egg mini-game spawn points currently mounted in
+   * the scene. Keyed by `MiniGameSpawnConfig.id`. Spawns are mounted
+   * only when their preceding checkpoint is complete (AC1) and removed
+   * the moment they're cleared by this user (AC2).
+   */
+  private miniGameSpawns: Map<string, MiniGameSpawnPoint> = new Map();
+  /** Most recent completed-checkpoint set received from React. */
+  private miniGameCompletedCheckpointIds: Set<string> = new Set();
+  /** Most recent already-cleared spawn-point ids received from React. */
+  private miniGameCompletedSpawnIds: Set<string> = new Set();
   public persona: Persona | null;
   private companions: Map<string, ContributorCompanion> = new Map();
   private bosses: Map<string, BossSilhouette>;
@@ -378,6 +394,10 @@ export class WorldMapScene extends Phaser.Scene {
     bossCombatRetreat?: (event: { stage: number; checkpoint: number }) => void;
     bossFinalOutcome?: (event: { stage: number; outcome: "slay_gold" | "retreat_permanent" }) => void;
     updateCorruption?: (event: { corruptionLevel: number }) => void;
+    minigameSyncState?: (event: {
+      completedCheckpointIds: string[];
+      completedSpawnIds: string[];
+    }) => void;
   };
 
   // Map dimensions — every stage shares the same world frame (40×40 tiles @ 16px).
@@ -481,6 +501,11 @@ export class WorldMapScene extends Phaser.Scene {
     // 2. Create the snake path and checkpoints (needed on startup so nodes are interactive and persona can be positioned)
     this.createSnakePath();
 
+    // 2.5 PRD §2 — re-mount any mini-game spawn points that should be
+    // visible per the most recent state from React. First-time mount
+    // before React syncs is a no-op (both sets empty).
+    this.syncMiniGameSpawns();
+
     // 3. Create the super boss
     this.createSuperBoss();
 
@@ -529,6 +554,7 @@ export class WorldMapScene extends Phaser.Scene {
     this.animationLayer?.destroy(true);
 
     this.checkpointNodes.clear();
+    this.miniGameSpawns.clear(); // PRD §2 — rebuild on template switch
     this.bosses.clear();
     this.miniBosses.clear();
     this.biomeContainers.clear();
@@ -6558,6 +6584,87 @@ export class WorldMapScene extends Phaser.Scene {
     });
   }
 
+  // ───────────────────────────────────────────────────────────────
+  // PRD §2 — Mini-game easter-egg spawn points
+  // ───────────────────────────────────────────────────────────────
+
+  /**
+   * (Re)mount mini-game spawn entities. Honours gating per PRD §2.3.1
+   * AC1 — a spawn renders only when the checkpoint preceding its
+   * stage segment is in the user's completed set. Already-cleared
+   * spawn ids (PRD AC2 idempotency) are skipped entirely.
+   *
+   * Safe to call multiple times — it diffs against the current spawn
+   * map and only mounts new ones.
+   */
+  private syncMiniGameSpawns(): void {
+    // PRD §2 v1.1 — the floating-dot easter-egg UX read as visually
+    // noisy alongside the snake-path checkpoints. Mini-games are now
+    // launched from a dedicated sidebar panel instead of being
+    // discovered on the map. The MINIGAME_SPAWNS catalogue and the
+    // session/completion backend are unchanged — the only thing
+    // suppressed is the in-world rendering.
+    //
+    // To bring the on-map discovery back, re-enable the spawn-mount
+    // loop below.
+    for (const [id, spawn] of this.miniGameSpawns) {
+      spawn.hide();
+      this.miniGameSpawns.delete(id);
+    }
+  }
+
+  /**
+   * A spawn is gated on its "preceding" checkpoint. We use the first
+   * checkpoint in the spawn's stage as that gate — a spawn in stage 3
+   * only appears once stage 3's first checkpoint is complete, i.e.
+   * the player has demonstrably reached that segment. For stage 1
+   * spawns there's no preceding stage; we treat them as unlocked.
+   */
+  private isMiniGameSpawnUnlocked(cfg: MiniGameSpawnConfig): boolean {
+    if (cfg.stage <= 1) return true;
+    const gateId = `${cfg.stage - 1}-${this.checkpointsPerStage(cfg.stage - 1)}`;
+    return this.miniGameCompletedCheckpointIds.has(gateId);
+  }
+
+  /** Look up how many checkpoints stage `stageId` has. */
+  private checkpointsPerStage(stageId: number): number {
+    const stage = this.activeStages.find((s) => s.id === stageId);
+    return stage?.checkpoints ?? 1;
+  }
+
+  /**
+   * Bridge a spawn-activate event into the React layer. The page-level
+   * `useMiniGameLifecycle` hook calls `engageWithSpawn` when it sees
+   * this dispatch, which mounts the prompt dialog.
+   */
+  private handleMiniGameSpawnActivated(cfg: MiniGameSpawnConfig): void {
+    eventBridge.dispatchToReact({
+      type: "MINIGAME_SPAWN_ACTIVATED",
+      spawnPointId: cfg.id,
+      stage: cfg.stage,
+      archetype: cfg.archetype,
+      difficulty: cfg.difficulty,
+      x: cfg.x,
+      y: cfg.y,
+      flavorText: cfg.flavorText,
+    });
+  }
+
+  /**
+   * Receive the latest completed-checkpoint + completed-spawn sets
+   * from React. Recomputes which spawns should currently be mounted.
+   *
+   * Wired in `subscribeToReactEvents` to the MINIGAME_SYNC_STATE event.
+   */
+  private receiveMiniGameSyncState(payload: {
+    completedCheckpointIds: string[];
+    completedSpawnIds: string[];
+  }): void {
+    this.miniGameCompletedCheckpointIds = new Set(payload.completedCheckpointIds);
+    this.miniGameCompletedSpawnIds = new Set(payload.completedSpawnIds);
+    this.syncMiniGameSpawns();
+  }
+
   private drawSnakePathConnectors(positions: { x: number; y: number }[]): void {
     let offset = 0;
 
@@ -6634,10 +6741,12 @@ export class WorldMapScene extends Phaser.Scene {
   ): void {
     const stageX = (stage - 1) * this.BIOME_WIDTH;
 
-    // Stage 5 (Mine) has special ember/fog effects
+    // Particle counts are halved from the original and tween starts are
+    // staggered across 0-1200ms so we don't queue 100+ simultaneous
+    // tweens on the same frame (was a visible stutter on stage entry).
     if (stage === 5) {
       // Dark fog particles that swirl and dissipate
-      for (let i = 0; i < 25; i += 1) {
+      for (let i = 0; i < 12; i += 1) {
         const fog = this.add.circle(
           stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
           Phaser.Math.Between(100, 500),
@@ -6654,6 +6763,7 @@ export class WorldMapScene extends Phaser.Scene {
           y: fog.y + Phaser.Math.Between(-80, 80),
           alpha: 0,
           scale: { from: 1, to: 2 },
+          delay: i * 60,
           duration: Phaser.Math.Between(2000, 3000),
           ease: "Cubic.easeOut",
           onComplete: () => fog.destroy(),
@@ -6661,7 +6771,7 @@ export class WorldMapScene extends Phaser.Scene {
       }
 
       // Glowing embers rising from the ground
-      for (let i = 0; i < 40; i += 1) {
+      for (let i = 0; i < 20; i += 1) {
         const ember = this.add.circle(
           stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
           600,
@@ -6677,6 +6787,7 @@ export class WorldMapScene extends Phaser.Scene {
           y: ember.y - Phaser.Math.Between(200, 400),
           alpha: 0,
           scale: 0.3,
+          delay: i * 50,
           duration: Phaser.Math.Between(1500, 2500),
           ease: "Sine.easeIn",
           onComplete: () => ember.destroy(),
@@ -6684,7 +6795,7 @@ export class WorldMapScene extends Phaser.Scene {
       }
     } else {
       // Default weather effect for other stages (clouds)
-      for (let i = 0; i < 18; i += 1) {
+      for (let i = 0; i < 10; i += 1) {
         const cloud = this.add.container(
           stageX + Phaser.Math.Between(80, this.BIOME_WIDTH - 80),
           Phaser.Math.Between(120, 360),
@@ -6706,6 +6817,7 @@ export class WorldMapScene extends Phaser.Scene {
           x: cloud.x + Phaser.Math.Between(90, 180),
           y: cloud.y + Phaser.Math.Between(-16, 28),
           alpha: 0,
+          delay: i * 80,
           duration: Phaser.Math.Between(1300, 2100),
           ease: "Sine.easeOut",
           onComplete: () => cloud.destroy(),
@@ -6713,8 +6825,8 @@ export class WorldMapScene extends Phaser.Scene {
       }
     }
 
-    // Common flake effect
-    for (let i = 0; i < 90; i += 1) {
+    // Common flake effect — halved + staggered.
+    for (let i = 0; i < 45; i += 1) {
       const flake = this.add.circle(
         stageX + Phaser.Math.Between(40, this.BIOME_WIDTH - 40),
         Phaser.Math.Between(80, 420),
@@ -6731,6 +6843,7 @@ export class WorldMapScene extends Phaser.Scene {
         y: flake.y + Phaser.Math.Between(180, 360),
         alpha: 0,
         scale: 0.35,
+        delay: i * 26,
         duration: Phaser.Math.Between(1200, 2400),
         ease: "Sine.easeIn",
         onComplete: () => flake.destroy(),
@@ -7014,6 +7127,9 @@ export class WorldMapScene extends Phaser.Scene {
       this.handleBossFinalOutcome.bind(this);
     this.boundHandlers.updateCorruption =
       this.handleUpdateCorruption.bind(this);
+    // PRD §2 — mini-game state sync from React
+    this.boundHandlers.minigameSyncState =
+      this.receiveMiniGameSyncState.bind(this);
 
     eventBridge.onPhaser(
       "UPDATE_BRIGHTNESS",
@@ -7059,6 +7175,10 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "UPDATE_CORRUPTION",
       this.boundHandlers.updateCorruption,
+    );
+    eventBridge.onPhaser(
+      "MINIGAME_SYNC_STATE",
+      this.boundHandlers.minigameSyncState,
     );
 
     // Handle checkpoint clicks (emitted by CheckpointNode)
@@ -8111,29 +8231,73 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   /**
-   * Update loop - handles parallax scrolling
+   * Update loop - handles parallax scrolling and per-frame ticks.
+   * Iteration of entities is frustum-culled so off-screen objects don't
+   * burn CPU on Math.sqrt distance calcs or label fade timers.
    */
   update(): void {
     this.checkBiomeLoading();
     this.emitTutorialPulsePosition();
 
-    // Update jumping monkeys in Stage 2 forest
+    // Visible world rect plus a 200px margin so entities just outside
+    // the camera still get a tick (keeps walk-on animations smooth).
+    const view = this.cameras.main.worldView;
+    const viewLeft = view.x - 200;
+    const viewTop = view.y - 200;
+    const viewRight = view.x + view.width + 200;
+    const viewBottom = view.y + view.height + 200;
+    const inView = (x: number, y: number): boolean =>
+      x >= viewLeft && x <= viewRight && y >= viewTop && y <= viewBottom;
+
+    // Update jumping monkeys in Stage 2 forest — only those on screen.
     if (this.monkeys && this.monkeys.length > 0) {
-      this.monkeys.forEach((monkey) => monkey.update());
+      for (const monkey of this.monkeys) {
+        if (inView(monkey.x ?? 0, monkey.y ?? 0)) monkey.update();
+      }
     }
 
-    // Update accepted contributor companion sprites follow tracking
+    // Companion follow tracking. Companions far from the camera don't
+    // need per-frame LERP, the next update when the persona enters
+    // range will snap them into the orbit.
     if (this.persona && this.companions && this.companions.size > 0) {
       const totalCompanions = this.companions.size;
       let index = 0;
       this.companions.forEach((companion) => {
-        companion.updateCompanion(
-          this.persona!.x,
-          this.persona!.y,
-          index,
-          totalCompanions,
-        );
+        // Companion sprite may be at companion.x/companion.y or under
+        // companion.sprite; check whichever is exposed.
+        const cx =
+          (companion as unknown as { x?: number }).x ?? this.persona!.x;
+        const cy =
+          (companion as unknown as { y?: number }).y ?? this.persona!.y;
+        if (inView(cx, cy) || inView(this.persona!.x, this.persona!.y)) {
+          companion.updateCompanion(
+            this.persona!.x,
+            this.persona!.y,
+            index,
+            totalCompanions,
+          );
+        }
         index++;
+      });
+    }
+
+    // PRD §2 — tick mini-game spawn points so the "?" label fades in
+    // when the player enters interaction range. Skip ones the player
+    // is nowhere near (>800px away).
+    if (this.persona && this.miniGameSpawns.size > 0) {
+      const px = this.persona.x;
+      const py = this.persona.y;
+      this.miniGameSpawns.forEach((spawn) => {
+        const sx = (spawn as unknown as { x?: number }).x;
+        const sy = (spawn as unknown as { y?: number }).y;
+        if (typeof sx !== "number" || typeof sy !== "number") {
+          spawn.update(px, py);
+          return;
+        }
+        const dx = sx - px;
+        const dy = sy - py;
+        if (dx * dx + dy * dy > 640000) return; // 800² — out of range
+        spawn.update(px, py);
       });
     }
   }
@@ -8150,7 +8314,11 @@ export class WorldMapScene extends Phaser.Scene {
     }
 
     const now = this.time.now;
-    if (now - this.lastEmitTime < 100) {
+    // Throttled to 500ms (~2 Hz). The pulse overlay tracks the
+    // checkpoint visually via CSS easing on the React side, so we
+    // don't need higher fidelity than this. Drops the React state
+    // churn from ~10 Hz to 2 Hz.
+    if (now - this.lastEmitTime < 500) {
       return;
     }
     this.lastEmitTime = now;
@@ -8159,10 +8327,11 @@ export class WorldMapScene extends Phaser.Scene {
     const screenX = (firstNode.x - camera.worldView.x) * camera.zoom;
     const screenY = (firstNode.y - camera.worldView.y) * camera.zoom;
 
-    // Only dispatch if coordinates or visibility actually changed
+    // Only dispatch if coordinates moved >4px or visibility flipped.
+    // Sub-pixel jitter from camera easing would otherwise spam React.
     if (
-      Math.abs(screenX - this.lastEmitX) < 1 &&
-      Math.abs(screenY - this.lastEmitY) < 1 &&
+      Math.abs(screenX - this.lastEmitX) < 4 &&
+      Math.abs(screenY - this.lastEmitY) < 4 &&
       isPulseActive === this.lastEmitVisible
     ) {
       return;

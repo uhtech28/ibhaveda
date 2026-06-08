@@ -162,7 +162,24 @@ export type ReactToPhaserEvent =
   /** Final boss outcome at stage completion — slain (gold) or retreated permanently */
   | { type: "BOSS_FINAL_OUTCOME"; stage: number; outcome: "slay_gold" | "retreat_permanent" }
   /** Live corruption meter sync (0–100) — updates map visuals without full venture reload */
-  | { type: "UPDATE_CORRUPTION"; corruptionLevel: number };
+  | { type: "UPDATE_CORRUPTION"; corruptionLevel: number }
+  /**
+   * PRD §2 — sync the mini-game state to the Phaser scene.
+   *
+   *   - `completedCheckpointIds` enumerates which checkpoints the user
+   *     has already cleared. A spawn only renders if the checkpoint
+   *     preceding its segment is in this list (AC1: easter eggs appear
+   *     only in already-brightened world).
+   *   - `completedSpawnIds` enumerates which spawns the user has
+   *     already cleared. Those spawns hide themselves (AC2).
+   *
+   * Dispatched on world-map mount and whenever either set changes.
+   */
+  | {
+      type: "MINIGAME_SYNC_STATE";
+      completedCheckpointIds: string[];
+      completedSpawnIds: string[];
+    };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phaser → React events
@@ -245,6 +262,20 @@ export type PhaserToReactEvent =
         xp: number;
         isOnline: boolean;
       };
+    }
+  /**
+   * PRD §2 — a mini-game easter-egg spawn was activated. React should
+   * show the prompt dialog via `useMiniGameLifecycle.engageWithSpawn`.
+   */
+  | {
+      type: "MINIGAME_SPAWN_ACTIVATED";
+      spawnPointId: string;
+      stage: number;
+      archetype: "pattern_match" | "reflex_tap" | "decrypt";
+      difficulty: 1 | 2 | 3 | 4 | 5;
+      x: number;
+      y: number;
+      flavorText?: string;
     };
 
 // ─────────────────────────────────────────────────────────────────────────────

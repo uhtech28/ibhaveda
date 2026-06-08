@@ -50,3 +50,9 @@ next-env.d.ts
 /.clerk/
 .agent/
 .agents/
+
+# local-only scratch files from PRD 3.0 development
+.env.local.prod-backup
+.env.local.testing-backup
+convex-output.log
+convex-transcript.txt

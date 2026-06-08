@@ -74,6 +74,13 @@ crons.daily(
   api.agent_actions.backfillAgentEngagement,
 );
 
+// Schedule: Weekly League Promotion / Relegation (Monday 00:00 UTC)
+crons.weekly(
+  "Weekly League Promotion",
+  { dayOfWeek: "monday", hourUTC: 0, minuteUTC: 0 },
+  api.leagues.runWeeklyPromotion,
+);
+
 // One-time XP backfill: runs hourly until all agents have XP, then becomes a no-op
 crons.hourly(
   "Backfill Agent XP",

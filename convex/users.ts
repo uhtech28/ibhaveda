@@ -98,11 +98,15 @@ export const createUserProfile = mutation({
 
       // Validate and normalize username (case-insensitive uniqueness)
       const normalizedUsername = args.username.toLowerCase().trim()
-      if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
-        throw new Error("Invalid username: Username must be between 3 and 20 characters long")
+      if (normalizedUsername.length < 3 || normalizedUsername.length > 30) {
+        throw new Error("Invalid username: Username must be between 3 and 30 characters long")
       }
-      if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
-        throw new Error("Invalid username: Username can only contain letters, numbers, and underscores")
+      // Permissive — allow special characters. Only block whitespace
+      // and URL-routing chars that would break links/route params.
+      if (!/^[^\s\/\\?#&=:@<>"'`]+$/.test(normalizedUsername)) {
+        throw new Error(
+          "Invalid username: Username can't contain spaces or URL-reserved chars (/ ? # & = : @ < > \" ')",
+        )
       }
 
       // Check for existing username (case-insensitive)
@@ -879,6 +883,50 @@ export const generateUsernameSuggestions = query({
 })
 
 // Update user persona gender - one-time selection
+export const setBuilderRole = mutation({
+  args: {
+    role: v.union(
+      v.literal("founder"),
+      v.literal("engineer"),
+      v.literal("designer"),
+      v.literal("student"),
+      v.literal("researcher"),
+      v.literal("pm"),
+    ),
+  },
+  handler: async ({ db, auth }, args) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!profile) throw new Error("User profile not found");
+
+    await db.patch(profile._id, {
+      builderRole: args.role,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+export const getMyBuilderRole = query({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    return profile?.builderRole ?? null;
+  },
+});
+
 export const updatePersonaGender = mutation({
   args: {
     gender: v.union(v.literal("male"), v.literal("female")),

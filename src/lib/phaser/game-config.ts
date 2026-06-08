@@ -94,7 +94,12 @@ export function createGameConfig(
       forceSetTimeOut: false,
     },
     audio: {
-      disableWebAudio: false,
+      // The world map has no audio cues — all UX sounds run through
+      // audioManager (HTMLAudio). Disabling Phaser's WebAudio path
+      // avoids "Cannot suspend a closed AudioContext" errors when the
+      // game pauses/resumes during dialog overlays (CombatPanel,
+      // CheckpointPanel, mini-game spawns).
+      noAudio: true,
     },
   };
 }

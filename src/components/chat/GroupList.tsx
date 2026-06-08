@@ -12,6 +12,34 @@ import { formatDistanceToNow } from "date-fns";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { NewDirectMessagePanel } from "./NewDirectMessageDialog";
 
+/**
+ * Inbox preview text for a conversation's most-recent message.
+ *
+ * Plain text → "Hello there" / "You: Hello"
+ * Image with caption → "📷 Caption text"
+ * Image without caption → "📷 Photo"
+ * Empty / missing → "No messages yet"
+ */
+function previewForLastMessage(
+  m:
+    | {
+        content?: string | null;
+        messageType?: string;
+        isFromMe?: boolean;
+      }
+    | null
+    | undefined,
+): string {
+  if (!m) return "No messages yet";
+  const prefix = m.isFromMe ? "You: " : "";
+  const trimmed = (m.content ?? "").trim();
+  if (m.messageType === "image") {
+    return `${prefix}📷 ${trimmed || "Photo"}`;
+  }
+  if (!trimmed) return "No messages yet";
+  return `${prefix}${trimmed}`;
+}
+
 interface GroupListProps {
   onSelectGroup?: (conversationId: Id<"conversations"> | undefined, ideaId: Id<"ideas">) => void;
   onClose: () => void;
@@ -133,7 +161,13 @@ const GroupList: React.FC<GroupListProps> = memo(({ onClose }) => {
                   <p className="text-xs mt-1 opacity-70">Tap the + button below to find people and start chatting.</p>
                 </div>
               ) : (
-                directConversations.map((convo) => (
+                // Defensive dedupe — the server query already dedupes,
+                // but if any legacy duplicate slips through (self-DM
+                // rows can flip participant1/2), we still want a stable
+                // unique key per row to avoid React warnings.
+                Array.from(
+                  new Map(directConversations.map((c) => [String(c._id), c])).values(),
+                ).map((convo) => (
                   <Button
                     key={convo._id}
                     variant="ghost"
@@ -161,7 +195,7 @@ const GroupList: React.FC<GroupListProps> = memo(({ onClose }) => {
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {convo.lastMessage?.content || 'No messages yet'}
+                        {previewForLastMessage(convo.lastMessage)}
                       </div>
                     </div>
                   </Button>

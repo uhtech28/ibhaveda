@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { MessageCircle, UserPlus, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import type { Id } from "@convex/_generated/dataModel";
+import { SparkersDialog, ContributorsDialog } from "@/components/engagement";
 
 export type ConvexIdea = {
   _id: string;
@@ -46,6 +48,10 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
   onCommentClick,
   onContributeClick
 }) => {
+  // PRD §8 — popup state for "who sparked" and "who's contributing"
+  const [sparkersOpen, setSparkersOpen] = useState(false);
+  const [contributorsOpen, setContributorsOpen] = useState(false);
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -262,9 +268,11 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // TODO: Show list of sparkers
+                  if ((idea.sparkCount || 0) > 0) setSparkersOpen(true);
                 }}
-                className="text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:underline min-w-[12px] text-center"
+                disabled={(idea.sparkCount || 0) === 0}
+                className="text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:underline min-w-[12px] text-center disabled:cursor-default disabled:no-underline disabled:hover:text-muted-foreground"
+                title={(idea.sparkCount || 0) > 0 ? "See who sparked this" : undefined}
               >
                 {idea.sparkCount || 0}
               </button>
@@ -305,14 +313,31 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
               >
                 <UserPlus className="w-4 h-4" />
               </button>
-              <span className="text-[11px] font-semibold text-muted-foreground min-w-[12px] text-center tabular-nums">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setContributorsOpen(true);
+                }}
+                className="text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:underline min-w-[12px] text-center tabular-nums"
+                title="See contributors"
+              >
                 {contributorsCount}
-              </span>
+              </button>
             </div>
 
           </div>
         </div>
       </div>
+
+      {/* PRD §8 — engagement popups */}
+      <SparkersDialog
+        ideaId={sparkersOpen ? (idea._id as Id<"ideas">) : null}
+        onOpenChange={(open) => setSparkersOpen(open)}
+      />
+      <ContributorsDialog
+        ideaId={contributorsOpen ? (idea._id as Id<"ideas">) : null}
+        onOpenChange={(open) => setContributorsOpen(open)}
+      />
     </div>
   );
 }, (prevProps, nextProps) => {

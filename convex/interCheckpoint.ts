@@ -205,6 +205,67 @@ export const getInterCheckpointResources = query({
  * outcome: "retreat" — player failed, no penalty (boss health unaffected)
  * outcome: "skipped" — player paid Gold to skip
  */
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt-security gate for henchman encounters.
+// Mirrors the text-only signals from aiScoring so the boss challenge can't be
+// trivially defeated with a copy-pasted ChatGPT paragraph.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HENCHMAN_AI_DETECTION_THRESHOLD = 0.4;
+
+const HENCHMAN_AI_FLAG_PHRASES: readonly string[] = [
+  "furthermore", "moreover", "in conclusion", "in summary",
+  "it is important to note", "it's worth noting", "it should be noted",
+  "on the one hand", "on the other hand", "that being said",
+  "comprehensive understanding", "comprehensive suite",
+  "multifaceted approach", "multifaceted needs",
+  "paradigm shift", "leverage synergies", "leverages cutting-edge",
+  "leveraging cutting-edge", "robust framework", "robust customer engagement",
+  "user-centric approach", "user-centric design",
+  "data-driven insights", "data-driven decisions",
+  "harnessing the power", "harness the power",
+  "cutting-edge artificial intelligence", "machine learning algorithms",
+  "deliver exceptional value", "exceptional value to", "delivering exceptional",
+  "rapidly evolving digital landscape", "rapidly evolving landscape",
+  "ever-rising consumer expectations",
+  "in today's competitive", "in today's rapidly evolving", "in today's digital",
+  "in the realm of", "navigate the complexities", "tapestry of", "delve into",
+  "unlock new growth", "unlock the potential",
+  "streamline their workflows", "streamline operations",
+  "thrive in an increasingly competitive", "commitment to excellence",
+  "innovative platform", "innovative solution", "innovative approach",
+  "revolutionize how", "transform the way",
+];
+
+function henchmanAiConfidence(text: string): number {
+  const trimmed = text.trim();
+  if (trimmed.length < 30) return 0;
+  const lower = trimmed.toLowerCase();
+  let hits = 0;
+  for (const phrase of HENCHMAN_AI_FLAG_PHRASES) {
+    if (lower.includes(phrase)) hits++;
+  }
+  const vocab = Math.min(1, hits / 4);
+  const sentences = trimmed
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  let burstiness = 0;
+  if (sentences.length >= 3) {
+    const wordCounts = sentences.map((s) => s.split(/\s+/).length);
+    const mean = wordCounts.reduce((a, b) => a + b, 0) / wordCounts.length;
+    if (mean > 0) {
+      const variance =
+        wordCounts.reduce((acc, w) => acc + (w - mean) ** 2, 0) /
+        wordCounts.length;
+      const cv = Math.sqrt(variance) / mean;
+      if (cv <= 0.15) burstiness = 1;
+      else if (cv < 0.5) burstiness = 1 - (cv - 0.15) / (0.5 - 0.15);
+    }
+  }
+  return vocab * 0.6 + burstiness * 0.4;
+}
+
 export const resolveHenchmanEncounter = mutation({
   args: {
     ventureId: v.id("ventures"),
@@ -212,11 +273,108 @@ export const resolveHenchmanEncounter = mutation({
     checkpoint: v.number(),
     outcome: v.union(v.literal("victory"), v.literal("retreat"), v.literal("skipped")),
     henchmanName: v.string(),
+    // Server-side anti-cheat — optional for backward compatibility with
+    // older client builds, but new client sends it on every victory submit.
+    answerText: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     const venture = await ctx.db.get(args.ventureId);
     if (!venture) return null;
+
+    // Prompt-security gate: if the user submits a "victory" with an
+    // AI-generated paragraph, downgrade the outcome to a retreat with
+    // a flag so the front-end can show the AntiCheatWarning.
+    //
+    // 2-strike policy mirrors the combat anti-cheat:
+    //   strike 1 → warn user, no rewards
+    //   strike 2 → permanent account suspension via userAccountSuspensions
+    if (args.outcome === "victory" && args.answerText) {
+      const confidence = henchmanAiConfidence(args.answerText);
+      if (confidence >= HENCHMAN_AI_DETECTION_THRESHOLD) {
+        // Check whether the user is already banned (defensive — the
+        // client should already gate this, but a stale tab could try).
+        const activeBan = await ctx.db
+          .query("userAccountSuspensions")
+          .withIndex("by_user_active", (q) => q.eq("userId", venture.userId))
+          .order("desc")
+          .first();
+        if (
+          activeBan &&
+          (activeBan.isPermanent || activeBan.banEndAt > now)
+        ) {
+          return {
+            xpEarned: 0,
+            corruptionReduction: 0,
+            aiDetected: true,
+            aiConfidence: Math.round(confidence * 1000) / 1000,
+            banned: true,
+            message:
+              "Your account is suspended for repeated AI-generated submissions. Contact support if you believe this is an error.",
+          } as const;
+        }
+
+        // Count this user's prior AI-detection strikes (any henchman or
+        // combat anti-cheat event). Re-use `combatAiSuspicions` as the
+        // shared "strike record" table to keep policy unified.
+        const priorStrikes = await ctx.db
+          .query("combatAiSuspicions")
+          .withIndex("by_user", (q) => q.eq("userId", venture.userId))
+          .collect();
+        const strikeNumber = priorStrikes.length + 1;
+
+        // Record this offense in the shared strike table.
+        await ctx.db.insert("combatAiSuspicions", {
+          userId: venture.userId,
+          source: "henchman_encounter",
+          confidence,
+          signals: ["vocabulary_fingerprint", "burstiness"],
+          detectedAt: now,
+          action: strikeNumber >= 2 ? "ban" : "warning",
+          textSample: args.answerText.slice(0, 500),
+        });
+
+        if (strikeNumber >= 2) {
+          // Permanent ban — matches combat anti-cheat second-offense policy.
+          await ctx.db.insert("userAccountSuspensions", {
+            userId: venture.userId,
+            reason: `AI-generated submission detected — strike ${strikeNumber}. Confidence ${confidence.toFixed(3)}.`,
+            scope: "account",
+            isPermanent: true,
+            banStartAt: now,
+            banEndAt: now + 100 * 365 * 24 * 60 * 60 * 1000, // ~100 years
+          });
+          return {
+            xpEarned: 0,
+            corruptionReduction: 0,
+            aiDetected: true,
+            aiConfidence: Math.round(confidence * 1000) / 1000,
+            banned: true,
+            strikeNumber,
+            message:
+              "🛑 ACCOUNT PERMANENTLY SUSPENDED\n\n" +
+              "This is your second confirmed AI-generated submission. Per the platform's prompt-security policy, your account has been suspended permanently.\n\n" +
+              "All progress, ventures, and rewards are frozen. Contact support if you believe this is an error.",
+          } as const;
+        }
+
+        return {
+          xpEarned: 0,
+          corruptionReduction: 0,
+          aiDetected: true,
+          aiConfidence: Math.round(confidence * 1000) / 1000,
+          strikeNumber,
+          message:
+            "⚠️ FINAL WARNING — AI-generated submission detected\n\n" +
+            "We use server-side prompt-security analysis to keep the platform fair. " +
+            "Your submission matched the AI-generated profile (no original phrasing, uniform sentence structure, marketing-buzzword density).\n\n" +
+            "Strike 1 of 2. " +
+            "If we detect another AI-generated submission anywhere on the platform — combat, tasks, or boss encounters — your account will be PERMANENTLY SUSPENDED. " +
+            "No second chances, no appeals.\n\n" +
+            "Rewrite your answer in your own words: concrete, specific, grounded in your own experience or research.",
+        } as const;
+      }
+    }
 
     const xpEarned = args.outcome === "victory" ? 75 : args.outcome === "skipped" ? 0 : 25; // retreat gives 25 XP for trying
     const corruptionReduction = args.outcome === "victory" ? 3 : 0;

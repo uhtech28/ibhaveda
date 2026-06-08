@@ -28,6 +28,7 @@ import { computeCumulativeVentureScores } from "@/lib/scoring/cumulativeVentureS
 import { api } from "@convex/_generated/api";
 import { LEVEL_DEFINITIONS } from "@convex/ventureConstants";
 import type { Id } from "@convex/_generated/dataModel";
+import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import {
   buildCheckpointSyncSignature,
@@ -37,6 +38,7 @@ import { CommentsSection } from "@/components/comments/CommentsSection";
 import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords, Zap } from "lucide-react";
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
+import { CombatPanel } from "@/components/combat/CombatPanel";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
@@ -85,6 +87,14 @@ import {
   templateIdAtom,
   templateMetricAtom,
 } from "@/lib/stores/hudStore";
+import { useMiniGameLifecycle } from "@/lib/minigames/useMiniGameLifecycle";
+import {
+  MiniGameOverlay,
+  MiniGamePromptDialog,
+  MiniGameResultPanel,
+  MiniGamesPanel,
+} from "@/components/minigames";
+import { MINIGAME_SPAWNS } from "@convex/miniGameConstants";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -504,6 +514,7 @@ function CheckpointPanel({
   showBossGateHint = false,
   isCurrentMapCheckpoint = false,
   totalCheckpointsInStage = 4,
+  tourActive = false,
 }: {
   detail: CheckpointDetail | null;
   onClose: () => void;
@@ -513,6 +524,9 @@ function CheckpointPanel({
   showBossGateHint?: boolean;
   isCurrentMapCheckpoint?: boolean;
   totalCheckpointsInStage?: number;
+  /** First-run product tour active. Relaxes the advance threshold so
+   *  the user can fight the Doubt Imp after a single task submission. */
+  tourActive?: boolean;
   evaluationSummary?: Array<{
     taskLevel: "t1" | "t2" | "t3";
     taskStatus: string;
@@ -531,7 +545,9 @@ function CheckpointPanel({
 
   const totalTasks = detail.tasks.length;
   const doneTasks = detail.tasks.filter((t) => t.done).length;
-  const canAdvance = doneTasks >= 2;
+  // First-run tour users can advance after their very first submission so
+  // they reach the Doubt Imp combat without grinding the full checkpoint.
+  const canAdvance = doneTasks >= 2 || (tourActive && doneTasks >= 1);
   const isGold = doneTasks >= totalTasks && totalTasks > 0;
   const isLocked = detail.status === "locked";
   const bossEncounterNumber = detail.checkpointIndex;
@@ -589,25 +605,39 @@ function CheckpointPanel({
 
             {/* Tasks */}
             <div className="flex flex-col gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3">
-              {detail.tasks.map((task, i) => (
-                <TaskCard
-                  key={i}
-                  task={task}
-                  index={i}
-                  locked={isLocked}
-                  evaluationSummary={evaluationSummary?.find(
-                    (entry) => entry.taskLevel === task._taskLevel,
-                  )}
-                  onToggle={() => {
-                    audioManager.playTouch("click");
-                    onTaskToggle(i);
-                  }}
-                  onRedo={() => {
-                    audioManager.playTouch("click");
-                    onTaskRedo(i);
-                  }}
-                />
-              ))}
+              {detail.tasks.map((task, i) => {
+                // Mark the first not-yet-done task so the product tour
+                // can pulse its highlight ring around it.
+                const isFirstOpenTask =
+                  !task.done &&
+                  !isLocked &&
+                  detail.tasks.findIndex((t) => !t.done) === i;
+                return (
+                  <div
+                    key={i}
+                    {...(isFirstOpenTask
+                      ? { "data-tutorial": "first-task" }
+                      : {})}
+                  >
+                    <TaskCard
+                      task={task}
+                      index={i}
+                      locked={isLocked}
+                      evaluationSummary={evaluationSummary?.find(
+                        (entry) => entry.taskLevel === task._taskLevel,
+                      )}
+                      onToggle={() => {
+                        audioManager.playTouch("click");
+                        onTaskToggle(i);
+                      }}
+                      onRedo={() => {
+                        audioManager.playTouch("click");
+                        onTaskRedo(i);
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
           </div>
@@ -621,6 +651,7 @@ function CheckpointPanel({
                   </div>
                 )}
                 <motion.button
+                  data-tutorial={canAdvance ? "combat-trigger" : undefined}
                   onClick={() => {
                     audioManager.playTouch(canAdvance ? "confirm" : "error");
                     if (canAdvance && !isAdvancing) onAdvance();
@@ -1443,6 +1474,9 @@ function MapPageInner() {
 
   // Group chat popup modal state
   const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
+  // PRD §2 v1.1 — sidebar-driven mini-games panel (replaced the
+  // floating-dot easter-egg UX on the world map).
+  const [isMiniGamesPanelOpen, setIsMiniGamesPanelOpen] = useState(false);
   const [isContributorsOpen, setIsContributorsOpen] = useState(false);
   const [isContributionsOpen, setIsContributionsOpen] = useState(false);
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
@@ -1575,6 +1609,9 @@ function MapPageInner() {
 
   // Tour walkthrough state
   const [showTour, setShowTour] = useState(false);
+  // New product-tour state. Used to suppress the legacy WorldMapTour
+  // and to drive the first-checkpoint pulse for first-run users.
+  const tourStateForPulse = useQuery(api.tutorial.getMyFeedTutorialState, {});
 
   // Inter-checkpoint events state
   const [interCheckpointQueue, setInterCheckpointQueue] = useState<Array<"henchman" | "treasure" | "shield" | "insight" | "clear">>([]);
@@ -1591,6 +1628,54 @@ function MapPageInner() {
     isLastInStage: boolean;
     isGold: boolean;
   } | null>(null);
+
+  // HP-based Cross-Question Combat round id, fetched when boss combat target is set.
+  const [activeCombatRoundId, setActiveCombatRoundId] = useState<string | null>(null);
+  const [combatStartError, setCombatStartError] = useState<string | null>(null);
+  const startCombatRoundMutation = useMutation(api.combat.startCombatRound);
+
+  useEffect(() => {
+    if (!bossCombatTarget) {
+      setActiveCombatRoundId(null);
+      setCombatStartError(null);
+      return;
+    }
+    let cancelled = false;
+    setCombatStartError(null);
+    (async () => {
+      try {
+        const result = await startCombatRoundMutation({
+          checkpointId: bossCombatTarget.checkpointId as Id<"ventureCheckpoints">,
+        });
+        if (!cancelled) setActiveCombatRoundId(result.roundId);
+      } catch (err) {
+        if (!cancelled) {
+          setCombatStartError(
+            err instanceof Error ? err.message : "Failed to start combat",
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bossCombatTarget, startCombatRoundMutation]);
+
+  // CombatPanel emits a `combat:retry-started` window event when the
+  // player clicks "Retry Combat" on the defeat screen. The event detail
+  // carries the new roundId from the server. We swap the active round
+  // id here so the panel remounts with the new round and a fresh first
+  // question.
+  useEffect(() => {
+    const onRetry = (e: Event) => {
+      const detail = (e as CustomEvent<{ newRoundId: string }>).detail;
+      if (detail?.newRoundId) {
+        setActiveCombatRoundId(detail.newRoundId);
+      }
+    };
+    window.addEventListener("combat:retry-started", onRetry);
+    return () => window.removeEventListener("combat:retry-started", onRetry);
+  }, []);
 
   const dismissBossCombatVisual = useCallback((stage: number) => {
     eventBridge.dispatchToPhaser({
@@ -1612,7 +1697,18 @@ function MapPageInner() {
 
   useEffect(() => {
     if (!activeVenture) return;
-    // Only automatically show the tour guide on Stage 1
+    // Suppress the legacy WorldMapTour whenever the new product tour
+    // is (or might be) running. Treat undefined/null tour state as
+    // "still loading, assume new tour" so the legacy overlay never
+    // appears before the convex query resolves.
+    const newTourActive =
+      !tourStateForPulse ||
+      tourStateForPulse.state === "not_started" ||
+      tourStateForPulse.state === "in_progress";
+    if (newTourActive) {
+      if (showTour) setShowTour(false);
+      return;
+    }
     if (activeVenture.currentStage !== 1) return;
     const tourCompletedKey = `worldMapTourCompleted_${activeVenture._id}`;
     const isCompleted = localStorage.getItem(tourCompletedKey);
@@ -1620,7 +1716,7 @@ function MapPageInner() {
       setShowTour(true);
       localStorage.setItem(tourCompletedKey, "true");
     }
-  }, [activeVenture]);
+  }, [activeVenture, tourStateForPulse, showTour]);
 
   // Task submission state (now using Jotai atom for global access)
   const [submittingTask, setSubmittingTask] = useAtom(submittingTaskAtom);
@@ -1767,6 +1863,8 @@ function MapPageInner() {
       bossDefeatedAtCheckpoint,
       activeStage,
       activeCP,
+      tourStateForPulse?.state === "not_started" ||
+        tourStateForPulse?.state === "in_progress",
     );
   }, [
     selectedDetail,
@@ -1774,6 +1872,7 @@ function MapPageInner() {
     bossDefeatedAtCheckpoint,
     activeStage,
     activeCP,
+    tourStateForPulse,
   ]);
   const corruptionLevel = venture?.corruptionLevel ?? 0;
   const corruptionPhase = useMemo(() => {
@@ -2057,29 +2156,50 @@ function MapPageInner() {
     });
   }, [seedFlags]);
 
-  // Tutorial: Show first checkpoint pulse after map intro tutorial
+  // Listen for the tutorial's "Start the fight" button. Forces the
+  // CombatPanel open on the active checkpoint without making the user
+  // grind tasks first.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const handler = () => {
+      if (!activeVenture) return;
+      const cp = checkpoints.find(
+        (c) => c.stage === activeStage && c.checkpoint === activeCP,
+      );
+      if (!cp) return;
+      const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
+        Boolean,
+      ).length;
+      startBossCombat(cp, doneTasks);
+    };
+    window.addEventListener("tutorial:force-combat", handler);
+    return () => window.removeEventListener("tutorial:force-combat", handler);
+  }, [activeVenture, checkpoints, activeStage, activeCP, startBossCombat]);
 
-    const tutorialCompleted =
-      localStorage.getItem("tutorial_completed") === "true";
+  // Show first-checkpoint pulse for new users on their first venture
+  // (stage 1, checkpoint 1). Two trigger paths:
+  //   1. The legacy map-intro tutorial flag in localStorage.
+  //   2. The new product tour state from Convex (feedTutorialState).
+  // Either is enough.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!phaserReady || checkpoints.length === 0) return;
+    if (activeStage !== 1 || activeCP !== 1) return;
+
     const pulseShown =
       localStorage.getItem("first_checkpoint_pulse_shown") === "true";
+    if (pulseShown) return;
 
-    // Show pulse if tutorial just completed but pulse hasn't been shown yet
-    if (
-      tutorialCompleted &&
-      !pulseShown &&
-      phaserReady &&
-      checkpoints.length > 0
-    ) {
-      // Only show if user is on checkpoint 1 of the very first stage
-      const firstCheckpoint = checkpoints[0];
-      if (firstCheckpoint && activeStage === 1 && activeCP === 1) {
-        setShowFirstCheckpointPulse(true);
-      }
+    const legacyTutorialDone =
+      localStorage.getItem("tutorial_completed") === "true";
+    const newTourActive =
+      tourStateForPulse?.state === "in_progress" ||
+      tourStateForPulse?.state === "not_started";
+
+    if (legacyTutorialDone || newTourActive) {
+      setShowFirstCheckpointPulse(true);
     }
-  }, [phaserReady, checkpoints, activeStage, activeCP]);
+  }, [phaserReady, checkpoints, activeStage, activeCP, tourStateForPulse]);
 
   // XP / Level from Convex
   const level = levelData?.level ?? 1;
@@ -2525,6 +2645,43 @@ function MapPageInner() {
     });
   }, [phaserReady, venture?._id, checkpoints, activeStage, activeCP]);
 
+  // ── PRD §2 — mini-game lifecycle hook + Phaser sync ───────────────────────
+  const miniGameLifecycle = useMiniGameLifecycle(
+    venture?._id as Id<"ventures"> | undefined,
+  );
+  const miniGamePhase = miniGameLifecycle.phase;
+  const miniGameCompletedSpawnIds = miniGameLifecycle.completedSpawnIds;
+
+  // The "completed-checkpoint" set Phaser uses to gate spawn visibility.
+  // Format mirrors the Phaser-side node-key: "{stage}-{checkpoint}".
+  const miniGameCheckpointGate = useMemo(() => {
+    return checkpoints
+      .filter((c) => deriveCheckpointStatus(c, activeStage, activeCP) === "completed"
+        || deriveCheckpointStatus(c, activeStage, activeCP) === "gold")
+      .map((c) => `${c.stage}-${c.checkpoint}`);
+  }, [checkpoints, activeStage, activeCP]);
+
+  useEffect(() => {
+    if (!phaserReady) return;
+    eventBridge.dispatchToPhaser({
+      type: "MINIGAME_SYNC_STATE",
+      completedCheckpointIds: miniGameCheckpointGate,
+      completedSpawnIds: miniGameCompletedSpawnIds,
+    });
+  }, [phaserReady, miniGameCheckpointGate, miniGameCompletedSpawnIds]);
+
+  // Bridge: Phaser fires MINIGAME_SPAWN_ACTIVATED → hook opens the prompt.
+  useEffect(() => {
+    const handler = (e: {
+      spawnPointId: string;
+    }) => {
+      const cfg = MINIGAME_SPAWNS.find((s) => s.id === e.spawnPointId);
+      if (cfg) miniGameLifecycle.engageWithSpawn(cfg);
+    };
+    eventBridge.onReact("MINIGAME_SPAWN_ACTIVATED", handler);
+    return () => eventBridge.off("MINIGAME_SPAWN_ACTIVATED", handler);
+  }, [miniGameLifecycle]);
+
   // ── Sync world brightness → Phaser ─────────────────────────────────────────
   useEffect(() => {
     if (!phaserReady) return;
@@ -2953,7 +3110,13 @@ function MapPageInner() {
     const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
       Boolean,
     ).length;
-    if (doneTasks < 2 && !skipDoneTasksCheck) return;
+    // First-run tour can advance after 1 task to reach the Doubt Imp
+    // without grinding all three.
+    const tourActiveNow =
+      tourStateForPulse?.state === "not_started" ||
+      tourStateForPulse?.state === "in_progress";
+    const minTasksToAdvance = tourActiveNow ? 1 : 2;
+    if (doneTasks < minTasksToAdvance && !skipDoneTasksCheck) return;
 
     const mapStage = venture.currentStage ?? 1;
     const mapCheckpoint = venture.currentCheckpoint ?? 1;
@@ -2967,6 +3130,7 @@ function MapPageInner() {
         bossDefeatedAtCheckpoint,
         mapStage,
         mapCheckpoint,
+        tourActiveNow,
       )
     ) {
       startBossCombat(cp, doneTasks);
@@ -3279,6 +3443,7 @@ function MapPageInner() {
     bossDefeatedAtCheckpoint,
     setBossCombatTarget,
     startBossCombat,
+    tourStateForPulse,
   ]);
 
   // Keep handleAdvanceRef always pointing at the latest handleAdvance
@@ -3603,34 +3768,78 @@ function MapPageInner() {
             onDismiss={() => setGoldCheckpointNotification(null)}
           />
 
-          {/* ── Boss combat gate overlay — fires for every checkpoint at 2/3 tasks ── */}
-          {bossCombatTarget && activeVenture && (
-            <InterCheckpointOverlay
-              isOpen={true}
-              events={["henchman"]}
-              templateId={activeVenture.templateId as any}
-              stage={bossCombatTarget.stage}
-              checkpoint={bossCombatTarget.checkpoint}
-              ventureId={activeVenture._id}
-              checkpointId={checkpoints.find((cp) => cp.stage === bossCombatTarget.stage && cp.checkpoint === bossCombatTarget.checkpoint)?._id as any}
-              isBossCombat={true}
-              isLastCheckpointInStage={bossCombatTarget.isLastInStage}
-              isGoldCheckpoint={bossCombatTarget.isGold}
-              onBossVictory={finishBossCombatAndAdvance}
-              onBossSkip={finishBossCombatAndAdvance}
-              onBossRetreat={() => {
-                dismissBossCombatVisual(bossCombatTarget.stage);
-                setBossCombatTarget(null);
+          {/* ── HP-based Cross-Question Combat — replaces the old single-question
+                Doubt Imp overlay. Fires when player walks into a boss checkpoint. ── */}
+          {bossCombatTarget && activeVenture && activeCombatRoundId && (
+            <CombatPanel
+              key={activeCombatRoundId}
+              roundId={activeCombatRoundId as Id<"combatRounds">}
+              checkpointId={bossCombatTarget.checkpointId as Id<"ventureCheckpoints">}
+              onRetryStarted={(newRoundId) => {
+                // Direct swap to the new round. The key prop above
+                // forces a clean CombatPanel remount when activeCombatRoundId changes.
+                console.log("[combat] retry: swapping roundId from", activeCombatRoundId, "→", newRoundId);
+                setActiveCombatRoundId(newRoundId);
               }}
-              onComplete={() => {
-                dismissBossCombatVisual(bossCombatTarget.stage);
-                setBossCombatTarget(null);
+              onAdvanceCheckpoint={() => {
+                setActiveCombatRoundId(null);
+                // First-run tour: skip the post-combat ceremony
+                // (checkpoint walk + animations) and drop the user
+                // straight onto /feed for the final contribute step.
+                const tourActiveNow =
+                  tourStateForPulse?.state === "not_started" ||
+                  tourStateForPulse?.state === "in_progress";
+                if (tourActiveNow) {
+                  setBossCombatTarget(null);
+                  router.push("/feed");
+                  return;
+                }
+                finishBossCombatAndAdvance();
               }}
               onClose={() => {
                 dismissBossCombatVisual(bossCombatTarget.stage);
                 setBossCombatTarget(null);
+                setActiveCombatRoundId(null);
+                // Tour exits combat — win or lose — straight to /feed
+                // for the contributor step.
+                if (
+                  tourStateForPulse?.state === "not_started" ||
+                  tourStateForPulse?.state === "in_progress"
+                ) {
+                  router.push("/feed");
+                }
               }}
             />
+          )}
+
+          {/* Loading / error state while the combat round is being created */}
+          {bossCombatTarget && activeVenture && !activeCombatRoundId && (
+            <div className="pointer-events-auto fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-sm">
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950 p-8 text-center text-white">
+                {combatStartError ? (
+                  <>
+                    <p className="text-sm text-red-400">
+                      Failed to summon the boss: {combatStartError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dismissBossCombatVisual(bossCombatTarget.stage);
+                        setBossCombatTarget(null);
+                      }}
+                      className="rounded-md border border-white/20 px-4 py-1.5 text-sm hover:bg-white/5"
+                    >
+                      Retreat
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-rose-400 border-t-transparent" />
+                    <p className="text-sm text-white/70">The boss is awakening…</p>
+                  </>
+                )}
+              </div>
+            </div>
           )}
 
           {/* Inter-checkpoint passage events overlay */}
@@ -3662,6 +3871,70 @@ function MapPageInner() {
             );
           })()}
 
+          {/* PRD §2 v1.1 — sidebar entry-point for mini-games (the
+           *  floating dot UX was replaced because it felt visually
+           *  noisy alongside the snake-path checkpoints). Selecting a
+           *  game here calls `engageWithSpawn` → prompt → overlay →
+           *  result, same downstream flow. */}
+          <MiniGamesPanel
+            open={isMiniGamesPanelOpen}
+            onClose={() => setIsMiniGamesPanelOpen(false)}
+            completedSpawnIds={miniGameCompletedSpawnIds}
+            onPlay={(spawn) => {
+              setIsMiniGamesPanelOpen(false);
+              miniGameLifecycle.engageWithSpawn(spawn);
+            }}
+          />
+
+          {/* Lifecycle surfaces — same as before. */}
+          <MiniGamePromptDialog
+            spawn={miniGamePhase.kind === "prompt" ? miniGamePhase.spawn : null}
+            onEngage={miniGameLifecycle.acceptPrompt}
+            onDismiss={miniGameLifecycle.dismissPrompt}
+          />
+          {miniGamePhase.kind === "playing" && (
+            <MiniGameOverlay
+              spawn={miniGamePhase.spawn}
+              onResult={miniGameLifecycle.settle}
+              onAbandon={miniGameLifecycle.abandon}
+            />
+          )}
+          {miniGamePhase.kind === "result" && (() => {
+            // Pick the next un-cleared spawn. Preference order:
+            //   1. Same archetype, next-higher difficulty in catalogue.
+            //   2. Any other un-cleared spawn.
+            const completedIds = new Set(miniGameCompletedSpawnIds);
+            const lastSpawnId = miniGamePhase.completion.spawnPointId;
+            const lastSpawn = MINIGAME_SPAWNS.find((s) => s.id === lastSpawnId);
+            const candidates = MINIGAME_SPAWNS.filter(
+              (s) => !completedIds.has(s.id),
+            );
+            const sameArchetypeNext = lastSpawn
+              ? candidates
+                  .filter((s) => s.archetype === lastSpawn.archetype)
+                  .sort((a, b) => a.difficulty - b.difficulty)[0]
+              : undefined;
+            const anyNext = candidates[0];
+            const nextSpawn = sameArchetypeNext ?? anyNext ?? null;
+
+            return (
+              <MiniGameResultPanel
+                completion={miniGamePhase.completion}
+                onClose={miniGameLifecycle.closeResult}
+                nextSpawn={nextSpawn}
+                onPlayNext={(spawn) => {
+                  miniGameLifecycle.closeResult();
+                  // Tiny delay so the result panel finishes its exit
+                  // before the prompt opens — avoids two stacked
+                  // modals in the same frame.
+                  setTimeout(() => {
+                    miniGameLifecycle.engageWithSpawn(spawn);
+                  }, 120);
+                }}
+              />
+            );
+          })()}
+
           {/* Left Sidebar & Floating Popup Tools Panel Wrapper */}
           <div id="left-control-panel" className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
             <LeftSidebar
@@ -3684,6 +3957,8 @@ function MapPageInner() {
                   setIsKanbanOpen(true);
                 } else if (tab === "journal") {
                   setIsJournalOpen(true);
+                } else if (tab === "minigames") {
+                  setIsMiniGamesPanelOpen(true);
                 } else {
                   updateUrlParams({ panel: "tools", tab, checkpointId: null });
                 }
@@ -3726,6 +4001,10 @@ function MapPageInner() {
                 activeStage={activeStage}
                 activeCheckpoint={activeCP}
                 showBossGateHint={showBossGateHint}
+                tourActive={
+                  tourStateForPulse?.state === "not_started" ||
+                  tourStateForPulse?.state === "in_progress"
+                }
                 isCurrentMapCheckpoint={
                   selectedDetail.stage === activeStage &&
                   selectedDetail.checkpointIndex === activeCP
@@ -4574,6 +4853,70 @@ export default function MapPage() {
       }
     >
       <MapPageInner />
+      <MapTourMount />
     </Suspense>
+  );
+}
+
+function MapTourMount() {
+  const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
+  // Needed to drive the FeedTutorial's phase machine. FeedTutorial
+  // itself no longer queries this (deduped from /feed), so each mount
+  // point feeds it in.
+  const myIdeaCount = useQuery(api.tutorial_metrics.getMyIdeaCount, {});
+  const [show, setShow] = useState(false);
+  // Stable callback so the memoized FeedTutorial doesn't re-render.
+  const onClose = useCallback(() => {
+    setShow(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("feedTourClosed", "1");
+    }
+  }, []);
+  useEffect(() => {
+    if (!tutorialState) return;
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("feedTourClosed") === "1"
+    ) {
+      return;
+    }
+    if (
+      tutorialState.state !== "not_started" &&
+      tutorialState.state !== "in_progress"
+    ) {
+      return;
+    }
+
+    // Don't show the tour until Phaser has reported its boot scene
+    // finished, plus a 400ms breath so the world-map idle animations
+    // can hand off. Fallback timeout of 3.5s in case PHASER_READY
+    // never fires (e.g. WebGL unsupported, slow assets).
+    let bufferTimer: number | undefined;
+    let cancelled = false;
+
+    const arm = () => {
+      if (cancelled) return;
+      bufferTimer = window.setTimeout(() => {
+        if (!cancelled) setShow(true);
+      }, 400);
+    };
+
+    const off = eventBridge.onReact("PHASER_READY", arm);
+    const fallbackTimer = window.setTimeout(arm, 3500);
+
+    return () => {
+      cancelled = true;
+      off?.();
+      if (bufferTimer) window.clearTimeout(bufferTimer);
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+    };
+  }, [tutorialState]);
+  return (
+    <FeedTutorial
+      show={show}
+      initialStep={tutorialState?.step ?? 0}
+      onClose={onClose}
+      myIdeaCount={myIdeaCount}
+    />
   );
 }

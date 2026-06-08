@@ -17,12 +17,12 @@ interface Message {
   isCurrentUser: boolean;
 }
 
-interface MessageBubbleProps {
+interface Props {
   message: Message;
   variant?: "direct" | "group";
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, variant = "direct" }) => {
+const MessageBubble: React.FC<Props> = memo(({ message, variant = "direct" }) => {
   const { text, sender, timestamp, isCurrentUser } = message;
 
   const timestampStr = format(timestamp, "HH:mm");

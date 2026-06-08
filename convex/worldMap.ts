@@ -29,6 +29,30 @@ import {
 import { Id } from "./_generated/dataModel";
 import { recalculateAndAwardBadgesHelper } from "./badges";
 
+/**
+ * Allow access if the user is the venture owner OR an accepted
+ * contributor on the underlying idea. Owner-only checks were blocking
+ * collaborators from submitting tasks / interacting with shared maps.
+ */
+async function assertVentureAccess(
+  ctx: { db: any },
+  venture: { userId: Id<"users">; ideaId?: Id<"ideas"> },
+  userId: Id<"users">,
+): Promise<void> {
+  if (venture.userId === userId) return;
+  if (venture.ideaId) {
+    const accepted = await ctx.db
+      .query("contributionRequests")
+      .withIndex("by_contributor_status", (q: any) =>
+        q.eq("contributorId", userId).eq("status", "accepted"),
+      )
+      .filter((q: any) => q.eq(q.field("ideaId"), venture.ideaId))
+      .first();
+    if (accepted) return;
+  }
+  throw new Error("You don't have access to this venture");
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -903,7 +927,7 @@ export const markTaskComplete = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
     if (!user) throw new Error("User not found");
-    if (venture.userId !== user._id) throw new Error("Not your venture");
+    await assertVentureAccess(ctx, venture, user._id);
 
     // ── Find the task row ────────────────────────────────────────────────────
     const task = await ctx.db
@@ -1075,7 +1099,7 @@ export const redoTask = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
     if (!user) throw new Error("User not found");
-    if (venture.userId !== user._id) throw new Error("Not your venture");
+    await assertVentureAccess(ctx, venture, user._id);
 
     // ── Find the task row ────────────────────────────────────────────────────
     const task = await ctx.db
@@ -1753,18 +1777,7 @@ export const submitTaskContent = mutation({
     // ── Verify ownership or contributor status ────────────────────────────────
     const venture = await ctx.db.get(checkpoint.ventureId);
     if (!venture) throw new Error("Venture not found");
-
-    const isOwner = venture.userId === user._id;
-    if (!isOwner) {
-      const contribution = await ctx.db
-        .query("contributionRequests")
-        .withIndex("by_idea_contributor", (q) =>
-          q.eq("ideaId", venture.ideaId).eq("contributorId", user._id),
-        )
-        .filter((q) => q.eq(q.field("status"), "accepted"))
-        .first();
-      if (!contribution) throw new Error("Only contributors can submit tasks");
-    }
+    await assertVentureAccess(ctx, venture, user._id);
 
     // ── Check if already completed ────────────────────────────────────────────
     const flagField =
@@ -1947,6 +1960,51 @@ export const submitTaskContent = mutation({
         checkpointOutcome: checkpointDefForScore?.outcome ?? "",
         userTier: "free",
       });
+    }
+
+    // Streak v2 — submitting a task counts as a meaningful action.
+    try {
+      await ctx.scheduler.runAfter(0, internal.streaks.recordAction, {
+        userId: user._id,
+        actionType: "submitted_task",
+      });
+    } catch { /* streak failure must never block primary mutation */ }
+
+    // Auto-share to the feed — every completed task becomes a public
+    // milestone post so the user's progress is visible to the network
+    // without them having to compose anything. Wrapped so a feed
+    // failure can never block the task submission.
+    try {
+      const ventureForPost = await ctx.db.get(checkpoint.ventureId);
+      const ideaForPost = ventureForPost?.ideaId
+        ? await ctx.db.get(ventureForPost.ideaId)
+        : null;
+      const projectLabel = ideaForPost?.title ?? "my venture";
+      const tierLabel = String(args.taskLevel).toUpperCase();
+      const checkpointOutcome = checkpointDefForScore?.outcome ?? "";
+      const taskLabel = checkpointOutcome
+        ? `${tierLabel} · ${checkpointOutcome}`
+        : `${tierLabel} task`;
+      const summary =
+        typeof args.content === "string"
+          ? args.content.trim().slice(0, 400)
+          : "";
+      await ctx.db.insert("ideas", {
+        authorId: user._id,
+        title: `✅ Completed: ${taskLabel}`,
+        description: summary
+          ? `${summary}\n\n— from "${projectLabel}", Stage ${checkpoint.stage} · Checkpoint ${checkpoint.checkpoint}`
+          : `Cleared a ${tierLabel} task in "${projectLabel}" — Stage ${checkpoint.stage}, Checkpoint ${checkpoint.checkpoint}.`,
+        category: "milestone",
+        visibility: "public",
+        sparkCount: 0,
+        commentCount: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        isDeleted: false,
+      });
+    } catch (err) {
+      console.warn("[submitTask] auto feed-post failed (non-fatal):", err);
     }
 
     return {

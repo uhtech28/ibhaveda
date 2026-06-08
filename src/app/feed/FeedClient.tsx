@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -9,18 +9,16 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { IdeaForgeExperience } from "@/components/ideaforge/experience";
 import { IdeaForgeIdea } from "@/components/ideaforge/shared";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { MessageCircle } from "lucide-react";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
-import { useToast } from "@/components/ui/use-toast";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
+import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 
 export function FeedClient() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
-  const { toast } = useToast();
   const { isComplete: isProfileComplete, isLoading: isProfileLoading } = useProfileCompletion();
   const currentUser = useQuery(api.users.getCurrentUser);
 
@@ -71,16 +69,56 @@ export function FeedClient() {
     }
   }, [isLoaded, router, userId]);
 
+  // PRD §6 AC6 — Profile-completion toast is superseded by the
+  // first-time-user FeedTutorial below. We still need to route users
+  // through profile setup if they haven't completed it, but the
+  // tutorial only mounts AFTER profile setup, so the explicit nag
+  // here is no longer required.
   useEffect(() => {
     if (isLoaded && userId && !isProfileLoading && !isProfileComplete) {
-      toast({
-        title: "Complete your profile",
-        description: "Add a bit more context so builders can discover and trust your ideas.",
-        action: <Button size="sm" onClick={() => router.push("/profile-setup")}>Complete Profile</Button>,
-        duration: 8000,
-      });
+      router.push("/profile-setup");
     }
-  }, [isLoaded, isProfileComplete, isProfileLoading, router, toast, userId]);
+  }, [isLoaded, isProfileComplete, isProfileLoading, router, userId]);
+
+  // First-run tour state.
+  const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
+  const myIdeaCount = useQuery(api.tutorial_metrics.getMyIdeaCount, {});
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  // Stable callback so the memoized FeedTutorial doesn't re-render on
+  // every parent tick.
+  const closeFeedTutorial = useCallback(() => {
+    setTutorialOpen(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("feedTourClosed", "1");
+    }
+  }, []);
+  useEffect(() => {
+    if (!tutorialState) return;
+    // Hard local guard: once the user has explicitly dismissed the
+    // tour this session, don't re-open it even if convex hasn't
+    // finished propagating the completion mutation yet.
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("feedTourClosed") === "1"
+    ) {
+      return;
+    }
+    if (tutorialState.state === "not_started" || tutorialState.state === "in_progress") {
+      const t = window.setTimeout(() => setTutorialOpen(true), 700);
+      return () => window.clearTimeout(t);
+    }
+  }, [tutorialState]);
+
+  // Whether the user is currently in the tour's compose phase. Used to
+  // light up the tutorial highlight on the + button and to switch the
+  // wizard into tutorialMode once they open it.
+  const tourActiveOrLoading =
+    !tutorialState ||
+    tutorialState.state === "in_progress" ||
+    tutorialState.state === "not_started";
+  const ideaCountKnown = typeof myIdeaCount === "number";
+  const inComposePhase =
+    tourActiveOrLoading && (!ideaCountKnown || myIdeaCount === 0);
 
   const ideas = stableIdeas;
 
@@ -93,6 +131,7 @@ export function FeedClient() {
         isLoading={isInitialLoading}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        tutorialOpenCompose={inComposePhase}
         onSpark={async (ideaId) => {
           return await toggleSpark({ ideaId: ideaId as Id<"ideas"> });
         }}
@@ -154,6 +193,14 @@ export function FeedClient() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* First-time user walkthrough. */}
+      <FeedTutorial
+        show={tutorialOpen}
+        initialStep={tutorialState?.step ?? 0}
+        onClose={closeFeedTutorial}
+        myIdeaCount={myIdeaCount}
+      />
     </>
   );
 }

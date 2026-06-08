@@ -10,6 +10,7 @@ import { Id } from "../../../convex/_generated/dataModel";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import { ChannelSettingsDialog } from "./ChannelSettingsDialog";
+import { ChannelMembersDialog } from "./ChannelMembersDialog";
 
 
 interface ChatThreadProps {
@@ -47,6 +48,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
       : undefined;
 
   const sendMessage = useMutation(api.chat.sendMessage);
+  const sendImageMessage = useMutation(api.chatImages.sendImageMessage);
   const users = useQuery(api.chat.getAllUsers, isAuthenticated ? {} : "skip");
   const currentUserDoc = useQuery(api.chat.getUserByClerkId, isAuthenticated ? {} : "skip");
   // For group chats — pull the idea title so the header reads "<idea title>"
@@ -58,6 +60,8 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
   // Add loading and error states
   const [sendError, setSendError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  // PRD §10 AC6 — channel members popup, reusing the §8 popup pattern.
+  const [showMembers, setShowMembers] = useState(false);
 
   // Live member count for group chats — surfaces add/remove flow as a
   // visible Members pill in the header rather than just a settings cog.
@@ -76,40 +80,66 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
   const currentUserId = currentUserDoc?._id as Id<"users">;
 
-  const handleSendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || !currentUserId) return;
+  /**
+   * Send a message. `ChatInput` hands us `{ text, image? }`.
+   *
+   * Branching:
+   *   - image alone or image+text → `sendImageMessage` (the caption
+   *     carries the text; the server creates/finds the conversation
+   *     so brand-new DMs work on the first send without any
+   *     placeholder text).
+   *   - text alone → legacy `sendMessage`.
+   */
+  const handleSendMessage = useCallback(async (
+    payload:
+      | string
+      | { text: string; image?: { storageId: string; width: number; height: number } | null }
+  ) => {
+    // Back-compat: legacy callers may still pass a raw string.
+    const text = typeof payload === "string" ? payload : (payload.text ?? "");
+    const image = typeof payload === "string" ? null : payload.image ?? null;
+    const trimmed = text.trim();
+
+    if (!currentUserId) return;
+    if (!trimmed && !image) return;
 
     setSendError(null);
 
+    // Infer a receiverId for DMs from visible messages when neither
+    // prop nor explicit selection is set.
+    let inferredReceiverId: Id<"users"> | null = receiverId ?? null;
+    if (!inferredReceiverId && !ideaId && displayedMessages && displayedMessages.length > 0) {
+      const firstMessage = displayedMessages[0];
+      inferredReceiverId =
+        (firstMessage.senderId === currentUserId
+          ? firstMessage.receiverId
+          : firstMessage.senderId) ?? null;
+    }
+
     try {
-      if (ideaId) {
-        // Group chat
-        await sendMessage({
-          content,
-          conversationId: activeConversationId || undefined,
-          ideaId: ideaId,
-        });
-      } else if (receiverId) {
-        // Direct chat
-        await sendMessage({
-          receiverId,
-          content,
-          conversationId: activeConversationId || undefined,
+      if (image) {
+        // Image (with optional caption) — single round trip.
+        await sendImageMessage({
+          conversationId: activeConversationId ?? undefined,
+          receiverId: !activeConversationId && !ideaId ? inferredReceiverId ?? undefined : undefined,
+          ideaId: !activeConversationId && ideaId ? ideaId : undefined,
+          storageId: image.storageId as unknown as Id<"_storage">,
+          width: image.width,
+          height: image.height,
+          caption: trimmed || undefined,
         });
       } else {
-        // Try to infer context from existing messages if no explicit context
-        let recId = receiverId;
-        if (!recId && displayedMessages && displayedMessages.length > 0) {
-          const firstMessage = displayedMessages[0];
-          recId = firstMessage.senderId === currentUserId
-            ? firstMessage.receiverId
-            : firstMessage.senderId;
-        }
-
-        if (recId) {
+        // Text only.
+        if (ideaId) {
           await sendMessage({
-            receiverId: recId,
-            content,
+            content: trimmed,
+            conversationId: activeConversationId || undefined,
+            ideaId,
+          });
+        } else if (inferredReceiverId) {
+          await sendMessage({
+            receiverId: inferredReceiverId,
+            content: trimmed,
             conversationId: activeConversationId || undefined,
           });
         } else {
@@ -117,13 +147,19 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
           return;
         }
       }
-      // Message sent successfully
     } catch (error) {
       console.error("Failed to send message:", error);
       setSendError("Failed to send message. Please try again.");
-    } finally {
     }
-  }, [sendMessage, displayedMessages, currentUserId, receiverId, activeConversationId, ideaId]);
+  }, [
+    sendMessage,
+    sendImageMessage,
+    displayedMessages,
+    currentUserId,
+    receiverId,
+    activeConversationId,
+    ideaId,
+  ]);
 
   // Resolve the header — show the recipient's name for DMs, or the idea
   // title for group/channel chats. Falls back to "Conversation" only as
@@ -179,7 +215,9 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
         <div className="absolute inset-y-0 right-4 flex items-center gap-1">
           {ideaId && activeConversationId && (
             <>
-              {/* Visible Members pill (Co-dev change) */}
+              {/* Members pill — opens read-only members popup; admins
+               * see a "Manage" link to drill into ChannelSettingsDialog.
+               * Reuses the §8 ResponsivePopup pattern (PRD §10 AC6). */}
               <Button
                 variant="outline"
                 size="sm"
@@ -280,6 +318,16 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
           onChannelDeleted={onBack}
         />
       )}
+
+      {/* PRD §10 AC6 — read-only members popup (reuses §8 pattern).
+       *  The "Manage members" footer link drops admins into the
+       *  existing ChannelSettingsDialog for add/remove. */}
+      <ChannelMembersDialog
+        conversationId={showMembers ? activeConversationId ?? null : null}
+        canManage={!!ideaId && !!activeConversationId}
+        onOpenChange={(open) => setShowMembers(open)}
+        onManageMembers={() => setShowSettings(true)}
+      />
     </div>
   );
 });

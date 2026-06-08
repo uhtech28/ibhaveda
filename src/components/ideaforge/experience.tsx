@@ -106,6 +106,7 @@ export function IdeaForgeExperience({
   onCompleteProfile,
   onLoadMore,
   hasMore = false,
+  tutorialOpenCompose,
 }: {
   mode: "feed" | "my-ideas";
   currentUser: CurrentUserProfile | null | undefined;
@@ -123,6 +124,10 @@ export function IdeaForgeExperience({
   onCompleteProfile: () => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
+  /** True while the first-run tour is on its compose phase. The wizard
+   *  switches to tutorialMode (outline highlight + auto-submit) when
+   *  the user opens it during this window. */
+  tutorialOpenCompose?: boolean;
 }) {
   const router = useRouter();
   const seed = useMemo(() => Math.floor(Math.random() * 5), []);
@@ -165,6 +170,9 @@ export function IdeaForgeExperience({
   
   // Co-dev Wizard state
   const [showIdeaWizard, setShowIdeaWizard] = useState(false);
+  // Set true when the wizard was opened during the first-run tour, so
+  // tutorialMode (auto-submit countdown) is on. Cleared on close.
+  const [wizardTutorialMode, setWizardTutorialMode] = useState(false);
 
   const filteredFeedIdeas = useMemo(() => {
     const searchable = ideas.filter((idea) => matchesSearch(idea, searchQuery));
@@ -217,7 +225,12 @@ export function IdeaForgeExperience({
   };
 
   const openWizard = () => {
+    // Tour compose phase: turn on tutorialMode so the wizard highlights
+    // the outline textarea and the preview-step countdown auto-submits
+    // once the AI has filled the form. We deliberately do NOT pre-fill
+    // — the user types their own description, then lets the AI expand.
     setWizardDraft(undefined);
+    setWizardTutorialMode(!!tutorialOpenCompose);
     setShowIdeaWizard(true);
   };
 
@@ -404,9 +417,13 @@ export function IdeaForgeExperience({
         isOpen={showIdeaWizard}
         onOpenChange={(open) => {
           setShowIdeaWizard(open);
-          if (!open) setWizardDraft(undefined);
+          if (!open) {
+            setWizardDraft(undefined);
+            setWizardTutorialMode(false);
+          }
         }}
         initialDraft={wizardDraft}
+        tutorialMode={wizardTutorialMode}
       />
     </div>
   );

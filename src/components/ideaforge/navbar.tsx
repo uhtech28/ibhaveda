@@ -90,7 +90,7 @@ export function IdeaForgeNavbar({
               <span className="text-sm truncate">Search</span>
             </button>
 
-            <button type="button" onClick={onOpenComposer} aria-label="Post idea" className={cn(transitionBase, "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
+            <button type="button" data-tutorial="compose" onClick={onOpenComposer} aria-label="Post idea" className={cn(transitionBase, "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
               <Plus className="h-5 w-5" />
             </button>
 
@@ -152,7 +152,7 @@ export function IdeaForgeNavbar({
           </div>
         </div>
 
-        <Button type="button" onClick={onOpenComposer} aria-label="Post Idea" title="Post Idea" className="hidden lg:inline-flex items-center justify-center w-10 h-10 p-0 rounded-[10px] bg-[#6366F1] text-white shadow-[0_10px_32px_rgba(99,102,241,0.18)] hover:bg-[#8B5CF6]">
+        <Button type="button" data-tutorial="compose" onClick={onOpenComposer} aria-label="Post Idea" title="Post Idea" className="hidden lg:inline-flex items-center justify-center w-10 h-10 p-0 rounded-[10px] bg-[#6366F1] text-white shadow-[0_10px_32px_rgba(99,102,241,0.18)] hover:bg-[#8B5CF6]">
           <Plus className="h-5 w-5" />
         </Button>
 
