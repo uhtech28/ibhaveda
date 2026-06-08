@@ -94,24 +94,9 @@ export function FeedClient({
     }
   }, [tutorialState]);
 
-  // Fetch the AI pre-filled idea once when the tour is in its compose
-  // phase (user has 0 ideas). We hold it locally and pass it to the
-  // wizard, which auto-opens via tutorialOpenCompose.
-  const generateTutorialIdea = useAction(api.ai.generateTutorialIdeaDraft);
-  const [tutorialDraft, setTutorialDraft] = useState<
-    | {
-        title?: string;
-        description?: string;
-        industries?: string[];
-        skills?: string[];
-      }
-    | undefined
-  >(undefined);
-  // Treat loading-state convex queries as "maybe in tour" so the user
-  // gets the tutorial draft even if they click + before metadata loads.
-  // tutorialState may be undefined (loading) OR null (no user yet);
-  // either is a "don't know yet" signal that should still attempt the
-  // pre-fill.
+  // Whether the user is currently in the tour's compose phase. Used to
+  // light up the tutorial highlight on the + button and to switch the
+  // wizard into tutorialMode once they open it.
   const tourActiveOrLoading =
     !tutorialState ||
     tutorialState.state === "in_progress" ||
@@ -119,34 +104,6 @@ export function FeedClient({
   const ideaCountKnown = typeof myIdeaCount === "number";
   const inComposePhase =
     tourActiveOrLoading && (!ideaCountKnown || myIdeaCount === 0);
-  useEffect(() => {
-    if (!inComposePhase) return;
-    if (tutorialDraft) return;
-    let cancelled = false;
-    void generateTutorialIdea({})
-      .then((draft) => {
-        if (cancelled) return;
-        setTutorialDraft({
-          title: draft.title,
-          description: draft.description,
-          industries: draft.industries,
-          skills: draft.skills,
-        });
-      })
-      .catch(() => {
-        // If AI fails, fall back to a generic seed so the tour still
-        // auto-opens the composer.
-        if (cancelled) return;
-        setTutorialDraft({
-          title: "My first idea",
-          description:
-            "A small project I want to ship in the next two weeks. I'll use this space to plan it in public and find people who want to help.",
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [inComposePhase, tutorialDraft, generateTutorialIdea]);
 
   const ideas = useMemo(() => (ideasQuery || []) as IdeaForgeIdea[], [ideasQuery]);
 
@@ -159,8 +116,7 @@ export function FeedClient({
         isLoading={false}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        tutorialDraft={tutorialDraft}
-        tutorialOpenCompose={inComposePhase && !!tutorialDraft}
+        tutorialOpenCompose={inComposePhase}
         onSpark={async (ideaId) => {
           await toggleSpark({ ideaId: ideaId as Id<"ideas"> });
         }}
@@ -222,14 +178,11 @@ export function FeedClient({
         </DialogContent>
       </Dialog>
 
-      {/* PRD §6 — first-time user walkthrough */}
+      {/* First-time user walkthrough. */}
       <FeedTutorial
         show={tutorialOpen}
         initialStep={tutorialState?.step ?? 0}
         onClose={closeFeedTutorial}
-        composeDraftReady={
-          inComposePhase ? !!tutorialDraft?.title?.trim() : true
-        }
         myIdeaCount={myIdeaCount}
       />
     </>

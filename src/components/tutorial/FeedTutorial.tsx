@@ -8,8 +8,8 @@
 // pair on Convex, so the tour resumes wherever the user left off even
 // across page reloads.
 
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { memo, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { useMutation, useQuery } from "convex/react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
@@ -27,10 +27,6 @@ interface Props {
   show: boolean;
   initialStep?: number;
   onClose: () => void;
-  /** True once the AI tutorial draft has loaded (or fallback fired).
-   *  While false, the compose step shows a "Generating..." state so
-   *  the user doesn't open the wizard before pre-fill is available. */
-  composeDraftReady?: boolean;
   /** Idea count piped down from the parent so we don't open a duplicate
    *  Convex subscription. Undefined while parent's query is still
    *  loading. */
@@ -53,7 +49,6 @@ type Phase = (typeof PHASES)[number];
 function FeedTutorialInner({
   show,
   onClose,
-  composeDraftReady = true,
   myIdeaCount,
 }: Props) {
   const pathname = usePathname();
@@ -133,10 +128,7 @@ function FeedTutorialInner({
   return (
     <>
       {phase === "compose" && onFeed && (
-        <ComposeStep
-          onSkip={handleSkip}
-          draftReady={composeDraftReady}
-        />
+        <ComposeStep onSkip={handleSkip} />
       )}
       {phase === "map" && onMap && (
         <MapTour onSkip={handleSkip} />
@@ -514,30 +506,13 @@ function GuidedStep({
   );
 }
 
-function ComposeStep({
-  onSkip,
-  draftReady,
-}: {
-  onSkip: () => void;
-  draftReady: boolean;
-}) {
-  if (!draftReady) {
-    return (
-      <GuidedStep
-        eyebrow="Step 1 of 4"
-        title="Drafting your first idea…"
-        body="We're generating a starter idea you can post in one tap. This usually takes a few seconds."
-        icon={<Sparkles className="h-6 w-6 animate-pulse text-amber-300" />}
-        onSkip={onSkip}
-      />
-    );
-  }
+function ComposeStep({ onSkip }: { onSkip: () => void }) {
   return (
     <GuidedStep
       selector="[data-tutorial='compose']"
       eyebrow="Step 1 of 4"
       title="Make your first idea"
-      body="Tap the glowing + button at the top of the screen to open the composer. We've already drafted an idea you can post in one tap."
+      body="Tap the glowing + button at the top of the screen. We'll walk you through the rest."
       icon={<Plus className="h-6 w-6 text-amber-300" />}
       onSkip={onSkip}
     />

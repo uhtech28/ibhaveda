@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useAction, useQuery } from "convex/react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,12 +36,6 @@ interface WriteToolProps {
   isSubmitting?: boolean;
   layout?: "compact" | "wide";
 }
-
-// Generic 70-word response auto-typed during the first-run tour so the
-// user sees the submit + AI scoring flow without having to write a
-// response themselves on their very first task.
-const TUTORIAL_RESPONSE_TEMPLATE =
-  "This is the starting point for my venture. The core problem is something I have personally felt: builders struggle to ship in public, get fast feedback, and find collaborators. My plan is to start small and focused, validate the idea with at least five user conversations this week, then prototype the thinnest possible slice. From there I will measure interest, iterate on what works, and decide what to expand based on real signal rather than guessing.";
 
 interface WriteAssistPayload {
   suggestion: string;
@@ -181,47 +175,9 @@ export function WriteTool({
 
   const generateWriteAssist = useAction(api.aiScoring.generateWriteAssist);
 
-  // First-run tour hook: detect whether the user is in the task phase
-  // (active tour + zero completed tasks). When yes, auto-fill a generic
-  // 70-word response and count down to submit so the user sees the flow
-  // without typing anything.
-  // Task autofill during the first-run tour was removed at user
-  // request — they want builders to actually write their answer.
-  const tutorialMode = false;
-
-  const [tutorialCountdown, setTutorialCountdown] = useState<number | null>(
-    null,
-  );
-  const [tutorialPaused, setTutorialPaused] = useState(false);
-  const autofilledRef = useRef(false);
-
   useEffect(() => {
     if (initialContent) setText(initialContent);
   }, [initialContent]);
-
-  useEffect(() => {
-    if (!tutorialMode) return;
-    if (autofilledRef.current) return;
-    autofilledRef.current = true;
-    setText(TUTORIAL_RESPONSE_TEMPLATE);
-    setTutorialCountdown(4);
-  }, [tutorialMode]);
-
-  useEffect(() => {
-    if (tutorialCountdown === null) return;
-    if (tutorialPaused) return;
-    if (tutorialCountdown === 0) {
-      handleSubmit();
-      setTutorialCountdown(null);
-      return;
-    }
-    const id = window.setTimeout(
-      () => setTutorialCountdown((c) => (c === null ? null : c - 1)),
-      1000,
-    );
-    return () => window.clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tutorialCountdown, tutorialPaused]);
 
   const wordCount = useMemo(
     () => (text.trim() ? text.trim().split(/\s+/).length : 0),
@@ -391,8 +347,6 @@ export function WriteTool({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Submitting...
                 </>
-              ) : tutorialCountdown !== null && !tutorialPaused ? (
-                <>Submitting in {tutorialCountdown}…</>
               ) : (
                 <>
                   <Check className="mr-2 h-4 w-4" />
@@ -400,22 +354,6 @@ export function WriteTool({
                 </>
               )}
             </Button>
-            {tutorialCountdown !== null && !isSubmitting && (
-              <div className="mt-2 flex items-center justify-between rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs">
-                <span className="font-medium text-amber-200">
-                  {tutorialPaused
-                    ? "Auto-submit paused. Edit and submit when ready."
-                    : `We'll submit this for you in ${tutorialCountdown}s.`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setTutorialPaused((p) => !p)}
-                  className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-white/15"
-                >
-                  {tutorialPaused ? "Resume" : "Pause"}
-                </button>
-              </div>
-            )}
           </div>
 
             {/* Commented out the entire AI Assist panel for future implementation

@@ -105,7 +105,6 @@ export function IdeaForgeExperience({
   onCompleteProfile,
   onLoadMore,
   hasMore = false,
-  tutorialDraft,
   tutorialOpenCompose,
 }: {
   mode: "feed" | "my-ideas";
@@ -123,10 +122,9 @@ export function IdeaForgeExperience({
   onCompleteProfile: () => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
-  /** First-run tour draft. When the user opens the wizard during the
-   *  tour's compose phase, this seeds the form and turns on the
-   *  tutorial countdown / auto-submit. */
-  tutorialDraft?: Partial<ComposerDraft>;
+  /** True while the first-run tour is on its compose phase. The wizard
+   *  switches to tutorialMode (outline highlight + auto-submit) when
+   *  the user opens it during this window. */
   tutorialOpenCompose?: boolean;
 }) {
   const router = useRouter();
