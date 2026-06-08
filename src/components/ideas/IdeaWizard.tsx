@@ -248,9 +248,15 @@ export function IdeaWizard({
         setStep("preview");
       } else {
         reset();
+        // Tutorial mode: skip the template chooser and drop the user
+        // straight onto the AI-description step so the tour highlight
+        // has something to point at.
+        if (tutorialMode) {
+          setStep("outline");
+        }
       }
     }
-  }, [isOpen, initialDraft]);
+  }, [isOpen, initialDraft, tutorialMode]);
 
   // ── AI handlers ──
   const handleGenerate = async () => {
@@ -618,6 +624,14 @@ export function IdeaWizard({
 
             <div className="flex-1 flex flex-col px-5 py-4 min-h-0">
               <div className="relative flex-1">
+                {tutorialMode && !outline.trim() && (
+                  <>
+                    <span className="pointer-events-none absolute -inset-1.5 rounded-[14px] border-2 border-amber-300 shadow-[0_0_45px_rgba(251,191,36,0.55)] z-10" />
+                    <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 z-20 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0A0E1A] shadow-[0_8px_24px_rgba(251,191,36,0.5)]">
+                      ↓ Describe your idea
+                    </span>
+                  </>
+                )}
                 <Textarea
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
@@ -667,20 +681,30 @@ export function IdeaWizard({
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    audioManager.playTouch(
-                      outline.trim() ? "confirm" : "error",
-                    );
-                    if (outline.trim()) handleGenerate();
-                  }}
-                  disabled={!outline.trim()}
-                  className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate
-                </Button>
+                <div className="relative">
+                  {tutorialMode && outline.trim() && (
+                    <>
+                      <span className="pointer-events-none absolute -inset-1.5 rounded-[12px] border-2 border-amber-300 shadow-[0_0_45px_rgba(251,191,36,0.55)]" />
+                      <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0A0E1A] shadow-[0_8px_24px_rgba(251,191,36,0.5)]">
+                        ↓ Tap to generate
+                      </span>
+                    </>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      audioManager.playTouch(
+                        outline.trim() ? "confirm" : "error",
+                      );
+                      if (outline.trim()) handleGenerate();
+                    }}
+                    disabled={!outline.trim()}
+                    className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate
+                  </Button>
+                </div>
               </div>
             </div>
           </>

@@ -4826,7 +4826,10 @@ function MapTourMount() {
       tutorialState.state === "not_started" ||
       tutorialState.state === "in_progress"
     ) {
-      const t = window.setTimeout(() => setShow(true), 700);
+      // Wait long enough for the Phaser scene + initial Convex queries
+      // to settle, otherwise FeedTutorial's mutation observers fire
+      // alongside Phaser boot and the spotlight tracks a moving DOM.
+      const t = window.setTimeout(() => setShow(true), 1800);
       return () => window.clearTimeout(t);
     }
   }, [tutorialState]);

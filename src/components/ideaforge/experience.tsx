@@ -224,16 +224,12 @@ export function IdeaForgeExperience({
   };
 
   const openWizard = () => {
-    // If the tour is in its compose phase and the AI draft is ready,
-    // pre-fill the wizard and turn on tutorialMode so the countdown +
-    // auto-submit run after the user opens the composer themselves.
-    if (tutorialDraft && tutorialOpenCompose) {
-      setWizardDraft(tutorialDraft);
-      setWizardTutorialMode(true);
-    } else {
-      setWizardDraft(undefined);
-      setWizardTutorialMode(false);
-    }
+    // Tour compose phase: turn on tutorialMode so the wizard highlights
+    // the outline textarea and the preview-step countdown auto-submits
+    // once the AI has filled the form. We deliberately do NOT pre-fill
+    // — the user types their own description, then lets the AI expand.
+    setWizardDraft(undefined);
+    setWizardTutorialMode(!!tutorialOpenCompose);
     setShowIdeaWizard(true);
   };
 

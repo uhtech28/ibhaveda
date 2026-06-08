@@ -185,20 +185,9 @@ export function WriteTool({
   // (active tour + zero completed tasks). When yes, auto-fill a generic
   // 70-word response and count down to submit so the user sees the flow
   // without typing anything.
-  const tourState = useQuery(api.tutorial.getMyFeedTutorialState, {});
-  const myCombatCount = useQuery(api.tutorial_metrics.getMyCombatCount, {});
-  // Auto-fill every task during the first-run tour until the user has
-  // gone through at least one combat round. That way they reach the
-  // Advance button + Doubt Imp without grinding through multiple
-  // manual task submissions.
-  const tourActive =
-    !tourState ||
-    tourState.state === "in_progress" ||
-    tourState.state === "not_started";
-  const tutorialMode =
-    tourActive &&
-    (myCombatCount === 0 || myCombatCount === undefined) &&
-    !initialContent?.trim();
+  // Task autofill during the first-run tour was removed at user
+  // request — they want builders to actually write their answer.
+  const tutorialMode = false;
 
   const [tutorialCountdown, setTutorialCountdown] = useState<number | null>(
     null,
