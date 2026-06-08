@@ -4802,6 +4802,10 @@ export default function MapPage() {
 
 function MapTourMount() {
   const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
+  // Needed to drive the FeedTutorial's phase machine. FeedTutorial
+  // itself no longer queries this (deduped from /feed), so each mount
+  // point feeds it in.
+  const myIdeaCount = useQuery(api.tutorial_metrics.getMyIdeaCount, {});
   const [show, setShow] = useState(false);
   // Stable callback so the memoized FeedTutorial doesn't re-render.
   const onClose = useCallback(() => {
@@ -4831,6 +4835,7 @@ function MapTourMount() {
       show={show}
       initialStep={tutorialState?.step ?? 0}
       onClose={onClose}
+      myIdeaCount={myIdeaCount}
     />
   );
 }
