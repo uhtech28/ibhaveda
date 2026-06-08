@@ -175,7 +175,7 @@ describe("End-to-end round simulations", () => {
 describe("Level-floor guard with HP-based XP awards", () => {
   it("four critical hits cannot push the user below their level floor", () => {
     const four1s = 4 * COMBAT_CONFIG.INDIVIDUAL_XP_PER_SCORE[1]; // -16
-    const beforeXp = 5050;
+    const beforeXp = 5010; // close enough to floor that -16 would drop below
     const levelFloor = 5000;
     expect(applyXpDelta(beforeXp, levelFloor, four1s)).toBe(levelFloor);
   });

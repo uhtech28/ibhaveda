@@ -146,25 +146,28 @@ export function composeText(
   opts: ComposeOpts = {},
 ): string {
   const limit = COMPOSER_LIMITS_CHARS[platform];
-  const url = opts.includeUrl ? payload.url ?? "" : "";
+  const payloadUrl = payload.url ?? "";
+  const includeUrlInline = opts.includeUrl ?? false;
 
   const parts: string[] = [];
   if (payload.title) parts.push(payload.title);
   if (payload.text) parts.push(payload.text);
-  if (url) parts.push(url);
+  if (includeUrlInline && payloadUrl) parts.push(payloadUrl);
 
   const joined = parts.filter(Boolean).join("\n\n");
   if (joined.length <= limit) return joined;
 
   // Drop the body and try again.
-  const withoutBody = [payload.title, url].filter(Boolean).join("\n\n");
+  const withoutBody = [payload.title, includeUrlInline ? payloadUrl : null]
+    .filter(Boolean)
+    .join("\n\n");
   if (withoutBody.length <= limit) return withoutBody;
 
-  // Drop the title; URL only.
-  if (url.length <= limit) return url;
+  // Drop the title; URL only (always falls back to URL when available).
+  if (payloadUrl && payloadUrl.length <= limit) return payloadUrl;
 
   // URL itself is too long — truncate (extreme edge).
-  return url.slice(0, limit);
+  return payloadUrl.slice(0, limit);
 }
 
 // ─────────────────────────────────────────────────────────────────────
