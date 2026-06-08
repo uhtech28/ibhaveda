@@ -275,6 +275,18 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
             <div className="w-full space-y-2.5 px-3.5 py-3">
               {displayedMessages.map((message) => {
                 const senderUser = users?.find(u => u.id === message.senderId);
+                const msgWithImage = message as typeof message & {
+                  imageStorageId?: Id<"_storage">;
+                  imageWidth?: number;
+                  imageHeight?: number;
+                };
+                const image = msgWithImage.imageStorageId
+                  ? {
+                      storageId: msgWithImage.imageStorageId,
+                      width: msgWithImage.imageWidth ?? 0,
+                      height: msgWithImage.imageHeight ?? 0,
+                    }
+                  : null;
                 return (
                   <MessageBubble
                     key={message._id}
@@ -289,6 +301,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
                       },
                       timestamp: new Date(message.createdAt),
                       isCurrentUser: message.senderId === currentUserId,
+                      image,
                     }}
                   />
                 );
@@ -302,7 +315,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
           {sendError}
         </div>
       )}
-      <div className="flex h-[72px] shrink-0 items-center border-t border-white/10 bg-[#0B101B]">
+      <div className="shrink-0 border-t border-white/10 bg-[#0B101B]">
         <ChatInput
           onSend={handleSendMessage}
           typingUsers={[]}
