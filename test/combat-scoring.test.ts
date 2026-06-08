@@ -104,8 +104,8 @@ describe("resolveOutcome — sudden-death and question-budget end states", () =>
 
 describe("End-to-end round simulations", () => {
   it("two 5/5 answers win the round in 2 questions", () => {
-    let boss = COMBAT_CONFIG.INITIAL_HP;
-    let player = COMBAT_CONFIG.INITIAL_HP;
+    let boss: number = COMBAT_CONFIG.INITIAL_HP;
+    let player: number = COMBAT_CONFIG.INITIAL_HP;
     const scores = [5, 5];
     for (let i = 0; i < scores.length; i++) {
       const r = applyDamageExchange(boss, player, scores[i]);
@@ -119,8 +119,8 @@ describe("End-to-end round simulations", () => {
   });
 
   it("three 1/5 answers end the round in sudden-death loss", () => {
-    let boss = COMBAT_CONFIG.INITIAL_HP;
-    let player = COMBAT_CONFIG.INITIAL_HP;
+    let boss: number = COMBAT_CONFIG.INITIAL_HP;
+    let player: number = COMBAT_CONFIG.INITIAL_HP;
     const scores = [1, 1, 1];
     let lostAt: number | null = null;
     for (let i = 0; i < scores.length; i++) {
@@ -137,8 +137,8 @@ describe("End-to-end round simulations", () => {
   });
 
   it("four 3/3/3/3 (all blocked) end as a loss — boss survived", () => {
-    let boss = COMBAT_CONFIG.INITIAL_HP;
-    let player = COMBAT_CONFIG.INITIAL_HP;
+    let boss: number = COMBAT_CONFIG.INITIAL_HP;
+    let player: number = COMBAT_CONFIG.INITIAL_HP;
     for (let i = 0; i < 4; i++) {
       const r = applyDamageExchange(boss, player, 3);
       boss = r.bossHpAfter;
@@ -150,8 +150,8 @@ describe("End-to-end round simulations", () => {
   });
 
   it("a mixed strong round wins in 3 questions (4/5, 4/5, 4/5)", () => {
-    let boss = COMBAT_CONFIG.INITIAL_HP;
-    let player = COMBAT_CONFIG.INITIAL_HP;
+    let boss: number = COMBAT_CONFIG.INITIAL_HP;
+    let player: number = COMBAT_CONFIG.INITIAL_HP;
     const scores = [4, 4, 4];
     let wonAt: number | null = null;
     for (let i = 0; i < scores.length; i++) {

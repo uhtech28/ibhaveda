@@ -83,7 +83,7 @@ export default function TestCombatPage() {
             <VentureSection
               key={v._id}
               ventureId={v._id}
-              ventureName={v.name ?? "Untitled venture"}
+              ventureName={(v as { name?: string }).name ?? "Untitled venture"}
               onStart={startCombat}
               busyCheckpoint={busyCheckpoint}
             />

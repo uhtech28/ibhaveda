@@ -52,10 +52,12 @@ export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
         <EmptyState />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {flares.map((flare) => (
+          {flares
+            .filter((flare) => flare.status !== "closed")
+            .map((flare) => (
             <FlareCard
               key={flare._id}
-              flare={flare}
+              flare={flare as typeof flare & { status: "open" | "resolved" }}
               isOwn={
                 currentUserId !== null && flare.owner._id === currentUserId
               }

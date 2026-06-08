@@ -89,10 +89,7 @@ function FeedTutorialInner({
       // Hand-off after the user posts: go to their newest venture.
       // The post-create flow already does this, so no-op here.
     }
-    if (
-      (phase === "contribute" || phase === "finale") &&
-      !pathname?.startsWith("/feed")
-    ) {
+    if (phase === "contribute" && !pathname?.startsWith("/feed")) {
       router.push("/feed");
     }
   }, [phase, pathname, router, show]);
@@ -114,10 +111,6 @@ function FeedTutorialInner({
 
   if (!show) return null;
   if (anyDialogOpen) return null;
-  if (phase === "done") {
-    handleFinish();
-    return null;
-  }
 
   // Each page renders its own slice of the tour. We render the right
   // overlay based on (phase, pathname).

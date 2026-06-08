@@ -139,8 +139,8 @@ export class DecryptScene extends MiniGameSceneBase {
     return {
       archetype: "decrypt",
       cipherLength: this.pieces.length,
-      vocabularySize: 1, // one glyph per puzzle
       guessesUsed: this.moveCount,
+      maxGuesses: this.pieces.length,
     };
   }
 

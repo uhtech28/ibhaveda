@@ -156,8 +156,8 @@ function IdeaDetailVideo({ src, mimeType }: { src: string; mimeType?: string }) 
         preload="auto"
         className="mx-auto block max-h-[85vh] max-w-full"
         style={{
+          // @ts-expect-error — "high-quality" is valid CSS but missing from lib types
           imageRendering: "high-quality",
-          // @ts-expect-error — vendor-prefix smoothing hints
           WebkitBackfaceVisibility: "hidden",
           backfaceVisibility: "hidden",
           transform: "translateZ(0)",

@@ -285,6 +285,7 @@ const HlsVideo = React.forwardRef<
     let cancelled = false;
     (async () => {
       try {
+        // @ts-expect-error — hls.js is optional, loaded only if installed
         const mod = await import("hls.js");
         if (cancelled) return;
         const Hls = (mod as { default: any }).default ?? (mod as any);
