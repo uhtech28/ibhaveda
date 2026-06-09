@@ -307,6 +307,21 @@ export class WorldMapScene extends Phaser.Scene {
   private retreatedStages: Set<number> = new Set();
   /** Stages whose mini-boss defeat animation has already started this session */
   private slainMiniBossStages: Set<number> = new Set();
+  // Tracks which stages have had their gold/retreat **celebration burst**
+  // played in this scene lifetime. Distinct from slainMiniBossStages
+  // (which we reset on venture switch). On remount of an advanced
+  // venture, every already-finished stage was replaying the cascade
+  // (~81 game objects + tweens per stage × 8 stages = 648 transient
+  // entities in one frame). This set persists across venture switches
+  // for the lifetime of the scene; the visual end-state (gold node
+  // + slain boss sprite) is restored by slayGold()/restoreBiome
+  // without the burst.
+  private celebratedGoldStages: Set<number> = new Set();
+  private celebratedRetreatStages: Set<number> = new Set();
+  // Last performance.now() timestamp updateMiniBossProgress ran. The
+  // initial scene boot can call it 3+ times within the same frame from
+  // loadStage; we throttle to one call per 100ms.
+  private lastMiniBossRefreshMs: number = 0;
   /** Checkpoints that have already triggered a mini-boss combat sequence */
   private triggeredBossCheckpoints: Set<string> = new Set();
   private initializedBossTriggers: boolean = false;
@@ -1319,8 +1334,18 @@ export class WorldMapScene extends Phaser.Scene {
       // 4. Create stage mini-boss
       this.createMiniBossForStage(stageId);
 
-      // 5. Update the new mini-boss state if checkpoints have been loaded
-      if (this.latestCheckpointsState) {
+      // 5. Update the new mini-boss state if checkpoints have been loaded.
+      // loadStage runs once per lazy-loaded stage on initial mount (3
+      // stages by default) — without this guard we'd call updateMiniBoss-
+      // Progress 3x, each call walking all 8 stages. The celebratedGold/
+      // Retreat sets gate the visual cascade now, so even repeated calls
+      // are cheap, but skipping when we already ran a refresh in the
+      // last 100ms removes the loop work too.
+      if (
+        this.latestCheckpointsState &&
+        performance.now() - this.lastMiniBossRefreshMs > 100
+      ) {
+        this.lastMiniBossRefreshMs = performance.now();
         this.updateMiniBossProgress(this.latestCheckpointsState);
       }
 
@@ -7588,7 +7613,15 @@ export class WorldMapScene extends Phaser.Scene {
           if (finalCheckpointGold) {
             // Did all tasks -> Boss dies!
             miniBoss.slayGold();
-            this.transformBiomeGold(stage);
+            // Only run the celebration burst the first time we see this
+            // stage as gold in the scene's lifetime. On re-mount or
+            // venture-switch, slayGold() above plus the persistent gold
+            // visuals on each checkpoint produce the correct end-state
+            // without the 81-object burst.
+            if (!this.celebratedGoldStages.has(stage)) {
+              this.celebratedGoldStages.add(stage);
+              this.transformBiomeGold(stage);
+            }
             this.syncCorruptionVisuals();
           } else {
             // Did bare minimum (2 tasks) -> Boss retreats permanently!
@@ -7605,7 +7638,10 @@ export class WorldMapScene extends Phaser.Scene {
                 miniBoss.destroy();
               }
             });
-            this.restoreBiome(stage);
+            if (!this.celebratedRetreatStages.has(stage)) {
+              this.celebratedRetreatStages.add(stage);
+              this.restoreBiome(stage);
+            }
             this.syncCorruptionVisuals();
           }
           this.slainMiniBossStages.add(stage);
@@ -7688,6 +7724,17 @@ export class WorldMapScene extends Phaser.Scene {
         this.bossCombatActiveStages.clear();
         this.retreatedStages.clear();
         this.slainMiniBossStages.clear();
+        // Seed the celebration sets from the venture's current state so
+        // re-entering an already-advanced venture doesn't replay 8x worth
+        // of gold cascades on mount. Any stage strictly before the user's
+        // current stage is "already finished" from a player perspective.
+        this.celebratedGoldStages.clear();
+        this.celebratedRetreatStages.clear();
+        const currentStageNumber = event.currentStage ?? this.currentStage;
+        for (let s = 1; s < currentStageNumber; s += 1) {
+          this.celebratedGoldStages.add(s);
+          this.celebratedRetreatStages.add(s);
+        }
         this.triggeredBossCheckpoints.clear();
         this.initializedBossTriggers = false;
         this.checkpointIdAliases.clear();

@@ -43,6 +43,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
   private numberText: Phaser.GameObjects.Text;
   private pulseTween: Phaser.Tweens.Tween | null = null;
   private shimmerTween: Phaser.Tweens.Tween | null = null;
+  private floatTween: Phaser.Tweens.Tween | null = null;
 
   private static readonly C = {
     barkDark: 0x342416,
@@ -207,15 +208,21 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
       this.numberText,
     ]);
 
-    scene.tweens.add({
-      targets: this,
-      y: config.y - 2,
-      duration: 2200 + Math.random() * 800,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-      delay: Math.random() * 1800,
-    });
+    // Forever-running bobbing tween — skip it for already-finished
+    // checkpoints (completed/gold). On an advanced venture with 20+
+    // such nodes we were leaving 20 repeat:-1 tweens ticking every
+    // frame; the tween manager doesn't skip them via frustum culling.
+    if (config.status !== "completed" && config.status !== "gold") {
+      this.floatTween = scene.tweens.add({
+        targets: this,
+        y: config.y - 2,
+        duration: 2200 + Math.random() * 800,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+        delay: Math.random() * 1800,
+      });
+    }
 
     this.setSize(100, 100);
     this.setInteractive();
@@ -344,6 +351,10 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
   private startGoldShimmer(): void {
     this.shimmerTween?.stop();
+    // Slowed to 1800ms (from 900ms) — halves the per-frame tint work for
+    // every gold node we DO shimmer. Before this change an advanced
+    // venture with 20 gold checkpoints was running 20 * 60fps = 1200
+    // tint operations per second just for shimmer.
     const start = Phaser.Display.Color.IntegerToColor(CheckpointNode.C.amber);
     const end = Phaser.Display.Color.IntegerToColor(
       CheckpointNode.C.amberLight,
@@ -353,7 +364,7 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     this.shimmerTween = this.scene.tweens.add({
       targets: counter,
       t: 1,
-      duration: 900,
+      duration: 1800,
       ease: Phaser.Math.Easing.Sine.InOut,
       yoyo: true,
       repeat: -1,
@@ -388,6 +399,16 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     }
 
     this.stopAnimations();
+
+    // Stop the idle bobbing tween once we transition out of an active
+    // state — finished nodes shouldn't pay tween-manager cost forever.
+    if (
+      (this._status === "completed" || this._status === "gold") &&
+      this.floatTween
+    ) {
+      this.floatTween.stop();
+      this.floatTween = null;
+    }
     this.mainSprite.setTexture(
       `cp_${this._status === "partial" ? "in_progress" : this._status}`,
     );
