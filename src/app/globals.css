@@ -850,13 +850,29 @@
 
 /* Mobile-only keyboard lift for the request-to-contribute dialog. */
 @media (max-width: 639px) {
-  .mobile-contribution-request-dialog:has(textarea:focus) {
-    top: 34% !important;
+  .mobile-contribution-request-dialog {
+    left: 50vw !important;
+    top: 50dvh !important;
+    right: auto !important;
     bottom: auto !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: 31rem !important;
+    max-height: min(78dvh, 34rem) !important;
     overflow-y: auto !important;
-    max-height: min(58dvh, calc(100dvh - 11rem)) !important;
     transform: translate(-50%, -50%) !important;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-contribution-request-dialog:has(textarea:focus) {
+    left: 50vw !important;
+    top: 30dvh !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: 31rem !important;
+    overflow-y: auto !important;
+    max-height: min(46dvh, 27rem) !important;
+    transform: translate(-50%, -50%) !important;
   }
 
   .mobile-contribution-request-dialog:has(textarea:focus) form {
@@ -898,11 +914,18 @@
   }
 
   .mobile-comments-dialog:has(textarea:focus) {
-    top: calc(env(safe-area-inset-top, 0px) + 5rem) !important;
+    left: 50vw !important;
+    top: 36dvh !important;
+    right: auto !important;
     bottom: auto !important;
-    height: min(54dvh, 29rem) !important;
-    max-height: min(54dvh, 29rem) !important;
-    transform: translateX(-50%) !important;
+    height: min(48dvh, 28rem) !important;
+    max-height: min(48dvh, 28rem) !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .mobile-comments-dialog:has(textarea:focus) > div:last-child {
+    min-height: 0 !important;
+    overflow: hidden !important;
   }
 
   .mobile-comments-dialog [data-slot="dialog-title"] {

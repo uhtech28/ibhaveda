@@ -575,13 +575,13 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                   <select
                     value={sortBy}
                     onChange={(e: any) => setSortBy(e.target.value)}
-                    className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-4 max-sm:text-[9.5px]"
+                    className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:text-[8px]"
                   >
                     <option value="recent" className="bg-slate-950 text-white font-sans">Recently Earned</option>
                     <option value="prestige" className="bg-slate-950 text-white font-sans">Highest Rarity</option>
                     <option value="name" className="bg-slate-950 text-white font-sans">Alphabetical (A-Z)</option>
                   </select>
-                  <ChevronDown className="pointer-events-none absolute right-0 top-1/2 hidden h-3 w-3 -translate-y-1/2 text-white max-sm:block" />
+                  <ChevronDown className="pointer-events-none absolute right-0 top-1/2 hidden h-2.5 w-2.5 -translate-y-1/2 text-white max-sm:block" />
                 </div>
               </div>
 
@@ -593,7 +593,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                 <select
                   value={activeRarity}
                   onChange={(e: any) => setActiveRarity(e.target.value)}
-                  className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-4 max-sm:text-[9.5px]"
+                  className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:text-[8px]"
                 >
                   <option value="all" className="bg-slate-950 text-white font-sans">All Rarities</option>
                   <option value="common" className="bg-slate-950 text-white font-sans">🥉 Bronze</option>
@@ -603,7 +603,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                   <option value="legendary" className="bg-slate-950 text-white font-sans">👑 Legendary</option>
                   <option value="mythic" className="bg-slate-950 text-white font-sans">🔥 Mythic</option>
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 hidden h-3 w-3 -translate-y-1/2 text-white max-sm:block" />
+                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 hidden h-2.5 w-2.5 -translate-y-1/2 text-white max-sm:block" />
                 </div>
               </div>
             </div>
