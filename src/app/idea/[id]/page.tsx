@@ -195,6 +195,8 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
   const [showComments, setShowComments] = useState(false);
   const [showCreateSubIdea, setShowCreateSubIdea] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [commentsKeyboardOpen, setCommentsKeyboardOpen] = useState(false);
+  const [contributionKeyboardOpen, setContributionKeyboardOpen] = useState(false);
 
   React.useEffect(() => {
     if (isLoaded && !userId) router.push("/");
@@ -341,8 +343,22 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={showRequests} onOpenChange={setShowRequests}>
-                <DialogContent className="mobile-contribution-request-dialog max-w-3xl max-h-[85vh] overflow-y-auto w-full">
+              <Dialog
+                open={showRequests}
+                onOpenChange={(open) => {
+                  setShowRequests(open);
+                  if (!open) setContributionKeyboardOpen(false);
+                }}
+              >
+                <DialogContent
+                  onFocus={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(true);
+                  }}
+                  onBlur={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(false);
+                  }}
+                  className={`mobile-contribution-request-dialog ${contributionKeyboardOpen ? "mobile-contribution-request-dialog--keyboard" : ""} max-w-3xl max-h-[85vh] overflow-y-auto w-full`}
+                >
                   <DialogHeader>
                     <DialogTitle>Contribution Requests</DialogTitle>
                   </DialogHeader>
@@ -359,7 +375,10 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                           authorId={(ideaQuery as ConvexIdea).authorId}
                           authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
                           isAuthor
-                          onClose={() => setShowRequests(false)}
+                          onClose={() => {
+                            setShowRequests(false);
+                            setContributionKeyboardOpen(false);
+                          }}
                           embedded
                         />
                       </TabsContent>
@@ -378,7 +397,10 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                         authorId={(ideaQuery as ConvexIdea).authorId}
                         authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
                         isAuthor={false}
-                        onClose={() => setShowRequests(false)}
+                        onClose={() => {
+                          setShowRequests(false);
+                          setContributionKeyboardOpen(false);
+                        }}
                       />
                       <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: false }} />
                     </>
@@ -413,16 +435,29 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={showComments} onOpenChange={setShowComments}>
+              <Dialog
+                open={showComments}
+                onOpenChange={(open) => {
+                  setShowComments(open);
+                  if (!open) setCommentsKeyboardOpen(false);
+                }}
+              >
                 <DialogContent
                   showCloseButton={false}
-                  className="
+                  onFocus={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(true);
+                  }}
+                  onBlur={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(false);
+                  }}
+                  className={`
                     mobile-comments-dialog
+                    ${commentsKeyboardOpen ? "mobile-comments-dialog--keyboard" : ""}
                     grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
                     w-full max-w-[640px] sm:w-[min(calc(100vw-2rem),640px)]
                     h-[100dvh] max-h-[100dvh] rounded-none
                     sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
-                  "
+                  `}
                 >
                   <header className="flex min-w-0 items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4 max-sm:h-14 max-sm:px-4 max-sm:py-0">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30 max-sm:h-9 max-sm:w-9">

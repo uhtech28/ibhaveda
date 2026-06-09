@@ -575,7 +575,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                   <select
                     value={sortBy}
                     onChange={(e: any) => setSortBy(e.target.value)}
-                    className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:text-[8px]"
+                    className="mobile-badge-select min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:!text-[8px]"
                   >
                     <option value="recent" className="bg-slate-950 text-white font-sans">Recently Earned</option>
                     <option value="prestige" className="bg-slate-950 text-white font-sans">Highest Rarity</option>
@@ -593,7 +593,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                 <select
                   value={activeRarity}
                   onChange={(e: any) => setActiveRarity(e.target.value)}
-                  className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:text-[8px]"
+                  className="mobile-badge-select min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:!text-[8px]"
                 >
                   <option value="all" className="bg-slate-950 text-white font-sans">All Rarities</option>
                   <option value="common" className="bg-slate-950 text-white font-sans">🥉 Bronze</option>

@@ -863,18 +863,20 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .mobile-contribution-request-dialog--keyboard,
   .mobile-contribution-request-dialog:has(textarea:focus) {
     left: 50vw !important;
-    top: 30dvh !important;
+    top: calc(env(safe-area-inset-top, 0px) + 4rem) !important;
     right: auto !important;
     bottom: auto !important;
     width: calc(100vw - 2rem) !important;
     max-width: 31rem !important;
     overflow-y: auto !important;
-    max-height: min(46dvh, 27rem) !important;
-    transform: translate(-50%, -50%) !important;
+    max-height: min(52dvh, 27rem) !important;
+    transform: translateX(-50%) !important;
   }
 
+  .mobile-contribution-request-dialog--keyboard form,
   .mobile-contribution-request-dialog:has(textarea:focus) form {
     padding-bottom: 0.25rem;
   }
@@ -913,19 +915,26 @@
     border-radius: 1rem !important;
   }
 
+  .mobile-comments-dialog--keyboard,
   .mobile-comments-dialog:has(textarea:focus) {
     left: 50vw !important;
-    top: 36dvh !important;
+    top: calc(env(safe-area-inset-top, 0px) + 4.25rem) !important;
     right: auto !important;
     bottom: auto !important;
-    height: min(48dvh, 28rem) !important;
-    max-height: min(48dvh, 28rem) !important;
-    transform: translate(-50%, -50%) !important;
+    height: min(52dvh, 30rem) !important;
+    max-height: min(52dvh, 30rem) !important;
+    transform: translateX(-50%) !important;
   }
 
+  .mobile-comments-dialog--keyboard > div:last-child,
   .mobile-comments-dialog:has(textarea:focus) > div:last-child {
     min-height: 0 !important;
     overflow: hidden !important;
+  }
+
+  .mobile-badge-select {
+    font-size: 8px !important;
+    line-height: 1 !important;
   }
 
   .mobile-comments-dialog [data-slot="dialog-title"] {
