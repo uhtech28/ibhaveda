@@ -623,6 +623,58 @@ export const ensureVentureStructure = mutation({
       }
     }
 
+    // Deduplicate (stage, checkpoint) pairs. Old code had a race that
+    // could insert the same checkpoint twice — for those rows Phaser
+    // renders both nodes on top of each other, the task panel toggles
+    // between them, and the world looks "glitchy" because every Convex
+    // update flips which one is "first". Keep the row with the most
+    // task progress (so we don't lose completed flags), delete the rest.
+    const byKey = new Map<string, typeof refreshedCheckpoints>();
+    for (const cp of refreshedCheckpoints) {
+      const key = `${cp.stage}-${cp.checkpoint}`;
+      const group = byKey.get(key) ?? [];
+      group.push(cp);
+      byKey.set(key, group);
+    }
+    for (const group of byKey.values()) {
+      if (group.length <= 1) continue;
+      // Pick the keeper: prefer completed > in_progress > anything else;
+      // tiebreak by most task flags set; final tiebreak by oldest row.
+      group.sort((a, b) => {
+        const score = (c: typeof a) =>
+          (c.status === "completed" ? 3 : c.status === "in_progress" ? 2 : 1) * 10 +
+          [c.t1Completed, c.t2Completed, c.t3Completed].filter(Boolean).length;
+        const diff = score(b) - score(a);
+        if (diff !== 0) return diff;
+        return a._creationTime - b._creationTime;
+      });
+      const [keeper, ...duplicates] = group;
+      for (const dup of duplicates) {
+        // Move any tasks attached to the dup onto the keeper so we don't
+        // orphan them.
+        const dupTasks = await ctx.db
+          .query("ventureTasks")
+          .withIndex("by_checkpoint", (q) => q.eq("checkpointId", dup._id))
+          .collect();
+        for (const t of dupTasks) {
+          // If keeper already has a task at this level, drop the dup;
+          // otherwise re-parent it.
+          const existing = await ctx.db
+            .query("ventureTasks")
+            .withIndex("by_checkpoint_level", (q) =>
+              q.eq("checkpointId", keeper._id).eq("taskLevel", t.taskLevel),
+            )
+            .first();
+          if (existing) {
+            await ctx.db.delete(t._id);
+          } else {
+            await ctx.db.patch(t._id, { checkpointId: keeper._id });
+          }
+        }
+        await ctx.db.delete(dup._id);
+      }
+    }
+
     const orderedCheckpoints = refreshedCheckpoints.sort((a, b) => {
       if (a.stage !== b.stage) return a.stage - b.stage;
       return a.checkpoint - b.checkpoint;
