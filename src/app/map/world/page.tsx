@@ -306,8 +306,13 @@ function useMapGame() {
     const apply = () => {
       const game = gameRef.current;
       if (!game) return;
+      // Strict: only ACTUALLY-OPEN Radix dialogs (data-state="open") or
+      // elements we explicitly tagged with data-phaser-pause. The earlier
+      // `[role="dialog"]` blanket selector matched hidden Radix portals
+      // that live in the DOM permanently, leaving Phaser asleep forever
+      // and breaking map scroll.
       const domOpen = !!document.querySelector(
-        '[role="dialog"], [data-phaser-pause="true"]',
+        '[role="dialog"][data-state="open"], [data-phaser-pause="true"]',
       );
       const shouldPause = manualPause || domOpen;
       if (shouldPause && !game.loop.sleeping) {
@@ -611,7 +616,6 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
   return (
     <motion.div
       key="cp-panel"
-      data-phaser-pause="true"
       initial={{ x: "100%", opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
