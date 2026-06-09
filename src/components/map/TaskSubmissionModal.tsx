@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, X } from "lucide-react";
 import { useMutation } from "convex/react";
@@ -80,7 +80,11 @@ function getMinRequirementLabel(toolType: string): string {
   }
 }
 
-export function TaskSubmissionModal({
+// memo wrapper — INP trace showed 2.2s per keystroke when the parent
+// MapPage was re-rendering on every Convex tick. Now the modal only
+// reconciles when its own props (isOpen / task / onClose / onSuccess)
+// change reference.
+function TaskSubmissionModalInner({
   isOpen,
   onClose,
   task,
@@ -411,3 +415,5 @@ export function TaskSubmissionModal({
     </AnimatePresence>
   );
 }
+
+export const TaskSubmissionModal = memo(TaskSubmissionModalInner);
