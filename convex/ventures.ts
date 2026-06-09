@@ -533,6 +533,8 @@ export const ensureVentureStructure = mutation({
     const venturePatch: Partial<{
       corruptionLevel: number;
       lastActivityAt: number;
+      templateId: "venture" | "academic" | "lab" | "creative";
+      assignedBosses: number[];
       updatedAt: number;
     }> = {};
 
@@ -542,32 +544,134 @@ export const ensureVentureStructure = mutation({
     if (typeof venture.lastActivityAt !== "number") {
       venturePatch.lastActivityAt = venture.updatedAt ?? now;
     }
+    // Old rows persisted before templateId existed silently default to
+    // "venture" everywhere. Materialise that so all downstream readers
+    // (template helpers, biome resolvers) see a concrete value rather
+    // than undefined.
+    if (!venture.templateId) {
+      venturePatch.templateId = "venture";
+    }
+    // assignedBosses is required by the schema but pre-PRD venture
+    // rows may have an empty array. Default to the full 8-boss roster
+    // so the world map can render the boss icons over each checkpoint.
+    if (!Array.isArray(venture.assignedBosses) || venture.assignedBosses.length === 0) {
+      venturePatch.assignedBosses = [1, 2, 3, 4, 5, 6, 7, 8];
+    }
     if (Object.keys(venturePatch).length > 0) {
       venturePatch.updatedAt = now;
       await ctx.db.patch(venture._id, venturePatch);
     }
 
-    // Auto-heal checkpoints so the persisted status matches the 2-of-3 gate.
+    // Auto-heal checkpoints so the persisted status matches the 2-of-3 gate,
+    // and patch any missing required fields on very old rows. The boolean
+    // task flags occasionally have `undefined` instead of `false` on the
+    // oldest data — normalise those, and ensure goldBonusEarned exists so
+    // the gold-checkpoint pipeline doesn't trip on it.
     for (const cp of refreshedCheckpoints) {
+      const checkpointPatch: Partial<{
+        t1Completed: boolean;
+        t2Completed: boolean;
+        t3Completed: boolean;
+        goldBonusEarned: boolean;
+        status: "not_started" | "in_progress" | "completed" | "skipped";
+        completedAt: number;
+        partialStartedAt: number | undefined;
+      }> = {};
+
+      if (typeof cp.t1Completed !== "boolean") checkpointPatch.t1Completed = false;
+      if (typeof cp.t2Completed !== "boolean") checkpointPatch.t2Completed = false;
+      if (typeof cp.t3Completed !== "boolean") checkpointPatch.t3Completed = false;
+      if (typeof cp.goldBonusEarned !== "boolean") checkpointPatch.goldBonusEarned = false;
+
       const completedCount = [
-        cp.t1Completed,
-        cp.t2Completed,
-        cp.t3Completed,
+        checkpointPatch.t1Completed ?? cp.t1Completed,
+        checkpointPatch.t2Completed ?? cp.t2Completed,
+        checkpointPatch.t3Completed ?? cp.t3Completed,
       ].filter(Boolean).length;
 
       if (completedCount >= 2 && cp.status !== "completed") {
-        await ctx.db.patch(cp._id, {
-          status: "completed",
-          completedAt: cp.completedAt ?? now,
-          partialStartedAt: undefined,
-        });
-        cp.status = "completed"; // mutate local copy for downstream logic
+        checkpointPatch.status = "completed";
+        checkpointPatch.completedAt = cp.completedAt ?? now;
+        checkpointPatch.partialStartedAt = undefined;
+        cp.status = "completed";
       } else if (completedCount === 1 && cp.status !== "in_progress") {
-        await ctx.db.patch(cp._id, {
-          status: "in_progress",
-          partialStartedAt: cp.partialStartedAt ?? now,
-        });
+        checkpointPatch.status = "in_progress";
+        if (typeof cp.partialStartedAt !== "number") {
+          checkpointPatch.partialStartedAt = now;
+        }
         cp.status = "in_progress";
+      }
+
+      if (Object.keys(checkpointPatch).length > 0) {
+        await ctx.db.patch(cp._id, checkpointPatch);
+      }
+    }
+
+    // Normalise legacy task toolType values that aren't supported by the
+    // current tool renderers. Old rows persisted "oauth" before that
+    // tool was retired; treat them as "link" submissions so the world
+    // map task panel doesn't crash trying to render an unknown tool.
+    for (const cp of refreshedCheckpoints) {
+      const cpTasks = await ctx.db
+        .query("ventureTasks")
+        .withIndex("by_checkpoint", (q) => q.eq("checkpointId", cp._id))
+        .collect();
+      for (const task of cpTasks) {
+        if (task.toolType === "oauth") {
+          await ctx.db.patch(task._id, { toolType: "link" });
+        }
+      }
+    }
+
+    // Deduplicate (stage, checkpoint) pairs. Old code had a race that
+    // could insert the same checkpoint twice — for those rows Phaser
+    // renders both nodes on top of each other, the task panel toggles
+    // between them, and the world looks "glitchy" because every Convex
+    // update flips which one is "first". Keep the row with the most
+    // task progress (so we don't lose completed flags), delete the rest.
+    const byKey = new Map<string, typeof refreshedCheckpoints>();
+    for (const cp of refreshedCheckpoints) {
+      const key = `${cp.stage}-${cp.checkpoint}`;
+      const group = byKey.get(key) ?? [];
+      group.push(cp);
+      byKey.set(key, group);
+    }
+    for (const group of byKey.values()) {
+      if (group.length <= 1) continue;
+      // Pick the keeper: prefer completed > in_progress > anything else;
+      // tiebreak by most task flags set; final tiebreak by oldest row.
+      group.sort((a, b) => {
+        const score = (c: typeof a) =>
+          (c.status === "completed" ? 3 : c.status === "in_progress" ? 2 : 1) * 10 +
+          [c.t1Completed, c.t2Completed, c.t3Completed].filter(Boolean).length;
+        const diff = score(b) - score(a);
+        if (diff !== 0) return diff;
+        return a._creationTime - b._creationTime;
+      });
+      const [keeper, ...duplicates] = group;
+      for (const dup of duplicates) {
+        // Move any tasks attached to the dup onto the keeper so we don't
+        // orphan them.
+        const dupTasks = await ctx.db
+          .query("ventureTasks")
+          .withIndex("by_checkpoint", (q) => q.eq("checkpointId", dup._id))
+          .collect();
+        for (const t of dupTasks) {
+          // If keeper already has a task at this level, drop the dup;
+          // otherwise re-parent it.
+          const existing = await ctx.db
+            .query("ventureTasks")
+            .withIndex("by_checkpoint_level", (q) =>
+              q.eq("checkpointId", keeper._id).eq("taskLevel", t.taskLevel),
+            )
+            .first();
+          if (existing) {
+            await ctx.db.delete(t._id);
+          } else {
+            await ctx.db.patch(t._id, { checkpointId: keeper._id });
+          }
+        }
+        await ctx.db.delete(dup._id);
       }
     }
 
