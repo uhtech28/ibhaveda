@@ -794,17 +794,46 @@ export const getWorldMapData = query({
       .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
       .collect();
 
-    // ── Tasks (per-checkpoint using index) ─────────────────────────────
-    // Fetched via the by_checkpoint index to avoid a full ventureTasks scan.
-    const tasksPerCheckpoint = await Promise.all(
-      checkpoints.map((cp) =>
-        ctx.db
-          .query("ventureTasks")
-          .withIndex("by_checkpoint", (q) => q.eq("checkpointId", cp._id))
-          .collect(),
-      ),
+    // ── Tasks (single venture-scoped query) ────────────────────────────
+    // The denormalised by_venture index lets us collapse the previous
+    // 24-36 by_checkpoint fanout into one indexed collect. Legacy task
+    // rows whose ventureId wasn't backfilled yet fall through to the
+    // by_checkpoint path so the migration can proceed gradually.
+    let allTasks = await ctx.db
+      .query("ventureTasks")
+      .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
+      .collect();
+
+    const checkpointIdSet = new Set(checkpoints.map((cp) => cp._id as string));
+    const expectedTaskCount = checkpoints.length * 3;
+    if (allTasks.length < expectedTaskCount) {
+      // Some tasks predate the ventureId field — fall back to the old
+      // per-checkpoint fanout for the missing ones. After the next
+      // ensureVentureStructure run this branch becomes dead.
+      const seen = new Set(allTasks.map((t) => t._id as string));
+      const fallbackChunks = await Promise.all(
+        checkpoints.map((cp) =>
+          ctx.db
+            .query("ventureTasks")
+            .withIndex("by_checkpoint", (q) => q.eq("checkpointId", cp._id))
+            .collect(),
+        ),
+      );
+      for (const chunk of fallbackChunks) {
+        for (const t of chunk) {
+          if (!seen.has(t._id as string)) {
+            allTasks.push(t);
+            seen.add(t._id as string);
+          }
+        }
+      }
+    }
+    // Filter out any tasks pointing at a checkpoint that's no longer
+    // part of this venture (defensive — shouldn't happen but cheap).
+    allTasks = allTasks.filter((t) =>
+      checkpointIdSet.has(t.checkpointId as string),
     );
-    const allTasks = tasksPerCheckpoint.flat();
+
     const tasksByCheckpoint = new Map<string, typeof allTasks>();
     for (const task of allTasks) {
       const key = task.checkpointId as string;

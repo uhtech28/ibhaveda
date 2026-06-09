@@ -113,6 +113,7 @@ async function createVentureForUser(
 
     await ctx.db.insert("ventureTasks", {
       checkpointId,
+      ventureId,
       taskLevel: "t1",
       toolType: cpDef.t1.tool as any,
       status: "not_started",
@@ -120,6 +121,7 @@ async function createVentureForUser(
 
     await ctx.db.insert("ventureTasks", {
       checkpointId,
+      ventureId,
       taskLevel: "t2",
       toolType: cpDef.t2.tool as any,
       status: "not_started",
@@ -127,6 +129,7 @@ async function createVentureForUser(
 
     await ctx.db.insert("ventureTasks", {
       checkpointId,
+      ventureId,
       taskLevel: "t3",
       toolType: cpDef.t3.tool as any,
       status: "not_started",
@@ -376,6 +379,7 @@ export const createVenture = mutation({
       // Create T1 task
       await ctx.db.insert("ventureTasks", {
         checkpointId,
+        ventureId,
         taskLevel: "t1",
         toolType: cpDef.t1.tool as any,
         status: "not_started",
@@ -384,6 +388,7 @@ export const createVenture = mutation({
       // Create T2 task
       await ctx.db.insert("ventureTasks", {
         checkpointId,
+        ventureId,
         taskLevel: "t2",
         toolType: cpDef.t2.tool as any,
         status: "not_started",
@@ -392,6 +397,7 @@ export const createVenture = mutation({
       // Create T3 task
       await ctx.db.insert("ventureTasks", {
         checkpointId,
+        ventureId,
         taskLevel: "t3",
         toolType: cpDef.t3.tool as any,
         status: "not_started",
@@ -607,18 +613,22 @@ export const ensureVentureStructure = mutation({
       }
     }
 
-    // Normalise legacy task toolType values that aren't supported by the
-    // current tool renderers. Old rows persisted "oauth" before that
-    // tool was retired; treat them as "link" submissions so the world
-    // map task panel doesn't crash trying to render an unknown tool.
+    // Normalise legacy task toolType values + backfill the denormalised
+    // ventureId reference. The new `by_venture` index on ventureTasks
+    // lets getWorldMapData fetch every task in one collect instead of
+    // fanning out 24-36 by_checkpoint queries per tick. Old rows lack
+    // the field; this loop is idempotent and only patches what's missing.
     for (const cp of refreshedCheckpoints) {
       const cpTasks = await ctx.db
         .query("ventureTasks")
         .withIndex("by_checkpoint", (q) => q.eq("checkpointId", cp._id))
         .collect();
       for (const task of cpTasks) {
-        if (task.toolType === "oauth") {
-          await ctx.db.patch(task._id, { toolType: "link" });
+        const taskPatch: Partial<{ toolType: "link"; ventureId: Id<"ventures"> }> = {};
+        if (task.toolType === "oauth") taskPatch.toolType = "link";
+        if (!task.ventureId) taskPatch.ventureId = venture._id;
+        if (Object.keys(taskPatch).length > 0) {
+          await ctx.db.patch(task._id, taskPatch);
         }
       }
     }

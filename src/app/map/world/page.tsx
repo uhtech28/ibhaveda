@@ -1942,26 +1942,40 @@ function MapPageInner() {
   }, [activeVenture?._id, backfillPendingEvaluations]);
 
   // ── Detect gold checkpoint notifications ──────────────────────────────────
+  // Bail BEFORE the work — previously the spread + sort over `checkpoints`
+  // ran on every notifications poll even when there was nothing to show.
+  // For advanced ventures `checkpoints` is 30+ items so that allocation
+  // chain was paid constantly.
   useEffect(() => {
     if (!notifications || !venture) return;
 
-    // Find unread gold checkpoint notifications for this venture
-    const goldNotifications = notifications?.filter(
+    // Find unread gold checkpoint notification for this venture (only
+    // need the first one — find is O(N) once, not filter+spread+sort).
+    const latestNotif = notifications.find(
       (n) =>
         n.type === "gold_checkpoint" &&
         !n.isRead &&
         n.relatedId === venture._id,
     );
+    if (!latestNotif) return;
 
-    if (goldNotifications.length > 0) {
-      // Use the most recent notification
-      const latestNotif = goldNotifications[0];
-
-      // Try to find the actual checkpoint that earned gold by looking in our
-      // in-memory checkpoints for the most recently gold-completed one.
-      const goldCp = [...checkpoints]
-        .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
-        .find((cp) => cp.t1Completed && cp.t2Completed && cp.t3Completed);
+    {
+      // Single linear scan to find the most recently gold-completed
+      // checkpoint instead of [...checkpoints].sort() (creates a new
+      // 30-item array + an O(N log N) sort per run).
+      let goldCp: typeof checkpoints[number] | undefined;
+      let bestTs = -1;
+      for (const cp of checkpoints) {
+        if (
+          cp.t1Completed &&
+          cp.t2Completed &&
+          cp.t3Completed &&
+          (cp.completedAt ?? 0) > bestTs
+        ) {
+          bestTs = cp.completedAt ?? 0;
+          goldCp = cp;
+        }
+      }
 
       const targetStage = goldCp?.stage ?? activeStage;
       const targetCP = goldCp?.checkpoint ?? activeCP;

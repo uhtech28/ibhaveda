@@ -7582,6 +7582,21 @@ export class WorldMapScene extends Phaser.Scene {
       superBossObj.updateCorruptionAura(this.currentCorruptionLevel);
     }
 
+    // Pre-group checkpoints by stage ONCE so the per-stage loop below
+    // doesn't redo a filter+sort over the entire array for each of 8
+    // mini-bosses. Previously this was 8 × O(N log N) per Convex tick;
+    // now it's one O(N) pass + 8 O(K log K) sorts of small per-stage
+    // arrays.
+    const checkpointsByStage = new Map<number, typeof checkpoints>();
+    for (const cp of checkpoints) {
+      const arr = checkpointsByStage.get(cp.stage);
+      if (arr) arr.push(cp);
+      else checkpointsByStage.set(cp.stage, [cp]);
+    }
+    for (const arr of checkpointsByStage.values()) {
+      arr.sort((a, b) => a.checkpoint - b.checkpoint);
+    }
+
     // Update all mini-bosses
     for (const [stage, miniBoss] of this.miniBosses.entries()) {
       const progress = stageProgress.get(stage);
@@ -7590,9 +7605,7 @@ export class WorldMapScene extends Phaser.Scene {
       }
 
       const { completed, total } = progress;
-      const stageCheckpoints = checkpoints
-        .filter((cp) => cp.stage === stage)
-        .sort((a, b) => a.checkpoint - b.checkpoint);
+      const stageCheckpoints = checkpointsByStage.get(stage) ?? [];
       const finalCheckpoint = stageCheckpoints[stageCheckpoints.length - 1];
       const finalCheckpointCompleted =
         finalCheckpoint?.status === "completed" ||
