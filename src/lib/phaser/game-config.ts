@@ -92,14 +92,12 @@ export function createGameConfig(
       batchSize: 4096,
     },
     fps: {
-      // Half the per-frame work. 30fps is more than enough for a pixel-
-      // art world map with slow parallax + checkpoint pulses — there's
-      // no fast-action gameplay here. Drops sustained CPU/GPU usage
-      // dramatically; the symptom of "the whole computer lags" comes
-      // from this kind of constant 60fps render budget.
-      target: 30,
+      // Back to 60fps — 30fps was making pan/scroll feel choppy even on
+      // good devices. Real per-frame cost is already aggressively
+      // trimmed (frustum culling, idle-tween skip, parallax batch tick).
+      target: 60,
       smoothStep: true,
-      panicMax: 60,
+      panicMax: 120,
       forceSetTimeOut: false,
     },
     // Pause game loop while the tab is hidden — by default Phaser keeps

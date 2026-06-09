@@ -20,31 +20,26 @@ let cached: boolean | null = null;
 function detectAutomatic(): boolean {
   if (typeof navigator === "undefined") return false;
 
-  // Total RAM hint in GB (1, 0.5, 0.25 are valid). Anything < 4GB is
-  // considered low-end. Safari and Firefox don't expose this, so we
-  // fall back to hardwareConcurrency.
+  // Tightened thresholds — earlier 4GB / 4-core cut was too aggressive
+  // and was matching most mid-range laptops, stripping their visuals
+  // unnecessarily. Now only fires for genuinely budget hardware.
   const memoryGb = (navigator as { deviceMemory?: number }).deviceMemory;
-  if (typeof memoryGb === "number" && memoryGb > 0 && memoryGb < 4) {
+  if (typeof memoryGb === "number" && memoryGb > 0 && memoryGb < 2) {
     return true;
   }
 
-  // Logical CPU cores. <= 4 cores → likely budget device. Most modern
-  // desktops have 8+, most phones have 6+. Cheap laptops + budget
-  // Android often have 4 or fewer.
   const cores = navigator.hardwareConcurrency;
-  if (typeof cores === "number" && cores > 0 && cores <= 4) {
+  if (typeof cores === "number" && cores > 0 && cores < 4) {
     return true;
   }
 
-  // Connection type — "slow-2g" / "2g" / "3g" implies a budget device
-  // even if RAM/cores look fine.
+  // Slow-2g / 2g only — 3G is fine for our payload sizes.
   const conn = (
     navigator as { connection?: { effectiveType?: string } }
   ).connection;
   if (
     conn?.effectiveType === "slow-2g" ||
-    conn?.effectiveType === "2g" ||
-    conn?.effectiveType === "3g"
+    conn?.effectiveType === "2g"
   ) {
     return true;
   }
