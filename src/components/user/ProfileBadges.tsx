@@ -566,15 +566,15 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
               />
             </div>
 
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 max-sm:grid max-sm:w-full max-sm:min-w-0 max-sm:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
               {/* Sort selector dropdown */}
-              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans">
-                <ArrowUpDown className="w-3.5 h-3.5" />
-                <span className="font-extrabold uppercase tracking-wide text-[10px] text-slate-500">Sort:</span>
+              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans max-sm:min-w-0 max-sm:gap-1 max-sm:px-2">
+                <ArrowUpDown className="w-3.5 h-3.5 shrink-0 max-sm:w-3 max-sm:h-3" />
+                <span className="shrink-0 font-extrabold uppercase tracking-wide text-[10px] text-slate-500 max-sm:text-[9px]">Sort:</span>
                 <select
                   value={sortBy}
                   onChange={(e: any) => setSortBy(e.target.value)}
-                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans"
+                  className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:text-[11px]"
                 >
                   <option value="recent" className="bg-slate-950 text-white font-sans">Recently Earned</option>
                   <option value="prestige" className="bg-slate-950 text-white font-sans">Highest Rarity</option>
@@ -583,13 +583,13 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
               </div>
 
               {/* Rarity filter dropdown */}
-              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans">
-                <Filter className="w-3.5 h-3.5" />
-                <span className="font-extrabold uppercase tracking-wide text-[10px] text-slate-500">Rarity:</span>
+              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans max-sm:min-w-0 max-sm:gap-1 max-sm:px-2">
+                <Filter className="w-3.5 h-3.5 shrink-0 max-sm:w-3 max-sm:h-3" />
+                <span className="shrink-0 font-extrabold uppercase tracking-wide text-[10px] text-slate-500 max-sm:text-[9px]">Rarity:</span>
                 <select
                   value={activeRarity}
                   onChange={(e: any) => setActiveRarity(e.target.value)}
-                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans"
+                  className="min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:text-[11px]"
                 >
                   <option value="all" className="bg-slate-950 text-white font-sans">All Rarities</option>
                   <option value="common" className="bg-slate-950 text-white font-sans">🥉 Bronze</option>

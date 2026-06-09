@@ -402,7 +402,7 @@ export default function ContributionRequestsPage() {
                   Contribution Requests
                 </h1>
               </div>
-              <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-2xl">
+              <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-2xl max-sm:pl-10">
                 Manage requests on your ideas and track the ones you&apos;ve sent.
               </p>
             </div>

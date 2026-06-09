@@ -206,13 +206,13 @@ export default function HeroSection() {
                       style={{ background: role.glow }}
                     />
                     <div className="relative z-10 h-full">
-                      <div
-                        className="absolute left-0 top-0 grid h-10 w-10 place-items-center rounded-xl border border-white/10"
-                        style={{ background: `${role.color}18` }}
-                      >
-                        <Icon className="h-5 w-5" style={{ color: role.color }} />
-                      </div>
                       <div className="flex h-full flex-col items-center justify-center text-center">
+                        <div
+                          className="mb-6 grid h-10 w-10 place-items-center rounded-xl border border-white/10"
+                          style={{ background: `${role.color}18` }}
+                        >
+                          <Icon className="h-5 w-5" style={{ color: role.color }} />
+                        </div>
                         <p
                           className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1"
                           style={{ color: role.color }}
@@ -232,7 +232,7 @@ export default function HeroSection() {
                   "relative aspect-square overflow-hidden rounded-[20px] border border-white/10 bg-[#0B111A] p-4 transition-transform duration-200 hover:scale-[1.025] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 cursor-pointer text-left";
 
                 const style = {
-                  animation: `lp-card-in 450ms ${index * 80}ms ease both, lp-card-cta-glow 5200ms ${900 + index * 650}ms ease-in-out infinite`,
+                  animation: `lp-card-in 450ms ${index * 80}ms ease both, lp-card-cta-glow 10400ms ${900 + index * 650}ms ease-in-out infinite`,
                   "--role-color": role.color,
                   "--role-glow": role.glow,
                   "--role-glow-strong": `${role.color}66`,

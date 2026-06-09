@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 
 import { api } from "@convex/_generated/api";
@@ -108,21 +109,30 @@ export default function MyFeedPage() {
       <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
         <DialogContent
           className="
+            mobile-comments-dialog
             grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
             w-full max-w-[640px]
             h-[100dvh] max-h-[100dvh] rounded-none
             sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
           "
         >
-          <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
+          <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4 max-sm:h-14 max-sm:px-4 max-sm:py-0">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30 max-sm:h-9 max-sm:w-9">
               <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
             </div>
             <DialogTitle className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
-              {activeCommentIdea?.title}
+              {activeCommentIdea && (
+                <Link
+                  href={`/idea/${activeCommentIdea._id}`}
+                  className="block truncate transition-colors hover:text-[#C7D2FE]"
+                  onClick={() => setActiveCommentIdea(null)}
+                >
+                  {activeCommentIdea.title}
+                </Link>
+              )}
             </DialogTitle>
           </header>
-          <div className="min-h-0 px-5 py-4 overflow-hidden">
+          <div className="min-h-0 px-5 py-4 overflow-hidden max-sm:px-4 max-sm:py-3">
             {activeCommentIdea && (
               <CommentsSection
                 ideaId={activeCommentIdea._id as Id<"ideas">}
@@ -134,7 +144,7 @@ export default function MyFeedPage() {
       </Dialog>
 
       <Dialog open={!!activeContributeIdea} onOpenChange={(open) => !open && setActiveContributeIdea(null)}>
-        <DialogContent className="w-[min(92vw,560px)] max-w-[560px] overflow-hidden border-white/10 bg-[#111827] text-white">
+        <DialogContent className="mobile-contribution-request-dialog w-[min(92vw,560px)] max-w-[560px] overflow-hidden border-white/10 bg-[#111827] text-white">
           {activeContributeIdea && (
             <ContributionRequestModal
               ideaId={activeContributeIdea._id as Id<"ideas">}

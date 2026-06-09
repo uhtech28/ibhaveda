@@ -847,3 +847,37 @@
     font-size: 16px !important;
   }
 }
+
+/* Mobile-only keyboard lift for the request-to-contribute dialog. */
+@media (max-width: 639px) {
+  .mobile-contribution-request-dialog:has(textarea:focus) {
+    top: 43%;
+    overflow-y: auto;
+    max-height: min(72dvh, calc(100dvh - 1rem));
+  }
+
+  .mobile-invitation-popover {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .mobile-comments-dialog {
+    width: calc(100vw - 1.5rem) !important;
+    max-width: 31rem !important;
+    height: min(76dvh, 43rem) !important;
+    max-height: min(76dvh, 43rem) !important;
+    border-radius: 1rem !important;
+  }
+
+  .mobile-comments-dialog [data-slot="dialog-close"] {
+    top: 1.75rem;
+    right: 1rem;
+    display: grid;
+    height: 2rem;
+    width: 2rem;
+    place-items: center;
+    transform: translateY(-50%);
+  }
+}

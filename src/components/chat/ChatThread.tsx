@@ -188,7 +188,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
   return (
     <div className="flex flex-col h-full bg-[#0B101B] max-w-full overflow-hidden">
-      <div className="relative flex h-16 shrink-0 items-center border-b border-white/10 bg-[#0B101B] px-4 py-0">
+      <div className="relative flex h-16 shrink-0 items-center border-b border-white/10 bg-[#0B101B] px-4 py-0 max-sm:h-14">
         <div className="absolute inset-y-0 left-4 flex items-center">
           <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 hover:bg-white/[0.08] shrink-0">
             <ArrowLeft className="w-4 h-4" />

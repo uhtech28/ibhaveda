@@ -122,7 +122,7 @@ const ChatInput: React.FC<Props> = memo(({
 
   return (
     <div
-      className={`flex w-full flex-col bg-[#0B101B] px-3 py-3 transition ${
+      className={`flex w-full flex-col justify-center bg-[#0B101B] px-3 py-3 transition max-sm:py-2 ${
         isDragging ? "ring-2 ring-[#6366F1]/45" : ""
       }`}
       onDragOver={(e) => {
@@ -138,7 +138,6 @@ const ChatInput: React.FC<Props> = memo(({
           {typingUsers.length === 1 ? "is" : "are"} typing…
         </div>
       )}
-
       {stagedFile && (
         <div className="mb-2">
           <ImagePreviewCard
@@ -155,7 +154,7 @@ const ChatInput: React.FC<Props> = memo(({
         </div>
       )}
 
-      <div className="relative flex items-end gap-2">
+      <div className="relative flex items-end gap-2 max-sm:items-center">
         <input
           ref={fileInputRef}
           type="file"
@@ -174,20 +173,20 @@ const ChatInput: React.FC<Props> = memo(({
           size="icon"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="h-9 w-9 shrink-0 rounded-full text-[#9CA3AF] hover:bg-white/[0.06] hover:text-white"
+          className="h-9 w-9 shrink-0 rounded-full text-[#9CA3AF] hover:bg-white/[0.06] hover:text-white max-sm:h-8 max-sm:w-8"
           aria-label="Attach image"
         >
           <ImagePlus className="h-4 w-4" />
         </Button>
 
-        <div className="relative flex-1 rounded-[22px] border border-white/10 bg-[#0A0D12] transition-colors focus-within:border-[#6366F1]/45 focus-within:bg-[#111827]">
+        <div className="relative flex-1 rounded-[22px] border border-white/10 bg-[#0A0D12] transition-colors focus-within:border-[#6366F1]/45 focus-within:bg-[#111827] max-sm:h-10">
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             placeholder={placeholder}
-            className="block max-h-[72px] min-h-[38px] w-full resize-none rounded-[22px] border-0 bg-transparent py-2 pl-4 pr-14 text-sm leading-5 text-white placeholder:text-[#6B7280] shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="block max-h-[72px] min-h-[38px] w-full resize-none rounded-[22px] border-0 bg-transparent py-2 pl-4 pr-14 text-sm leading-5 text-white placeholder:text-[#6B7280] shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 max-sm:h-10 max-sm:min-h-10 max-sm:py-[9px]"
             rows={1}
             disabled={uploading}
           />
@@ -195,10 +194,10 @@ const ChatInput: React.FC<Props> = memo(({
           <Button
             onClick={() => void handleSubmit()}
             size="icon"
-            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full bg-[#4F46E5] text-white hover:bg-[#6366F1] disabled:opacity-40 disabled:hover:bg-[#4F46E5]"
+            className="absolute right-1 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#4F46E5] p-0 text-white hover:bg-[#6366F1] disabled:opacity-40 disabled:hover:bg-[#4F46E5]"
             disabled={(!message.trim() && !stagedFile) || uploading}
           >
-            <Send className="h-4 w-4" />
+            <Send className="block h-4 w-4" />
           </Button>
         </div>
       </div>
