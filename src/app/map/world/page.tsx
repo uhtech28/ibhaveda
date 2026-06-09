@@ -306,19 +306,34 @@ function useMapGame() {
     const apply = () => {
       const game = gameRef.current;
       if (!game) return;
-      // Strict: only ACTUALLY-OPEN Radix dialogs (data-state="open") or
-      // elements we explicitly tagged with data-phaser-pause. The earlier
-      // `[role="dialog"]` blanket selector matched hidden Radix portals
-      // that live in the DOM permanently, leaving Phaser asleep forever
-      // and breaking map scroll.
-      const domOpen = !!document.querySelector(
-        '[role="dialog"][data-state="open"], [data-phaser-pause="true"]',
+      // When a side overlay is open we THROTTLE Phaser instead of
+      // pausing it. Pausing froze input so users couldn't scroll/drag
+      // the map. Throttling to 15fps drops main-thread work by ~75%
+      // (huge INP win) while keeping pointer/wheel handlers active.
+      // Full pause is still used for Radix dialogs that genuinely
+      // cover the entire viewport (TaskSubmissionModal).
+      const fullModalOpen = !!document.querySelector(
+        '[role="dialog"][data-state="open"]',
       );
-      const shouldPause = manualPause || domOpen;
-      if (shouldPause && !game.loop.sleeping) {
-        game.loop.sleep();
-      } else if (!shouldPause && game.loop.sleeping) {
-        game.loop.wake();
+      const sideOverlayOpen = !!document.querySelector(
+        '[data-phaser-pause="true"]',
+      );
+
+      if (manualPause || fullModalOpen) {
+        if (!game.loop.sleeping) game.loop.sleep();
+        return;
+      }
+      if (game.loop.sleeping) game.loop.wake();
+
+      // Set FPS based on overlay state. The TimeStep `setLimitFPS` API
+      // adjusts the delta cap without re-creating the loop.
+      const targetFps = sideOverlayOpen ? 15 : 60;
+      const loop = game.loop as Phaser.Core.TimeStep & { setFpsLimit?: (n: number) => void };
+      if (typeof loop.setFpsLimit === "function") {
+        loop.setFpsLimit(targetFps);
+      } else {
+        // Older Phaser versions — set the field directly.
+        (loop as unknown as { targetFps: number }).targetFps = targetFps;
       }
     };
     const onPause = () => { manualPause = true; apply(); };
@@ -616,6 +631,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
   return (
     <motion.div
       key="cp-panel"
+      data-phaser-pause="true"
       initial={{ x: "100%", opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
