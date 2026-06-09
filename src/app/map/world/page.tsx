@@ -3545,6 +3545,45 @@ function MapPageInner() {
   const userProgress = useAtomValue(userProgressAtom);
   const corruption = useAtomValue(corruptionStateAtom);
 
+  // Stable callback for LeftSidebar — inlined as a 25-line arrow before,
+  // which re-created the closure every render and prevented LeftSidebar
+  // from staying memoized.
+  const handleSidebarOpenPanel = useCallback(
+    (tab: string) => {
+      if (tab === "chat") {
+        if (activeVenture?.ideaId) {
+          openGroupChat(
+            activeVenture.ideaId,
+            activeConversationId as Id<"conversations"> | undefined,
+          );
+        }
+        setIsGroupChatOpen(true);
+      } else if (tab === "contributors") {
+        setIsContributorsOpen(true);
+      } else if (tab === "feed") {
+        setIsContributionsOpen(true);
+      } else if (tab === "hierarchy") {
+        setIsHierarchyOpen(true);
+      } else if (tab === "calendar") {
+        setIsCalendarOpen(true);
+      } else if (tab === "kanban") {
+        setIsKanbanOpen(true);
+      } else if (tab === "journal") {
+        setIsJournalOpen(true);
+      } else if (tab === "minigames") {
+        setIsMiniGamesPanelOpen(true);
+      } else {
+        updateUrlParams({ panel: "tools", tab, checkpointId: null });
+      }
+    },
+    [
+      activeVenture?.ideaId,
+      activeConversationId,
+      openGroupChat,
+      updateUrlParams,
+    ],
+  );
+
   // ── Loading / no-venture guard ─────────────────────────────────────────────
   // worldMapData is "skip"ped while intro is showing, so only check it after intro
 
@@ -3728,8 +3767,12 @@ function MapPageInner() {
 
           {/* Quest List removed per user request */}
 
-          {/* Boss HP Bar - shows when corruption > 60% */}
-          <BossHPBar forceVisible={!!bossCombatTarget} />
+          {/* Boss HP Bar - only mount when it actually needs to show.
+              Previously this component always mounted and read Jotai
+              corruption state on every tick. */}
+          {(corruption.level >= 60 || bossCombatTarget) && (
+            <BossHPBar forceVisible={!!bossCombatTarget} />
+          )}
 
           {/* Stage navigation strip removed */}
 
@@ -3749,17 +3792,21 @@ function MapPageInner() {
 
           <CrossingFlash trigger={flashTrigger} />
 
-          {/* Gap 3 fix: use the real LevelUpSequence component */}
-          <LevelUpSequence
-            isVisible={showLevelUp}
-            oldLevel={levelUpData.oldLevel}
-            newLevel={levelUpData.newLevel}
-            phase={levelUpData.phase}
-            isPhaseTransition={levelUpData.isPhaseTransition}
-            unlockedTools={levelUpData.unlockedTools}
-            onComplete={() => setShowLevelUp(false)}
-            onSkip={() => setShowLevelUp(false)}
-          />
+          {/* Gap 3 fix: use the real LevelUpSequence component.
+              Conditionally mount so the audio + RollingCounter hooks
+              don't fire while closed. */}
+          {showLevelUp && (
+            <LevelUpSequence
+              isVisible
+              oldLevel={levelUpData.oldLevel}
+              newLevel={levelUpData.newLevel}
+              phase={levelUpData.phase}
+              isPhaseTransition={levelUpData.isPhaseTransition}
+              unlockedTools={levelUpData.unlockedTools}
+              onComplete={() => setShowLevelUp(false)}
+              onSkip={() => setShowLevelUp(false)}
+            />
+          )}
 
           {activeBadge && (
             <BadgeAwardSequence
@@ -3777,13 +3824,15 @@ function MapPageInner() {
           )}
 
           {/* Gold checkpoint notification popup */}
-          <GoldCheckpointPopup
-            isVisible={!!goldCheckpointNotification}
-            ventureName={goldCheckpointNotification?.ventureName ?? ""}
-            stageName={goldCheckpointNotification?.stageName ?? ""}
-            checkpoint={goldCheckpointNotification?.checkpoint ?? 0}
-            onDismiss={() => setGoldCheckpointNotification(null)}
-          />
+          {goldCheckpointNotification && (
+            <GoldCheckpointPopup
+              isVisible
+              ventureName={goldCheckpointNotification.ventureName}
+              stageName={goldCheckpointNotification.stageName}
+              checkpoint={goldCheckpointNotification.checkpoint}
+              onDismiss={() => setGoldCheckpointNotification(null)}
+            />
+          )}
 
           {/* ── HP-based Cross-Question Combat — replaces the old single-question
                 Doubt Imp overlay. Fires when player walks into a boss checkpoint. ── */}
@@ -3860,13 +3909,13 @@ function MapPageInner() {
           )}
 
           {/* Inter-checkpoint passage events overlay */}
-          {activeVenture && (() => {
+          {activeVenture && interCheckpointQueue.length > 0 && (() => {
             const currentCp = checkpoints.find(
               (cp) => cp.stage === activeVenture.currentStage && cp.checkpoint === activeVenture.currentCheckpoint
             );
             return (
               <InterCheckpointOverlay
-                isOpen={interCheckpointQueue.length > 0}
+                isOpen
                 events={interCheckpointQueue}
                 templateId={activeVenture.templateId as any}
                 stage={activeVenture.currentStage}
@@ -3903,12 +3952,17 @@ function MapPageInner() {
             }}
           />
 
-          {/* Lifecycle surfaces — same as before. */}
-          <MiniGamePromptDialog
-            spawn={miniGamePhase.kind === "prompt" ? miniGamePhase.spawn : null}
-            onEngage={miniGameLifecycle.acceptPrompt}
-            onDismiss={miniGameLifecycle.dismissPrompt}
-          />
+          {/* Lifecycle surfaces — same as before. Only mount the
+              prompt dialog when the prompt phase is actually active,
+              otherwise the Radix portal + state machine sits in the
+              tree for nothing. */}
+          {miniGamePhase.kind === "prompt" && (
+            <MiniGamePromptDialog
+              spawn={miniGamePhase.spawn}
+              onEngage={miniGameLifecycle.acceptPrompt}
+              onDismiss={miniGameLifecycle.dismissPrompt}
+            />
+          )}
           {miniGamePhase.kind === "playing" && (
             <MiniGameOverlay
               spawn={miniGamePhase.spawn}
@@ -3956,30 +4010,7 @@ function MapPageInner() {
           <div id="left-control-panel" className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
             <LeftSidebar
               ventureName={ideaTitle}
-              onOpenPanel={(tab) => {
-                if (tab === "chat") {
-                  if (activeVenture?.ideaId) {
-                    openGroupChat(activeVenture.ideaId, activeConversationId as Id<"conversations"> | undefined);
-                  }
-                  setIsGroupChatOpen(true);
-                } else if (tab === "contributors") {
-                  setIsContributorsOpen(true);
-                } else if (tab === "feed") {
-                  setIsContributionsOpen(true);
-                } else if (tab === "hierarchy") {
-                  setIsHierarchyOpen(true);
-                } else if (tab === "calendar") {
-                  setIsCalendarOpen(true);
-                } else if (tab === "kanban") {
-                  setIsKanbanOpen(true);
-                } else if (tab === "journal") {
-                  setIsJournalOpen(true);
-                } else if (tab === "minigames") {
-                  setIsMiniGamesPanelOpen(true);
-                } else {
-                  updateUrlParams({ panel: "tools", tab, checkpointId: null });
-                }
-              }}
+              onOpenPanel={handleSidebarOpenPanel}
             />
 
             {/* Tools Panel (Left - Floating Popup next to sidebar) */}
@@ -4071,20 +4102,24 @@ function MapPageInner() {
             onSuccess={handleTaskSubmissionSuccess}
           />
 
-          {/* Stage Clear Modal */}
-          <StageClearModal
-            show={stageClearModal.show}
-            stageNumber={stageClearModal.stageNumber}
-            stageName={stageClearModal.stageName}
-            isGold={stageClearModal.isGold}
-            medalTier={stageClearModal.medalTier}
-            fromBiome={stageClearModal.fromBiome}
-            nextStageName={stageClearModal.nextStageName}
-            nextBiome={stageClearModal.nextBiome}
-            onComplete={() =>
-              setStageClearModal({ ...stageClearModal, show: false })
-            }
-          />
+          {/* Stage Clear Modal — only mount while it should be visible
+              so its timers / dynamic import / framer hooks stay cold
+              otherwise. */}
+          {stageClearModal.show && (
+            <StageClearModal
+              show
+              stageNumber={stageClearModal.stageNumber}
+              stageName={stageClearModal.stageName}
+              isGold={stageClearModal.isGold}
+              medalTier={stageClearModal.medalTier}
+              fromBiome={stageClearModal.fromBiome}
+              nextStageName={stageClearModal.nextStageName}
+              nextBiome={stageClearModal.nextBiome}
+              onComplete={() =>
+                setStageClearModal((prev) => ({ ...prev, show: false }))
+              }
+            />
+          )}
 
           {/* Contributions / Project Feed Popup Modal */}
           <AnimatePresence>
