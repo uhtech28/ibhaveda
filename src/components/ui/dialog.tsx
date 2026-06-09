@@ -6,10 +6,21 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+const DialogCloseContext = React.createContext<(() => void) | null>(null)
+
 function Dialog({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  const closeDialog = React.useCallback(() => {
+    onOpenChange?.(false)
+  }, [onOpenChange])
+
+  return (
+    <DialogCloseContext.Provider value={onOpenChange ? closeDialog : null}>
+      <DialogPrimitive.Root data-slot="dialog" onOpenChange={onOpenChange} {...props} />
+    </DialogCloseContext.Provider>
+  )
 }
 
 function DialogTrigger({
@@ -32,11 +43,30 @@ function DialogClose({
 
 function DialogOverlay({
   className,
+  onPointerDown,
+  onClick,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+  const closeDialog = React.useContext(DialogCloseContext)
+
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
+      onPointerDown={(event) => {
+        onPointerDown?.(event)
+        if (event.defaultPrevented) return
+        if (closeDialog) {
+          event.preventDefault()
+          event.stopPropagation()
+          closeDialog()
+        }
+      }}
+      onClick={(event) => {
+        onClick?.(event)
+        if (event.defaultPrevented) return
+        event.preventDefault()
+        event.stopPropagation()
+      }}
       className={cn(
         // z-[9999] so dialogs always render above all panels, bottom navs (z-50) and game map tools (z-[100])
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[9999] bg-black/50",
@@ -51,15 +81,36 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onPointerDown,
+  onClick,
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const closeDialog = React.useContext(DialogCloseContext)
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        onPointerDown={(event) => {
+          onPointerDown?.(event)
+          if (!event.defaultPrevented) event.stopPropagation()
+        }}
+        onClick={(event) => {
+          onClick?.(event)
+          if (!event.defaultPrevented) event.stopPropagation()
+        }}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          if (event.defaultPrevented) return
+          if (closeDialog) {
+            event.preventDefault()
+            closeDialog()
+          }
+        }}
         className={cn(
           // z-[10000] sits one above the overlay (z-[9999]) so the dialog
           // body always paints over its own backdrop.

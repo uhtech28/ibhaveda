@@ -185,7 +185,15 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
             type="button"
             aria-label="Close invitation overlay"
             className="fixed inset-0 z-[10090] hidden bg-black/55 backdrop-blur-sm max-sm:block"
-            onClick={() => setIsPopoverOpen(false)}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsPopoverOpen(false);
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
           />
         )}
 

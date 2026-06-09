@@ -5,10 +5,21 @@ import * as PopoverPrimitive from "@radix-ui/react-popover"
 
 import { cn } from "@/lib/utils"
 
+const PopoverCloseContext = React.createContext<(() => void) | null>(null)
+
 function Popover({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+  const closePopover = React.useCallback(() => {
+    onOpenChange?.(false)
+  }, [onOpenChange])
+
+  return (
+    <PopoverCloseContext.Provider value={onOpenChange ? closePopover : null}>
+      <PopoverPrimitive.Root data-slot="popover" onOpenChange={onOpenChange} {...props} />
+    </PopoverCloseContext.Provider>
+  )
 }
 
 function PopoverTrigger({
@@ -21,14 +32,35 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  onPointerDown,
+  onClick,
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  const closePopover = React.useContext(PopoverCloseContext)
+
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
+        onPointerDown={(event) => {
+          onPointerDown?.(event)
+          if (!event.defaultPrevented) event.stopPropagation()
+        }}
+        onClick={(event) => {
+          onClick?.(event)
+          if (!event.defaultPrevented) event.stopPropagation()
+        }}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          if (event.defaultPrevented) return
+          if (closePopover) {
+            event.preventDefault()
+            closePopover()
+          }
+        }}
         className={cn(
           // z-[10100] so popovers (multi-select dropdowns, etc.) always
           // render above the dialog layer (z-[9999]/z-[10000]). Without this,

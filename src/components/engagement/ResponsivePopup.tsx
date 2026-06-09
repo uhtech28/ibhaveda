@@ -44,6 +44,15 @@ export function ResponsivePopup({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenChange(false);
+          }}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
           className={cn(
             "fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -51,6 +60,12 @@ export function ResponsivePopup({
           )}
         />
         <DialogPrimitive.Content
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDownOutside={(event) => {
+            event.preventDefault();
+            onOpenChange(false);
+          }}
           className={cn(
             // base — always
             "fixed z-[10000] border border-white/10 bg-[#111827] shadow-2xl",

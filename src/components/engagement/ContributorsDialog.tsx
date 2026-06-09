@@ -5,8 +5,8 @@
  * card or venture page. Shows the author first, then every accepted
  * contributor in acceptance order.
  *
- * Wired to the `getIdeaContributors` query. Renders as a bottom sheet
- * on mobile and a centered modal on desktop via `ResponsivePopup`.
+ * Wired to the `getIdeaContributors` query. Renders as a centered
+ * modal on mobile and desktop via `ResponsivePopup`.
  */
 
 import React from "react";
@@ -40,6 +40,7 @@ export function ContributorsDialog({ ideaId, onOpenChange }: Props) {
           {contributorCount} Contributors
         </span>
       }
+      mobilePresentation="modal"
     >
       {team === undefined ? (
         <LoadingState />
