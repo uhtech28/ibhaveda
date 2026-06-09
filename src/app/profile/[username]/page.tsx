@@ -75,7 +75,7 @@ export default function ProfilePage() {
     <div className="min-h-screen flex flex-col bg-background">
       <HeroHeader />
 
-      <main className="flex-1 container mx-auto px-4 py-12 pt-32">
+      <main className="flex-1 container mx-auto px-4 pb-12 pt-20 sm:py-12 sm:pt-32">
         <CompactProfileView
           profile={profileData}
           isOwner={isCurrentUser}

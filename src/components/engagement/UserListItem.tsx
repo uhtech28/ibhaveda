@@ -27,7 +27,7 @@ interface User {
 interface Props {
   user: User;
   /** Right-aligned meta line — e.g. "sparked 3d ago", "contributor", "author". */
-  subtext?: string;
+  subtext?: React.ReactNode;
   /** Optional badge to render next to the name (e.g. "Author"). */
   badge?: string;
 }

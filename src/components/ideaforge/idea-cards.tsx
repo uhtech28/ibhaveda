@@ -265,7 +265,7 @@ function StoryAction({
       title={label}
       className={cn(
         transitionBase,
-        "flex flex-1 min-w-0 items-center justify-center gap-1.5 rounded-[10px] px-2 py-2 text-xs sm:text-sm",
+        "flex w-full min-w-0 items-center justify-center gap-1.5 rounded-[10px] px-2 py-2 text-xs sm:text-sm",
         active ? tone.active : tone.base
       )}
     >
@@ -785,7 +785,7 @@ export function IdeaStoryCard({
       </div>
 
       <div className="mt-5 border-t border-white/8 pt-3">
-        <div className="flex flex-nowrap items-center gap-1">
+        <div className="grid grid-cols-3 items-center gap-1">
           <StoryAction
             icon={Sparkles}
             label="Spark"
@@ -804,7 +804,7 @@ export function IdeaStoryCard({
             onClick={() => onComment(idea._id)}
             iconOnly
           />
-          <span data-tutorial="contribute" className="inline-flex">
+          <span data-tutorial="contribute" className="min-w-0">
             <ContributorsAction
               ideaId={idea._id}
               onClick={() => {
@@ -836,6 +836,7 @@ export function IdeaStoryCard({
       {/* PRD §8 — engagement popups for this story card */}
       <SparkersDialog
         ideaId={sparkersOpen ? (idea._id as Id<"ideas">) : null}
+        sparkCount={optimisticSpark.count}
         onOpenChange={(open) => setSparkersOpen(open)}
       />
       <ContributorsDialog

@@ -240,7 +240,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
         onOpenCalendar={() => setShowCalendar(true)}
       />
 
-      <main className="flex-1 w-full py-12 pt-24">
+      <main className="flex-1 w-full pb-12 pt-24 lg:grid lg:place-items-center lg:py-16">
         <div className="mx-auto w-full max-w-[900px] px-4 sm:px-6 lg:px-8 relative">
           {/* Breadcrumb — always shows Feed > root > ... > current so
               the user never loses context. */}
@@ -415,25 +415,29 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
 
               <Dialog open={showComments} onOpenChange={setShowComments}>
                 <DialogContent
+                  showCloseButton={false}
                   className="
                     mobile-comments-dialog
-                    grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
-                    w-full max-w-[640px]
+                    grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
+                    w-full max-w-[640px] sm:w-[min(calc(100vw-2rem),640px)]
                     h-[100dvh] max-h-[100dvh] rounded-none
                     sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
                   "
                 >
-                  <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4 max-sm:h-14 max-sm:px-4 max-sm:py-0">
+                  <header className="flex min-w-0 items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4 max-sm:h-14 max-sm:px-4 max-sm:py-0">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30 max-sm:h-9 max-sm:w-9">
                       <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
                     </div>
                     <DialogTitle className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
-                      <Link href={`/idea/${ideaQuery._id}`} className="block truncate transition-colors hover:text-[#C7D2FE]">
+                      <Link href={`/idea/${ideaQuery._id}`} className="block max-w-full truncate transition-colors hover:text-[#C7D2FE]">
                         {ideaQuery.title}
                       </Link>
                     </DialogTitle>
+                    <DialogClose className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/65 transition hover:bg-white/10 hover:text-white" aria-label="Close comments">
+                      <X className="h-4 w-4" />
+                    </DialogClose>
                   </header>
-                  <div className="min-h-0 px-5 py-4 overflow-hidden max-sm:px-4 max-sm:py-3">
+                  <div className="min-h-0 min-w-0 overflow-hidden px-5 py-4 max-sm:px-4 max-sm:py-3">
                     <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
                   </div>
                 </DialogContent>

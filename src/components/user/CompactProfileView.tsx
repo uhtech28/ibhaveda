@@ -244,10 +244,10 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                         variant="default"
                         size="icon"
                         onClick={handleSendMessage}
-                        className="h-8 w-8 rounded-full flex-shrink-0"
+                        className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full p-0 [&_svg]:m-0"
                         title="Message"
                       >
-                        <MessageCircle className="w-4 h-4 text-white" />
+                        <MessageCircle className="h-4 w-4 text-white" />
                         <span className="sr-only">Message</span>
                       </Button>
                       <InvitationButton

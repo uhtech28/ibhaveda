@@ -10,8 +10,8 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { IdeaForgeExperience } from "@/components/ideaforge/experience";
 import { IdeaForgeIdea } from "@/components/ideaforge/shared";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { MessageCircle } from "lucide-react";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MessageCircle, X } from "lucide-react";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
@@ -154,15 +154,16 @@ export function FeedClient() {
 
       <Dialog open={!!activeCommentIdea} onOpenChange={(open) => !open && setActiveCommentIdea(null)}>
         <DialogContent
+          showCloseButton={false}
           className="
             mobile-comments-dialog
-            grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
-            w-full max-w-[640px]
+            grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
+            w-full max-w-[640px] sm:w-[min(calc(100vw-2rem),640px)]
             h-[100dvh] max-h-[100dvh] rounded-none
             sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
           "
         >
-          <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4 max-sm:h-14 max-sm:px-4 max-sm:py-0">
+          <header className="flex min-w-0 items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4 max-sm:h-14 max-sm:px-4 max-sm:py-0">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30 max-sm:h-9 max-sm:w-9">
               <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
             </div>
@@ -170,15 +171,18 @@ export function FeedClient() {
               {activeCommentIdea && (
                 <Link
                   href={`/idea/${activeCommentIdea._id}`}
-                  className="block truncate transition-colors hover:text-[#C7D2FE]"
+                  className="block max-w-full truncate transition-colors hover:text-[#C7D2FE]"
                   onClick={() => setActiveCommentIdea(null)}
                 >
                   {activeCommentIdea.title}
                 </Link>
               )}
             </DialogTitle>
+            <DialogClose className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/65 transition hover:bg-white/10 hover:text-white" aria-label="Close comments">
+              <X className="h-4 w-4" />
+            </DialogClose>
           </header>
-          <div className="min-h-0 px-5 py-4 overflow-hidden max-sm:px-4 max-sm:py-3">
+          <div className="min-h-0 min-w-0 overflow-hidden px-5 py-4 max-sm:px-4 max-sm:py-3">
             {activeCommentIdea && (
               <CommentsSection
                 ideaId={activeCommentIdea._id as Id<"ideas">}

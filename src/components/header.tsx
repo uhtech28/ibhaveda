@@ -120,34 +120,36 @@ export const HeroHeader = ({
                                 </div>
                             </SignedOut>
                             <SignedIn>
-                                <button type="button" aria-label="Post idea" onClick={() => setShowIdeaWizard(true)} className={cn(transitionBase, "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
-                                    <Plus className="h-5 w-5" />
-                                </button>
-                                <div className="shrink-0 [&_button]:h-9 [&_button]:w-9 [&_button]:text-[#D1D5DB] [&_button:hover]:bg-white/[0.06] [&_button:hover]:text-white">
-                                    <NotificationBell />
+                                <div className="grid shrink-0 grid-cols-3 items-center gap-1">
+                                    <button type="button" aria-label="Post idea" onClick={() => setShowIdeaWizard(true)} className={cn(transitionBase, "grid h-9 w-9 place-items-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
+                                        <Plus className="h-5 w-5" />
+                                    </button>
+                                    <div className="grid h-9 w-9 place-items-center [&_button]:grid [&_button]:h-9 [&_button]:w-9 [&_button]:place-items-center [&_button]:p-0 [&_button]:text-[#D1D5DB] [&_button:hover]:bg-white/[0.06] [&_button:hover]:text-white">
+                                        <NotificationBell />
+                                    </div>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <button type="button" className="grid h-9 w-9 place-items-center rounded-full" aria-label="Open profile menu">
+                                                <Avatar className="h-7 w-7">
+                                                    <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                                                    <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{initials}</AvatarFallback>
+                                                </Avatar>
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56" align="end" forceMount>
+                                            <div className="grid gap-2">
+                                                <Link href={`/profile/${currentUser?.username}`} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors">
+                                                    {currentUser?.displayName}
+                                                    <p className="text-xs text-muted-foreground font-normal truncate">@{currentUser?.username}</p>
+                                                </Link>
+                                                <Button variant="ghost" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => signOut()}>
+                                                    <LogOut className="h-4 w-4" />
+                                                    <span>Sign Out</span>
+                                                </Button>
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <button type="button" className="shrink-0 rounded-full" aria-label="Open profile menu">
-                                            <Avatar className="h-7 w-7">
-                                                <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
-                                                <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{initials}</AvatarFallback>
-                                            </Avatar>
-                                        </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-56" align="end" forceMount>
-                                        <div className="grid gap-2">
-                                            <Link href={`/profile/${currentUser?.username}`} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors">
-                                                {currentUser?.displayName}
-                                                <p className="text-xs text-muted-foreground font-normal truncate">@{currentUser?.username}</p>
-                                            </Link>
-                                            <Button variant="ghost" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => signOut()}>
-                                                <LogOut className="h-4 w-4" />
-                                                <span>Sign Out</span>
-                                            </Button>
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
                             </SignedIn>
                         </>
                     )}
