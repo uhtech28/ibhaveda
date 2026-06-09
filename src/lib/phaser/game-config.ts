@@ -8,7 +8,13 @@
  */
 
 import * as Phaser from "phaser";
-import { WorldMapScene } from "./scenes/WorldMapScene";
+// NOTE: WorldMapScene is intentionally NOT statically imported here. The
+// scene module is ~9k lines and was being parse+compiled on every
+// /map/world hydration as part of the phaser-boot chunk. Callers should
+// dynamic-import it themselves and pass the resolved class into
+// createGameConfig(). See createGameConfigWithScene() below for the
+// async helper that keeps the scene off the initial Phaser bundle.
+import type { WorldMapScene as WorldMapSceneType } from "./scenes/WorldMapScene";
 
 /**
  * Creates a Phaser game configuration object
@@ -25,6 +31,7 @@ import { WorldMapScene } from "./scenes/WorldMapScene";
  */
 export function createGameConfig(
   parent: HTMLElement,
+  SceneClass?: typeof WorldMapSceneType,
 ): Phaser.Types.Core.GameConfig {
   // Detect device type and screen size
   const width = parent.clientWidth || window.innerWidth;
@@ -79,7 +86,7 @@ export function createGameConfig(
         gravity: { x: 0, y: 0 },
       },
     },
-    scene: [WorldMapScene],
+    scene: SceneClass ? [SceneClass] : [],
     render: {
       antialias: false,
       pixelArt: true,

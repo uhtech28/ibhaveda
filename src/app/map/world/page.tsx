@@ -294,12 +294,20 @@ function useMapGame() {
 
     eventBridge.onReact("PHASER_READY", handleReady);
 
+    // Three parallel imports: Phaser core, game-config (no scene), and
+    // the WorldMapScene chunk. The scene was being statically pulled
+    // into the game-config bundle and parsed alongside Phaser core on
+    // hydration — that's ~1.5 MB of JS evaluation on the main thread.
+    // Splitting it out lets the browser parse/compile concurrently.
     Promise.all([
       import("phaser"),
       import("@/lib/phaser/game-config"),
-    ]).then(([Phaser, { createGameConfig }]) => {
+      import("@/lib/phaser/scenes/WorldMapScene"),
+    ]).then(([Phaser, { createGameConfig }, { WorldMapScene }]) => {
       if (!containerRef.current || gameRef.current) return;
-      const game = new Phaser.Game(createGameConfig(containerRef.current));
+      const game = new Phaser.Game(
+        createGameConfig(containerRef.current, WorldMapScene),
+      );
       gameRef.current = game;
     });
 
