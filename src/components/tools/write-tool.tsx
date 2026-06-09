@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -158,12 +158,7 @@ function renderMarkdownPreview(text: string) {
   return nodes;
 }
 
-// Wrapped in memo because Performance trace showed INP = 2.2s on every
-// keystroke. WriteTool was re-rendering whenever its parent (Task-
-// SubmissionModal, ToolsPanel, MapPage) did — and the parent does so
-// constantly because of Convex subscription ticks. With memo the
-// keystroke-driven setState only reconciles WriteTool itself.
-function WriteToolInner({
+export function WriteTool({
   prompt,
   onSubmit,
   initialContent,
@@ -399,5 +394,3 @@ function WriteToolInner({
     </Card>
   );
 }
-
-export const WriteTool = memo(WriteToolInner);
