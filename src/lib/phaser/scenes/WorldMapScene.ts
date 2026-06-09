@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { AssetLoader } from "../utils/asset-loader";
+import { isLiteMode } from "../performance-mode";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender } from "../entities/Persona";
 import {
@@ -552,12 +553,17 @@ export class WorldMapScene extends Phaser.Scene {
     // 3. Create the super boss
     this.createSuperBoss();
 
-    // 4. Defer atmospheric effects so the map paints immediately
-    this.time.delayedCall(0, () => {
-      if (this.sys.isActive()) {
-        this.createAtmosphericEffects();
-      }
-    });
+    // 4. Defer atmospheric effects so the map paints immediately.
+    // Skip entirely in lite mode (auto-detected on low-spec devices) —
+    // the dust emitter, ambient stars, and parallax clouds are pure
+    // cosmetic cost that hurts cheap laptops + budget phones.
+    if (!isLiteMode()) {
+      this.time.delayedCall(0, () => {
+        if (this.sys.isActive()) {
+          this.createAtmosphericEffects();
+        }
+      });
+    }
 
     // 5. Load only the focused stage + neighbors (packs load on demand)
     const focus = Phaser.Math.Clamp(
