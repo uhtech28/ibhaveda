@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Grid,
@@ -148,54 +148,71 @@ export function ToolsPanel({
 
   const saveToolData = useMutation(api.worldMap.saveToolData);
 
+  // Only subscribe to the tool data the user is currently viewing — six
+  // simultaneous getToolData websockets created noticeable per-render churn
+  // before. Each query becomes "skip" when its tab isn't active.
   const kanbanData = useQuery(
     api.worldMap.getToolData,
-    activeVentureId
+    activeVentureId && activeTab === "kanban"
       ? { ventureId: activeVentureId, toolType: "kanban" }
       : "skip",
   );
 
   const calendarData = useQuery(
     api.worldMap.getToolData,
-    activeVentureId
+    activeVentureId && activeTab === "calendar"
       ? { ventureId: activeVentureId, toolType: "calendar" }
       : "skip",
   );
 
   const writeData = useQuery(
     api.worldMap.getToolData,
-    activeVentureId
+    activeVentureId && activeTab === "write"
       ? { ventureId: activeVentureId, toolType: "write" }
       : "skip",
   );
 
   const mapData = useQuery(
     api.worldMap.getToolData,
-    activeVentureId ? { ventureId: activeVentureId, toolType: "map" } : "skip",
+    activeVentureId && activeTab === "map"
+      ? { ventureId: activeVentureId, toolType: "map" }
+      : "skip",
   );
 
   const journalData = useQuery(
     api.worldMap.getToolData,
-    activeVentureId
+    activeVentureId && activeTab === "journal"
       ? { ventureId: activeVentureId, toolType: "journal" }
       : "skip",
   );
 
   const surveyData = useQuery(
     api.worldMap.getToolData,
-    activeVentureId
+    activeVentureId && activeTab === "survey"
       ? { ventureId: activeVentureId, toolType: "survey" }
       : "skip",
   );
 
-  const handleToolSubmit = async (toolType: string, data: unknown) => {
-    if (!activeVentureId) return;
-    await saveToolData({
-      ventureId: activeVentureId,
-      toolType,
-      data,
-    });
-  };
+  // Stable identity so memoized tool components don't see a new prop each
+  // render (every keystroke in the search bar triggers a parent re-render).
+  const handleToolSubmit = useCallback(
+    async (toolType: string, data: unknown) => {
+      if (!activeVentureId) return;
+      await saveToolData({
+        ventureId: activeVentureId,
+        toolType,
+        data,
+      });
+    },
+    [activeVentureId, saveToolData],
+  );
+
+  const onKanbanSubmit = useCallback((d: unknown) => handleToolSubmit("kanban", d), [handleToolSubmit]);
+  const onCalendarSubmit = useCallback((d: unknown) => handleToolSubmit("calendar", d), [handleToolSubmit]);
+  const onWriteSubmit = useCallback((d: unknown) => handleToolSubmit("write", d), [handleToolSubmit]);
+  const onMapSubmit = useCallback((d: unknown) => handleToolSubmit("map", d), [handleToolSubmit]);
+  const onJournalSubmit = useCallback((d: unknown) => handleToolSubmit("journal", d), [handleToolSubmit]);
+  const onSurveySubmit = useCallback((d: unknown) => handleToolSubmit("survey", d), [handleToolSubmit]);
 
   const allTabs = {
     tools: { id: "tools" as TabType, label: "Tools", icon: Grid },
@@ -338,7 +355,7 @@ export function ToolsPanel({
                     <CalendarTool
                       prompt="Plan your venture milestones and team syncs."
                       initialContent={calendarData}
-                      onSubmit={(data) => handleToolSubmit("calendar", data)}
+                      onSubmit={onCalendarSubmit}
                     />
                   </div>
                 )}
@@ -347,7 +364,7 @@ export function ToolsPanel({
                     <KanbanTool
                       prompt="Manage your venture tasks and workflow."
                       initialContent={kanbanData}
-                      onSubmit={(data) => handleToolSubmit("kanban", data)}
+                      onSubmit={onKanbanSubmit}
                       activeVentureId={activeVentureId}
                     />
                   </div>
@@ -357,7 +374,7 @@ export function ToolsPanel({
                     <WriteTool
                       prompt="Craft documentation and notes."
                       initialContent={writeData?.text}
-                      onSubmit={(data) => handleToolSubmit("write", data)}
+                      onSubmit={onWriteSubmit}
                       layout="compact"
                     />
                   </div>
@@ -367,7 +384,7 @@ export function ToolsPanel({
                     <MapTool
                       prompt="Visualize and connect your ideas."
                       initialContent={mapData}
-                      onSubmit={(data) => handleToolSubmit("map", data)}
+                      onSubmit={onMapSubmit}
                     />
                   </div>
                 )}
@@ -376,7 +393,7 @@ export function ToolsPanel({
                     <JournalTool
                       prompt="Log your daily progress and thoughts."
                       initialContent={journalData}
-                      onSubmit={(data) => handleToolSubmit("journal", data)}
+                      onSubmit={onJournalSubmit}
                     />
                   </div>
                 )}
@@ -385,7 +402,7 @@ export function ToolsPanel({
                     <SurveyTool
                       prompt="Create surveys to gather user feedback."
                       initialContent={surveyData}
-                      onSubmit={(data) => handleToolSubmit("survey", data)}
+                      onSubmit={onSurveySubmit}
                     />
                   </div>
                 )}

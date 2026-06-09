@@ -441,6 +441,34 @@ export class WorldMapScene extends Phaser.Scene {
   private corruptionRenderer: CorruptionRenderer | null = null;
   private stageEnvironmentBlur: StageEnvironmentBlur | null = null;
   private updateHandlers: Array<() => void> = [];
+  // Single per-frame parallax tick that walks a flat array of drifters
+  // instead of registering 15 separate event.on("update", ...) closures
+  // that each pay emitter dispatch overhead. Drift speeds are tiny so the
+  // wrap math is the only per-item work.
+  private parallaxDrifters: Array<{
+    obj: Phaser.GameObjects.GameObject & { x: number };
+    speed: number; // signed; positive = right, negative = left
+    minX: number;
+    maxX: number;
+    resetTo: number;
+  }> = [];
+  private parallaxTickInstalled = false;
+  private ensureParallaxTick(): void {
+    if (this.parallaxTickInstalled) return;
+    this.parallaxTickInstalled = true;
+    const tick = () => {
+      const drifters = this.parallaxDrifters;
+      for (let i = 0; i < drifters.length; i++) {
+        const d = drifters[i];
+        d.obj.x += d.speed;
+        if (d.speed > 0 ? d.obj.x > d.maxX : d.obj.x < d.minX) {
+          d.obj.x = d.resetTo;
+        }
+      }
+    };
+    this.events.on("update", tick);
+    this.updateHandlers.push(tick);
+  }
   private resizeHandler?: (
     gameSize: Phaser.Structs.Size,
     baseSize: Phaser.Structs.Size,
@@ -545,6 +573,8 @@ export class WorldMapScene extends Phaser.Scene {
       this.events.off("update", handler),
     );
     this.updateHandlers = [];
+    this.parallaxDrifters = [];
+    this.parallaxTickInstalled = false;
 
     this.backgroundLayer?.destroy(true);
     this.midgroundLayer?.destroy(true);
@@ -841,6 +871,19 @@ export class WorldMapScene extends Phaser.Scene {
    * Single source of truth for stage panel dimensions and placement.
    * Every biome uses the same width, height, and vertical alignment.
    */
+  // Cached because getStandardPanelLayout is called from the wheel handler,
+  // drag pointermove, and inertia tween's onUpdate — collectively 60-120
+  // times per second during scrolling. Recomputing object literals + map
+  // size reads in that hot path was a real cost. Invalidate on resize +
+  // template rebuild via syncStageLayoutMetrics.
+  private cachedPanelLayout: {
+    panelWidth: number;
+    panelHeight: number;
+    panelOffsetX: number;
+    panelOffsetY: number;
+    stageViewCenterY: number;
+  } | null = null;
+
   private getStandardPanelLayout(): {
     panelWidth: number;
     panelHeight: number;
@@ -848,23 +891,26 @@ export class WorldMapScene extends Phaser.Scene {
     panelOffsetY: number;
     stageViewCenterY: number;
   } {
+    if (this.cachedPanelLayout) return this.cachedPanelLayout;
     const baseWidth = this.map?.widthInPixels ?? this.MAP_TILE_COLS * this.MAP_TILE_PX;
     const baseHeight = this.map?.heightInPixels ?? this.MAP_TILE_ROWS * this.MAP_TILE_PX;
     const panelWidth = baseWidth * this.MAP_PANEL_SCALE;
     const panelHeight = baseHeight * this.MAP_PANEL_SCALE;
     const panelOffsetX = 0;
     const panelOffsetY = Math.round((this.MAP_HEIGHT - panelHeight) / 2);
-    return {
+    this.cachedPanelLayout = {
       panelWidth,
       panelHeight,
       panelOffsetX,
       panelOffsetY,
       stageViewCenterY: panelOffsetY + panelHeight / 2,
     };
+    return this.cachedPanelLayout;
   }
 
   /** Sync stage slot width to the rendered panel so there is no empty side padding. */
   private syncStageLayoutMetrics(): void {
+    this.cachedPanelLayout = null; // invalidate before re-reading
     const layout = this.getStandardPanelLayout();
     this.BIOME_WIDTH = layout.panelWidth;
     this.MAP_WIDTH = this.BIOME_WIDTH * this.activeBiomeConfigs.length;
@@ -1403,6 +1449,10 @@ export class WorldMapScene extends Phaser.Scene {
     }
   }
 
+  // Tracks where the camera was the last time we actually iterated the
+  // stage list, so we can skip the work when the camera is parked.
+  private lastBiomeCheckCamX: number = Number.NEGATIVE_INFINITY;
+
   /**
    * Checks the camera scroll position and loads stages that are near the view
    */
@@ -1415,6 +1465,10 @@ export class WorldMapScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     const camX = cam.scrollX + cam.width / 2;
+    // Bail out if the camera barely moved since the last full check.
+    // Avoids touching all 8 stages while the user isn't scrolling.
+    if (Math.abs(camX - this.lastBiomeCheckCamX) < 48) return;
+    this.lastBiomeCheckCamX = camX;
     const loadBuffer = WorldMapScene.STAGE_LOAD_BUFFER_PX;
     const unloadBuffer = WorldMapScene.STAGE_UNLOAD_BUFFER_PX;
 
@@ -6479,13 +6533,16 @@ export class WorldMapScene extends Phaser.Scene {
 
       this.backgroundLayer.add(g);
 
-      // Parallax scroll effect (slow drift)
-      const mountainUpdate = () => {
-        g.x -= speed;
-        if (g.x < -200) g.x = 0; // Simple loop
-      };
-      this.events.on("update", mountainUpdate);
-      this.updateHandlers.push(mountainUpdate);
+      // Parallax scroll effect (slow drift) — pushed onto a shared
+      // batch so 3 mountain + 12 cloud handlers become one update tick.
+      this.parallaxDrifters.push({
+        obj: g as unknown as Phaser.GameObjects.GameObject & { x: number },
+        speed: -speed,
+        minX: -200,
+        maxX: Number.POSITIVE_INFINITY,
+        resetTo: 0,
+      });
+      this.ensureParallaxTick();
     }
 
     const cloudCount = 12;
@@ -6509,16 +6566,16 @@ export class WorldMapScene extends Phaser.Scene {
       cloud.add(graphics);
       this.midgroundLayer.add(cloud);
 
-      // Drifting animation
+      // Drifting animation — batched via the shared parallax tick.
       const speed = 0.05 + Math.random() * 0.1;
-      const cloudUpdate = () => {
-        cloud.x += speed;
-        if (cloud.x > this.MAP_WIDTH + 200) {
-          cloud.x = -200;
-        }
-      };
-      this.events.on("update", cloudUpdate);
-      this.updateHandlers.push(cloudUpdate);
+      this.parallaxDrifters.push({
+        obj: cloud as unknown as Phaser.GameObjects.GameObject & { x: number },
+        speed,
+        minX: -Infinity,
+        maxX: this.MAP_WIDTH + 200,
+        resetTo: -200,
+      });
+      this.ensureParallaxTick();
 
       // Subtle float up/down
       this.tweens.add({
@@ -8015,7 +8072,7 @@ export class WorldMapScene extends Phaser.Scene {
       cam.pan(x, y, MAP_PERF.CAMERA_PAN_MS, "Quad.easeOut", false, (_cam, progress) => {
         if (progress === 1) {
           this.clampCameraToStagePanel(focusStage);
-          eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
+          this.dispatchStageInView(focusStage);
         }
       });
       return;
@@ -8023,7 +8080,17 @@ export class WorldMapScene extends Phaser.Scene {
 
     cam.centerOn(x, y);
     this.clampCameraToStagePanel(focusStage);
-    eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
+    this.dispatchStageInView(focusStage);
+  }
+
+  // Dedupes STAGE_IN_VIEW dispatches so React doesn't get repeated
+  // events when the camera pan completes on a stage that's already the
+  // active one (e.g. resize -> recenter on same stage).
+  private lastDispatchedStage: number | null = null;
+  private dispatchStageInView(stage: number): void {
+    if (this.lastDispatchedStage === stage) return;
+    this.lastDispatchedStage = stage;
+    eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage });
   }
 
   /** Lock the camera to one stage — no neighboring maps bleed into view. */
@@ -8258,24 +8325,20 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Companion follow tracking. Companions far from the camera don't
     // need per-frame LERP, the next update when the persona enters
-    // range will snap them into the orbit.
+    // range will snap them into the orbit. Hoist persona x/y and the
+    // persona-in-view check out of the forEach body — they're invariant
+    // across the iteration and dominated companion cost before.
     if (this.persona && this.companions && this.companions.size > 0) {
       const totalCompanions = this.companions.size;
+      const px = this.persona.x;
+      const py = this.persona.y;
+      const personaVisible = inView(px, py);
       let index = 0;
       this.companions.forEach((companion) => {
-        // Companion sprite may be at companion.x/companion.y or under
-        // companion.sprite; check whichever is exposed.
-        const cx =
-          (companion as unknown as { x?: number }).x ?? this.persona!.x;
-        const cy =
-          (companion as unknown as { y?: number }).y ?? this.persona!.y;
-        if (inView(cx, cy) || inView(this.persona!.x, this.persona!.y)) {
-          companion.updateCompanion(
-            this.persona!.x,
-            this.persona!.y,
-            index,
-            totalCompanions,
-          );
+        const cx = (companion as unknown as { x?: number }).x ?? px;
+        const cy = (companion as unknown as { y?: number }).y ?? py;
+        if (personaVisible || inView(cx, cy)) {
+          companion.updateCompanion(px, py, index, totalCompanions);
         }
         index++;
       });
@@ -8302,13 +8365,23 @@ export class WorldMapScene extends Phaser.Scene {
     }
   }
 
+  // Hard kill-switch — once we're past stage 1 the tutorial pulse can
+  // never become active again until a new scene. Avoids waking this
+  // function 60 Hz forever for the entire rest of the session.
+  private pulseEverNeeded = true;
+
   private emitTutorialPulsePosition(): void {
+    if (!this.pulseEverNeeded) return;
+    if (this.currentStage > 1) {
+      this.pulseEverNeeded = false;
+      return;
+    }
+
     const firstNode = this.checkpointNodes.get("1-1");
     if (!firstNode) return;
 
     // Check if Stage 1 Checkpoint 1 pulse is active
-    const isPulseActive =
-      this.currentStage === 1 && firstNode.status === "active";
+    const isPulseActive = firstNode.status === "active";
     if (!isPulseActive && !this.lastEmitVisible) {
       return;
     }
@@ -8556,9 +8629,13 @@ export class WorldMapScene extends Phaser.Scene {
       },
     });
 
-    // Sparkle particles
+    // Sparkle particles — use Phaser's delayedCall so the scheduled
+    // callbacks are cleaned up automatically when the scene shuts down.
+    // Plain setTimeout survives scene transitions and leaks across
+    // ventures.
     for (let i = 0; i < 30; i++) {
-      setTimeout(() => {
+      this.time.delayedCall(i * 50, () => {
+        if (!this.sys.isActive()) return;
         const x = Phaser.Math.Between(minX - 100, maxX + 100);
         const y = Phaser.Math.Between(200, 600);
         const sparkle = this.add.star(
@@ -8583,7 +8660,7 @@ export class WorldMapScene extends Phaser.Scene {
             sparkle.destroy();
           },
         });
-      }, i * 50);
+      });
     }
   }
 

@@ -33,6 +33,11 @@ function MapIntroInner() {
   const savedGender = useQuery(api.users.getPersonaGender);
   const updateGender = useMutation(api.users.updatePersonaGender);
 
+  // Resolve current user so we can tell if the URL idea belongs to them.
+  // createVenture throws for non-authors, so we must avoid that path when
+  // viewing someone else's idea or the useEffect will re-fire forever.
+  const currentUser = useQuery(api.users.getCurrentUser);
+
   // ── Venture resolution ──────────────────────────────────────────────────────
   // If we have an ideaId, look up the specific venture for that idea.
   // Otherwise, fall back to the user's first venture (backward compat).
@@ -112,10 +117,38 @@ function MapIntroInner() {
       return;
     }
 
-    // Auto-create venture if missing
-    if (ideaIdParam && idea && ventureByIdea === null && !isCreatingVenture && !createdVentureId) {
+    // Auto-create venture if missing — but ONLY when the viewer is the
+    // idea author. createVenture throws "Only the idea author can create a
+    // venture" otherwise, and the catch block resets isCreatingVenture,
+    // which makes this effect fire again in a tight loop.
+    const isViewerAuthor =
+      !!currentUser?._id && !!idea?.authorId && idea.authorId === currentUser._id;
+
+    // Non-author landed on /map?ideaId=X with no shared venture — bounce
+    // them to the idea page so they can request to contribute. Without
+    // this branch the loading screen would hang forever.
+    if (
+      ideaIdParam &&
+      idea &&
+      ventureByIdea === null &&
+      !isViewerAuthor &&
+      idea?.author?.role !== "agent" &&
+      !isCreatingVenture
+    ) {
+      router.push(`/idea/${ideaIdParam}`);
+      return;
+    }
+
+    if (
+      ideaIdParam &&
+      idea &&
+      ventureByIdea === null &&
+      !isCreatingVenture &&
+      !createdVentureId &&
+      isViewerAuthor
+    ) {
       setIsCreatingVenture(true);
-      
+
       let skills: string[] = [];
       try {
         if (idea.category) {
@@ -202,6 +235,7 @@ function MapIntroInner() {
     createdVentureId,
     createVenture,
     ensureAgentShowcaseVenture,
+    currentUser?._id,
   ]);
 
   const handleStart = async (gender: "male" | "female") => {

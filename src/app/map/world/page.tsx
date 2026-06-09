@@ -1206,9 +1206,14 @@ function MapPageInner() {
   const paramTab = searchParams.get("tab");
   const sourceIdeaId = searchParams.get("sourceIdeaId") as Id<"ideas"> | null;
 
+  // Read window.location.search inline so this callback's identity is stable
+  // across renders. searchParams (the Next.js hook value) gets a fresh ref
+  // every render, which would invalidate every consumer of updateUrlParams
+  // (eventBridge listeners, click handlers, advance callbacks).
   const updateUrlParams = useCallback(
     (newParams: Record<string, string | null>, replace = false) => {
-      const params = new URLSearchParams(searchParams.toString());
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
       Object.entries(newParams).forEach(([key, value]) => {
         if (value === null) {
           params.delete(key);
@@ -1223,7 +1228,7 @@ function MapPageInner() {
         router.push(newUrl);
       }
     },
-    [searchParams, pathname, router],
+    [pathname, router],
   );
 
   // ── Read gender + stage from localStorage (set by /map and /map/stages) ──
@@ -1357,10 +1362,22 @@ function MapPageInner() {
       ? { ventureId: preferredVentureId as Id<"ventures"> }
       : "skip",
   );
-  const activeVenture =
-    ventures?.find((venture) => venture._id === preferredVentureId) ??
-    ventureById ??
-    (hasUrlVentureParam ? null : (ventures?.[0] ?? null));
+  // Memoized so referential identity is stable across renders. Without
+  // this, every Convex tick produces a fresh `activeVenture` object and
+  // the 7+ queries below build new `{ ventureId }` arg literals, which
+  // makes Convex's useQuery do a deep-equal check every render.
+  const activeVenture = useMemo(
+    () =>
+      ventures?.find((venture) => venture._id === preferredVentureId) ??
+      ventureById ??
+      (hasUrlVentureParam ? null : (ventures?.[0] ?? null)),
+    [ventures, ventureById, preferredVentureId, hasUrlVentureParam],
+  );
+  const activeVentureId = activeVenture?._id ?? null;
+  const ventureArg = useMemo(
+    () => (activeVentureId ? { ventureId: activeVentureId } : "skip"),
+    [activeVentureId],
+  );
 
   // Subscribe to notifications for gold checkpoint awards
   const notifications = useQuery(api.notifications.getNotifications, {
@@ -1368,10 +1385,7 @@ function MapPageInner() {
     filterType: "all",
   });
 
-  const worldMapData = useQuery(
-    api.worldMap.getWorldMapData,
-    activeVenture ? { ventureId: activeVenture._id } : "skip",
-  );
+  const worldMapData = useQuery(api.worldMap.getWorldMapData, ventureArg);
 
   // Fetch chat channels for Group Chat popup modal integration
   const chatChannels = useQuery(
@@ -1403,25 +1417,24 @@ function MapPageInner() {
   const prevVentureBadgeCountRef = useRef<number | null>(null);
 
   // Cumulative quality scores across ALL stages (grows checkpoint-by-checkpoint)
-  const allStageQualities = useQuery(
-    api.aiScoring.getVentureQualityScores,
-    activeVenture ? { ventureId: activeVenture._id } : "skip",
-  );
+  const allStageQualities = useQuery(api.aiScoring.getVentureQualityScores, ventureArg);
   // Keep the per-stage query too (still used by the passage event overlay)
-  const stageQuality = useQuery(
-    api.aiScoring.getStageQualityScore,
-    activeVenture && worldMapData?.venture
-      ? {
-        ventureId: activeVenture._id,
-        stageNumber: worldMapData.venture.currentStage,
-      }
-      : "skip",
+  const stageQualityArg = useMemo(
+    () =>
+      activeVentureId && worldMapData?.venture
+        ? {
+            ventureId: activeVentureId,
+            stageNumber: worldMapData.venture.currentStage,
+          }
+        : "skip",
+    [activeVentureId, worldMapData?.venture?.currentStage],
   );
+  const stageQuality = useQuery(api.aiScoring.getStageQualityScore, stageQualityArg);
 
   // Template metric (JIF Score / p-value / Fan Score)
   const templateMetric = useQuery(
     api.templateMetrics.getTemplateMetric,
-    activeVenture ? { ventureId: activeVenture._id } : "skip",
+    ventureArg,
   );
 
   // ── Convex mutations ───────────────────────────────────────────────────────
@@ -1903,13 +1916,23 @@ function MapPageInner() {
   useEffect(() => {
     if (!activeVenture?._id) return;
     if (structureEnsuredForRef.current === activeVenture._id) return;
+    // Skip when the viewer is not the venture owner. The mutation
+    // requires assertVentureAccess, so for someone else's venture it
+    // throws "no access" → catch resets the guard → effect re-fires
+    // → infinite failing mutations, which is the dominant lag source
+    // on forked-venture views. Stamping the guard with the activeVenture
+    // id below ALSO suppresses retry when we did skip.
+    if (!currentUser?._id || activeVenture.userId !== currentUser._id) {
+      structureEnsuredForRef.current = activeVenture._id;
+      return;
+    }
 
     structureEnsuredForRef.current = activeVenture._id;
     ensureVentureStructure({ ventureId: activeVenture._id }).catch((error) => {
       console.error("[MapPage] Failed to ensure venture structure:", error);
       structureEnsuredForRef.current = null;
     });
-  }, [activeVenture?._id, ensureVentureStructure]);
+  }, [activeVenture?._id, activeVenture?.userId, currentUser?._id, ensureVentureStructure]);
 
   useEffect(() => {
     if (!activeVenture?._id) return;
@@ -2015,33 +2038,36 @@ function MapPageInner() {
     [activeStage, activeCP, optimisticCompletedTaskIds],
   );
 
+  // Refresh selectedDetail when checkpoints tick — but read prev via the
+  // setter form so this effect doesn't depend on selectedDetail (which it
+  // sets), preventing a self-perpetuating cascade.
   useEffect(() => {
-    if (!selectedDetail) return;
+    setSelectedDetail((prev) => {
+      if (!prev) return prev;
+      const latestSelected = checkpoints.find((cp) => cp._id === prev.id);
+      if (!latestSelected) return null;
 
-    const latestSelected = checkpoints.find(
-      (cp) => cp._id === selectedDetail.id,
-    );
-    if (!latestSelected) {
-      setSelectedDetail(null);
-      return;
-    }
+      const refreshedDetail = buildCheckpointDetail(latestSelected);
+      const taskStatesChanged = refreshedDetail.tasks.some(
+        (task, index) => task.done !== prev.tasks[index]?.done,
+      );
 
-    const refreshedDetail = buildCheckpointDetail(latestSelected);
-    const taskStatesChanged = refreshedDetail.tasks.some(
-      (task, index) => task.done !== selectedDetail.tasks[index]?.done,
-    );
-
-    if (
-      refreshedDetail.status !== selectedDetail.status ||
-      refreshedDetail.title !== selectedDetail.title ||
-      refreshedDetail.outcome !== selectedDetail.outcome ||
-      taskStatesChanged
-    ) {
-      setSelectedDetail(refreshedDetail);
-    }
-  }, [selectedDetail, checkpoints, buildCheckpointDetail]);
+      if (
+        refreshedDetail.status !== prev.status ||
+        refreshedDetail.title !== prev.title ||
+        refreshedDetail.outcome !== prev.outcome ||
+        taskStatesChanged
+      ) {
+        return refreshedDetail;
+      }
+      return prev;
+    });
+  }, [checkpoints, buildCheckpointDetail]);
 
   // ── Sync URL Query Parameters to React state ───────────────────────────────
+  // Drop `checkpoints` from deps — the effect above already keeps
+  // selectedDetail fresh when checkpoints change. This effect should only
+  // re-run when the URL param itself changes.
   useEffect(() => {
     // 1. Sync Checkpoint detail panel state
     if (paramCheckpointId) {
@@ -2064,7 +2090,8 @@ function MapPageInner() {
     } else {
       setIsToolsPanelOpen(false);
     }
-  }, [paramCheckpointId, paramPanel, paramTab, checkpoints, buildCheckpointDetail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramCheckpointId, paramPanel, paramTab]);
 
   // ── Auto-open current active checkpoint on mount if no param is set ────────
   useEffect(() => {
@@ -2136,15 +2163,18 @@ function MapPageInner() {
   ]);
 
   // ── Persist gender to DB whenever venture + gender are known ─────────────
+  // Only writes when the viewer owns the venture — otherwise we'd
+  // silently overwrite the author's persona gender on every visit to
+  // their map.
   useEffect(() => {
-    if (activeVenture?._id && selectedGender) {
-      savePersonaGender({
-        ventureId: activeVenture._id,
-        gender: selectedGender,
-      }).catch(() => { });
-    }
+    if (!activeVenture?._id || !selectedGender) return;
+    if (!currentUser?._id || activeVenture.userId !== currentUser._id) return;
+    savePersonaGender({
+      ventureId: activeVenture._id,
+      gender: selectedGender,
+    }).catch(() => { });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVenture?._id, selectedGender]);
+  }, [activeVenture?._id, activeVenture?.userId, currentUser?._id, selectedGender]);
 
   // Seed feature flags once on first load (idempotent mutation)
   const flagsSeededRef = useRef(false);
@@ -3528,6 +3558,45 @@ function MapPageInner() {
   const userProgress = useAtomValue(userProgressAtom);
   const corruption = useAtomValue(corruptionStateAtom);
 
+  // Stable callback for LeftSidebar — inlined as a 25-line arrow before,
+  // which re-created the closure every render and prevented LeftSidebar
+  // from staying memoized.
+  const handleSidebarOpenPanel = useCallback(
+    (tab: string) => {
+      if (tab === "chat") {
+        if (activeVenture?.ideaId) {
+          openGroupChat(
+            activeVenture.ideaId,
+            activeConversationId as Id<"conversations"> | undefined,
+          );
+        }
+        setIsGroupChatOpen(true);
+      } else if (tab === "contributors") {
+        setIsContributorsOpen(true);
+      } else if (tab === "feed") {
+        setIsContributionsOpen(true);
+      } else if (tab === "hierarchy") {
+        setIsHierarchyOpen(true);
+      } else if (tab === "calendar") {
+        setIsCalendarOpen(true);
+      } else if (tab === "kanban") {
+        setIsKanbanOpen(true);
+      } else if (tab === "journal") {
+        setIsJournalOpen(true);
+      } else if (tab === "minigames") {
+        setIsMiniGamesPanelOpen(true);
+      } else {
+        updateUrlParams({ panel: "tools", tab, checkpointId: null });
+      }
+    },
+    [
+      activeVenture?.ideaId,
+      activeConversationId,
+      openGroupChat,
+      updateUrlParams,
+    ],
+  );
+
   // ── Loading / no-venture guard ─────────────────────────────────────────────
   // worldMapData is "skip"ped while intro is showing, so only check it after intro
 
@@ -3711,8 +3780,12 @@ function MapPageInner() {
 
           {/* Quest List removed per user request */}
 
-          {/* Boss HP Bar - shows when corruption > 60% */}
-          <BossHPBar forceVisible={!!bossCombatTarget} />
+          {/* Boss HP Bar - only mount when it actually needs to show.
+              Previously this component always mounted and read Jotai
+              corruption state on every tick. */}
+          {(corruption.level >= 60 || bossCombatTarget) && (
+            <BossHPBar forceVisible={!!bossCombatTarget} />
+          )}
 
           {/* Stage navigation strip removed */}
 
@@ -3732,17 +3805,21 @@ function MapPageInner() {
 
           <CrossingFlash trigger={flashTrigger} />
 
-          {/* Gap 3 fix: use the real LevelUpSequence component */}
-          <LevelUpSequence
-            isVisible={showLevelUp}
-            oldLevel={levelUpData.oldLevel}
-            newLevel={levelUpData.newLevel}
-            phase={levelUpData.phase}
-            isPhaseTransition={levelUpData.isPhaseTransition}
-            unlockedTools={levelUpData.unlockedTools}
-            onComplete={() => setShowLevelUp(false)}
-            onSkip={() => setShowLevelUp(false)}
-          />
+          {/* Gap 3 fix: use the real LevelUpSequence component.
+              Conditionally mount so the audio + RollingCounter hooks
+              don't fire while closed. */}
+          {showLevelUp && (
+            <LevelUpSequence
+              isVisible
+              oldLevel={levelUpData.oldLevel}
+              newLevel={levelUpData.newLevel}
+              phase={levelUpData.phase}
+              isPhaseTransition={levelUpData.isPhaseTransition}
+              unlockedTools={levelUpData.unlockedTools}
+              onComplete={() => setShowLevelUp(false)}
+              onSkip={() => setShowLevelUp(false)}
+            />
+          )}
 
           {activeBadge && (
             <BadgeAwardSequence
@@ -3760,13 +3837,15 @@ function MapPageInner() {
           )}
 
           {/* Gold checkpoint notification popup */}
-          <GoldCheckpointPopup
-            isVisible={!!goldCheckpointNotification}
-            ventureName={goldCheckpointNotification?.ventureName ?? ""}
-            stageName={goldCheckpointNotification?.stageName ?? ""}
-            checkpoint={goldCheckpointNotification?.checkpoint ?? 0}
-            onDismiss={() => setGoldCheckpointNotification(null)}
-          />
+          {goldCheckpointNotification && (
+            <GoldCheckpointPopup
+              isVisible
+              ventureName={goldCheckpointNotification.ventureName}
+              stageName={goldCheckpointNotification.stageName}
+              checkpoint={goldCheckpointNotification.checkpoint}
+              onDismiss={() => setGoldCheckpointNotification(null)}
+            />
+          )}
 
           {/* ── HP-based Cross-Question Combat — replaces the old single-question
                 Doubt Imp overlay. Fires when player walks into a boss checkpoint. ── */}
@@ -3843,13 +3922,13 @@ function MapPageInner() {
           )}
 
           {/* Inter-checkpoint passage events overlay */}
-          {activeVenture && (() => {
+          {activeVenture && interCheckpointQueue.length > 0 && (() => {
             const currentCp = checkpoints.find(
               (cp) => cp.stage === activeVenture.currentStage && cp.checkpoint === activeVenture.currentCheckpoint
             );
             return (
               <InterCheckpointOverlay
-                isOpen={interCheckpointQueue.length > 0}
+                isOpen
                 events={interCheckpointQueue}
                 templateId={activeVenture.templateId as any}
                 stage={activeVenture.currentStage}
@@ -3886,12 +3965,17 @@ function MapPageInner() {
             }}
           />
 
-          {/* Lifecycle surfaces — same as before. */}
-          <MiniGamePromptDialog
-            spawn={miniGamePhase.kind === "prompt" ? miniGamePhase.spawn : null}
-            onEngage={miniGameLifecycle.acceptPrompt}
-            onDismiss={miniGameLifecycle.dismissPrompt}
-          />
+          {/* Lifecycle surfaces — same as before. Only mount the
+              prompt dialog when the prompt phase is actually active,
+              otherwise the Radix portal + state machine sits in the
+              tree for nothing. */}
+          {miniGamePhase.kind === "prompt" && (
+            <MiniGamePromptDialog
+              spawn={miniGamePhase.spawn}
+              onEngage={miniGameLifecycle.acceptPrompt}
+              onDismiss={miniGameLifecycle.dismissPrompt}
+            />
+          )}
           {miniGamePhase.kind === "playing" && (
             <MiniGameOverlay
               spawn={miniGamePhase.spawn}
@@ -3939,30 +4023,7 @@ function MapPageInner() {
           <div id="left-control-panel" className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
             <LeftSidebar
               ventureName={ideaTitle}
-              onOpenPanel={(tab) => {
-                if (tab === "chat") {
-                  if (activeVenture?.ideaId) {
-                    openGroupChat(activeVenture.ideaId, activeConversationId as Id<"conversations"> | undefined);
-                  }
-                  setIsGroupChatOpen(true);
-                } else if (tab === "contributors") {
-                  setIsContributorsOpen(true);
-                } else if (tab === "feed") {
-                  setIsContributionsOpen(true);
-                } else if (tab === "hierarchy") {
-                  setIsHierarchyOpen(true);
-                } else if (tab === "calendar") {
-                  setIsCalendarOpen(true);
-                } else if (tab === "kanban") {
-                  setIsKanbanOpen(true);
-                } else if (tab === "journal") {
-                  setIsJournalOpen(true);
-                } else if (tab === "minigames") {
-                  setIsMiniGamesPanelOpen(true);
-                } else {
-                  updateUrlParams({ panel: "tools", tab, checkpointId: null });
-                }
-              }}
+              onOpenPanel={handleSidebarOpenPanel}
             />
 
             {/* Tools Panel (Left - Floating Popup next to sidebar) */}
@@ -4054,20 +4115,24 @@ function MapPageInner() {
             onSuccess={handleTaskSubmissionSuccess}
           />
 
-          {/* Stage Clear Modal */}
-          <StageClearModal
-            show={stageClearModal.show}
-            stageNumber={stageClearModal.stageNumber}
-            stageName={stageClearModal.stageName}
-            isGold={stageClearModal.isGold}
-            medalTier={stageClearModal.medalTier}
-            fromBiome={stageClearModal.fromBiome}
-            nextStageName={stageClearModal.nextStageName}
-            nextBiome={stageClearModal.nextBiome}
-            onComplete={() =>
-              setStageClearModal({ ...stageClearModal, show: false })
-            }
-          />
+          {/* Stage Clear Modal — only mount while it should be visible
+              so its timers / dynamic import / framer hooks stay cold
+              otherwise. */}
+          {stageClearModal.show && (
+            <StageClearModal
+              show
+              stageNumber={stageClearModal.stageNumber}
+              stageName={stageClearModal.stageName}
+              isGold={stageClearModal.isGold}
+              medalTier={stageClearModal.medalTier}
+              fromBiome={stageClearModal.fromBiome}
+              nextStageName={stageClearModal.nextStageName}
+              nextBiome={stageClearModal.nextBiome}
+              onComplete={() =>
+                setStageClearModal((prev) => ({ ...prev, show: false }))
+              }
+            />
+          )}
 
           {/* Contributions / Project Feed Popup Modal */}
           <AnimatePresence>

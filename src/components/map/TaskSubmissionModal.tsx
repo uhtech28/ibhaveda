@@ -92,13 +92,18 @@ export function TaskSubmissionModal({
   const [animationFinished, setAnimationFinished] = useState(false);
   const submitTask = useMutation(api.worldMap.submitTaskContent);
 
+  // Depend on the primitive fields, not the task object identity — parents
+  // tend to pass new task object references on every render.
   const draftKey = useMemo(
     () =>
       task ? `venture-task-draft:${task.checkpointId}:${task.taskLevel}` : "",
-    [task],
+    [task?.checkpointId, task?.taskLevel],
   );
 
+  // Only attach the online/offline listeners while the modal is actually
+  // mounted on screen — otherwise we pay for two window listeners forever.
   useEffect(() => {
+    if (!isOpen) return;
     const syncOnlineStatus = () => setIsOnline(window.navigator.onLine);
     syncOnlineStatus();
     window.addEventListener("online", syncOnlineStatus);
@@ -107,7 +112,7 @@ export function TaskSubmissionModal({
       window.removeEventListener("online", syncOnlineStatus);
       window.removeEventListener("offline", syncOnlineStatus);
     };
-  }, []);
+  }, [isOpen]);
 
   // Reset error/message when modal opens
   useEffect(() => {
@@ -120,7 +125,19 @@ export function TaskSubmissionModal({
     }
   }, [isOpen, task]);
 
-  if (!task) return null;
+  // Read the saved draft once per (open + task) — without this useMemo,
+  // every parent re-render would call localStorage.getItem in render path
+  // and pass a fresh string to WriteTool, which would reset its editor.
+  const initialDraft = useMemo(() => {
+    if (!isOpen || !draftKey) return undefined;
+    if (typeof window === "undefined") return undefined;
+    return window.localStorage.getItem(draftKey) ?? undefined;
+  }, [isOpen, draftKey]);
+
+  // Early return BEFORE rendering anything else — keeps the hook order
+  // stable but stops the renderTool / tool subscriptions from happening
+  // when the modal is closed.
+  if (!isOpen || !task) return null;
 
   const handleToolSubmit = async (content: unknown) => {
     if (!isOnline) {
@@ -167,11 +184,7 @@ export function TaskSubmissionModal({
             prompt={task.description}
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}
-            initialContent={
-              typeof window !== "undefined"
-                ? (window.localStorage.getItem(draftKey) ?? undefined)
-                : undefined
-            }
+            initialContent={initialDraft}
           />
         );
 
@@ -299,11 +312,7 @@ export function TaskSubmissionModal({
             prompt={task.description}
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}
-            initialContent={
-              typeof window !== "undefined"
-                ? (window.localStorage.getItem(draftKey) ?? undefined)
-                : undefined
-            }
+            initialContent={initialDraft}
           />
         );
     }
