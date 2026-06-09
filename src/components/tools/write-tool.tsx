@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -175,8 +175,15 @@ export function WriteTool({
 
   const generateWriteAssist = useAction(api.aiScoring.generateWriteAssist);
 
+  // Initialize text from saved draft exactly once per mount. Re-running on
+  // every initialContent ref change would overwrite the user's edits.
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (initialContent) setText(initialContent);
+    if (initializedRef.current) return;
+    if (initialContent) {
+      setText(initialContent);
+      initializedRef.current = true;
+    }
   }, [initialContent]);
 
   const wordCount = useMemo(

@@ -1206,9 +1206,14 @@ function MapPageInner() {
   const paramTab = searchParams.get("tab");
   const sourceIdeaId = searchParams.get("sourceIdeaId") as Id<"ideas"> | null;
 
+  // Read window.location.search inline so this callback's identity is stable
+  // across renders. searchParams (the Next.js hook value) gets a fresh ref
+  // every render, which would invalidate every consumer of updateUrlParams
+  // (eventBridge listeners, click handlers, advance callbacks).
   const updateUrlParams = useCallback(
     (newParams: Record<string, string | null>, replace = false) => {
-      const params = new URLSearchParams(searchParams.toString());
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
       Object.entries(newParams).forEach(([key, value]) => {
         if (value === null) {
           params.delete(key);
@@ -1223,7 +1228,7 @@ function MapPageInner() {
         router.push(newUrl);
       }
     },
-    [searchParams, pathname, router],
+    [pathname, router],
   );
 
   // ── Read gender + stage from localStorage (set by /map and /map/stages) ──
@@ -1357,10 +1362,22 @@ function MapPageInner() {
       ? { ventureId: preferredVentureId as Id<"ventures"> }
       : "skip",
   );
-  const activeVenture =
-    ventures?.find((venture) => venture._id === preferredVentureId) ??
-    ventureById ??
-    (hasUrlVentureParam ? null : (ventures?.[0] ?? null));
+  // Memoized so referential identity is stable across renders. Without
+  // this, every Convex tick produces a fresh `activeVenture` object and
+  // the 7+ queries below build new `{ ventureId }` arg literals, which
+  // makes Convex's useQuery do a deep-equal check every render.
+  const activeVenture = useMemo(
+    () =>
+      ventures?.find((venture) => venture._id === preferredVentureId) ??
+      ventureById ??
+      (hasUrlVentureParam ? null : (ventures?.[0] ?? null)),
+    [ventures, ventureById, preferredVentureId, hasUrlVentureParam],
+  );
+  const activeVentureId = activeVenture?._id ?? null;
+  const ventureArg = useMemo(
+    () => (activeVentureId ? { ventureId: activeVentureId } : "skip"),
+    [activeVentureId],
+  );
 
   // Subscribe to notifications for gold checkpoint awards
   const notifications = useQuery(api.notifications.getNotifications, {
@@ -1368,10 +1385,7 @@ function MapPageInner() {
     filterType: "all",
   });
 
-  const worldMapData = useQuery(
-    api.worldMap.getWorldMapData,
-    activeVenture ? { ventureId: activeVenture._id } : "skip",
-  );
+  const worldMapData = useQuery(api.worldMap.getWorldMapData, ventureArg);
 
   // Fetch chat channels for Group Chat popup modal integration
   const chatChannels = useQuery(
@@ -1403,25 +1417,24 @@ function MapPageInner() {
   const prevVentureBadgeCountRef = useRef<number | null>(null);
 
   // Cumulative quality scores across ALL stages (grows checkpoint-by-checkpoint)
-  const allStageQualities = useQuery(
-    api.aiScoring.getVentureQualityScores,
-    activeVenture ? { ventureId: activeVenture._id } : "skip",
-  );
+  const allStageQualities = useQuery(api.aiScoring.getVentureQualityScores, ventureArg);
   // Keep the per-stage query too (still used by the passage event overlay)
-  const stageQuality = useQuery(
-    api.aiScoring.getStageQualityScore,
-    activeVenture && worldMapData?.venture
-      ? {
-        ventureId: activeVenture._id,
-        stageNumber: worldMapData.venture.currentStage,
-      }
-      : "skip",
+  const stageQualityArg = useMemo(
+    () =>
+      activeVentureId && worldMapData?.venture
+        ? {
+            ventureId: activeVentureId,
+            stageNumber: worldMapData.venture.currentStage,
+          }
+        : "skip",
+    [activeVentureId, worldMapData?.venture?.currentStage],
   );
+  const stageQuality = useQuery(api.aiScoring.getStageQualityScore, stageQualityArg);
 
   // Template metric (JIF Score / p-value / Fan Score)
   const templateMetric = useQuery(
     api.templateMetrics.getTemplateMetric,
-    activeVenture ? { ventureId: activeVenture._id } : "skip",
+    ventureArg,
   );
 
   // ── Convex mutations ───────────────────────────────────────────────────────
@@ -2015,33 +2028,36 @@ function MapPageInner() {
     [activeStage, activeCP, optimisticCompletedTaskIds],
   );
 
+  // Refresh selectedDetail when checkpoints tick — but read prev via the
+  // setter form so this effect doesn't depend on selectedDetail (which it
+  // sets), preventing a self-perpetuating cascade.
   useEffect(() => {
-    if (!selectedDetail) return;
+    setSelectedDetail((prev) => {
+      if (!prev) return prev;
+      const latestSelected = checkpoints.find((cp) => cp._id === prev.id);
+      if (!latestSelected) return null;
 
-    const latestSelected = checkpoints.find(
-      (cp) => cp._id === selectedDetail.id,
-    );
-    if (!latestSelected) {
-      setSelectedDetail(null);
-      return;
-    }
+      const refreshedDetail = buildCheckpointDetail(latestSelected);
+      const taskStatesChanged = refreshedDetail.tasks.some(
+        (task, index) => task.done !== prev.tasks[index]?.done,
+      );
 
-    const refreshedDetail = buildCheckpointDetail(latestSelected);
-    const taskStatesChanged = refreshedDetail.tasks.some(
-      (task, index) => task.done !== selectedDetail.tasks[index]?.done,
-    );
-
-    if (
-      refreshedDetail.status !== selectedDetail.status ||
-      refreshedDetail.title !== selectedDetail.title ||
-      refreshedDetail.outcome !== selectedDetail.outcome ||
-      taskStatesChanged
-    ) {
-      setSelectedDetail(refreshedDetail);
-    }
-  }, [selectedDetail, checkpoints, buildCheckpointDetail]);
+      if (
+        refreshedDetail.status !== prev.status ||
+        refreshedDetail.title !== prev.title ||
+        refreshedDetail.outcome !== prev.outcome ||
+        taskStatesChanged
+      ) {
+        return refreshedDetail;
+      }
+      return prev;
+    });
+  }, [checkpoints, buildCheckpointDetail]);
 
   // ── Sync URL Query Parameters to React state ───────────────────────────────
+  // Drop `checkpoints` from deps — the effect above already keeps
+  // selectedDetail fresh when checkpoints change. This effect should only
+  // re-run when the URL param itself changes.
   useEffect(() => {
     // 1. Sync Checkpoint detail panel state
     if (paramCheckpointId) {
@@ -2064,7 +2080,8 @@ function MapPageInner() {
     } else {
       setIsToolsPanelOpen(false);
     }
-  }, [paramCheckpointId, paramPanel, paramTab, checkpoints, buildCheckpointDetail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramCheckpointId, paramPanel, paramTab]);
 
   // ── Auto-open current active checkpoint on mount if no param is set ────────
   useEffect(() => {

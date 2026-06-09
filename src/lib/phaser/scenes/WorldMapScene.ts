@@ -841,6 +841,19 @@ export class WorldMapScene extends Phaser.Scene {
    * Single source of truth for stage panel dimensions and placement.
    * Every biome uses the same width, height, and vertical alignment.
    */
+  // Cached because getStandardPanelLayout is called from the wheel handler,
+  // drag pointermove, and inertia tween's onUpdate — collectively 60-120
+  // times per second during scrolling. Recomputing object literals + map
+  // size reads in that hot path was a real cost. Invalidate on resize +
+  // template rebuild via syncStageLayoutMetrics.
+  private cachedPanelLayout: {
+    panelWidth: number;
+    panelHeight: number;
+    panelOffsetX: number;
+    panelOffsetY: number;
+    stageViewCenterY: number;
+  } | null = null;
+
   private getStandardPanelLayout(): {
     panelWidth: number;
     panelHeight: number;
@@ -848,23 +861,26 @@ export class WorldMapScene extends Phaser.Scene {
     panelOffsetY: number;
     stageViewCenterY: number;
   } {
+    if (this.cachedPanelLayout) return this.cachedPanelLayout;
     const baseWidth = this.map?.widthInPixels ?? this.MAP_TILE_COLS * this.MAP_TILE_PX;
     const baseHeight = this.map?.heightInPixels ?? this.MAP_TILE_ROWS * this.MAP_TILE_PX;
     const panelWidth = baseWidth * this.MAP_PANEL_SCALE;
     const panelHeight = baseHeight * this.MAP_PANEL_SCALE;
     const panelOffsetX = 0;
     const panelOffsetY = Math.round((this.MAP_HEIGHT - panelHeight) / 2);
-    return {
+    this.cachedPanelLayout = {
       panelWidth,
       panelHeight,
       panelOffsetX,
       panelOffsetY,
       stageViewCenterY: panelOffsetY + panelHeight / 2,
     };
+    return this.cachedPanelLayout;
   }
 
   /** Sync stage slot width to the rendered panel so there is no empty side padding. */
   private syncStageLayoutMetrics(): void {
+    this.cachedPanelLayout = null; // invalidate before re-reading
     const layout = this.getStandardPanelLayout();
     this.BIOME_WIDTH = layout.panelWidth;
     this.MAP_WIDTH = this.BIOME_WIDTH * this.activeBiomeConfigs.length;
@@ -1403,6 +1419,10 @@ export class WorldMapScene extends Phaser.Scene {
     }
   }
 
+  // Tracks where the camera was the last time we actually iterated the
+  // stage list, so we can skip the work when the camera is parked.
+  private lastBiomeCheckCamX: number = Number.NEGATIVE_INFINITY;
+
   /**
    * Checks the camera scroll position and loads stages that are near the view
    */
@@ -1415,6 +1435,10 @@ export class WorldMapScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     const camX = cam.scrollX + cam.width / 2;
+    // Bail out if the camera barely moved since the last full check.
+    // Avoids touching all 8 stages while the user isn't scrolling.
+    if (Math.abs(camX - this.lastBiomeCheckCamX) < 48) return;
+    this.lastBiomeCheckCamX = camX;
     const loadBuffer = WorldMapScene.STAGE_LOAD_BUFFER_PX;
     const unloadBuffer = WorldMapScene.STAGE_UNLOAD_BUFFER_PX;
 
@@ -8015,7 +8039,7 @@ export class WorldMapScene extends Phaser.Scene {
       cam.pan(x, y, MAP_PERF.CAMERA_PAN_MS, "Quad.easeOut", false, (_cam, progress) => {
         if (progress === 1) {
           this.clampCameraToStagePanel(focusStage);
-          eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
+          this.dispatchStageInView(focusStage);
         }
       });
       return;
@@ -8023,7 +8047,17 @@ export class WorldMapScene extends Phaser.Scene {
 
     cam.centerOn(x, y);
     this.clampCameraToStagePanel(focusStage);
-    eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage: focusStage });
+    this.dispatchStageInView(focusStage);
+  }
+
+  // Dedupes STAGE_IN_VIEW dispatches so React doesn't get repeated
+  // events when the camera pan completes on a stage that's already the
+  // active one (e.g. resize -> recenter on same stage).
+  private lastDispatchedStage: number | null = null;
+  private dispatchStageInView(stage: number): void {
+    if (this.lastDispatchedStage === stage) return;
+    this.lastDispatchedStage = stage;
+    eventBridge.dispatchToReact({ type: "STAGE_IN_VIEW", stage });
   }
 
   /** Lock the camera to one stage — no neighboring maps bleed into view. */
@@ -8556,9 +8590,13 @@ export class WorldMapScene extends Phaser.Scene {
       },
     });
 
-    // Sparkle particles
+    // Sparkle particles — use Phaser's delayedCall so the scheduled
+    // callbacks are cleaned up automatically when the scene shuts down.
+    // Plain setTimeout survives scene transitions and leaks across
+    // ventures.
     for (let i = 0; i < 30; i++) {
-      setTimeout(() => {
+      this.time.delayedCall(i * 50, () => {
+        if (!this.sys.isActive()) return;
         const x = Phaser.Math.Between(minX - 100, maxX + 100);
         const y = Phaser.Math.Between(200, 600);
         const sparkle = this.add.star(
@@ -8583,7 +8621,7 @@ export class WorldMapScene extends Phaser.Scene {
             sparkle.destroy();
           },
         });
-      }, i * 50);
+      });
     }
   }
 
