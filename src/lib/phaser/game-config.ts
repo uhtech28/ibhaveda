@@ -84,15 +84,29 @@ export function createGameConfig(
       antialias: false,
       pixelArt: true,
       roundPixels: true,
-      powerPreference: "high-performance",
+      // "default" instead of "high-performance" — the latter forces the
+      // discrete/integrated GPU choice and on many machines (especially
+      // laptops) pegs CPU/GPU usage even when nothing is moving on
+      // screen. "default" lets the browser pick lazily.
+      powerPreference: "default",
       batchSize: 4096,
     },
     fps: {
-      target: 60,
+      // Half the per-frame work. 30fps is more than enough for a pixel-
+      // art world map with slow parallax + checkpoint pulses — there's
+      // no fast-action gameplay here. Drops sustained CPU/GPU usage
+      // dramatically; the symptom of "the whole computer lags" comes
+      // from this kind of constant 60fps render budget.
+      target: 30,
       smoothStep: true,
-      panicMax: 120,
+      panicMax: 60,
       forceSetTimeOut: false,
     },
+    // Pause game loop while the tab is hidden — by default Phaser keeps
+    // ticking even when minimised. With multiple tabs open this is
+    // significant background CPU.
+    autoFocus: true,
+    disableContextMenu: true,
     audio: {
       // The world map has no audio cues — all UX sounds run through
       // audioManager (HTMLAudio). Disabling Phaser's WebAudio path
