@@ -160,9 +160,9 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
 function DialogTitle({
   className,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+}: React.ComponentProps<"h2">) {
   return (
-    <DialogPrimitive.Title
+    <h2
       data-slot="dialog-title"
       className={cn("text-lg leading-none font-semibold", className)}
       {...props}
@@ -173,9 +173,9 @@ function DialogTitle({
 function DialogDescription({
   className,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+}: React.ComponentProps<"p">) {
   return (
-    <DialogPrimitive.Description
+    <p
       data-slot="dialog-description"
       className={cn("text-muted-foreground text-sm", className)}
       {...props}

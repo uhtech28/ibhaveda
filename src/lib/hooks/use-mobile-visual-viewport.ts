@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export function useMobileVisualViewport() {
   useEffect(() => {
@@ -32,4 +32,32 @@ export function useMobileVisualViewport() {
       window.visualViewport?.removeEventListener("scroll", updateViewportVars);
     };
   }, []);
+}
+
+export function useMobilePopupMode() {
+  const [isMobilePopup, setIsMobilePopup] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const queries = [
+      window.matchMedia("(max-width: 639px)"),
+      window.matchMedia("(hover: none) and (pointer: coarse)"),
+    ];
+
+    const update = () => {
+      setIsMobilePopup(queries.some((query) => query.matches));
+    };
+
+    update();
+    queries.forEach((query) => query.addEventListener("change", update));
+    window.addEventListener("resize", update);
+
+    return () => {
+      queries.forEach((query) => query.removeEventListener("change", update));
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return isMobilePopup;
 }

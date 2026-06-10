@@ -11,15 +11,17 @@ import { Id } from "@convex/_generated/dataModel";
 import { IdeaForgeExperience } from "@/components/ideaforge/experience";
 import { IdeaForgeIdea } from "@/components/ideaforge/shared";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MobilePopup } from "@/components/ui/mobile-popup";
 import { MessageCircle, X } from "lucide-react";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
-import { useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
+import { useMobilePopupMode, useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 
 export function FeedClient() {
   useMobileVisualViewport();
+  const isMobilePopup = useMobilePopupMode();
 
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
@@ -157,6 +159,57 @@ export function FeedClient() {
         hasMore={hasMore}
       />
 
+      {isMobilePopup && activeCommentIdea && (
+        <MobilePopup
+          onClose={() => {
+            setActiveCommentIdea(null);
+            setCommentsKeyboardOpen(false);
+          }}
+          className={`mobile-comments-dialog ${commentsKeyboardOpen ? "mobile-comments-dialog--keyboard" : ""} grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden bg-[#0A0D12] p-0 text-white`}
+        >
+          <header className="flex min-w-0 items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-4 py-0 h-14">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
+              <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
+            </div>
+            <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
+              <Link
+                href={`/idea/${activeCommentIdea._id}`}
+                className="block max-w-full truncate transition-colors hover:text-[#C7D2FE]"
+                onClick={() => setActiveCommentIdea(null)}
+              >
+                {activeCommentIdea.title}
+              </Link>
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveCommentIdea(null);
+                setCommentsKeyboardOpen(false);
+              }}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/65 transition hover:bg-white/10 hover:text-white"
+              aria-label="Close comments"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+          <div
+            className="min-h-0 min-w-0 overflow-hidden px-4 py-3"
+            onFocus={(event) => {
+              if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(true);
+            }}
+            onBlur={(event) => {
+              if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(false);
+            }}
+          >
+            <CommentsSection
+              ideaId={activeCommentIdea._id as Id<"ideas">}
+              commentCount={activeCommentIdea.commentCount || 0}
+            />
+          </div>
+        </MobilePopup>
+      )}
+
+      {!isMobilePopup && (
       <Dialog
         open={!!activeCommentIdea}
         onOpenChange={(open) => {
@@ -212,7 +265,40 @@ export function FeedClient() {
           </div>
         </DialogContent>
       </Dialog>
+      )}
 
+      {isMobilePopup && activeContributeIdea && (
+        <MobilePopup
+          onClose={() => {
+            setActiveContributeIdea(null);
+            setContributionKeyboardOpen(false);
+          }}
+          className={`mobile-contribution-request-dialog ${contributionKeyboardOpen ? "mobile-contribution-request-dialog--keyboard" : ""} overflow-y-auto border-white/10 bg-[#111827] p-6 text-white`}
+        >
+          <div
+            onFocus={(event) => {
+              if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(true);
+            }}
+            onBlur={(event) => {
+              if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(false);
+            }}
+          >
+            <ContributionRequestModal
+              ideaId={activeContributeIdea._id as Id<"ideas">}
+              ideaTitle={activeContributeIdea.title}
+              authorName={activeContributeIdea.author?.displayName || activeContributeIdea.author?.name || activeContributeIdea.author?.username}
+              authorUsername={activeContributeIdea.author?.username}
+              authorAvatar={activeContributeIdea.author?.avatar}
+              onClose={() => {
+                setActiveContributeIdea(null);
+                setContributionKeyboardOpen(false);
+              }}
+            />
+          </div>
+        </MobilePopup>
+      )}
+
+      {!isMobilePopup && (
       <Dialog
         open={!!activeContributeIdea}
         onOpenChange={(open) => {
@@ -246,6 +332,7 @@ export function FeedClient() {
           )}
         </DialogContent>
       </Dialog>
+      )}
 
       {/* First-time user walkthrough. */}
       <FeedTutorial
