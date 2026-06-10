@@ -10,6 +10,7 @@
  */
 
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -30,6 +31,7 @@ import { LEVEL_DEFINITIONS } from "@convex/ventureConstants";
 import type { Id } from "@convex/_generated/dataModel";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
+import { isLiteMode } from "@/lib/phaser/performance-mode";
 import {
   buildCheckpointSyncSignature,
   mapCheckpointsToPhaserState,
@@ -287,6 +289,82 @@ function useMapGame() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [phaserReady, setPhaserReady] = useState(false);
 
+  // Pause Phaser when any overlay panel is open. Trace showed INP of
+  // 2 seconds with only 189ms of JS work — the remaining 1.8s was
+  // "presentation delay" caused by the Phaser game loop hogging the
+  // main thread every 16ms. When an overlay covers the canvas there's
+  // no visual reason to keep rendering, and freeing the main thread
+  // lets React's update paint immediately.
+  //
+  // We accept three trigger sources:
+  //   1. Radix-style `[role="dialog"]` + `aria-modal` toggles
+  //   2. Any element with `data-phaser-pause="true"`
+  //   3. Window events `phaser:pause` / `phaser:resume` for direct
+  //      React-driven control (CheckpointPanel uses this)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    let manualPause = false;
+    const apply = () => {
+      const game = gameRef.current;
+      if (!game) return;
+      // When a side overlay is open we THROTTLE Phaser instead of
+      // pausing it. Pausing froze input so users couldn't scroll/drag
+      // the map. Throttling to 15fps drops main-thread work by ~75%
+      // (huge INP win) while keeping pointer/wheel handlers active.
+      // Full pause is still used for Radix dialogs that genuinely
+      // cover the entire viewport (TaskSubmissionModal).
+      const fullModalOpen = !!document.querySelector(
+        '[role="dialog"][data-state="open"]',
+      );
+      const sideOverlayOpen = !!document.querySelector(
+        '[data-phaser-pause="true"]',
+      );
+
+      // `sleeping` is a runtime field on Phaser's TimeStep but the
+      // typed surface doesn't expose it.
+      const phaserLoop = game.loop as Phaser.Core.TimeStep & { sleeping?: boolean };
+      if (manualPause || fullModalOpen) {
+        if (!phaserLoop.sleeping) phaserLoop.sleep();
+        return;
+      }
+      if (phaserLoop.sleeping) phaserLoop.wake();
+
+      // Set FPS based on overlay + lite-mode state. Lite-mode kicks in
+      // automatically for advanced ventures (6+ completed checkpoints
+      // — see WorldMapScene.setVentureAdvanced) and we drop the steady
+      // FPS to 30. With smoothStep on, pixel-art world maps look fine
+      // at 30fps and the main thread has roughly half the per-frame
+      // cost, which is the dominant remaining lag source for veterans.
+      const lite = isLiteMode();
+      const baseFps = lite ? 30 : 60;
+      const targetFps = sideOverlayOpen ? 15 : baseFps;
+      const loop = game.loop as Phaser.Core.TimeStep & { setFpsLimit?: (n: number) => void };
+      if (typeof loop.setFpsLimit === "function") {
+        loop.setFpsLimit(targetFps);
+      } else {
+        // Older Phaser versions — set the field directly.
+        (loop as unknown as { targetFps: number }).targetFps = targetFps;
+      }
+    };
+    const onPause = () => { manualPause = true; apply(); };
+    const onResume = () => { manualPause = false; apply(); };
+    window.addEventListener("phaser:pause", onPause);
+    window.addEventListener("phaser:resume", onResume);
+    const observer = new MutationObserver(apply);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-state", "aria-modal", "role", "data-phaser-pause"],
+    });
+    apply();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("phaser:pause", onPause);
+      window.removeEventListener("phaser:resume", onResume);
+    };
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
 
@@ -294,12 +372,20 @@ function useMapGame() {
 
     eventBridge.onReact("PHASER_READY", handleReady);
 
+    // Three parallel imports: Phaser core, game-config (no scene), and
+    // the WorldMapScene chunk. The scene was being statically pulled
+    // into the game-config bundle and parsed alongside Phaser core on
+    // hydration — that's ~1.5 MB of JS evaluation on the main thread.
+    // Splitting it out lets the browser parse/compile concurrently.
     Promise.all([
       import("phaser"),
       import("@/lib/phaser/game-config"),
-    ]).then(([Phaser, { createGameConfig }]) => {
+      import("@/lib/phaser/scenes/WorldMapScene"),
+    ]).then(([Phaser, { createGameConfig }, { WorldMapScene }]) => {
       if (!containerRef.current || gameRef.current) return;
-      const game = new Phaser.Game(createGameConfig(containerRef.current));
+      const game = new Phaser.Game(
+        createGameConfig(containerRef.current, WorldMapScene),
+      );
       gameRef.current = game;
     });
 
@@ -501,7 +587,7 @@ function StageStrip({
 }
 
 /** Checkpoint detail slide-in panel */
-function CheckpointPanel({
+const CheckpointPanel = memo(function CheckpointPanelInner({
   detail,
   onClose,
   onAdvance,
@@ -555,6 +641,7 @@ function CheckpointPanel({
   return (
     <motion.div
       key="cp-panel"
+      data-phaser-pause="true"
       initial={{ x: "100%", opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
@@ -731,7 +818,7 @@ function CheckpointPanel({
       </div>
     </motion.div>
   );
-}
+});
 
 function StatusDot({ status }: { status: CheckpointStatus }) {
   const colors: Record<CheckpointStatus, string> = {
@@ -761,7 +848,7 @@ function StatusDot({ status }: { status: CheckpointStatus }) {
   );
 }
 
-function TaskCard({
+const TaskCard = memo(function TaskCardInner({
   task,
   locked,
   evaluationSummary,
@@ -894,7 +981,7 @@ function TaskCard({
       </div>
     </motion.div>
   );
-}
+});
 
 /** Gold flash overlay on checkpoint advance */
 function CrossingFlash({ trigger }: { trigger: number }) {
@@ -1942,26 +2029,40 @@ function MapPageInner() {
   }, [activeVenture?._id, backfillPendingEvaluations]);
 
   // ── Detect gold checkpoint notifications ──────────────────────────────────
+  // Bail BEFORE the work — previously the spread + sort over `checkpoints`
+  // ran on every notifications poll even when there was nothing to show.
+  // For advanced ventures `checkpoints` is 30+ items so that allocation
+  // chain was paid constantly.
   useEffect(() => {
     if (!notifications || !venture) return;
 
-    // Find unread gold checkpoint notifications for this venture
-    const goldNotifications = notifications?.filter(
+    // Find unread gold checkpoint notification for this venture (only
+    // need the first one — find is O(N) once, not filter+spread+sort).
+    const latestNotif = notifications.find(
       (n) =>
         n.type === "gold_checkpoint" &&
         !n.isRead &&
         n.relatedId === venture._id,
     );
+    if (!latestNotif) return;
 
-    if (goldNotifications.length > 0) {
-      // Use the most recent notification
-      const latestNotif = goldNotifications[0];
-
-      // Try to find the actual checkpoint that earned gold by looking in our
-      // in-memory checkpoints for the most recently gold-completed one.
-      const goldCp = [...checkpoints]
-        .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
-        .find((cp) => cp.t1Completed && cp.t2Completed && cp.t3Completed);
+    {
+      // Single linear scan to find the most recently gold-completed
+      // checkpoint instead of [...checkpoints].sort() (creates a new
+      // 30-item array + an O(N log N) sort per run).
+      let goldCp: typeof checkpoints[number] | undefined;
+      let bestTs = -1;
+      for (const cp of checkpoints) {
+        if (
+          cp.t1Completed &&
+          cp.t2Completed &&
+          cp.t3Completed &&
+          (cp.completedAt ?? 0) > bestTs
+        ) {
+          bestTs = cp.completedAt ?? 0;
+          goldCp = cp;
+        }
+      }
 
       const targetStage = goldCp?.stage ?? activeStage;
       const targetCP = goldCp?.checkpoint ?? activeCP;

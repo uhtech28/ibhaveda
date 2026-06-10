@@ -525,6 +525,11 @@ export default defineSchema({
   // Venture tasks — individual T1/T2/T3 task tracking
   ventureTasks: defineTable({
     checkpointId: v.id("ventureCheckpoints"),
+    // Denormalised venture reference so getWorldMapData can pull every
+    // task for a venture in one indexed query instead of fanning out 24-36
+    // `by_checkpoint` collects. Optional for back-compat; ensureVenture-
+    // Structure backfills it when the owner opens the map.
+    ventureId: v.optional(v.id("ventures")),
     taskLevel: v.union(v.literal("t1"), v.literal("t2"), v.literal("t3")),
     toolType: v.union(
       v.literal("write"),
@@ -551,7 +556,8 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
   })
     .index("by_checkpoint", ["checkpointId"])
-    .index("by_checkpoint_level", ["checkpointId", "taskLevel"]),
+    .index("by_checkpoint_level", ["checkpointId", "taskLevel"])
+    .index("by_venture", ["ventureId"]),
 
   // Venture evidence — user-submitted proof of task completion
   ventureEvidence: defineTable({

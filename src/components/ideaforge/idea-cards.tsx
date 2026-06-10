@@ -547,9 +547,37 @@ export function IdeaStoryCard({
   const bannerVideo = getBannerVideo(idea);
   const description = idea.description || "No description yet.";
   const shouldClamp = description.length > 220;
-  const ventureSummary = useQuery(api.ventures.getVentureSummaryByIdea, {
-    ideaId: idea._id as Id<"ideas">,
-  });
+  // Gate per-card Convex subscriptions on visibility — for a 20-card
+  // feed with 3 subscriptions per card we were firing 60 simultaneous
+  // websocket subscriptions, all blocking the initial feed render. With
+  // an IntersectionObserver we now only subscribe for cards in or near
+  // the viewport, then progressively activate as the user scrolls.
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  useEffect(() => {
+    if (isVisible) return; // once visible we stay subscribed
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px" }, // load ~half a viewport in advance
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isVisible]);
+
+  const ventureSummary = useQuery(
+    api.ventures.getVentureSummaryByIdea,
+    isVisible ? { ideaId: idea._id as Id<"ideas"> } : "skip",
+  );
   const cumulativeScores = useQuery(
     api.aiScoring.getVentureCumulativeHUDScores,
     ventureSummary?._id ? { ventureId: ventureSummary._id as Id<"ventures"> } : "skip",
@@ -606,6 +634,7 @@ export function IdeaStoryCard({
 
   return (
     <article
+      ref={cardRef}
       onClick={handleCardClick}
       className={cn(
         cardSurface,

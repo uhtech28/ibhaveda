@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { AssetLoader } from "../utils/asset-loader";
+import { isLiteMode, setVentureAdvanced } from "../performance-mode";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender } from "../entities/Persona";
 import {
@@ -307,6 +308,21 @@ export class WorldMapScene extends Phaser.Scene {
   private retreatedStages: Set<number> = new Set();
   /** Stages whose mini-boss defeat animation has already started this session */
   private slainMiniBossStages: Set<number> = new Set();
+  // Tracks which stages have had their gold/retreat **celebration burst**
+  // played in this scene lifetime. Distinct from slainMiniBossStages
+  // (which we reset on venture switch). On remount of an advanced
+  // venture, every already-finished stage was replaying the cascade
+  // (~81 game objects + tweens per stage × 8 stages = 648 transient
+  // entities in one frame). This set persists across venture switches
+  // for the lifetime of the scene; the visual end-state (gold node
+  // + slain boss sprite) is restored by slayGold()/restoreBiome
+  // without the burst.
+  private celebratedGoldStages: Set<number> = new Set();
+  private celebratedRetreatStages: Set<number> = new Set();
+  // Last performance.now() timestamp updateMiniBossProgress ran. The
+  // initial scene boot can call it 3+ times within the same frame from
+  // loadStage; we throttle to one call per 100ms.
+  private lastMiniBossRefreshMs: number = 0;
   /** Checkpoints that have already triggered a mini-boss combat sequence */
   private triggeredBossCheckpoints: Set<string> = new Set();
   private initializedBossTriggers: boolean = false;
@@ -537,12 +553,17 @@ export class WorldMapScene extends Phaser.Scene {
     // 3. Create the super boss
     this.createSuperBoss();
 
-    // 4. Defer atmospheric effects so the map paints immediately
-    this.time.delayedCall(0, () => {
-      if (this.sys.isActive()) {
-        this.createAtmosphericEffects();
-      }
-    });
+    // 4. Defer atmospheric effects so the map paints immediately.
+    // Skip entirely in lite mode (auto-detected on low-spec devices) —
+    // the dust emitter, ambient stars, and parallax clouds are pure
+    // cosmetic cost that hurts cheap laptops + budget phones.
+    if (!isLiteMode()) {
+      this.time.delayedCall(0, () => {
+        if (this.sys.isActive()) {
+          this.createAtmosphericEffects();
+        }
+      });
+    }
 
     // 5. Load only the focused stage + neighbors (packs load on demand)
     const focus = Phaser.Math.Clamp(
@@ -1319,8 +1340,18 @@ export class WorldMapScene extends Phaser.Scene {
       // 4. Create stage mini-boss
       this.createMiniBossForStage(stageId);
 
-      // 5. Update the new mini-boss state if checkpoints have been loaded
-      if (this.latestCheckpointsState) {
+      // 5. Update the new mini-boss state if checkpoints have been loaded.
+      // loadStage runs once per lazy-loaded stage on initial mount (3
+      // stages by default) — without this guard we'd call updateMiniBoss-
+      // Progress 3x, each call walking all 8 stages. The celebratedGold/
+      // Retreat sets gate the visual cascade now, so even repeated calls
+      // are cheap, but skipping when we already ran a refresh in the
+      // last 100ms removes the loop work too.
+      if (
+        this.latestCheckpointsState &&
+        performance.now() - this.lastMiniBossRefreshMs > 100
+      ) {
+        this.lastMiniBossRefreshMs = performance.now();
         this.updateMiniBossProgress(this.latestCheckpointsState);
       }
 
@@ -7551,10 +7582,31 @@ export class WorldMapScene extends Phaser.Scene {
       }
     });
 
+    // 6+ completed checkpoints → "advanced venture" → auto-enable lite
+    // mode for ambient effects. New ideas (0-5 completed) keep full
+    // visuals; older ventures with lots of progress get the stripped
+    // path so they render as smoothly as fresh ones.
+    setVentureAdvanced(totalCompleted >= 6);
+
     const superBossObj = this.bosses.get("super_boss");
     if (superBossObj) {
       superBossObj.weaken(totalCompleted, totalCheckpoints);
       superBossObj.updateCorruptionAura(this.currentCorruptionLevel);
+    }
+
+    // Pre-group checkpoints by stage ONCE so the per-stage loop below
+    // doesn't redo a filter+sort over the entire array for each of 8
+    // mini-bosses. Previously this was 8 × O(N log N) per Convex tick;
+    // now it's one O(N) pass + 8 O(K log K) sorts of small per-stage
+    // arrays.
+    const checkpointsByStage = new Map<number, typeof checkpoints>();
+    for (const cp of checkpoints) {
+      const arr = checkpointsByStage.get(cp.stage);
+      if (arr) arr.push(cp);
+      else checkpointsByStage.set(cp.stage, [cp]);
+    }
+    for (const arr of checkpointsByStage.values()) {
+      arr.sort((a, b) => a.checkpoint - b.checkpoint);
     }
 
     // Update all mini-bosses
@@ -7565,9 +7617,7 @@ export class WorldMapScene extends Phaser.Scene {
       }
 
       const { completed, total } = progress;
-      const stageCheckpoints = checkpoints
-        .filter((cp) => cp.stage === stage)
-        .sort((a, b) => a.checkpoint - b.checkpoint);
+      const stageCheckpoints = checkpointsByStage.get(stage) ?? [];
       const finalCheckpoint = stageCheckpoints[stageCheckpoints.length - 1];
       const finalCheckpointCompleted =
         finalCheckpoint?.status === "completed" ||
@@ -7588,7 +7638,15 @@ export class WorldMapScene extends Phaser.Scene {
           if (finalCheckpointGold) {
             // Did all tasks -> Boss dies!
             miniBoss.slayGold();
-            this.transformBiomeGold(stage);
+            // Only run the celebration burst the first time we see this
+            // stage as gold in the scene's lifetime. On re-mount or
+            // venture-switch, slayGold() above plus the persistent gold
+            // visuals on each checkpoint produce the correct end-state
+            // without the 81-object burst.
+            if (!this.celebratedGoldStages.has(stage)) {
+              this.celebratedGoldStages.add(stage);
+              this.transformBiomeGold(stage);
+            }
             this.syncCorruptionVisuals();
           } else {
             // Did bare minimum (2 tasks) -> Boss retreats permanently!
@@ -7605,7 +7663,10 @@ export class WorldMapScene extends Phaser.Scene {
                 miniBoss.destroy();
               }
             });
-            this.restoreBiome(stage);
+            if (!this.celebratedRetreatStages.has(stage)) {
+              this.celebratedRetreatStages.add(stage);
+              this.restoreBiome(stage);
+            }
             this.syncCorruptionVisuals();
           }
           this.slainMiniBossStages.add(stage);
@@ -7688,6 +7749,17 @@ export class WorldMapScene extends Phaser.Scene {
         this.bossCombatActiveStages.clear();
         this.retreatedStages.clear();
         this.slainMiniBossStages.clear();
+        // Seed the celebration sets from the venture's current state so
+        // re-entering an already-advanced venture doesn't replay 8x worth
+        // of gold cascades on mount. Any stage strictly before the user's
+        // current stage is "already finished" from a player perspective.
+        this.celebratedGoldStages.clear();
+        this.celebratedRetreatStages.clear();
+        const currentStageNumber = event.currentStage ?? this.currentStage;
+        for (let s = 1; s < currentStageNumber; s += 1) {
+          this.celebratedGoldStages.add(s);
+          this.celebratedRetreatStages.add(s);
+        }
         this.triggeredBossCheckpoints.clear();
         this.initializedBossTriggers = false;
         this.checkpointIdAliases.clear();
