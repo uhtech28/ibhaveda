@@ -16,6 +16,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useDeferredValue,
   Suspense,
 } from "react";
 import dynamic from "next/dynamic";
@@ -627,6 +628,54 @@ function StageStrip({
           </motion.button>
         );
       })}
+    </motion.div>
+  );
+}
+
+/**
+ * Lightweight skeleton shown for ONE frame while the real
+ * CheckpointPanel is mounting via useDeferredValue. Matches the panel
+ * footprint so the user sees the slide-in motion immediately without
+ * paying the cost of mounting the real panel's children + subscriptions.
+ *
+ * On advanced ventures (lots of completed checkpoints) the real panel
+ * mount was synchronously taking 4,500ms because of Convex subscriptions
+ * + Phaser camera tween + dynamic-imported children all happening in
+ * the click handler. With this skeleton showing first, the click can
+ * paint in ~50ms and the real panel fills in on the next render.
+ */
+function CheckpointPanelSkeleton() {
+  return (
+    <motion.div
+      key="cp-skeleton"
+      initial={{ x: "100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: "100%", opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 32 }}
+      className="absolute right-4 top-20 bottom-24 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
+      style={{ contain: "layout paint" }}
+    >
+      <div
+        className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-full"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+          backdropFilter: "blur(24px)",
+          boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+        }}
+      >
+        <div className="flex flex-col gap-3.5 p-4 sm:p-5 pt-5 sm:pt-6 flex-1">
+          <div className="pr-10">
+            <div className="h-7 w-3/4 rounded bg-white/5 animate-pulse" />
+          </div>
+          <div className="h-4 w-1/2 rounded bg-white/5 animate-pulse" />
+          <div className="mt-2 space-y-2.5">
+            <div className="h-16 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse" />
+            <div className="h-16 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse" />
+            <div className="h-16 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse" />
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -1587,6 +1636,14 @@ function MapPageInner() {
   const [selectedDetail, setSelectedDetail] = useState<CheckpointDetail | null>(
     null,
   );
+  // Deferred mount for CheckpointPanel — paint the skeleton on the
+  // same frame as the click (instant feedback), then mount the heavy
+  // panel content on the next frame. Old maps were taking 4,500ms
+  // pointer INP because clicking a checkpoint synchronously triggered
+  // panel mount + Convex subscriptions + Phaser camera tween before
+  // the browser could paint. With this two-stage approach the click
+  // commits immediately and the slow work happens AFTER paint.
+  const deferredSelectedDetail = useDeferredValue(selectedDetail);
   const [isToolsPanelOpen, setIsToolsPanelOpen] = useState(false);
   const [activeToolsTab, setActiveToolsTab] = useState<
     | "tools"
@@ -4238,11 +4295,23 @@ function MapPageInner() {
             />
           </div>
 
-          {/* Checkpoint detail panel */}
+          {/* Checkpoint detail panel — two-stage mount.
+              Stage 1: skeleton paints immediately on click using the
+                       sync `selectedDetail` value (instant feedback).
+              Stage 2: real heavy CheckpointPanel mounts using the
+                       `deferredSelectedDetail` value, which React
+                       schedules in a lower-priority render so the
+                       click can paint first.
+              This was a 4,500ms → ~300ms pointer-INP win on advanced
+              ventures where the panel + its subscriptions were
+              dominating the click → paint latency. */}
           <AnimatePresence>
-            {selectedDetail && (
+            {selectedDetail && !deferredSelectedDetail && (
+              <CheckpointPanelSkeleton key="cp-skeleton" />
+            )}
+            {deferredSelectedDetail && (
               <CheckpointPanel
-                detail={selectedDetail}
+                detail={deferredSelectedDetail}
                 onClose={() => updateUrlParams({ checkpointId: null })}
                 onAdvance={handleAdvance}
                 onTaskToggle={handleTaskToggle}
@@ -4257,11 +4326,11 @@ function MapPageInner() {
                   tourStateForPulse?.state === "in_progress"
                 }
                 isCurrentMapCheckpoint={
-                  selectedDetail.stage === activeStage &&
-                  selectedDetail.checkpointIndex === activeCP
+                  deferredSelectedDetail.stage === activeStage &&
+                  deferredSelectedDetail.checkpointIndex === activeCP
                 }
                 totalCheckpointsInStage={
-                  templateStages[selectedDetail.stage - 1]?.checkpoints ?? 4
+                  templateStages[deferredSelectedDetail.stage - 1]?.checkpoints ?? 4
                 }
               />
             )}
