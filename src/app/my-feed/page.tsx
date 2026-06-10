@@ -119,7 +119,8 @@ export default function MyFeedPage() {
             setActiveCommentIdea(null);
             setCommentsKeyboardOpen(false);
           }}
-          className={`mobile-comments-dialog ${commentsKeyboardOpen ? "mobile-comments-dialog--keyboard" : ""} grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden bg-[#0A0D12] p-0 text-white`}
+          className="grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden bg-[#0A0D12] p-0 text-white"
+          style={{ height: commentsKeyboardOpen ? 'var(--app-vv-comments-keyboard-height, min(82dvh, 28rem))' : 'var(--app-vv-comments-height, min(76dvh, 43rem))' }}
         >
           <header className="flex min-w-0 items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-4 py-0 h-14">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
