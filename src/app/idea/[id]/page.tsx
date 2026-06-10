@@ -247,7 +247,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
         onOpenCalendar={() => setShowCalendar(true)}
       />
 
-      <main className="flex-1 w-full pb-12 pt-24 max-sm:flex max-sm:justify-center lg:grid lg:place-items-center lg:py-16">
+      <main className="flex-1 w-full pb-12 pt-24 max-sm:flex max-sm:min-h-[100dvh] max-sm:justify-center lg:grid lg:place-items-center lg:py-16">
         <div className="mx-auto flex w-full max-w-[900px] flex-col items-center px-4 sm:px-6 lg:px-8 relative">
           {/* Breadcrumb — always shows Feed > root > ... > current so
               the user never loses context. */}
@@ -354,7 +354,8 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                     setShowRequests(false);
                     setContributionKeyboardOpen(false);
                   }}
-                  className={`mobile-contribution-request-dialog ${contributionKeyboardOpen ? "mobile-contribution-request-dialog--keyboard" : ""} overflow-y-auto border-white/10 bg-[#111827] p-6 text-white`}
+                  className="overflow-y-auto border-white/10 bg-[#111827] p-6 text-white"
+                  style={{ maxHeight: contributionKeyboardOpen ? 'var(--app-vv-contribution-keyboard-height, min(82dvh, 27rem))' : 'var(--app-vv-contribution-height, min(78dvh, 34rem))' }}
                 >
                   <div
                     onFocus={(event) => {

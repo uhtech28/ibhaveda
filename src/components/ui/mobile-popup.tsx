@@ -6,10 +6,11 @@ import { cn } from "@/lib/utils";
 type MobilePopupProps = {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   onClose: () => void;
 };
 
-export function MobilePopup({ children, className, onClose }: MobilePopupProps) {
+export function MobilePopup({ children, className, style, onClose }: MobilePopupProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function MobilePopup({ children, className, onClose }: MobilePopupProps) 
     <div
       className="fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm"
       onPointerDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         event.preventDefault();
         event.stopPropagation();
         onClose();
@@ -43,6 +45,7 @@ export function MobilePopup({ children, className, onClose }: MobilePopupProps) 
       <div
         role="dialog"
         aria-modal="true"
+        style={style}
         className={cn(
           "fixed left-1/2 top-[var(--app-vv-center-y,50dvh)] z-[10000] w-[calc(100vw-1.5rem)] max-w-[31rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(3,7,18,0.65)]",
           className,
