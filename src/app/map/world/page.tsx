@@ -348,15 +348,22 @@ function useMapGame() {
       }
       if (phaserLoop.sleeping) phaserLoop.wake();
 
-      // Set FPS based on overlay + lite-mode state. Lite-mode kicks in
-      // automatically for advanced ventures (6+ completed checkpoints
-      // — see WorldMapScene.setVentureAdvanced) and we drop the steady
-      // FPS to 30. With smoothStep on, pixel-art world maps look fine
-      // at 30fps and the main thread has roughly half the per-frame
-      // cost, which is the dominant remaining lag source for veterans.
+      // Set FPS based on overlay + lite-mode + interaction-burst state.
+      // Lite-mode kicks in automatically for advanced ventures (6+
+      // completed checkpoints — see WorldMapScene.setVentureAdvanced)
+      // and we drop the steady FPS to 30.
+      //
+      // INTERACTION BURST: for 400ms after any pointerdown/keydown we
+      // drop Phaser to 15fps regardless of baseline. This frees the
+      // main thread for the React render + Convex round-trip that
+      // follows a user interaction. Field traces showed pointer INP
+      // on advanced ventures was 1,183ms with ~5s of unattributed
+      // Phaser canvas paint over a 21s session — the paint pipeline
+      // was the dominant cost, not JS work.
       const lite = isLiteMode();
       const baseFps = lite ? 30 : 60;
-      const targetFps = sideOverlayOpen ? 15 : baseFps;
+      const bursting = Date.now() < interactionBurstUntil;
+      const targetFps = sideOverlayOpen || bursting ? 15 : baseFps;
       const loop = game.loop as Phaser.Core.TimeStep & { setFpsLimit?: (n: number) => void };
       if (typeof loop.setFpsLimit === "function") {
         loop.setFpsLimit(targetFps);
@@ -365,6 +372,11 @@ function useMapGame() {
         (loop as unknown as { targetFps: number }).targetFps = targetFps;
       }
     };
+    // Timestamp (ms) until which Phaser should run at 15fps because
+    // of a recent user interaction. Updated by the pointer/key
+    // listeners below.
+    let interactionBurstUntil = 0;
+    const INTERACTION_BURST_MS = 400;
     const onPause = () => { manualPause = true; apply(); };
     const onResume = () => { manualPause = false; apply(); };
     const onFocusIn = (e: FocusEvent) => {
@@ -389,10 +401,26 @@ function useMapGame() {
         });
       }
     };
+    // Triggered on any user interaction. Sets a 400ms 15fps window
+    // and schedules a re-apply when that window closes so the
+    // baseline FPS is restored. Capture phase so we run BEFORE React
+    // event handlers, giving the throttle effect a few ms head start.
+    let burstTimer: number | null = null;
+    const onInteractionStart = () => {
+      interactionBurstUntil = Date.now() + INTERACTION_BURST_MS;
+      apply();
+      if (burstTimer != null) window.clearTimeout(burstTimer);
+      burstTimer = window.setTimeout(() => {
+        burstTimer = null;
+        apply();
+      }, INTERACTION_BURST_MS + 16);
+    };
     window.addEventListener("phaser:pause", onPause);
     window.addEventListener("phaser:resume", onResume);
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
+    document.addEventListener("pointerdown", onInteractionStart, { capture: true });
+    document.addEventListener("keydown", onInteractionStart, { capture: true });
     const observer = new MutationObserver(apply);
     observer.observe(document.body, {
       childList: true,
@@ -407,6 +435,9 @@ function useMapGame() {
       window.removeEventListener("phaser:resume", onResume);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
+      document.removeEventListener("pointerdown", onInteractionStart, { capture: true } as EventListenerOptions);
+      document.removeEventListener("keydown", onInteractionStart, { capture: true } as EventListenerOptions);
+      if (burstTimer != null) window.clearTimeout(burstTimer);
     };
   }, []);
 
