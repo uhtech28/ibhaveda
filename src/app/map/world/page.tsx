@@ -3814,9 +3814,29 @@ function MapPageInner() {
       className="relative h-[100svh] w-full overflow-hidden font-sans"
       style={{ background: "#050810" }}
     >
-      {/* Fonts + keyframes */}
+      {/* Fonts + keyframes + Phaser canvas position lock.
+          The Phaser RESIZE scale mode dynamically sets margin-left /
+          margin-top on the inserted canvas to center it inside the
+          wrapper. Each margin change counts as a layout shift —
+          field traces (PerformanceObserver) showed CLS 1.000 with
+          the canvas as the largest source. Pinning the canvas to
+          inset:0 with !important neutralises those margin writes
+          (Phaser still updates them in JS, but CSS overrides them
+          visually), so the canvas never moves. The render still
+          looks identical because the wrapper itself is full-screen
+          inset-0. */}
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .phaser-canvas-wrapper > canvas {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          margin: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
       `}</style>
 
       {/* IdeaForge Navbar at top */}
