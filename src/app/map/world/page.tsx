@@ -4295,20 +4295,16 @@ function MapPageInner() {
             />
           </div>
 
-          {/* Checkpoint detail panel — two-stage mount.
-              Stage 1: skeleton paints immediately on click using the
-                       sync `selectedDetail` value (instant feedback).
-              Stage 2: real heavy CheckpointPanel mounts using the
-                       `deferredSelectedDetail` value, which React
-                       schedules in a lower-priority render so the
-                       click can paint first.
-              This was a 4,500ms → ~300ms pointer-INP win on advanced
-              ventures where the panel + its subscriptions were
-              dominating the click → paint latency. */}
+          {/* Checkpoint detail panel — deferred mount.
+              `selectedDetail` flips synchronously on click (React
+              commits the state). React then schedules the heavy
+              CheckpointPanel render at lower priority via
+              `useDeferredValue`, so the click event finishes paint
+              before the panel mount work runs. User sees the slide-in
+              on the next frame (~16ms, imperceptible). No skeleton —
+              an earlier skeleton attempt added CLS because its size
+              didn't match the real panel content. */}
           <AnimatePresence>
-            {selectedDetail && !deferredSelectedDetail && (
-              <CheckpointPanelSkeleton key="cp-skeleton" />
-            )}
             {deferredSelectedDetail && (
               <CheckpointPanel
                 detail={deferredSelectedDetail}
