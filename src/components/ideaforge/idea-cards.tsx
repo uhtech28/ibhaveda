@@ -640,7 +640,7 @@ export function IdeaStoryCard({
         cardSurface,
         transitionBase,
         "cursor-pointer overflow-hidden p-5 hover:border-[#6366F1]/50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]",
-        showFullContent && "max-sm:mx-auto max-sm:w-[calc(100vw-2rem)] max-sm:text-center"
+        showFullContent && "mobile-post-detail-card max-sm:mx-auto max-sm:w-[calc(100vw-2rem)] max-sm:text-center"
       )}
     >
       <div>
