@@ -66,6 +66,7 @@ import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { IdeaBreadcrumb, IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
 import { IdeaStoryCard } from "@/components/ideaforge/idea-cards";
 import { IdeaForgeIdea } from "@/components/ideaforge/shared";
+import { useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 
 type ConvexIdea = {
   _id: string;
@@ -172,6 +173,8 @@ function IdeaDetailVideo({ src, mimeType }: { src: string; mimeType?: string }) 
 }
 
 export default function IdeaDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  useMobileVisualViewport();
+
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const resolvedParams = React.use(params);
@@ -242,8 +245,8 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
         onOpenCalendar={() => setShowCalendar(true)}
       />
 
-      <main className="flex-1 w-full pb-12 pt-24 lg:grid lg:place-items-center lg:py-16">
-        <div className="mx-auto w-full max-w-[900px] px-4 sm:px-6 lg:px-8 relative">
+      <main className="flex-1 w-full pb-12 pt-24 max-sm:flex max-sm:justify-center lg:grid lg:place-items-center lg:py-16">
+        <div className="mx-auto flex w-full max-w-[900px] flex-col items-center px-4 sm:px-6 lg:px-8 relative">
           {/* Breadcrumb — always shows Feed > root > ... > current so
               the user never loses context. */}
           <IdeaBreadcrumb ideaId={id as Id<"ideas">} className="mb-4 justify-center" />
@@ -308,7 +311,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           ) : (
             <>
-              <div className="pb-8">
+              <div className="w-full pb-8 max-sm:flex max-sm:justify-center">
                 <IdeaStoryCard
                   idea={ideaQuery as IdeaForgeIdea}
                   saved={false}

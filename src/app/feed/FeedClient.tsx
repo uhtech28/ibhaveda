@@ -15,9 +15,12 @@ import { MessageCircle, X } from "lucide-react";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
+import { useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 
 export function FeedClient() {
+  useMobileVisualViewport();
+
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const { isComplete: isProfileComplete, isLoading: isProfileLoading } = useProfileCompletion();

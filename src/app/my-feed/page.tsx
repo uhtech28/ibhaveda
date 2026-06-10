@@ -17,10 +17,13 @@ import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useToast } from "@/components/ui/use-toast";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
+import { useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 
 export const dynamic = "force-dynamic";
 
 export default function MyFeedPage() {
+  useMobileVisualViewport();
+
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const { toast } = useToast();

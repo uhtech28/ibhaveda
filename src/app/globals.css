@@ -851,13 +851,16 @@
 /* Mobile-only keyboard lift for the request-to-contribute dialog. */
 @media (max-width: 639px) {
   .mobile-contribution-request-dialog {
-    left: 50vw !important;
-    top: 50dvh !important;
+    position: fixed !important;
+    inset: auto !important;
+    left: 50% !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
     right: auto !important;
     bottom: auto !important;
     width: calc(100vw - 2rem) !important;
     max-width: 31rem !important;
-    max-height: min(78dvh, 34rem) !important;
+    max-height: var(--app-vv-contribution-height, min(78dvh, 34rem)) !important;
+    margin: 0 !important;
     overflow-y: auto !important;
     transform: translate(-50%, -50%) !important;
     -webkit-overflow-scrolling: touch;
@@ -865,14 +868,17 @@
 
   .mobile-contribution-request-dialog--keyboard,
   .mobile-contribution-request-dialog:has(textarea:focus) {
-    left: 50vw !important;
-    top: 34dvh !important;
+    position: fixed !important;
+    inset: auto !important;
+    left: 50% !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
     right: auto !important;
     bottom: auto !important;
     width: calc(100vw - 2rem) !important;
     max-width: 31rem !important;
     overflow-y: auto !important;
-    max-height: min(50dvh, 27rem) !important;
+    max-height: var(--app-vv-contribution-keyboard-height, min(82dvh, 27rem)) !important;
+    margin: 0 !important;
     transform: translate(-50%, -50%) !important;
   }
 
@@ -908,21 +914,32 @@
   }
 
   .mobile-comments-dialog {
+    position: fixed !important;
+    inset: auto !important;
+    left: 50% !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
+    right: auto !important;
+    bottom: auto !important;
     width: calc(100vw - 1.5rem) !important;
     max-width: 31rem !important;
-    height: min(76dvh, 43rem) !important;
-    max-height: min(76dvh, 43rem) !important;
+    height: var(--app-vv-comments-height, min(76dvh, 43rem)) !important;
+    max-height: var(--app-vv-comments-height, min(76dvh, 43rem)) !important;
+    margin: 0 !important;
     border-radius: 1rem !important;
+    transform: translate(-50%, -50%) !important;
   }
 
   .mobile-comments-dialog--keyboard,
   .mobile-comments-dialog:has(textarea:focus) {
-    left: 50vw !important;
-    top: 35dvh !important;
+    position: fixed !important;
+    inset: auto !important;
+    left: 50% !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
     right: auto !important;
     bottom: auto !important;
-    height: min(46dvh, 28rem) !important;
-    max-height: min(46dvh, 28rem) !important;
+    height: var(--app-vv-comments-keyboard-height, min(82dvh, 28rem)) !important;
+    max-height: var(--app-vv-comments-keyboard-height, min(82dvh, 28rem)) !important;
+    margin: 0 !important;
     transform: translate(-50%, -50%) !important;
   }
 

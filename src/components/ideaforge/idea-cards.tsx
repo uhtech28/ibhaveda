@@ -639,7 +639,8 @@ export function IdeaStoryCard({
       className={cn(
         cardSurface,
         transitionBase,
-        "cursor-pointer overflow-hidden p-5 hover:border-[#6366F1]/50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]"
+        "cursor-pointer overflow-hidden p-5 hover:border-[#6366F1]/50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]",
+        showFullContent && "max-sm:mx-auto max-sm:w-[calc(100vw-2rem)] max-sm:text-center"
       )}
     >
       <div>
@@ -666,7 +667,7 @@ export function IdeaStoryCard({
         </div>
         <IdeaVentureProgressBar ideaId={idea._id} title={idea.title} author={idea.author} summary={ventureSummary} />
         <div className="mt-3 text-[15px] leading-7 text-[#D1D5DB]">
-          <p className={cn(!showFullContent && !expanded && shouldClamp && "line-clamp-3")}>{description}</p>
+          <p className={cn(!showFullContent && !expanded && shouldClamp && "line-clamp-3", showFullContent && "max-sm:text-center")}>{description}</p>
           {!showFullContent && shouldClamp && (
             <button
               type="button"
@@ -702,7 +703,7 @@ export function IdeaStoryCard({
       <div className="mt-5 flex flex-col gap-2 text-xs text-[#9CA3AF]">
         {/* Industries — own row */}
         {industryTags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={cn("flex flex-wrap items-center gap-2", showFullContent && "max-sm:justify-center")}>
             {visibleIndustries.map((tag) => (
               <button
                 key={`ind-${tag}`}
@@ -760,7 +761,7 @@ export function IdeaStoryCard({
 
         {/* Skills — own row */}
         {skillTags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={cn("flex flex-wrap items-center gap-2", showFullContent && "max-sm:justify-center")}>
             {visibleSkills.map((tag) => (
               <button
                 key={`skl-${tag}`}
