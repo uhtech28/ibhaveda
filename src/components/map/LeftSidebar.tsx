@@ -115,8 +115,12 @@ export function LeftSidebar({ onOpenPanel, className, ventureName }: LeftSidebar
     <>
       <TooltipProvider delayDuration={0}>
         <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
+          // Was `x: -20` slide-in — layout-affecting transform that
+          // counts toward CLS (saw 0.464 on first render). Opacity is
+          // composited so it doesn't register as a layout shift while
+          // still giving the user a fade-in cue.
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           className={cn(
             "flex flex-col items-center py-3 px-2 sm:py-6 sm:px-3 z-[55] bg-card/40 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl gap-2 sm:gap-4",
             className,
