@@ -3860,11 +3860,11 @@ function MapPageInner() {
       {/* Phaser canvas - Fully responsive.
           `contain: strict` confines the entire Phaser subtree from
           contributing to outer layout/paint shifts — when Phaser
-          inserts/resizes its <canvas> after mount, none of those size
-          recalcs can ripple into surrounding HUD/overlays. This was a
-          measurable CLS contributor on advanced ventures because the
-          canvas is the LCP element and its first paint counts as a
-          shift if outer layout is still settling. */}
+          inserts/resizes its canvas element after mount, none of
+          those size recalcs can ripple into surrounding HUD/overlays.
+          This was a measurable CLS contributor on advanced ventures
+          because the canvas is the LCP element and its first paint
+          counts as a shift if outer layout is still settling. */}
       <div
         ref={containerRef}
         className="phaser-canvas-wrapper absolute inset-0 z-0 [image-rendering:pixelated] overflow-hidden"
@@ -4895,4 +4895,238 @@ function MapFeedComposer({
                   <div className="flex-1 min-w-0 space-y-1.5">
                     {/* Header bar */}
                     <div className="flex items-center justify-between gap-2">
-                      
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <span className="text-xs font-bold text-zinc-100 truncate hover:text-indigo-400 transition-colors">
+                          {c.author?.name || c.author?.username || "Someone"}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-medium shrink-0">
+                          {formatRelative(c.createdAt)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button
+                          onClick={() => {
+                            audioManager.playUI("click");
+                            setSharingPost(c.content);
+                          }}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-zinc-200 transition-colors border border-white/5"
+                          title="Share post"
+                        >
+                          <Share2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Post Text */}
+                    <p className="text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap break-words">
+                      {c.content}
+                    </p>
+
+                    {/* Bottom Actions Row */}
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        onClick={async () => {
+                          audioManager.playUI(hasSparked ? "click" : "confirm");
+                          try {
+                            await toggleCommentSpark({ commentId: c._id });
+                          } catch (err) {
+                            console.error("Failed to toggle comment spark:", err);
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all duration-300 ${
+                          hasSparked
+                            ? "bg-amber-400/10 border-amber-400/30 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:bg-amber-400/25"
+                            : "bg-white/5 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-white/10"
+                        }`}
+                        title={hasSparked ? "Unspark this comment" : "Spark this comment"}
+                      >
+                        <Zap className={`w-3 h-3 ${hasSparked ? "fill-amber-300 stroke-amber-400 animate-pulse" : ""}`} />
+                        <span className="tabular-nums">{c.sparkCount || 0}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+        )}
+      </div>
+
+      {/* Premium Social Share Drawer/Modal overlay */}
+      <AnimatePresence>
+        {sharingPost && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/85 backdrop-blur-md rounded-2xl flex flex-col justify-center p-6 z-20"
+          >
+            <div className="text-center space-y-1 mb-5">
+              <h3 className="text-base font-bold text-white flex items-center justify-center gap-2">
+                <Share2 className="w-4 h-4 text-indigo-400" /> Share Contribution
+              </h3>
+              <p className="text-xs text-slate-400">Share your latest milestone update with the world</p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3 mb-5 max-h-[140px] overflow-y-auto no-scrollbar">
+              <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed italic">{sharingPost}</p>
+            </div>
+
+            {/* Social Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <a
+                href={shareUrls(sharingPost).x}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-900 border border-white/10 hover:border-white/20 text-white font-semibold text-xs transition-colors"
+              >
+                𝕏 Share on X
+              </a>
+              <a
+                href={shareUrls(sharingPost).linkedin}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0077B5]/20 border border-[#0077B5]/40 hover:bg-[#0077B5]/30 text-white font-semibold text-xs transition-colors"
+              >
+                LinkedIn
+              </a>
+              <a
+                href={shareUrls(sharingPost).whatsapp}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#25D366]/25 border border-[#25D366]/40 hover:bg-[#25D366]/35 text-white font-semibold text-xs transition-colors"
+              >
+                WhatsApp
+              </a>
+              <button
+                onClick={() => {
+                  handleCopyLink(sharingPost);
+                  window.open(shareUrls(sharingPost).instagram, "_blank");
+                }}
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-[#833AB4]/20 via-[#FD1D1D]/20 to-[#F56040]/20 border border-[#FD1D1D]/30 hover:opacity-90 text-white font-semibold text-xs transition-colors"
+              >
+                📸 Instagram Info
+              </button>
+            </div>
+
+            {/* Copy Link Actions */}
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => handleCopyLink(sharingPost)}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    Copied text!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy Post Text
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setSharingPost(null)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                Close
+              </button>
+            </div>
+            {copied && (
+              <p className="text-[10px] text-center text-indigo-300 mt-3">
+                ✓ Ready to paste! Instagram will open so you can share your milestone.
+              </p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
+          style={{ background: "#050810", fontFamily: "var(--font-sans)" }}
+        >
+          <div
+            className="text-xs tracking-[0.3em] uppercase font-black"
+            style={{ color: "#6366f1" }}
+          >
+            Entering the World…
+          </div>
+        </div>
+      }
+    >
+      <MapPageInner />
+      <MapTourMount />
+    </Suspense>
+  );
+}
+
+function MapTourMount() {
+  const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
+  // Needed to drive the FeedTutorial's phase machine. FeedTutorial
+  // itself no longer queries this (deduped from /feed), so each mount
+  // point feeds it in.
+  const myIdeaCount = useQuery(api.tutorial_metrics.getMyIdeaCount, {});
+  const [show, setShow] = useState(false);
+  // Stable callback so the memoized FeedTutorial doesn't re-render.
+  const onClose = useCallback(() => {
+    setShow(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("feedTourClosed", "1");
+    }
+  }, []);
+  useEffect(() => {
+    if (!tutorialState) return;
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("feedTourClosed") === "1"
+    ) {
+      return;
+    }
+    if (
+      tutorialState.state !== "not_started" &&
+      tutorialState.state !== "in_progress"
+    ) {
+      return;
+    }
+
+    // Don't show the tour until Phaser has reported its boot scene
+    // finished, plus a 400ms breath so the world-map idle animations
+    // can hand off. Fallback timeout of 3.5s in case PHASER_READY
+    // never fires (e.g. WebGL unsupported, slow assets).
+    let bufferTimer: number | undefined;
+    let cancelled = false;
+
+    const arm = () => {
+      if (cancelled) return;
+      bufferTimer = window.setTimeout(() => {
+        if (!cancelled) setShow(true);
+      }, 400);
+    };
+
+    const off = eventBridge.onReact("PHASER_READY", arm);
+    const fallbackTimer = window.setTimeout(arm, 3500);
+
+    return () => {
+      cancelled = true;
+      off?.();
+      if (bufferTimer) window.clearTimeout(bufferTimer);
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+    };
+  }, [tutorialState]);
+  return (
+    <FeedTutorial
+      show={show}
+      initialStep={tutorialState?.step ?? 0}
+      onClose={onClose}
+      myIdeaCount={myIdeaCount}
+    />
+  );
+}
