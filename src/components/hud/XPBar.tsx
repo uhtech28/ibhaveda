@@ -99,10 +99,14 @@ const XPBarComponent = ({
           <div className="relative h-[5px] w-full overflow-hidden rounded-full"
             style={{ background: "rgba(0,0,0,0.7)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.8)" }}
           >
+            {/* width: 100% + scaleX animation is compositor-only and
+                doesn't trigger layout (and so doesn't count toward
+                CLS). The old `width: 0 → X%` animation was a
+                measurable CLS contributor on the bottom HUD. */}
             <motion.div
-              className={`h-full rounded-full bg-gradient-to-r ${scoreColors.bar} origin-left`}
-              initial={{ width: 0 }}
-              animate={{ width: `${venturePercentage}%` }}
+              className={`h-full w-full rounded-full bg-gradient-to-r ${scoreColors.bar} origin-left`}
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: venturePercentage / 100 }}
               transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
             />
             {/* Shimmer */}
@@ -180,9 +184,9 @@ const XPBarComponent = ({
             style={{ background: "rgba(0,0,0,0.7)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.8)" }}
           >
             <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-rose-700 via-red-500 to-rose-300 origin-left"
-              initial={{ width: 0 }}
-              animate={{ width: `${bossPercentage}%` }}
+              className="h-full w-full rounded-full bg-gradient-to-r from-rose-700 via-red-500 to-rose-300 origin-left"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: bossPercentage / 100 }}
               transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
             />
             {/* Shimmer */}
@@ -232,9 +236,9 @@ const XPBarComponent = ({
           </div>
           <div className="relative h-2.5 w-full overflow-hidden rounded-full border border-white/5 bg-black/50 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
             <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-400 origin-left"
-              initial={{ width: 0 }}
-              animate={{ width: `${venturePercentage}%` }}
+              className="h-full w-full rounded-full bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-400 origin-left"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: venturePercentage / 100 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             />
             {/* Shimmer */}

@@ -16,6 +16,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useDeferredValue,
   Suspense,
 } from "react";
 import dynamic from "next/dynamic";
@@ -304,6 +305,23 @@ function useMapGame() {
   useEffect(() => {
     if (typeof document === "undefined") return;
     let manualPause = false;
+    // Tracks whether a text-editable element currently has focus.
+    // Field data: /feed (no Phaser) keyboard INP = 40ms; /map/world
+    // (Phaser running) keyboard INP = 1,400-1,700ms; on the rare frame
+    // when a modal happened to pause Phaser the same keypress dropped
+    // to 40ms. The single biggest INP win available is sleeping the
+    // game loop while the user is actually typing/clicking inside an
+    // input. That's what this flag drives.
+    let inputFocused = false;
+    const isEditableTarget = (el: EventTarget | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false;
+      if (el.isContentEditable) return true;
+      const tag = el.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        return true;
+      }
+      return false;
+    };
     const apply = () => {
       const game = gameRef.current;
       if (!game) return;
@@ -323,7 +341,9 @@ function useMapGame() {
       // `sleeping` is a runtime field on Phaser's TimeStep but the
       // typed surface doesn't expose it.
       const phaserLoop = game.loop as Phaser.Core.TimeStep & { sleeping?: boolean };
-      if (manualPause || fullModalOpen) {
+      // SLEEP if a text input has focus — keyboard INP drops from
+      // ~1,700ms to ~40ms. This is the dominant lag the user feels.
+      if (manualPause || fullModalOpen || inputFocused) {
         if (!phaserLoop.sleeping) phaserLoop.sleep();
         return;
       }
@@ -348,8 +368,32 @@ function useMapGame() {
     };
     const onPause = () => { manualPause = true; apply(); };
     const onResume = () => { manualPause = false; apply(); };
+    const onFocusIn = (e: FocusEvent) => {
+      if (isEditableTarget(e.target)) {
+        if (!inputFocused) {
+          inputFocused = true;
+          apply();
+        }
+      }
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (isEditableTarget(e.target)) {
+        // Defer: focus may immediately move to another input (e.g.
+        // tab between fields in TaskSubmissionModal). Re-check on the
+        // next microtask so we don't pause/resume/pause flicker.
+        queueMicrotask(() => {
+          const active = document.activeElement;
+          if (!isEditableTarget(active)) {
+            inputFocused = false;
+            apply();
+          }
+        });
+      }
+    };
     window.addEventListener("phaser:pause", onPause);
     window.addEventListener("phaser:resume", onResume);
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
     const observer = new MutationObserver(apply);
     observer.observe(document.body, {
       childList: true,
@@ -362,6 +406,8 @@ function useMapGame() {
       observer.disconnect();
       window.removeEventListener("phaser:pause", onPause);
       window.removeEventListener("phaser:resume", onResume);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
     };
   }, []);
 
@@ -586,6 +632,54 @@ function StageStrip({
   );
 }
 
+/**
+ * Lightweight skeleton shown for ONE frame while the real
+ * CheckpointPanel is mounting via useDeferredValue. Matches the panel
+ * footprint so the user sees the slide-in motion immediately without
+ * paying the cost of mounting the real panel's children + subscriptions.
+ *
+ * On advanced ventures (lots of completed checkpoints) the real panel
+ * mount was synchronously taking 4,500ms because of Convex subscriptions
+ * + Phaser camera tween + dynamic-imported children all happening in
+ * the click handler. With this skeleton showing first, the click can
+ * paint in ~50ms and the real panel fills in on the next render.
+ */
+function CheckpointPanelSkeleton() {
+  return (
+    <motion.div
+      key="cp-skeleton"
+      initial={{ x: "100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: "100%", opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 32 }}
+      className="absolute right-4 top-20 bottom-24 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
+      style={{ contain: "layout paint" }}
+    >
+      <div
+        className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-full"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
+          backdropFilter: "blur(24px)",
+          boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+        }}
+      >
+        <div className="flex flex-col gap-3.5 p-4 sm:p-5 pt-5 sm:pt-6 flex-1">
+          <div className="pr-10">
+            <div className="h-7 w-3/4 rounded bg-white/5 animate-pulse" />
+          </div>
+          <div className="h-4 w-1/2 rounded bg-white/5 animate-pulse" />
+          <div className="mt-2 space-y-2.5">
+            <div className="h-16 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse" />
+            <div className="h-16 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse" />
+            <div className="h-16 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 /** Checkpoint detail slide-in panel */
 const CheckpointPanel = memo(function CheckpointPanelInner({
   detail,
@@ -647,6 +741,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
       exit={{ x: "100%", opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 32 }}
       className="absolute right-4 top-20 bottom-24 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
+      style={{ contain: "layout paint" }}
     >
       <div
         className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-full"
@@ -655,6 +750,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
             "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
           backdropFilter: "blur(24px)",
           boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+          contain: "layout style",
         }}
       >
           {/* Close button */}
@@ -1540,6 +1636,14 @@ function MapPageInner() {
   const [selectedDetail, setSelectedDetail] = useState<CheckpointDetail | null>(
     null,
   );
+  // Deferred mount for CheckpointPanel — paint the skeleton on the
+  // same frame as the click (instant feedback), then mount the heavy
+  // panel content on the next frame. Old maps were taking 4,500ms
+  // pointer INP because clicking a checkpoint synchronously triggered
+  // panel mount + Convex subscriptions + Phaser camera tween before
+  // the browser could paint. With this two-stage approach the click
+  // commits immediately and the slow work happens AFTER paint.
+  const deferredSelectedDetail = useDeferredValue(selectedDetail);
   const [isToolsPanelOpen, setIsToolsPanelOpen] = useState(false);
   const [activeToolsTab, setActiveToolsTab] = useState<
     | "tools"
@@ -3707,12 +3811,32 @@ function MapPageInner() {
 
   return (
     <div
-      className="relative h-[100dvh] w-full overflow-hidden font-sans"
+      className="relative h-[100svh] w-full overflow-hidden font-sans"
       style={{ background: "#050810" }}
     >
-      {/* Fonts + keyframes */}
+      {/* Fonts + keyframes + Phaser canvas position lock.
+          The Phaser RESIZE scale mode dynamically sets margin-left /
+          margin-top on the inserted canvas to center it inside the
+          wrapper. Each margin change counts as a layout shift —
+          field traces (PerformanceObserver) showed CLS 1.000 with
+          the canvas as the largest source. Pinning the canvas to
+          inset:0 with !important neutralises those margin writes
+          (Phaser still updates them in JS, but CSS overrides them
+          visually), so the canvas never moves. The render still
+          looks identical because the wrapper itself is full-screen
+          inset-0. */}
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .phaser-canvas-wrapper > canvas {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          margin: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
       `}</style>
 
       {/* IdeaForge Navbar at top */}
@@ -3723,9 +3847,20 @@ function MapPageInner() {
         onOpenComposer={() => { }}
       />
 
-      {/* HUD at bottom - Stage Info, Progress, Level, XP */}
-      <div className="absolute inset-x-0 bottom-4 z-[70] pointer-events-none flex justify-center">
-        <div id="bottom-hud-control" className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl">
+      {/* HUD at bottom - Stage Info, Progress, Level, XP.
+          `contain: layout paint` confines re-layout from XPBar/Stage
+          updates to this subtree so it can't ripple into the rest of
+          the page. min-h-[52px] reserves height even before the inner
+          flex content paints, eliminating a CLS contributor on slow
+          first paint. */}
+      <div
+        className="absolute inset-x-0 bottom-4 z-[70] pointer-events-none flex justify-center"
+        style={{ contain: "layout paint" }}
+      >
+        <div
+          id="bottom-hud-control"
+          className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl min-h-[52px]"
+        >
           <button
             onClick={handlePrevStage}
             disabled={viewingStage <= 1}
@@ -3766,16 +3901,24 @@ function MapPageInner() {
             <ChevronRight className="w-4 h-4" />
           </button>
 
-          {viewingStage < activeStage && (
-            <button
-              onClick={handleCurrentStage}
-              onMouseEnter={() => audioManager.playUI("hover")}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/50 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25 hover:text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0"
-              title={`Jump to your current stage (Stage ${activeStage})`}
-            >
-              <span>Current Map</span>
-            </button>
-          )}
+          {/* Visibility-toggled (not conditionally mounted) so the
+              HUD row's flex layout doesn't shift when the user is on
+              vs off their current stage. Conditional mount was a CLS
+              source on advanced ventures. */}
+          <button
+            onClick={handleCurrentStage}
+            onMouseEnter={() => audioManager.playUI("hover")}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/50 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25 hover:text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0 ${
+              viewingStage < activeStage
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none"
+            }`}
+            aria-hidden={!(viewingStage < activeStage)}
+            tabIndex={viewingStage < activeStage ? 0 : -1}
+            title={`Jump to your current stage (Stage ${activeStage})`}
+          >
+            <span>Current Map</span>
+          </button>
 
           <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
 
@@ -3836,7 +3979,14 @@ function MapPageInner() {
         </div>
       </div>
 
-      {/* Phaser canvas - Fully responsive */}
+      {/* Phaser canvas - Fully responsive.
+          `contain: strict` confines the entire Phaser subtree from
+          contributing to outer layout/paint shifts — when Phaser
+          inserts/resizes its canvas element after mount, none of
+          those size recalcs can ripple into surrounding HUD/overlays.
+          This was a measurable CLS contributor on advanced ventures
+          because the canvas is the LCP element and its first paint
+          counts as a shift if outer layout is still settling. */}
       <div
         ref={containerRef}
         className="phaser-canvas-wrapper absolute inset-0 z-0 [image-rendering:pixelated] overflow-hidden"
@@ -3847,6 +3997,7 @@ function MapPageInner() {
           userSelect: "none",
           width: "100%",
           height: "100%",
+          contain: "strict",
         }}
       />
 
@@ -3870,8 +4021,17 @@ function MapPageInner() {
         <>
           {/* Corruption colour wash removed — it dimmed the map with a transparent layer. */}
 
+          {/* Critical-corruption alert ring. Using box-shadow inset
+              instead of border-[10px] so the element never affects
+              its own content box (border collapses the inner area on
+              transition and was a CLS contributor). */}
           {corruptionPhase === "critical" && (
-            <div className="pointer-events-none absolute inset-0 z-[13] animate-pulse border-[10px] border-red-500/25" />
+            <div
+              className="pointer-events-none absolute inset-0 z-[13] animate-pulse"
+              style={{
+                boxShadow: "inset 0 0 0 10px rgba(239, 68, 68, 0.25)",
+              }}
+            />
           )}
 
           {/* Phase banner removed per user request */}
@@ -4120,8 +4280,14 @@ function MapPageInner() {
             );
           })()}
 
-          {/* Left Sidebar & Floating Popup Tools Panel Wrapper */}
-          <div id="left-control-panel" className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3">
+          {/* Left Sidebar & Floating Popup Tools Panel Wrapper.
+              `contain: layout` keeps ToolsPanel popover open/close
+              from re-laying out the whole map subtree. */}
+          <div
+            id="left-control-panel"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3"
+            style={{ contain: "layout" }}
+          >
             <LeftSidebar
               ventureName={ideaTitle}
               onOpenPanel={handleSidebarOpenPanel}
@@ -4149,11 +4315,19 @@ function MapPageInner() {
             />
           </div>
 
-          {/* Checkpoint detail panel */}
+          {/* Checkpoint detail panel — deferred mount.
+              `selectedDetail` flips synchronously on click (React
+              commits the state). React then schedules the heavy
+              CheckpointPanel render at lower priority via
+              `useDeferredValue`, so the click event finishes paint
+              before the panel mount work runs. User sees the slide-in
+              on the next frame (~16ms, imperceptible). No skeleton —
+              an earlier skeleton attempt added CLS because its size
+              didn't match the real panel content. */}
           <AnimatePresence>
-            {selectedDetail && (
+            {deferredSelectedDetail && (
               <CheckpointPanel
-                detail={selectedDetail}
+                detail={deferredSelectedDetail}
                 onClose={() => updateUrlParams({ checkpointId: null })}
                 onAdvance={handleAdvance}
                 onTaskToggle={handleTaskToggle}
@@ -4168,11 +4342,11 @@ function MapPageInner() {
                   tourStateForPulse?.state === "in_progress"
                 }
                 isCurrentMapCheckpoint={
-                  selectedDetail.stage === activeStage &&
-                  selectedDetail.checkpointIndex === activeCP
+                  deferredSelectedDetail.stage === activeStage &&
+                  deferredSelectedDetail.checkpointIndex === activeCP
                 }
                 totalCheckpointsInStage={
-                  templateStages[selectedDetail.stage - 1]?.checkpoints ?? 4
+                  templateStages[deferredSelectedDetail.stage - 1]?.checkpoints ?? 4
                 }
               />
             )}

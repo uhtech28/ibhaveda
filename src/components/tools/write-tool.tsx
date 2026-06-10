@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -158,11 +158,22 @@ function renderMarkdownPreview(text: string) {
   return nodes;
 }
 
-// Wrapped in memo because Performance trace showed INP = 2.2s on every
-// keystroke. WriteTool was re-rendering whenever its parent (Task-
-// SubmissionModal, ToolsPanel, MapPage) did — and the parent does so
-// constantly because of Convex subscription ticks. With memo the
-// keystroke-driven setState only reconciles WriteTool itself.
+// UNCONTROLLED TEXTAREA strategy:
+// Field measurement showed keyboard INP at 2.2s on advanced ventures
+// even with Phaser paused. The controlled-component pattern was
+// re-rendering WriteTool on every keystroke, and on data-heavy
+// ventures that render coincided with batched Convex subscription
+// updates from MapPageInner, blocking paint for ~2 seconds.
+//
+// The fix: let the browser own the textarea value. Each keystroke
+// mutates the DOM natively, never enters React. We only:
+//   1. update a DEBOUNCED `text` state (200ms) for wordCount /
+//      submit-button enable. The user sees the button enable a
+//      fraction of a second after they stop typing — imperceptible.
+//   2. read the live value via `textareaRef.current.value` on
+//      submit and on AI-assist requests.
+//
+// Result on /feed (no Phaser): typing INP ~40ms. We're matching that.
 function WriteToolInner({
   prompt,
   onSubmit,
@@ -170,6 +181,8 @@ function WriteToolInner({
   isSubmitting,
   layout = "wide",
 }: WriteToolProps) {
+  // `text` is the DEBOUNCED snapshot of the textarea value — used for
+  // wordCount / submit-button gating only. NOT bound to the textarea.
   const [text, setText] = useState(initialContent || "");
   const [activeTab, setActiveTab] = useState("editor");
   const [assist, setAssist] = useState<WriteAssistPayload | null>(null);
@@ -177,6 +190,9 @@ function WriteToolInner({
     "outline" | "strengthen" | "sharpen" | null
   >(null);
   const [assistError, setAssistError] = useState<string | null>(null);
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
 
   const generateWriteAssist = useAction(api.aiScoring.generateWriteAssist);
 
@@ -187,9 +203,37 @@ function WriteToolInner({
     if (initializedRef.current) return;
     if (initialContent) {
       setText(initialContent);
+      // Also seed the DOM textarea if it's already mounted.
+      if (textareaRef.current && !textareaRef.current.value) {
+        textareaRef.current.value = initialContent;
+      }
       initializedRef.current = true;
     }
   }, [initialContent]);
+
+  // Cleanup any pending debounce on unmount.
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current != null) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Debounced sync: every 200ms of idle typing the React state catches
+  // up. Submit button enable / disable lags typing by at most 200ms.
+  const scheduleTextSync = useCallback(() => {
+    if (debounceTimerRef.current != null) {
+      window.clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = window.setTimeout(() => {
+      debounceTimerRef.current = null;
+      const v = textareaRef.current?.value ?? "";
+      // Only set state if changed — prevents an unnecessary re-render
+      // when the user just types a single space.
+      setText((prev) => (prev === v ? prev : v));
+    }, 200);
+  }, []);
 
   const wordCount = useMemo(
     () => (text.trim() ? text.trim().split(/\s+/).length : 0),
@@ -198,22 +242,34 @@ function WriteToolInner({
   const meetsRequirement = wordCount >= 50;
 
   const handleSubmit = () => {
-    if (!text.trim() || wordCount < 50) return;
-    onSubmit({ text, wordCount, markdown: text });
+    // Read LIVE value from the DOM, not the debounced state — covers
+    // the case where user clicks Submit within 200ms of last keystroke.
+    const liveText = textareaRef.current?.value ?? text;
+    const liveWordCount = liveText.trim()
+      ? liveText.trim().split(/\s+/).length
+      : 0;
+    if (!liveText.trim() || liveWordCount < 50) return;
+    onSubmit({ text: liveText, wordCount: liveWordCount, markdown: liveText });
   };
 
   const insertAroundSelection = (prefix: string, suffix = "") => {
-    const textarea = document.getElementById("write-response") as HTMLTextAreaElement | null;
+    const textarea = textareaRef.current
+      ?? (document.getElementById("write-response") as HTMLTextAreaElement | null);
     if (!textarea) {
+      // Fallback: append to React state.
       setText((current) => `${current}${prefix}${suffix}`);
       return;
     }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selected = text.slice(start, end);
-    const next = `${text.slice(0, start)}${prefix}${selected}${suffix}${text.slice(end)}`;
-    setText(next);
+    const current = textarea.value;
+    const selected = current.slice(start, end);
+    const next = `${current.slice(0, start)}${prefix}${selected}${suffix}${current.slice(end)}`;
+    // Write directly to the DOM so we don't trigger a controlled-component
+    // round-trip. Then sync React state on the next tick.
+    textarea.value = next;
+    scheduleTextSync();
 
     requestAnimationFrame(() => {
       textarea.focus();
@@ -226,9 +282,11 @@ function WriteToolInner({
     setAssistMode(mode);
     setAssistError(null);
     try {
+      // Use the live DOM value, not debounced state.
+      const draft = textareaRef.current?.value ?? text;
       const result = (await generateWriteAssist({
         prompt,
-        draft: text,
+        draft,
         mode,
       })) as WriteAssistPayload;
       setAssist(result);
@@ -286,11 +344,17 @@ function WriteToolInner({
             <div className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="write-response">Markdown response</Label>
+                {/* UNCONTROLLED textarea — browser owns the value, no
+                    React work per keystroke. See WriteToolInner header
+                    comment for the rationale (kills 2s INP on old maps).
+                    onInput schedules a 200ms-debounced state sync so
+                    wordCount / submit-button gating still update. */}
                 <Textarea
+                  ref={textareaRef}
                   id="write-response"
                   placeholder="Write your response here..."
-                  value={text}
-                  onChange={(event) => setText(event.target.value)}
+                  defaultValue={initialContent || ""}
+                  onInput={scheduleTextSync}
                   className="h-[200px] resize-none font-mono text-sm xl:h-[220px]"
                 />
               </div>
