@@ -643,11 +643,15 @@ export function IdeaStoryCard({
       )}
     >
       <div>
-        <div className="flex items-start justify-between gap-3">
-          <button type="button" onClick={() => !disableCardOpen && onOpenIdea(idea._id)} className="min-w-0 flex-1 text-left">
-            <h2 className={cn(displayFontClass, "text-[18px] font-semibold leading-tight text-[#F9FAFB] hover:text-[#C7D2FE]")}>{idea.title}</h2>
+        <div className={cn("flex items-start justify-between gap-3", showFullContent && "max-sm:flex-col max-sm:items-center max-sm:text-center")}>
+          <button
+            type="button"
+            onClick={() => !disableCardOpen && onOpenIdea(idea._id)}
+            className={cn("min-w-0 flex-1 text-left", showFullContent && "max-sm:w-full max-sm:text-center")}
+          >
+            <h2 className={cn(displayFontClass, "text-[18px] font-semibold leading-tight text-[#F9FAFB] hover:text-[#C7D2FE]", showFullContent && "max-sm:text-center")}>{idea.title}</h2>
           </button>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className={cn("flex shrink-0 items-center gap-2", showFullContent && "max-sm:justify-center")}>
             {ventureSummary && (
               <span className={cn(displayFontClass, "shrink-0 text-[18px] font-semibold leading-tight text-orange-300")}>
                 {formatDollarValue(cumulativeScores?.valuationScore)}

@@ -232,7 +232,7 @@ export default function HeroSection() {
                   "relative aspect-square overflow-hidden rounded-[20px] border border-white/10 bg-[#0B111A] p-4 transition-transform duration-200 hover:scale-[1.025] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 cursor-pointer text-left";
 
                 const style = {
-                  animation: `lp-card-in 450ms ${index * 80}ms ease both, lp-card-cta-glow 20800ms ${900 + index * 5200}ms ease-in-out infinite`,
+                  animation: `lp-card-in 450ms ${index * 80}ms ease both, lp-card-cta-glow 10400ms ${900 + index * 2600}ms ease-in-out infinite`,
                   "--role-color": role.color,
                   "--role-glow": role.glow,
                   "--role-glow-strong": `${role.color}66`,

@@ -866,14 +866,14 @@
   .mobile-contribution-request-dialog--keyboard,
   .mobile-contribution-request-dialog:has(textarea:focus) {
     left: 50vw !important;
-    top: calc(env(safe-area-inset-top, 0px) + 4rem) !important;
+    top: 34dvh !important;
     right: auto !important;
     bottom: auto !important;
     width: calc(100vw - 2rem) !important;
     max-width: 31rem !important;
     overflow-y: auto !important;
-    max-height: min(52dvh, 27rem) !important;
-    transform: translateX(-50%) !important;
+    max-height: min(50dvh, 27rem) !important;
+    transform: translate(-50%, -50%) !important;
   }
 
   .mobile-contribution-request-dialog--keyboard form,
@@ -918,12 +918,12 @@
   .mobile-comments-dialog--keyboard,
   .mobile-comments-dialog:has(textarea:focus) {
     left: 50vw !important;
-    top: calc(env(safe-area-inset-top, 0px) + 4.25rem) !important;
+    top: 35dvh !important;
     right: auto !important;
     bottom: auto !important;
-    height: min(52dvh, 30rem) !important;
-    max-height: min(52dvh, 30rem) !important;
-    transform: translateX(-50%) !important;
+    height: min(46dvh, 28rem) !important;
+    max-height: min(46dvh, 28rem) !important;
+    transform: translate(-50%, -50%) !important;
   }
 
   .mobile-comments-dialog--keyboard > div:last-child,
