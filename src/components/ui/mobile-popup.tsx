@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type MobilePopupProps = {
@@ -28,7 +27,7 @@ export function MobilePopup({ children, className, onClose }: MobilePopupProps) 
 
   if (!mounted) return null;
 
-  return createPortal(
+  return (
     <div
       className="fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm"
       onPointerDown={(event) => {
@@ -53,8 +52,6 @@ export function MobilePopup({ children, className, onClose }: MobilePopupProps) 
       >
         {children}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
-
