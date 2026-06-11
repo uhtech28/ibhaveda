@@ -389,15 +389,13 @@ export function IdeaForgeExperience({
                   </div>
                 );
               })()}
-              {/* Infinite scroll — sentinel triggers next page; spinner shows while loading */}
+              {/* Infinite scroll — sentinel triggers next page; spinner always visible at bottom */}
               {mode === "feed" && (
                 <>
                   <div ref={sentinelRef} className="h-4" />
-                  {hasMore && (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-[#6366F1]" />
-                    </div>
-                  )}
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#6366F1]" />
+                  </div>
                 </>
               )}
             </div>
