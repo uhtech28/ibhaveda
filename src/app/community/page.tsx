@@ -360,17 +360,17 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const showcaseBadgeColors = ["#10B981", "#F97316", "#06B6D4"];
 
   return (
-    <Card className="group relative flex h-[172px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
+    <Card className="group relative flex h-[196px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
       {!isCurrentUser && currentUserId && (
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             onClick={handleMessageClick}
             title="Message"
             aria-label={`Message ${user.displayName}`}
           >
-            <MessageCircle className="h-4 w-4" />
+            <MessageCircle className="h-3.5 w-3.5" />
           </button>
           <InvitationButton
             targetUser={{
@@ -379,14 +379,14 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               displayName: user.displayName,
             }}
             iconOnly
-            iconOnlyClassName="inline-flex h-8 w-8 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block [&_svg]:h-4 [&_svg]:w-4"
+            iconOnlyClassName="inline-flex h-7 w-7 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block [&_svg]:h-3.5 [&_svg]:w-3.5"
           />
         </div>
       )}
-      <div className="flex h-full flex-col px-4 py-3">
+      <div className="flex h-full flex-col px-5 py-5">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
-          <div className="flex items-center gap-3 pr-20">
+          <div className="flex items-center gap-3 pr-16">
             <Avatar className="w-8 h-8 border-2 border-background shadow-sm shrink-0">
               <AvatarImage src={user.avatar} alt={user.displayName} className="object-cover" />
               <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
@@ -424,7 +424,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
         </Link>
 
-        <Link href={profileHref} className="mt-3 block min-w-0">
+        <Link href={profileHref} className="mt-4 block min-w-0">
           <p className="line-clamp-1 text-[10px] leading-5 text-muted-foreground">
             {bio || emptyProfileText}
           </p>
@@ -469,7 +469,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
           )}
 
           {/* Stats Row */}
-          <div className="mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-1">
+          <div className="mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-2">
             <button
               type="button"
               onClick={() => openStatsDialog("created")}
