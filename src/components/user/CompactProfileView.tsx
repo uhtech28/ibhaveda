@@ -240,16 +240,15 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                     </Button>
                   ) : (
                     <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="default"
-                        size="icon"
+                      <button
+                        type="button"
                         onClick={handleSendMessage}
-                        className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full p-0 leading-none [&_svg]:block"
+                        className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         title="Message"
+                        aria-label="Message"
                       >
-                        <MessageCircle className="h-4 w-4 translate-x-px text-white" />
-                        <span className="sr-only">Message</span>
-                      </Button>
+                        <MessageCircle className="block h-[17px] w-[17px] translate-x-[1px] translate-y-[0.5px]" />
+                      </button>
                       <InvitationButton
                         targetUser={{
                           _id: profile._id,
