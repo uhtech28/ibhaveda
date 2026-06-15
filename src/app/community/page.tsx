@@ -362,7 +362,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   return (
     <Card className="group relative flex h-[220px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
       {!isCurrentUser && currentUserId && (
-        <div className="absolute right-5 top-6 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute right-5 top-8 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -383,7 +383,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
           />
         </div>
       )}
-      <div className="flex h-full flex-col px-5 py-5">
+      <div className="flex h-full flex-col px-5 pb-4 pt-5">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
           <div className="flex items-center gap-3 pr-16">
@@ -481,7 +481,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
           </div>
 
           {/* Stats Row */}
-          <div className="mb-3 mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-2">
+          <div className="mb-4 mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-2">
             <button
               type="button"
               onClick={() => openStatsDialog("created")}
