@@ -243,11 +243,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                       <button
                         type="button"
                         onClick={handleSendMessage}
-                        className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         title="Message"
                         aria-label="Message"
                       >
-                        <MessageCircle className="block h-[17px] w-[17px] translate-x-[1px] translate-y-[0.5px]" />
+                        <MessageCircle className="h-5 w-5" />
                       </button>
                       <InvitationButton
                         targetUser={{
@@ -256,7 +256,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                           displayName: profile.displayName,
                         }}
                         iconOnly
-                        iconOnlyClassName="inline-flex h-8 w-8 items-center justify-center p-0 leading-none [&_svg]:block"
+                        iconOnlyClassName="inline-flex h-10 w-10 items-center justify-center rounded-full p-0 leading-none [&_svg]:block"
                       />
                     </div>
                   )}

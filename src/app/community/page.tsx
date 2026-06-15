@@ -8,7 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, AlertCircle, Lightbulb, Sparkles, Send, Trophy, UserPlus } from "lucide-react";
+import { Users, AlertCircle, Lightbulb, Sparkles, MessageCircle, Trophy, UserPlus } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { HeroHeader } from "@/components/header";
 import { Spinner } from "@/components/ui/spinner";
@@ -363,6 +363,15 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
     <Card className="group hover:shadow-lg transition-all duration-300 relative flex h-[220px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
       {!isCurrentUser && currentUserId && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            onClick={handleMessageClick}
+            title="Message"
+            aria-label={`Message ${user.displayName}`}
+          >
+            <MessageCircle className="h-[18px] w-[18px]" />
+          </button>
           <InvitationButton
             targetUser={{
               _id: user._id,
@@ -370,18 +379,8 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               displayName: user.displayName,
             }}
             iconOnly
-            iconOnlyClassName="h-7 w-7 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
+            iconOnlyClassName="inline-flex h-9 w-9 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block"
           />
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
-            onClick={handleMessageClick}
-            title="Message"
-            aria-label={`Message ${user.displayName}`}
-          >
-            <Send className="w-3 h-3" />
-          </Button>
         </div>
       )}
       <div className="grid shrink-0 grid-rows-[42px_22px_24px_24px_42px] px-4 pb-0.5 pt-2">
