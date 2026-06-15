@@ -176,11 +176,11 @@ export default function HeroSection() {
             </p>
 
             <h1 className="text-[1.85rem] sm:text-5xl lg:text-[3.25rem] font-black text-white leading-[1.07] tracking-tight max-w-3xl font-display">
-              Stop Thinking. Start Building.
+              Nobody's Building With You. Yet.
             </h1>
 
             <p className="mt-3 text-sm sm:text-base text-slate-300 max-w-xl leading-6">
-              Join projects, recruit teammates and start creating.
+              Co-founders. Builders. Investors. Zero gatekeeping.
             </p>
           </div>
 

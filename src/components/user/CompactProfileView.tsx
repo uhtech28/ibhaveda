@@ -239,15 +239,15 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                       <Edit2 className="w-4 h-4" />
                     </Button>
                   ) : (
-                    <div className="flex gap-1.5">
+                    <div className="flex items-center gap-1.5">
                       <Button
                         variant="default"
                         size="icon"
                         onClick={handleSendMessage}
-                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full p-0"
+                        className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full p-0 leading-none [&_svg]:block"
                         title="Message"
                       >
-                        <MessageCircle className="h-4 w-4 text-white" />
+                        <MessageCircle className="h-4 w-4 translate-x-px text-white" />
                         <span className="sr-only">Message</span>
                       </Button>
                       <InvitationButton
@@ -257,6 +257,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                           displayName: profile.displayName,
                         }}
                         iconOnly
+                        iconOnlyClassName="inline-flex h-8 w-8 items-center justify-center p-0 leading-none [&_svg]:block"
                       />
                     </div>
                   )}

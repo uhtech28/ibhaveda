@@ -72,7 +72,8 @@ const LevelUpSequence = dynamic(() => import("@/components/animations/LevelUpSeq
 const BadgeAwardSequence = dynamic(() => import("@/components/animations/BadgeAwardSequence").then(mod => mod.BadgeAwardSequence), { ssr: false });
 const TaskSubmissionModal = dynamic(() => import("@/components/map/TaskSubmissionModal").then(mod => mod.TaskSubmissionModal), { ssr: false });
 const StageClearModal = dynamic(() => import("@/components/map/StageClearModal").then(mod => mod.StageClearModal), { ssr: false });
-const WorldMapTour = dynamic(() => import("@/components/map/WorldMapTour").then(mod => mod.WorldMapTour), { ssr: false });
+// Legacy world-map walkthrough disabled in favor of the FeedTutorial product tour.
+// const WorldMapTour = dynamic(() => import("@/components/map/WorldMapTour").then(mod => mod.WorldMapTour), { ssr: false });
 const ChatThread = dynamic(() => import("@/components/chat/ChatThread"), { ssr: false });
 const GroupList = dynamic(() => import("@/components/chat/GroupList"), { ssr: false });
 const ChannelList = dynamic(() => import("@/components/chat/ChannelList"), { ssr: false });
@@ -1811,8 +1812,8 @@ function MapPageInner() {
     nextBiome?: string;
   }>({ show: false, stageNumber: 1, stageName: "", isGold: false });
 
-  // Tour walkthrough state
-  const [showTour, setShowTour] = useState(false);
+  // Legacy world-map walkthrough disabled in favor of the FeedTutorial product tour.
+  // const [showTour, setShowTour] = useState(false);
   // New product-tour state. Used to suppress the legacy WorldMapTour
   // and to drive the first-checkpoint pulse for first-run users.
   const tourStateForPulse = useQuery(api.tutorial.getMyFeedTutorialState, {});
@@ -1899,28 +1900,29 @@ function MapPageInner() {
       : "skip"
   );
 
-  useEffect(() => {
-    if (!activeVenture) return;
-    // Suppress the legacy WorldMapTour whenever the new product tour
-    // is (or might be) running. Treat undefined/null tour state as
-    // "still loading, assume new tour" so the legacy overlay never
-    // appears before the convex query resolves.
-    const newTourActive =
-      !tourStateForPulse ||
-      tourStateForPulse.state === "not_started" ||
-      tourStateForPulse.state === "in_progress";
-    if (newTourActive) {
-      if (showTour) setShowTour(false);
-      return;
-    }
-    if (activeVenture.currentStage !== 1) return;
-    const tourCompletedKey = `worldMapTourCompleted_${activeVenture._id}`;
-    const isCompleted = localStorage.getItem(tourCompletedKey);
-    if (isCompleted !== "true") {
-      setShowTour(true);
-      localStorage.setItem(tourCompletedKey, "true");
-    }
-  }, [activeVenture, tourStateForPulse, showTour]);
+  // Legacy world-map walkthrough disabled in favor of the FeedTutorial product tour.
+  // useEffect(() => {
+  //   if (!activeVenture) return;
+  //   // Suppress the legacy WorldMapTour whenever the new product tour
+  //   // is (or might be) running. Treat undefined/null tour state as
+  //   // "still loading, assume new tour" so the legacy overlay never
+  //   // appears before the convex query resolves.
+  //   const newTourActive =
+  //     !tourStateForPulse ||
+  //     tourStateForPulse.state === "not_started" ||
+  //     tourStateForPulse.state === "in_progress";
+  //   if (newTourActive) {
+  //     if (showTour) setShowTour(false);
+  //     return;
+  //   }
+  //   if (activeVenture.currentStage !== 1) return;
+  //   const tourCompletedKey = `worldMapTourCompleted_${activeVenture._id}`;
+  //   const isCompleted = localStorage.getItem(tourCompletedKey);
+  //   if (isCompleted !== "true") {
+  //     setShowTour(true);
+  //     localStorage.setItem(tourCompletedKey, "true");
+  //   }
+  // }, [activeVenture, tourStateForPulse, showTour]);
 
   // Task submission state (now using Jotai atom for global access)
   const [submittingTask, setSubmittingTask] = useAtom(submittingTaskAtom);
@@ -4050,19 +4052,19 @@ function MapPageInner() {
 
           {/* Stage navigation strip removed */}
 
-          {/* World Map Tour Walkthrough */}
-          {activeStage === 1 && (
+          {/* Legacy World Map Tour disabled in favor of the FeedTutorial product tour. */}
+          {/* {activeStage === 1 && (
             <WorldMapTour
               show={showTour}
               onClose={() => setShowTour(false)}
               ventureName={ideaTitle}
             />
-          )}
+          )} */}
 
-          {/* Tour replay toggle */}
-          {activeStage === 1 && (
+          {/* Legacy tour replay toggle disabled. */}
+          {/* {activeStage === 1 && (
             <TourToggle onToggle={() => setShowTour(true)} />
-          )}
+          )} */}
 
           <CrossingFlash trigger={flashTrigger} />
 

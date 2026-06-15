@@ -59,15 +59,15 @@ export function IdeaForgeNavbar({
   }, [mobileSearchOpen]);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 h-14 lg:h-16 border-b border-white/7 bg-[#0A0D12]/92 backdrop-blur-xl overflow-hidden">
+    <header className="fixed inset-x-0 top-0 z-50 h-14 lg:h-16 border-b border-white/7 bg-[#0A0D12]/92 backdrop-blur-xl">
       {/* Mobile / tablet compact bar */}
-      <div className="flex h-14 items-center gap-2 px-3 lg:hidden">
+      <div className="flex h-14 min-w-0 items-center gap-1.5 px-3 lg:hidden">
         {mobileSearchOpen ? (
           <>
             <button type="button" onClick={() => setMobileSearchOpen(false)} aria-label="Close search" className={cn(transitionBase, "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div ref={mobileSearchRef} className="min-w-0 flex-1">
+            <div ref={mobileSearchRef} className="min-w-0 flex-1 overflow-visible">
               <SearchBar value={searchQuery} onSearch={(value) => onSearchChange(value)} placeholder="Search for ideas, people, tags..." className="[&_input]:h-9 [&_input]:rounded-full [&_input]:border-white/8 [&_input]:bg-[#111827] [&_input]:pl-9 [&_input]:pr-3 [&_input]:text-sm [&_input]:text-white [&_input]:placeholder:text-[#6B7280]" />
             </div>
           </>
@@ -85,7 +85,7 @@ export function IdeaForgeNavbar({
               </Link>
             )}
 
-            <button type="button" onClick={() => setMobileSearchOpen(true)} aria-label="Open search" className={cn(transitionBase, "flex flex-1 min-w-0 items-center gap-2 h-9 px-3 rounded-full border border-white/8 bg-[#111827]/60 text-[#9CA3AF] hover:bg-[#111827] hover:text-white")}>
+            <button type="button" onClick={() => setMobileSearchOpen(true)} aria-label="Open search" className={cn(transitionBase, "flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/8 bg-[#111827]/60 px-3 text-[#9CA3AF] hover:bg-[#111827] hover:text-white")}>
               <Search className="h-4 w-4 shrink-0" />
               <span className="text-sm truncate">Search</span>
             </button>
