@@ -142,7 +142,7 @@ export default function CommunityPage() {
           </LeaderboardErrorBoundary>
 
           {/* Users Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filteredUsers.filter(user => user.clerkId !== clerkUser?.id).map((user: UserProfile) => (
               <UserCard
                 key={user._id}
@@ -360,17 +360,17 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const showcaseBadgeColors = ["#10B981", "#F97316", "#06B6D4"];
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 relative flex h-[220px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+    <Card className="group relative flex h-[172px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
       {!isCurrentUser && currentUserId && (
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             onClick={handleMessageClick}
             title="Message"
             aria-label={`Message ${user.displayName}`}
           >
-            <MessageCircle className="h-[18px] w-[18px]" />
+            <MessageCircle className="h-4 w-4" />
           </button>
           <InvitationButton
             targetUser={{
@@ -379,11 +379,11 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               displayName: user.displayName,
             }}
             iconOnly
-            iconOnlyClassName="inline-flex h-9 w-9 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block"
+            iconOnlyClassName="inline-flex h-8 w-8 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block [&_svg]:h-4 [&_svg]:w-4"
           />
         </div>
       )}
-      <div className="grid shrink-0 grid-rows-[42px_22px_24px_24px_42px] px-4 pb-0.5 pt-2">
+      <div className="flex h-full flex-col px-4 py-3">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
           <div className="flex items-center gap-3 pr-20">
@@ -424,48 +424,52 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
         </Link>
 
-        <Link href={profileHref} className="block min-w-0">
+        <Link href={profileHref} className="mt-3 block min-w-0">
           <p className="line-clamp-1 text-[10px] leading-5 text-muted-foreground">
             {bio || emptyProfileText}
           </p>
         </Link>
 
-        <div className="flex min-w-0 flex-wrap items-start gap-1 overflow-hidden py-0.5">
-          {visibleIndustries.map((ind, i) => (
-            <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
-              {ind}
-            </span>
-          ))}
-          {hiddenIndustryCount > 0 && (
-            <Link
-              href={profileHref}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
-            >
-              +{hiddenIndustryCount} more
-            </Link>
-          )}
-        </div>
+        {(visibleIndustries.length > 0 || hiddenIndustryCount > 0) && (
+          <div className="mt-2 flex min-w-0 flex-wrap items-start gap-1 overflow-hidden">
+            {visibleIndustries.map((ind, i) => (
+              <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
+                {ind}
+              </span>
+            ))}
+            {hiddenIndustryCount > 0 && (
+              <Link
+                href={profileHref}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
+              >
+                +{hiddenIndustryCount} more
+              </Link>
+            )}
+          </div>
+        )}
 
-        <div className="flex min-w-0 flex-wrap items-start gap-1 overflow-hidden py-0.5">
-          {visibleSkills.map((skill, i) => (
-            <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
-              {skill}
-            </span>
-          ))}
-          {hiddenSkillCount > 0 && (
-            <Link
-              href={profileHref}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
-            >
-              +{hiddenSkillCount} more
-            </Link>
+        {(visibleSkills.length > 0 || hiddenSkillCount > 0) && (
+          <div className="mt-1 flex min-w-0 flex-wrap items-start gap-1 overflow-hidden">
+            {visibleSkills.map((skill, i) => (
+              <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                {skill}
+              </span>
+            ))}
+            {hiddenSkillCount > 0 && (
+              <Link
+                href={profileHref}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
+              >
+                +{hiddenSkillCount} more
+              </Link>
+            )}
+          </div>
           )}
-        </div>
 
           {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-1 border-b border-t border-border/40 py-1">
+          <div className="mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-1">
             <button
               type="button"
               onClick={() => openStatsDialog("created")}
