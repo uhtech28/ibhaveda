@@ -142,7 +142,7 @@ export default function CommunityPage() {
           </LeaderboardErrorBoundary>
 
           {/* Users Grid */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredUsers.filter(user => user.clerkId !== clerkUser?.id).map((user: UserProfile) => (
               <UserCard
                 key={user._id}
@@ -360,7 +360,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const showcaseBadgeColors = ["#10B981", "#F97316", "#06B6D4"];
 
   return (
-    <Card className="group relative flex h-[196px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
+    <Card className="group relative flex h-[220px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
       {!isCurrentUser && currentUserId && (
         <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
@@ -430,43 +430,55 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
           </p>
         </Link>
 
-        {(visibleIndustries.length > 0 || hiddenIndustryCount > 0) && (
-          <div className="mt-2 flex min-w-0 flex-wrap items-start gap-1 overflow-hidden">
-            {visibleIndustries.map((ind, i) => (
-              <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
-                {ind}
-              </span>
-            ))}
-            {hiddenIndustryCount > 0 && (
-              <Link
-                href={profileHref}
-                onClick={(e) => e.stopPropagation()}
-                className="rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
-              >
-                +{hiddenIndustryCount} more
-              </Link>
-            )}
-          </div>
-        )}
-
-        {(visibleSkills.length > 0 || hiddenSkillCount > 0) && (
-          <div className="mt-1 flex min-w-0 flex-wrap items-start gap-1 overflow-hidden">
-            {visibleSkills.map((skill, i) => (
-              <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
-                {skill}
-              </span>
-            ))}
-            {hiddenSkillCount > 0 && (
-              <Link
-                href={profileHref}
-                onClick={(e) => e.stopPropagation()}
-                className="rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
-              >
-                +{hiddenSkillCount} more
-              </Link>
-            )}
-          </div>
+        <div className="mt-3 flex min-h-6 min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          {visibleIndustries.length > 0 ? (
+            <>
+              {visibleIndustries.map((ind, i) => (
+                <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer truncate max-w-[150px] rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
+                  {ind}
+                </span>
+              ))}
+              {hiddenIndustryCount > 0 && (
+                <Link
+                  href={profileHref}
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0 rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
+                >
+                  +{hiddenIndustryCount}
+                </Link>
+              )}
+            </>
+          ) : (
+            <span className="truncate text-[10px] font-medium text-muted-foreground/60">
+              No industry listed
+            </span>
           )}
+          </div>
+
+        <div className="mt-1 flex min-h-6 min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          {visibleSkills.length > 0 ? (
+            <>
+              {visibleSkills.map((skill, i) => (
+                <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                  {skill}
+                </span>
+              ))}
+              {hiddenSkillCount > 0 && (
+                <Link
+                  href={profileHref}
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0 rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
+                >
+                  +{hiddenSkillCount}
+                </Link>
+              )}
+            </>
+          ) : (
+            <span className="truncate text-[10px] font-medium text-muted-foreground/60">
+              No skills listed
+            </span>
+          )}
+          </div>
 
           {/* Stats Row */}
           <div className="mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-2">
