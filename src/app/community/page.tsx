@@ -362,15 +362,15 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   return (
     <Card className="group relative flex h-[220px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
       {!isCurrentUser && currentUserId && (
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute right-5 top-6 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             onClick={handleMessageClick}
             title="Message"
             aria-label={`Message ${user.displayName}`}
           >
-            <MessageCircle className="h-3.5 w-3.5" />
+            <MessageCircle className="h-3 w-3" />
           </button>
           <InvitationButton
             targetUser={{
@@ -379,7 +379,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               displayName: user.displayName,
             }}
             iconOnly
-            iconOnlyClassName="inline-flex h-7 w-7 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block [&_svg]:h-3.5 [&_svg]:w-3.5"
+            iconOnlyClassName="inline-flex h-6 w-6 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block [&_svg]:h-3 [&_svg]:w-3"
           />
         </div>
       )}
@@ -449,7 +449,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               )}
             </>
           ) : (
-            <span className="truncate text-[10px] font-medium text-muted-foreground/60">
+            <span className="truncate text-[10px] font-medium text-muted-foreground">
               No industry listed
             </span>
           )}
@@ -474,14 +474,14 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               )}
             </>
           ) : (
-            <span className="truncate text-[10px] font-medium text-muted-foreground/60">
+            <span className="truncate text-[10px] font-medium text-muted-foreground">
               No skills listed
             </span>
           )}
           </div>
 
           {/* Stats Row */}
-          <div className="mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-2">
+          <div className="mb-3 mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-2">
             <button
               type="button"
               onClick={() => openStatsDialog("created")}
