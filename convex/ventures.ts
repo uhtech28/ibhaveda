@@ -443,6 +443,29 @@ export const createVenture = mutation({
       ventureId,
     );
 
+    // Fire onboarding welcome email — only if this is the user's first venture
+    const priorVentureCount = await ctx.db
+      .query("ventures")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect()
+      .then((vs) => vs.filter((existing) => existing._id !== ventureId).length);
+
+    if (priorVentureCount === 0) {
+      const email = identity.email;
+      const displayName = user.displayName || identity.givenName || "Adventurer";
+      if (email && assignedBossId !== undefined) {
+        const idea = await ctx.db.get(args.ideaId);
+        await ctx.scheduler.runAfter(0, internal.emailWelcome.sendOnboardingCompleteEmail, {
+          email,
+          displayName,
+          projectName: idea?.title ?? "Your Project",
+          templateId: templateId ?? "venture",
+          bossId: assignedBossId,
+          bossHealthPercent: 93, // fresh boss at venture creation = 7% corruption from tutorial hit
+        });
+      }
+    }
+
     return ventureId;
   },
 });
