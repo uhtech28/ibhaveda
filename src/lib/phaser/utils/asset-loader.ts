@@ -1188,6 +1188,17 @@ export class AssetLoader {
       "mine_bg_cave",
       "mine_cave_rail",
       "mine_cave_rock",
+      // Designer-painted Venture biomes — if any file is missing
+      // (e.g. asset not deployed yet) we silently fall back to
+      // procedural tile rendering instead of crashing.
+      "biome_venture_1",
+      "biome_venture_2",
+      "biome_venture_3",
+      "biome_venture_4",
+      "biome_venture_5",
+      "biome_venture_6",
+      "biome_venture_7",
+      "biome_venture_8",
     ]);
 
     const onLoadError = (file: { key: string }) => {
@@ -1206,6 +1217,22 @@ export class AssetLoader {
 
   private static queueCorePack(scene: Phaser.Scene): void {
     const fanTasyPath = "/assets/fan-tasy";
+
+    // Designer-painted Venture biome backgrounds. Each stage is a
+    // single 1280x640 (Stage 5 is 1600x800) panoramic illustration
+    // that replaces the procedural tile rendering for that stage.
+    // The visible disc markers in each art piece define checkpoint
+    // positions; see VENTURE_BIOME_CHECKPOINTS in WorldMapScene.
+    const venturePath = "/assets/biomes/venture";
+    scene.load.image("biome_venture_1", `${venturePath}/stage-1-ideation.jpg`);
+    scene.load.image("biome_venture_2", `${venturePath}/stage-2-research.jpg`);
+    scene.load.image("biome_venture_3", `${venturePath}/stage-3-validation.jpg`);
+    scene.load.image("biome_venture_5", `${venturePath}/stage-5-build-deliver.jpg`);
+    scene.load.image("biome_venture_6", `${venturePath}/stage-6-launch.jpg`);
+    scene.load.image("biome_venture_7", `${venturePath}/stage-7-iteration.jpg`);
+    scene.load.image("biome_venture_8", `${venturePath}/stage-8-scale.jpg`);
+    // Stage 4 (Offer Design / Artisan's Quarter) art pending — falls
+    // back to procedural tile rendering until designer delivers it.
 
     scene.load.spritesheet(
       "persona_male_idle_sheet",

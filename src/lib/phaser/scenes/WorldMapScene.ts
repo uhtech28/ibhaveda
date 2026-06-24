@@ -1099,6 +1099,36 @@ export class WorldMapScene extends Phaser.Scene {
       "Shadows",
     ];
 
+    // ── DESIGNER-PAINTED BIOME SHORT-CIRCUIT ──────────────────────
+    // If a hand-painted biome JPEG is registered for this stage
+    // (Venture template stages 1, 2, 3, 5, 6, 7, 8 as of MVP),
+    // use it instead of the procedural tile panel. Stage 4 and
+    // every other template still falls through to the existing
+    // procedural pipeline below.
+    // The art is painted at 1280x640 (Stage 5: 1600x800). We scale
+    // to fit BIOME_WIDTH so the panel boundaries stay consistent.
+    const stageId = i + 1;
+    const biomeImageKey = `biome_venture_${stageId}`;
+    if (
+      this.currentTemplateId === "venture" &&
+      this.textures.exists(biomeImageKey)
+    ) {
+      const img = this.add.image(panelX, panelOffsetY, biomeImageKey)
+        .setOrigin(0, 0)
+        .setDepth(3);
+      const tex = this.textures.get(biomeImageKey).getSourceImage() as HTMLImageElement;
+      const naturalWidth = tex?.width ?? this.BIOME_WIDTH;
+      const naturalHeight = tex?.height ?? this.BIOME_WIDTH * 0.5;
+      // Fit to BIOME_WIDTH; preserve aspect ratio
+      const fitScale = this.BIOME_WIDTH / naturalWidth;
+      img.setScale(fitScale);
+      // `contain: strict` on the canvas wrapper means the canvas
+      // is full-screen; the image just sits inside this stage's
+      // horizontal band. backgroundLayer keeps it under HUD/UI.
+      this.backgroundLayer.add(img);
+      return;
+    }
+
     if (biome.visualTheme === "forest") {
       this.createForestTilePanel(panelX, panelOffsetY, scale, biome, i);
       return;
