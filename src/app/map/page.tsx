@@ -32,6 +32,9 @@ function MapIntroInner() {
   // Fetch user's saved gender from database
   const savedGender = useQuery(api.users.getPersonaGender);
   const updateGender = useMutation(api.users.updatePersonaGender);
+  // PRD § 3.1 — save the chosen named persona to the venture row so
+  // the world map renders the painted sprite as the avatar.
+  const setVenturePersonaId = useMutation(api.ventures.setVenturePersonaId);
 
   // Resolve current user so we can tell if the URL idea belongs to them.
   // createVenture throws for non-authors, so we must avoid that path when
@@ -238,10 +241,34 @@ function MapIntroInner() {
     currentUser?._id,
   ]);
 
-  const handleStart = async (gender: "male" | "female") => {
+  const handleStart = async (selection: {
+    personaId:
+      | "arcanist" | "ranger" | "alchemist" | "artisan" | "drifter"
+      | "oracle" | "engineer" | "healer" | "pathfinder" | "sage";
+    gender: "male" | "female";
+  }) => {
+    const { personaId, gender } = selection;
+    // Save back-compat gender to the user record + the new personaId.
     await updateGender({ gender });
     if (typeof window !== "undefined") {
       localStorage.setItem("selectedGender", gender);
+      localStorage.setItem("selectedPersonaId", personaId);
+    }
+    // PRD § 3.1 — save the chosen persona to the venture so Phaser
+    // can render the painted sprite on subsequent loads.
+    const vId = createdVentureId || (activeVenture?._id as string | null);
+    if (vId) {
+      try {
+        await setVenturePersonaId({
+          ventureId: vId as Id<"ventures">,
+          personaId,
+        });
+      } catch (err) {
+        // Non-blocking — if the venture doesn't exist yet (e.g.
+        // mid-create) the worldMap page will save it when the user
+        // re-enters with their selection. We still proceed.
+        console.warn("[intro] failed to save personaId", err);
+      }
     }
 
     const tutorialCompleted =

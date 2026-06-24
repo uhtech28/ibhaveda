@@ -291,6 +291,78 @@ export const generateUploadUrl = mutation({
 });
 
 /**
+ * Set the chosen persona for a venture.
+ *
+ * PRD § 3.1 — when a user picks one of the 10 named personas in
+ * IntroScreen, this mutation saves the choice on the venture row so
+ * Phaser can render the painted sprite as the world-map avatar on
+ * every subsequent load.
+ *
+ * Guards:
+ *  - venture must exist
+ *  - caller must be authenticated and own the venture (or be an
+ *    accepted contributor) — preserves the same access model as
+ *    other venture mutations
+ */
+export const setVenturePersonaId = mutation({
+  args: {
+    ventureId: v.id("ventures"),
+    personaId: v.union(
+      v.literal("arcanist"),
+      v.literal("ranger"),
+      v.literal("alchemist"),
+      v.literal("artisan"),
+      v.literal("drifter"),
+      v.literal("oracle"),
+      v.literal("engineer"),
+      v.literal("healer"),
+      v.literal("pathfinder"),
+      v.literal("sage"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    const venture = await ctx.db.get(args.ventureId);
+    if (!venture) {
+      throw new Error("Venture not found");
+    }
+    // Owner check — only the author of the underlying idea may set
+    // the persona. Contributors should pick their own when they
+    // open the venture; we don't override theirs from someone else.
+    const idea = await ctx.db.get(venture.ideaId);
+    if (!idea) {
+      throw new Error("Underlying idea not found");
+    }
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) {
+      throw new Error("User row not found");
+    }
+    if (idea.authorId !== user._id) {
+      // Non-author callers: still allow if they are an accepted
+      // contributor on this idea (mirrors createVenture's policy).
+      const accepted = await ctx.db
+        .query("contributionRequests")
+        .withIndex("by_idea_contributor", (q) =>
+          q.eq("ideaId", venture.ideaId).eq("contributorId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "accepted"))
+        .first();
+      if (!accepted) {
+        throw new Error("Not authorized to change this venture's persona");
+      }
+    }
+    await ctx.db.patch(args.ventureId, { personaId: args.personaId });
+    return { ok: true };
+  },
+});
+
+/**
  * Create a new venture from an existing idea.
  * Initializes all checkpoints and tasks for all 8 stages.
  * Assigns exactly one random Super Boss from the pool.
