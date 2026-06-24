@@ -1199,6 +1199,19 @@ export class AssetLoader {
       "biome_venture_6",
       "biome_venture_7",
       "biome_venture_8",
+      // 10 painted personas. If a sprite is missing we silently
+      // fall back to the legacy male/female sprite sheet via the
+      // Persona class's `legacyGenderToPersonaId` lookup.
+      "persona_arcanist_portrait",
+      "persona_ranger_portrait",
+      "persona_alchemist_portrait",
+      "persona_artisan_portrait",
+      "persona_drifter_portrait",
+      "persona_oracle_portrait",
+      "persona_engineer_portrait",
+      "persona_healer_portrait",
+      "persona_pathfinder_portrait",
+      "persona_sage_portrait",
     ]);
 
     const onLoadError = (file: { key: string }) => {
@@ -1233,6 +1246,24 @@ export class AssetLoader {
     scene.load.image("biome_venture_8", `${venturePath}/stage-8-scale.jpg`);
     // Stage 4 (Offer Design / Artisan's Quarter) art pending — falls
     // back to procedural tile rendering until designer delivers it.
+
+    // 10 named personas (PRD § 3.1). Each is a painted 4-direction
+    // reference sheet (~384x1024 per frame, single horizontal strip).
+    // Phaser renders the front-facing frame as the world-map avatar;
+    // CharacterCreator uses the full image as a preview card.
+    // The texture key matches personaTextureKey() in
+    // src/config/personas.ts.
+    const personaPath = "/assets/personas";
+    scene.load.image("persona_arcanist_portrait",   `${personaPath}/arcanist.png`);
+    scene.load.image("persona_ranger_portrait",     `${personaPath}/ranger.png`);
+    scene.load.image("persona_alchemist_portrait",  `${personaPath}/alchemist.png`);
+    scene.load.image("persona_artisan_portrait",    `${personaPath}/artisan.png`);
+    scene.load.image("persona_drifter_portrait",    `${personaPath}/drifter.png`);
+    scene.load.image("persona_oracle_portrait",     `${personaPath}/oracle.png`);
+    scene.load.image("persona_engineer_portrait",   `${personaPath}/engineer.png`);
+    scene.load.image("persona_healer_portrait",     `${personaPath}/healer.png`);
+    scene.load.image("persona_pathfinder_portrait", `${personaPath}/pathfinder.png`);
+    scene.load.image("persona_sage_portrait",       `${personaPath}/sage.png`);
 
     scene.load.spritesheet(
       "persona_male_idle_sheet",

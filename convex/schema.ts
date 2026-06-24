@@ -17,7 +17,24 @@ export default defineSchema({
     skills: v.optional(v.array(v.string())), // Array of user skills (handled via userSkills table)
     industry: v.optional(v.string()), // Primary industry (kept for backward compatibility)
     industries: v.optional(v.array(v.string())), // Multiple industries
-    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))), // Character gender selection
+    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))), // Legacy — kept for back-compat
+    // PRD § 3.1 — 10 named personas. New ventures pick one of these
+    // and the world-map renders the painted sprite. If unset on a
+    // legacy venture, the Phaser scene falls back to personaGender.
+    personaId: v.optional(
+      v.union(
+        v.literal("arcanist"),
+        v.literal("ranger"),
+        v.literal("alchemist"),
+        v.literal("artisan"),
+        v.literal("drifter"),
+        v.literal("oracle"),
+        v.literal("engineer"),
+        v.literal("healer"),
+        v.literal("pathfinder"),
+        v.literal("sage"),
+      ),
+    ),
     // Builder persona picked during profile setup. Drives the AI
     // pre-fill in the first-run tour.
     builderRole: v.optional(
@@ -478,7 +495,25 @@ export default defineSchema({
       v.literal("lab"),
       v.literal("creative"),
     )),
-    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))),
+    personaGender: v.optional(v.union(v.literal("male"), v.literal("female"))), // Legacy — kept for back-compat
+    // PRD § 3.1 — 10 named personas selected per venture. Drives which
+    // painted sprite renders as the world-map avatar. New ventures
+    // populate this; legacy ventures fall back to personaGender via
+    // legacyGenderToPersonaId in src/config/personas.ts.
+    personaId: v.optional(
+      v.union(
+        v.literal("arcanist"),
+        v.literal("ranger"),
+        v.literal("alchemist"),
+        v.literal("artisan"),
+        v.literal("drifter"),
+        v.literal("oracle"),
+        v.literal("engineer"),
+        v.literal("healer"),
+        v.literal("pathfinder"),
+        v.literal("sage"),
+      ),
+    ),
     currentStage: v.number(), // 1-N (varies by template: Venture=8, Academic=6, Lab=7, Creative=6)
     currentCheckpoint: v.number(), // 1-N within current stage
     corruptionLevel: v.optional(v.number()), // Backward-compatible for legacy venture rows

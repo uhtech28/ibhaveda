@@ -32,6 +32,7 @@ import { LEVEL_DEFINITIONS } from "@convex/ventureConstants";
 import type { Id } from "@convex/_generated/dataModel";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
+import type { PersonaId } from "@/config/personas";
 import { isLiteMode } from "@/lib/phaser/performance-mode";
 import {
   buildCheckpointSyncSignature,
@@ -2802,6 +2803,11 @@ function MapPageInner() {
       ventureId: venture._id,
       templateId: venture.templateId ?? "venture",
       personaGender: selectedGender,
+      // PRD § 3.1 — pass the venture's chosen persona through so the
+      // Phaser scene renders the painted sprite. Legacy ventures
+      // without a personaId fall back to selectedGender on the
+      // Phaser side via LEGACY_GENDER_TO_PERSONA.
+      personaId: (venture as { personaId?: PersonaId }).personaId,
       userName: currentUser?.displayName || currentUser?.username || "User",
       userImageUrl: currentUser?.displayName
         ? `https://api.dicebear.com/7.x/adventurer/png?seed=${encodeURIComponent(currentUser.displayName)}&size=128&backgroundColor=transparent`

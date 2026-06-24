@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { AssetLoader } from "../utils/asset-loader";
 import { isLiteMode, setVentureAdvanced } from "../performance-mode";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
-import { Persona, PersonaGender } from "../entities/Persona";
+import { Persona, PersonaGender, PersonaId } from "../entities/Persona";
 import {
   ContributorCompanion,
   type ContributorData,
@@ -7803,8 +7803,12 @@ export class WorldMapScene extends Phaser.Scene {
         this.currentSuperBossName = null;
       }
 
-      // Create persona if doesn't exist
+      // Create persona if doesn't exist. Prefer the chosen
+      // personaId (PRD § 3.1, 10 named personas) when provided;
+      // fall back to the legacy gender for old ventures.
       if (!this.persona) {
+        const eventPersonaId =
+          (event as { personaId?: string }).personaId;
         this.persona = new Persona(
           this,
           0,
@@ -7813,6 +7817,7 @@ export class WorldMapScene extends Phaser.Scene {
           event.userName ?? "User",
           event.userImageUrl ??
           "https://api.dicebear.com/7.x/adventurer/png?seed=User&size=128&backgroundColor=transparent",
+          eventPersonaId as PersonaId | undefined,
         );
         this.gameLayer.add(this.persona);
       }

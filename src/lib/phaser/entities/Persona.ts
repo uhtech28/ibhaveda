@@ -14,8 +14,32 @@ import * as Phaser from "phaser";
 
 /**
  * The gender variant for the persona sprite.
+ * @deprecated kept for back-compat — new ventures should use PersonaId instead.
  */
 export type PersonaGender = "male" | "female";
+
+/**
+ * PRD § 3.1 — 10 named personas. The new way to identify the
+ * character. Defined alongside the canonical data in
+ * `src/config/personas.ts`; duplicated here to keep this file
+ * dependency-free.
+ */
+export type PersonaId =
+  | "arcanist"
+  | "ranger"
+  | "alchemist"
+  | "artisan"
+  | "drifter"
+  | "oracle"
+  | "engineer"
+  | "healer"
+  | "pathfinder"
+  | "sage";
+
+const LEGACY_GENDER_TO_PERSONA: Record<PersonaGender, PersonaId> = {
+  male: "drifter",
+  female: "artisan",
+};
 
 /** Locomotion style — map CP travel uses jog; other callers may use walk. */
 export type PersonaMovementPace = "walk" | "jog";
@@ -53,6 +77,7 @@ export class Persona extends Phaser.GameObjects.Container {
   // ── Public readonly ───────────────────────────────────────────────────────
 
   readonly gender: PersonaGender;
+  readonly personaId: PersonaId;
 
   // ── Private state ─────────────────────────────────────────────────────────
 
@@ -100,10 +125,12 @@ export class Persona extends Phaser.GameObjects.Container {
     gender: PersonaGender,
     userName?: string,
     userImageUrl?: string,
+    personaId?: PersonaId,
   ) {
     super(scene, x, y);
 
     this.gender = gender;
+    this.personaId = personaId ?? LEGACY_GENDER_TO_PERSONA[gender];
     this.userName = userName || "";
     this.userImageUrl = userImageUrl || "";
 
@@ -118,15 +145,49 @@ export class Persona extends Phaser.GameObjects.Container {
       0.25,
     );
 
-    // ── Pixel-Art Sprite (Always loaded for maximum RPG aesthetics!) ───────────────────────────
-    const spriteSheetKey =
+    // ── Sprite rendering ──────────────────────────────────────────────────
+    // Prefer the painted portrait for the chosen persona. If that
+    // texture isn't loaded yet (legacy ventures, asset still
+    // downloading, file 404'd), fall back to the legacy gendered
+    // sprite sheet so the avatar always appears.
+    const portraitKey = `persona_${this.personaId}_portrait`;
+    const fallbackKey =
       gender === "male"
         ? "persona_male_idle_sheet"
         : "persona_female_idle_sheet";
+    const haveStillPortrait = scene.textures.exists(portraitKey);
 
-    this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, spriteSheetKey, 0);
-    this.sprite.setOrigin(0.5, 40 / 48);
-    this.sprite.setScale(3);
+    if (haveStillPortrait) {
+      // Painted reference sheets are ~1536×1024 with 4 stacked
+      // directional poses. Crop to the front-facing frame and
+      // scale to roughly match the legacy sprite footprint.
+      this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, portraitKey);
+      const tex = scene.textures.get(portraitKey).getSourceImage() as HTMLImageElement;
+      const naturalWidth = tex?.width ?? 1536;
+      const naturalHeight = tex?.height ?? 1024;
+      // Most sheets are 4 frames wide, so the first frame is the
+      // leftmost quarter. arcanist.png is portrait-orientation single
+      // figure (1024x1536) — we detect that and skip the crop.
+      const isSingleFigure = naturalWidth < naturalHeight;
+      if (!isSingleFigure) {
+        const frameWidth = naturalWidth / 4;
+        // Phaser crop is in source-image pixels.
+        this.sprite.setCrop(0, 0, frameWidth, naturalHeight);
+        // Move origin so the cropped figure is centred on (x,y).
+        this.sprite.setOrigin(frameWidth / 2 / naturalWidth, 0.95);
+      } else {
+        this.sprite.setOrigin(0.5, 0.95);
+      }
+      // Target on-screen height ~ same as the legacy 48px sheet × 3
+      // = 144px. Solve for scale that hits that target height.
+      const targetHeightPx = 144;
+      const heightForScale = isSingleFigure ? naturalHeight : naturalHeight;
+      this.sprite.setScale(targetHeightPx / heightForScale);
+    } else {
+      this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, fallbackKey, 0);
+      this.sprite.setOrigin(0.5, 40 / 48);
+      this.sprite.setScale(3);
+    }
     this.add(this.sprite);
 
     // ── Integrated User Avatar Badge (Mini gold circular crown floating above head) ────────────

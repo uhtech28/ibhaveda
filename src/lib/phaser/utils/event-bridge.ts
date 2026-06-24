@@ -104,6 +104,22 @@ export type ReactToPhaserEvent =
       ventureId: string;
       templateId?: "venture" | "academic" | "lab" | "creative";
       personaGender: "male" | "female";
+      /**
+       * PRD § 3.1 — chosen named persona for this venture. When
+       * present, the Phaser scene renders the painted sprite for
+       * that persona instead of the legacy gendered sheet.
+       */
+      personaId?:
+        | "arcanist"
+        | "ranger"
+        | "alchemist"
+        | "artisan"
+        | "drifter"
+        | "oracle"
+        | "engineer"
+        | "healer"
+        | "pathfinder"
+        | "sage";
       userName?: string;
       userImageUrl?: string;
       assignedBosses?: string[];
@@ -147,6 +163,22 @@ export type ReactToPhaserEvent =
         username: string;
         avatar: string;
         personaGender: "male" | "female";
+      /**
+       * PRD § 3.1 — chosen named persona for this venture. When
+       * present, the Phaser scene renders the painted sprite for
+       * that persona instead of the legacy gendered sheet.
+       */
+      personaId?:
+        | "arcanist"
+        | "ranger"
+        | "alchemist"
+        | "artisan"
+        | "drifter"
+        | "oracle"
+        | "engineer"
+        | "healer"
+        | "pathfinder"
+        | "sage";
         role: string;
         level: number;
         xp: number;
@@ -257,6 +289,22 @@ export type PhaserToReactEvent =
         username: string;
         avatar: string;
         personaGender: "male" | "female";
+      /**
+       * PRD § 3.1 — chosen named persona for this venture. When
+       * present, the Phaser scene renders the painted sprite for
+       * that persona instead of the legacy gendered sheet.
+       */
+      personaId?:
+        | "arcanist"
+        | "ranger"
+        | "alchemist"
+        | "artisan"
+        | "drifter"
+        | "oracle"
+        | "engineer"
+        | "healer"
+        | "pathfinder"
+        | "sage";
         role: string;
         level: number;
         xp: number;
