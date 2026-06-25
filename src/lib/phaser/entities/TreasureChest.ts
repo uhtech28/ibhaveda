@@ -19,6 +19,7 @@
 
 import * as Phaser from "phaser";
 import { SpriteAnimator } from "../animations/SpriteAnimator";
+import { XpPopover } from "./XpPopover";
 
 export type ChestRewardKind =
   | "xp_cache"
@@ -114,6 +115,18 @@ export class TreasureChest extends Phaser.GameObjects.Container {
         chestId: this.chestId,
         reward: this.reward,
       });
+    });
+    // 4b. For XP chests, spawn an XP popover so the player sees the
+    // numeric reward alongside the particle burst. Other reward kinds
+    // (flare/shield/insight) don't grant XP so they get a smaller
+    // glyph popover with the kind name instead.
+    this.scene.time.delayedCall(600, () => {
+      if (this.reward === "xp_cache") {
+        // The actual XP amount is computed server-side per stage.
+        // Show a representative number — server may vary slightly but
+        // it's in the ballpark. Player gets exact figure in feed.
+        XpPopover.spawn(this.scene, this.x, this.y - 18, 35, "chest");
+      }
     });
     // 5. Fade out chest body after the icon escapes (1100ms total)
     return new Promise((resolve) => {

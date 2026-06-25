@@ -20,6 +20,7 @@
 
 import * as Phaser from "phaser";
 import { SpriteAnimator } from "../animations/SpriteAnimator";
+import { XpPopover } from "./XpPopover";
 import type {
   HenchmanDefinition,
   HenchmanInteractionKind,
@@ -160,6 +161,15 @@ export class Henchman extends Phaser.GameObjects.Container {
       template: this.definition.template,
       stage: this.definition.stage,
     });
+    // Numeric XP popover above the particle burst — gives the player
+    // an exact count, complementing the visual confetti.
+    XpPopover.spawn(
+      this.scene,
+      this.x,
+      this.y - 18,
+      this.definition.xpReward,
+      "defeat",
+    );
 
     // Fade out body
     return new Promise((resolve) => {
@@ -188,14 +198,18 @@ export class Henchman extends Phaser.GameObjects.Container {
       this.fleeTimer.destroy();
       this.fleeTimer = null;
     }
+    const fleeXp = Math.max(1, Math.floor(this.definition.xpReward / 2));
     // Emit fled event with half reward
     this.scene.events.emit("henchman_fled", {
       spawnId: this.spawnId,
       henchmanId: this.definition.id,
-      xpAwarded: Math.max(1, Math.floor(this.definition.xpReward / 2)),
+      xpAwarded: fleeXp,
       template: this.definition.template,
       stage: this.definition.stage,
     });
+    // Smaller popover with "ESCAPE" kind so the player sees they
+    // got something but missed the bigger reward.
+    XpPopover.spawn(this.scene, this.x, this.y - 18, fleeXp, "flee");
     // Drift off-screen + dissolve
     return SpriteAnimator.retreat(this.scene, this, {
       driftX: -60,
