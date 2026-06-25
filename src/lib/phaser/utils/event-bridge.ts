@@ -279,6 +279,21 @@ export type PhaserToReactEvent =
    */
   | { type: "PROJECT_COMPLETE_DISMISSED" }
   /**
+   * PRD § 9.2 — player tapped an inter-checkpoint treasure chest and
+   * the open animation completed. React should apply the reward
+   * server-side (XP cache / flare charge / corruption shield /
+   * insight fragment).
+   */
+  | {
+      type: "TREASURE_CHEST_OPENED";
+      chestId: string;
+      reward:
+        | "xp_cache"
+        | "flare_charge"
+        | "corruption_shield"
+        | "insight_fragment";
+    }
+  /**
    * User tapped/clicked a checkpoint node on the world map.
    * React should open the relevant checkpoint modal.
    */

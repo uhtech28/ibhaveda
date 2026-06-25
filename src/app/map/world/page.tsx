@@ -1624,6 +1624,9 @@ function MapPageInner() {
 
   // ── Convex mutations ───────────────────────────────────────────────────────
   const advanceCheckpoint = useMutation(api.ventures.advanceCheckpoint);
+  // PRD § 9.2 — applies XP / flare credit / corruption shield / insight
+  // when a treasure chest is opened in Phaser.
+  const applyChestReward = useMutation(api.treasureChests.applyChestReward);
   const ensureVentureStructure = useMutation(
     api.ventures.ensureVentureStructure,
   );
@@ -2778,6 +2781,37 @@ function MapPageInner() {
     eventBridge.onReact("BADGE_AWARDED", handleBadge);
     return () => eventBridge.off("BADGE_AWARDED", handleBadge);
   }, []);
+
+  // ── Treasure chest reward handler (PRD § 9.2) ──────────────────────────
+  // When the user taps a chest in Phaser, the entity fires
+  // treasure_chest_opened → forwarded to React as TREASURE_CHEST_OPENED.
+  // We call the server-side mutation here so the XP / flare credit /
+  // corruption shield / insight fragment is applied to the user's account.
+  // Idempotency is enforced by the mutation (chestId is unique per user).
+  useEffect(() => {
+    if (!venture) return;
+    const handleChest = async (event: {
+      chestId: string;
+      reward:
+        | "xp_cache"
+        | "flare_charge"
+        | "corruption_shield"
+        | "insight_fragment";
+    }) => {
+      try {
+        await applyChestReward({
+          chestId: event.chestId,
+          reward: event.reward,
+          ventureId: venture._id as Id<"ventures">,
+          stage: activeStage,
+        });
+      } catch (err) {
+        console.warn("[chest] failed to apply reward", err);
+      }
+    };
+    eventBridge.onReact("TREASURE_CHEST_OPENED", handleChest);
+    return () => eventBridge.off("TREASURE_CHEST_OPENED", handleChest);
+  }, [venture, activeStage]);
 
   // ── Sync venture identity → Phaser (not on every task/checkpoint tick) ───────
   useEffect(() => {

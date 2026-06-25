@@ -193,6 +193,26 @@ export default defineSchema({
     .index("by_created_at", ["createdAt"]),
 
   // Contribution requests table
+  // PRD § 9.2 — inter-checkpoint treasure chest claims. One row per
+  // chest opened, scoped per user so idempotency guarantees a chest
+  // can only be claimed once even if the React event fires twice.
+  treasureChestClaims: defineTable({
+    userId: v.id("users"),
+    chestId: v.string(),
+    ventureId: v.id("ventures"),
+    reward: v.union(
+      v.literal("xp_cache"),
+      v.literal("flare_charge"),
+      v.literal("corruption_shield"),
+      v.literal("insight_fragment"),
+    ),
+    stage: v.number(),
+    xpAwarded: v.optional(v.number()),
+    claimedAt: v.number(),
+  })
+    .index("by_user_chest", ["userId", "chestId"])
+    .index("by_venture", ["ventureId"]),
+
   contributionRequests: defineTable({
     ideaId: v.id("ideas"),
     contributorId: v.id("users"),
@@ -514,6 +534,10 @@ export default defineSchema({
         v.literal("sage"),
       ),
     ),
+    // PRD § 9.2 — treasure chest reward state. Optional so legacy
+    // ventures aren't broken by the schema migration.
+    freeFlareCredits: v.optional(v.number()),
+    corruptionShieldExpiresAt: v.optional(v.number()),
     currentStage: v.number(), // 1-N (varies by template: Venture=8, Academic=6, Lab=7, Creative=6)
     currentCheckpoint: v.number(), // 1-N within current stage
     corruptionLevel: v.optional(v.number()), // Backward-compatible for legacy venture rows

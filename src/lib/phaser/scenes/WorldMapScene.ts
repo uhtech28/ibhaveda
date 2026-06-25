@@ -9,6 +9,12 @@ import { StageClearBanner } from "../cinematics/StageClearBanner";
 import { ProjectCompleteCinematic } from "../cinematics/ProjectCompleteCinematic";
 import { CorruptionEscalation } from "../systems/CorruptionEscalation";
 import {
+  TreasureChest,
+  shouldSpawnChest,
+  pickChestReward,
+  type ChestRewardKind,
+} from "../entities/TreasureChest";
+import {
   ContributorCompanion,
   type ContributorData,
 } from "../entities/ContributorCompanion";
@@ -353,6 +359,14 @@ export class WorldMapScene extends Phaser.Scene {
   /** PRD § 6.2 — camera-anchored corruption escalation effects. Built
    * once in create(), updated whenever corruption level changes. */
   private corruptionEscalation: CorruptionEscalation | null = null;
+  /** PRD § 9.2 — treasure chests spawned per stage. Map: stageId → list
+   * of chest entities, so unloadStage can clean them up. Also used by
+   * the chest-opened forwarder so React knows which stage the reward
+   * came from. */
+  private treasureChestsByStage: Map<number, TreasureChest[]> = new Map();
+  /** Tracks chestIds already opened this session so we don't double-
+   * fire the React event if a chest re-spawns on a re-mount. */
+  private openedChestIds: Set<string> = new Set();
   private lastSuperBossDefeatStatus: "active" | "retreated" | "slain" | null =
     null;
   private lastEmitTime = 0;
@@ -1422,6 +1436,12 @@ export class WorldMapScene extends Phaser.Scene {
 
       // 4. Create stage mini-boss
       this.createMiniBossForStage(stageId);
+
+      // 4b. PRD § 9.2 — spawn inter-checkpoint treasure chests.
+      // 20% probability per segment, picks among 4 reward kinds.
+      // Server-side reward application happens via the
+      // TREASURE_CHEST_OPENED React event below.
+      this.spawnInterCheckpointChests(stageId);
 
       // 5. Update the new mini-boss state if checkpoints have been loaded.
       // loadStage runs once per lazy-loaded stage on initial mount (3
@@ -7387,6 +7407,23 @@ export class WorldMapScene extends Phaser.Scene {
         });
       },
     );
+
+    // PRD § 9.2 — forward chest-opened events to React so the server
+    // can apply the XP / flare / shield / insight reward. Dedupe by
+    // chestId so a chest spawned on a stage re-mount can't claim a
+    // reward that was already granted earlier in the session.
+    this.events.on(
+      "treasure_chest_opened",
+      (data: { chestId: string; reward: ChestRewardKind }) => {
+        if (this.openedChestIds.has(data.chestId)) return;
+        this.openedChestIds.add(data.chestId);
+        eventBridge.dispatchToReact({
+          type: "TREASURE_CHEST_OPENED",
+          chestId: data.chestId,
+          reward: data.reward,
+        });
+      },
+    );
   }
 
   /**
@@ -7568,6 +7605,48 @@ export class WorldMapScene extends Phaser.Scene {
     this.activeProjectComplete.dismiss();
     this.activeProjectComplete = null;
     this.cinematicPlaying = false;
+  }
+
+  /**
+   * PRD § 9.2 — spawn inter-checkpoint treasure chests for a stage.
+   * Each segment between two checkpoints has a 20% chance of
+   * containing a chest. Reward kind is picked randomly across the 4
+   * PRD types. Position is offset above the midpoint between
+   * checkpoints so the chest doesn't overlap the snake path.
+   */
+  private spawnInterCheckpointChests(stageId: number): void {
+    const stage = this.activeStages.find((s) => s.id === stageId);
+    if (!stage) return;
+    // Find the global index of the first checkpoint in this stage.
+    let globalIndex = 0;
+    for (let s = 0; s < stage.id - 1; s++) {
+      globalIndex += this.activeStages[s]?.checkpoints ?? 0;
+    }
+    const chests: TreasureChest[] = [];
+    // Each segment is between checkpoint i and i+1 within this stage.
+    for (let i = 0; i < stage.checkpoints - 1; i++) {
+      if (!shouldSpawnChest()) continue;
+      const cpA = this.calculateSnakePosition(globalIndex + i, this.TOTAL_CHECKPOINTS);
+      const cpB = this.calculateSnakePosition(globalIndex + i + 1, this.TOTAL_CHECKPOINTS);
+      const midX = (cpA.x + cpB.x) / 2;
+      const midY = (cpA.y + cpB.y) / 2;
+      // Offset upward so chest sits above the snake path.
+      const chestX = midX + (Math.random() - 0.5) * 24;
+      const chestY = midY - 36 - Math.random() * 12;
+      const chestId = `chest_${stage.id}_${i}_${Date.now()}`;
+      const chest = new TreasureChest(this, {
+        chestId,
+        x: chestX,
+        y: chestY,
+        reward: pickChestReward(),
+      });
+      chest.setDepth(15);
+      this.gameLayer.add(chest);
+      chests.push(chest);
+    }
+    if (chests.length > 0) {
+      this.treasureChestsByStage.set(stageId, chests);
+    }
   }
 
   /**
