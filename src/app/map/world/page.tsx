@@ -1627,6 +1627,9 @@ function MapPageInner() {
   // PRD § 9.2 — applies XP / flare credit / corruption shield / insight
   // when a treasure chest is opened in Phaser.
   const applyChestReward = useMutation(api.treasureChests.applyChestReward);
+  // PRD § 9.1 — applies XP when a henchman is defeated or fled on the
+  // inter-checkpoint path. Idempotent by spawnId server-side.
+  const applyHenchmanReward = useMutation(api.henchmen.applyHenchmanReward);
   const ensureVentureStructure = useMutation(
     api.ventures.ensureVentureStructure,
   );
@@ -2782,6 +2785,47 @@ function MapPageInner() {
     return () => eventBridge.off("BADGE_AWARDED", handleBadge);
   }, []);
 
+  // PRD § 3.1 — fire persona corruption_warning line once per band
+  // transition into the "heavy" zone (75% threshold). We track the
+  // most-recent-fired threshold in a ref so a corruption that ping-
+  // pongs across 75% doesn't re-fire the line.
+  const lastCorruptionThresholdFiredRef = useRef<number>(-1);
+  useEffect(() => {
+    if (!phaserReady) return;
+    const last = lastCorruptionThresholdFiredRef.current;
+    if (corruptionLevel >= 75 && last < 75) {
+      eventBridge.dispatchToPhaser({
+        type: "SPEAK_PERSONA_LINE",
+        event: "corruption_warning",
+      });
+      lastCorruptionThresholdFiredRef.current = 75;
+    } else if (corruptionLevel < 60 && last >= 75) {
+      // Reset the threshold so the line can fire again if corruption
+      // climbs back. 60% gives a 15% hysteresis so we don't ping-pong.
+      lastCorruptionThresholdFiredRef.current = -1;
+    }
+  }, [corruptionLevel, phaserReady]);
+
+  // PRD § 6 — fire persona boss_revealed line once when the super
+  // boss progresses to "foreground" status (corruption at 100%
+  // typically, or final-stage gate reached). Tracked via a ref so
+  // it can fire again per venture but not per re-render.
+  const bossRevealedFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!phaserReady || !superBoss) return;
+    const key = `${superBoss.bossSlug}:${superBoss.visualStatus}`;
+    if (
+      superBoss.visualStatus === "foreground" &&
+      bossRevealedFiredRef.current !== key
+    ) {
+      eventBridge.dispatchToPhaser({
+        type: "SPEAK_PERSONA_LINE",
+        event: "boss_revealed",
+      });
+      bossRevealedFiredRef.current = key;
+    }
+  }, [superBoss?.bossSlug, superBoss?.visualStatus, phaserReady]);
+
   // ── Treasure chest reward handler (PRD § 9.2) ──────────────────────────
   // When the user taps a chest in Phaser, the entity fires
   // treasure_chest_opened → forwarded to React as TREASURE_CHEST_OPENED.
@@ -2812,6 +2856,53 @@ function MapPageInner() {
     eventBridge.onReact("TREASURE_CHEST_OPENED", handleChest);
     return () => eventBridge.off("TREASURE_CHEST_OPENED", handleChest);
   }, [venture, activeStage]);
+
+  // PRD § 9.1 — henchman defeat / flee handlers. Both pay XP via the
+  // same mutation, distinguished by resolution kind. Idempotency is
+  // enforced server-side via henchmanResolutions by_user_spawn.
+  useEffect(() => {
+    if (!venture) return;
+    const apply = async (
+      event: {
+        spawnId: string;
+        henchmanId: string;
+        xpAwarded: number;
+        stage: number;
+      },
+      resolution: "defeated" | "fled",
+    ) => {
+      try {
+        await applyHenchmanReward({
+          spawnId: event.spawnId,
+          henchmanId: event.henchmanId,
+          xpAwarded: event.xpAwarded,
+          stage: event.stage,
+          resolution,
+          ventureId: venture._id as Id<"ventures">,
+        });
+      } catch (err) {
+        console.warn("[henchman] failed to apply reward", err);
+      }
+    };
+    const handleDefeated = (event: {
+      spawnId: string;
+      henchmanId: string;
+      xpAwarded: number;
+      stage: number;
+    }) => apply(event, "defeated");
+    const handleFled = (event: {
+      spawnId: string;
+      henchmanId: string;
+      xpAwarded: number;
+      stage: number;
+    }) => apply(event, "fled");
+    eventBridge.onReact("HENCHMAN_DEFEATED", handleDefeated);
+    eventBridge.onReact("HENCHMAN_FLED", handleFled);
+    return () => {
+      eventBridge.off("HENCHMAN_DEFEATED", handleDefeated);
+      eventBridge.off("HENCHMAN_FLED", handleFled);
+    };
+  }, [venture]);
 
   // ── Sync venture identity → Phaser (not on every task/checkpoint tick) ───────
   useEffect(() => {
@@ -3435,6 +3526,16 @@ function MapPageInner() {
     const animVariant = isGold ? "gold" : "standard";
     setFlashTrigger((n) => n + 1);
     setIsAdvancingCheckpoint(true);
+
+    // Persona delivers a flavour line on gold checkpoint clears (3/3).
+    // Standard 2/3 advances stay silent so the bubble doesn't spam
+    // the player who's grinding through. PRD § 3.1 voice.
+    if (isGold && phaserReady) {
+      eventBridge.dispatchToPhaser({
+        type: "SPEAK_PERSONA_LINE",
+        event: "checkpoint_gold",
+      });
+    }
 
     const afterBossVictory = fromBossVictory || advancingFromBossRef.current;
 
