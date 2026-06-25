@@ -3612,6 +3612,56 @@ function MapPageInner() {
                 tagline: nextMonster?.description,
               });
             }, 2400);
+          } else {
+            // PRD § 5.5 — this was the final stage of the venture.
+            // Fire the Project Complete cinematic. Variant is
+            // "perfect" if every final checkpoint was completed at
+            // 3/3 (every stage ended in gold); "complete" if at
+            // least one stage finished with a 2/3 final.
+            const finalCheckpointsByStage = new Map<number, typeof cp>();
+            for (const candidate of checkpoints) {
+              const stageMeta = templateStages[candidate.stage - 1];
+              if (!stageMeta) continue;
+              if (candidate.checkpoint === stageMeta.checkpoints) {
+                finalCheckpointsByStage.set(candidate.stage, candidate);
+              }
+            }
+            let allFinalsGold = true;
+            let goldCheckpointsEarned = 0;
+            for (const candidate of checkpoints) {
+              if (
+                candidate.t1Completed &&
+                candidate.t2Completed &&
+                candidate.t3Completed
+              ) {
+                goldCheckpointsEarned += 1;
+              }
+            }
+            for (const [, finalCp] of finalCheckpointsByStage) {
+              const isFinalGold =
+                finalCp.t1Completed &&
+                finalCp.t2Completed &&
+                finalCp.t3Completed;
+              if (!isFinalGold) {
+                allFinalsGold = false;
+                break;
+              }
+            }
+            const projectVariant: "complete" | "perfect" = allFinalsGold
+              ? "perfect"
+              : "complete";
+            // Delay so the clear banner finishes before the apex
+            // cinematic takes the screen.
+            window.setTimeout(() => {
+              eventBridge.dispatchToPhaser({
+                type: "PLAY_PROJECT_COMPLETE",
+                variant: projectVariant,
+                ventureName: ideaTitle ?? "Your Venture",
+                stagesCleared: templateStages.length,
+                goldCheckpointsEarned,
+                personaId: (venture as { personaId?: PersonaId }).personaId,
+              });
+            }, 2200);
           }
         }
 
