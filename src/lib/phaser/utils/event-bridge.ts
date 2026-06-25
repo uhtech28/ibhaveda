@@ -139,6 +139,30 @@ export type ReactToPhaserEvent =
   | { type: "FOCUS_STAGE"; stage: number; checkpointId?: string }
   /** Pause the Phaser game loop (e.g. modal is open). */
   | { type: "GAME_PAUSE" }
+  /**
+   * Play the stage entry cinematic (camera pan + letterbox + banner +
+   * monster nameplate). Fired by React on genuine stage advance.
+   * Idempotent — late dispatches during a cinematic in progress are
+   * dropped silently.
+   */
+  | {
+      type: "PLAY_STAGE_ENTRY";
+      stageNumber: number;
+      stageName: string;
+      monsterName?: string;
+      tagline?: string;
+    }
+  /**
+   * Play the arcade-style stage clear banner. variant="gold" when the
+   * final checkpoint was completed 3/3, otherwise "standard".
+   */
+  | {
+      type: "PLAY_STAGE_CLEAR";
+      stageNumber: number;
+      stageName: string;
+      monsterName?: string;
+      variant: "standard" | "gold";
+    }
   /** Resume the Phaser game loop after a pause. */
   | { type: "GAME_RESUME" }
   /**

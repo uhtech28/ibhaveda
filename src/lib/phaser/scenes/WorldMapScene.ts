@@ -4,6 +4,8 @@ import { isLiteMode, setVentureAdvanced } from "../performance-mode";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender, PersonaId } from "../entities/Persona";
 import { getStageMonster } from "@/config/stageMonsters";
+import { StageEntryCinematic } from "../cinematics/StageEntryCinematic";
+import { StageClearBanner } from "../cinematics/StageClearBanner";
 import {
   ContributorCompanion,
   type ContributorData,
@@ -339,6 +341,10 @@ export class WorldMapScene extends Phaser.Scene {
   private lastPersonaCheckpointId: string | null = null;
   private currentSuperBossSlug: string | null = null;
   private currentSuperBossName: string | null = null;
+  /** Set while a stage-entry or stage-clear cinematic is mid-play.
+   * Late-arriving dispatches for the same stage are dropped so the
+   * cinematic never double-fires. */
+  private cinematicPlaying = false;
   private lastSuperBossDefeatStatus: "active" | "retreated" | "slain" | null =
     null;
   private lastEmitTime = 0;
@@ -414,6 +420,18 @@ export class WorldMapScene extends Phaser.Scene {
     minigameSyncState?: (event: {
       completedCheckpointIds: string[];
       completedSpawnIds: string[];
+    }) => void;
+    playStageEntry?: (event: {
+      stageNumber: number;
+      stageName: string;
+      monsterName?: string;
+      tagline?: string;
+    }) => void;
+    playStageClear?: (event: {
+      stageNumber: number;
+      stageName: string;
+      monsterName?: string;
+      variant: "standard" | "gold";
     }) => void;
   };
 
@@ -7262,6 +7280,9 @@ export class WorldMapScene extends Phaser.Scene {
     // PRD §2 — mini-game state sync from React
     this.boundHandlers.minigameSyncState =
       this.receiveMiniGameSyncState.bind(this);
+    // PRD §§ 4, 5.4 — stage entry / clear cinematics
+    this.boundHandlers.playStageEntry = this.handlePlayStageEntry.bind(this);
+    this.boundHandlers.playStageClear = this.handlePlayStageClear.bind(this);
 
     eventBridge.onPhaser(
       "UPDATE_BRIGHTNESS",
@@ -7311,6 +7332,14 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "MINIGAME_SYNC_STATE",
       this.boundHandlers.minigameSyncState,
+    );
+    eventBridge.onPhaser(
+      "PLAY_STAGE_ENTRY",
+      this.boundHandlers.playStageEntry,
+    );
+    eventBridge.onPhaser(
+      "PLAY_STAGE_CLEAR",
+      this.boundHandlers.playStageClear,
     );
 
     // Handle checkpoint clicks (emitted by CheckpointNode)
@@ -7404,6 +7433,65 @@ export class WorldMapScene extends Phaser.Scene {
 
   private handleUpdateBrightness(_event?: { brightness: number }): void {
     this.applyCorruptionCameraFx();
+  }
+
+  /**
+   * PRD §§ 4, 5.4 — stage entry cinematic. Camera pans to the new
+   * stage's boss arena, letterbox bars frame the moment, banner +
+   * monster nameplate appear. ~1.8s total. Late dispatches during an
+   * in-flight cinematic are dropped silently.
+   */
+  private handlePlayStageEntry(event: {
+    stageNumber: number;
+    stageName: string;
+    monsterName?: string;
+    tagline?: string;
+  }): void {
+    if (this.cinematicPlaying) return;
+    this.cinematicPlaying = true;
+
+    // Compute camera target — the boss arena for this stage is at the
+    // last checkpoint of that stage. Derive from BIOME_WIDTH layout.
+    const stageIndex = event.stageNumber - 1;
+    const targetX =
+      stageIndex * this.BIOME_WIDTH + this.BIOME_WIDTH * 0.78;
+    const targetY = this.cameras.main.scrollY + this.cameras.main.height / 2;
+
+    const cinematic = new StageEntryCinematic(this);
+    void cinematic.play({
+      stageNumber: event.stageNumber,
+      stageName: event.stageName,
+      monsterName: event.monsterName,
+      tagline: event.tagline,
+      cameraTargetX: targetX,
+      cameraTargetY: targetY,
+    }).finally(() => {
+      this.cinematicPlaying = false;
+    });
+  }
+
+  /**
+   * PRD § 5.4 — stage clear banner. Arcade-style victory drop with
+   * standard or gold variant depending on whether the final
+   * checkpoint was 2/3 or 3/3.
+   */
+  private handlePlayStageClear(event: {
+    stageNumber: number;
+    stageName: string;
+    monsterName?: string;
+    variant: "standard" | "gold";
+  }): void {
+    if (this.cinematicPlaying) return;
+    this.cinematicPlaying = true;
+    const banner = new StageClearBanner(this);
+    void banner.play({
+      stageNumber: event.stageNumber,
+      stageName: event.stageName,
+      monsterName: event.monsterName,
+      variant: event.variant,
+    }).finally(() => {
+      this.cinematicPlaying = false;
+    });
   }
 
   /**
