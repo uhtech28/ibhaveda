@@ -8,6 +8,7 @@ import { StageEntryCinematic } from "../cinematics/StageEntryCinematic";
 import { StageClearBanner } from "../cinematics/StageClearBanner";
 import { ProjectCompleteCinematic } from "../cinematics/ProjectCompleteCinematic";
 import { CorruptionEscalation } from "../systems/CorruptionEscalation";
+import { TimeOfDayCycle } from "../systems/TimeOfDayCycle";
 import {
   TreasureChest,
   shouldSpawnChest,
@@ -362,6 +363,10 @@ export class WorldMapScene extends Phaser.Scene {
   /** PRD § 6.2 — camera-anchored corruption escalation effects. Built
    * once in create(), updated whenever corruption level changes. */
   private corruptionEscalation: CorruptionEscalation | null = null;
+  /** Day/night tint cycle. Subtle camera-anchored colour overlay that
+   * varies by real-world hour so dawn/noon/dusk/night look distinct.
+   * Disabled in lite mode. */
+  private timeOfDayCycle: TimeOfDayCycle | null = null;
   /** PRD § 9.2 — treasure chests spawned per stage. Map: stageId → list
    * of chest entities, so unloadStage can clean them up. Also used by
    * the chest-opened forwarder so React knows which stage the reward
@@ -745,6 +750,12 @@ export class WorldMapScene extends Phaser.Scene {
     // warning). Distinct from CorruptionRenderer which paints
     // per-stage in-world overlays.
     this.corruptionEscalation = new CorruptionEscalation(this);
+
+    // Atmosphere — subtle dawn/noon/dusk/night colour overlay that
+    // shifts with the player's real-world clock. Skipped in lite
+    // mode to keep advanced-venture maps light.
+    this.timeOfDayCycle = new TimeOfDayCycle(this);
+    this.timeOfDayCycle.start();
 
     // Camera setup with responsive zoom
     this.cameras.main.roundPixels = true;
