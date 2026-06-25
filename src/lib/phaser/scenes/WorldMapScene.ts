@@ -7,6 +7,7 @@ import { getStageMonster } from "@/config/stageMonsters";
 import { StageEntryCinematic } from "../cinematics/StageEntryCinematic";
 import { StageClearBanner } from "../cinematics/StageClearBanner";
 import { ProjectCompleteCinematic } from "../cinematics/ProjectCompleteCinematic";
+import { CorruptionEscalation } from "../systems/CorruptionEscalation";
 import {
   ContributorCompanion,
   type ContributorData,
@@ -346,6 +347,12 @@ export class WorldMapScene extends Phaser.Scene {
    * Late-arriving dispatches for the same stage are dropped so the
    * cinematic never double-fires. */
   private cinematicPlaying = false;
+  /** Reference to the active ProjectCompleteCinematic so the React
+   * side can dismiss it via DISMISS_PROJECT_COMPLETE. */
+  private activeProjectComplete: ProjectCompleteCinematic | null = null;
+  /** PRD § 6.2 — camera-anchored corruption escalation effects. Built
+   * once in create(), updated whenever corruption level changes. */
+  private corruptionEscalation: CorruptionEscalation | null = null;
   private lastSuperBossDefeatStatus: "active" | "retreated" | "slain" | null =
     null;
   private lastEmitTime = 0;
@@ -441,6 +448,7 @@ export class WorldMapScene extends Phaser.Scene {
       goldCheckpointsEarned?: number;
       personaId?: string;
     }) => void;
+    dismissProjectComplete?: () => void;
   };
 
   // Map dimensions — every stage shares the same world frame (40×40 tiles @ 16px).
@@ -702,6 +710,11 @@ export class WorldMapScene extends Phaser.Scene {
 
     this.corruptionRenderer = new CorruptionRenderer(this);
     this.stageEnvironmentBlur = new StageEnvironmentBlur();
+    // PRD § 6.2 — camera-anchored corruption escalation effects
+    // (edge overlay, vignette, desaturation, screen cracks, flash
+    // warning). Distinct from CorruptionRenderer which paints
+    // per-stage in-world overlays.
+    this.corruptionEscalation = new CorruptionEscalation(this);
 
     // Camera setup with responsive zoom
     this.cameras.main.roundPixels = true;
@@ -7293,6 +7306,8 @@ export class WorldMapScene extends Phaser.Scene {
     this.boundHandlers.playStageClear = this.handlePlayStageClear.bind(this);
     this.boundHandlers.playProjectComplete =
       this.handlePlayProjectComplete.bind(this);
+    this.boundHandlers.dismissProjectComplete =
+      this.handleDismissProjectComplete.bind(this);
 
     eventBridge.onPhaser(
       "UPDATE_BRIGHTNESS",
@@ -7354,6 +7369,10 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "PLAY_PROJECT_COMPLETE",
       this.boundHandlers.playProjectComplete,
+    );
+    eventBridge.onPhaser(
+      "DISMISS_PROJECT_COMPLETE",
+      this.boundHandlers.dismissProjectComplete,
     );
 
     // Handle checkpoint clicks (emitted by CheckpointNode)
@@ -7443,6 +7462,11 @@ export class WorldMapScene extends Phaser.Scene {
     this.syncCorruptionVisuals();
     const superBossObj = this.bosses.get("super_boss");
     superBossObj?.updateCorruptionAura(this.currentCorruptionLevel);
+    // PRD § 6.2 — apply camera-anchored escalation (edge overlay,
+    // vignette, desaturation, screen cracks, flash warning). Idempotent
+    // by band — same-band calls are no-ops, so this is safe to call
+    // on every corruption update.
+    this.corruptionEscalation?.setLevel(this.currentCorruptionLevel);
   }
 
   private handleUpdateBrightness(_event?: { brightness: number }): void {
@@ -7520,14 +7544,30 @@ export class WorldMapScene extends Phaser.Scene {
     goldCheckpointsEarned?: number;
     personaId?: string;
   }): void {
-    if (this.cinematicPlaying) return;
+    // If one is already on screen, dismiss before showing the new one.
+    if (this.activeProjectComplete) {
+      this.activeProjectComplete.dismiss();
+      this.activeProjectComplete = null;
+    }
     this.cinematicPlaying = true;
     const cinematic = new ProjectCompleteCinematic(this);
-    void cinematic.play(event).finally(() => {
-      // Note: we keep the cinematic on screen and let React dispatch a
-      // DISMISS event to close it. The flag stays true so subsequent
-      // stage cinematics don't fire on top.
+    this.activeProjectComplete = cinematic;
+    // When the user taps the backdrop, dismiss + notify React.
+    cinematic.onDismiss(() => {
+      this.handleDismissProjectComplete();
+      eventBridge.dispatchToReact({
+        type: "PROJECT_COMPLETE_DISMISSED",
+      });
     });
+    void cinematic.play(event);
+    // Note: cinematic stays up until tap or DISMISS_PROJECT_COMPLETE.
+  }
+
+  private handleDismissProjectComplete(): void {
+    if (!this.activeProjectComplete) return;
+    this.activeProjectComplete.dismiss();
+    this.activeProjectComplete = null;
+    this.cinematicPlaying = false;
   }
 
   /**

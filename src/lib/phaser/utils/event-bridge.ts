@@ -179,6 +179,12 @@ export type ReactToPhaserEvent =
       goldCheckpointsEarned?: number;
       personaId?: string;
     }
+  /**
+   * Dismiss the active ProjectCompleteCinematic. Fade out + cleanup.
+   * Idempotent — late dispatches when no cinematic is showing are
+   * silently ignored.
+   */
+  | { type: "DISMISS_PROJECT_COMPLETE" }
   /** Resume the Phaser game loop after a pause. */
   | { type: "GAME_RESUME" }
   /**
@@ -267,6 +273,11 @@ export type ReactToPhaserEvent =
 export type PhaserToReactEvent =
   /** Emitted once the boot scene has finished and the game is interactive. */
   | { type: "PHASER_READY" }
+  /**
+   * User tapped the ProjectCompleteCinematic backdrop to dismiss it.
+   * React should clean up any related project-complete state.
+   */
+  | { type: "PROJECT_COMPLETE_DISMISSED" }
   /**
    * User tapped/clicked a checkpoint node on the world map.
    * React should open the relevant checkpoint modal.

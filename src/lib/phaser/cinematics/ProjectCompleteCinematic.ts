@@ -38,11 +38,19 @@ export class ProjectCompleteCinematic {
   private scene: Phaser.Scene;
   private layer: Phaser.GameObjects.Container;
 
+  /** Click-to-dismiss callback, set after `play()` runs. */
+  private dismissCallback: (() => void) | null = null;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.layer = scene.add.container(0, 0);
     this.layer.setScrollFactor(0);
     this.layer.setDepth(2200);
+  }
+
+  /** Register a callback that fires on user tap-to-dismiss. */
+  onDismiss(cb: () => void): void {
+    this.dismissCallback = cb;
   }
 
   async play(config: ProjectCompleteConfig): Promise<void> {
@@ -206,12 +214,12 @@ export class ProjectCompleteCinematic {
         }
       });
 
-      // ── 8. Dismiss prompt + resolve (3.5s) ──────────────────────────
+      // ── 8. Dismiss prompt + click handler + resolve (3.5s) ──────────
       scene.time.delayedCall(3500, () => {
         const dismiss = scene.add.text(
           viewW / 2,
           viewH * 0.92,
-          "Tap to continue",
+          "Tap anywhere to continue",
           {
             fontFamily: '"Courier New", monospace',
             fontSize: "12px",
@@ -239,6 +247,16 @@ export class ProjectCompleteCinematic {
           repeat: -1,
           ease: "Sine.easeInOut",
           delay: 600,
+        });
+        // Make the blackout backdrop interactive — tap anywhere
+        // fires the dismiss callback so React can clean up.
+        blackout.setInteractive({ useHandCursor: true });
+        blackout.on("pointerdown", () => {
+          if (this.dismissCallback) {
+            this.dismissCallback();
+          } else {
+            this.dismiss();
+          }
         });
         resolve();
       });
