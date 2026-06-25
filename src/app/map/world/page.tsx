@@ -3628,6 +3628,12 @@ function MapPageInner() {
             monsterName: clearedMonster?.name,
             variant: isGold ? "gold" : "standard",
           });
+          // Persona delivers a flavour line under their breath —
+          // tied to their archetype voice in personaDialogue.
+          eventBridge.dispatchToPhaser({
+            type: "SPEAK_PERSONA_LINE",
+            event: "stage_clear",
+          });
 
           // PRD § 4 — fire the stage entry cinematic for the NEXT
           // stage on a small delay so the clear banner finishes its
@@ -3694,6 +3700,11 @@ function MapPageInner() {
                 stagesCleared: templateStages.length,
                 goldCheckpointsEarned,
                 personaId: (venture as { personaId?: PersonaId }).personaId,
+              });
+              // Final line — persona reflects on the completed venture.
+              eventBridge.dispatchToPhaser({
+                type: "SPEAK_PERSONA_LINE",
+                event: "venture_complete",
               });
             }, 2200);
           }

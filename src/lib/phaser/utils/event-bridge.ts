@@ -185,6 +185,23 @@ export type ReactToPhaserEvent =
    * silently ignored.
    */
   | { type: "DISMISS_PROJECT_COMPLETE" }
+  /**
+   * Have the persona speak a contextual line from
+   * `personaDialogue.ts`. React fires this after key events
+   * (checkpoint_gold, stage_clear, etc.). The persona picks a random
+   * line from its pool — voice is set by the chosen persona's
+   * archetype, not the event.
+   */
+  | {
+      type: "SPEAK_PERSONA_LINE";
+      event:
+        | "checkpoint_gold"
+        | "stage_clear"
+        | "corruption_warning"
+        | "boss_revealed"
+        | "venture_complete"
+        | "idle";
+    }
   /** Resume the Phaser game loop after a pause. */
   | { type: "GAME_RESUME" }
   /**

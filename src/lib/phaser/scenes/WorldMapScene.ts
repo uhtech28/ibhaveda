@@ -463,6 +463,15 @@ export class WorldMapScene extends Phaser.Scene {
       personaId?: string;
     }) => void;
     dismissProjectComplete?: () => void;
+    speakPersonaLine?: (event: {
+      event:
+        | "checkpoint_gold"
+        | "stage_clear"
+        | "corruption_warning"
+        | "boss_revealed"
+        | "venture_complete"
+        | "idle";
+    }) => void;
   };
 
   // Map dimensions — every stage shares the same world frame (40×40 tiles @ 16px).
@@ -7328,6 +7337,8 @@ export class WorldMapScene extends Phaser.Scene {
       this.handlePlayProjectComplete.bind(this);
     this.boundHandlers.dismissProjectComplete =
       this.handleDismissProjectComplete.bind(this);
+    this.boundHandlers.speakPersonaLine =
+      this.handleSpeakPersonaLine.bind(this);
 
     eventBridge.onPhaser(
       "UPDATE_BRIGHTNESS",
@@ -7393,6 +7404,10 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "DISMISS_PROJECT_COMPLETE",
       this.boundHandlers.dismissProjectComplete,
+    );
+    eventBridge.onPhaser(
+      "SPEAK_PERSONA_LINE",
+      this.boundHandlers.speakPersonaLine,
     );
 
     // Handle checkpoint clicks (emitted by CheckpointNode)
@@ -7605,6 +7620,24 @@ export class WorldMapScene extends Phaser.Scene {
     this.activeProjectComplete.dismiss();
     this.activeProjectComplete = null;
     this.cinematicPlaying = false;
+  }
+
+  /**
+   * Persona speaks a contextual line per personaDialogue. Routed
+   * through Persona.sayLine which picks a random line from the
+   * persona's pool for the requested event.
+   */
+  private handleSpeakPersonaLine(event: {
+    event:
+      | "checkpoint_gold"
+      | "stage_clear"
+      | "corruption_warning"
+      | "boss_revealed"
+      | "venture_complete"
+      | "idle";
+  }): void {
+    if (!this.persona) return;
+    this.persona.sayLine(event.event);
   }
 
   /**

@@ -8,6 +8,10 @@
 
 import * as Phaser from "phaser";
 import { SpriteAnimator } from "../animations/SpriteAnimator";
+import {
+  pickPersonaLine,
+  type PersonaDialogueEvent,
+} from "@/config/personaDialogue";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exported types
@@ -102,6 +106,7 @@ export class Persona extends Phaser.GameObjects.Container {
   private avatarBobTween: Phaser.Tweens.Tween | null = null;
   private avatarWalkTween: Phaser.Tweens.Tween | null = null;
   private speechBubble: Phaser.GameObjects.Container | null = null;
+  private speechAutoHideTimer: Phaser.Time.TimerEvent | null = null;
   private userName: string = "";
   private userImageUrl: string = "";
 
@@ -393,7 +398,29 @@ export class Persona extends Phaser.GameObjects.Container {
   /**
    * Show a speech bubble with "Hi [Username]!" message
    */
-  private showSpeechBubble(): void {
+  /**
+   * Show a contextual line spoken by this persona. Picks a PRD-flavour
+   * line from `personaDialogue` keyed by personaId + event. Auto-
+   * dismisses after 4s (or `durationMs` if provided).
+   *
+   * Public API — called by the React side via the speakPersonaLine
+   * helper after key game events (gold checkpoint, stage clear, etc.).
+   */
+  public sayLine(event: PersonaDialogueEvent, durationMs = 4000): void {
+    if (!this.scene) return;
+    const line = pickPersonaLine(this.personaId, event);
+    if (!line) return;
+    this.showSpeechBubble(line);
+    if (this.speechAutoHideTimer) {
+      this.speechAutoHideTimer.destroy();
+    }
+    this.speechAutoHideTimer = this.scene.time.delayedCall(durationMs, () => {
+      this.hideSpeechBubble();
+      this.speechAutoHideTimer = null;
+    });
+  }
+
+  private showSpeechBubble(messageOverride?: string): void {
     if (!this.scene) return;
 
     // Remove existing speech bubble
@@ -402,9 +429,9 @@ export class Persona extends Phaser.GameObjects.Container {
       this.speechBubble = null;
     }
 
-    if (!this.userName) return;
+    if (!messageOverride && !this.userName) return;
 
-    const message = `Hi ${this.userName}!`;
+    const message = messageOverride ?? `Hi ${this.userName}!`;
     const bubbleWidth = Math.max(140, message.length * 9 + 40);
     const bubbleHeight = 48;
     const bubbleX = 0;
