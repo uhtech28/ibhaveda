@@ -14,6 +14,9 @@ import {
   pickChestReward,
   type ChestRewardKind,
 } from "../entities/TreasureChest";
+import { Henchman } from "../entities/Henchman";
+import { getHenchmanForStage, shouldSpawnHenchman } from "@/config/henchmen";
+import type { StageMonsterTemplate } from "@/config/stageMonsters";
 import {
   ContributorCompanion,
   type ContributorData,
@@ -367,6 +370,10 @@ export class WorldMapScene extends Phaser.Scene {
   /** Tracks chestIds already opened this session so we don't double-
    * fire the React event if a chest re-spawns on a re-mount. */
   private openedChestIds: Set<string> = new Set();
+  /** PRD § 9.1 — henchman entities spawned per stage. */
+  private henchmenByStage: Map<number, Henchman[]> = new Map();
+  /** Tracks henchman spawnIds already resolved this session. */
+  private resolvedHenchmanIds: Set<string> = new Set();
   private lastSuperBossDefeatStatus: "active" | "retreated" | "slain" | null =
     null;
   private lastEmitTime = 0;
@@ -1451,6 +1458,13 @@ export class WorldMapScene extends Phaser.Scene {
       // Server-side reward application happens via the
       // TREASURE_CHEST_OPENED React event below.
       this.spawnInterCheckpointChests(stageId);
+
+      // 4c. PRD § 9.1 — spawn inline henchmen on the path. 35% per
+      // segment, stage-thematic creature (Fog Wisp, Confusion Sprite,
+      // etc.). Tap to defeat for full XP, auto-flees after 11-14s for
+      // half XP. Server-side XP application happens via the
+      // HENCHMAN_DEFEATED / HENCHMAN_FLED React events.
+      this.spawnInterCheckpointHenchmen(stageId);
 
       // 5. Update the new mini-boss state if checkpoints have been loaded.
       // loadStage runs once per lazy-loaded stage on initial mount (3
@@ -7439,6 +7453,33 @@ export class WorldMapScene extends Phaser.Scene {
         });
       },
     );
+
+    // PRD § 9.1 — forward henchman defeat and flee events. Same
+    // dedupe pattern so a henchman re-spawned across a re-mount
+    // can't double-claim XP.
+    const onHenchmanResolved = (data: {
+      spawnId: string;
+      henchmanId: string;
+      xpAwarded: number;
+      template: string;
+      stage: number;
+    }, kind: "defeated" | "fled") => {
+      if (this.resolvedHenchmanIds.has(data.spawnId)) return;
+      this.resolvedHenchmanIds.add(data.spawnId);
+      eventBridge.dispatchToReact({
+        type: kind === "defeated" ? "HENCHMAN_DEFEATED" : "HENCHMAN_FLED",
+        spawnId: data.spawnId,
+        henchmanId: data.henchmanId,
+        xpAwarded: data.xpAwarded,
+        stage: data.stage,
+      });
+    };
+    this.events.on("henchman_defeated", (data: never) =>
+      onHenchmanResolved(data, "defeated"),
+    );
+    this.events.on("henchman_fled", (data: never) =>
+      onHenchmanResolved(data, "fled"),
+    );
   }
 
   /**
@@ -7679,6 +7720,51 @@ export class WorldMapScene extends Phaser.Scene {
     }
     if (chests.length > 0) {
       this.treasureChestsByStage.set(stageId, chests);
+    }
+  }
+
+  /**
+   * PRD § 9.1 — spawn small henchmen on the path between checkpoints.
+   * Each segment has a 35% chance of getting one. Stage-thematic
+   * creature pulled from HENCHMAN_DEFINITIONS. Position is offset
+   * BELOW the midpoint so it doesn't overlap with chests above.
+   */
+  private spawnInterCheckpointHenchmen(stageId: number): void {
+    const stage = this.activeStages.find((s) => s.id === stageId);
+    if (!stage) return;
+    const definition = getHenchmanForStage(
+      this.currentTemplateId as StageMonsterTemplate,
+      stageId,
+    );
+    if (!definition) return;
+    let globalIndex = 0;
+    for (let s = 0; s < stage.id - 1; s++) {
+      globalIndex += this.activeStages[s]?.checkpoints ?? 0;
+    }
+    const list: Henchman[] = [];
+    for (let i = 0; i < stage.checkpoints - 1; i++) {
+      if (!shouldSpawnHenchman()) continue;
+      const cpA = this.calculateSnakePosition(globalIndex + i, this.TOTAL_CHECKPOINTS);
+      const cpB = this.calculateSnakePosition(globalIndex + i + 1, this.TOTAL_CHECKPOINTS);
+      const midX = (cpA.x + cpB.x) / 2;
+      const midY = (cpA.y + cpB.y) / 2;
+      // Offset BELOW the path so chests (above) and henchmen (below)
+      // don't overlap. Random jitter to avoid uniform rows.
+      const spawnX = midX + (Math.random() - 0.5) * 32;
+      const spawnY = midY + 28 + Math.random() * 12;
+      const spawnId = `henchman_${stage.id}_${i}_${Date.now()}`;
+      const henchman = new Henchman(this, {
+        spawnId,
+        x: spawnX,
+        y: spawnY,
+        definition,
+      });
+      henchman.setDepth(15);
+      this.gameLayer.add(henchman);
+      list.push(henchman);
+    }
+    if (list.length > 0) {
+      this.henchmenByStage.set(stageId, list);
     }
   }
 

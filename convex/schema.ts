@@ -193,6 +193,21 @@ export default defineSchema({
     .index("by_created_at", ["createdAt"]),
 
   // Contribution requests table
+  // PRD § 9.1 — inline path henchman resolutions. One row per
+  // henchman defeated or fled, scoped per user for idempotency.
+  henchmanResolutions: defineTable({
+    userId: v.id("users"),
+    spawnId: v.string(),
+    henchmanId: v.string(),
+    ventureId: v.id("ventures"),
+    stage: v.number(),
+    resolution: v.union(v.literal("defeated"), v.literal("fled")),
+    xpAwarded: v.number(),
+    resolvedAt: v.number(),
+  })
+    .index("by_user_spawn", ["userId", "spawnId"])
+    .index("by_venture", ["ventureId"]),
+
   // PRD § 9.2 — inter-checkpoint treasure chest claims. One row per
   // chest opened, scoped per user so idempotency guarantees a chest
   // can only be claimed once even if the React event fires twice.

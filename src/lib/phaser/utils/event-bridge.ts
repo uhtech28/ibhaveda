@@ -311,6 +311,26 @@ export type PhaserToReactEvent =
         | "insight_fragment";
     }
   /**
+   * PRD § 9.1 — player tapped a henchman on the path. Full XP reward.
+   */
+  | {
+      type: "HENCHMAN_DEFEATED";
+      spawnId: string;
+      henchmanId: string;
+      xpAwarded: number;
+      stage: number;
+    }
+  /**
+   * PRD § 9.1 — henchman timed out and fled. Half XP reward.
+   */
+  | {
+      type: "HENCHMAN_FLED";
+      spawnId: string;
+      henchmanId: string;
+      xpAwarded: number;
+      stage: number;
+    }
+  /**
    * User tapped/clicked a checkpoint node on the world map.
    * React should open the relevant checkpoint modal.
    */
