@@ -163,6 +163,22 @@ export type ReactToPhaserEvent =
       monsterName?: string;
       variant: "standard" | "gold";
     }
+  /**
+   * Project completion cinematic (PRD § 5.5). Fired by React when the
+   * player clears the final stage of their venture.
+   *
+   * variant="perfect" → every final checkpoint was 3/3, monument
+   * transforms to gold + extra particle sweep + camera flash.
+   * variant="complete" → some stages were 2/3, solid stone monument.
+   */
+  | {
+      type: "PLAY_PROJECT_COMPLETE";
+      variant: "complete" | "perfect";
+      ventureName: string;
+      stagesCleared: number;
+      goldCheckpointsEarned?: number;
+      personaId?: string;
+    }
   /** Resume the Phaser game loop after a pause. */
   | { type: "GAME_RESUME" }
   /**

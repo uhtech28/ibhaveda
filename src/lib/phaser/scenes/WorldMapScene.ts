@@ -6,6 +6,7 @@ import { Persona, PersonaGender, PersonaId } from "../entities/Persona";
 import { getStageMonster } from "@/config/stageMonsters";
 import { StageEntryCinematic } from "../cinematics/StageEntryCinematic";
 import { StageClearBanner } from "../cinematics/StageClearBanner";
+import { ProjectCompleteCinematic } from "../cinematics/ProjectCompleteCinematic";
 import {
   ContributorCompanion,
   type ContributorData,
@@ -432,6 +433,13 @@ export class WorldMapScene extends Phaser.Scene {
       stageName: string;
       monsterName?: string;
       variant: "standard" | "gold";
+    }) => void;
+    playProjectComplete?: (event: {
+      variant: "complete" | "perfect";
+      ventureName: string;
+      stagesCleared: number;
+      goldCheckpointsEarned?: number;
+      personaId?: string;
     }) => void;
   };
 
@@ -7280,9 +7288,11 @@ export class WorldMapScene extends Phaser.Scene {
     // PRD §2 — mini-game state sync from React
     this.boundHandlers.minigameSyncState =
       this.receiveMiniGameSyncState.bind(this);
-    // PRD §§ 4, 5.4 — stage entry / clear cinematics
+    // PRD §§ 4, 5.4, 5.5 — stage entry / clear / project complete cinematics
     this.boundHandlers.playStageEntry = this.handlePlayStageEntry.bind(this);
     this.boundHandlers.playStageClear = this.handlePlayStageClear.bind(this);
+    this.boundHandlers.playProjectComplete =
+      this.handlePlayProjectComplete.bind(this);
 
     eventBridge.onPhaser(
       "UPDATE_BRIGHTNESS",
@@ -7340,6 +7350,10 @@ export class WorldMapScene extends Phaser.Scene {
     eventBridge.onPhaser(
       "PLAY_STAGE_CLEAR",
       this.boundHandlers.playStageClear,
+    );
+    eventBridge.onPhaser(
+      "PLAY_PROJECT_COMPLETE",
+      this.boundHandlers.playProjectComplete,
     );
 
     // Handle checkpoint clicks (emitted by CheckpointNode)
@@ -7491,6 +7505,28 @@ export class WorldMapScene extends Phaser.Scene {
       variant: event.variant,
     }).finally(() => {
       this.cinematicPlaying = false;
+    });
+  }
+
+  /**
+   * PRD § 5.5 — project complete cinematic. The apex moment: monument
+   * placement + persona engraving + venture stats. Perfect variant
+   * gets the gold transformation sweep.
+   */
+  private handlePlayProjectComplete(event: {
+    variant: "complete" | "perfect";
+    ventureName: string;
+    stagesCleared: number;
+    goldCheckpointsEarned?: number;
+    personaId?: string;
+  }): void {
+    if (this.cinematicPlaying) return;
+    this.cinematicPlaying = true;
+    const cinematic = new ProjectCompleteCinematic(this);
+    void cinematic.play(event).finally(() => {
+      // Note: we keep the cinematic on screen and let React dispatch a
+      // DISMISS event to close it. The flag stays true so subsequent
+      // stage cinematics don't fire on top.
     });
   }
 

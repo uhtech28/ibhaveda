@@ -84,6 +84,9 @@ export class Persona extends Phaser.GameObjects.Container {
 
   private sprite: Phaser.GameObjects.Sprite | null = null;
   private paintedIdleBob: Phaser.Tweens.Tween | null = null;
+  private paintedWalkBob: Phaser.Tweens.Tween | null = null;
+  private paintedWalkRock: Phaser.Tweens.Tween | null = null;
+  private paintedWalkSquash: Phaser.Tweens.Tween | null = null;
   private shadowEllipse: Phaser.GameObjects.Ellipse;
   private shadowTween: Phaser.Tweens.Tween | null = null;
   private walkTween: Phaser.Tweens.Tween | null = null;
@@ -612,10 +615,21 @@ export class Persona extends Phaser.GameObjects.Container {
     }
 
     if (this.sprite) {
-      const walkAnimKey =
-        this.gender === "male" ? "persona_male_walk" : "persona_female_walk";
-      this.playSpriteAnimation(walkAnimKey);
-      this.syncWalkAnimationSpeed(totalDistance, duration);
+      // Painted portraits have no walk-cycle frames. Apply procedural
+      // walk choreography: side-to-side rocking + slight squash so
+      // the character feels like it's actually moving rather than
+      // sliding. Legacy gender sprite sheets use their animation
+      // frames as before.
+      const portraitKey = `persona_${this.personaId}_portrait`;
+      const isPainted = this.sprite.texture.key === portraitKey;
+      if (isPainted) {
+        this.startPaintedWalkChoreography();
+      } else {
+        const walkAnimKey =
+          this.gender === "male" ? "persona_male_walk" : "persona_female_walk";
+        this.playSpriteAnimation(walkAnimKey);
+        this.syncWalkAnimationSpeed(totalDistance, duration);
+      }
     }
 
     this.shadowEllipse.setScale(1, 1);
@@ -707,6 +721,7 @@ export class Persona extends Phaser.GameObjects.Container {
     this.movementPace = "walk";
     this.currentAnimation = "idle";
     this.stopWalkTweens();
+    this.stopPaintedWalkChoreography();
     this.playIdle();
   }
 
@@ -718,6 +733,78 @@ export class Persona extends Phaser.GameObjects.Container {
     if (this.walkProgressTween) {
       this.walkProgressTween.stop();
       this.walkProgressTween = null;
+    }
+  }
+
+  /**
+   * Start procedural walk choreography on the painted portrait sprite.
+   * The painted sprites have no walk-cycle frames, so we animate the
+   * sprite transform itself: side-to-side angle sway + Y bob +
+   * gentle scale pulse. Looks like a stepping motion.
+   */
+  private startPaintedWalkChoreography(): void {
+    if (!this.sprite || !this.scene) return;
+    // Stop the gentle idle bob — walk choreography takes over.
+    if (this.paintedIdleBob) {
+      this.paintedIdleBob.stop();
+      this.paintedIdleBob = null;
+    }
+
+    const baseY = this.sprite.y;
+    // Y bob — more pronounced than idle, faster cadence
+    this.paintedWalkBob = this.scene.tweens.add({
+      targets: this.sprite,
+      y: baseY - 6,
+      duration: 280,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+    // Side-to-side rocking — small angle sway
+    this.paintedWalkRock = this.scene.tweens.add({
+      targets: this.sprite,
+      angle: { from: -3, to: 3 },
+      duration: 280,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+    // Subtle squash on each step — Y scale dips slightly when foot
+    // lands. Period is the same as bob so they sync.
+    this.paintedWalkSquash = this.scene.tweens.add({
+      targets: this.sprite,
+      scaleY: this.sprite.scaleY * 0.97,
+      duration: 280,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  private stopPaintedWalkChoreography(): void {
+    if (this.paintedWalkBob) {
+      this.paintedWalkBob.stop();
+      this.paintedWalkBob = null;
+    }
+    if (this.paintedWalkRock) {
+      this.paintedWalkRock.stop();
+      this.paintedWalkRock = null;
+    }
+    if (this.paintedWalkSquash) {
+      this.paintedWalkSquash.stop();
+      this.paintedWalkSquash = null;
+    }
+    // Reset angle so the sprite stands straight
+    if (this.sprite) {
+      this.sprite.setAngle(0);
+    }
+    // Restart the idle bob if we have a painted sprite mounted
+    const portraitKey = `persona_${this.personaId}_portrait`;
+    if (this.sprite && this.scene && this.sprite.texture.key === portraitKey) {
+      this.paintedIdleBob = SpriteAnimator.startIdleBob(this.scene, this.sprite, {
+        amplitude: 3,
+        duration: 2400,
+      });
     }
   }
 
