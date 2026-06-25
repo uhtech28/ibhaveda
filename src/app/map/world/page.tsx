@@ -34,6 +34,10 @@ import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { PersonaId } from "@/config/personas";
 import { getStageMonster } from "@/config/stageMonsters";
+import {
+  StageOverviewMinimap,
+  type StageOverviewStageState,
+} from "@/components/map/StageOverviewMinimap";
 import { isLiteMode } from "@/lib/phaser/performance-mode";
 import {
   buildCheckpointSyncSignature,
@@ -2087,6 +2091,55 @@ function MapPageInner() {
     tourStateForPulse,
   ]);
   const corruptionLevel = venture?.corruptionLevel ?? 0;
+
+  // PRD § 15.1 — derive per-stage tile state for the corner minimap.
+  // Counts completed (2/3 or better) checkpoints per stage, flags
+  // whether the FINAL checkpoint of each stage was 3/3 gold, marks
+  // the active stage, and locks any stage beyond active+1.
+  const stageOverviewStages = useMemo<StageOverviewStageState[]>(() => {
+    if (!templateStages || templateStages.length === 0) return [];
+    const finalsByStage = new Map<number, typeof checkpoints[number]>();
+    const completedCountsByStage = new Map<number, number>();
+    for (const cp of checkpoints) {
+      const stageMeta = templateStages[cp.stage - 1];
+      if (!stageMeta) continue;
+      const isCompleted =
+        (cp.t1Completed ? 1 : 0) +
+          (cp.t2Completed ? 1 : 0) +
+          (cp.t3Completed ? 1 : 0) >=
+        2;
+      if (isCompleted) {
+        completedCountsByStage.set(
+          cp.stage,
+          (completedCountsByStage.get(cp.stage) ?? 0) + 1,
+        );
+      }
+      if (cp.checkpoint === stageMeta.checkpoints) {
+        finalsByStage.set(cp.stage, cp);
+      }
+    }
+    return templateStages.map((meta, idx) => {
+      const stageNum = idx + 1;
+      const total = meta.checkpoints;
+      const done = completedCountsByStage.get(stageNum) ?? 0;
+      const completion = total > 0 ? Math.min(1, done / total) : 0;
+      const finalCp = finalsByStage.get(stageNum);
+      const isGold =
+        completion >= 1 &&
+        !!finalCp &&
+        finalCp.t1Completed &&
+        finalCp.t2Completed &&
+        finalCp.t3Completed;
+      return {
+        stage: stageNum,
+        name: meta.name,
+        completion,
+        isGold,
+        isActive: stageNum === activeStage,
+        isLocked: stageNum > activeStage,
+      };
+    });
+  }, [templateStages, checkpoints, activeStage]);
   const corruptionPhase = useMemo(() => {
     if (corruptionLevel >= 90) return "critical" as const;
     if (corruptionLevel >= 75) return "urgent" as const;
@@ -4304,6 +4357,19 @@ function MapPageInner() {
           )}
 
           <CrossingFlash trigger={flashTrigger} />
+
+          {/* PRD § 15.1 — stage overview minimap. Persistent corner
+              panel showing all stages with completion status, current
+              position highlighted, locked stages dimmed. Click jumps
+              the camera to the chosen stage. */}
+          <StageOverviewMinimap
+            template={(venture.templateId as
+              | "venture"
+              | "academic"
+              | "lab"
+              | "creative") ?? "venture"}
+            stages={stageOverviewStages}
+          />
 
           {/* Gap 3 fix: use the real LevelUpSequence component.
               Conditionally mount so the audio + RollingCounter hooks
