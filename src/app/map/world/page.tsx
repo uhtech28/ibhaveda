@@ -38,6 +38,7 @@ import {
   StageOverviewMinimap,
   type StageOverviewStageState,
 } from "@/components/map/StageOverviewMinimap";
+import { BossApproachWarning } from "@/components/map/BossApproachWarning";
 import { isLiteMode } from "@/lib/phaser/performance-mode";
 import {
   buildCheckpointSyncSignature,
@@ -2859,6 +2860,22 @@ function MapPageInner() {
     }
   }, [corruptionLevel, phaserReady]);
 
+  // PRD § 6.2 critical band — show a dramatic "THE BOSS APPROACHES"
+  // alert when corruption first crosses 90%. Auto-dismisses after 4s.
+  // Once per critical crossing per venture (resets at <80% for
+  // hysteresis so a player who claws back down can re-trigger it).
+  const [bossApproachVisible, setBossApproachVisible] = useState(false);
+  const lastBossApproachFiredRef = useRef<number>(-1);
+  useEffect(() => {
+    const last = lastBossApproachFiredRef.current;
+    if (corruptionLevel >= 90 && last < 90) {
+      setBossApproachVisible(true);
+      lastBossApproachFiredRef.current = 90;
+    } else if (corruptionLevel < 80 && last >= 90) {
+      lastBossApproachFiredRef.current = -1;
+    }
+  }, [corruptionLevel]);
+
   // PRD § 6 — fire persona boss_revealed line once when the super
   // boss progresses to "foreground" status (corruption at 100%
   // typically, or final-stage gate reached). Tracked via a ref so
@@ -4369,6 +4386,17 @@ function MapPageInner() {
               | "lab"
               | "creative") ?? "venture"}
             stages={stageOverviewStages}
+          />
+
+          {/* PRD § 6.2 critical band — boss approach screen alert.
+              Fires once per critical corruption crossing per venture
+              with 10% hysteresis at 80%. Auto-dismisses after 4s. */}
+          <BossApproachWarning
+            visible={bossApproachVisible}
+            bossName={
+              superBoss?.definition?.name ?? superBoss?.bossName ?? undefined
+            }
+            onDismiss={() => setBossApproachVisible(false)}
           />
 
           {/* Gap 3 fix: use the real LevelUpSequence component.
