@@ -7,6 +7,7 @@
  */
 
 import * as Phaser from "phaser";
+import { SpriteAnimator } from "../animations/SpriteAnimator";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exported types
@@ -82,6 +83,7 @@ export class Persona extends Phaser.GameObjects.Container {
   // ── Private state ─────────────────────────────────────────────────────────
 
   private sprite: Phaser.GameObjects.Sprite | null = null;
+  private paintedIdleBob: Phaser.Tweens.Tween | null = null;
   private shadowEllipse: Phaser.GameObjects.Ellipse;
   private shadowTween: Phaser.Tweens.Tween | null = null;
   private walkTween: Phaser.Tweens.Tween | null = null;
@@ -183,6 +185,10 @@ export class Persona extends Phaser.GameObjects.Container {
       const targetHeightPx = 144;
       const heightForScale = isSingleFigure ? naturalHeight : naturalHeight;
       this.sprite.setScale(targetHeightPx / heightForScale);
+      this.paintedIdleBob = SpriteAnimator.startIdleBob(scene, this.sprite, {
+        amplitude: 3,
+        duration: 2400,
+      });
     } else {
       this.sprite = new Phaser.GameObjects.Sprite(scene, 0, 0, fallbackKey, 0);
       this.sprite.setOrigin(0.5, 40 / 48);

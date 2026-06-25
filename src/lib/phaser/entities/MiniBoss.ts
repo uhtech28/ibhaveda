@@ -16,6 +16,7 @@
  */
 
 import * as Phaser from "phaser";
+import { SpriteAnimator } from "../animations/SpriteAnimator";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exported types
@@ -90,50 +91,105 @@ export class MiniBoss extends Phaser.GameObjects.Container {
    * @param scene  The Phaser Scene this mini-boss belongs to.
    * @param config Full mini-boss configuration including position and type.
    */
-  constructor(scene: Phaser.Scene, config: MiniBossConfig) {
+  /**
+   * Optional painted sprite ID — when present, the constructor uses
+   * `monster_<paintedSpriteId>` as the rendered visual instead of
+   * running the procedural draw switch. Set via the optional
+   * `paintedSpriteId` field on MiniBossConfig.
+   */
+  private paintedSprite: Phaser.GameObjects.Image | null = null;
+  private idleBobTween: Phaser.Tweens.Tween | null = null;
+
+  constructor(
+    scene: Phaser.Scene,
+    config: MiniBossConfig & { paintedSpriteId?: string },
+  ) {
     super(scene, config.x, config.y);
 
     this.bossId = config.bossId;
     this.bossType = config.bossType;
     this.stage = config.stage;
 
-    // ── Boss graphics ───────────────────────────────────────────────────────
+    // ── Boss graphics (procedural fallback layer — always created
+    //    so existing weakness/eye/crack methods continue to work) ─
     this.bossGraphics = scene.add.graphics();
 
     // ── Cracks/damage overlay ───────────────────────────────────────────────
     this.cracksGraphics = scene.add.graphics();
     this.cracksGraphics.setAlpha(0);
 
-    // Draw type-specific boss visuals
-    switch (this.bossType) {
-      case "Fog of Vagueness":
-        this.drawFogOfVagueness();
-        break;
-      case "Pathwarden Wraith":
-        this.drawPathwardenWraith();
-        break;
-      case "Advocate of Comfortable Lies":
-        this.drawAdvocateOfComfortableLies();
-        break;
-      case "Unfinished Golem":
-        this.drawUnfinishedGolem();
-        break;
-      case "Collapse Specter":
-        this.drawCollapseSpecter();
-        break;
-      case "Harbourmaster of Hesitation":
-        this.drawHarbourmasterOfHesitation();
-        break;
-      case "Babel Merchant":
-        this.drawBabelMerchant();
-        break;
-      case "Iron Bureaucrat":
-        this.drawIronBureaucrat();
-        break;
-      default:
-        // Generic boss visual for other types
-        this.drawGenericBoss();
-        break;
+    // ── DESIGNER-PAINTED SPRITE SHORT-CIRCUIT ───────────────────────────────
+    // When a painted sprite asset for this monster has been loaded
+    // (see STAGE_MONSTER_DEFINITIONS + asset-loader), use it as the
+    // rendered visual. The procedural draw method only runs as a
+    // fallback for monsters whose painted PNG is missing.
+    const paintedKey = config.paintedSpriteId
+      ? `monster_${config.paintedSpriteId}`
+      : null;
+    const hasPainted = !!paintedKey && scene.textures.exists(paintedKey);
+
+    if (hasPainted && paintedKey) {
+      // Painted reference sheets are typically 4-direction strips —
+      // we crop to the front-facing frame and scale to roughly match
+      // the procedural footprint (~120px tall for a stage monster).
+      this.paintedSprite = scene.add.image(0, 0, paintedKey);
+      const tex = scene.textures.get(paintedKey).getSourceImage() as HTMLImageElement;
+      const naturalWidth = tex?.width ?? 1024;
+      const naturalHeight = tex?.height ?? 1024;
+      const isSingleFigure = naturalWidth <= naturalHeight;
+      if (!isSingleFigure) {
+        // 4 frames horizontal — keep just the leftmost frame
+        const frameWidth = naturalWidth / 4;
+        this.paintedSprite.setCrop(0, 0, frameWidth, naturalHeight);
+        this.paintedSprite.setOrigin(frameWidth / 2 / naturalWidth, 0.95);
+      } else {
+        this.paintedSprite.setOrigin(0.5, 0.95);
+      }
+      const targetHeight = 160;
+      this.paintedSprite.setScale(targetHeight / naturalHeight);
+      this.add(this.paintedSprite);
+      // Don't run the procedural draw switch — the sprite IS the
+      // visual. Damage tinting + crack overlay still apply on top.
+
+      // Start a gentle idle bob so painted monsters feel alive even
+      // when they're standing still. SpriteAnimator handles the
+      // sin-wave Y oscillation; the bob is staggered with a random
+      // delay so multiple monsters on screen don't bob in sync.
+      this.idleBobTween = SpriteAnimator.startIdleBob(scene, this.paintedSprite, {
+        amplitude: 5,
+        duration: 2600,
+      });
+    } else {
+      // Procedural fallback — same dispatch as before
+      switch (this.bossType) {
+        case "Fog of Vagueness":
+          this.drawFogOfVagueness();
+          break;
+        case "Pathwarden Wraith":
+          this.drawPathwardenWraith();
+          break;
+        case "Advocate of Comfortable Lies":
+          this.drawAdvocateOfComfortableLies();
+          break;
+        case "Unfinished Golem":
+          this.drawUnfinishedGolem();
+          break;
+        case "Collapse Specter":
+          this.drawCollapseSpecter();
+          break;
+        case "Harbourmaster of Hesitation":
+          this.drawHarbourmasterOfHesitation();
+          break;
+        case "Babel Merchant":
+          this.drawBabelMerchant();
+          break;
+        case "Iron Bureaucrat":
+          this.drawIronBureaucrat();
+          break;
+        default:
+          this.drawGenericBoss();
+          break;
+      }
     }
 
     // ── Nameplate Capsule Badge (Modern premium glassmorphism) ─────────────
@@ -221,8 +277,21 @@ export class MiniBoss extends Phaser.GameObjects.Container {
   weaken(checkpointsComplete: number, totalCheckpoints: number): void {
     if (totalCheckpoints === 0) return;
 
+    const prevWeakness = this.currentWeakness;
     const weakness = checkpointsComplete / totalCheckpoints;
     this.currentWeakness = Phaser.Math.Clamp(weakness, 0, 1);
+
+    // If weakness increased (player just landed a checkpoint hit),
+    // play a damage flash on the painted sprite for instant feedback.
+    // Procedural-only monsters skip this — their crack overlay below
+    // provides the same role.
+    if (this.currentWeakness > prevWeakness && this.paintedSprite) {
+      void SpriteAnimator.damageFlash(this.scene, this.paintedSprite, {
+        color: 0xff4040,
+        shake: 5,
+        duration: 320,
+      });
+    }
 
     if (
       this.bossType === "Fog of Vagueness" ||
@@ -278,6 +347,24 @@ export class MiniBoss extends Phaser.GameObjects.Container {
       console.warn("[MiniBoss] Cannot slay - scene or tweens not available");
       this.destroy();
       return;
+    }
+
+    // Stop the idle bob so the slay animation can take over.
+    if (this.idleBobTween) {
+      this.idleBobTween.stop();
+      this.idleBobTween = null;
+    }
+
+    // If we have a painted sprite, run the cinematic slay sequence
+    // on top of (not instead of) the procedural slay logic below.
+    // The painted sprite spins + golden particle burst + fades.
+    if (this.paintedSprite) {
+      void SpriteAnimator.slay(this.scene, this.paintedSprite, {
+        rotation: Math.PI / 3,
+        particleCount: 28,
+        particleColor: 0xffd700,
+        duration: 1100,
+      });
     }
 
     // Stop any ongoing tweens
@@ -533,6 +620,23 @@ export class MiniBoss extends Phaser.GameObjects.Container {
   retreat(): void {
     if (!this.scene || !this.scene.tweens) return;
     this.isRetreated = true;
+
+    // Stop the idle bob — the retreat drift takes over the sprite's
+    // position tween chain.
+    if (this.idleBobTween) {
+      this.idleBobTween.stop();
+      this.idleBobTween = null;
+    }
+
+    // Painted sprite drifts off and fades. Drift direction is back
+    // toward the stage edge (opposite of player travel).
+    if (this.paintedSprite) {
+      void SpriteAnimator.retreat(this.scene, this.paintedSprite, {
+        driftX: 60,
+        driftY: -20,
+        duration: 900,
+      });
+    }
 
     this.scene.tweens.killTweensOf([
       this,

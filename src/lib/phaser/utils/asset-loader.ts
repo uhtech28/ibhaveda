@@ -1212,6 +1212,42 @@ export class AssetLoader {
       "persona_healer_portrait",
       "persona_pathfinder_portrait",
       "persona_sage_portrait",
+      // 27 stage monsters across all 4 templates. Missing files
+      // fall back to MiniBoss.ts's procedural draw method for that
+      // bossType.
+      "monster_venture-s1-fog",
+      "monster_venture-s2-pathwarden",
+      "monster_venture-s3-advocate",
+      "monster_venture-s4-golem",
+      "monster_venture-s5-specter",
+      "monster_venture-s6-harbourmaster",
+      "monster_venture-s7-merchant",
+      "monster_venture-s8-bureaucrat",
+      "monster_academic-s1-librarian",
+      "monster_academic-s2-keeper",
+      "monster_academic-s3-cartographer",
+      "monster_academic-s4-blank-page-wraith",
+      "monster_academic-s5-councillor",
+      "monster_academic-s6-gatekeeper",
+      "monster_lab-s1-mirage-lens",
+      "monster_lab-s2-librarian",
+      "monster_lab-s3-cartographer",
+      "monster_lab-s4-saboteur",
+      "monster_lab-s5-alchemist-wraith",
+      "monster_lab-s6-merchant",
+      "monster_lab-s7-silencer",
+      "monster_creative-s1-silence",
+      "monster_creative-s2-curator",
+      "monster_creative-s3-beast",
+      "monster_creative-s4-crowd",
+      "monster_creative-s5-perfectionist",
+      "monster_creative-s6-harbourmaster",
+      // 12 super-boss sprites (PRD § 6.3). Missing files fall back
+      // to procedural drawSilhouette in BossSilhouette.
+      "boss_unraveller", "boss_pale-architect", "boss_hollow-king",
+      "boss_thornwarden", "boss_mirror-witch", "boss_ashen-drake",
+      "boss_tide-caller", "boss_gravemind", "boss_rusted-oracle",
+      "boss_wraith-council", "boss_stonecaller", "boss_veilwalker",
     ]);
 
     const onLoadError = (file: { key: string }) => {
@@ -1264,6 +1300,48 @@ export class AssetLoader {
     scene.load.image("persona_healer_portrait",     `${personaPath}/healer.png`);
     scene.load.image("persona_pathfinder_portrait", `${personaPath}/pathfinder.png`);
     scene.load.image("persona_sage_portrait",       `${personaPath}/sage.png`);
+
+    // Stage monsters (PRD Monsters & Mechanics, 27 monsters total
+    // across all 4 templates). Each id matches
+    // monsterTextureKey() in src/config/stageMonsters.ts. Files
+    // that don't exist on disk silently fall back to the existing
+    // procedural draw method in MiniBoss.ts.
+    const monsterIds = [
+      // Venture (8)
+      "venture-s1-fog", "venture-s2-pathwarden", "venture-s3-advocate",
+      "venture-s4-golem", "venture-s5-specter", "venture-s6-harbourmaster",
+      "venture-s7-merchant", "venture-s8-bureaucrat",
+      // Academic (6)
+      "academic-s1-librarian", "academic-s2-keeper", "academic-s3-cartographer",
+      "academic-s4-blank-page-wraith", "academic-s5-councillor",
+      "academic-s6-gatekeeper",
+      // Lab (7)
+      "lab-s1-mirage-lens", "lab-s2-librarian", "lab-s3-cartographer",
+      "lab-s4-saboteur", "lab-s5-alchemist-wraith", "lab-s6-merchant",
+      "lab-s7-silencer",
+      // Creative (6)
+      "creative-s1-silence", "creative-s2-curator", "creative-s3-beast",
+      "creative-s4-crowd", "creative-s5-perfectionist",
+      "creative-s6-harbourmaster",
+    ];
+    for (const id of monsterIds) {
+      const template = id.split("-")[0];
+      scene.load.image(`monster_${id}`, `/assets/monsters/${template}/${id.substring(template.length + 1)}.png`);
+    }
+
+    // 12 painted super-boss sprites (PRD § 6.3). Each venture is
+    // randomly assigned one of these as its super boss. The sprite
+    // is rendered by BossSilhouette in progressively reveal states
+    // tied to corruption %. Missing files fall back to the existing
+    // procedural drawSilhouette method.
+    const bossIds = [
+      "unraveller", "pale-architect", "hollow-king", "thornwarden",
+      "mirror-witch", "ashen-drake", "tide-caller", "gravemind",
+      "rusted-oracle", "wraith-council", "stonecaller", "veilwalker",
+    ];
+    for (const id of bossIds) {
+      scene.load.image(`boss_${id}`, `/assets/bosses/${id}.png`);
+    }
 
     scene.load.spritesheet(
       "persona_male_idle_sheet",

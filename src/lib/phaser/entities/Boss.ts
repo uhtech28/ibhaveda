@@ -83,6 +83,10 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
   private namePlate: Phaser.GameObjects.Text;
   private corruptionLevel: number = 0;
   private currentWeakness: number = 0;
+  /** Designer-painted boss sprite, when its texture is loaded. */
+  private paintedSprite: Phaser.GameObjects.Image | null = null;
+  /** Tween that pulses the boss aura when corruption climbs. */
+  private revealTween: Phaser.Tweens.Tween | null = null;
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
@@ -100,7 +104,38 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
     // ── Aura graphics (behind the silhouette) ───────────────────────────────
     this.auraGraphics = scene.add.graphics();
 
+    // ── DESIGNER-PAINTED BOSS SHORT-CIRCUIT ─────────────────────────────────
+    // PRD § 6.3 — 12 super-boss sprites. When the painted asset is
+    // loaded we render add.image with progressive tint and alpha
+    // tied to the corruption-driven status ("silhouette" → dark and
+    // faint, "present" → tinted, "foreground" → full color +
+    // manifestation). The procedural silhouette is still created as
+    // a fallback layer behind the painted sprite, then hidden if the
+    // painted version succeeds.
+    const paintedKey = `boss_${config.bossId}`;
+    const hasPainted = scene.textures.exists(paintedKey);
+    if (hasPainted) {
+      this.paintedSprite = scene.add.image(0, 0, paintedKey);
+      const tex = scene.textures.get(paintedKey).getSourceImage() as HTMLImageElement;
+      const naturalWidth = tex?.width ?? 1024;
+      const naturalHeight = tex?.height ?? 1024;
+      const isSingleFigure = naturalWidth <= naturalHeight;
+      if (!isSingleFigure) {
+        const frameWidth = naturalWidth / 4;
+        this.paintedSprite.setCrop(0, 0, frameWidth, naturalHeight);
+        this.paintedSprite.setOrigin(frameWidth / 2 / naturalWidth, 0.5);
+      } else {
+        this.paintedSprite.setOrigin(0.5, 0.5);
+      }
+      // Super bosses are imposing — larger than stage monsters.
+      const targetHeight = 280;
+      this.paintedSprite.setScale(targetHeight / naturalHeight);
+      this.paintedSprite.setAlpha(0); // updateStatus sets the real alpha
+    }
+
     // ── Silhouette graphics ─────────────────────────────────────────────────
+    // Always created, even when painted exists — it serves as the
+    // dark silhouette underlay in low-corruption states.
     this.silhouetteGraphics = this.drawSilhouette(scene);
 
     // ── Cracks/damage overlay ───────────────────────────────────────────────
@@ -120,7 +155,25 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
     this.namePlate.setOrigin(0.5, 0);
 
     // ── Assemble container ──────────────────────────────────────────────────
-    this.add([this.auraGraphics, this.silhouetteGraphics, this.cracksGraphics, this.namePlate]);
+    // Order matters for layering: aura behind silhouette, painted
+    // sprite on top of silhouette (so the dark shape sits behind the
+    // detail art), cracks overlaid on both, nameplate on top.
+    if (this.paintedSprite) {
+      this.add([
+        this.auraGraphics,
+        this.silhouetteGraphics,
+        this.paintedSprite,
+        this.cracksGraphics,
+        this.namePlate,
+      ]);
+    } else {
+      this.add([
+        this.auraGraphics,
+        this.silhouetteGraphics,
+        this.cracksGraphics,
+        this.namePlate,
+      ]);
+    }
 
     // Register with scene
     scene.add.existing(this);
@@ -161,6 +214,43 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
       });
     } else {
       this.setAlpha(targetAlpha);
+    }
+
+    // Painted-sprite progressive reveal — silhouette → present →
+    // foreground. We keep the dark procedural silhouette behind the
+    // painted sprite and only fade in the painted sprite from
+    // "present" onwards. At "foreground" we punctuate with a camera
+    // boom (shake + flash) to mark the boss's full manifestation.
+    if (this.paintedSprite) {
+      const paintedTarget =
+        status === "silhouette" ? 0 :
+        status === "present" ? 0.7 :
+        1.0;
+      // Tint stays dark at silhouette/present so it reads as a
+      // looming shadow; cleared at foreground for full color.
+      if (status === "foreground") {
+        this.paintedSprite.clearTint();
+      } else {
+        this.paintedSprite.setTint(0x101020);
+      }
+      if (smooth) {
+        this.scene.tweens.add({
+          targets: this.paintedSprite,
+          alpha: paintedTarget,
+          duration: 900,
+          ease: "Sine.easeInOut",
+        });
+      } else {
+        this.paintedSprite.setAlpha(paintedTarget);
+      }
+      if (status === "foreground") {
+        // Cinematic boss arrival — screen shake + brief flash.
+        // Bounded so we don't double-trigger when the same status
+        // event arrives multiple times in rapid succession.
+        const cam = this.scene.cameras.main;
+        cam.shake(420, 0.014);
+        cam.flash(220, 220, 60, 60, false);
+      }
     }
 
     if (status === "foreground" && this.config.bossName) {

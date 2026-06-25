@@ -3,6 +3,7 @@ import { AssetLoader } from "../utils/asset-loader";
 import { isLiteMode, setVentureAdvanced } from "../performance-mode";
 import { CheckpointNode, CheckpointStatus } from "../entities/Checkpoint";
 import { Persona, PersonaGender, PersonaId } from "../entities/Persona";
+import { getStageMonster } from "@/config/stageMonsters";
 import {
   ContributorCompanion,
   type ContributorData,
@@ -1259,12 +1260,25 @@ export class WorldMapScene extends Phaser.Scene {
     const offsetX = 100;
     const offsetY = -120;
 
+    // PRD Monsters & Mechanics — look up the painted sprite for the
+    // current template + stage. When present, MiniBoss will render
+    // the painted PNG instead of running its procedural draw method.
+    // Templates without painted assets (or stages where the artist
+    // hasn't delivered yet) silently fall back to the procedural
+    // rendering. See src/config/stageMonsters.ts for the registry.
+    const monsterDef = getStageMonster(
+      this.currentTemplateId as
+        | "venture" | "academic" | "lab" | "creative",
+      stage.id,
+    );
+
     const miniBoss = new MiniBoss(this, {
       bossId: `mini_boss_${stage.id}`,
       bossType: (stage.monsterName || "Fog of Vagueness") as MiniBossType,
       stage: stage.id,
       x: pos.x + offsetX,
       y: pos.y + offsetY,
+      paintedSpriteId: monsterDef?.id,
     });
 
     this.miniBosses.set(stage.id, miniBoss);
