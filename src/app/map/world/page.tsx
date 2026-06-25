@@ -33,6 +33,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import type { PersonaId } from "@/config/personas";
+import { getStageMonster } from "@/config/stageMonsters";
 import { isLiteMode } from "@/lib/phaser/performance-mode";
 import {
   buildCheckpointSyncSignature,
@@ -3576,6 +3577,42 @@ function MapPageInner() {
             nextStageName: nextStageMeta?.name,
             nextBiome: nextStageMeta?.biome,
           });
+
+          // PRD § 5.4 — fire the Phaser-side stage clear banner so
+          // the game world reacts immediately, then the React
+          // StageClearModal overlays the celebration. Banner runs in
+          // parallel with the React modal's intro fade — they
+          // complement rather than compete.
+          const clearedMonster = getStageMonster(
+            (venture.templateId as "venture" | "academic" | "lab" | "creative") ?? "venture",
+            cp.stage,
+          );
+          eventBridge.dispatchToPhaser({
+            type: "PLAY_STAGE_CLEAR",
+            stageNumber: cp.stage,
+            stageName: stageNames[cp.stage - 1] || "Stage",
+            monsterName: clearedMonster?.name,
+            variant: isGold ? "gold" : "standard",
+          });
+
+          // PRD § 4 — fire the stage entry cinematic for the NEXT
+          // stage on a small delay so the clear banner finishes its
+          // intro before the entry letterbox bars start.
+          if (nextStageMeta) {
+            const nextMonster = getStageMonster(
+              (venture.templateId as "venture" | "academic" | "lab" | "creative") ?? "venture",
+              cp.stage + 1,
+            );
+            window.setTimeout(() => {
+              eventBridge.dispatchToPhaser({
+                type: "PLAY_STAGE_ENTRY",
+                stageNumber: cp.stage + 1,
+                stageName: nextStageMeta.name,
+                monsterName: nextMonster?.name,
+                tagline: nextMonster?.description,
+              });
+            }, 2400);
+          }
         }
 
         const stageBadgeRarity: BadgePayload["rarity"] =

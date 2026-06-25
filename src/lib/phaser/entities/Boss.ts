@@ -10,6 +10,10 @@
  */
 
 import * as Phaser from "phaser";
+import {
+  BossDefeatChoreographer,
+  type BossSlug,
+} from "../cinematics/BossDefeatChoreographer";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exported types
@@ -552,6 +556,20 @@ export class BossSilhouette extends Phaser.GameObjects.Container {
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.killTweensOf(this.silhouetteGraphics);
     this.scene.tweens.killTweensOf(this.namePlate);
+
+    // PRD § 6.3 — when a painted boss sprite is loaded, run the
+    // boss-specific defeat cinematic (Pale Architect shatters,
+    // Mirror Witch reflects, Ashen Drake turns to gold dust...). The
+    // procedural per-bossId switch-case below still runs in parallel
+    // as a back-up visual layer.
+    if (this.paintedSprite) {
+      void BossDefeatChoreographer.play(this.bossId as BossSlug, {
+        scene: this.scene,
+        sprite: this.paintedSprite,
+        container: this,
+        silhouette: this.silhouetteGraphics,
+      });
+    }
 
     // Nameplate always fades first
     this.scene.tweens.add({
