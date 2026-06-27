@@ -20,7 +20,9 @@ interface Props {
     _id: Id<"flares">;
     description: string;
     createdAt: number;
-    status: "open" | "resolved";
+    expiresAt?: number;
+    expertiseTag?: string;
+    status: "open" | "resolved" | "closed" | "expired";
     owner: {
       _id: Id<"users">;
       displayName: string;
@@ -30,6 +32,22 @@ interface Props {
   };
   isOwn?: boolean;
   onClick: () => void;
+}
+
+/**
+ * Format the days-left countdown for a flare. Returns a short string
+ * the card pills can display. Empty string if no expiry data.
+ */
+function formatDaysLeft(expiresAt?: number): string {
+  if (!expiresAt) return "";
+  const ms = expiresAt - Date.now();
+  if (ms <= 0) return "Expired";
+  const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+  if (days >= 1) return `${days}d left`;
+  const hours = Math.floor(ms / (60 * 60 * 1000));
+  if (hours >= 1) return `${hours}h left`;
+  const mins = Math.max(1, Math.floor(ms / (60 * 1000)));
+  return `${mins}m left`;
 }
 
 export function FlareCard({ flare, isOwn, onClick }: Props) {
@@ -62,19 +80,33 @@ export function FlareCard({ flare, isOwn, onClick }: Props) {
         <StatusPill status={flare.status} />
       </div>
 
+      {/* Expertise tag pill — visible when the asker tagged a field. */}
+      {flare.expertiseTag && (
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-sky-300">
+          Needs: {flare.expertiseTag}
+        </span>
+      )}
+
       <p className="line-clamp-2 text-sm leading-relaxed text-white/80">
         {flare.description}
       </p>
 
       <div className="flex items-center justify-between border-t border-white/5 pt-3">
-        <span className="inline-flex items-center gap-1.5 text-xs text-white/50">
-          <MessageSquare className="h-3.5 w-3.5" />
-          {flare.responseCount === 0
-            ? "No responses yet"
-            : flare.responseCount === 1
-            ? "1 response"
-            : `${flare.responseCount} responses`}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-xs text-white/50">
+            <MessageSquare className="h-3.5 w-3.5" />
+            {flare.responseCount === 0
+              ? "No responses yet"
+              : flare.responseCount === 1
+                ? "1 response"
+                : `${flare.responseCount} responses`}
+          </span>
+          {flare.expiresAt && flare.status === "open" && (
+            <span className="text-xs font-mono text-white/40">
+              · {formatDaysLeft(flare.expiresAt)}
+            </span>
+          )}
+        </div>
         <span className="text-xs text-amber-300/70 opacity-0 transition group-hover:opacity-100">
           View →
         </span>
@@ -83,12 +115,30 @@ export function FlareCard({ flare, isOwn, onClick }: Props) {
   );
 }
 
-function StatusPill({ status }: { status: "open" | "resolved" }) {
+function StatusPill({
+  status,
+}: {
+  status: "open" | "resolved" | "closed" | "expired";
+}) {
   if (status === "open") {
     return (
       <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-300">
         <Radio className="h-2.5 w-2.5" />
         Open
+      </span>
+    );
+  }
+  if (status === "expired") {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/40">
+        Expired
+      </span>
+    );
+  }
+  if (status === "closed") {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/40">
+        Closed
       </span>
     );
   }

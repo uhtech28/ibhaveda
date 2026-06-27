@@ -728,17 +728,27 @@ export default defineSchema({
     ventureId: v.optional(v.id("ventures")),
     checkpointId: v.optional(v.id("ventureCheckpoints")),
     description: v.string(), // What they need help with
+    // Free-text expertise tag — what field/skill the helper should
+    // have (e.g. "marketing", "react", "fundraising"). Optional so
+    // legacy flares fired before this column existed don't break.
+    expertiseTag: v.optional(v.string()),
     status: v.union(
       v.literal("open"),
       v.literal("resolved"),
       v.literal("closed"),
+      v.literal("expired"),
     ),
     createdAt: v.number(),
+    // Auto-expiry timestamp — set to createdAt + 7 days when fired.
+    // A daily cron moves status="open" flares with expiresAt < now
+    // to status="expired" so the feed stays clean.
+    expiresAt: v.optional(v.number()),
     resolvedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
     .index("by_status_created", ["status", "createdAt"])
+    .index("by_status_expires", ["status", "expiresAt"])
     .index("by_venture", ["ventureId"]),
 
   // Flare responses — community responses to flares

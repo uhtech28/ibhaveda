@@ -234,6 +234,25 @@ export function IdeaForgeExperience({
     setShowIdeaWizard(true);
   };
 
+  // After profile-setup the user is routed to /feed?openCompose=1.
+  // Auto-open the compose wizard on that landing so the new user
+  // doesn't get stuck on the feed wondering what to do next.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("openCompose") === "1") {
+      setWizardDraft(undefined);
+      setWizardTutorialMode(true);
+      setShowIdeaWizard(true);
+      // Strip the param from the URL so a refresh doesn't re-open.
+      params.delete("openCompose");
+      const next =
+        window.location.pathname +
+        (params.toString() ? `?${params.toString()}` : "");
+      window.history.replaceState(null, "", next);
+    }
+  }, []);
+
   const openComposerWithDraft = (draft?: Partial<ComposerDraft>) => {
     setWizardDraft(draft);
     setShowIdeaWizard(true);

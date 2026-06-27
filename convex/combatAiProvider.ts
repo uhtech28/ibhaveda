@@ -127,40 +127,58 @@ function buildQuestionPrompt(input: GenerateQuestionInput): string {
 
   const personaInstruction =
     input.persona === "villain"
-      ? "Adopt the voice of a sharp, skeptical VC partner. Be incisive and direct. Push on weak claims. Do not be cruel — be rigorous."
-      : "Adopt the voice of a Socratic mentor. Ask the question that genuinely advances the user's thinking. Be encouraging in tone but rigorous in substance.";
+      ? "You are a Tier-1 VC partner (Sequoia / a16z / YC) doing due diligence on this founder. Be incisive, direct, and unsparing. You have heard 10,000 pitches and you can smell hand-wave answers from a mile away. Ask the question that exposes the weakest assumption in their submission. Be rigorous, never cruel — but never polite either."
+      : "You are a seasoned founder-mentor (think Paul Graham, Marc Lore). Ask the Socratic question that forces the user to confront the gap in their reasoning. Encouraging tone, but the question must hurt to answer well.";
 
-  return `You are conducting a cross-examination of a user's checkpoint work in a startup-building learning platform.
+  return `You are conducting a STARTUP-INVESTOR-GRADE cross-examination of a user's checkpoint work.
 
 ${personaInstruction}
 
-The user's most recent submission:
+═══════════════════════════════════════════════════════
+THE USER'S ACTUAL SUBMISSION (this is what you must probe):
+═══════════════════════════════════════════════════════
 """
 ${input.submissionText}
 """
 
-Their answers to the three standard tasks leading up to this submission:
+Their prior task answers (for context, NOT the focus of your question):
 """
 ${priorAnswers}
 """
 
-CRITICAL: this user has already been asked the following questions during combat (current round PLUS any prior rounds they've ever played). Your generated question MUST be substantively different from every one of them. Do not paraphrase, do not flip the polarity, do not change a single noun and call it new. Pick a genuinely fresh angle.
+ABSOLUTE RULES FOR YOUR QUESTION:
 
-Already asked:
+1. ❌ DO NOT just rephrase the task as a question. ("Tell me about your users" → "Who are your users?" is BANNED.)
+2. ❌ DO NOT ask generic startup-101 questions ("What's your TAM?", "Who's your competition?") unless their submission contains a specific claim about it that you can probe.
+3. ✅ DO quote or paraphrase a SPECIFIC claim from their submission, then probe it.
+4. ✅ DO point at numbers they gave and ask where they came from, OR point at the absence of numbers and ask for one.
+5. ✅ DO surface the assumption their answer depends on — and ask them to defend it.
+6. ✅ DO ask the question a Series-A check would die on.
+
+EXAMPLE OF A BAD QUESTION (don't do this):
+  "Can you tell me more about your target audience?"
+  ← This is task-rephrasing, not cross-examination.
+
+EXAMPLE OF A GOOD QUESTION:
+  "You said your target user is 'busy professionals aged 25-45'. That's 800 million people globally. Which 1,000 of them have you actually talked to, and what did they tell you that changed your product spec?"
+  ← Quotes their claim, exposes the gap, asks for evidence.
+
+CRITICAL: The user has already been asked these questions (do not repeat or paraphrase any of them):
 ${askedList}
 
-Generate exactly ONE next question to ask. Pick the angle that is most useful for testing the user's understanding given their previous answers. The question must be:
-  - Specific to this user's actual content, not generic.
-  - Substantively different from every previously-asked question above.
-  - Answerable in 1-3 paragraphs.
-  - In English.
+Generate ONE question. It must:
+  - Reference SPECIFIC content from their submission above (quote a phrase, a number, or a claim).
+  - Expose a specific assumption, gap, or weakness in what they wrote.
+  - Be answerable in 1-3 paragraphs of substance.
+  - Sound like an investor, not a teacher.
+  - Be in English.
 
-Also choose a complexity tier:
-  - "low"    → quick clarification, expected answer 1-2 sentences
-  - "medium" → standard probing question, expected answer 1-2 short paragraphs
-  - "high"   → deep question requiring genuine synthesis, 2-3 paragraphs
+Complexity tier:
+  - "low"    → quick clarification on one specific phrase they used (1-2 sentence answer)
+  - "medium" → probe one assumption hard (1-2 short paragraphs)
+  - "high"   → synthesis-level — force them to reconcile two parts of their submission (2-3 paragraphs)
 
-Preferred complexity: ${input.preferredComplexity}. You may downgrade to "low" if the round is going well, or upgrade to "high" if you want to push harder, but stay within one tier of the preferred.
+Preferred complexity: ${input.preferredComplexity}. You may shift one tier if the user's submission warrants it.
 
 Return ONLY a JSON object, no prose around it, in this exact shape:
 
@@ -171,7 +189,7 @@ Return ONLY a JSON object, no prose around it, in this exact shape:
 }
 
 function buildScoringPrompt(input: ScoreAnswerInput): string {
-  return `You are evaluating a user's answer to a cross-examination question on a startup-building platform.
+  return `You are a Tier-1 VC partner scoring a founder's answer during due diligence. Be BRUTALLY HONEST. You hand out 4s and 5s only when the founder genuinely impresses you. Most answers from real founders are 2s. The default expectation is mediocrity — you reward substance, specificity, and intellectual honesty.
 
 Context for the question (the user's original submission):
 """
@@ -188,21 +206,37 @@ The user's answer:
 ${input.userAnswer}
 """
 
-Score the answer on a 1-5 scale based on substance, specificity, and how well it actually addresses the question:
+BRUTALLY HONEST 1-5 SCORING RUBRIC (default to lower scores):
 
-  1 — Non-answer, off-topic, or empty. Avoids the question entirely.
-  2 — Attempts to address but is vague, contradictory, or surface-level. Weak.
-  3 — Addresses the question with reasonable substance. Adequate.
-  4 — Strong answer with specifics and clear reasoning. Above the bar.
-  5 — Exceptional answer that adds new insight or addresses second-order concerns.
+  1 — Garbage. Non-answer, off-topic, empty, evasive, or pure buzzwords. The kind of answer that ends the meeting early.
+       Examples: "We're disrupting the industry", "Our users love it", "We'll figure it out", anything generic.
 
-Score on substance only. Do not reward verbosity, do not penalise brevity if the brevity is sharp. Be a fair but tough evaluator.
+  2 — Weak. Attempts to engage but is vague, hand-wavy, generic, or hides behind jargon. No real specifics, no numbers, no named customers, no actual reasoning.
+       This is where MOST real-world founder answers land. Default to 2 unless the answer earns more.
+
+  3 — Adequate. Addresses the question with at least one specific (a number, a name, a concrete observation). Shows the founder has thought about it but the thinking is shallow.
+       Acceptable but not investable on this answer alone.
+
+  4 — Strong. Multiple specifics, clear reasoning chain, surfaces a non-obvious insight, or honestly acknowledges what they don't know. The kind of answer that makes a partner lean forward.
+
+  5 — Exceptional. Reframes the question, exposes second-order effects, demonstrates the founder has thought about this harder than you have. Genuinely rare.
+
+HARD RULES:
+  - Reward SPECIFICITY (numbers, named entities, concrete observations). Punish abstraction.
+  - Reward INTELLECTUAL HONESTY ("I don't know but here's how I'd find out" is a 3 minimum). Punish hand-waving.
+  - Do NOT reward word count. A sharp 2-sentence answer beats a vague 3-paragraph one.
+  - Do NOT reward agreement with the question's framing. Reward the founder challenging it IF they back it up.
+  - If you can't tell what they actually mean → it's a 2.
+  - If they restate the question without answering it → it's a 1.
+  - If they use the phrase "leverage", "synergy", "disrupt", or "ecosystem" without specifics → automatic -1 from whatever you were going to give.
+
+The rationale must be one sentence that names the SPECIFIC strength or weakness — not "good answer" or "needs work".
 
 Return ONLY a JSON object, no prose around it:
 
 {
   "score": 1 | 2 | 3 | 4 | 5,
-  "rationale": "one sentence on why you scored this way"
+  "rationale": "one sentence naming the specific strength or weakness"
 }`;
 }
 
@@ -309,12 +343,13 @@ class LlamaCombatAi implements CombatAi {
     return JSON.stringify(output ?? "");
   }
 
+
   async generateQuestion(input: GenerateQuestionInput): Promise<GeneratedQuestion> {
     const raw = await this.run(buildQuestionPrompt(input));
     const parsed = extractJson<{ prompt?: string; complexityTier?: string }>(raw);
     const prompt = parsed?.prompt?.trim();
     if (!prompt) {
-      throw new Error("Llama returned an empty question prompt");
+      throw new Error("Gemini returned an empty question prompt");
     }
     return {
       prompt,
@@ -338,11 +373,6 @@ class LlamaCombatAi implements CombatAi {
     return clampConfidence0to1(parsed?.aiGeneratedConfidence);
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────
-// Gemini 2.5 Flash (testing fallback)
-// ─────────────────────────────────────────────────────────────────────
-
 class GeminiCombatAi implements CombatAi {
   private client: GoogleGenerativeAI;
 

@@ -21,6 +21,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { FlareCard } from "./FlareCard";
 import { FlareDetailDialog } from "./FlareDetailDialog";
+import { FlareTriggerButton } from "./FlareTriggerButton";
 
 interface Props {
   limit?: number;
@@ -34,16 +35,21 @@ export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
 
   return (
     <section className="space-y-3">
-      <header className="flex items-baseline justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-white/70">
-          <Radio className="h-4 w-4 text-amber-400" />
-          Open flares
-        </h2>
-        {flares && flares.length > 0 && (
-          <span className="text-xs text-white/40">
-            {flares.length} {flares.length === 1 ? "person" : "people"} need a hand
-          </span>
-        )}
+      <header className="flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h2 className="flex shrink-0 items-center gap-2 text-sm font-medium uppercase tracking-wider text-white/70">
+            <Radio className="h-4 w-4 text-amber-400" />
+            Open flares
+          </h2>
+          {flares && flares.length > 0 && (
+            <span className="text-xs text-white/40 truncate">
+              {flares.length} {flares.length === 1 ? "person" : "people"} need a hand
+            </span>
+          )}
+        </div>
+        {/* "Fire a Flare" CTA sits in the section header so anyone
+            scrolling past the open flares can request help in two clicks. */}
+        <FlareTriggerButton variant="solid" />
       </header>
 
       {flares === undefined ? (

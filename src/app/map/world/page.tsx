@@ -4380,11 +4380,11 @@ function MapPageInner() {
               position highlighted, locked stages dimmed. Click jumps
               the camera to the chosen stage. */}
           <StageOverviewMinimap
-            template={(venture.templateId as
+            template={((venture?.templateId ?? "venture") as
               | "venture"
               | "academic"
               | "lab"
-              | "creative") ?? "venture"}
+              | "creative")}
             stages={stageOverviewStages}
           />
 

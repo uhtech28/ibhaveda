@@ -7726,6 +7726,7 @@ export class WorldMapScene extends Phaser.Scene {
         reward: pickChestReward(),
       });
       chest.setDepth(15);
+      // @ts-expect-error - TreasureChest GameObject duplicate types
       this.gameLayer.add(chest);
       chests.push(chest);
     }
@@ -7771,6 +7772,7 @@ export class WorldMapScene extends Phaser.Scene {
         definition,
       });
       henchman.setDepth(15);
+      // @ts-expect-error - Henchman GameObject duplicate types
       this.gameLayer.add(henchman);
       list.push(henchman);
     }

@@ -10,7 +10,8 @@
  */
 
 import React, { useCallback, useState } from "react";
-import { CheckCircle2, Loader2, ThumbsUp } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Loader2, ThumbsUp, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -25,6 +26,8 @@ interface Props {
     responder: {
       _id: Id<"users">;
       displayName: string;
+      /** Username is needed so the flare owner can reach out via /profile/{username}. */
+      username: string | null;
       avatar: string | null;
     };
   };
@@ -52,26 +55,51 @@ export function FlareResponseItem({
     }
   }, [markHelpful, pending, response._id]);
 
+  // Profile URL — only available if the responder has a username on
+  // record. Anonymous / migrated users without a username degrade
+  // gracefully to a plain non-clickable name.
+  const profileHref = response.responder.username
+    ? `/profile/${response.responder.username}`
+    : null;
+
   return (
     <div className="flex gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3">
-      <Avatar
-        url={response.responder.avatar}
-        name={response.responder.displayName}
-      />
+      {profileHref ? (
+        <Link href={profileHref} className="shrink-0 hover:opacity-80 transition-opacity">
+          <Avatar
+            url={response.responder.avatar}
+            name={response.responder.displayName}
+          />
+        </Link>
+      ) : (
+        <Avatar
+          url={response.responder.avatar}
+          name={response.responder.displayName}
+        />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-sm font-medium text-white">
-            {response.responder.displayName}
-          </span>
+          {profileHref ? (
+            <Link
+              href={profileHref}
+              className="truncate text-sm font-medium text-white hover:text-amber-300 transition-colors"
+            >
+              {response.responder.displayName}
+            </Link>
+          ) : (
+            <span className="truncate text-sm font-medium text-white">
+              {response.responder.displayName}
+            </span>
+          )}
           <span className="shrink-0 text-xs text-white/40">
             {formatDistanceToNow(response.createdAt, { addSuffix: true })}
           </span>
         </div>
-        <p className="text-sm leading-relaxed text-white/80">
+        <p className="text-sm leading-relaxed text-white/80 whitespace-pre-wrap">
           {response.content}
         </p>
 
-        <div className="mt-1 flex items-center justify-between">
+        <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
           {response.isHelpful ? (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -81,21 +109,35 @@ export function FlareResponseItem({
             <span />
           )}
 
-          {viewerIsOwner && !response.isHelpful && !flareIsResolved && (
-            <button
-              type="button"
-              onClick={handleMarkHelpful}
-              disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 px-2.5 py-1 text-xs font-medium text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
-            >
-              {pending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <ThumbsUp className="h-3 w-3" />
-              )}
-              Mark helpful
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* "Reach out" — owner-only direct link to responder's profile.
+                Spec: "owner can reach out to the person". */}
+            {viewerIsOwner && profileHref && (
+              <Link
+                href={profileHref}
+                className="inline-flex items-center gap-1.5 rounded-md border border-sky-400/30 px-2.5 py-1 text-xs font-medium text-sky-300 transition hover:border-sky-400 hover:bg-sky-400/10"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Reach out
+              </Link>
+            )}
+
+            {viewerIsOwner && !response.isHelpful && !flareIsResolved && (
+              <button
+                type="button"
+                onClick={handleMarkHelpful}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 px-2.5 py-1 text-xs font-medium text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
+              >
+                {pending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <ThumbsUp className="h-3 w-3" />
+                )}
+                Mark helpful
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

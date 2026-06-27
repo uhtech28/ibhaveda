@@ -23,7 +23,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -37,6 +37,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 export const fireFlare = mutation({
   args: {
     description: v.string(),
+    expertiseTag: v.optional(v.string()),
     ventureId: v.optional(v.id("ventures")),
     checkpointId: v.optional(v.id("ventureCheckpoints")),
   },
@@ -48,13 +49,28 @@ export const fireFlare = mutation({
       throw new Error("Flare description cannot be empty");
     }
 
+    // Normalise the expertise tag — lowercased + trimmed, dropped if
+    // empty. Keeps feed filtering consistent later.
+    const tagRaw = (args.expertiseTag ?? "").trim();
+    const expertiseTag = tagRaw.length > 0
+      ? tagRaw.slice(0, 60) // hard cap so it can't be abused as a title
+      : undefined;
+
+    const now = Date.now();
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
     const flareId = await ctx.db.insert("flares", {
       userId: user._id,
       ventureId: args.ventureId,
       checkpointId: args.checkpointId,
       description: trimmed,
+      expertiseTag,
       status: "open",
-      createdAt: Date.now(),
+      createdAt: now,
+      // Auto-expires in 7 days. The expireOldFlares cron flips
+      // status to "expired" when this passes; the feed query
+      // already filters expired flares out as a defence in depth.
+      expiresAt: now + ONE_WEEK_MS,
     });
 
     // Streak v2 — firing a flare counts as a meaningful action.
@@ -87,6 +103,23 @@ export const respondToFlare = mutation({
     if (flare.status !== "open") throw new Error("Flare is not open");
     if (flare.userId === user._id) {
       throw new Error("You can't respond to your own flare");
+    }
+    // Reject responses to flares that have aged past the 7-day window
+    // even if the daily cron hasn't run yet. Defence in depth.
+    if (flare.expiresAt && flare.expiresAt < Date.now()) {
+      throw new Error("This flare has expired");
+    }
+
+    // One response per user per flare. Each individual gets a single
+    // slot to propose their solution — this prevents thread spam and
+    // matches the spec ("each person can add 1 post after that").
+    const existing = await ctx.db
+      .query("flareResponses")
+      .withIndex("by_flare", (q) => q.eq("flareId", args.flareId))
+      .filter((q) => q.eq(q.field("userId"), user._id))
+      .first();
+    if (existing) {
+      throw new Error("You've already responded to this flare");
     }
 
     const trimmed = args.content.trim();
@@ -229,14 +262,23 @@ export const resolveFlare = mutation({
 export const getOpenFlares = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    const now = Date.now();
     const flares = await ctx.db
       .query("flares")
       .withIndex("by_status_created", (q) => q.eq("status", "open"))
       .order("desc")
-      .take(args.limit ?? 20);
+      .take((args.limit ?? 20) * 2); // fetch extra in case some are expired
+
+    // Filter out flares whose expiresAt has passed but the cron hasn't
+    // touched them yet. Defence in depth — the cron will catch them
+    // eventually but the feed should never show stale flares.
+    const fresh = flares.filter((f) =>
+      f.expiresAt === undefined || f.expiresAt > now,
+    );
+    const trimmed = fresh.slice(0, args.limit ?? 20);
 
     return await Promise.all(
-      flares.map(async (flare) => ({
+      trimmed.map(async (flare) => ({
         ...flare,
         owner: await ownerLite(ctx, flare.userId),
         responseCount: await responseCountFor(ctx, flare._id),
@@ -328,6 +370,60 @@ export const getUserFlares = query({
   },
 });
 
+/**
+ * Has the current user already responded to this flare?
+ * Frontend uses this to hide the compose form + show their existing
+ * response (or a "you've already replied" banner) on the detail view.
+ */
+export const hasMyResponse = query({
+  args: { flareId: v.id("flares") },
+  handler: async (ctx, { flareId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { responded: false, response: null };
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) return { responded: false, response: null };
+    const response = await ctx.db
+      .query("flareResponses")
+      .withIndex("by_flare", (q) => q.eq("flareId", flareId))
+      .filter((q) => q.eq(q.field("userId"), user._id))
+      .first();
+    return { responded: !!response, response };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Background tasks
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Internal sweep — flips any open flares with expiresAt < now to
+ * status="expired". Called from a daily cron defined in crons.ts.
+ *
+ * Idempotent — running twice is a no-op since already-expired
+ * flares are no longer status="open".
+ */
+export const expireOldFlares = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const candidates = await ctx.db
+      .query("flares")
+      .withIndex("by_status_expires", (q) => q.eq("status", "open"))
+      .collect();
+    let expired = 0;
+    for (const flare of candidates) {
+      if (flare.expiresAt && flare.expiresAt < now) {
+        await ctx.db.patch(flare._id, { status: "expired" });
+        expired += 1;
+      }
+    }
+    return { scanned: candidates.length, expired };
+  },
+});
+
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
@@ -335,17 +431,21 @@ export const getUserFlares = query({
 interface OwnerLite {
   _id: Id<"users">;
   displayName: string;
+  username: string | null;
   avatar: string | null;
 }
 
 async function ownerLite(ctx: any, userId: Id<"users">): Promise<OwnerLite> {
   const u = await ctx.db.get(userId);
   if (!u) {
-    return { _id: userId, displayName: "Unknown", avatar: null };
+    return { _id: userId, displayName: "Unknown", username: null, avatar: null };
   }
   return {
     _id: u._id,
     displayName: u.displayName ?? "Anonymous",
+    // Username enables /profile/{username} links from FlareResponseItem so
+    // the flare owner can reach out directly to whoever proposed a solution.
+    username: u.username ?? null,
     avatar: u.avatar ?? null,
   };
 }

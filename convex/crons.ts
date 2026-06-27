@@ -39,6 +39,14 @@ crons.daily(
   api.crons.dailyBossCorruption,
 );
 
+// Schedule: Daily flare expiry sweep — marks any open flare past its
+// 7-day window as status="expired" so the community feed stays fresh.
+crons.daily(
+  "Expire Old Flares",
+  { hourUTC: 4, minuteUTC: 0 },
+  api.flares.expireOldFlares,
+);
+
 // Schedule: Weekly Badge Evaluation
 crons.weekly(
   "Weekly Badge Evaluation",

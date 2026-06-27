@@ -290,6 +290,7 @@ export class CorruptionEscalation {
   private removeDesaturation(): void {
     if (!this.desaturationFx) return;
     try {
+      // @ts-expect-error - ColorMatrix vs Controller mismatch
       this.scene.cameras.main.postFX.remove(this.desaturationFx);
     } catch {
       // ignore

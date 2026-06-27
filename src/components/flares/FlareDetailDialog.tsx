@@ -45,6 +45,13 @@ export function FlareDetailDialog({
     api.flares.getFlareDetail,
     flareId ? { flareId } : "skip",
   );
+  // Has the current user already posted a response on this flare?
+  // Spec: each person can add only 1 post per flare — once they've
+  // responded we hide the compose form and show them their reply.
+  const myResponseInfo = useQuery(
+    api.flares.hasMyResponse,
+    flareId ? { flareId } : "skip",
+  );
 
   const respondToFlare = useMutation(api.flares.respondToFlare);
   const resolveFlare = useMutation(api.flares.resolveFlare);
@@ -60,10 +67,16 @@ export function FlareDetailDialog({
   );
 
   const flareIsResolved = detail?.status === "resolved";
+  const flareIsExpired =
+    detail?.status === "expired" ||
+    (!!detail?.expiresAt && detail.expiresAt < Date.now());
+  const alreadyResponded = myResponseInfo?.responded === true;
   const canRespond =
     detail !== null &&
     !viewerIsOwner &&
     !flareIsResolved &&
+    !flareIsExpired &&
+    !alreadyResponded &&
     Boolean(currentUserId);
 
   const handleSubmitResponse = useCallback(async () => {
@@ -151,6 +164,31 @@ export function FlareDetailDialog({
                   submitting={submittingResponse}
                   error={error}
                 />
+              )}
+
+              {/* Already responded — spec calls for "1 post per individual".
+                  Show their existing reply instead of the compose form. */}
+              {alreadyResponded && myResponseInfo?.response && (
+                <div className="rounded-lg border border-sky-400/30 bg-sky-400/[0.06] p-3 text-sm">
+                  <div className="mb-1.5 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-sky-300">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Your response
+                  </div>
+                  <p className="leading-relaxed text-white/85 whitespace-pre-wrap">
+                    {myResponseInfo.response.content}
+                  </p>
+                  <p className="mt-2 text-[11px] text-white/40">
+                    Each person can post one response per flare. The flare
+                    owner can reach out to you directly.
+                  </p>
+                </div>
+              )}
+
+              {/* Expired — flare is past its 7-day window. */}
+              {flareIsExpired && !alreadyResponded && !viewerIsOwner && (
+                <div className="rounded-lg border border-white/15 bg-white/[0.03] p-3 text-sm text-white/60">
+                  This flare has expired. New responses are no longer accepted.
+                </div>
               )}
 
               {viewerIsOwner && !flareIsResolved && (

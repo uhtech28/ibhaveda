@@ -41,6 +41,7 @@ export function FlareComposeDialog({
   checkpointId,
 }: Props) {
   const [description, setDescription] = useState("");
+  const [expertiseTag, setExpertiseTag] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +52,7 @@ export function FlareComposeDialog({
   useEffect(() => {
     if (open) {
       setDescription("");
+      setExpertiseTag("");
       setError(null);
     }
   }, [open]);
@@ -66,6 +68,8 @@ export function FlareComposeDialog({
     try {
       await fireFlare({
         description: description.trim(),
+        // Optional expertise hint — backend trims + caps at 60 chars.
+        expertiseTag: expertiseTag.trim() || undefined,
         ventureId,
         checkpointId,
       });
@@ -79,7 +83,15 @@ export function FlareComposeDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, description, fireFlare, ventureId, checkpointId, onOpenChange]);
+  }, [
+    canSubmit,
+    description,
+    expertiseTag,
+    fireFlare,
+    ventureId,
+    checkpointId,
+    onOpenChange,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,6 +108,30 @@ export function FlareComposeDialog({
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Optional expertise hint — helps responders self-select.
+              Free text so the user can write whatever's specific to
+              their problem (e.g. "react performance", "fundraising
+              pitch", "labor law"). Capped at 60 chars by the backend. */}
+          <div className="space-y-1">
+            <label
+              htmlFor="flare-expertise"
+              className="text-xs font-semibold uppercase tracking-wider text-white/60"
+            >
+              Field of expertise needed
+              <span className="ml-1 text-white/30">(optional)</span>
+            </label>
+            <input
+              id="flare-expertise"
+              type="text"
+              value={expertiseTag}
+              onChange={(e) => setExpertiseTag(e.target.value.slice(0, 60))}
+              placeholder="e.g. marketing, react, fundraising, design"
+              maxLength={60}
+              className="w-full rounded-md border border-white/15 bg-white/[0.02] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/30 transition-colors"
+              disabled={submitting}
+            />
+          </div>
+
           <Textarea
             placeholder="What are you stuck on? Mention what you've tried so far if it helps."
             value={description}
