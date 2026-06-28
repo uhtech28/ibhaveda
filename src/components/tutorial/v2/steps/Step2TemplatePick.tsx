@@ -56,7 +56,7 @@ export function Step2TemplatePick() {
 
   const active =
     tutorial.active &&
-    (tutorial.step === 1 || tutorial.step === 2) &&
+    tutorial.step === 1 &&
     pathname === "/feed";
 
   const [dialogue, setDialogue] = useState<DialogueState>("click_plus");

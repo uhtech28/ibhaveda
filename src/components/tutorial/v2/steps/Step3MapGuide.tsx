@@ -2,20 +2,18 @@
 
 /**
  * Step3MapGuide -- Sparky guides the user through their first task
- * + AI combat on /map/world. Detects DOM state via polling:
+ * + AI combat on /map/world.
  *
- *   1. arrived       -- Sparky points at checkpoint 1 ("Click a checkpoint
- *                       to start your first task.")
- *   2. checkpoint    -- Side panel opened ("Pick a task to work on.")
- *   3. task_open     -- TaskSubmissionModal opened ("Write your answer
- *                       below -- be specific!")
- *   4. submitted     -- Modal closed after submit ("Great! AI is judging.")
- *   5. combat        -- Combat panel mounted ("Cross-questions incoming.
- *                       Defend your idea.")
- *   6. done          -- Combat ends ("You finished your first task!")
+ * CRITICAL: This step is "sticky". On arrival at /map/world, if the
+ * user's tutorial step is still 0, 1, or 2 (e.g., because they were
+ * auto-redirected after posting before clicking Sparky's "Go to map"
+ * button), we FORCE-ADVANCE to step 3. This:
+ *   1. makes Sparky appear on the map
+ *   2. advances the progress bar (1/7 -> 3/7)
+ *   3. prevents Step2 from re-firing if user goes back to /feed
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { TutorialMascot, type SparkyMood } from "../TutorialMascot";
 import { useTutorial } from "../useTutorial";
@@ -29,9 +27,8 @@ type Stage =
   | "done";
 
 function findCheckpointPanel(): HTMLElement | null {
-  // Sahit's left-side checkpoint panel container
   return document.querySelector<HTMLElement>(
-    '[data-tutorial="checkpoint-panel"], [aria-label="Checkpoint"], [data-checkpoint-panel]',
+    '[data-tutorial="checkpoint-panel"], [aria-label="Checkpoint"], [data-checkpoint-panel], .checkpoint-panel',
   );
 }
 
@@ -50,12 +47,34 @@ function findCombatPanel(): HTMLElement | null {
 export function Step3MapGuide() {
   const tutorial = useTutorial();
   const pathname = usePathname();
-
   const onMap = pathname?.startsWith("/map/") ?? false;
+
+  // FORCE-ADVANCE: when we land on /map/ and tutorial is active but
+  // step is still < 3, push it to 3 immediately. This guarantees the
+  // progress bar moves AND Sparky appears here even if the user got
+  // auto-redirected from /feed before clicking Step2's "Go to map".
+  const advancedRef = useRef(false);
+  useEffect(() => {
+    if (!onMap) return;
+    if (!tutorial.active) return;
+    if (advancedRef.current) return;
+    if (tutorial.step < 3) {
+      advancedRef.current = true;
+      void tutorial.goTo(3);
+    }
+  }, [onMap, tutorial]);
+
+  // Reset force-advance flag when we leave the map (so re-entry works)
+  useEffect(() => {
+    if (!onMap) {
+      advancedRef.current = false;
+    }
+  }, [onMap]);
+
   const active =
     tutorial.active &&
     onMap &&
-    (tutorial.step === 2 || tutorial.step === 3 || tutorial.step === 4);
+    (tutorial.step === 3 || tutorial.step === 4 || tutorial.step === 5);
 
   const [stage, setStage] = useState<Stage>("arrived");
 
@@ -82,16 +101,13 @@ export function Step3MapGuide() {
     return () => window.clearInterval(id);
   }, [active]);
 
-  // When stage transitions past "submitted", advance the persisted
-  // tutorial step so the progress bar moves N/7.
+  // Sync persisted step as user progresses through the map flow
   useEffect(() => {
     if (!active) return;
-    if (stage === "task_open" && tutorial.step === 2) {
-      void tutorial.advance();
-    } else if (stage === "combat" && tutorial.step === 3) {
-      void tutorial.advance();
-    } else if (stage === "done" && tutorial.step === 4) {
-      void tutorial.advance();
+    if (stage === "task_open" && tutorial.step === 3) {
+      void tutorial.advance();  // 3 -> 4
+    } else if (stage === "combat" && tutorial.step === 4) {
+      void tutorial.advance();  // 4 -> 5
     }
   }, [stage, active, tutorial]);
 
