@@ -192,7 +192,7 @@ export const HeroHeader = ({
                         })}
                     </nav>
 
-                    <div className="ml-auto flex items-center gap-3">
+                    <div className="ml-1 flex items-center gap-2">
                         <SignedOut>
                             <div className="flex gap-2">
                                 <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn({ afterSignInUrl: "/feed" })}>Login</Button>

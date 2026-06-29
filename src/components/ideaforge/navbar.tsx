@@ -169,7 +169,7 @@ export function IdeaForgeNavbar({
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-1 flex items-center gap-2">
           <NotificationBell />
           <Popover>
             <PopoverTrigger asChild>
