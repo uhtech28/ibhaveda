@@ -142,7 +142,13 @@ async function dispatchEmail(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: FROM_ADDRESS, to, subject, html }),
+    body: JSON.stringify({
+      from: FROM_ADDRESS,
+      to,
+      subject,
+      html,
+      tags: [{ name: "campaign_type", value: "welcome" }],
+    }),
   });
 
   if (!response.ok) {

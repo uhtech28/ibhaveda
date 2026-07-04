@@ -46,14 +46,14 @@ export const NotificationBell = () => {
         ref={triggerRef}
         variant="ghost"
         size="sm"
-        className="relative"
+        className="relative h-10 w-10 p-0"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label="Notifications"
       >
         <Bell className="h-4 w-4" />
-        {unreadCount && unreadCount > 0 && (
+        {typeof unreadCount === 'number' && unreadCount > 0 && (
           <Badge
             className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] rounded-full p-0 text-[10px] leading-none font-semibold flex items-center justify-center px-1 bg-red-500 text-white border-0"
           >
