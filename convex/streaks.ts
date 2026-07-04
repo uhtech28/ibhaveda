@@ -264,6 +264,14 @@ export const recordAction = internalMutation({
         lastStreakUpdate: Date.now(),
       });
       await awardDayReward(ctx, userId, actionType);
+      await ctx.db.insert("analytics_events", {
+        userId,
+        sessionId: "server",
+        eventName: "streak_extended",
+        eventCategory: "engagement",
+        eventData: { newStreak, actionType },
+        timestamp: Date.now(),
+      });
       return { status: "incremented", streak: newStreak } as const;
     }
 

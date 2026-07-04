@@ -13,6 +13,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { Webhook } from "svix";
+import { resendWebhook } from "./emailWebhook";
 
 const http = httpRouter();
 
@@ -71,10 +72,23 @@ http.route({
         internal.emailWelcome.sendDelayedWelcomeEmail,
         { email, name, clerkId: (data.id as string) ?? "" },
       );
+
+      // Store email on the Convex user row after onboarding has had time to complete
+      await ctx.scheduler.runAfter(
+        60 * 60 * 1000, // 1 hour — safely after onboarding
+        internal.users.storeEmailFromWebhook,
+        { clerkId: (data.id as string) ?? "", email },
+      );
     }
 
     return new Response("ok", { status: 200 });
   }),
+});
+
+http.route({
+  path: "/resend-webhook",
+  method: "POST",
+  handler: resendWebhook,
 });
 
 export default http;

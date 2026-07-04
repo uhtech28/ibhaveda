@@ -25,6 +25,7 @@ export const sendEmail = internalAction({
         to,
         subject,
         html,
+        tags: [{ name: "campaign_type", value: "reengagement" }],
       }),
     });
 

@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation, internalAction, internalQuery } from "./_generated/server";
 import { Id, Doc } from "./_generated/dataModel";
 import { ConvexError } from "convex/values";
+import { internal } from "./_generated/api";
 
 export type UserProfile = Doc<"users"> & {
   skills: string[];
@@ -965,5 +966,72 @@ export const getPersonaGender = query({
       .first();
 
     return profile?.personaGender ?? null;
+  },
+});
+
+// Called from the Clerk webhook when user.created fires — stores email on the
+// Convex user row once onboarding completes and the row exists.
+export const storeEmailFromWebhook = internalMutation({
+  args: { clerkId: v.string(), email: v.string() },
+  handler: async (ctx, { clerkId, email }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
+      .first();
+    if (!user) return; // row not yet created — webhook fired before onboarding
+    if (user.email) return; // already stored, skip
+    await ctx.db.patch(user._id, { email });
+  },
+});
+
+// Internal helper — patches a single user's email. Called by the backfill action.
+export const patchUserEmail = internalMutation({
+  args: { userId: v.id("users"), email: v.string() },
+  handler: async (ctx, { userId, email }) => {
+    await ctx.db.patch(userId, { email });
+  },
+});
+
+// One-time backfill action: reads all users missing email, fetches from Clerk,
+// and patches each one. Run once from the Convex dashboard after deploying to prod.
+export const backfillUserEmails = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    if (!clerkSecretKey) throw new Error("CLERK_SECRET_KEY not set");
+
+    const users = await ctx.runQuery(internal.users.getUsersMissingEmail);
+
+    for (const user of users) {
+      try {
+        const res = await fetch(
+          `https://api.clerk.com/v1/users/${user.clerkId}`,
+          { headers: { Authorization: `Bearer ${clerkSecretKey}` } }
+        );
+        if (!res.ok) continue;
+        const data = (await res.json()) as {
+          email_addresses?: Array<{ email_address: string }>;
+        };
+        const email = data.email_addresses?.[0]?.email_address;
+        if (email) {
+          await ctx.runMutation(internal.users.patchUserEmail, {
+            userId: user._id,
+            email,
+          });
+        }
+      } catch {
+        // skip individual failures, continue backfill
+      }
+    }
+  },
+});
+
+export const getUsersMissingEmail = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("email"), undefined))
+      .collect();
   },
 });

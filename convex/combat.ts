@@ -1020,12 +1020,24 @@ async function settleRound(
   const individualPoints = computeIndividualPoints(questions, status);
   const outcomeScore = computeOutcomeScore(questions);
 
+  const endedAt = Date.now();
   await ctx.db.patch(round._id, {
     status,
     outcomeScore,
     individualPointsAwarded: individualPoints,
-    endedAt: Date.now(),
+    endedAt,
   });
+
+  if (status === "won") {
+    await ctx.db.insert("analytics_events", {
+      userId: round.userId,
+      sessionId: "server",
+      eventName: "boss_battle_won",
+      eventCategory: "engagement",
+      eventData: { roundId: String(round._id), outcomeScore, xpAwarded: individualPoints },
+      timestamp: endedAt,
+    });
+  }
 
   // Award XP with level-floor guard — losing can still net negative
   // points (the boss landed criticals).

@@ -185,12 +185,8 @@ export function IdeaForgeLeftRail({
   const builders = useMemo(() => {
     const isNonAgent = (user: BuilderSuggestion | CurrentUserProfile) => !isAgentRole(user.role);
 
-    if (suggested && suggested.length > 0) {
-      return suggested.filter(isNonAgent).slice(0, 5);
-    }
-    return (allUsers || [])
+    const fallbackBuilders = (allUsers || [])
       .filter((user) => user._id !== currentUser?._id && isNonAgent(user))
-      .slice(0, 5)
       .map((user) => ({
         _id: user._id,
         username: user.username,
@@ -199,6 +195,16 @@ export function IdeaForgeLeftRail({
         skills: user.skills,
         role: user.role,
       }));
+
+    const seen = new Set<string>();
+    return [...(suggested || []).filter(isNonAgent), ...fallbackBuilders]
+      .filter((builder) => {
+        const key = builder._id?.toString() || builder.username;
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5);
   }, [allUsers, currentUser?._id, suggested]);
 
   const profileBadges = useMemo(() => {

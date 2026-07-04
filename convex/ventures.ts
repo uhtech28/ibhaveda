@@ -97,6 +97,15 @@ async function createVentureForUser(
     updatedAt: now,
   });
 
+  await ctx.db.insert("analytics_events", {
+    userId: args.userId,
+    sessionId: "server",
+    eventName: "venture_created",
+    eventCategory: "engagement",
+    eventData: { ventureId, templateId },
+    timestamp: now,
+  });
+
   for (const cpDef of checkpointDefs) {
     const checkpointId = await ctx.db.insert("ventureCheckpoints", {
       ventureId,
@@ -623,6 +632,14 @@ export const ensureVentureStructure = mutation({
         checkpointPatch.completedAt = cp.completedAt ?? now;
         checkpointPatch.partialStartedAt = undefined;
         cp.status = "completed";
+        await ctx.db.insert("analytics_events", {
+          userId: venture.userId,
+          sessionId: "server",
+          eventName: "checkpoint_completed",
+          eventCategory: "engagement",
+          eventData: { checkpointId: String(cp._id), stage: cp.stage, checkpoint: cp.checkpoint },
+          timestamp: now,
+        });
       } else if (completedCount === 1 && cp.status !== "in_progress") {
         checkpointPatch.status = "in_progress";
         if (typeof cp.partialStartedAt !== "number") {

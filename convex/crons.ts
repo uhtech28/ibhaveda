@@ -60,6 +60,13 @@ crons.daily(
     api.emailReengagement.sendReengagementEmails
 );
 
+// Schedule: Daily retention snapshot at midnight IST (18:30 UTC)
+crons.daily(
+  "daily-retention-snapshot",
+  { hourUTC: 18, minuteUTC: 30 },
+  api.retentionCron.takeRetentionSnapshot
+);
+
 // Schedule: Social Proof Engine — daily spark evaluator at 00:05 UTC
 crons.daily(
   "Social Proof Daily Evaluator",

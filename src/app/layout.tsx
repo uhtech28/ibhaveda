@@ -9,6 +9,8 @@ import { Toaster } from '@/components/ui/toaster';
 import ChatWidget from "@/components/chat/ChatWidget";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { ClarityScript } from "@/components/analytics/ClarityScript";
 import "./globals.css";
 
 const displayFont = Sora({
@@ -125,14 +127,17 @@ export default function RootLayout({
           className="font-sans antialiased"
         >
           <ConvexClientProvider>
-            <ThemeProvider>
-              <ChatProvider>
-                {children}
-                <MobileBottomNav />
-                <Toaster />
-                <ChatWidget />
-              </ChatProvider>
-            </ThemeProvider>
+            <AnalyticsProvider>
+              <ClarityScript />
+              <ThemeProvider>
+                <ChatProvider>
+                  {children}
+                  <MobileBottomNav />
+                  <Toaster />
+                  <ChatWidget />
+                </ChatProvider>
+              </ThemeProvider>
+            </AnalyticsProvider>
           </ConvexClientProvider>
         </body>
       </html>
