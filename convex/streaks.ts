@@ -269,8 +269,10 @@ export const recordAction = internalMutation({
         sessionId: "server",
         eventName: "streak_extended",
         eventCategory: "engagement",
-        eventData: { newStreak, actionType },
+        properties: { newStreak, actionType },
         timestamp: Date.now(),
+        serverTimestamp: Date.now(),
+        sequenceNumber: 0,
       });
       return { status: "incremented", streak: newStreak } as const;
     }

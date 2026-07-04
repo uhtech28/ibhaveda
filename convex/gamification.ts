@@ -437,8 +437,10 @@ export const internalAwardPoints = internalMutation({
             sessionId: "server",
             eventName: "xp_awarded",
             eventCategory: "engagement",
-            eventData: { amount: args.amount, type: args.type, description: args.description },
+            properties: { amount: args.amount, type: args.type, description: args.description },
             timestamp: Date.now(),
+            serverTimestamp: Date.now(),
+            sequenceNumber: 0,
         });
 
         // Mirror the award into the userLevels.titlePoints/totalPoints so the

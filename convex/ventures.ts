@@ -102,8 +102,10 @@ async function createVentureForUser(
     sessionId: "server",
     eventName: "venture_created",
     eventCategory: "engagement",
-    eventData: { ventureId, templateId },
+    properties: { ventureId, templateId },
     timestamp: now,
+    serverTimestamp: now,
+    sequenceNumber: 0,
   });
 
   for (const cpDef of checkpointDefs) {
@@ -637,8 +639,10 @@ export const ensureVentureStructure = mutation({
           sessionId: "server",
           eventName: "checkpoint_completed",
           eventCategory: "engagement",
-          eventData: { checkpointId: String(cp._id), stage: cp.stage, checkpoint: cp.checkpoint },
+          properties: { checkpointId: String(cp._id), stage: cp.stage, checkpoint: cp.checkpoint },
           timestamp: now,
+          serverTimestamp: now,
+          sequenceNumber: 0,
         });
       } else if (completedCount === 1 && cp.status !== "in_progress") {
         checkpointPatch.status = "in_progress";

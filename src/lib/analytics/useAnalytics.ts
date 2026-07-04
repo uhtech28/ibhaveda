@@ -45,7 +45,7 @@ export function useAnalytics(convexUserId?: Id<"users">) {
   const sessionId = useRef(getSessionId());
   const sessionStarted = useRef(false);
   const prevPath = useRef("");
-  const idleTimer = useRef<ReturnType<typeof setTimeout>>();
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const idleStart = useRef(0);
   const IDLE_MS = 2 * 60 * 1000;
 

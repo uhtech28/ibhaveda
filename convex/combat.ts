@@ -1034,8 +1034,10 @@ async function settleRound(
       sessionId: "server",
       eventName: "boss_battle_won",
       eventCategory: "engagement",
-      eventData: { roundId: String(round._id), outcomeScore, xpAwarded: individualPoints },
+      properties: { roundId: String(round._id), outcomeScore, xpAwarded: individualPoints },
       timestamp: endedAt,
+      serverTimestamp: endedAt,
+      sequenceNumber: 0,
     });
   }
 
