@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ColorField Test</title>
+  <style>
+    html, body { margin: 0; background: #111; }
+    #ui { position: fixed; top: 8px; left: 8px; z-index: 10; font-family: sans-serif; }
+    #ui button { margin-right: 6px; padding: 6px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button onclick="game.scene.scenes[0].goDay()">Day</button>
+    <button onclick="game.scene.scenes[0].goSunset()">Sunset</button>
+    <button onclick="game.scene.scenes[0].goNight()">Night</button>
+    <button onclick="game.scene.scenes[0].applyAutumn(0.7)">Autumn</button>
+    <button onclick="game.scene.scenes[0].resetPalette()">Reset</button>
+  </div>
+  <div id="game-container"></div>
+
+  <script src="phaser.js"></script>
+  <script src="ColorFieldRenderer.js"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { TutorialSpeechBubble } from "./TutorialSpeechBubble";
+import { SparkyPixelDog, type DogMood } from "./puppy/SparkyPixelDog";
 
 export type SparkyMood = "idle" | "talking" | "pointing" | "celebrating";
 
@@ -91,21 +92,17 @@ function SparkyMascotImage({ mood }: { mood: SparkyMood }) {
           pointerEvents: "none",
         }}
       />
-      <img
-        src={
-          mood === "celebrating"
-            ? "/assets/tutorial/sparky-cheer.gif"
-            : "/assets/tutorial/sparky-talk.gif"
-        }
-        alt={`Sparky (${mood})`}
+      <div
         style={{
-          width: 170,
-          height: 170,
-          objectFit: "contain",
-          filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.35))",
-          display: "block",
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
-      />
+      >
+        <SparkyPixelDog mood={mood as DogMood} size={150} />
+      </div>
     </div>
   );
 }
