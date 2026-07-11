@@ -452,6 +452,39 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_badge", ["userId", "badgeId"]),
 
+  // ─────────────────────────────────────────────────────────────
+  // Daily challenges — user gets 3 challenges per local day, rotated
+  // deterministically by day-of-week so everyone on the same day sees
+  // the same set. Progress increments live on qualifying actions;
+  // claim mutation grants XP + points once all three complete.
+  //
+  // Fills gap #6 in the gamification audit ("no daily challenges,
+  // engagement loop is thin").
+  // ─────────────────────────────────────────────────────────────
+  dailyChallenges: defineTable({
+    userId: v.id("users"),
+    // Local YYYY-MM-DD in the user's timezone (matches userStreaks).
+    dateKey: v.string(),
+    // The three challenges for this day, denormalised so progress
+    // reads/writes are one document patch instead of joins.
+    challenges: v.array(
+      v.object({
+        id: v.string(),                    // stable template id
+        label: v.string(),                 // display label
+        actionType: v.string(),            // "submit_task" | "fire_flare" | etc.
+        target: v.number(),                // e.g. 3
+        progress: v.number(),              // current count
+        xpReward: v.number(),              // per-challenge XP
+      }),
+    ),
+    // Whether the "all three complete" bonus has been claimed.
+    claimedAt: v.optional(v.number()),
+    // Timestamp of last progress update (for debugging + cleanup).
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "dateKey"]),
+
   // User Skill Progress (per Idea/Skill)
   userSkillProgress: defineTable({
     userId: v.id("users"),
@@ -565,6 +598,11 @@ export default defineSchema({
     assignedBosses: v.array(v.number()), // boss IDs 1-12
     skills: v.optional(v.array(v.string())), // Selected skill tags (max 5)
     industries: v.optional(v.array(v.string())), // Selected industry tags (max 4)
+    // Legacy field — pre-schema-refactor code recorded which stages the
+    // user had "previewed" (the finale pan choreography). Nothing writes
+    // this now, but existing prod rows carry it, so it must be declared
+    // optional here for schema validation to pass on `convex dev`.
+    previewedStages: v.optional(v.array(v.number())),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

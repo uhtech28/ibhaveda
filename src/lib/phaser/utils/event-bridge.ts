@@ -179,7 +179,14 @@ export type ReactToPhaserEvent =
       type: "MINIGAME_SYNC_STATE";
       completedCheckpointIds: string[];
       completedSpawnIds: string[];
-    };
+    }
+  /**
+   * Village demo — after the Stage 1 Complete overlay closes, ask the
+   * Phaser scene to pan east and reveal a silhouetted preview of the
+   * next stage (Forest of Perfectionism) for a few seconds before
+   * settling back to the map centre.
+   */
+  | { type: "PREVIEW_NEXT_STAGE"; stage: number };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phaser → React events
@@ -276,6 +283,51 @@ export type PhaserToReactEvent =
       x: number;
       y: number;
       flavorText?: string;
+    }
+  /**
+   * Village demo — all 4 mini-bosses cleared and the Unraveller has been
+   * revealed. React should show the full-screen "Stage 1 Complete!"
+   * celebration overlay to close the emotional arc.
+   */
+  | {
+      type: "VILLAGE_COMPLETE";
+      checkpointsCleared: number;
+      tasksCompleted: number;
+    }
+  /**
+   * A stage's last CP has been cleared — React should navigate to the
+   * next stage. Emitted by ForestMapScene, GoldenHarborScene,
+   * ArtisansScene when advanceToNextCheckpoint is called on CP4.
+   * (Village emits VILLAGE_COMPLETE instead, which has a fuller
+   * celebration overlay + preview pan.)
+   */
+  | { type: "STAGE_COMPLETE"; stage: number; nextStage: number }
+  /**
+   * The stage's mini bosses are down and the SUPER-boss has been
+   * revealed on the map. React should open the CombatPanel against
+   * this super boss. When combat is won, React fires STAGE_COMPLETE.
+   *
+   * Emitted by Forest/Harbor/Artisans scenes for stages 2-4.
+   * (Stage 1 uses VILLAGE_COMPLETE + Unraveller reveal instead — the
+   * Unraveller is a visual reveal, not a combat encounter, for the
+   * demo's storytelling arc.)
+   */
+  | {
+      type: "SUPER_BOSS_ENCOUNTER";
+      stage: number;
+      /** Slug of the super boss for CombatPanel lookup. */
+      bossSlug?: string;
+    }
+  /**
+   * XP reward feedback — React should show a floating "+N XP" popover.
+   * Dispatched by both Phaser (on CP clear, boss defeat) and React (on
+   * task submission accepted).
+   */
+  | {
+      type: "XP_AWARDED";
+      amount: number;
+      /** Optional short label appended after the amount (e.g. "Task"). */
+      label?: string;
     };
 
 // ─────────────────────────────────────────────────────────────────────────────

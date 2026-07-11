@@ -161,32 +161,75 @@ export const getMyBadges = query({
 
     if (!user) return [];
 
-    const userBadges = await ctx.db
+    // ── Slug-based badges (userBadges) ──────────────────────────────────
+    // These come from awardBadge() calls — e.g. legendary-venture-completion,
+    // first-idea, chatterbox — and reference the `badges` table by _id.
+    const userBadgesRaw = await ctx.db
       .query("userBadges")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
-    // Sort newest first so the client can detect additions at index 0
-    userBadges.sort((a, b) => b.awardedAt - a.awardedAt);
+    // ── Numeric-id badges (ventureBadges) ───────────────────────────────
+    // These come from recalculateAndAwardBadgesHelper — stage-clear
+    // badges (tier A/B/C), gold-checkpoint achievements, lifecycle
+    // completions.  Their badgeId is a number from BADGE_DEFINITIONS
+    // or STAGE_BADGE_DEFINITIONS, NOT an Id<"badges">.
+    //
+    // Prior to Fix #11 the query returned only userBadges, so the client
+    // never noticed when ventureBadges rows landed — the BadgeAwardSequence
+    // overlay silently skipped every stage/perfection achievement.
+    const ventureBadgesRaw = await ctx.db
+      .query("ventureBadges")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
 
-    const enriched = await Promise.all(
-      userBadges.map(async (ub) => {
+    const slugEnriched = await Promise.all(
+      userBadgesRaw.map(async (ub) => {
         const badge = await ctx.db.get(ub.badgeId);
         if (!badge) return null;
         return {
-          _id: ub._id,
-          badgeId: ub.badgeId,
+          _id: ub._id as string,
+          badgeId: String(ub.badgeId),
           awardedAt: ub.awardedAt,
           name: badge.name,
           description: badge.description,
           icon: badge.icon,
-          // Map category ? rarity for the BadgeAwardSequence component
           rarity: categoryToRarity(badge.category),
+          source: "slug" as const,
         };
       }),
     );
 
-    return enriched.filter((b): b is NonNullable<typeof b> => b !== null);
+    const numericEnriched = ventureBadgesRaw
+      .map((vb) => {
+        // Prefer the venture BADGE_DEFINITIONS (ids 1-99), fall back to
+        // stage badges (ids 101-124) as of Fix #9.
+        const def =
+          BADGE_DEFINITIONS.find((b: any) => b.id === vb.badgeId) ??
+          STAGE_BADGE_DEFINITIONS.find((b: any) => b.id === vb.badgeId);
+        if (!def) return null;
+        return {
+          _id: vb._id as string,
+          badgeId: String(vb.badgeId),
+          awardedAt: vb.awardedAt,
+          name: def.name,
+          description: (def as any).tagline ?? (def as any).description ?? "",
+          icon: (def as any).shape ?? "trophy",
+          rarity: def.rarity as
+            | "common" | "uncommon" | "rare" | "epic" | "legendary",
+          source: "numeric" as const,
+        };
+      })
+      .filter((b): b is NonNullable<typeof b> => b !== null);
+
+    // Union + newest-first sort so the client's index-0 addition
+    // detector sees the freshest badge regardless of its source table.
+    const combined = [
+      ...slugEnriched.filter((b): b is NonNullable<typeof b> => b !== null),
+      ...numericEnriched,
+    ];
+    combined.sort((a, b) => b.awardedAt - a.awardedAt);
+    return combined;
   },
 });
 
@@ -1116,7 +1159,13 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
 
   for (const { id, shouldAward } of ventureConditions) {
     if (shouldAward && !existingVentureIds.has(id)) {
-      const badgeDef = BADGE_DEFINITIONS.find((b: any) => b.id === id);
+      // Stage badges live at ids >= 101 in STAGE_BADGE_DEFINITIONS.
+      // Fall back to that table when BADGE_DEFINITIONS misses — otherwise
+      // stage-clear badges silently skip insertion, which was the audit
+      // finding "stage badges defined but never awarded".
+      const badgeDef =
+        BADGE_DEFINITIONS.find((b: any) => b.id === id) ??
+        STAGE_BADGE_DEFINITIONS.find((b: any) => b.id === id);
       if (!badgeDef) continue;
 
       await ctx.db.insert("ventureBadges", {
@@ -1124,7 +1173,7 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
         badgeId: id,
         awardedAt: now,
         isHidden: badgeDef.rarity === "hidden",
-        metadata: { 
+        metadata: {
           awardedBy: "realtime_recalculate",
           corruptionLevel: corruptionLevel
         },
@@ -1136,7 +1185,7 @@ export async function recalculateAndAwardBadgesHelper(ctx: any, userId: Id<"user
       await ctx.db.insert("badgeEvaluations", {
         badgeId: id,
         userId,
-        condition: badgeDef.requirement,
+        condition: (badgeDef as any).requirement ?? "",
         lastChecked: now,
         isAwarded: true,
         awardedAt: now,

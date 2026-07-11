@@ -1172,6 +1172,15 @@ export const advanceCheckpoint = mutation({
       );
     }
 
+    // Daily challenge progress — clearing a CP bumps the
+    // "clear_checkpoint" challenge.
+    try {
+      await ctx.scheduler.runAfter(0, internal.dailyChallenges.bumpProgress, {
+        userId: user._id,
+        actionType: "clear_checkpoint",
+      });
+    } catch { /* non-blocking */ }
+
     // PRD §9 — completing a checkpoint no longer advances the streak.
   },
 });

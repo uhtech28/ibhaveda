@@ -234,6 +234,7 @@ const AUDIO_PATHS = {
       "/audio/music/stage_village.ogg",
     ],
     stage_2: ["/audio/music/stage_forest.mp3", "/audio/music/stage_forest.ogg"],
+    // Canonical spec order: Village · Forest · Arena · Artisan · Mine · Harbour · Crossroads · Capital
     stage_3: ["/audio/music/stage_arena.mp3", "/audio/music/stage_arena.ogg"],
     stage_4: [
       "/audio/music/stage_artisan.mp3",
@@ -255,7 +256,12 @@ const AUDIO_PATHS = {
   } as Record<string, string[]>,
 } as const;
 
-/** Map stage number (1–8) to BiomeId */
+/**
+ * Map stage number (1–8) to BiomeId. Matches the canonical venture-
+ * template spec: Village → Forest → Arena → Artisan → Mine → Harbour
+ * → Crossroads → Capital.  (Previously stages 3 and 6 were swapped
+ * during the demo rollout; unswapped in the spec-realignment pass.)
+ */
 const STAGE_TO_BIOME: Record<number, BiomeId> = {
   1: "village",
   2: "forest",
@@ -596,6 +602,7 @@ class AudioManager {
   playAmbienceForTemplate(templateId: "venture" | "academic" | "lab" | "creative", stage: number): void {
     this.lastTemplateId = templateId;
     const templateBiomeMap: Record<string, Record<number, BiomeId>> = {
+      // Canonical venture-template biome order (matches spec).
       venture: { 1: "village", 2: "forest", 3: "arena", 4: "artisan", 5: "mine", 6: "harbour", 7: "crossroads", 8: "capital" },
       academic: { 1: "reading_room", 2: "archive_hall", 3: "monastery_scriptorium", 4: "cartographers_den", 5: "council_chamber", 6: "grand_archive" },
       lab: { 1: "circuit_nexus", 2: "clean_room", 3: "field_station", 4: "data_vault", 5: "review_chamber", 6: "publishing_reactor", 7: "replication_engine" },

@@ -1,6 +1,14 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+
+// XP reward for chat participation. Kept tiny + length-gated so it's
+// not a farming path, but still connects the social loop to the level
+// ladder. Fills gap #5 in the gamification audit ("chat is fully
+// decoupled from all reward systems").
+const CHAT_MESSAGE_XP = 2;
+const CHAT_XP_MIN_LENGTH = 20;
 
 async function findRootIdea(
   ctx: { db: { get: (id: Id<"ideas">) => Promise<Doc<"ideas"> | null> } },
@@ -341,6 +349,30 @@ export const sendMessage = mutation({
     });
 
     await ctx.db.patch(conversationId, { updatedAt: Date.now(), lastMessageId: messageId });
+
+    // Small XP reward for meaningful chat participation.  Length-gated
+    // at CHAT_XP_MIN_LENGTH chars so one-word replies don't count.
+    // No hard rate cap — the length gate + tiny per-message amount are
+    // the natural anti-farm.  If farming shows up we add rate limits.
+    const trimmedContent = (args.content ?? "").trim();
+    if (trimmedContent.length >= CHAT_XP_MIN_LENGTH) {
+      try {
+        await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+          userId,
+          amount: CHAT_MESSAGE_XP,
+          action: "chat_message",
+        });
+      } catch { /* XP failure non-blocking */ }
+
+      // Daily challenge progress (only qualifying-length messages count).
+      try {
+        await ctx.scheduler.runAfter(0, internal.dailyChallenges.bumpProgress, {
+          userId,
+          actionType: "send_chat",
+        });
+      } catch { /* non-blocking */ }
+    }
+
     return messageId;
   },
 });

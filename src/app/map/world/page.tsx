@@ -31,6 +31,7 @@ import { api } from "@convex/_generated/api";
 import { LEVEL_DEFINITIONS } from "@convex/ventureConstants";
 import type { Id } from "@convex/_generated/dataModel";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
+import { useTutorialOptional } from "@/components/tutorial/v2";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import { isLiteMode } from "@/lib/phaser/performance-mode";
 import {
@@ -42,6 +43,9 @@ import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock,
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { CombatPanel } from "@/components/combat/CombatPanel";
+import { getVillageBoss } from "@/config/village-bosses";
+import { getStageBoss, getStageSuperBoss } from "@/config/stage-bosses";
+import type { StageBoss } from "@/config/stage-bosses";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
@@ -70,9 +74,37 @@ import { JournalTool } from "@/components/tools/journal-tool";
 // Dynamic/lazy loaded overlay components for faster page loading performance
 const LevelUpSequence = dynamic(() => import("@/components/animations/LevelUpSequence").then(mod => mod.LevelUpSequence), { ssr: false });
 const BadgeAwardSequence = dynamic(() => import("@/components/animations/BadgeAwardSequence").then(mod => mod.BadgeAwardSequence), { ssr: false });
+const VillageCompleteCelebration = dynamic(
+  () => import("@/components/village/VillageCompleteCelebration"),
+  { ssr: false },
+);
+const VentureCompleteCelebration = dynamic(
+  () => import("@/components/village/VentureCompleteCelebration"),
+  { ssr: false },
+);
+const SuperBossEncounterOverlay = dynamic(
+  () => import("@/components/combat/SuperBossEncounterOverlay"),
+  { ssr: false },
+);
+const StageClearedToast = dynamic(
+  () => import("@/components/village/StageClearedToast"),
+  { ssr: false },
+);
+const DailyChallengesCard = dynamic(
+  () => import("@/components/gamification/DailyChallengesCard").then((m) => m.DailyChallengesCard),
+  { ssr: false },
+);
+const XpFloatingPopover = dynamic(
+  () => import("@/components/xp/XpFloatingPopover"),
+  { ssr: false },
+);
+const FlareTriggerButton = dynamic(
+  () => import("@/components/flares/FlareTriggerButton").then(mod => mod.FlareTriggerButton),
+  { ssr: false },
+);
 const TaskSubmissionModal = dynamic(() => import("@/components/map/TaskSubmissionModal").then(mod => mod.TaskSubmissionModal), { ssr: false });
 const StageClearModal = dynamic(() => import("@/components/map/StageClearModal").then(mod => mod.StageClearModal), { ssr: false });
-const WorldMapTour = dynamic(() => import("@/components/map/WorldMapTour").then(mod => mod.WorldMapTour), { ssr: false });
+// WorldMapTour removed — replaced entirely by the v2 tutorial (Sparky).
 const ChatThread = dynamic(() => import("@/components/chat/ChatThread"), { ssr: false });
 const GroupList = dynamic(() => import("@/components/chat/GroupList"), { ssr: false });
 const ChannelList = dynamic(() => import("@/components/chat/ChannelList"), { ssr: false });
@@ -285,6 +317,22 @@ const PHASE_ONE_STAGE_LIMIT = 2;
 // HOOK — Phaser game lifecycle
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Stage → scene key mapping. When the venture's currentStage changes
+ * (or the user visits with ?stage=N in the URL), we look up the correct
+ * scene key here and swap Phaser scenes.
+ */
+const STAGE_SCENE_KEY: Record<number, string> = {
+  1: "VillageMapScene",     // Ideation · The Village
+  2: "ForestMapScene",      // Research · The Forest
+  3: "ArenaScene",          // Validation · The Arena
+  4: "ArtisansScene",       // Offer Design · The Artisan's Quarter
+  5: "MineScene",           // Build & Deliver · The Mine (Ironhold)
+  6: "GoldenHarborScene",   // Launch · The Harbour
+  7: "CrossroadsScene",     // Iteration · The Crossroads Town
+  // Stage 8 (The Capital · Scale) — art pending.
+};
+
 function useMapGame() {
   const gameRef = useRef<import("phaser").Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -414,23 +462,66 @@ function useMapGame() {
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
 
-    const handleReady = () => setPhaserReady(true);
+    const handleReady = () => {
+      setPhaserReady(true);
+      // Kick off village ambience + music once Phaser finishes booting.
+      // Both files already exist in public/audio/ so this is a pure wire-up.
+      try {
+        audioManager.playAmbienceForStage(1);
+        audioManager.playMusic("stage_village", 0.42);
+      } catch (err) {
+        console.warn("[MapPage] audio startup failed", err);
+      }
+    };
 
     eventBridge.onReact("PHASER_READY", handleReady);
 
-    // Three parallel imports: Phaser core, game-config (no scene), and
-    // the WorldMapScene chunk. The scene was being statically pulled
-    // into the game-config bundle and parsed alongside Phaser core on
-    // hydration — that's ~1.5 MB of JS evaluation on the main thread.
-    // Splitting it out lets the browser parse/compile concurrently.
+    // MAP SWAP: /map/world now uses the new painted VillageMapScene
+    // instead of Sahit's procedural WorldMapScene. All React overlays
+    // (sidebar, boss HP bar, task panel, bottom HUD) still render on top
+    // because they're React components. Phaser events (CHECKPOINT_CLICKED)
+    // are still fired the same way.
     Promise.all([
       import("phaser"),
       import("@/lib/phaser/game-config"),
-      import("@/lib/phaser/scenes/WorldMapScene"),
-    ]).then(([Phaser, { createGameConfig }, { WorldMapScene }]) => {
+      import("@/lib/phaser/scenes/VillageMapScene"),
+      import("@/lib/phaser/scenes/ForestMapScene"),
+      import("@/lib/phaser/scenes/ArenaScene"),
+      import("@/lib/phaser/scenes/ArtisansScene"),
+      import("@/lib/phaser/scenes/MineScene"),
+      import("@/lib/phaser/scenes/GoldenHarborScene"),
+      import("@/lib/phaser/scenes/CrossroadsScene"),
+    ]).then((
+      [
+        Phaser,
+        { createGameConfig },
+        { VillageMapScene },
+        { ForestMapScene },
+        { ArenaScene },
+        { ArtisansScene },
+        { MineScene },
+        { GoldenHarborScene },
+        { CrossroadsScene },
+      ],
+    ) => {
       if (!containerRef.current || gameRef.current) return;
+      // Register all playable stage scenes.  Phaser auto-starts the
+      // FIRST one (VillageMapScene = Stage 1); later stages launch via
+      // `scene.start("<key>")` when the user progresses or ?stage=N.
+      const scenes = [
+        VillageMapScene,
+        ForestMapScene,
+        ArenaScene,
+        ArtisansScene,
+        MineScene,
+        GoldenHarborScene,
+        CrossroadsScene,
+      ];
       const game = new Phaser.Game(
-        createGameConfig(containerRef.current, WorldMapScene),
+        createGameConfig(
+          containerRef.current,
+          scenes as unknown as Parameters<typeof createGameConfig>[1],
+        ),
       );
       gameRef.current = game;
     });
@@ -443,7 +534,7 @@ function useMapGame() {
     };
   }, []);
 
-  return { containerRef, phaserReady };
+  return { containerRef, phaserReady, gameRef };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -695,6 +786,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
   isCurrentMapCheckpoint = false,
   totalCheckpointsInStage = 4,
   tourActive = false,
+  ventureId,
 }: {
   detail: CheckpointDetail | null;
   onClose: () => void;
@@ -704,6 +796,8 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
   showBossGateHint?: boolean;
   isCurrentMapCheckpoint?: boolean;
   totalCheckpointsInStage?: number;
+  /** Current active venture id, forwarded to the contextual Flare button. */
+  ventureId?: Id<"ventures">;
   /** First-run product tour active. Relaxes the advance threshold so
    *  the user can fight the Doubt Imp after a single task submission. */
   tourActive?: boolean;
@@ -736,6 +830,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
     <motion.div
       key="cp-panel"
       data-phaser-pause="true"
+      data-tutorial="checkpoint-panel"
       initial={{ x: "100%", opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
@@ -787,10 +882,16 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
             </div>
 
             {/* Tasks */}
-            <div className="flex flex-col gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3">
+            <div
+              className="flex flex-col gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3"
+              data-tutorial="task-list"
+            >
               {detail.tasks.map((task, i) => {
                 // Mark the first not-yet-done task so the product tour
-                // can pulse its highlight ring around it.
+                // can pulse its highlight ring around it. Also add
+                // a stable per-index marker so the tutorial can find
+                // the first row even if the "first-open" logic is out
+                // of sync with the current render.
                 const isFirstOpenTask =
                   !task.done &&
                   !isLocked &&
@@ -798,9 +899,8 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                 return (
                   <div
                     key={i}
-                    {...(isFirstOpenTask
-                      ? { "data-tutorial": "first-task" }
-                      : {})}
+                    data-tutorial-task-index={i}
+                    data-tutorial={isFirstOpenTask ? "first-task" : undefined}
                   >
                     <TaskCard
                       task={task}
@@ -909,6 +1009,18 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                     )}
                   </span>
                 </motion.button>
+
+                {/* Contextual "Fire a Flare" — pre-fills the ventureId and
+                    checkpointId so a responder sees exactly where the user
+                    is stuck. Sits below the Advance button so it's easy to
+                    reach when tasks feel blocked. */}
+                <div className="pt-1">
+                  <FlareTriggerButton
+                    variant="subtle"
+                    ventureId={ventureId}
+                    checkpointId={detail.id as Id<"ventureCheckpoints">}
+                  />
+                </div>
               </div>
             )}
       </div>
@@ -1068,12 +1180,9 @@ const TaskCard = memo(function TaskCardInner({
             AI evaluating...
           </p>
         )}
-        {evaluationSummary?.evaluation && (
-          <p className="mt-1.5 sm:mt-2 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">
-            {evaluationSummary.evaluation.qualityTier} ·{" "}
-            {evaluationSummary.evaluation.totalScore}/12
-          </p>
-        )}
+        {/* Score badge (STANDARD · 8/12) hidden per user preference —
+            keep evaluation data in state for combat logic but do not show
+            the tier/score label on task cards. */}
       </div>
     </motion.div>
   );
@@ -1194,29 +1303,7 @@ function StageResetNotice({
   );
 }
 
-/** Tour replay button */
-function TourToggle({ onToggle }: { onToggle: () => void }) {
-  return (
-    <motion.button
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 1 }}
-      onClick={onToggle}
-      onMouseEnter={() => audioManager.playUI("hover")}
-      className="absolute bottom-20 right-2 z-20 flex h-9 w-9 items-center justify-center rounded-full text-[14px] shadow-lg backdrop-blur-xl sm:bottom-24 sm:right-4 sm:h-10 sm:w-10 sm:text-[16px] md:bottom-26 md:right-5 lg:bottom-24"
-      style={{
-        background: "rgba(15, 23, 42, 0.6)",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        color: "#e2e8f0",
-      }}
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
-      title="Replay World Map Tour"
-    >
-      🗺️
-    </motion.button>
-  );
-}
+// TourToggle removed with the WorldMapTour walkthrough deletion.
 
 
 
@@ -1335,10 +1422,37 @@ interface BadgePayload {
 }
 
 function MapPageInner() {
-  const { containerRef, phaserReady } = useMapGame();
+  const { containerRef, phaserReady, gameRef } = useMapGame();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Stage-based scene routing — reads ?stage=N from the URL. Stage lock
+  // (clamp to unlocked ceiling) applied lower down once `venture` loads.
+  const paramStage = searchParams?.get("stage");
+  const requestedStage = paramStage ? parseInt(paramStage, 10) : null;
+
+  // STAGE_COMPLETE listener is registered further down, after
+  // `activeVentureId` is defined — its handler needs a stable, current
+  // reference to the venture id to persist stage advancement to Convex.
+  useEffect(() => {
+    if (!phaserReady || !gameRef.current) return;
+    const stage =
+      requestedStage && Number.isFinite(requestedStage)
+        ? requestedStage
+        : null;
+    if (!stage || stage === 1) return; // Village is the default; nothing to swap
+    const targetKey = STAGE_SCENE_KEY[stage];
+    if (!targetKey) return;
+    const sceneMgr = gameRef.current.scene;
+    // Stop every registered scene, then start the target.
+    for (const key of Object.values(STAGE_SCENE_KEY)) {
+      if (sceneMgr.isActive(key) || sceneMgr.isVisible(key)) {
+        sceneMgr.stop(key);
+      }
+    }
+    sceneMgr.start(targetKey);
+  }, [phaserReady, requestedStage, gameRef]);
 
   const {
     selectedConversationId,
@@ -1592,6 +1706,13 @@ function MapPageInner() {
   const myBadges = useQuery(api.badges.getMyBadges);
   const prevBadgeCountRef = useRef<number | null>(null);
 
+  // Suppress badge-award modals while the v2 product tutorial is running.
+  // The tutorial has its own step-by-step guidance and a "Congratulations"
+  // celebration screen popping up mid-flow (e.g. First Spark right after
+  // the auto-submitted post) breaks the guided experience.
+  const tutorialCtx = useTutorialOptional();
+  const tutorialActive = !!tutorialCtx?.active;
+
   // Venture badge subscription (62-badge system)
   const ventureMyBadges = useQuery(
     api.badges.getVentureBadges,
@@ -1622,6 +1743,7 @@ function MapPageInner() {
 
   // ── Convex mutations ───────────────────────────────────────────────────────
   const advanceCheckpoint = useMutation(api.ventures.advanceCheckpoint);
+  const advanceStage = useMutation(api.ventures.advanceStage);
   const ensureVentureStructure = useMutation(
     api.ventures.ensureVentureStructure,
   );
@@ -1812,7 +1934,7 @@ function MapPageInner() {
   }>({ show: false, stageNumber: 1, stageName: "", isGold: false });
 
   // Tour walkthrough state
-  const [showTour, setShowTour] = useState(false);
+  // showTour removed with WorldMapTour deletion — v2 tutorial replaces it.
   // New product-tour state. Used to suppress the legacy WorldMapTour
   // and to drive the first-checkpoint pulse for first-run users.
   const tourStateForPulse = useQuery(api.tutorial.getMyFeedTutorialState, {});
@@ -1899,28 +2021,8 @@ function MapPageInner() {
       : "skip"
   );
 
-  useEffect(() => {
-    if (!activeVenture) return;
-    // Suppress the legacy WorldMapTour whenever the new product tour
-    // is (or might be) running. Treat undefined/null tour state as
-    // "still loading, assume new tour" so the legacy overlay never
-    // appears before the convex query resolves.
-    const newTourActive =
-      !tourStateForPulse ||
-      tourStateForPulse.state === "not_started" ||
-      tourStateForPulse.state === "in_progress";
-    if (newTourActive) {
-      if (showTour) setShowTour(false);
-      return;
-    }
-    if (activeVenture.currentStage !== 1) return;
-    const tourCompletedKey = `worldMapTourCompleted_${activeVenture._id}`;
-    const isCompleted = localStorage.getItem(tourCompletedKey);
-    if (isCompleted !== "true") {
-      setShowTour(true);
-      localStorage.setItem(tourCompletedKey, "true");
-    }
-  }, [activeVenture, tourStateForPulse, showTour]);
+  // Legacy WorldMapTour open/close effect removed — v2 Sparky is now the
+  // only walkthrough on /map/world.
 
   // Task submission state (now using Jotai atom for global access)
   const [submittingTask, setSubmittingTask] = useAtom(submittingTaskAtom);
@@ -1974,6 +2076,38 @@ function MapPageInner() {
 
   const activeStage = venture?.currentStage ?? 1;
   const activeCP = venture?.currentCheckpoint ?? 1;
+
+  // Stage lock — if the URL requests a stage the user hasn't unlocked yet,
+  // rewrite it to their actual currentStage. Prevents skipping progression
+  // via URL fiddling and keeps deep-linked bookmarks honest.
+  //
+  // Note: allows +1 stage of "preview tour" access beyond currentStage,
+  // so demo presenters can walk the next stage without playing through.
+  // Real progression (task submits, boss defeats) still requires unlocking.
+  useEffect(() => {
+    // Dev bypass — `?stagelock=off` or NODE_ENV=development + explicit
+    // opt-in URL param lets you preview any painted stage without
+    // needing to actually progress a Convex venture through it.  Kept
+    // opt-in even in dev so we don't hide the lock's normal behaviour
+    // during regular testing.
+    if (
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("stagelock") === "off"
+    ) {
+      return;
+    }
+    if (!venture) return;
+    if (!requestedStage || !Number.isFinite(requestedStage)) return;
+    const unlockedCeiling = (venture.currentStage ?? 1) + 1;
+    if (requestedStage <= unlockedCeiling) return;
+    const clamped = Math.max(1, unlockedCeiling);
+    const next = new URLSearchParams(searchParams?.toString() ?? "");
+    if (clamped === 1) next.delete("stage");
+    else next.set("stage", String(clamped));
+    const qs = next.toString();
+    router.replace(qs ? `/map/world?${qs}` : "/map/world", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venture?.currentStage, requestedStage]);
 
   useEffect(() => {
     if (!checkpoints.length) return;
@@ -2270,18 +2404,27 @@ function MapPageInner() {
   }, [checkpoints, buildCheckpointDetail]);
 
   // ── Sync URL Query Parameters to React state ───────────────────────────────
-  // Drop `checkpoints` from deps — the effect above already keeps
-  // selectedDetail fresh when checkpoints change. This effect should only
-  // re-run when the URL param itself changes.
+  // Must include `checkpoints` in deps: if the URL loads with a
+  // ?checkpointId=... before the checkpoints Convex query resolves,
+  // the initial run of this effect sees an empty checkpoints array,
+  // finds nothing, and sets selectedDetail = null. The refresh effect
+  // above only reruns when `prev` is non-null, so without a rerun here
+  // once checkpoints arrive, the panel never opens (user reported this
+  // — task column not visible on /map/world?checkpointId=... after
+  // Step2's auto-navigate). Adding checkpoints + buildCheckpointDetail
+  // to deps makes the sync try again when the query lands.
   useEffect(() => {
     // 1. Sync Checkpoint detail panel state
     if (paramCheckpointId) {
       const cp = checkpoints.find((c) => c._id === paramCheckpointId);
       if (cp) {
         setSelectedDetail(buildCheckpointDetail(cp));
-      } else {
+      } else if (checkpoints.length > 0) {
+        // We have checkpoints loaded but the ID isn't among them — the URL
+        // param is stale. Clear it.
         setSelectedDetail(null);
       }
+      // else: checkpoints still loading, do nothing (rerun once loaded)
     } else {
       setSelectedDetail(null);
     }
@@ -2296,7 +2439,7 @@ function MapPageInner() {
       setIsToolsPanelOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramCheckpointId, paramPanel, paramTab]);
+  }, [paramCheckpointId, paramPanel, paramTab, checkpoints, buildCheckpointDetail]);
 
   // ── Auto-open current active checkpoint on mount if no param is set ────────
   useEffect(() => {
@@ -2488,6 +2631,16 @@ function MapPageInner() {
         return;
       }
 
+      // Skip while the v2 tutorial is active — badges awarded during the
+      // guided flow (e.g. First Spark from the auto-submitted post) show
+      // up right when Sparky is teaching the first task and derail the
+      // guided experience. The badge is still recorded server-side; the
+      // user just sees the celebration modal later.
+      if (tutorialActive) {
+        prevBadgeCountRef.current = count;
+        return;
+      }
+
       // New badge(s) awarded — enqueue them
       const newCount = count - prevBadgeCountRef.current;
       const newBadges = myBadges.slice(0, newCount);
@@ -2508,7 +2661,7 @@ function MapPageInner() {
     }
 
     prevBadgeCountRef.current = count;
-  }, [myBadges]);
+  }, [myBadges, tutorialActive]);
 
   // ── Detect new venture badges (62-badge system) ───────────────────────────
   useEffect(() => {
@@ -2523,6 +2676,12 @@ function MapPageInner() {
       // handleTaskSubmissionSuccess already covers this animation.
       const msSinceSubmit = Date.now() - recentTaskSubmitRef.current;
       if (msSinceSubmit < 5000) {
+        prevVentureBadgeCountRef.current = count;
+        return;
+      }
+
+      // Skip while the v2 tutorial is active — see the myBadges effect above.
+      if (tutorialActive) {
         prevVentureBadgeCountRef.current = count;
         return;
       }
@@ -2573,17 +2732,23 @@ function MapPageInner() {
     }
 
     prevVentureBadgeCountRef.current = count;
-  }, [ventureMyBadges]);
+  }, [ventureMyBadges, tutorialActive]);
 
-  // ── Play biome ambience + stage music whenever active stage changes ─────────
+  // ── Play biome ambience + stage music whenever the DISPLAYED stage changes.
+  //     Uses the URL-requested stage (?stage=N) when present so the user
+  //     hears Forest music while walking the Forest map, even if Convex
+  //     venture.currentStage hasn't caught up yet (demo path where CPs
+  //     aren't all persisted-complete).
   useEffect(() => {
     if (!phaserReady) return;
     const templateId = (activeVenture?.templateId ?? "venture") as "venture" | "academic" | "lab" | "creative";
-    // Layer 1: Atmospheric ambience loop (always on)
-    audioManager.playAmbienceForTemplate(templateId, activeStage);
-    // Layer 2: Stage thematic music (crossfades in)
-    audioManager.playStageMusic(activeStage);
-  }, [activeStage, activeVenture?.templateId, phaserReady]);
+    const displayedStage =
+      requestedStage && Number.isFinite(requestedStage) && requestedStage >= 1
+        ? requestedStage
+        : activeStage;
+    audioManager.playAmbienceForTemplate(templateId, displayedStage);
+    audioManager.playStageMusic(displayedStage);
+  }, [activeStage, requestedStage, activeVenture?.templateId, phaserReady]);
 
   // ── Detect level-up → trigger LevelUpSequence + fanfare ──────────────────
   // Handles multi-level progression (XP overflow) - shows all levels gained in one animation
@@ -2777,6 +2942,125 @@ function MapPageInner() {
     return () => eventBridge.off("BADGE_AWARDED", handleBadge);
   }, []);
 
+  // ── Village demo — final celebration on Unraveller reveal ────────────────
+  // The Phaser scene fires VILLAGE_COMPLETE 4s after the boss taunt lands.
+  // We render VillageCompleteCelebration as a full-screen overlay to close
+  // the emotional arc of Stage 1.
+  const [villageComplete, setVillageComplete] = useState<{
+    open: boolean;
+    checkpointsCleared: number;
+    tasksCompleted: number;
+  }>({ open: false, checkpointsCleared: 4, tasksCompleted: 12 });
+
+  useEffect(() => {
+    const handleVillageComplete = (event: {
+      checkpointsCleared: number;
+      tasksCompleted: number;
+    }) => {
+      setVillageComplete({
+        open: true,
+        checkpointsCleared: event.checkpointsCleared,
+        tasksCompleted: event.tasksCompleted,
+      });
+    };
+    eventBridge.onReact("VILLAGE_COMPLETE", handleVillageComplete);
+    return () => eventBridge.off("VILLAGE_COMPLETE", handleVillageComplete);
+  }, []);
+
+  // ── Venture-wide finale — fires when the final stage (Artisans / 4) is
+  //     cleared. The STAGE_COMPLETE event carries `nextStage > 4` in that
+  //     case; we open the VentureCompleteCelebration overlay instead of
+  //     navigating (there's no stage 5 art yet).
+  const [ventureComplete, setVentureComplete] = useState<{
+    open: boolean;
+    stagesCleared: number;
+  }>({ open: false, stagesCleared: 4 });
+
+  // ── Super-boss encounter overlay — opens when Forest/Harbor/Artisans
+  //     scenes fire SUPER_BOSS_ENCOUNTER after CP4 mini-boss clears.
+  //     The player commits to a "final blow" CTA; on click we call the
+  //     scene's defeatSuperBoss() which plays the defeat beat and then
+  //     fires STAGE_COMPLETE, wired above.
+  const [superBossEncounter, setSuperBossEncounter] = useState<{
+    open: boolean;
+    stage: number;
+    boss: StageBoss | null;
+  }>({ open: false, stage: 0, boss: null });
+
+  // Brief toast between mid-arc stage transitions (Forest→Harbor and
+  // Harbor→Artisans). Village→Forest has the fuller celebration, and
+  // Stage 4 finish has the venture finale, so this only fires for
+  // clearedStage of 2 or 3.
+  const [stageCleared, setStageCleared] = useState<{ open: boolean; stage: number }>({
+    open: false,
+    stage: 0,
+  });
+
+  useEffect(() => {
+    const handleEncounter = (e: { stage: number; bossSlug?: string }) => {
+      const boss = getStageSuperBoss(e.stage);
+      setSuperBossEncounter({ open: true, stage: e.stage, boss });
+      // Layer a dramatic boss theme over the stage ambience for the
+      // encounter's duration. Pick track by boss family so each stage's
+      // super boss has a distinct sonic identity.
+      //   plant → Pale Architect (Forest Colossus)
+      //   serpent → Gravemind (Leviathan / Forge Dragon)
+      //   default → Unraveller (Village fallback)
+      try {
+        let track = "boss_unraveller";
+        if (boss?.family === "plant") track = "boss_pale_architect";
+        else if (boss?.family === "serpent") track = "boss_gravemind";
+        audioManager.playMusic(track, 0.55);
+      } catch {
+        /* audio failure non-blocking */
+      }
+    };
+    eventBridge.onReact("SUPER_BOSS_ENCOUNTER", handleEncounter);
+    return () => eventBridge.off("SUPER_BOSS_ENCOUNTER", handleEncounter);
+  }, []);
+
+  // Listen for STAGE_COMPLETE events from Forest/Harbor/Artisans scenes.
+  // Persists progression to Convex via advanceStage (idempotent — the
+  // Convex-side tryAdvanceStage guards with a "all CPs of stage marked
+  // completed" check, so this is safe to fire opportunistically).
+  //
+  // If nextStage <= 4: we swap URL to load next stage.
+  // If nextStage > 4: we open the venture-wide finale overlay.
+  useEffect(() => {
+    const handleStageComplete = (e: { stage: number; nextStage: number }) => {
+      // Fire Convex persistence in the background — never block the UX on it.
+      if (activeVentureId) {
+        advanceStage({ ventureId: activeVentureId as Id<"ventures"> }).catch(
+          (err) => {
+            console.warn("[stage-complete] advanceStage failed:", err);
+          },
+        );
+      }
+
+      // Venture-wide finale trigger.  Post spec-realignment (Harbor
+      // moved to stage 6) the last playable stage in the 4-map demo is
+      // Harbor.  When Harbor clears (nextStage advances beyond the
+      // painted stages we own), fire the venture-complete overlay.
+      const HAS_ART_STAGES = new Set([1, 2, 3, 4, 5, 6, 7]);
+      if (!HAS_ART_STAGES.has(e.nextStage)) {
+        setVentureComplete({ open: true, stagesCleared: 4 });
+        return;
+      }
+      // Mid-arc transitions (Forest→Artisans, Artisans→Harbor): brief
+      // cleared-toast for atmosphere.  Stage 1→2 uses the fuller
+      // VillageCompleteCelebration path elsewhere.
+      if (e.stage === 2 || e.stage === 4) {
+        setStageCleared({ open: true, stage: e.stage });
+      }
+      const next = new URLSearchParams(searchParams?.toString() ?? "");
+      next.set("stage", String(e.nextStage));
+      router.replace(`/map/world?${next.toString()}`, { scroll: false });
+    };
+    eventBridge.onReact("STAGE_COMPLETE", handleStageComplete);
+    return () => eventBridge.off("STAGE_COMPLETE", handleStageComplete);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVentureId]);
+
   // ── Sync venture identity → Phaser (not on every task/checkpoint tick) ───────
   useEffect(() => {
     if (!phaserReady || !venture) return;
@@ -2887,6 +3171,31 @@ function MapPageInner() {
   const miniGamePhase = miniGameLifecycle.phase;
   const miniGameCompletedSpawnIds = miniGameLifecycle.completedSpawnIds;
 
+  // Belt-and-suspenders: whenever the mini-game phase returns to idle
+  // (game finished, abandoned, or dismissed), force a re-focus + scroll
+  // unlock. Prevents "map stuck after mini-game" reports caused by the
+  // sub-Phaser instance leaving stray global listeners or the scroll
+  // lock counter drifting past zero.
+  useEffect(() => {
+    if (miniGamePhase.kind !== "idle") return;
+    // Delay so it runs after React has unmounted the overlay.
+    const t = window.setTimeout(() => {
+      if (typeof window !== "undefined") {
+        window.focus();
+        // If document.body still has overflow:hidden but no active
+        // scroll-lock consumer (Radix Dialog, tutorial, celebration),
+        // stomp it clear. Defensive — never runs if a real overlay is open.
+        const openDialogs = document.querySelectorAll("[role='dialog'][data-state='open']").length;
+        if (openDialogs === 0 && document.body.style.overflow === "hidden") {
+          document.body.style.overflow = "";
+          document.documentElement.style.overflow = "";
+          document.body.style.paddingRight = "";
+        }
+      }
+    }, 100);
+    return () => window.clearTimeout(t);
+  }, [miniGamePhase.kind]);
+
   // The "completed-checkpoint" set Phaser uses to gate spawn visibility.
   // Format mirrors the Phaser-side node-key: "{stage}-{checkpoint}".
   const miniGameCheckpointGate = useMemo(() => {
@@ -2906,12 +3215,30 @@ function MapPageInner() {
   }, [phaserReady, miniGameCheckpointGate, miniGameCompletedSpawnIds]);
 
   // Bridge: Phaser fires MINIGAME_SPAWN_ACTIVATED → hook opens the prompt.
+  // Prefer the Convex-registered config (canonical difficulty/flavor), but
+  // fall back to the event payload for demo/dev spawns that Phaser adds
+  // ad-hoc without a matching Convex row (e.g. the visible near-CP1 tag).
   useEffect(() => {
     const handler = (e: {
       spawnPointId: string;
+      stage: number;
+      archetype: "pattern_match" | "reflex_tap" | "decrypt";
+      difficulty: 1 | 2 | 3 | 4 | 5;
+      x: number;
+      y: number;
+      flavorText?: string;
     }) => {
-      const cfg = MINIGAME_SPAWNS.find((s) => s.id === e.spawnPointId);
-      if (cfg) miniGameLifecycle.engageWithSpawn(cfg);
+      const registered = MINIGAME_SPAWNS.find((s) => s.id === e.spawnPointId);
+      const cfg = registered ?? {
+        id: e.spawnPointId,
+        stage: e.stage,
+        archetype: e.archetype,
+        difficulty: e.difficulty,
+        x: e.x,
+        y: e.y,
+        flavorText: e.flavorText,
+      };
+      miniGameLifecycle.engageWithSpawn(cfg);
     };
     eventBridge.onReact("MINIGAME_SPAWN_ACTIVATED", handler);
     return () => eventBridge.off("MINIGAME_SPAWN_ACTIVATED", handler);
@@ -2942,9 +3269,27 @@ function MapPageInner() {
       const ventureId = activeVenture?._id;
       if (!ventureId) return;
 
-      const cp = checkpoints.find(
+      // First try to match by the payload's stage/checkpoint (Sahit path).
+      let cp = checkpoints.find(
         (c) => c.stage === e.stage && c.checkpoint === e.checkpoint,
       );
+
+      // Fallback for the new painted-village scene: the demo village emits
+      // a synthetic stage/checkpoint that may not exist in Convex venture
+      // data. When the exact match fails, open whichever venture checkpoint
+      // is currently ACTIVE. This keeps the demo village clickable while
+      // preserving old behavior for legacy scenes with real checkpoint IDs.
+      if (!cp) {
+        cp = checkpoints.find(
+          (c) => c.stage === activeStage && c.checkpoint === activeCP,
+        );
+        if (cp) {
+          console.log(
+            "[React] Payload CP not found; falling back to active CP",
+            { activeStage, activeCP, cpId: cp._id },
+          );
+        }
+      }
 
       // Hide first checkpoint pulse when any checkpoint is clicked
       if (showFirstCheckpointPulse) {
@@ -2968,7 +3313,28 @@ function MapPageInner() {
         };
 
         console.log("[React] Opening CheckpointPanel with detail:", detail);
+        // Directly set the panel state to guarantee the modal opens even
+        // if the URL params don't propagate cleanly (avoids race between
+        // Phaser click and Next.js router push in the demo village).
+        setSelectedDetail(detail);
         updateUrlParams({ checkpointId: cp._id, panel: null, tab: null });
+      } else {
+        console.warn(
+          "[React] No checkpoint matched (payload or active). Falling back to first available checkpoint.",
+          { payload: e, activeStage, activeCP, cpCount: checkpoints.length },
+        );
+        // Last-resort fallback: just open the FIRST checkpoint of the
+        // venture so the user always gets a task panel from a click.
+        const anyCp = checkpoints[0];
+        if (anyCp) {
+          const status = deriveCheckpointStatus(anyCp, activeStage, activeCP);
+          const detail: CheckpointDetail = {
+            ...buildCheckpointDetail(anyCp),
+            status,
+          };
+          setSelectedDetail(detail);
+          updateUrlParams({ checkpointId: anyCp._id, panel: null, tab: null });
+        }
       }
     };
 
@@ -3214,28 +3580,34 @@ function MapPageInner() {
         taskTagline = "Manage your time wisely and build consistency.";
       }
 
-      setBadgeQueue((q) => {
-        if (q.some((b) => b.name === taskBadgeLabel) || shownBadgesRef.current.has(taskBadgeLabel)) {
-          return q;
-        }
-        return [
-          ...q,
-          {
-            id: `task_${checkpointId}_${taskLevel}_${Date.now()}`,
-            name: taskBadgeLabel,
-            description: taskBadgeDesc,
-            icon: taskBadgeIcon,
-            rarity: taskBadgeRarity,
-            category: "idea_milestones",
-            isProfileStyle: true,
-            primaryColor: taskPrimaryColor,
-            secondaryColor: taskSecondaryColor,
-            tagline: taskTagline,
-            awardedAt: Date.now(),
-            scoreEarned: taskLevel === "t3" ? 35 : 20,
-          },
-        ];
-      });
+      // Suppress the task-badge celebration while the v2 tutorial is
+      // running — it hijacks the guided flow with a full-screen
+      // "CONGRATULATIONS!" modal right after Submit Response. Post-tutorial
+      // task submissions still trigger the badge normally.
+      if (!tutorialActive) {
+        setBadgeQueue((q) => {
+          if (q.some((b) => b.name === taskBadgeLabel) || shownBadgesRef.current.has(taskBadgeLabel)) {
+            return q;
+          }
+          return [
+            ...q,
+            {
+              id: `task_${checkpointId}_${taskLevel}_${Date.now()}`,
+              name: taskBadgeLabel,
+              description: taskBadgeDesc,
+              icon: taskBadgeIcon,
+              rarity: taskBadgeRarity,
+              category: "idea_milestones",
+              isProfileStyle: true,
+              primaryColor: taskPrimaryColor,
+              secondaryColor: taskSecondaryColor,
+              tagline: taskTagline,
+              awardedAt: Date.now(),
+              scoreEarned: taskLevel === "t3" ? 35 : 20,
+            },
+          ];
+        });
+      }
 
       const nextLabelMap: Record<"t1" | "t2" | "t3", string> = {
         t1: "T1",
@@ -3306,6 +3678,75 @@ function MapPageInner() {
         checkpointId,
         taskLevel,
       });
+
+      // Boss weakening — call scene.weakenActiveBoss(doneCount) on
+      // whichever stage scene is currently active. All four stage scenes
+      // (Village / Forest / GoldenHarbor / Artisans) implement the same
+      // weakenActiveBoss(tasksDone, total) contract, so we probe each in
+      // turn and forward the call to the first one that's alive.
+      // Fixes the audit gap "stages 2-4 have zero boss reactivity to
+      // task submissions".
+      try {
+        let bossDoneCount = 0;
+        if (current && current.id === checkpointId) {
+          bossDoneCount = current.tasks.filter(
+            (t) => t.done || t._taskId === taskId,
+          ).length;
+        }
+        const sceneMgr = gameRef.current?.scene;
+        const STAGE_KEYS = [
+          "VillageMapScene",
+          "ForestMapScene",
+          "GoldenHarborScene",
+          "ArtisansScene",
+        ];
+        for (const key of STAGE_KEYS) {
+          if (!sceneMgr) break;
+          const isLive = sceneMgr.isActive(key) || sceneMgr.isVisible(key);
+          if (!isLive) continue;
+          const scene = sceneMgr.getScene(key);
+          if (scene && "weakenActiveBoss" in scene) {
+            (scene as unknown as {
+              weakenActiveBoss: (n: number, total?: number) => void;
+            }).weakenActiveBoss(bossDoneCount, 3);
+            break; // Only fire on the active scene, not all of them
+          }
+        }
+      } catch (err) {
+        console.warn("[MapPage] weakenActiveBoss failed", err);
+      }
+
+      // Reward feedback — floating "+N XP" popover.  Uses the REAL point
+      // value granted by the server (t1/t2 = 20 pts, t3 = 35 pts) so the
+      // popover doesn't lie to the user.  Gamification audit surfaced
+      // the previous hardcoded "+15 XP" as a UX credibility issue.
+      try {
+        const rewardAmount =
+          taskLevel === "t3" ? 35 : 20;
+        eventBridge.dispatchToReact({
+          type: "XP_AWARDED",
+          amount: rewardAmount,
+          label: taskLevel === "t3" ? "Task · Deep" : "Task",
+        });
+      } catch (err) {
+        console.warn("[MapPage] XP_AWARDED dispatch failed", err);
+      }
+
+      // v2 tutorial: after the guided first task, auto-advance the
+      // checkpoint so the user is taken straight into AI Combat instead
+      // of having to hunt for the Advance button.
+      //   forceBypass=false → boss combat check RUNS (we want combat)
+      //   skipDoneTasksCheck=true → allow advance with just 1 completed
+      //     task (the tutorial only submits one)
+      //   fromBossVictory=false → default
+      // handleAdvance then hits needsCheckpointBossCombat() → true →
+      // startBossCombat() → sets bossCombatTarget → CombatPanel mounts.
+      if (tutorialActive) {
+        window.setTimeout(() => {
+          const fn = handleAdvanceRef.current;
+          if (fn) void fn(false, true, false);
+        }, 800);
+      }
     },
     [
       selectedDetail,
@@ -3316,6 +3757,7 @@ function MapPageInner() {
       setBadgeQueue,
       corruptionLevel,
       checkpoints,
+      tutorialActive,
     ],
   );
 
@@ -3346,10 +3788,12 @@ function MapPageInner() {
       Boolean,
     ).length;
     // First-run tour can advance after 1 task to reach the Doubt Imp
-    // without grinding all three.
+    // without grinding all three. Include the v2 product tutorial so a
+    // guided-tour user gets the same relaxed threshold.
     const tourActiveNow =
       tourStateForPulse?.state === "not_started" ||
-      tourStateForPulse?.state === "in_progress";
+      tourStateForPulse?.state === "in_progress" ||
+      tutorialActive;
     const minTasksToAdvance = tourActiveNow ? 1 : 2;
     if (doneTasks < minTasksToAdvance && !skipDoneTasksCheck) return;
 
@@ -3679,6 +4123,7 @@ function MapPageInner() {
     setBossCombatTarget,
     startBossCombat,
     tourStateForPulse,
+    tutorialActive,
   ]);
 
   // Keep handleAdvanceRef always pointing at the latest handleAdvance
@@ -3969,9 +4414,12 @@ function MapPageInner() {
               currentXP={userProgress.xp}
               maxXP={userProgress.xpToNextLevel}
               compact={true}
-              bossHp={corruption.bossHp}
-              bossBaseHp={corruption.bossBaseHp}
-              bossName={corruption.bossName}
+              // TEMPORARY: boss overlay hidden for demo — omitting boss props
+              // makes XPBar render as an XP-only bar without the "THE HOLLOW
+              // KING" HP header and VS panel. Restore by re-passing:
+              //   bossHp={corruption.bossHp}
+              //   bossBaseHp={corruption.bossBaseHp}
+              //   bossName={corruption.bossName}
             />
           </div>
 
@@ -4041,28 +4489,17 @@ function MapPageInner() {
 
           {/* Quest List removed per user request */}
 
-          {/* Boss HP Bar - only mount when it actually needs to show.
-              Previously this component always mounted and read Jotai
-              corruption state on every tick. */}
-          {(corruption.level >= 60 || bossCombatTarget) && (
+          {/* TEMPORARY: boss HP bar hidden for demo — restore by removing
+              the `false &&` guard below. Original condition preserved for
+              easy re-enable after client sign-off.  */}
+          {false && (corruption.level >= 60 || bossCombatTarget) && (
             <BossHPBar forceVisible={!!bossCombatTarget} />
           )}
 
           {/* Stage navigation strip removed */}
 
-          {/* World Map Tour Walkthrough */}
-          {activeStage === 1 && (
-            <WorldMapTour
-              show={showTour}
-              onClose={() => setShowTour(false)}
-              ventureName={ideaTitle}
-            />
-          )}
-
-          {/* Tour replay toggle */}
-          {activeStage === 1 && (
-            <TourToggle onToggle={() => setShowTour(true)} />
-          )}
+          {/* WorldMapTour + TourToggle removed — v2 tutorial (Sparky) is
+              the only guided walkthrough now. */}
 
           <CrossingFlash trigger={flashTrigger} />
 
@@ -4097,6 +4534,126 @@ function MapPageInner() {
             />
           )}
 
+          {/* Floating "+N XP" popovers on task submit / CP clear / boss defeat */}
+          <XpFloatingPopover />
+
+          {/* Daily challenges — fixed to top-right so it's visible on load
+              without blocking the map interactions.  Hidden during:
+                - the Sparky tutorial (competing focus)
+                - CheckpointPanel open (would overlap the task list)
+                - Any other modal / boss encounter / celebration (invisible
+                  overlays sit on top anyway, but explicit hide avoids
+                  z-index race conditions like this Daily card overlapping
+                  the checkpoint dialog).
+             */}
+          {!tutorialActive && !selectedDetail && !bossCombatTarget && (
+            <div className="pointer-events-auto fixed right-4 top-20 z-[10005] hidden w-[280px] sm:block">
+              <DailyChallengesCard compact />
+            </div>
+          )}
+
+          {/* Village demo — Stage 1 Complete finale after Unraveller reveal.
+              When the user dismisses this we also fire PREVIEW_NEXT_STAGE
+              on the event bridge; the Phaser scene handles the camera pan
+              east to the silhouetted Forest of Perfectionism. */}
+          <VillageCompleteCelebration
+            open={villageComplete.open}
+            checkpointsCleared={villageComplete.checkpointsCleared}
+            tasksCompleted={villageComplete.tasksCompleted}
+            onContinue={() => {
+              setVillageComplete((s) => ({ ...s, open: false }));
+              // Beat 1: brief exit animation + Phaser preview pan east
+              window.setTimeout(() => {
+                eventBridge.dispatchToPhaser({
+                  type: "PREVIEW_NEXT_STAGE",
+                  stage: 2,
+                });
+              }, 350);
+              // Beat 2: after the preview pan (~4.2s per previewNextStage
+              // choreography) navigate the URL to ?stage=2 so the Forest
+              // scene loads. Preserves ventureId so downstream React
+              // (CheckpointPanel, boss combat, etc.) stays anchored.
+              window.setTimeout(() => {
+                const next = new URLSearchParams(
+                  searchParams?.toString() ?? "",
+                );
+                next.set("stage", "2");
+                router.replace(`/map/world?${next.toString()}`, {
+                  scroll: false,
+                });
+              }, 5500);
+            }}
+          />
+
+          {/* Mid-arc stage-clear toast — Forest→Harbor + Harbor→Artisans.
+              Fires briefly during the URL swap between stages. */}
+          <StageClearedToast
+            open={stageCleared.open}
+            stage={stageCleared.stage}
+            onDismiss={() => setStageCleared((s) => ({ ...s, open: false }))}
+          />
+
+          {/* Super-boss encounter for stages 2-4 — sits between the CP4
+              mini-boss clear and the STAGE_COMPLETE navigation. Strike
+              CTA calls the scene's defeatSuperBoss method, which plays
+              the defeat animation and then fires STAGE_COMPLETE. */}
+          <SuperBossEncounterOverlay
+            open={superBossEncounter.open}
+            stage={superBossEncounter.stage}
+            boss={superBossEncounter.boss}
+            onStrike={() => {
+              setSuperBossEncounter((s) => ({ ...s, open: false }));
+              const game = gameRef.current;
+              if (!game) return;
+              const stageKey =
+                superBossEncounter.stage === 2
+                  ? "ForestMapScene"
+                  : superBossEncounter.stage === 3
+                    ? "GoldenHarborScene"
+                    : superBossEncounter.stage === 4
+                      ? "ArtisansScene"
+                      : null;
+              if (!stageKey) return;
+              const scene = game.scene.getScene(stageKey) as
+                | { defeatSuperBoss?: () => void }
+                | undefined;
+              scene?.defeatSuperBoss?.();
+            }}
+            onDismiss={() => {
+              setSuperBossEncounter((s) => ({ ...s, open: false }));
+              // Boss theme was layered on when encounter opened — swap
+              // back to the stage's ambient music since we're staying on
+              // this stage.
+              try {
+                audioManager.playStageMusic(superBossEncounter.stage);
+              } catch {
+                /* audio non-critical */
+              }
+            }}
+          />
+
+          {/* Venture-wide finale — fires when the final stage (4) clears.
+              Nothing to preview beyond this yet; the CTA drops the user
+              back on the World map at their current (final) stage. */}
+          <VentureCompleteCelebration
+            open={ventureComplete.open}
+            stagesCleared={ventureComplete.stagesCleared}
+            onContinue={() => {
+              setVentureComplete((s) => ({ ...s, open: false }));
+              // Clear any ?stage=N deep-link so refreshes land cleanly
+              // on the current stage (which by now is 4).
+              const next = new URLSearchParams(
+                searchParams?.toString() ?? "",
+              );
+              next.delete("stage");
+              const qs = next.toString();
+              router.replace(qs ? `/map/world?${qs}` : "/map/world", {
+                scroll: false,
+              });
+            }}
+          />
+
+
           {/* Gold checkpoint notification popup */}
           {goldCheckpointNotification && (
             <GoldCheckpointPopup
@@ -4115,6 +4672,22 @@ function MapPageInner() {
               key={activeCombatRoundId}
               roundId={activeCombatRoundId as Id<"combatRounds">}
               checkpointId={bossCombatTarget.checkpointId as Id<"ventureCheckpoints">}
+              // Stage-aware boss identity — pulls from the shared
+              // stage-bosses config which covers stages 1-4 with real
+              // sprites + names + intro lines. Falls back to Village
+              // config for stage 1 (both paths return same data).
+              boss={
+                bossCombatTarget.stage === 1
+                  ? getVillageBoss(bossCombatTarget.checkpoint - 1)
+                  : getStageBoss(
+                      bossCombatTarget.stage,
+                      bossCombatTarget.checkpoint - 1,
+                    )
+              }
+              // Founder's actual venture / idea title — replaces the
+              // hardcoded "RETLIFY: BOSS CHALLENGE" placeholder in the
+              // combat header with the user's real idea name.
+              ideaTitle={ideaTitle}
               onRetryStarted={(newRoundId) => {
                 // Direct swap to the new round. The key prop above
                 // forces a clean CombatPanel remount when activeCombatRoundId changes.
@@ -4348,6 +4921,7 @@ function MapPageInner() {
                 totalCheckpointsInStage={
                   templateStages[deferredSelectedDetail.stage - 1]?.checkpoints ?? 4
                 }
+                ventureId={venture?._id}
               />
             )}
           </AnimatePresence>

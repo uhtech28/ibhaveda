@@ -1,10 +1,21 @@
 # 2-Stage Venture System Specification
 **Interactive Ideas - MVP Launch Scope**
 
-**Version**: 2.0 (Reduced Scope)  
+> **⚠️ DEPRECATED — do not use this as a source of truth.**
+>
+> This doc described the 2-stage MVP scope from January 2025. Since then the product shipped **all 8 stages** (Village, Forest, Arena, Artisan's Quarter, Mine, Harbour, Crossroads Town, Capital). Boss names, CP counts, and roster details in this document are from the deprecated scope and do **not** match what actually ships.
+>
+> For current truth see:
+> - Runtime rosters: `src/config/stage-bosses.ts`
+> - Stage metadata: `src/config/stages.config.ts`
+> - CP task templates: `convex/ventureConstants.ts` → `VENTURE_STAGES`
+> - Painting briefs: `docs/MAP_BRIEFS_FOR_ARTIST.md`
+> - Design spec: `MAP_SPEC.md`
+
+**Version**: 2.0 (Reduced Scope) — DEPRECATED
 **Date**: January 2025  
-**Status**: Implementation Guide  
-**Scope Change**: 8 stages → 2 stages (Ideation + Research)
+**Status**: DEPRECATED — kept for historical reference only  
+**Scope Change**: 8 stages → 2 stages (Ideation + Research) — this reduction was later reversed; product now ships all 8 stages.
 
 ---
 

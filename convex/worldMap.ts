@@ -292,6 +292,21 @@ async function awardPointsAndSyncLevel(
     updatedAt: args.now,
   });
 
+  // ── Sync the legacy users.xp/level fields so the HUD XP bar and
+  //     LevelUpSequence overlay (which read from users.xp/level, not
+  //     userLevels) actually update on task/CP/gold events.
+  //     Without this, tasks submit → points award → userLevels moves
+  //     but the visible XP bar sits still. Fixing the "task rewards
+  //     lie to the user" gap surfaced in the gamification audit.
+  const userDoc = await ctx.db.get(args.userId);
+  if (userDoc) {
+    const nextUserXp = (userDoc.xp ?? 0) + args.amount;
+    await ctx.db.patch(args.userId, {
+      xp: nextUserXp,
+      level: targetLevel,
+    });
+  }
+
   // Recalculate and award badges in real-time
   await recalculateAndAwardBadgesHelper(ctx, args.userId);
 
@@ -1999,6 +2014,15 @@ export const submitTaskContent = mutation({
       });
     } catch { /* streak failure must never block primary mutation */ }
 
+    // Daily challenge progress — task submission bumps the
+    // "submit_task" challenge.
+    try {
+      await ctx.scheduler.runAfter(0, internal.dailyChallenges.bumpProgress, {
+        userId: user._id,
+        actionType: "submit_task",
+      });
+    } catch { /* challenge bump non-blocking */ }
+
     // Auto-share to the feed — every completed task becomes a public
     // milestone post so the user's progress is visible to the network
     // without them having to compose anything. Wrapped so a feed
@@ -2031,6 +2055,11 @@ export const submitTaskContent = mutation({
         createdAt: Date.now(),
         updatedAt: Date.now(),
         isDeleted: false,
+        // Link the milestone back to the source venture's idea so the
+        // feed can render the venture progress bar (THE VILLAGE 1/8,
+        // boss HP, etc.) on the milestone post — same UI as the
+        // original venture post.
+        parentId: ventureForPost?.ideaId,
       });
     } catch (err) {
       console.warn("[submitTask] auto feed-post failed (non-fatal):", err);

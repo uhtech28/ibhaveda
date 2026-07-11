@@ -283,7 +283,7 @@
 
     **Deliverables:**
     - Snake-path overworld map
-    - 8 biome visual designs (Village, Forest, Arena, Quarry, Mine, Harbour, Crossroads, Capital)
+    - 8 biome visual designs (Village, Forest, Arena, Artisan's Quarter, Mine, Harbour, Crossroads Town, Capital)
     - Checkpoint node rendering
     - Stage progression visualization
     - Boss silhouette system

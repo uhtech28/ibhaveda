@@ -27,6 +27,17 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 
+// XP rewards for flare loop.  Kept modest — mentorship should feel
+// meaningful but shouldn't be a level-farming path.  Fills gap #4 in
+// the gamification audit ("flare counters exist but nothing reads them
+// into XP or leagues").
+const FLARE_XP = {
+  fire: 5,
+  respond: 10,
+  markedHelpful: 25,
+  resolve: 15,
+} as const;
+
 // ─────────────────────────────────────────────────────────────────────
 // Mutations
 // ─────────────────────────────────────────────────────────────────────
@@ -80,6 +91,23 @@ export const fireFlare = mutation({
         actionType: "fired_flare",
       });
     } catch { /* streak failure must never block primary mutation */ }
+
+    // Small XP grant for engagement — asking for help IS the action.
+    try {
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: user._id,
+        amount: FLARE_XP.fire,
+        action: "flare_fired",
+      });
+    } catch { /* XP failure non-blocking */ }
+
+    // Daily challenge progress
+    try {
+      await ctx.scheduler.runAfter(0, internal.dailyChallenges.bumpProgress, {
+        userId: user._id,
+        actionType: "fire_flare",
+      });
+    } catch { /* non-blocking */ }
 
     return flareId;
   },
@@ -154,6 +182,23 @@ export const respondToFlare = mutation({
       });
     } catch { /* streak failure must never block primary mutation */ }
 
+    // Reward the responder — mentorship is real work.
+    try {
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: user._id,
+        amount: FLARE_XP.respond,
+        action: "flare_responded",
+      });
+    } catch { /* XP failure non-blocking */ }
+
+    // Daily challenge progress
+    try {
+      await ctx.scheduler.runAfter(0, internal.dailyChallenges.bumpProgress, {
+        userId: user._id,
+        actionType: "respond_flare",
+      });
+    } catch { /* non-blocking */ }
+
     return responseId;
   },
 });
@@ -208,6 +253,16 @@ export const markResponseHelpful = mutation({
       createdAt: Date.now(),
     });
 
+    // Larger XP reward — being genuinely helpful is the aspirational
+    // behaviour the community should optimize for.
+    try {
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: response.userId,
+        amount: FLARE_XP.markedHelpful,
+        action: "flare_marked_helpful",
+      });
+    } catch { /* XP failure non-blocking */ }
+
     return { alreadyMarked: false };
   },
 });
@@ -245,6 +300,15 @@ export const resolveFlare = mutation({
         updatedAt: Date.now(),
       });
     }
+
+    // Reward the resolver — closing the loop matters for community health.
+    try {
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: user._id,
+        amount: FLARE_XP.resolve,
+        action: "flare_resolved",
+      });
+    } catch { /* XP failure non-blocking */ }
 
     return { alreadyResolved: false };
   },

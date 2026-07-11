@@ -386,3 +386,159 @@ async function maybeUser(ctx: any): Promise<Doc<"users"> | null> {
     .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
     .first();
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Streak recovery — the first real wallet spend beyond henchman skip.
+// Fills gap #3 in the gamification audit ("currency has no sink").
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Cost in wallet points to restore a broken streak. Set deliberately
+ * above the SKIP_COST_GOLD (5) so it feels like a meaningful spend for
+ * a meaningful recovery.
+ */
+export const STREAK_RESTORE_COST = 20;
+
+/**
+ * Fixed number of days the streak is restored to. Kept modest so the
+ * feature encourages continued engagement rather than resetting a
+ * lifetime maximum for cheap.
+ */
+export const STREAK_RESTORE_DAYS = 7;
+
+/**
+ * Restore a broken streak by spending wallet points. Requires:
+ *   - The user has a userStreaks row
+ *   - `recoveryAvailable` is true (only set by the daily cron when a
+ *     streak of ≥ 7 breaks — small streaks aren't worth restoring)
+ *   - Wallet balance ≥ STREAK_RESTORE_COST
+ *
+ * On success: deducts points, bumps currentStreak to STREAK_RESTORE_DAYS,
+ * writes today into lastActionDate, clears recoveryAvailable, and inserts
+ * a "streak_restore" wallet transaction so it shows in history.
+ */
+export const restoreStreak = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await maybeUser(ctx);
+    if (!user) throw new Error("Unauthenticated");
+
+    const streakRow = await ctx.db
+      .query("userStreaks")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!streakRow) {
+      throw new Error("No streak to restore");
+    }
+    if (!streakRow.recoveryAvailable) {
+      throw new Error(
+        "Streak recovery is not available. Recovery unlocks after a streak of 7+ days breaks.",
+      );
+    }
+
+    // Wallet spend
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+    if (!wallet || wallet.balance < STREAK_RESTORE_COST) {
+      throw new Error(
+        `Need ${STREAK_RESTORE_COST} gold to restore your streak (you have ${wallet?.balance ?? 0}).`,
+      );
+    }
+
+    const now = Date.now();
+    const tz = streakRow.timezone ?? "UTC";
+    const today = localDateStringForRestore(now, tz);
+
+    // Deduct points
+    await ctx.db.patch(wallet._id, {
+      balance: wallet.balance - STREAK_RESTORE_COST,
+      updatedAt: now,
+    });
+    await ctx.db.insert("transactions", {
+      walletId: wallet._id,
+      amount: -STREAK_RESTORE_COST,
+      type: "streak_restore",
+      description: `Restored streak to ${STREAK_RESTORE_DAYS} days`,
+      relatedId: streakRow._id,
+      createdAt: now,
+    });
+
+    // Restore the streak
+    await ctx.db.patch(streakRow._id, {
+      currentStreak: STREAK_RESTORE_DAYS,
+      longestStreak: Math.max(streakRow.longestStreak, STREAK_RESTORE_DAYS),
+      lastActionDate: today,
+      lastLoginDate: today,
+      lastStreakUpdate: now,
+      recoveryAvailable: false,
+    });
+
+    // Celebrate — user gets a notification so the bell animates.
+    await ctx.db.insert("notifications", {
+      recipientId: user._id,
+      senderId: user._id,
+      type: "streak_restored" as any,
+      message: `🔥 Streak restored · Back to ${STREAK_RESTORE_DAYS} days · -${STREAK_RESTORE_COST} gold`,
+      isRead: false,
+      createdAt: now,
+    });
+
+    return {
+      restoredTo: STREAK_RESTORE_DAYS,
+      cost: STREAK_RESTORE_COST,
+      newBalance: wallet.balance - STREAK_RESTORE_COST,
+    };
+  },
+});
+
+/**
+ * Whether streak recovery is currently available for the authed user
+ * and whether they can afford it. Powers the "Restore streak" UI.
+ */
+export const getStreakRestoreState = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await maybeUser(ctx);
+    if (!user) return null;
+
+    const streakRow = await ctx.db
+      .query("userStreaks")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    return {
+      available: streakRow?.recoveryAvailable === true,
+      cost: STREAK_RESTORE_COST,
+      restoreTo: STREAK_RESTORE_DAYS,
+      balance: wallet?.balance ?? 0,
+      canAfford: (wallet?.balance ?? 0) >= STREAK_RESTORE_COST,
+    };
+  },
+});
+
+// Small helper — replicates the localDateString shape used above but
+// local to this section to avoid tangling the imports up top.
+function localDateStringForRestore(ms: number, tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date(ms));
+    const y = parts.find((p) => p.type === "year")?.value ?? "";
+    const m = parts.find((p) => p.type === "month")?.value ?? "";
+    const d = parts.find((p) => p.type === "day")?.value ?? "";
+    return `${y}-${m}-${d}`;
+  } catch {
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+}
