@@ -114,13 +114,28 @@ export const viewport = {
   interactiveWidget: 'resizes-content',
 };
 
+// Only wrap in <ClerkProvider> if the publishable key is present.
+// Without it, ClerkProvider throws during hydration and the whole
+// React tree crashes with "Application error: a client-side
+// exception has occurred". When missing (e.g. Preview deployment
+// without full env), fall back to a plain wrapper -- auth features
+// silently no-op but the app LOADS.
+const CLERK_PUBLISHABLE_KEY =
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const CLERK_READY = Boolean(CLERK_PUBLISHABLE_KEY);
+
+function AuthWrapper({ children }: { children: React.ReactNode }) {
+  if (!CLERK_READY) return <>{children}</>;
+  return <ClerkProvider>{children}</ClerkProvider>;
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <AuthWrapper>
       <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
         <body
           className="font-sans antialiased"
@@ -139,6 +154,6 @@ export default function RootLayout({
           </ConvexClientProvider>
         </body>
       </html>
-    </ClerkProvider>
+    </AuthWrapper>
   );
 }

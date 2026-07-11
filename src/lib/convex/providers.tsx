@@ -12,6 +12,14 @@ interface ConvexProviderProps {
 }
 
 export function ConvexClientProvider({ children }: ConvexProviderProps) {
+  // If Convex isn't configured on this environment (e.g. Preview
+  // deployment without NEXT_PUBLIC_CONVEX_URL) skip the provider and
+  // render children directly. Convex-dependent hooks will fail
+  // gracefully at their call sites instead of crashing the whole app
+  // during hydration.
+  if (!convex) {
+    return <>{children}</>
+  }
   return (
     <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
       <TimezoneSync />
