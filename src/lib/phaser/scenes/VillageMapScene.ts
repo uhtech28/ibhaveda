@@ -106,7 +106,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     loopFrameCount: 6,
     attackKey: "boss-fog-attack",
     attackFrameCount: 6,
-    scale: 1.5,
+    scale: 2.2,
     yOffset: -30,
     offsetX: 105, // east of CP1 — persona stands on marker facing east
 
@@ -128,7 +128,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     loopFrameCount: 0,
     attackKey: null,
     attackFrameCount: 0,
-    scale: 1.5,
+    scale: 2.2,
     yOffset: -30,
     offsetX: -110, // west of CP2 (path bends east so guardian sits west)
 
@@ -151,7 +151,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     loopFrameCount: 0,
     attackKey: null,
     attackFrameCount: 0,
-    scale: 1.5,
+    scale: 2.2,
     yOffset: -30,
     offsetX: 105, // east of CP3
 
@@ -171,7 +171,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     loopFrameCount: 8,
     attackKey: null,
     attackFrameCount: 0,
-    scale: 1.6,
+    scale: 2.3,
     yOffset: -30,
     offsetX: -105, // west of CP4 — Unraveller lives east so Wraith guards west approach
 
@@ -512,6 +512,32 @@ export class VillageMapScene extends Phaser.Scene {
       // Face the character (opposite of offsetX direction)
       sprite.setFlipX(def.offsetX > 0 ? true : false);
       tagBossFamily(sprite, def.family);
+
+      // Contrast anchor — a wide, soft dark ellipse behind the sprite so
+      // pale-palette bosses (Fog, Chimera) don't disappear against grass.
+      // Sized 1.15x sprite width, tall enough to sit "behind" the whole
+      // silhouette, dark navy at low alpha. Reads as body-shadow / aura.
+      const anchorW = sprite.displayWidth * 1.15;
+      const anchorH = sprite.displayHeight * 1.35;
+      const anchor = this.add.ellipse(
+        sprite.x,
+        sprite.y - sprite.displayHeight * 0.5,
+        anchorW,
+        anchorH,
+        0x0a0a1a,
+        0.28,
+      );
+      anchor.setDepth(sprite.depth - 3);
+      // Follow the sprite as it bobs (per-frame so no lag)
+      this.time.addEvent({
+        delay: 16,
+        loop: true,
+        callback: () => {
+          if (!sprite.active) return;
+          anchor.setPosition(sprite.x, sprite.y - sprite.displayHeight * 0.5);
+          anchor.setVisible(sprite.visible);
+        },
+      });
 
       // HD pixel-art crisp filter
       const tex = sprite.texture;

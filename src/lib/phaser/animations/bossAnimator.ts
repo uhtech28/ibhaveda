@@ -542,10 +542,13 @@ export function addBossHpBar(
   const totalH = chipH + 4 + barH; // chip + gap + bar
   const totalW = barW + 8; // 4px padding each side
 
-  // Container anchored above the boss's head. Origin (0.5, 1) so the
-  // chip's bottom aligns with the anchor point → nice visual gap to the
-  // sprite crown.
-  const anchorY = sprite.y - sprite.displayHeight * 0.55;
+  // Container anchored ABOVE the top of the sprite so it never overlaps
+  // the boss's head / body. Old anchor was 55% of displayHeight from the
+  // bottom (i.e. inside the sprite); with the scaled-up 2.2x bosses that
+  // put the chip on the boss's forehead. New anchor: sprite top - 20px
+  // gap. Total container height ~30px, so the visible bar sits ~6-35px
+  // above the sprite crown.
+  const anchorY = sprite.y - sprite.displayHeight - 20;
   const container = scene.add.container(sprite.x, anchorY);
   container.setDepth(sprite.depth + 4);
 
@@ -612,7 +615,8 @@ export function addBossHpBar(
 
   // Follow boss. Poll every frame (~16ms) so the HP-bar container
   // stays glued to the sprite; a 60ms cadence made the bar visibly
-  // wobble a frame behind the bob tween.
+  // wobble a frame behind the bob tween. Anchor is sprite-top - 20px
+  // so the bar sits above the crown, not on the boss's face.
   const follow = scene.time.addEvent({
     delay: 16,
     loop: true,
@@ -620,7 +624,7 @@ export function addBossHpBar(
       if (!sprite.active) return;
       container.setPosition(
         sprite.x,
-        sprite.y - sprite.displayHeight * 0.55,
+        sprite.y - sprite.displayHeight - 20,
       );
     },
   });
