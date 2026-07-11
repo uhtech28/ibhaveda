@@ -3,7 +3,12 @@ import { NextResponse } from 'next/server'
 import { api } from '@convex/_generated/api'
 import { ConvexHttpClient } from 'convex/browser'
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+// Resilient Convex client: don't crash at module load if the env var
+// is missing on this environment (e.g. Vercel Preview without full env).
+// The profile-complete check just becomes a no-op in that case, letting
+// requests through instead of throwing MIDDLEWARE_INVOCATION_FAILED.
+const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL
+const convex = CONVEX_URL ? new ConvexHttpClient(CONVEX_URL) : null
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -58,7 +63,25 @@ export default clerkMiddleware(async (auth, req) => {
         }
 
         // ── Slow path: query Convex (once per TTL per browser session) ───────
-        const isProfileComplete = await convex.query(api.users.isProfileComplete, { clerkId: userId })
+        // If Convex isn't configured on this environment, let the request
+        // through rather than blocking with a redirect loop.
+        if (!convex) {
+          return NextResponse.next()
+        }
+
+        let isProfileComplete = true
+        try {
+          isProfileComplete = await convex.query(
+            api.users.isProfileComplete,
+            { clerkId: userId },
+          )
+        } catch (err) {
+          // Convex unavailable (network / auth / schema mismatch) — do NOT
+          // 500 the whole app. Assume profile is complete for this request;
+          // the /profile-setup page has its own client-side gate anyway.
+          console.error('[middleware] Convex isProfileComplete failed:', err)
+          return NextResponse.next()
+        }
 
         if (!isProfileComplete) {
           return NextResponse.redirect(new URL('/profile-setup', req.url))
