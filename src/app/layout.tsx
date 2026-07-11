@@ -114,20 +114,16 @@ export const viewport = {
   interactiveWidget: 'resizes-content',
 };
 
-// Only wrap in <ClerkProvider> if the publishable key is present.
-// Without it, ClerkProvider throws during hydration and the whole
-// React tree crashes with "Application error: a client-side
-// exception has occurred". When missing (e.g. Preview deployment
-// without full env), fall back to a plain wrapper -- auth features
-// silently no-op but the app LOADS.
+// ClerkProvider is ALWAYS rendered so downstream `useAuth()` /
+// `useUser()` calls don't throw "clerk not provided". If the real
+// publishable key is missing (e.g. Preview deployment without full
+// env), we pass a syntactically valid stub key. Clerk mounts, hooks
+// return "signed out" state, and the app LOADS. Actual auth calls
+// will fail but that's fine for a visual demo -- they're not invoked
+// without user interaction.
 const CLERK_PUBLISHABLE_KEY =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-const CLERK_READY = Boolean(CLERK_PUBLISHABLE_KEY);
-
-function AuthWrapper({ children }: { children: React.ReactNode }) {
-  if (!CLERK_READY) return <>{children}</>;
-  return <ClerkProvider>{children}</ClerkProvider>;
-}
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  "pk_test_ZGVtby1zdHViLmNsZXJrLmFjY291bnRzLmRldiQ"; // demo-stub.clerk.accounts.dev$
 
 export default function RootLayout({
   children,
@@ -135,7 +131,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <AuthWrapper>
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
       <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
         <body
           className="font-sans antialiased"
@@ -154,6 +150,6 @@ export default function RootLayout({
           </ConvexClientProvider>
         </body>
       </html>
-    </AuthWrapper>
+    </ClerkProvider>
   );
 }
