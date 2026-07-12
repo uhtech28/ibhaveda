@@ -133,6 +133,24 @@ export default function RootLayout({
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
       <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
+        <head>
+          {/* One-shot cache nuke. next.config.ts previously served
+              /assets/* with `max-age=31536000, immutable` which froze
+              old files on returning visitors' devices for a full year.
+              This script runs on every page load, checks a version
+              stamp in localStorage, and if it doesn't match: unregisters
+              any service worker, clears all CacheStorage entries, then
+              does a single reload. After that the version is bumped and
+              the script skips itself on subsequent loads. Bump
+              CACHE_BUST_VERSION whenever you need to force a global
+              cache-flush again. */}
+          <script
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{
+              __html: `(function(){try{var K='__ibhaveda_cache_bust_v';var V='2026-07-10a';if(typeof window==='undefined')return;if(window.localStorage.getItem(K)===V)return;window.localStorage.setItem(K,V);var ops=[];if('serviceWorker' in navigator){ops.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}));}if('caches' in window){ops.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}));}Promise.all(ops).finally(function(){window.location.reload();});}catch(e){}})();`,
+            }}
+          />
+        </head>
         <body
           className="font-sans antialiased"
         >

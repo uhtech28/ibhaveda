@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
-const staticCache = "public, max-age=31536000, immutable";
+// Was `public, max-age=31536000, immutable` (1 YEAR immutable) which
+// froze /assets/* on user devices for a full year -- new deploys had
+// no effect on returning visitors because their browser refused to
+// re-fetch. Now: cache for 1 hour then revalidate. Static-hash paths
+// under /_next/static/ keep the long cache because Next.js includes
+// a build hash in the filename (each new build = new URL, safe).
+const staticCache = "public, max-age=3600, s-maxage=60, stale-while-revalidate=86400";
+const buildHashedCache = "public, max-age=31536000, immutable";
 
 const nextConfig: NextConfig = {
   turbopack: {
@@ -47,7 +54,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/_next/static/:path*",
-        headers: [{ key: "Cache-Control", value: staticCache }],
+        headers: [{ key: "Cache-Control", value: buildHashedCache }],
       },
     ];
   },
