@@ -9,7 +9,7 @@ import { ConvexReactClient } from "convex/react"
 //
 // If you change your Convex deployment, update BOTH this fallback AND
 // the NEXT_PUBLIC_CONVEX_URL env var in Vercel.
-const HARDCODED_FALLBACK = "https://grateful-canary-901.convex.cloud";
+const HARDCODED_FALLBACK = "https://admired-quail-169.convex.cloud";
 
 export const convexUrl =
   process.env.NEXT_PUBLIC_CONVEX_URL || HARDCODED_FALLBACK;
