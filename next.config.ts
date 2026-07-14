@@ -36,29 +36,6 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-toast",
     ],
   },
-  // ------------------------------------------------------------------
-  // Vercel reverse-proxy to Cloudflare tunnel.
-  // Every request to uhtech.in gets forwarded to the local dev server
-  // running on the user's PC (via cloudflared quick tunnel). Client
-  // sees `uhtech.in` in the address bar; content served from localhost.
-  //
-  // This is a demo-only crutch until proper Convex/Clerk production
-  // deployment is done. To swap tunnel URLs later: update TUNNEL_URL
-  // below, commit, push, wait for Vercel rebuild (~3 min).
-  // ------------------------------------------------------------------
-  async rewrites() {
-    const TUNNEL_URL = "https://advantage-interview-textile-respond.trycloudflare.com";
-    return {
-      beforeFiles: [
-        {
-          source: "/:path*",
-          destination: `${TUNNEL_URL}/:path*`,
-        },
-      ],
-      afterFiles: [],
-      fallback: [],
-    };
-  },
   async headers() {
     return [
       {
