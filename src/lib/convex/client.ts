@@ -2,34 +2,32 @@
 
 import { ConvexReactClient } from "convex/react"
 
-// Always return a ConvexReactClient so useQuery / useMutation calls
-// downstream don't throw "Could not find Convex client!" errors. If
-// the real URL is missing OR init throws, fall back to a placeholder
-// URL. Queries will fail against that placeholder (no backend), but
-// components will render loading/empty states instead of crashing the
-// whole React tree.
-const FALLBACK_URL = "https://placeholder-demo.convex.cloud";
+// Hardcoded real Convex URL as fallback. Even if the env var isn't
+// baked into the bundle (build ran before env was set / cached build /
+// etc.), the client still connects to the actual working backend.
+// This makes the app FUNCTIONAL regardless of Vercel env var timing.
+//
+// If you change your Convex deployment, update BOTH this fallback AND
+// the NEXT_PUBLIC_CONVEX_URL env var in Vercel.
+const HARDCODED_FALLBACK = "https://grateful-canary-901.convex.cloud";
 
-export const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+export const convexUrl =
+  process.env.NEXT_PUBLIC_CONVEX_URL || HARDCODED_FALLBACK;
 
 function initConvexClient(): ConvexReactClient {
-  const raw = convexUrl?.trim().replace(/^["']|["']$/g, "") || "";
-  const url = raw || FALLBACK_URL;
-  if (!raw) {
-    console.warn(
-      "[convex/client] NEXT_PUBLIC_CONVEX_URL missing - using placeholder. " +
-      "Queries will fail but the app will render.",
-    );
-  }
+  const raw = convexUrl.trim().replace(/^["']|["']$/g, "");
+  // Basic validation: must be a valid Convex URL format
+  const url = /^https?:\/\/[a-z]+-[a-z]+-\d+\.convex\.cloud/.test(raw)
+    ? raw
+    : HARDCODED_FALLBACK;
   try {
     return new ConvexReactClient(url);
   } catch (err) {
     console.error(
-      "[convex/client] init failed even with fallback - falling back to placeholder retry:",
+      "[convex/client] init failed - falling back to hardcoded URL:",
       err,
     );
-    // Last-resort: guaranteed-valid URL
-    return new ConvexReactClient(FALLBACK_URL);
+    return new ConvexReactClient(HARDCODED_FALLBACK);
   }
 }
 
