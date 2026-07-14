@@ -12,14 +12,11 @@ interface ConvexProviderProps {
 }
 
 export function ConvexClientProvider({ children }: ConvexProviderProps) {
-  // If Convex isn't configured on this environment (e.g. Preview
-  // deployment without NEXT_PUBLIC_CONVEX_URL) skip the provider and
-  // render children directly. Convex-dependent hooks will fail
-  // gracefully at their call sites instead of crashing the whole app
-  // during hydration.
-  if (!convex) {
-    return <>{children}</>
-  }
+  // convex is ALWAYS defined now (client.ts falls back to a placeholder
+  // URL if the env var is missing) so we can render the provider
+  // unconditionally. Downstream `useQuery` calls will always find the
+  // provider; if the URL is fake, queries just fail silently and
+  // components render loading/empty state.
   return (
     <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
       <TimezoneSync />
