@@ -23,10 +23,14 @@ interface TutorialSpeechBubbleProps {
   /** Optional secondary text-style link, e.g. "Skip tutorial". */
   secondaryAction?: { label: string; onClick: () => void };
   /** Side the bubble sits relative to Sparky. Default "right".
-   *  "bottom" means bubble sits ABOVE Sparky and tail points DOWN. */
-  side?: "left" | "right" | "bottom";
+   *  "bottom" means bubble sits ABOVE Sparky and tail points DOWN.
+   *  "top" means bubble sits BELOW Sparky and tail points UP. */
+  side?: "left" | "right" | "bottom" | "top";
   /** Render-text speed in ms per character. Default 24. Lower = faster. */
   typeSpeed?: number;
+  /** When true, bubble spans its container width instead of the fixed 260px.
+   *  Used on mobile where the bubble is docked to the viewport bottom. */
+  fullWidth?: boolean;
 }
 
 export function TutorialSpeechBubble({
@@ -35,6 +39,7 @@ export function TutorialSpeechBubble({
   secondaryAction,
   side = "right",
   typeSpeed = 24,
+  fullWidth = false,
 }: TutorialSpeechBubbleProps) {
   // ── Typewriter state ─────────────────────────────────────────────────────
   const [shown, setShown] = useState("");
@@ -62,11 +67,18 @@ export function TutorialSpeechBubble({
   }, [text, typeSpeed]);
 
   // Tail direction — `side` is which edge of the bubble Sparky is on.
-  //   side="right"  → Sparky on right  → tail on right edge   → points right
-  //   side="left"   → Sparky on left   → tail on left edge    → points left
+  //   side="right"  → Sparky on right   → tail on right edge  → points right
+  //   side="left"   → Sparky on left    → tail on left edge   → points left
   //   side="bottom" → Sparky underneath → tail on bottom edge → points down
-  const tailDirection: "left" | "right" | "bottom" =
-    side === "right" ? "right" : side === "bottom" ? "bottom" : "left";
+  //   side="top"    → Sparky above      → tail on top edge    → points up
+  const tailDirection: "left" | "right" | "bottom" | "top" =
+    side === "right"
+      ? "right"
+      : side === "bottom"
+        ? "bottom"
+        : side === "top"
+          ? "top"
+          : "left";
 
   return (
     <motion.div
@@ -74,7 +86,12 @@ export function TutorialSpeechBubble({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.8, y: 10 }}
       transition={{ type: "spring", stiffness: 300, damping: 24 }}
-      className="relative w-[260px] pointer-events-auto"
+      // Bubble container is pointer-events:none so clicks pass through
+      // to whatever's underneath (e.g. the combat "Attack" button
+      // that lived beneath Sparky). The primary/skip action buttons
+      // below re-enable pointer-events on themselves so they still
+      // work. Fixes "attack button not working on tutorial".
+      className={`relative pointer-events-none ${fullWidth ? "w-full" : "w-[260px]"}`}
     >
       <div
         className="relative rounded-2xl bg-white px-5 py-4 shadow-xl border-2 border-amber-300/70"
@@ -113,6 +130,17 @@ export function TutorialSpeechBubble({
                 borderLeft: amber,
               };
             }
+            if (tailDirection === "top") {
+              // top — bubble sits BELOW Sparky, tail points UP.
+              return {
+                top: "0px",
+                left: "50%",
+                transform: "translate(-50%, -50%) rotate(45deg)",
+                background: "white",
+                borderTop: amber,
+                borderLeft: amber,
+              };
+            }
             // bottom — bubble sits ABOVE Sparky, tail points DOWN.
             // Anchor at right-third so the tail aims at Sparky's head
             // (Sparky sits flush with the bubble's right edge in the
@@ -144,8 +172,12 @@ export function TutorialSpeechBubble({
         </div>
 
         {/* ── Actions ─────────────────────────────────────────────────── */}
+        {/* Secondary action ("Skip tutorial") REMOVED per product
+            request. The tutorial can no longer be skipped from
+            inside Sparky's speech bubble. `secondaryAction` prop
+            still accepted for backward compat but never rendered. */}
         <AnimatePresence>
-          {done && (primaryAction || secondaryAction) && (
+          {done && primaryAction && (
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -153,22 +185,16 @@ export function TutorialSpeechBubble({
               transition={{ duration: 0.2, delay: 0.15 }}
               className="mt-3 flex items-center justify-between gap-3"
             >
-              {secondaryAction ? (
-                <button
-                  type="button"
-                  onClick={secondaryAction.onClick}
-                  className="text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  {secondaryAction.label}
-                </button>
-              ) : (
-                <span />
-              )}
+              <span />
+              {/* secondaryAction intentionally not rendered — see above. */}
+              {secondaryAction ? null : null}
               {primaryAction && (
                 <button
                   type="button"
                   onClick={primaryAction.onClick}
-                  className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:from-amber-500 active:to-amber-600 text-white text-sm font-bold px-4 py-2 shadow-md hover:shadow-lg transition-all touch-manipulation"
+                  // pointer-events-auto opts this button back in
+                  // (bubble container is now pointer-events-none).
+                  className="pointer-events-auto ml-auto inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:from-amber-500 active:to-amber-600 text-white text-sm font-bold px-4 py-2 shadow-md hover:shadow-lg transition-all touch-manipulation"
                   style={{ boxShadow: "0 3px 0 rgb(180, 83, 9)" }}
                 >
                   {primaryAction.label}

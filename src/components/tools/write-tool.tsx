@@ -349,12 +349,28 @@ function WriteToolInner({
                     comment for the rationale (kills 2s INP on old maps).
                     onInput schedules a 200ms-debounced state sync so
                     wordCount / submit-button gating still update. */}
+                {/* Copy / paste / cut / right-click BLOCKED per product
+                    request — task responses must be typed by the user
+                    (no ChatGPT paste-through). */}
                 <Textarea
                   ref={textareaRef}
                   id="write-response"
                   placeholder="Write your response here..."
                   defaultValue={initialContent || ""}
                   onInput={scheduleTextSync}
+                  onPaste={(e) => e.preventDefault()}
+                  onCopy={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onDrop={(e) => e.preventDefault()}
+                  // Stop keydown bubbling so Phaser's SPACE binding,
+                  // the tutorial scrim, or any parent handler can't
+                  // swallow the space key when this modal is open on
+                  // /map/world (Phaser is active behind the modal).
+                  onKeyDown={(e) => e.stopPropagation()}
+                  onKeyUp={(e) => e.stopPropagation()}
+                  autoComplete="off"
+                  autoCorrect="off"
                   className="h-[200px] resize-none font-mono text-sm xl:h-[220px]"
                 />
               </div>

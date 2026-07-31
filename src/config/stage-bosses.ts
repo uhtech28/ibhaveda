@@ -81,6 +81,27 @@ const LEVIATHAN_QUESTIONS: readonly SuperBossQuestion[] = [
   },
 ];
 
+const ADVOCATE_QUESTIONS: readonly SuperBossQuestion[] = [
+  {
+    framing: "The Advocate cross-examines",
+    prompt:
+      "Which assumption about your customer are you still treating as fact without evidence? Name it plainly.",
+    minLength: 20,
+  },
+  {
+    framing: "He tables the evidence",
+    prompt:
+      "What is the cheapest, fastest test you could run this week to confirm or kill that assumption?",
+    minLength: 20,
+  },
+  {
+    framing: "The verdict looms",
+    prompt:
+      "If the test comes back negative, what concretely will you change about your offer or your pitch?",
+    minLength: 20,
+  },
+];
+
 const FORGE_DRAGON_QUESTIONS: readonly SuperBossQuestion[] = [
   {
     framing: "The Dragon roars",
@@ -143,6 +164,26 @@ const STAGE_2_FOREST: StageRoster = {
 };
 
 // ─────────────────────────────────────────────────────────────────────
+// STAGE 3 — The Arena (Validation)
+//   Theme: assumptions dragged into public light, evidence over eloquence.
+//   Family palette skews arcane (barrister/oracle) + plant (thorns of
+//   argument) — the horror is that the monsters look respectable.
+//   NOTE: only 3 mini-boss ZIPs delivered so far — CP0/CP1/CP2 filled,
+//   CP3 slot vacant (getStageBoss returns null; scene skips sprite).
+// ─────────────────────────────────────────────────────────────────────
+
+const STAGE_3_ARENA: StageRoster = {
+  stage: 3,
+  stageName: "The Arena",
+  bosses: [
+    { checkpointIndex: 0, name: "Judge of False Precedent", family: "arcane", idleAsset: "/assets/bosses/arena/judge/idle.png", introLine: "* The Judge cites a precedent that never was. Prove otherwise." },
+    { checkpointIndex: 1, name: "The Masked Challenger", family: "arcane", idleAsset: "/assets/bosses/arena/masked-challenger/idle.png", introLine: "* Two blades, no face. The Masked Challenger tests what you truly know." },
+    { checkpointIndex: 2, name: "Oracle of Doubt", family: "arcane", idleAsset: "/assets/bosses/arena/oracle-of-doubt/idle.png", introLine: "* The blindfolded Oracle speaks three futures. Only evidence chooses one." },
+    { checkpointIndex: -1, name: "The Advocate of Comfortable Lies", family: "arcane", idleAsset: "/assets/bosses/arena/advocate/idle.png", isSuper: true, introLine: "* The Advocate rises, gavel gleaming. He will make your assumptions sound like law.", questions: ADVOCATE_QUESTIONS },
+  ],
+};
+
+// ─────────────────────────────────────────────────────────────────────
 // STAGE 6 — The Harbour (Launch)
 //   Theme: distribution, sales, first customers.
 //   Family palette skews serpent/arcane — the water reveals hidden depths.
@@ -161,7 +202,10 @@ const STAGE_6_HARBOR: StageRoster = {
   stageName: "The Harbour",
   bosses: [
     { checkpointIndex: 0, name: "The Silver-Tongued Merchant", family: "arcane", idleAsset: "/assets/bosses/stage3/harbor-merchant/idle.png", introLine: "* 'Your price is wrong,' the merchant smirks." },
-    { checkpointIndex: 1, name: "Harbormaster of Gatekeeping", family: "machine", idleAsset: "/assets/bosses/stage3/harbor-official/idle.png", introLine: "* The Harbormaster demands proof you belong here." },
+    // Uses the delivered Pixellab pack under /incoming/harbourmaster/
+    // (idle + attack + retreat + victory), not the older single-frame
+    // /stage3/harbor-official sheet which sits unused now.
+    { checkpointIndex: 1, name: "Harbormaster of Gatekeeping", family: "machine", idleAsset: "/assets/bosses/incoming/harbourmaster/idle.png", introLine: "* The Harbormaster demands proof you belong here." },
     { checkpointIndex: 2, name: "Colossal Sea Serpent", family: "serpent", idleAsset: "/assets/bosses/stage3/sea-serpent/idle.png", introLine: "* The serpent coils in the deep, guarding the shipping lanes." },
     { checkpointIndex: -1, name: "The Leviathan of Market Rejection", family: "serpent", idleAsset: "/assets/bosses/stage3/leviathan/idle.png", isSuper: true, introLine: "* The Leviathan rises. The market has spoken.", questions: LEVIATHAN_QUESTIONS },
   ],
@@ -192,10 +236,7 @@ const STAGE_4_ARTISANS: StageRoster = {
 export const STAGE_ROSTERS: readonly StageRoster[] = [
   STAGE_1_VILLAGE,
   STAGE_2_FOREST,
-  // Stage 3 (Validation · The Arena · The Advocate of Comfortable Lies)
-  //   — boss art pending. stages.config.ts marks bossArtPending:true.
-  //   getStageSuperBoss(3) returns null so ArenaScene's reveal branch
-  //   silently skips to STAGE_COMPLETE.
+  STAGE_3_ARENA,
   STAGE_4_ARTISANS,
   // Stage 5 (Build & Deliver · The Mine · The Collapse Specter)
   //   — boss art pending. bossArtPending:true in stages.config.ts.

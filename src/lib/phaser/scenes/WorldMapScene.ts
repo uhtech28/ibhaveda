@@ -5439,6 +5439,25 @@ export class WorldMapScene extends Phaser.Scene {
     sky.fillStyle(biome.colors.sky, 1);
     sky.fillRect(0, 0, this.BIOME_WIDTH, bgHeight);
     container.add(sky);
+
+    // Overlay painted village PNG when the biome is a village theme
+    if (
+      biome.visualTheme === "village" &&
+      this.textures.exists("painted-village-bg")
+    ) {
+      const painted = this.add.image(
+        this.BIOME_WIDTH / 2,
+        bgHeight / 2,
+        "painted-village-bg",
+      );
+      painted.setOrigin(0.5, 0.5);
+      // Cover-fit so no gaps at edges
+      const scaleX = this.BIOME_WIDTH / painted.width;
+      const scaleY = bgHeight / painted.height;
+      const scale = Math.max(scaleX, scaleY);
+      painted.setScale(scale);
+      container.add(painted);
+    }
   }
 
   private addBiomeDecorations(
@@ -5616,6 +5635,11 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private createVillageLandmarks(stageId: number): void {
+    // Skip procedural houses/wells when the painted village PNG is loaded -
+    // the painted image already has all landmarks baked in. Double-draw would
+    // clutter the map with mismatched props.
+    if (this.textures.exists("painted-village-bg")) return;
+
     const nodes = this.getStageNodes(stageId);
     if (nodes.length === 0) return;
 

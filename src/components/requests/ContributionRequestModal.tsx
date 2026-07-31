@@ -7,7 +7,12 @@ import { Id, Doc } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+// NOTE: This component is embedded inside plain overlay containers
+// (e.g. the map's contributors panel) rather than a Radix <Dialog>
+// root. That means <DialogTitle> and friends throw "must be used
+// within `Dialog`" — so we render bare div/h2 elements that keep the
+// original shadcn styling (flex/gap/font-semibold) without needing
+// the Dialog context.
 import { CheckCircle2, Clock, XCircle, UserPlus } from "lucide-react";
 import { notifyRequestSent } from "@/components/requests/notification-toast";
 import Link from "next/link";
@@ -144,9 +149,11 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
 
     return (
       <div className="space-y-6">
-        <DialogHeader>
-          <DialogTitle>Contribution Status</DialogTitle>
-        </DialogHeader>
+        <div className="flex flex-col gap-2 text-left">
+          <h2 className="text-lg leading-none font-semibold">
+            Contribution Status
+          </h2>
+        </div>
 
         <div className="flex flex-col gap-4">
             {projectProfileHeader}
@@ -167,7 +174,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
             </div>
         </div>
 
-        <DialogFooter>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             {status === "rejected" ? (
                 <div className="flex w-full justify-end gap-2">
                      <Button variant="outline" onClick={onClose}>Close</Button>
@@ -176,16 +183,18 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
             ) : (
                 <Button onClick={onClose} className="w-full sm:w-auto">Close</Button>
             )}
-        </DialogFooter>
+        </div>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-6 overflow-hidden">
-      <DialogHeader>
-        <DialogTitle>Request to Contribute</DialogTitle>
-      </DialogHeader>
+      <div className="flex flex-col gap-2 text-left">
+        <h2 className="text-lg leading-none font-semibold">
+          Request to Contribute
+        </h2>
+      </div>
 
       <div className="space-y-4">
         {projectProfileHeader}
@@ -203,6 +212,13 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
               placeholder={`Tell ${displayAuthorName} how you can help!`}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              // Stop keydown from bubbling to any parent handler that may
+              // preventDefault on Space / Enter (StoryAction inner span,
+              // Radix Dialog focus trap edge cases, tutorial scrim wraps).
+              // Ensures the native textarea receives every keystroke.
+              onKeyDown={(e) => e.stopPropagation()}
+              onKeyUp={(e) => e.stopPropagation()}
+              onKeyPress={(e) => e.stopPropagation()}
               className="block min-h-[120px] w-full resize-none rounded-[22px] bg-transparent p-4 text-base leading-6 text-white placeholder:text-[#6B7280] outline-none focus:ring-0 lg:text-sm lg:leading-5"
               required
             />
@@ -216,12 +232,12 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
         </div>
       </div>
 
-      <DialogFooter>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="submit" disabled={!message.trim() || isSubmitting || isOverMessageLimit} className="gap-2">
           {isSubmitting ? <Spinner size={16} /> : <UserPlus className="w-4 h-4" />}
           Send Request
         </Button>
-      </DialogFooter>
+      </div>
     </form>
   );
 };

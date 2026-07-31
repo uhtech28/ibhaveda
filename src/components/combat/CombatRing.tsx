@@ -29,6 +29,14 @@ interface Props {
   size?: number;
   /** Ring stroke thickness in pixels. */
   strokeWidth?: number;
+  /**
+   * When false, the ring stays FULL and does not count down. Used to
+   * hold the timer at 100% while the AI dialogue is still typing —
+   * the user shouldn't be racing against a clock that started before
+   * they've even seen the question. Flip to true once the typewriter
+   * completes; anchor resets from that moment.
+   */
+  enabled?: boolean;
 }
 
 export function CombatRing({
@@ -37,16 +45,24 @@ export function CombatRing({
   onExpire,
   size = 128,
   strokeWidth = 10,
+  enabled = true,
 }: Props) {
   // Client-side anchor so the timer always reads fresh when a new
   // question mounts, regardless of server clock drift or the lag
   // between question persistence and React render. We reset the
-  // anchor whenever `servedAt` (the question identity proxy) changes.
+  // anchor whenever `servedAt` (the question identity proxy) changes
+  // OR when the ring transitions from disabled -> enabled (i.e. the
+  // typewriter finishes and the countdown should start from now).
   const anchorRef = useRef<number>(Date.now());
   const lastServedAtRef = useRef<number>(servedAt);
+  const lastEnabledRef = useRef<boolean>(enabled);
   if (lastServedAtRef.current !== servedAt) {
     anchorRef.current = Date.now();
     lastServedAtRef.current = servedAt;
+  }
+  if (lastEnabledRef.current !== enabled) {
+    if (enabled) anchorRef.current = Date.now();
+    lastEnabledRef.current = enabled;
   }
 
   const [remainingMs, setRemainingMs] = useState(() => durationMs);
@@ -56,6 +72,11 @@ export function CombatRing({
   // distort the timer.
   useEffect(() => {
     expiredRef.current = false;
+    if (!enabled) {
+      // Hold at full while we wait for the AI to finish typing.
+      setRemainingMs(durationMs);
+      return;
+    }
     let frame = 0;
     const tick = () => {
       const remain = Math.max(0, anchorRef.current + durationMs - Date.now());
@@ -71,7 +92,7 @@ export function CombatRing({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [servedAt, durationMs, onExpire]);
+  }, [servedAt, durationMs, onExpire, enabled]);
 
   const fraction = durationMs > 0 ? remainingMs / durationMs : 0;
   const phase = phaseFor(fraction);
@@ -138,21 +159,8 @@ export function CombatRing({
         />
       </svg>
 
-      {/* Numeric countdown — centered inside the ring */}
-      <div
-        className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center font-mono leading-none"
-        style={{
-          fontFamily: "var(--font-pixel-display), monospace",
-          color,
-        }}
-      >
-        <span className="text-xl font-black tabular-nums">
-          {Math.ceil(remainingMs / 1000)}
-        </span>
-        <span className="mt-0.5 text-[8px] uppercase tracking-widest opacity-70">
-          sec
-        </span>
-      </div>
+      {/* Numeric countdown REMOVED per product request — timer is
+          expressed by the ring's arc length + colour only. */}
 
       <style jsx>{`
         .combat-ring-pulse {

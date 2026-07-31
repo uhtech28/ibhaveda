@@ -1,116 +1,103 @@
 "use client";
 
-// Chips for choosing which external platforms to cross-post to. The
-// share panel renders one button per selected platform after the user
-// hits Post.
+/**
+ * @file CrossPostSelector.tsx
+ * @description Compact single-checkbox toggle for cross-posting (a.k.a.
+ *  "Double Posting"). Renders one small pill in the idea composer.
+ *
+ * Historical note: prior versions rendered 4 large per-platform cards
+ * (X / LinkedIn / Instagram / Facebook) inside the composer. That was
+ * pushed into Settings — the composer only decides whether to cross-post
+ * this idea at all; which platforms get it comes from stored preferences.
+ *
+ * Backwards-compat: the `selected` + `onChange` props are kept so the
+ * caller (IdeaWizard) doesn't need to change its state model. When the
+ * checkbox is checked, we emit ALL platforms the user has enabled in
+ * Settings; when unchecked, we emit an empty set.
+ */
 
-import React from "react";
-import { Check, Instagram, Linkedin, Facebook } from "lucide-react";
+import React, { useEffect } from "react";
+import { Check, Settings2 } from "lucide-react";
 import type { SharePlatform } from "@/lib/share/types";
-
-function XLogo({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M18.244 2H21.5l-7.5 8.57L22.5 22h-6.91l-5.42-7.09L4.27 22H1l8.02-9.17L1.5 2h7.09l4.9 6.49L18.24 2Zm-1.21 18h1.91L7.06 4H5.07l11.96 16Z" />
-    </svg>
-  );
-}
-
-const PLATFORMS: ReadonlyArray<{
-  id: SharePlatform;
-  label: string;
-  icon: React.ReactNode;
-  accent: string;
-}> = [
-  {
-    id: "twitter",
-    label: "X",
-    icon: <XLogo className="h-3.5 w-3.5" />,
-    accent: "text-white",
-  },
-  {
-    id: "linkedin",
-    label: "LinkedIn",
-    icon: <Linkedin className="h-3.5 w-3.5" fill="currentColor" />,
-    accent: "text-sky-300",
-  },
-  {
-    id: "instagram",
-    label: "Instagram",
-    icon: <Instagram className="h-3.5 w-3.5" />,
-    accent: "text-pink-300",
-  },
-  {
-    id: "facebook",
-    label: "Facebook",
-    icon: <Facebook className="h-3.5 w-3.5" fill="currentColor" />,
-    accent: "text-blue-300",
-  },
-];
+import { useCrossPostPreferences } from "@/lib/share/useCrossPostPreferences";
 
 interface Props {
   selected: Set<SharePlatform>;
   onChange: (next: Set<SharePlatform>) => void;
+  /** Optional callback to open the Settings dialog. */
+  onOpenSettings?: () => void;
 }
 
-export function CrossPostSelector({ selected, onChange }: Props) {
-  const toggle = (id: SharePlatform) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    onChange(next);
-  };
+export function CrossPostSelector({
+  selected,
+  onChange,
+  onOpenSettings,
+}: Props) {
+  const { prefs, hydrated, setEnabled, activePlatforms } =
+    useCrossPostPreferences();
+
+  // Whenever settings-driven active platforms change (or the toggle
+  // flips), reflect that in the composer's `selected` state so the
+  // downstream post pipeline sees the correct target list.
+  useEffect(() => {
+    if (!hydrated) return;
+    const target = new Set<SharePlatform>(activePlatforms);
+    // Bail out if unchanged to avoid a render loop.
+    if (
+      selected.size === target.size &&
+      Array.from(selected).every((p) => target.has(p))
+    ) {
+      return;
+    }
+    onChange(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, prefs.enabled, prefs.platforms.twitter, prefs.platforms.linkedin, prefs.platforms.instagram, prefs.platforms.facebook]);
+
+  const activeCount = activePlatforms.size;
+  const checkboxOn = prefs.enabled;
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-baseline gap-2">
-        <span className="text-[11px] font-semibold text-[#F9FAFB] uppercase tracking-wider">
-          Also post to
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#0D1117] px-3 py-2">
+      <label className="flex cursor-pointer items-center gap-2 select-none">
+        <input
+          type="checkbox"
+          checked={checkboxOn}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="peer sr-only"
+        />
+        {/* Custom checkbox visual */}
+        <span
+          className={`grid h-4 w-4 shrink-0 place-items-center rounded border transition-all ${
+            checkboxOn
+              ? "border-[#6366F1] bg-[#6366F1]/80"
+              : "border-white/25 bg-transparent hover:border-white/40"
+          }`}
+          aria-hidden="true"
+        >
+          {checkboxOn && (
+            <Check className="h-3 w-3 text-white" strokeWidth={3} />
+          )}
         </span>
-        <span className="text-[10px] font-normal lowercase text-[#6B7280]">
-          (deselect any you don't want)
+        <span className="text-xs font-medium text-[#F9FAFB]">
+          Also post to social platforms
         </span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {PLATFORMS.map((p) => {
-          const isSelected = selected.has(p.id);
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => toggle(p.id)}
-              aria-pressed={isSelected}
-              className={`group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
-                isSelected
-                  ? "border-[#6366F1]/60 bg-[#6366F1]/15 text-white"
-                  : "border-white/10 bg-[#0D1117] text-[#9CA3AF] hover:border-white/20 hover:text-white"
-              }`}
-            >
-              <span
-                className={`grid h-5 w-5 place-items-center rounded-md ${
-                  isSelected
-                    ? "bg-[#6366F1]/30 text-white"
-                    : `bg-white/[0.04] ${p.accent}`
-                }`}
-              >
-                {p.icon}
-              </span>
-              <span>{p.label}</span>
-              {isSelected && <Check className="h-3 w-3 text-emerald-300" />}
-            </button>
-          );
-        })}
-      </div>
-      <p className="text-[10px] text-[#6B7280] leading-snug">
-        After you post, you'll see one button per platform — tap each to open
-        its composer. Instagram has no web composer, so we copy the caption to
-        your clipboard for you to paste into a new post.
-      </p>
+        {checkboxOn && activeCount > 0 && (
+          <span className="text-[10px] font-normal text-[#6B7280]">
+            ({activeCount} enabled)
+          </span>
+        )}
+      </label>
+      {onOpenSettings && (
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-[#9CA3AF] transition hover:text-white"
+          title="Change which platforms to post to"
+        >
+          <Settings2 className="h-3 w-3" />
+          Settings
+        </button>
+      )}
     </div>
   );
 }

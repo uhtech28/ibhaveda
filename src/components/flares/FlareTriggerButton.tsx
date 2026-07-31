@@ -37,9 +37,14 @@ export function FlareTriggerButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={buttonClass}
+        data-tutorial="flare-button"
+      >
         <Radio className={variant === "solid" ? "h-4 w-4" : "h-3.5 w-3.5"} />
-        Fire a Flare
+        Flare
       </button>
 
       <FlareComposeDialog

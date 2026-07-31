@@ -50,7 +50,13 @@ async function assertVentureAccess(
       .first();
     if (accepted) return;
   }
-  throw new Error("You don't have access to this venture");
+  // Short, user-facing message. The client's friendlyError() extracts
+  // just this line from the Convex error envelope and surfaces it in
+  // the task modal so users see actionable copy rather than a
+  // stack-trace.
+  throw new Error(
+    "Only the venture owner or accepted contributors can submit tasks here. Send a Contribution Request from the idea page to get access.",
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -874,8 +880,18 @@ export const getWorldMapData = query({
         .map((task) => {
           // Pull the real prompt from the constant definitions
           const promptKey = task.taskLevel as "t1" | "t2" | "t3";
-          const prompt = cpDef?.[promptKey]?.prompt ?? "";
-          return { ...task, prompt };
+          const taskDef = cpDef?.[promptKey];
+          const prompt = taskDef?.prompt ?? "";
+          // v3 fantasy fields — optional; UI falls back to the plain
+          // prompt/name when these are absent (legacy templates).
+          const taskTitle = taskDef?.title;
+          const taskSubheader = taskDef?.subheader;
+          return {
+            ...task,
+            prompt,
+            taskTitle,
+            taskSubheader,
+          };
         });
 
       return {
@@ -883,6 +899,12 @@ export const getWorldMapData = query({
         // Expose checkpoint outcome so the panel can display it
         outcome: cpDef?.outcome ?? "",
         checkpointName: cpDef?.name ?? `Checkpoint ${cp.checkpoint}`,
+        // v3 fantasy fields — checkpoint-level. Optional; UI falls
+        // back to `checkpointName` and `outcome` when absent.
+        checkpointTitle: cpDef?.title,
+        checkpointSubheader: cpDef?.subheader,
+        checkpointStandardTagline: cpDef?.standardTagline,
+        checkpointGoldTagline: cpDef?.goldTagline,
         tasks,
       };
     });

@@ -45,10 +45,32 @@ import {
 import { CompassCalibrationAnimation } from "./animations/CompassCalibrationAnimation";
 import { MiniGameSpawnPoint } from "../entities/MiniGameSpawnPoint";
 import { spawnsForStage } from "@convex/miniGameConstants";
+import {
+  getCurrentPersonaId,
+  loadPersonaSprites,
+  registerPersonaAnimations,
+  personaSpriteKey,
+  personaAnimKey,
+  personaHasExtended,
+  directionalWalkAnimKey,
+} from "../persona-assets";
+import { getPersona } from "@/config/personas";
+import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
+import {
+  CorruptionOverlay,
+  type OverlayCheckpoint,
+} from "@/lib/phaser/systems/corruptionOverlay";
+import {
+  ensureCorruptionPattern,
+  motifForStage,
+} from "@/lib/phaser/systems/corruptionPatterns";
+import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 
 const MAP_ASSET = "/assets/maps-v2/village-painted/village-map.png";
-// Sahit's pixel-art character spritesheets — 160×192 with 32×48 frames
-// arranged as 5 cols × 4 rows (rows = down/left/right/up, cols = anim frames).
+// Legacy fantasy sprite paths kept only as a fallback if the persona
+// system isn't wired yet (e.g. running the scene from a dev script).
+// Real player art now comes from persona-assets.ts using whichever
+// persona React set via setCurrentPersonaId() before boot.
 const CHAR_IDLE_ASSET = "/assets/fan-tasy/Character_Idle.webp";
 const CHAR_WALK_ASSET = "/assets/fan-tasy/Character_Walk.webp";
 const CHAR_FRAME_W = 32;
@@ -57,17 +79,32 @@ const CHAR_FRAME_H = 48;
 // ── Village bosses — PixelLab-generated painted sprites ─────────────────
 // Each boss frame is 92×92 (Quadruped/humanoid model export).
 const BOSS_FRAME = 92;
-const FOG_IDLE_ASSET = "/assets/bosses/village/fog/idle.png";
-const FOG_RUN_ASSET = "/assets/bosses/village/fog/running.png"; // 6 frames
-const FOG_ATTACK_ASSET = "/assets/bosses/village/fog/attack.png"; // 6 frames
+// Fog sheets — the *new* Pixellab pipeline (9 frames × 92×92 each) for
+// idle/attack/hurt/defeat/victory. Legacy `running.png` (6 frames) stays
+// loaded as a fallback loopKey for the old MINI_BOSSES entry but is not
+// used by the new state machine (bosses have no walking mechanism).
+const FOG_IDLE_ASSET = "/assets/bosses/village/fog/idle.png"; // 9-frame Pixellab
+const FOG_ATTACK_ASSET = "/assets/bosses/village/fog/attack.png"; // 9-frame Pixellab
+const FOG_HURT_ASSET = "/assets/bosses/village/fog/hurt.png"; // 9-frame Pixellab
+const FOG_DEFEAT_ASSET = "/assets/bosses/village/fog/defeat.png"; // 9-frame Pixellab
+const FOG_VICTORY_ASSET = "/assets/bosses/village/fog/victory.png"; // 9-frame Pixellab
+// Wraith / Chimera / Automaton — Pixellab pipeline sheets from the
+// second-wave boss pack (all 92×92 × 9 frames, same as Fog). Some
+// clips are missing (e.g. no defeat sheet); the boss config below
+// falls back to `hurt` for defeat where needed.
 const WRAITH_IDLE_ASSET = "/assets/bosses/village/wraith/idle.png";
-const WRAITH_WALK_ASSET = "/assets/bosses/village/wraith/walk.png"; // 8 frames
-const UNRAVELLER_IDLE_ASSET = "/assets/bosses/village/unraveller/idle.png";
-// CP2 + CP3 dedicated sprites — Specter (4-armed shadowy humanoid) reaches
-// for every customer segment; Automaton (mechanical golem) endlessly stamps
-// out new features. Static rotations only, no animation frames yet.
+const WRAITH_ATTACK_ASSET = "/assets/bosses/village/wraith/attack.png";
+const WRAITH_HURT_ASSET = "/assets/bosses/village/wraith/hurt.png";
+const WRAITH_VICTORY_ASSET = "/assets/bosses/village/wraith/victory.png";
+const WRAITH_WALK_ASSET = "/assets/bosses/village/wraith/walk.png"; // legacy 8-frame
 const CHIMERA_IDLE_ASSET = "/assets/bosses/village/chimera/idle.png";
+const CHIMERA_ATTACK_ASSET = "/assets/bosses/village/chimera/attack.png";
+const CHIMERA_HURT_ASSET = "/assets/bosses/village/chimera/hurt.png";
 const AUTOMATON_IDLE_ASSET = "/assets/bosses/village/automaton/idle.png";
+const AUTOMATON_ATTACK_ASSET = "/assets/bosses/village/automaton/attack.png";
+const AUTOMATON_HURT_ASSET = "/assets/bosses/village/automaton/hurt.png";
+const AUTOMATON_VICTORY_ASSET = "/assets/bosses/village/automaton/victory.png";
+const UNRAVELLER_IDLE_ASSET = "/assets/bosses/village/unraveller/idle.png";
 
 /** Per-checkpoint mini-boss assignments (Village = Stage 1). */
 interface VillageBossDef {
@@ -81,9 +118,20 @@ interface VillageBossDef {
   idleKey: string;
   loopKey: string | null; // walk/run animation, null = still image
   loopFrameCount: number;
+  /** How many frames the idle sheet has. 1 = static image; >1 = looping breathing anim. */
+  idleFrameCount: number;
   /** Optional attack animation (played via taunt loop). */
   attackKey: string | null;
   attackFrameCount: number;
+  /** Optional hurt animation (played on weaken). */
+  hurtKey?: string | null;
+  hurtFrameCount?: number;
+  /** Optional defeat animation (played on dispel). */
+  defeatKey?: string | null;
+  defeatFrameCount?: number;
+  /** Optional victory animation (boss dominating pose after player defeat). */
+  victoryKey?: string | null;
+  victoryFrameCount?: number;
   /** Boss size scale — bigger for stage-final, smaller for early. */
   scale: number;
   /** Y offset from checkpoint marker (negative = above the marker). */
@@ -102,12 +150,27 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     name: "Fog of Vagueness",
     family: "mist",
     idleKey: "boss-fog-idle",
-    loopKey: "boss-fog-run",
-    loopFrameCount: 6,
+    // No walking mechanism for bosses (per spec) — idle is the loop.
+    loopKey: null,
+    loopFrameCount: 0,
+    idleFrameCount: 9,
     attackKey: "boss-fog-attack",
-    attackFrameCount: 6,
-    scale: 2.2,
-    yOffset: -30,
+    attackFrameCount: 9,
+    hurtKey: "boss-fog-hurt",
+    hurtFrameCount: 9,
+    defeatKey: "boss-fog-defeat",
+    defeatFrameCount: 9,
+    victoryKey: "boss-fog-victory",
+    victoryFrameCount: 9,
+    // Pixellab sheet packs the character into ~46/92 of the frame height,
+    // so the OLD 2.2 scale ended up rendering the boss ~200px tall and
+    // clipping the top off the visible camera. 1.5 gives ~140px on screen,
+    // which fits and reads clean.
+    scale: 1.5,
+    // Sit closer to the CP marker — sprite origin (0.5, 1) puts the frame's
+    // bottom-edge at yOffset, and the character occupies the mid section
+    // of the frame. yOffset=+8 nudges the feet visually onto the ground.
+    yOffset: 8,
     offsetX: 105, // east of CP1 — persona stands on marker facing east
 
     taunts: [
@@ -126,10 +189,21 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     idleKey: "boss-chimera-idle",
     loopKey: null,
     loopFrameCount: 0,
-    attackKey: null,
-    attackFrameCount: 0,
-    scale: 2.2,
-    yOffset: -30,
+    idleFrameCount: 9,
+    attackKey: "boss-chimera-attack",
+    attackFrameCount: 9,
+    hurtKey: "boss-chimera-hurt",
+    hurtFrameCount: 9,
+    // No dedicated defeat sheet — fall back to hurt so the KO frame still reads.
+    defeatKey: "boss-chimera-hurt",
+    defeatFrameCount: 9,
+    // No dedicated victory sheet — fall back to attack pose.
+    victoryKey: "boss-chimera-attack",
+    victoryFrameCount: 9,
+    // Match Fog's tuned scale/yOffset — Pixellab bosses fill more of
+    // their 92-frame than the old single-image bosses did.
+    scale: 1.5,
+    yOffset: 8,
     offsetX: -110, // west of CP2 (path bends east so guardian sits west)
 
     taunts: [
@@ -149,10 +223,18 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     idleKey: "boss-automaton-idle",
     loopKey: null,
     loopFrameCount: 0,
-    attackKey: null,
-    attackFrameCount: 0,
-    scale: 2.2,
-    yOffset: -30,
+    idleFrameCount: 9,
+    attackKey: "boss-automaton-attack",
+    attackFrameCount: 9,
+    hurtKey: "boss-automaton-hurt",
+    hurtFrameCount: 9,
+    // Missing defeat sheet — fall back to hurt.
+    defeatKey: "boss-automaton-hurt",
+    defeatFrameCount: 9,
+    victoryKey: "boss-automaton-victory",
+    victoryFrameCount: 9,
+    scale: 1.5,
+    yOffset: 8,
     offsetX: 105, // east of CP3
 
     taunts: [
@@ -167,12 +249,22 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     name: "Assumption Wraith",
     family: "undead",
     idleKey: "boss-wraith-idle",
-    loopKey: "boss-wraith-walk",
-    loopFrameCount: 8,
-    attackKey: null,
-    attackFrameCount: 0,
-    scale: 2.3,
-    yOffset: -30,
+    // Legacy walk sheet still exists but the new Pixellab idle takes
+    // precedence — bosses don't have a walking mechanism.
+    loopKey: null,
+    loopFrameCount: 0,
+    idleFrameCount: 9,
+    attackKey: "boss-wraith-attack",
+    attackFrameCount: 9,
+    hurtKey: "boss-wraith-hurt",
+    hurtFrameCount: 9,
+    // Missing defeat sheet — fall back to hurt.
+    defeatKey: "boss-wraith-hurt",
+    defeatFrameCount: 9,
+    victoryKey: "boss-wraith-victory",
+    victoryFrameCount: 9,
+    scale: 1.5,
+    yOffset: 8,
     offsetX: -105, // west of CP4 — Unraveller lives east so Wraith guards west approach
 
     taunts: [
@@ -246,11 +338,109 @@ interface CheckpointVisual {
 // at r=24, (2) light number-text pixel center-of-mass on dark
 // surround. Both methods returned identical (x, y) — precise centers
 // of the painted 1/2/3/4 markers.
+/** Fast point-in-rects test for the walkability system.
+ *  Checks both the hardcoded BLOCKED_ZONES AND any custom zones the
+ *  user is currently drawing via the in-map editor (`?editZones=1`). */
+let _customZonesGetter: () => readonly ZoneRect[] = () => [];
+function pointInAnyBlockedZone(x: number, y: number): boolean {
+  for (const z of BLOCKED_ZONES) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  for (const z of _customZonesGetter()) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  return false;
+}
+
 const CHECKPOINTS: readonly CheckpointDef[] = [
   { id: 1, x: 173, y: 215, title: "The Signboard" },
   { id: 2, x: 587, y: 633, title: "The Bridge" },
   { id: 3, x: 1177, y: 662, title: "The Barn" },
   { id: 4, x: 1304, y: 325, title: "The Well" },
+];
+
+/**
+ * Hand-defined obstacles the character cannot walk through.
+ * Each entry is an axis-aligned rectangle in map-space pixels
+ * (map is 1536×1024). Feet of the character are checked; if the
+ * proposed X or Y move puts them inside a rect, that axis is
+ * rejected (letting the player slide along walls).
+ *
+ * Approximate zones for the Village painted map:
+ *  - Streams / water bodies
+ *  - Barn footprint, cottages, well platform
+ * Tune visually with `?showZones=1` on `/map/world`.
+ * Task #213 (FREE-ROAM 2 — walkability).
+ */
+// Village walkability blockers — authored via the in-map editor
+// (?editZones=1) and pasted here. To edit: reopen the editor, redraw
+// the ones you want to change, COPY JSON, replace this array.
+const BLOCKED_ZONES: readonly { x: number; y: number; w: number; h: number }[] = [
+  { x: 350, y: 119, w: 78, h: 74 },
+  { x: 513, y: 69, w: 143, h: 166 },
+  { x: 818, y: 47, w: 356, h: 206 },
+  { x: 1175, y: 252, w: 80, h: 81 },
+  { x: 723, y: 226, w: 90, h: 33 },
+  { x: 703, y: 60, w: 52, h: 71 },
+  { x: 662, y: 136, w: 76, h: 47 },
+  { x: 176, y: 332, w: 95, h: 51 },
+  { x: 17, y: 417, w: 96, h: 55 },
+  { x: 62, y: 474, w: 51, h: 56 },
+  { x: 201, y: 492, w: 136, h: 109 },
+  { x: 87, y: 817, w: 113, h: 124 },
+  { x: 726, y: 871, w: 84, h: 111 },
+  { x: 591, y: 850, w: 82, h: 90 },
+  { x: 112, y: 416, w: 207, h: 99 },
+  { x: 115, y: 516, w: 89, h: 60 },
+  { x: 324, y: 458, w: 73, h: 111 },
+  { x: 398, y: 488, w: 66, h: 114 },
+  { x: 466, y: 506, w: 40, h: 152 },
+  { x: 358, y: 571, w: 40, h: 55 },
+  { x: 400, y: 606, w: 61, h: 49 },
+  { x: 368, y: 630, w: 30, h: 28 },
+  { x: 407, y: 746, w: 99, h: 112 },
+  { x: 511, y: 787, w: 34, h: 91 },
+  { x: 421, y: 860, w: 165, h: 97 },
+  { x: 435, y: 927, w: 119, h: 33 },
+  { x: 438, y: 967, w: 133, h: 50 },
+  { x: 970, y: 832, w: 139, h: 26 },
+  { x: 761, y: 580, w: 233, h: 191 },
+  { x: 1112, y: 778, w: 42, h: 91 },
+  { x: 1233, y: 741, w: 62, h: 66 },
+  { x: 1261, y: 809, w: 90, h: 93 },
+  { x: 1298, y: 903, w: 158, h: 51 },
+  { x: 1356, y: 825, w: 141, h: 70 },
+  { x: 1460, y: 905, w: 40, h: 46 },
+  { x: 1395, y: 954, w: 114, h: 63 },
+  { x: 1246, y: 953, w: 156, h: 69 },
+  { x: 1347, y: 669, w: 109, h: 115 },
+  { x: 1406, y: 575, w: 89, h: 106 },
+  { x: 1362, y: 550, w: 91, h: 49 },
+  { x: 1380, y: 342, w: 115, h: 204 },
+  { x: 1463, y: 552, w: 36, h: 25 },
+  { x: 1356, y: 288, w: 144, h: 51 },
+  { x: 1189, y: 47, w: 101, h: 40 },
+  { x: 1226, y: 93, w: 70, h: 73 },
+  { x: 630, y: 383, w: 41, h: 22 },
+  { x: 642, y: 348, w: 59, h: 36 },
+  { x: 69, y: 104, w: 21, h: 64 },
+  { x: 21, y: 128, w: 44, h: 42 },
+  { x: 134, y: 46, w: 76, h: 40 },
+  { x: 41, y: 46, w: 60, h: 54 },
+  { x: 683, y: 832, w: 99, h: 29 },
+  { x: 67, y: 537, w: 75, h: 286 },
+  { x: 144, y: 714, w: 54, h: 116 },
+  { x: 201, y: 757, w: 24, h: 89 },
+  { x: 144, y: 578, w: 29, h: 80 },
+  { x: 666, y: 713, w: 28, h: 118 },
+  { x: 800, y: 834, w: 62, h: 59 },
+  { x: 1285, y: 171, w: 69, h: 60 },
+  { x: 1332, y: 289, w: 23, h: 24 },
+  { x: 1313, y: 233, w: 186, h: 56 },
+  { x: 1044, y: 478, w: 45, h: 48 },
+  { x: 719, y: 378, w: 121, h: 20 },
+  { x: 639, y: 302, w: 78, h: 44 },
+  { x: 622, y: 190, w: 111, h: 53 },
 ];
 
 export class VillageMapScene extends Phaser.Scene {
@@ -259,6 +449,67 @@ export class VillageMapScene extends Phaser.Scene {
   private isAnimating = false;
   private character: Phaser.GameObjects.Sprite | null = null;
   private characterShadow: Phaser.GameObjects.Ellipse | null = null;
+  // Resolved persona animation clip keys. Written in spawnCharacter()
+  // based on whether the persona sheet loaded (persona-anim:<id>:*)
+  // or we fell back to the legacy fantasy sheet (persona-idle/walk).
+  private _personaIdleAnimKey: string | null = null;
+  private _personaWalkAnimKey: string | null = null;
+  // True when the loaded persona has the full Pixellab set (4-dir walk
+  // + combat one-shots). Governs whether update() plays directional
+  // walks and whether playPersonaState() is a no-op.
+  private _personaUsesExtended = false;
+  // Last-played anim key so update() only calls play() when the anim
+  // actually changes — Phaser restarts on repeat play(), freezing frame 0.
+  private _currentPersonaAnimKey: string | null = null;
+  // True while a one-shot combat animation (attack/hurt/defeat/victory)
+  // is playing — update() yields free-roam input during this window
+  // and returns to idle when the anim completes.
+  private _personaAnimBusy = false;
+  // Safety-net timer that force-clears the busy flag if the natural
+  // ANIMATION_COMPLETE event never fires (Phaser interrupt edge cases).
+  private _personaAnimBusyTimer: number | null = null;
+
+  // ── Free-roam state ────────────────────────────────────────────────
+  /** WASD + arrow-key handles. Set in create(). */
+  private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+  private wasd: {
+    W: Phaser.Input.Keyboard.Key;
+    A: Phaser.Input.Keyboard.Key;
+    S: Phaser.Input.Keyboard.Key;
+    D: Phaser.Input.Keyboard.Key;
+    E: Phaser.Input.Keyboard.Key;
+    SPACE: Phaser.Input.Keyboard.Key;
+  } | null = null;
+  /** Whether the character is currently animating (walk cycle vs idle). */
+  private isWalking = false;
+  /** Whether a script (walkCharacterTo) has control over the character.
+   *  When true, free-roam input is ignored so the two systems don't fight. */
+  private scriptedMovement = false;
+  /** Handle to the active walk tween so we can kill the prior one when a
+   *  new walk starts (prevents onComplete-loss stalls that would strand
+   *  scriptedMovement=true and freeze WASD forever). */
+  private _walkTween: Phaser.Tweens.Tween | null = null;
+  /** Per-CP corruption overlay (opacity-driven tile strips + weakened
+   *  monster sprite at 2/3 + shatter burst at 3/3). Implements the model
+   *  from Ibhaveda_boss_corruption_table. Instantiated once in create(). */
+  private _corruption: CorruptionOverlay | null = null;
+  /** Latest CheckpointState snapshot from React — cached so weakenActiveBoss
+   *  can call updateSegment with the freshest known state. */
+  private _lastCheckpointStates: CheckpointState[] = [];
+  /** Nearest checkpoint within interact range, or null. */
+  private nearestInteractCp: number | null = null;
+  /** Interact-hint ring positioned above the CP marker when in range. */
+  private interactHint: Phaser.GameObjects.Container | null = null;
+  /** Joystick vector from mobile nipplejs — {x, y} in [-1, 1] range, null when idle. */
+  private joystickVector: { x: number; y: number } | null = null;
+  /** Handler ref for the joystick event so we can unbind on shutdown. */
+  private joystickHandler:
+    | ((e: { x: number; y: number } | null) => void)
+    | null = null;
+  /** Player movement speed in world pixels per second. */
+  private static readonly PLAYER_SPEED = 220;
+  /** Distance (world px) within which the interact prompt shows. */
+  private static readonly INTERACT_RADIUS = 90;
   private characterIdleTween: Phaser.Tweens.Tween | null = null;
 
   // Per-checkpoint mini-boss sprites (one Phaser.Sprite per checkpoint).
@@ -271,6 +522,16 @@ export class VillageMapScene extends Phaser.Scene {
   private miniBossAuras: Array<Phaser.GameObjects.Ellipse | null> = [];
   // Track which checkpoints have already had their reveal-taunt fired.
   private miniBossTauntFired: boolean[] = [];
+  // Per-boss animation keys resolved during spawn (idle / hurt / defeat /
+  // victory / attack). Nullable when the sheet wasn't present. Used by
+  // playBossState() to swap one-shots on combat events.
+  private miniBossAnimKeys: Array<{
+    idle: string | null;
+    attack: string | null;
+    hurt: string | null;
+    defeat: string | null;
+    victory: string | null;
+  } | null> = [];
   // Super boss (The Unraveller).
   private superBossSprite: Phaser.GameObjects.Sprite | null = null;
   private superBossBobTween: Phaser.Tweens.Tween | null = null;
@@ -310,9 +571,12 @@ export class VillageMapScene extends Phaser.Scene {
   preload(): void {
     this.load.image("village-composite", MAP_ASSET);
     // ── Boss textures ─────────────────────────────────────────────────────
-    // Fog of Vagueness — idle (single frame) + running loop (6 frames).
-    this.load.image("boss-fog-idle", FOG_IDLE_ASSET);
-    this.load.spritesheet("boss-fog-run", FOG_RUN_ASSET, {
+    // Fog of Vagueness — Pixellab pipeline: idle + combat state one-shots
+    // (attack / hurt / defeat / victory), all 9 frames × 92×92.
+    // Bosses have no walking mechanism (user spec), so no run sheet is
+    // loaded — the sprite plays idle on the map, then swaps to attack/
+    // hurt/defeat/victory in reaction to combat events.
+    this.load.spritesheet("boss-fog-idle", FOG_IDLE_ASSET, {
       frameWidth: BOSS_FRAME,
       frameHeight: BOSS_FRAME,
     });
@@ -320,20 +584,67 @@ export class VillageMapScene extends Phaser.Scene {
       frameWidth: BOSS_FRAME,
       frameHeight: BOSS_FRAME,
     });
-    // Assumption Wraith — idle + walk loop (8 frames).
-    this.load.image("boss-wraith-idle", WRAITH_IDLE_ASSET);
-    this.load.spritesheet("boss-wraith-walk", WRAITH_WALK_ASSET, {
+    this.load.spritesheet("boss-fog-hurt", FOG_HURT_ASSET, {
       frameWidth: BOSS_FRAME,
       frameHeight: BOSS_FRAME,
     });
+    this.load.spritesheet("boss-fog-defeat", FOG_DEFEAT_ASSET, {
+      frameWidth: BOSS_FRAME,
+      frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-fog-victory", FOG_VICTORY_ASSET, {
+      frameWidth: BOSS_FRAME,
+      frameHeight: BOSS_FRAME,
+    });
+    // Assumption Wraith — Pixellab pipeline (idle + attack + hurt + victory),
+    // 9 frames × 92×92. Missing defeat sheet — config falls back to hurt.
+    this.load.spritesheet("boss-wraith-idle", WRAITH_IDLE_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-wraith-attack", WRAITH_ATTACK_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-wraith-hurt", WRAITH_HURT_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-wraith-victory", WRAITH_VICTORY_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-wraith-walk", WRAITH_WALK_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
     // The Unraveller — static rotation (no anim frames available yet).
     this.load.image("boss-unraveller-idle", UNRAVELLER_IDLE_ASSET);
-    // CP2 Everyone Chimera (Specter — 4-armed) and CP3 Feature Automaton.
-    // Static rotations only for now — bob + aura + tendrils + face-flip
-    // give them life without needing walk frames.
-    this.load.image("boss-chimera-idle", CHIMERA_IDLE_ASSET);
-    this.load.image("boss-automaton-idle", AUTOMATON_IDLE_ASSET);
+    // Everyone Chimera (CP2) — Pixellab pipeline: idle + attack + hurt.
+    // Missing victory / defeat — config falls back to hurt for defeat.
+    this.load.spritesheet("boss-chimera-idle", CHIMERA_IDLE_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-chimera-attack", CHIMERA_ATTACK_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-chimera-hurt", CHIMERA_HURT_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    // Feature Automaton (CP3) — Pixellab pipeline: idle + attack + hurt + victory.
+    this.load.spritesheet("boss-automaton-idle", AUTOMATON_IDLE_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-automaton-attack", AUTOMATON_ATTACK_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-automaton-hurt", AUTOMATON_HURT_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
+    this.load.spritesheet("boss-automaton-victory", AUTOMATON_VICTORY_ASSET, {
+      frameWidth: BOSS_FRAME, frameHeight: BOSS_FRAME,
+    });
     // Persona spritesheets ────────────────────────────────────────────────
+    // New pipeline: load the user's chosen persona under the shared
+    // `persona:<id>:{idle,walk}` keys. Legacy fantasy sprites still
+    // loaded as fallback under the old keys in case a scene consumer
+    // hasn't been migrated yet.
+    loadPersonaSprites(this, getCurrentPersonaId());
     this.load.spritesheet("village-persona-idle", CHAR_IDLE_ASSET, {
       frameWidth: CHAR_FRAME_W,
       frameHeight: CHAR_FRAME_H,
@@ -401,37 +712,106 @@ export class VillageMapScene extends Phaser.Scene {
       dragging = false;
     });
 
-    // 3b. Keyboard arrow keys — pan the camera. Users on desktop naturally
-    //     reach for arrow keys to explore a top-down map, so we hook them
-    //     up in addition to drag-to-pan. `WASD` also works as a bonus.
-    const KEY_PAN_SPEED = 12; // world px per frame at zoom=1
+    // 3b. Keyboard capture — arrow keys + WASD drive the CHARACTER
+    //     (free-roam), not the camera. E / Space open the nearest CP.
+    //     The actual per-frame movement runs in `update()` so it uses
+    //     delta-time and stays framerate-independent. Camera follows
+    //     the character (see spawnCharacter's startFollow call).
     const keyboard = this.input.keyboard;
     if (keyboard) {
-      const cursors = keyboard.createCursorKeys();
-      const wasd = {
+      this.cursors = keyboard.createCursorKeys();
+      this.wasd = {
         W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
         A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
         S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
         D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+        E: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E),
+        SPACE: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       };
-      this.events.on("update", () => {
-        const left = cursors.left?.isDown || wasd.A.isDown;
-        const right = cursors.right?.isDown || wasd.D.isDown;
-        const up = cursors.up?.isDown || wasd.W.isDown;
-        const down = cursors.down?.isDown || wasd.S.isDown;
-        const step = KEY_PAN_SPEED / cam.zoom;
-        if (left) cam.scrollX -= step;
-        if (right) cam.scrollX += step;
-        if (up) cam.scrollY -= step;
-        if (down) cam.scrollY += step;
-      });
+      // E and SPACE open the nearest CP if one is in range. Wired as
+      // one-shot keydown handlers rather than polled in update() so a
+      // single tap doesn't fire multiple opens. Viewer-mode blocks the
+      // open — spectators can't submit tasks against someone else's CP.
+      const openIfInRange = () => {
+        if (this.registry?.get?.("viewerMode") === true) return;
+        if (this.nearestInteractCp !== null) {
+          this.openCheckpointFromKey(this.nearestInteractCp);
+        }
+      };
+      this.wasd.E.on("down", openIfInRange);
+      this.wasd.SPACE.on("down", openIfInRange);
     }
+
+    // 3c. Mobile joystick bridge — the React MobileJoystick component
+    //     emits { x, y } vectors in [-1, 1] via eventBridge on drag,
+    //     and { x: 0, y: 0, released: true } on release. We consume the
+    //     vector in update(). Cast is intentional: eventBridge's typed
+    //     payload doesn't yet include JOYSTICK_MOVE.
+    this.joystickHandler = ((
+      e: { x: number; y: number; released?: boolean } | null,
+    ) => {
+      if (!e || e.released) {
+        this.joystickVector = null;
+        return;
+      }
+      this.joystickVector = { x: e.x, y: e.y };
+    }) as unknown as (e: { x: number; y: number } | null) => void;
+    eventBridge.onPhaser("JOYSTICK_MOVE", this.joystickHandler);
 
     // 4. Checkpoints
     for (const cp of CHECKPOINTS) {
       this.visuals.push(this.buildCheckpoint(cp));
     }
     this.refreshCheckpointStates();
+
+    // 4b. Corruption overlay — one tile-strip per CP-to-CP segment.
+    // Implements Ibhaveda_boss_corruption_table spec: strips start at
+    // full opacity, fade to ~10% when their owning CP hits 2/3 tasks,
+    // and to 0% + shatter burst at 3/3. `applyCorruptionState` is
+    // called from React whenever the CP data changes.
+    const villagePattern = ensureCorruptionPattern(this, motifForStage(1));
+    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
+      x: cp.x,
+      y: cp.y,
+    }));
+    this._corruption = new CorruptionOverlay(this, {
+      checkpoints: overlayCps,
+      patternTextureKey: villagePattern,
+      tint: 0xbdd4e7, // pale blue-grey — matches "Fog of Vagueness"
+      depth: 5, // above map (0), well below character (100+)
+      // Weakened-monster sprite reuses the fog boss idle sheet.
+      weakenedSpriteKey: "boss-fog-idle",
+      weakenedFrame: { width: 92, height: 92 },
+    });
+
+    // 4c. Debug overlay for walkability blocked zones — enabled via
+    // ?showZones=1 URL parameter. Red translucent rectangles let you
+    // tune the BLOCKED_ZONES coordinates visually against the map.
+    try {
+      const showZones =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("showZones") === "1";
+      if (showZones) {
+        const g = this.add.graphics();
+        g.setDepth(50); // above map, below characters
+        g.fillStyle(0xff0000, 0.35);
+        g.lineStyle(2, 0xff2222, 1);
+        BLOCKED_ZONES.forEach((z) => {
+          g.fillRect(z.x, z.y, z.w, z.h);
+          g.strokeRect(z.x, z.y, z.w, z.h);
+        });
+      }
+    } catch { /* URL parse fail — skip overlay */ }
+
+    // 4d. In-map zone editor — enabled via ?editZones=1. Lets you
+    // drag-draw new blocked rectangles right on the map, then copy
+    // the JSON into BLOCKED_ZONES. Zones drawn here also block
+    // movement LIVE while editing.
+    const editor = attachZoneEditor(this, "village");
+    _customZonesGetter = editor.getCustomZones;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      _customZonesGetter = () => [];
+    });
 
     // 5. Character sprite at active checkpoint. Sits just below the
     // painted checkpoint marker with a gentle idle bob so the map feels
@@ -456,13 +836,18 @@ export class VillageMapScene extends Phaser.Scene {
 
     // 7d. Mini-game spawns — discoverable easter-eggs the user can click
     //     to trigger a mini-game. Replaces the sidebar Mini Games button.
-    //     Reads from the shared Convex config so the same spawn list can
-    //     be used across scenes + level definitions.
-    this.spawnMiniGamePoints();
+    //     Wrap in try so a missing spawn asset doesn't stop PHASER_READY.
+    try {
+      this.spawnMiniGamePoints();
+    } catch (e) {
+      console.warn("[VillageMapScene] spawnMiniGamePoints failed:", e);
+    }
 
     // 8. Notify React that the scene is ready. The /map/world page.tsx
     // waits for this event before hiding the "Entering the world..."
-    // loading screen. Without it, the page hangs on the loader.
+    // loading screen. **This MUST always fire** even if some spawn calls
+    // above threw silently -- otherwise the loading screen hangs forever
+    // on production when a single asset 404s.
     eventBridge.dispatchToReact({ type: "PHASER_READY" });
 
     // 9. React → Phaser: after the "Stage 1 Complete" overlay closes we
@@ -471,6 +856,243 @@ export class VillageMapScene extends Phaser.Scene {
       this.previewNextStage(e.stage);
     };
     eventBridge.onPhaser("PREVIEW_NEXT_STAGE", this.previewStageHandler);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Free-roam update loop
+  // ─────────────────────────────────────────────────────────────────────
+
+  /**
+   * Called by Phaser every frame. Handles free-roam character movement
+   * from keyboard + joystick input, plays the correct walk/idle animation,
+   * flips the sprite to face the direction of travel, and refreshes the
+   * interact-hint ring on whichever CP is closest.
+   *
+   * Scripted movement (walkCharacterTo) sets `scriptedMovement=true`
+   * so this loop yields to the tween while a scripted walk is running.
+   */
+  update(_time: number, delta: number): void {
+    const char = this.character;
+    if (!char) return;
+
+    // Yield to scripted walks (tween-driven checkpoint transitions).
+    if (this.scriptedMovement) {
+      // Watchdog: if we think a scripted walk is running but no tween
+      // is actually alive, the tween was interrupted (scene pause /
+      // remount race / combat overlay teardown) and lost its
+      // onComplete. Release the lock so free-roam input works again.
+      if (!this._walkTween || !this._walkTween.isPlaying?.()) {
+        this.scriptedMovement = false;
+        this.isWalking = false;
+        this._walkTween = null;
+      } else {
+        this.updateInteractHint();
+        return;
+      }
+    }
+
+    // Viewer mode: we're spectating someone else's map. Persona stays
+    // parked; no keyboard/joystick input applied. Interact hint is also
+    // skipped since there's nothing to interact with (task modal is
+    // owner-only).
+    const viewerMode = this.registry?.get?.("viewerMode") === true;
+    if (viewerMode) {
+      // Keep shadow glued to the parked character.
+      if (this.characterShadow && char) {
+        this.characterShadow.setPosition(char.x, char.y + 4);
+      }
+      return;
+    }
+
+    // Read directional input. Keyboard is polled; joystick vector was
+    // pushed via eventBridge in create's handler.
+    let dx = 0;
+    let dy = 0;
+    if (this.cursors && this.wasd) {
+      if (this.cursors.left?.isDown || this.wasd.A.isDown) dx -= 1;
+      if (this.cursors.right?.isDown || this.wasd.D.isDown) dx += 1;
+      if (this.cursors.up?.isDown || this.wasd.W.isDown) dy -= 1;
+      if (this.cursors.down?.isDown || this.wasd.S.isDown) dy += 1;
+    }
+    if (this.joystickVector) {
+      dx += this.joystickVector.x;
+      dy += this.joystickVector.y;
+    }
+
+    const magnitude = Math.hypot(dx, dy);
+    const moving = magnitude > 0.05;
+
+    // Don't accept free-roam input while a persona combat one-shot
+    // (attack/hurt/defeat/victory) is mid-play — otherwise the anim
+    // is restarted on the next frame and never resolves.
+    if (this._personaAnimBusy) {
+      // Keep shadow glued to character even during the busy anim.
+      if (this.characterShadow) {
+        this.characterShadow.setPosition(char.x, char.y + 4);
+      }
+      this.updateInteractHint();
+      return;
+    }
+
+    if (moving) {
+      // Normalise so diagonal movement isn't faster than orthogonal.
+      const inv = magnitude > 1 ? 1 / magnitude : 1;
+      const nx = dx * inv;
+      const ny = dy * inv;
+      const speed = VillageMapScene.PLAYER_SPEED * (delta / 1000);
+      const targetX = char.x + nx * speed;
+      const targetY = char.y + ny * speed;
+
+      // Walkability — hand-defined BLOCKED_ZONES (water bodies +
+      // building footprints) + edge clamp. Axis-separated: if only X
+      // would enter a zone, block X and allow Y (character slides
+      // along walls). Escape-valve: if already inside a zone somehow
+      // (spawn glitch), allow any move so player isn't permanently
+      // trapped. Feet-hit-point is (x, y+4) since sprite origin is at
+      // (0.5, 0.75) — the feet sit just below sprite center.
+      const insetX = 30;
+      const insetY = 60;
+      const clampedX = Phaser.Math.Clamp(targetX, insetX, MAP_WIDTH - insetX);
+      const clampedY = Phaser.Math.Clamp(targetY, insetY, MAP_HEIGHT - insetY);
+      const feetOffsetY = 4;
+      const alreadyBlocked = pointInAnyBlockedZone(char.x, char.y + feetOffsetY);
+      if (alreadyBlocked) {
+        // Trapped — allow any move to escape.
+        char.x = clampedX;
+        char.y = clampedY;
+      } else {
+        // Try X first, then Y — axis-separated so player slides along walls.
+        if (!pointInAnyBlockedZone(clampedX, char.y + feetOffsetY)) {
+          char.x = clampedX;
+        }
+        if (!pointInAnyBlockedZone(char.x, clampedY + feetOffsetY)) {
+          char.y = clampedY;
+        }
+      }
+
+      // Pick the correct walk animation based on the dominant axis.
+      // Extended personas get 4 directional walk sheets; legacy personas
+      // fall back to the single walk sheet + horizontal flip trick.
+      const walkKey = this._personaUsesExtended
+        ? directionalWalkAnimKey(getCurrentPersonaId(), nx, ny)
+        : (this._personaWalkAnimKey ?? "persona-walk");
+
+      if (!this._personaUsesExtended) {
+        // Legacy: sprites face right; flip when moving left.
+        if (Math.abs(nx) > 0.05) char.setFlipX(nx < 0);
+      } else {
+        // Extended sheets already contain the correct facing for
+        // walk-east / walk-west, so keep flipX off.
+        char.setFlipX(false);
+      }
+
+      // Swap to walk animation only if the KEY has actually changed —
+      // otherwise Phaser restarts the clip every frame and freezes at
+      // frame 0, killing the illusion of walking.
+      if (this._currentPersonaAnimKey !== walkKey) {
+        char.play(walkKey);
+        this._currentPersonaAnimKey = walkKey;
+        this.isWalking = true;
+      }
+    } else if (this.isWalking) {
+      const idleKey = this._personaIdleAnimKey ?? "persona-idle";
+      char.play(idleKey);
+      this._currentPersonaAnimKey = idleKey;
+      this.isWalking = false;
+    }
+
+    // Keep the ground shadow glued to the character.
+    if (this.characterShadow) {
+      this.characterShadow.setPosition(char.x, char.y + 4);
+    }
+
+    // Refresh proximity to the nearest interactable CP.
+    this.updateInteractHint();
+  }
+
+  /**
+   * Compute nearest CP within INTERACT_RADIUS and toggle the interact
+   * hint ring on that CP. Also updates `nearestInteractCp` so the E/Space
+   * handler knows which CP to open.
+   */
+  private updateInteractHint(): void {
+    const char = this.character;
+    if (!char) {
+      this.nearestInteractCp = null;
+      this.setInteractHintVisible(null);
+      return;
+    }
+
+    let nearestIdx: number | null = null;
+    let nearestDist = VillageMapScene.INTERACT_RADIUS;
+    for (let i = 0; i < CHECKPOINTS.length; i++) {
+      const cp = CHECKPOINTS[i];
+      const d = Phaser.Math.Distance.Between(char.x, char.y, cp.x, cp.y);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestIdx = i;
+      }
+    }
+
+    if (nearestIdx !== this.nearestInteractCp) {
+      this.nearestInteractCp = nearestIdx;
+      this.setInteractHintVisible(nearestIdx);
+    }
+  }
+
+  /**
+   * Position / show / hide the interact-hint ring. Lazily builds the
+   * container on first show so we don't pay the cost until it's needed.
+   */
+  private setInteractHintVisible(cpIdx: number | null): void {
+    if (cpIdx === null) {
+      if (this.interactHint) this.interactHint.setVisible(false);
+      return;
+    }
+    const cp = CHECKPOINTS[cpIdx];
+    if (!this.interactHint) {
+      // Ring wraps the CHECKPOINT MARKER itself (roughly the size of
+      // the painted disc) so it reads as "activate this checkpoint",
+      // not as a UFO hovering above it. Label sits just above the ring.
+      const ring = this.add.circle(0, 0, 28, 0xfde047, 0);
+      ring.setStrokeStyle(2.5, 0xfde047, 0.95);
+      const label = this.add
+        .text(0, -42, "PRESS  E", {
+          fontFamily: "monospace",
+          fontSize: "10px",
+          color: "#fde047",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5);
+      // Container anchored ON the CP marker (cp.x, cp.y), not floating
+      // above it. Previously used cp.y - 40 which lifted the whole
+      // hint way above the marker and read as unrelated to it.
+      const container = this.add.container(cp.x, cp.y, [ring, label]);
+      container.setDepth(150);
+      this.tweens.add({
+        targets: ring,
+        scale: { from: 1, to: 1.25 },
+        alpha: { from: 0.95, to: 0.4 },
+        duration: 900,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+      this.interactHint = container;
+    }
+    this.interactHint.setPosition(cp.x, cp.y);
+    this.interactHint.setVisible(true);
+  }
+
+  /**
+   * Bridge E/Space keydown to the existing checkpoint-click handler.
+   * Reuses onCheckpointClicked so the React side sees the exact same
+   * event it would from a mouse click on the marker.
+   */
+  private openCheckpointFromKey(cpIdx: number): void {
+    const cp = CHECKPOINTS[cpIdx];
+    if (!cp) return;
+    this.onCheckpointClicked(cp);
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -493,6 +1115,7 @@ export class VillageMapScene extends Phaser.Scene {
         this.miniBossHpBars.push(null);
         this.miniBossAuras.push(null);
         this.miniBossTauntFired.push(false);
+        this.miniBossAnimKeys.push(null);
         continue;
       }
 
@@ -547,9 +1170,25 @@ export class VillageMapScene extends Phaser.Scene {
         );
       }
 
-      // Register idle-loop anim
+      // Register idle-loop anim — prefer the multi-frame idle sheet
+      // (Pixellab pipeline) over the legacy walk/run loop. Falls back
+      // to loopKey for legacy bosses whose idle is a single frame.
       let idleAnimKey: string | null = null;
-      if (useLoop) {
+      if (def.idleFrameCount > 1) {
+        idleAnimKey = `${def.idleKey}-idleLoop`;
+        if (!this.anims.exists(idleAnimKey)) {
+          this.anims.create({
+            key: idleAnimKey,
+            frames: this.anims.generateFrameNumbers(def.idleKey, {
+              start: 0,
+              end: def.idleFrameCount - 1,
+            }),
+            frameRate: 6,
+            repeat: -1,
+          });
+        }
+        sprite.play(idleAnimKey);
+      } else if (useLoop) {
         idleAnimKey = `${def.loopKey!}-loop`;
         if (!this.anims.exists(idleAnimKey)) {
           this.anims.create({
@@ -576,35 +1215,85 @@ export class VillageMapScene extends Phaser.Scene {
               start: 0,
               end: def.attackFrameCount - 1,
             }),
+            frameRate: 10,
+            repeat: 0,
+          });
+        }
+      }
+
+      // Register hurt / defeat / victory one-shots when the sheets are
+      // present (Pixellab pipeline). Each plays once then holds the last
+      // frame; playBossState() handles the return-to-idle behavior.
+      let hurtAnimKey: string | null = null;
+      if (def.hurtKey && this.textures.exists(def.hurtKey)) {
+        hurtAnimKey = `${def.hurtKey}-hurt`;
+        if (!this.anims.exists(hurtAnimKey)) {
+          this.anims.create({
+            key: hurtAnimKey,
+            frames: this.anims.generateFrameNumbers(def.hurtKey, {
+              start: 0,
+              end: (def.hurtFrameCount ?? 1) - 1,
+            }),
+            frameRate: 10,
+            repeat: 0,
+          });
+        }
+      }
+      let defeatAnimKey: string | null = null;
+      if (def.defeatKey && this.textures.exists(def.defeatKey)) {
+        defeatAnimKey = `${def.defeatKey}-defeat`;
+        if (!this.anims.exists(defeatAnimKey)) {
+          this.anims.create({
+            key: defeatAnimKey,
+            frames: this.anims.generateFrameNumbers(def.defeatKey, {
+              start: 0,
+              end: (def.defeatFrameCount ?? 1) - 1,
+            }),
+            frameRate: 8,
+            repeat: 0,
+          });
+        }
+      }
+      let victoryAnimKey: string | null = null;
+      if (def.victoryKey && this.textures.exists(def.victoryKey)) {
+        victoryAnimKey = `${def.victoryKey}-victory`;
+        if (!this.anims.exists(victoryAnimKey)) {
+          this.anims.create({
+            key: victoryAnimKey,
+            frames: this.anims.generateFrameNumbers(def.victoryKey, {
+              start: 0,
+              end: (def.victoryFrameCount ?? 1) - 1,
+            }),
             frameRate: 8,
             repeat: 0,
           });
         }
       }
 
-      // Bob tween — kept subtle (3px) so the HP bar / aura / tendril
-      // followers (see bossAnimator) don't visibly lag behind the sprite.
+      // Product decision — bosses stand STATIC on the map. No bob, no
+      // ambient tendrils, no taunt loop. Bosses only animate during
+      // combat / weaken / defeat events. Reads as a threat waiting for
+      // you rather than a busy background element.
       const bob = this.tweens.add({
         targets: sprite,
-        y: sprite.y - 3,
-        duration: 2200 + def.checkpointIndex * 120,
-        ease: "Sine.easeInOut",
-        yoyo: true,
-        repeat: -1,
+        y: sprite.y, // no delta — tween exists purely so the ref shape
+        duration: 1,
+        repeat: 0,
       });
+      bob.stop(); // static from the moment it spawns
 
-      // P1 #7 — ambient tendrils
-      const tendrilStop = startAmbientTendrils(this, sprite, def.family);
-      // P1 #8 — aura ring
-      const aura = addAuraRing(this, sprite, def.family);
-      // P2 #10 — HP bar (with boss name chip)
+      // Tendrils/aura are ambient VFX around the boss — disabled to
+      // keep the boss reading as a stone-still threat. Nulls make
+      // downstream `if (aura) …` guards skip the animation calls
+      // cleanly, so no other code path needs to change.
+      const tendrilStop: (() => void) | null = null;
+      const aura = null;
+      // P2 #10 — HP bar (with boss name chip) — kept, this is
+      // gameplay-critical UI, not animation.
       const hpBar = addBossHpBar(this, sprite, 1, def.name);
 
-      // P1 #6 — taunt loop (only if attack anim exists)
-      let tauntStop: (() => void) | null = null;
-      if (idleAnimKey && attackAnimKey) {
-        tauntStop = startTauntLoop(this, sprite, idleAnimKey, attackAnimKey, 8000);
-      }
+      // No taunt loop — boss stands still.
+      const tauntStop: (() => void) | null = null;
 
       this.miniBossSprites.push(sprite);
       this.miniBossBobTweens.push(bob);
@@ -613,6 +1302,13 @@ export class VillageMapScene extends Phaser.Scene {
       this.miniBossHpBars.push(hpBar);
       this.miniBossAuras.push(aura);
       this.miniBossTauntFired.push(false);
+      this.miniBossAnimKeys.push({
+        idle: idleAnimKey,
+        attack: attackAnimKey,
+        hurt: hurtAnimKey,
+        defeat: defeatAnimKey,
+        victory: victoryAnimKey,
+      });
     }
     this.refreshMiniBossVisibility();
     // Show the first boss's taunt on scene start after a short beat
@@ -762,12 +1458,132 @@ export class VillageMapScene extends Phaser.Scene {
       if (hp) hp.setHp(1 - tasksDone / tasksTotal);
       // Bosses face the player character while taking damage.
       if (this.character) bossFaceTarget(sprite, this.character.x);
+      // Fire the Pixellab hurt animation if the boss has one; this is
+      // what makes the mist "recoil" visually. Persona swings attack.
+      this.playBossState(idx, "hurt");
     }
+    // Persona attack swing — tracks each task landing.
+    this.playPersonaState("attack");
     // Fill the task-progress stars on the checkpoint marker regardless of
     // whether the boss is visible.
     this.setCheckpointTaskFill(idx, tasksDone);
+    // Update the corruption overlay for THIS CP's segment. 2/3 → 10%
+    // opacity + weakened monster; 3/3 → 0% + shatter burst.
+    this._corruption?.updateSegment(idx, tasksDone);
     // Subtle confirm click on each hit so the user feels the damage land.
     try { audioManager.playUI("confirm"); } catch { /* audio not critical */ }
+  }
+
+  /**
+   * Public: apply a full CheckpointState[] snapshot to the corruption
+   * overlay. Called from the React map page whenever CP progress data
+   * changes (initial load + realtime Convex updates).
+   *
+   * States must be ordered by checkpoint number (matches CHECKPOINTS array).
+   * Extra states past CHECKPOINTS.length are ignored (belong to other stages).
+   */
+  public applyCorruptionState(states: CheckpointState[]): void {
+    this._lastCheckpointStates = states;
+    this._corruption?.applyCheckpointStates(states);
+  }
+
+  /**
+   * Play a one-shot combat state animation on the persona sprite.
+   *   idle    → return to breathing loop (also clears defeat KO pose)
+   *   attack  → one-shot; auto-returns to idle
+   *   hurt    → one-shot; auto-returns to idle
+   *   defeat  → one-shot; HOLDS last frame until playPersonaState("idle")
+   *   victory → one-shot; auto-returns to idle
+   *
+   * Silently no-ops when the persona doesn't have the extended set or
+   * the requested clip isn't registered.
+   */
+  public playPersonaState(
+    state: "idle" | "attack" | "hurt" | "defeat" | "victory",
+  ): void {
+    const char = this.character;
+    if (!char || !this._personaUsesExtended) return;
+    // Clear any prior safety timeout — new state wins.
+    if (this._personaAnimBusyTimer !== null) {
+      window.clearTimeout(this._personaAnimBusyTimer);
+      this._personaAnimBusyTimer = null;
+    }
+    if (state === "idle") {
+      this._personaAnimBusy = false;
+      const idleKey = this._personaIdleAnimKey;
+      if (idleKey && this.anims.exists(idleKey)) {
+        char.play(idleKey);
+        this._currentPersonaAnimKey = idleKey;
+      }
+      return;
+    }
+    const key = personaAnimKey(getCurrentPersonaId(), state);
+    if (!this.anims.exists(key)) return;
+    this._personaAnimBusy = true;
+    char.play(key);
+    this._currentPersonaAnimKey = key;
+    // ── SAFETY-NET ────────────────────────────────────────────────
+    // The ANIMATION_COMPLETE handler in spawnCharacter() normally
+    // clears _personaAnimBusy after the clip ends. But if the sprite
+    // is interrupted or the event misfires (rare Phaser edge cases),
+    // the busy flag can get stuck TRUE and freeze the character
+    // forever — no idle, no walk. Belt-and-braces: force-clear after
+    // 1600ms (longer than any one-shot clip at 8-12fps × 9 frames)
+    // and drop back to idle. Defeat is exempt — it's supposed to
+    // hold its last frame until explicitly revived.
+    if (state !== "defeat") {
+      this._personaAnimBusyTimer = window.setTimeout(() => {
+        this._personaAnimBusyTimer = null;
+        if (!this._personaAnimBusy) return;
+        this._personaAnimBusy = false;
+        const idleKey = this._personaIdleAnimKey;
+        if (this.character && idleKey && this.anims.exists(idleKey)) {
+          this.character.play(idleKey);
+          this._currentPersonaAnimKey = idleKey;
+        }
+      }, 1600);
+    }
+  }
+
+  /**
+   * Play a boss state on the given checkpoint's mini-boss sprite.
+   * Uses the animation keys populated during spawnMiniBosses. Auto-returns
+   * to idle for hurt/attack/victory; holds last frame for defeat.
+   */
+  public playBossState(
+    checkpointIndex: number,
+    state: "idle" | "attack" | "hurt" | "defeat" | "victory",
+  ): void {
+    const sprite = this.miniBossSprites[checkpointIndex];
+    const keys = this.miniBossAnimKeys[checkpointIndex];
+    if (!sprite || !keys) return;
+
+    if (state === "idle") {
+      if (keys.idle && this.anims.exists(keys.idle)) sprite.play(keys.idle);
+      return;
+    }
+
+    const targetKey = keys[state];
+    if (!targetKey || !this.anims.exists(targetKey)) return;
+    sprite.play(targetKey);
+    // Attach a one-shot completion handler that returns to idle unless
+    // this was "defeat" (KO — hold last frame) or "victory" (dominating
+    // pose — hold last frame briefly then return to idle for map).
+    const returnToIdle = () => {
+      if (state === "defeat") return; // hold KO pose
+      if (keys.idle && this.anims.exists(keys.idle)) sprite.play(keys.idle);
+    };
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, returnToIdle);
+  }
+
+  /** Convenience wrappers for React → Phaser combat events. */
+  public onCombatVictory(): void {
+    this.playPersonaState("victory");
+    this.playBossState(this.currentIndex, "defeat");
+  }
+  public onCombatDefeat(): void {
+    this.playPersonaState("defeat");
+    this.playBossState(this.currentIndex, "victory");
   }
 
   /**
@@ -1288,35 +2104,68 @@ export class VillageMapScene extends Phaser.Scene {
   private spawnCharacter(): void {
     const active = CHECKPOINTS[this.currentIndex];
     if (!active) return;
-    if (!this.textures.exists("village-persona-idle")) return;
+
+    // ── Persona-aware sprite keys ─────────────────────────────────────
+    // Prefer the persona picked in the picker (via getCurrentPersonaId
+    // read at preload). If that texture didn't load (art missing, path
+    // 404, etc.), fall through to the legacy village-persona-* keys
+    // pointing at the fantasy character so the scene still renders.
+    const personaId = getCurrentPersonaId();
+    const personaIdleKey = personaSpriteKey(personaId, "idle");
+    const personaWalkKey = personaSpriteKey(personaId, "walk");
+    const idleTextureKey = this.textures.exists(personaIdleKey)
+      ? personaIdleKey
+      : "village-persona-idle";
+    const walkTextureKey = this.textures.exists(personaWalkKey)
+      ? personaWalkKey
+      : "village-persona-walk";
+    if (!this.textures.exists(idleTextureKey)) return;
+
+    // Register persona animations if the persona sheet loaded — this
+    // creates `persona-anim:<id>:{idle,walk}` clips scoped to the
+    // per-persona frame count/fps. When falling back to the legacy
+    // sheet, we keep the older `persona-idle` / `persona-walk` keys
+    // so no other code has to change.
+    registerPersonaAnimations(this, personaId);
 
     // HD pixel-art: force NEAREST filter on both spritesheets so the
     // 32×48 pixel art stays crisp when scaled instead of blurring
     // through linear interpolation.
-    this.textures
-      .get("village-persona-idle")
-      .setFilter(Phaser.Textures.FilterMode.NEAREST);
-    this.textures
-      .get("village-persona-walk")
-      .setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get(idleTextureKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get(walkTextureKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
 
-    // Register subtle idle + walk animations once (guard re-mount)
-    if (!this.anims.exists("persona-idle")) {
+    // Compute the animation clip keys we're going to play. Persona
+    // keys when the persona sheet is live, legacy keys otherwise.
+    const persona = getPersona(personaId);
+    const usingPersonaSheet = idleTextureKey === personaIdleKey;
+    const idleAnimKey = usingPersonaSheet
+      ? personaAnimKey(personaId, "idle")
+      : "persona-idle";
+    const walkAnimKey = usingPersonaSheet
+      ? personaAnimKey(personaId, "walk")
+      : "persona-walk";
+    // Store the resolved keys on the scene so walk/idle transitions
+    // downstream (walkCharacterTo, tween onComplete) can use them.
+    this._personaIdleAnimKey = idleAnimKey;
+    this._personaWalkAnimKey = walkAnimKey;
+    this._personaUsesExtended = usingPersonaSheet && personaHasExtended(personaId);
+
+    // Legacy fallback animation clips — only registered if we're on
+    // the fantasy sprite (i.e. persona sheet wasn't found).
+    if (!usingPersonaSheet && !this.anims.exists("persona-idle")) {
       this.anims.create({
         key: "persona-idle",
-        // Row 0 = facing down, very slow subtle breath (2 frames only)
         frames: this.anims.generateFrameNumbers("village-persona-idle", {
           start: 0,
           end: 1,
         }),
-        frameRate: 2, // slow — feels stable, not jittery
+        frameRate: 2,
         repeat: -1,
       });
     }
-    if (!this.anims.exists("persona-walk")) {
+    if (!usingPersonaSheet && !this.anims.exists("persona-walk")) {
       this.anims.create({
         key: "persona-walk",
-        // Row 2 = facing right, 5-frame walk cycle
         frames: this.anims.generateFrameNumbers("village-persona-walk", {
           start: 10,
           end: 14,
@@ -1325,6 +2174,7 @@ export class VillageMapScene extends Phaser.Scene {
         repeat: -1,
       });
     }
+    void persona; // reserved for future accent-color usage
 
     // Persistent soft ground shadow so the character feels planted on the
     // marker instead of floating. Sits BELOW the character sprite depth so
@@ -1342,14 +2192,86 @@ export class VillageMapScene extends Phaser.Scene {
     this.character = this.add.sprite(
       active.x,
       active.y + CHAR_Y_OFFSET,
-      "village-persona-idle",
+      idleTextureKey,
     );
     // Bottom-center origin so setPosition(cp.x, cp.y) lands the character's
     // feet EXACTLY on the checkpoint marker — no offset math needed.
-    this.character.setOrigin(0.5, 1);
-    this.character.setScale(CHAR_SCALE);
+    // For extended (Pixellab) personas the character body sits in the
+    // MIDDLE of the 88×88 frame (feet around row 65), so anchor at 0.75
+    // instead of 1.0 to plant the visible feet on the marker rather
+    // than the transparent bottom edge of the frame.
+    if (this._personaUsesExtended) {
+      this.character.setOrigin(0.5, 0.75);
+    } else {
+      this.character.setOrigin(0.5, 1);
+    }
+    // Extended (88×88) sheets: the Pixellab character silhouette usually
+    // occupies only the middle ~30×45px of the 88-frame with the rest
+    // being transparent padding. Scale accordingly so the visible
+    // character reads at roughly the same size as the legacy 32×48
+    // sprite (~76×115 world px at CHAR_SCALE=2.4).
+    if (this._personaUsesExtended) {
+      // Alchemist frames are 88×88; second-wave personas (arcanist etc.)
+      // are 92×92. Compensate so the on-screen character stays roughly
+      // the same size regardless of the source frame size — target a
+      // ~150px displayed height across all personas.
+      const persona = getPersona(personaId);
+      const frameH = persona.extended?.frameHeight ?? 88;
+      this.character.setScale(150 / frameH);
+    } else {
+      this.character.setScale(CHAR_SCALE);
+    }
     this.character.setDepth(100); // above painted map + checkpoint marker
-    this.character.play("persona-idle");
+    this.character.play(idleAnimKey);
+    this._currentPersonaAnimKey = idleAnimKey;
+
+    // When any one-shot combat anim ends, drop back to idle and clear
+    // the busy flag so update() resumes accepting free-roam input.
+    // Defeat clips are the ONLY exception — they hold their final KO
+    // frame until playPersonaState("idle") explicitly revives.
+    this.character.on(
+      Phaser.Animations.Events.ANIMATION_COMPLETE,
+      (anim: Phaser.Animations.Animation) => {
+        const key = anim.key;
+        // Ignore idle-loop completion events (idle never actually
+        // "completes" but Phaser can fire a spurious complete on
+        // interrupt — guard against it clearing the state wrongly).
+        if (this._personaIdleAnimKey && key === this._personaIdleAnimKey) {
+          return;
+        }
+        if (key.endsWith(":defeat")) {
+          this._personaAnimBusy = false;
+          if (this._personaAnimBusyTimer !== null) {
+            window.clearTimeout(this._personaAnimBusyTimer);
+            this._personaAnimBusyTimer = null;
+          }
+          return; // hold last frame
+        }
+        // Any other one-shot (attack/hurt/victory) finished → drop
+        // to idle unconditionally. Don't gate on _personaAnimBusy —
+        // if the flag somehow got out of sync, we still want the
+        // sprite to return to a playable state.
+        this._personaAnimBusy = false;
+        if (this._personaAnimBusyTimer !== null) {
+          window.clearTimeout(this._personaAnimBusyTimer);
+          this._personaAnimBusyTimer = null;
+        }
+        if (this.character && this._personaIdleAnimKey) {
+          this.character.play(this._personaIdleAnimKey);
+          this._currentPersonaAnimKey = this._personaIdleAnimKey;
+        }
+      },
+    );
+
+    // ── Free-roam camera follow ────────────────────────────────────
+    // Camera softly tracks the character as they walk around instead
+    // of snapping to CP markers. Deadzone keeps the sprite roughly in
+    // the center third so tiny movements don't jitter the whole view.
+    const cam = this.cameras.main;
+    cam.startFollow(this.character, true, 0.08, 0.08);
+    const dzW = Math.min(220, this.scale.width * 0.24);
+    const dzH = Math.min(160, this.scale.height * 0.24);
+    cam.setDeadzone(dzW, dzH);
 
     // Follow-loop: shadow tracks character X but stays at ground Y so it
     // doesn't bob with the sprite. Reads as a stable planted shadow.
@@ -1406,22 +2328,56 @@ export class VillageMapScene extends Phaser.Scene {
   private walkCharacterTo(x: number, y: number): void {
     const char = this.character;
     if (!char) return;
-    // Face direction of travel — walk sheet frames face right by default,
-    // so flip when moving left.
-    char.setFlipX(x < char.x);
-    char.play("persona-walk");
-    this.tweens.add({
+    // Pick the correct walk animation for the scripted direction of
+    // travel — extended personas get their 4-directional sheet; legacy
+    // personas fall back to the flip-horizontal trick.
+    const dx = x - char.x;
+    const dy = y - char.y;
+    let walkKey: string;
+    if (this._personaUsesExtended) {
+      walkKey = directionalWalkAnimKey(getCurrentPersonaId(), dx, dy);
+      char.setFlipX(false);
+    } else {
+      walkKey = this._personaWalkAnimKey ?? "persona-walk";
+      char.setFlipX(x < char.x);
+    }
+    char.play(walkKey);
+    this._currentPersonaAnimKey = walkKey;
+    this.scriptedMovement = true;
+    this.isWalking = true;
+    // Kill any prior walk tween FIRST. Phaser will silently drop the
+    // old tween's onComplete if we just add a second one on the same
+    // target, which strands scriptedMovement=true forever and freezes
+    // WASD input. Explicit removal guarantees cleanup.
+    if (this._walkTween && this._walkTween.isPlaying?.()) {
+      this._walkTween.stop();
+      this._walkTween.remove();
+    }
+    this._walkTween = this.tweens.add({
       targets: char,
       x,
       y,
       duration: VillageMapScene.WALK_DURATION_MS,
       ease: "Sine.easeInOut",
       onComplete: () => {
-        char.setFlipX(false); // face down again on arrival
-        char.play("persona-idle");
+        if (!this._personaUsesExtended) char.setFlipX(false); // face down on arrival
+        const idleKey = this._personaIdleAnimKey ?? "persona-idle";
+        char.play(idleKey);
+        this._currentPersonaAnimKey = idleKey;
+        this.scriptedMovement = false;
+        this.isWalking = false;
+        this._walkTween = null;
         // Small beat then run the "inspect" gesture on the checkpoint
         // the character just arrived at (nearest to their current pos).
         this.time.delayedCall(180, () => this.playInteractGesture());
+      },
+      onStop: () => {
+        // If Phaser stopped the tween for any reason (scene pause,
+        // new walk starting, sprite destroyed), release the lock so
+        // free-roam input can resume immediately.
+        this.scriptedMovement = false;
+        this.isWalking = false;
+        this._walkTween = null;
       },
     });
   }
@@ -1762,6 +2718,8 @@ export class VillageMapScene extends Phaser.Scene {
   }
 
   private onCheckpointClicked(cp: CheckpointDef): void {
+    // Viewer mode: reading someone else's map — CP clicks are inert.
+    if (this.registry?.get?.("viewerMode") === true) return;
     const activeCp = CHECKPOINTS[this.currentIndex];
     if (cp.id !== activeCp.id) return;
 

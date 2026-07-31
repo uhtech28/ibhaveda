@@ -42,6 +42,18 @@ export interface MiniGameSpawnConfig {
 export const MINIGAME_SPAWNS: readonly MiniGameSpawnConfig[] = [
   // Stage 1 — Ideation: discover by exploring the starting biome.
   {
+    // Demo-visible spawn placed near CP1 so users find it without
+    // having to explore. Coordinates match the near-marker grass
+    // patch on the painted village map. Discoverable easter-egg.
+    id: "s1-rt-village-glade",
+    stage: 1,
+    archetype: "reflex_tap",
+    x: 340,
+    y: 380,
+    difficulty: 1,
+    flavorText: "A curious glow pulses in the grass.",
+  },
+  {
     id: "s1-pm-east-grove",
     stage: 1,
     archetype: "pattern_match",

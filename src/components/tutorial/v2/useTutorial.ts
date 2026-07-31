@@ -18,17 +18,27 @@ import { createContext, useContext } from "react";
 
 // ── Step semantics ─────────────────────────────────────────────────────────
 // 0 = not started   (default for new user; we trigger step 1 once profile loads)
-// 1 = welcome + name/username form
-// 2 = template picker on /feed compose
-// 3 = outline form inside IdeaWizard
-// 4 = map orientation on /map/world
-// 5 = first task → AI evaluation → boss combat
-// 6 = celebration recap
-// 7 = exit watcher — auto-redirect to /profile-setup, optional
-// 8 = completed (terminal — never shown)
-export type TutorialStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+// 1..10 = live tutorial steps (see mapping below)
+// 11 = completed (terminal — never shown)
+export type TutorialStep =
+  | 0
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11;
 
-export const TUTORIAL_TOTAL_STEPS = 7;
+// 10-step flow:
+//   1 name → 2 username → 3 click + → 4 pick template → 5 write outline
+//   → 6 posted / heading to map → 7 task (skipped in map tutorial)
+//   → 8 combat / done → 9 fire a flare → 10 make a contribution
+export const TUTORIAL_TOTAL_STEPS = 10;
 
 export type TutorialBackendState =
   | "not_started"
@@ -56,8 +66,19 @@ export interface TutorialActions {
   complete: () => Promise<void>;
   /** Restart from step 1. Persists to Convex. */
   restart: () => Promise<void>;
-  /** Programmatically hide the overlay without persisting (rarely needed). */
-  setActive: (active: boolean) => void;
+  /**
+   * Programmatically override the overlay's visibility without persisting.
+   *   - `false` → force-hide (e.g. while a modal owns the screen)
+   *   - `true`  → force-show (debug only; rarely correct)
+   *   - `null`  → RELEASE the override so the natural completion / step
+   *              logic (`baseActive`) decides visibility again.
+   *
+   * IMPORTANT: callers that only want to "un-hide" the overlay after a
+   * temporary hide should pass `null`, NOT `true`. Passing `true` will
+   * force the progress bar / Sparky back on screen for already-completed
+   * users on every re-render, which is the bug fixed in task #344.
+   */
+  setActive: (active: boolean | null) => void;
 }
 
 export interface TutorialContextValue extends TutorialState, TutorialActions {}

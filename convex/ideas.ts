@@ -13,6 +13,67 @@ async function getIdeaSparkCount(ctx: any, ideaId: Id<"ideas">) {
   return sparks.length;
 }
 
+/**
+ * Look up the user by Clerk ID. If they don't have a Convex `users`
+ * row yet (e.g. skipped /profile-setup), create a minimal one on the
+ * fly derived from Clerk identity claims. Guarantees a non-null user
+ * so downstream code can safely reference `user._id`, `user.displayName`,
+ * etc. Throws only if the insert itself fails (schema mismatch, etc.).
+ */
+async function resolveOrProvisionUser(
+  ctx: any,
+  clerkSubject: string,
+  ident: { email?: string; name?: string; givenName?: string; nickname?: string },
+) {
+  const existing = await ctx.db
+    .query("users")
+    .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", clerkSubject))
+    .unique();
+  if (existing) return existing;
+
+  const rawEmail = ident.email ?? null;
+  const rawName =
+    ident.name ||
+    ident.givenName ||
+    ident.nickname ||
+    (rawEmail ? rawEmail.split("@")[0] : "");
+  const base =
+    (rawEmail
+      ? rawEmail.split("@")[0]
+      : `user_${clerkSubject.slice(-6)}`
+    )
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "")
+      .slice(0, 20) || `user_${clerkSubject.slice(-6)}`;
+
+  let candidate = base;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const clash = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q: any) => q.eq("username", candidate))
+      .first();
+    if (!clash) break;
+    candidate = `${base}${Math.floor(Math.random() * 10000)}`;
+  }
+
+  const now = Date.now();
+  const newId = await ctx.db.insert("users", {
+    clerkId: clerkSubject,
+    username: candidate,
+    displayName: rawName || candidate,
+    skills: [],
+    industries: [],
+    completedOnboarding: false,
+    createdAt: now,
+    updatedAt: now,
+  });
+  const fresh = await ctx.db.get(newId);
+  if (!fresh) {
+    throw new Error("Failed to auto-provision user");
+  }
+  return fresh;
+}
+
 async function getCurrentUserFromAuth(ctx: any) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
@@ -90,15 +151,22 @@ export const createIdea = mutation({
       throw new Error("Invalid visibility setting");
     }
 
-    // Find user by Clerk ID
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    // Find user by Clerk ID, auto-provisioning a minimal row if
+    // this is the first time we see them. The /profile-setup
+    // redirect is disabled per product request (task #145) so a
+    // freshly-signed-up user can reach /feed and try to post before
+    // ever completing the name/username form. Bootstrapping here
+    // means the post always succeeds; profile polish is optional.
+    const user = await resolveOrProvisionUser(
+      ctx,
+      identity.subject,
+      identity as unknown as {
+        email?: string;
+        name?: string;
+        givenName?: string;
+        nickname?: string;
+      },
+    );
 
     // If parentId is provided, validate it and check authorization
     if (args.parentId) {
@@ -207,6 +275,32 @@ export const createIdea = mutation({
       userId: user._id,
       trigger: "create_idea",
     });
+
+    // Auto-cross-post to any connected socials (LinkedIn / X / FB /
+    // IG) the user has toggled on. Fire-and-forget action — a
+    // provider failure never blocks idea creation, and users with no
+    // connected accounts silently skip.
+    //
+    // The `siteUrl` env var lets us hand each provider a canonical URL
+    // to link back to. Falls back to a placeholder if unset (dev).
+    if (args.visibility === "public") {
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ??
+        process.env.SITE_URL ??
+        "https://uhtech.in";
+      const ideaUrl = `${siteUrl.replace(/\/$/, "")}/idea/${ideaId}`;
+      await ctx.scheduler.runAfter(
+        500, // ~half-second delay so any post-insert triggers settle
+        internal.socialAutoPost.publishIdeaToConnectedSocials,
+        {
+          userId: user._id,
+          ideaId,
+          title: args.title.trim(),
+          description: (args.description ?? "").trim(),
+          ideaUrl,
+        },
+      );
+    }
 
     return { ideaId, message: "Idea created successfully" };
   },

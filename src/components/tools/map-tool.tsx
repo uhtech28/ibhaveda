@@ -139,6 +139,17 @@ export function MapTool({
     x2: number;
     y2: number;
   } | null>(null);
+  // Click-and-drag drawing state for rectangle / circle / triangle tools.
+  // Tracks the starting corner + current cursor so we can render a live
+  // preview of the shape as the user drags. Committed to `elements` on
+  // mouse-up.
+  const [drawingShape, setDrawingShape] = useState<{
+    type: "rectangle" | "circle" | "triangle";
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRectRef = useRef<DOMRect | null>(null);
@@ -226,12 +237,40 @@ export function MapTool({
     if (canvasRef.current) {
       canvasRectRef.current = canvasRef.current.getBoundingClientRect();
     }
-    if (selectedTool === "arrow" && canvasRectRef.current) {
-      const rect = canvasRectRef.current;
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+    if (!canvasRectRef.current) return;
+    const rect = canvasRectRef.current;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (selectedTool === "arrow") {
       setDrawingArrow({ x, y });
       setTempArrow({ x1: x, y1: y, x2: x, y2: y });
+    } else if (
+      selectedTool === "rectangle" ||
+      selectedTool === "circle" ||
+      selectedTool === "triangle"
+    ) {
+      // Click-and-drag drawing for rectangle / circle / triangle. The
+      // shape follows the cursor between mousedown and mouseup, like
+      // MS Paint. Committed on mouseup.
+      setDrawingShape({
+        type: selectedTool,
+        startX: x,
+        startY: y,
+        currentX: x,
+        currentY: y,
+      });
+    } else if (selectedTool === "postit") {
+      // Place post-it exactly at cursor position (not random)
+      const newPostIt: PostIt = {
+        id: `postit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: "postit",
+        x,
+        y,
+        text: "New note",
+        color: POSTIT_COLORS[elements.length % POSTIT_COLORS.length],
+      };
+      setElements([...elements, newPostIt]);
     }
   };
 
@@ -272,9 +311,13 @@ export function MapTool({
         );
       } else if (drawingArrow) {
         setTempArrow({ x1: drawingArrow.x, y1: drawingArrow.y, x2: x, y2: y });
+      } else if (drawingShape) {
+        // Live-update the shape as the user drags — the preview follows
+        // the cursor between mousedown and mouseup.
+        setDrawingShape({ ...drawingShape, currentX: x, currentY: y });
       }
     },
-    [dragging, resizing, drawingArrow],
+    [dragging, resizing, drawingArrow, drawingShape],
   );
 
   const handleMouseUp = (e: React.MouseEvent) => {
@@ -298,6 +341,33 @@ export function MapTool({
       setDrawingArrow(null);
       setTempArrow(null);
     }
+
+    // Commit the shape being drawn if the user actually dragged (>10px).
+    // Otherwise discard as a stray click.
+    if (drawingShape) {
+      const dx = drawingShape.currentX - drawingShape.startX;
+      const dy = drawingShape.currentY - drawingShape.startY;
+      const width = Math.abs(dx);
+      const height = Math.abs(dy);
+      if (width > 10 || height > 10) {
+        // Normalize position so shape is drawn from top-left corner
+        // regardless of drag direction.
+        const x = Math.min(drawingShape.startX, drawingShape.currentX);
+        const y = Math.min(drawingShape.startY, drawingShape.currentY);
+        const newShape: Shape = {
+          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: drawingShape.type,
+          x,
+          y,
+          width: Math.max(width, 20),
+          height: Math.max(height, 20),
+          color: selectedColor,
+        };
+        setElements((current) => [...current, newShape]);
+      }
+      setDrawingShape(null);
+    }
+
     setDragging(null);
     setResizing(null);
     canvasRectRef.current = null;
@@ -349,10 +419,7 @@ export function MapTool({
             <Button
               variant={selectedTool === "postit" ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                setSelectedTool("postit");
-                addPostIt();
-              }}
+              onClick={() => setSelectedTool("postit")}
               className={layout === "compact" ? "h-7 text-xs px-2" : "h-8"}
             >
               <StickyNote className="h-3 w-3 mr-1" />
@@ -361,10 +428,7 @@ export function MapTool({
             <Button
               variant={selectedTool === "rectangle" ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                setSelectedTool("rectangle");
-                addShape("rectangle");
-              }}
+              onClick={() => setSelectedTool("rectangle")}
               className={layout === "compact" ? "h-7 text-xs px-2" : "h-8"}
             >
               <Square className="h-3 w-3 mr-1" />
@@ -373,10 +437,7 @@ export function MapTool({
             <Button
               variant={selectedTool === "circle" ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                setSelectedTool("circle");
-                addShape("circle");
-              }}
+              onClick={() => setSelectedTool("circle")}
               className={layout === "compact" ? "h-7 text-xs px-2" : "h-8"}
             >
               <Circle className="h-3 w-3 mr-1" />
@@ -385,10 +446,7 @@ export function MapTool({
             <Button
               variant={selectedTool === "triangle" ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                setSelectedTool("triangle");
-                addShape("triangle");
-              }}
+              onClick={() => setSelectedTool("triangle")}
               className={layout === "compact" ? "h-7 text-xs px-2" : "h-8"}
             >
               <Triangle className="h-3 w-3 mr-1" />
@@ -527,6 +585,59 @@ export function MapTool({
                 )}
               </g>
             )}
+
+            {/* Live shape preview while dragging (rectangle / circle / triangle) */}
+            {drawingShape && (() => {
+              const x = Math.min(drawingShape.startX, drawingShape.currentX);
+              const y = Math.min(drawingShape.startY, drawingShape.currentY);
+              const w = Math.abs(drawingShape.currentX - drawingShape.startX);
+              const h = Math.abs(drawingShape.currentY - drawingShape.startY);
+              if (w < 2 && h < 2) return null;
+              if (drawingShape.type === "rectangle") {
+                return (
+                  <rect
+                    x={x}
+                    y={y}
+                    width={w}
+                    height={h}
+                    fill={selectedColor}
+                    fillOpacity="0.4"
+                    stroke={selectedColor}
+                    strokeWidth="2"
+                    strokeDasharray="4"
+                  />
+                );
+              }
+              if (drawingShape.type === "circle") {
+                return (
+                  <ellipse
+                    cx={x + w / 2}
+                    cy={y + h / 2}
+                    rx={w / 2}
+                    ry={h / 2}
+                    fill={selectedColor}
+                    fillOpacity="0.4"
+                    stroke={selectedColor}
+                    strokeWidth="2"
+                    strokeDasharray="4"
+                  />
+                );
+              }
+              if (drawingShape.type === "triangle") {
+                const cx = x + w / 2;
+                return (
+                  <polygon
+                    points={`${cx},${y} ${x},${y + h} ${x + w},${y + h}`}
+                    fill={selectedColor}
+                    fillOpacity="0.4"
+                    stroke={selectedColor}
+                    strokeWidth="2"
+                    strokeDasharray="4"
+                  />
+                );
+              }
+              return null;
+            })()}
 
             {/* Render shapes */}
             {elements.map((el) => {

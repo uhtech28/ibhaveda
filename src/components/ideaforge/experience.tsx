@@ -38,6 +38,7 @@ import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { IdeaForgeRightRail } from "@/components/ideaforge/right-rail";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { IdeaWizard } from "@/components/ideas/IdeaWizard";
+import { FlareFeedSection } from "@/components/flares/FlareFeedSection";
 import {
   cardSurface,
   ComposerDraft,
@@ -292,6 +293,10 @@ export function IdeaForgeExperience({
                       </div>
                     </section>
                   )}
+                  {/* Community Flares — shows all open help requests +
+                      "Flare" button. Rendered above the idea feed so
+                      users see requests for help first. */}
+                  <FlareFeedSection currentUserId={currentUser?._id ?? null} />
                   <FilterTabs tabs={feedTabs} activeKey={feedTab} onChange={setFeedTab} />
                 </>
               ) : (

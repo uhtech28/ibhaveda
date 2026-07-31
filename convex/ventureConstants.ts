@@ -8,6 +8,7 @@ import { STAGE_BADGE_DEFINITIONS } from "./stageBadgeDefinitions";
 export const TOOL_TYPES = [
   "write",
   "table",
+  "spreadsheet",
   "map",
   "survey",
   "poll",
@@ -23,6 +24,11 @@ export type ToolType = (typeof TOOL_TYPES)[number];
 export const TOOL_INFO: Record<ToolType, { name: string; icon: string }> = {
   write: { name: "Text Editor", icon: "✍️" },
   table: { name: "Data Table", icon: "📊" },
+  // "spreadsheet" is the Excel-like jspreadsheet-ce editor used for
+  // tasks that need real grid editing (formulas, copy-paste from Excel,
+  // resizable rows/cols). Preferred for competitor grids, financial
+  // rows, market overview, SWOT. See SpreadsheetTool.
+  spreadsheet: { name: "Spreadsheet", icon: "🧮" },
   map: { name: "Mind Map", icon: "🗺️" },
   survey: { name: "Survey Builder", icon: "📋" },
   poll: { name: "Quick Poll", icon: "📊" },
@@ -52,801 +58,1056 @@ export const VENTURE_STAGES = [
 // CHECKPOINT DEFINITIONS
 // Each checkpoint has a stage, number within stage, and 3 tasks (t1/t2/t3)
 // ─────────────────────────────────────────────────────────────────────────────
+interface TaskDef {
+  prompt: string;
+  tool: ToolType;
+  /** Fantasy-flavored task title (v3 spec) — shown in the checkpoint
+   *  panel and task modal header. Optional so legacy consumers can
+   *  fall back to `prompt`. */
+  title?: string;
+  /** Fantasy subheader shown under the task title in the modal. */
+  subheader?: string;
+}
+
 interface CheckpointDef {
   stage: number;
   checkpoint: number;
+  /** Plain checkpoint key used by Convex rows (e.g. "Problem identified"). */
   name: string;
+  /** Plain outcome description shown on legacy surfaces. */
   outcome: string;
-  t1: { prompt: string; tool: ToolType };
-  t2: { prompt: string; tool: ToolType };
-  t3: { prompt: string; tool: ToolType };
+  /** Fantasy-flavored checkpoint title (v3 spec) — shown on the map HUD
+   *  and checkpoint panel header. */
+  title?: string;
+  /** Fantasy subheader shown under the title. */
+  subheader?: string;
+  /** Tagline shown when 2/3 tasks complete. */
+  standardTagline?: string;
+  /** Tagline shown when 3/3 tasks (gold) complete. */
+  goldTagline?: string;
+  t1: TaskDef;
+  t2: TaskDef;
+  t3: TaskDef;
 }
 
 export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
-  // Stage 1: Ideation
+  // Stage 1: Ideation — The Village · The Fog of Vagueness
   {
     stage: 1,
     checkpoint: 1,
     name: "Problem identified",
-    outcome: "A specific, real pain point is clearly articulated",
+    outcome: "A specific, real pain point is clearly articulated — grounded in who experiences it, when, and what it costs them.",
+    title: "Pierce the Fog of Vagueness",
+    subheader: "The village can't fight what it can't see. Identify the real pain point and exactly who suffers it.",
+    standardTagline: "The village has named its affliction. The fog has a face.",
+    goldTagline: "The affliction is named, witnessed, and carved into the village stone. None shall forget what was wrong here.",
     t1: {
-      prompt:
-        "Describe the problem you're solving. Cover who experiences it, when it occurs, and what it costs them in time, money, or frustration.",
+      prompt: "Describe the problem you are solving in a short statement — who experiences it, when it occurs, and what it costs them in time, money, or frustration.",
       tool: "write",
+      title: "Speak Its Name",
+      subheader: "The fog feeds on what goes unnamed. Write a short statement of the problem: who feels it, when it strikes, and what it costs them in time, money, or peace of mind.",
     },
     t2: {
-      prompt:
-        "Map out the problem space — who is affected, what triggers the problem, and what currently happens as a result.",
+      prompt: "Map out the problem space on the canvas — showing who is affected, what triggers the problem, and what currently happens as a result, without proposing a solution yet.",
       tool: "map",
+      title: "Chart the Affliction",
+      subheader: "Before any cure, map where the sickness spreads. On the canvas, show who is affected, what triggers the problem, and what currently happens as a result. No solutions yet.",
     },
     t3: {
-      prompt:
-        "Find three real-world examples of this problem from forums, reviews, news, or your own observation. Add each as a link with a note.",
+      prompt: "Find three real-world examples of this problem — from forums, reviews, news, interviews, or direct observation. Add each as a link or upload with a note on what it reveals.",
       tool: "link",
+      title: "Gather the Witnesses",
+      subheader: "A claim needs those who will swear to it. Find three real-world examples of this problem from forums, reviews, news, or direct observation, and link each with a note on what it reveals.",
     },
   },
   {
     stage: 1,
     checkpoint: 2,
     name: "Problem owner defined",
-    outcome: "A specific person who experiences the problem is documented",
+    outcome: "A specific person or customer who experiences the problem is documented — with enough context to design for them.",
+    title: "Find the Burdened Soul",
+    subheader: "Every quest is undertaken for someone. Document the specific person who carries this problem daily.",
+    standardTagline: "The quest has found its first true soul — the one who carries this burden daily.",
+    goldTagline: "The soul is known completely. Their burden, their face, their hour of need — all recorded in the party's tome.",
     t1: {
-      prompt:
-        "Write a profile of your target user — their context, goals, and the moment this problem hits hardest.",
+      prompt: "Write a profile of your target customer — their context, their goals, and the specific moment in their life or work when this problem hits them hardest.",
       tool: "write",
+      title: "Name the One Who Suffers",
+      subheader: "Write a profile of the soul you are fighting for: their context, their goals, and the exact moment in their life or work when this problem strikes hardest.",
     },
     t2: {
-      prompt:
-        "Build a persona card — name, role, key frustrations, current workarounds, and what a good solution would feel like.",
+      prompt: "Build a persona card using the table tool — including name, role or context, key frustrations, current workarounds, and what a good solution would feel like to them.",
       tool: "table",
+      title: "Carve Their Likeness",
+      subheader: "Set their portrait in the party's tome so no one forgets. Build a persona card with their name, role or context, key frustrations, current workarounds, and what a good solution would feel like.",
     },
     t3: {
-      prompt:
-        "Create a short survey and share it with at least three real people who fit your target profile. Document what they told you.",
+      prompt: "Create a short survey and share it with at least three real people who fit your target profile — document what they told you about how they currently deal with this problem.",
       tool: "survey",
+      title: "Hear Them Speak",
+      subheader: "A portrait drawn from imagination lies. Send a short survey to at least three real people who fit your target, and record in their own words how they deal with this problem today.",
     },
   },
   {
     stage: 1,
     checkpoint: 3,
     name: "Solution concept formed",
-    outcome:
-      "A proposed approach to the problem for the defined audience exists",
+    outcome: "A proposed approach to the problem for the defined customer exists — described in terms of what it does for them, not how it works.",
+    title: "Imagine the Weapon",
+    subheader: "Before the forge, the blade must exist in the mind. Describe the solution by what it does, not how it works.",
+    standardTagline: "A weapon has been imagined. The forge has not yet touched it, but the shape is known.",
+    goldTagline: "The weapon's design is complete. Its purpose is clear. The smith awaits only the order to begin.",
     t1: {
-      prompt:
-        "Describe your solution in two or three sentences. Focus on what it does for the user, not how it works technically.",
+      prompt: "Describe your solution in two or three sentences — what it does for the customer and what problem it removes or reduces, without explaining the mechanics.",
       tool: "write",
+      title: "Forge It in the Mind",
+      subheader: "In two or three sentences, describe your solution by what it does for the customer and the problem it removes. Name no mechanics yet, only the outcome it delivers.",
     },
     t2: {
-      prompt:
-        "Sketch how your solution works — show the core flow from the user's perspective.",
+      prompt: "Sketch how your solution works on the canvas — showing the core experience from the customer's perspective, what they do, what happens, and what they get.",
       tool: "map",
+      title: "Trace Its Edge",
+      subheader: "Show how the weapon is wielded, from the customer's side. On the canvas, sketch the core experience: what they do, what happens, and what they walk away with.",
     },
     t3: {
-      prompt:
-        "Create a poll asking your target audience which of two or three solution directions appeals most. Share it and document the result.",
+      prompt: "Create a poll asking your target audience which of two or three solution directions appeals most — share it and document the result.",
       tool: "poll",
+      title: "Test the Balance",
+      subheader: "A weapon ill-suited to the hand fails in battle. Put two or three solution directions to your target audience in a poll, share it, and record which one they reach for.",
     },
   },
   {
     stage: 1,
     checkpoint: 4,
     name: "Idea worth pursuing",
-    outcome: "An honest first-pass judgment on viability is documented",
+    outcome: "An honest first-pass judgment on viability is documented — covering both the case for and the case against.",
+    title: "Accept the Quest",
+    subheader: "No worthy party marches blind. Make an honest first call on whether this idea is worth the journey.",
+    standardTagline: "The party has weighed the quest and chosen to accept it. The road ahead is long but the cause is just.",
+    goldTagline: "The quest is accepted with full eyes open — every risk counted, every reason weighed. The journey begins.",
     t1: {
-      prompt:
-        "Write an honest case for and against pursuing this idea. List three reasons it's worth doing and two reasons it might not be.",
+      prompt: "Write an honest case for and against pursuing this idea — at least three reasons it is worth doing and two reasons it might not work.",
       tool: "write",
+      title: "Weigh the Cause",
+      subheader: "Write the honest case both ways: at least three reasons this idea is worth pursuing, and two reasons it may not work. Both sides matter.",
     },
     t2: {
-      prompt:
-        "Build a comparison table of at least two existing alternatives — what they do, who they serve, where they fall short.",
+      prompt: "Build a quick comparison table of at least two existing alternatives to your idea — showing what they do, who they serve, and where they fall short.",
       tool: "table",
+      title: "Survey the Rival Roads",
+      subheader: "Others have walked toward this problem before you. Build a comparison table of at least two existing alternatives, showing what they do, who they serve, and where they fall short.",
     },
     t3: {
-      prompt:
-        "Write a one-page vision for this idea three years from now if it succeeds. Connect it to the problem and person you've defined.",
+      prompt: "Write a one-page vision for this idea three years from now if it succeeds — what it does, who it serves, and why it exists — connected directly to the problem and customer you have defined.",
       tool: "write",
+      title: "Read the Far Horizon",
+      subheader: "See the village as it could be once the fog lifts. Write a one-page vision of this idea three years from now: what it does, who it serves, and why it exists, tied directly to the problem and soul you have named.",
     },
   },
-  // Stage 2: Research
+  // Stage 2: Research — The Forest · The Pathwarden Wraith
   {
     stage: 2,
     checkpoint: 1,
     name: "Market landscape mapped",
-    outcome: "The size, shape and dynamics of the market are understood",
+    outcome: "The size, shape, and dynamics of the market this venture operates in are understood.",
+    title: "Chart the Forest",
+    subheader: "The Pathwarden Wraith hides the forest's true size. Map the market before you march into it.",
+    standardTagline: "The territory has been surveyed. The party knows how large the forest truly is.",
+    goldTagline: "The forest is fully charted. Every path, every clearing, every shadow mapped in faithful detail.",
     t1: {
-      prompt:
-        "Write a summary of the market — rough size, main players, and whether it is growing or contracting.",
+      prompt: "Write a summary of the market your idea operates in — covering the rough size, who the main players are, and whether it is growing or contracting.",
       tool: "write",
+      title: "Survey the Treeline",
+      subheader: "Write a summary of the market your idea operates in: its rough size, the main players, and whether it is growing or contracting.",
     },
     t2: {
-      prompt:
-        "Build a market overview table — market size estimate, growth rate, key drivers, and your source for each figure.",
+      prompt: "Build a market overview table — including market size estimate, growth rate, key demand drivers, and your source for each figure.",
       tool: "table",
+      title: "Measure the Canopy",
+      subheader: "Pace the forest in honest figures. Build a market overview table with a size estimate, growth rate, key demand drivers, and your source for each number.",
     },
     t3: {
-      prompt:
-        "Find and link at least two credible industry reports that support your market understanding. Add a note on what each confirms or challenges.",
+      prompt: "Find and link at least two credible industry reports or research pieces that support your market understanding — add a note on what each one confirms or challenges about your assumptions.",
       tool: "link",
+      title: "Consult the Old Maps",
+      subheader: "Trust no trail unchecked against another's record. Find and link at least two credible industry reports, with a note on what each confirms or challenges about your assumptions.",
     },
   },
   {
     stage: 2,
     checkpoint: 2,
-    name: "Competitors analysed",
-    outcome:
-      "Existing solutions and their strengths and weaknesses are documented",
+    name: "Competitors and alternatives analysed",
+    outcome: "Existing solutions — products, services, or behaviours — and their strengths and weaknesses are documented.",
+    title: "Track the Other Wanderers",
+    subheader: "You are not alone in this forest. Document existing solutions and map exactly where each falls short.",
+    standardTagline: "The other wanderers in this forest have been found and their paths recorded. None were the answer.",
+    goldTagline: "Every rival's camp has been studied. Their strengths honoured, their weaknesses marked. The gap is visible.",
     t1: {
-      prompt:
-        "List at least four direct or indirect competitors — products, services, or approaches people currently use.",
+      prompt: "List at least four direct or indirect competitors — products, services, approaches, or habits that your target customer currently uses to deal with this problem.",
       tool: "write",
+      title: "Spot the Rival Camps",
+      subheader: "List at least four direct or indirect competitors: the products, services, approaches, or habits your customer already uses to deal with this problem.",
     },
     t2: {
-      prompt:
-        "Build a competitor comparison table — what each offers, who they target, what they charge, where they fall short.",
+      prompt: "Build a competitor comparison table — covering what each one offers, who they target, what they charge or cost, and where they fall short for your target customer.",
       tool: "table",
+      title: "Study Their Fires",
+      subheader: "Build a competitor comparison table covering what each offers, who they target, what they charge or cost, and where they fall short for your customer.",
     },
     t3: {
-      prompt:
-        "Map the competitive landscape — position each competitor by two dimensions that matter most to your user, and mark where your idea would sit.",
+      prompt: "Map the competitive landscape on the canvas — positioning each competitor by two dimensions that matter most to your customer, such as price versus quality or convenience versus depth — and mark where your idea would sit.",
       tool: "map",
+      title: "Mark the Open Clearing",
+      subheader: "On the canvas, position each competitor along the two dimensions your customer cares about most, such as price against depth, and mark where your idea would stand.",
     },
   },
   {
     stage: 2,
     checkpoint: 3,
-    name: "Target user understood deeply",
-    outcome: "A rich portrait of the user built from research not assumption",
+    name: "Target customer understood deeply",
+    outcome: "A rich portrait of the customer is built from research, not assumption.",
+    title: "Walk in Their Footsteps",
+    subheader: "To find the true trail you must walk it as they do. Build a real portrait of the customer from evidence, not assumption.",
+    standardTagline: "The one for whom this quest is undertaken has been truly heard. Their voice is in the party's memory.",
+    goldTagline: "Their voice, their days, their unspoken wishes — all inscribed. The party carries them into every decision.",
     t1: {
-      prompt:
-        "Write a day-in-the-life description of your target user — focusing on moments where your problem and solution become relevant.",
+      prompt: "Write a day-in-the-life description of your target customer — focusing on the moments where your problem and solution become most relevant.",
       tool: "write",
+      title: "Trace a Day in Their Life",
+      subheader: "Write a day-in-the-life of your target customer, lingering on the moments where your problem and your solution are most relevant.",
     },
     t2: {
-      prompt:
-        "Design and run a short survey for your target audience. Ask about behaviour, frustrations, and what they've tried. Document key themes from at least five responses.",
+      prompt: "Design and run a short survey for your target audience — asking about their current behaviour, their frustrations, and what they have already tried. Document the key themes from at least five responses.",
       tool: "survey",
+      title: "Send Out the Scouts",
+      subheader: "Run a short survey asking your target audience about their current behaviour, frustrations, and what they have already tried. Record key themes from at least five responses.",
     },
     t3: {
-      prompt:
-        "Conduct at least three conversations with real target users. Upload a summary from each, including the most surprising thing each person told you.",
+      prompt: "Conduct at least three conversations with real target customers and upload a summary or note from each — including the most surprising thing each person told you.",
       tool: "upload",
+      title: "Sit at Their Fire",
+      subheader: "Nothing replaces real conversation. Hold at least three conversations with real target customers and upload a summary note from each, including the most surprising thing each person told you.",
     },
   },
   {
     stage: 2,
     checkpoint: 4,
-    name: "Trends & timing assessed",
-    outcome: "External forces shaping the opportunity right now are understood",
+    name: "Trends and timing assessed",
+    outcome: "External forces shaping the opportunity right now are understood — making the case that this is the right moment for this idea.",
+    title: "Read the Changing Winds",
+    subheader: "The forest moves with the seasons, and so does opportunity. Name the forces that make now the right moment.",
+    standardTagline: "The winds have been read. The season is understood. The time to move is now, or not for years.",
+    goldTagline: "The winds and tides are fully read. Every external force is mapped. The moment is confirmed.",
     t1: {
-      prompt:
-        "Identify at least two trends — technological, social, regulatory, or economic — that make this problem more acute or your solution more possible now.",
+      prompt: "Identify at least two trends — technological, social, regulatory, economic, or behavioural — that make this problem more acute or your solution more possible right now.",
       tool: "write",
+      title: "Feel the Season Turn",
+      subheader: "Identify at least two trends, technological, social, regulatory, economic, or behavioural, that make this problem sharper or your solution more possible right now.",
     },
     t2: {
-      prompt:
-        "Build a trends table — each trend, its relevance, whether it helps or hurts, and a source link.",
+      prompt: "Build a trends table — listing each trend, its relevance to your idea, whether it helps or hurts you, and a source for each.",
       tool: "table",
+      title: "Log the Omens",
+      subheader: "Build a trends table listing each trend, its relevance to your idea, whether it helps or hurts you, and a source for each.",
     },
     t3: {
-      prompt:
-        "Find and link a comparable idea that succeeded or failed partly because of timing. Write a specific lesson from that case for your own idea.",
+      prompt: "Find and link a comparable venture that succeeded or failed partly because of timing — and write a specific lesson from that case for your own idea.",
       tool: "link",
+      title: "Heed the Fallen",
+      subheader: "Others have read these winds before, some to ruin. Find and link a comparable venture that rose or fell partly on timing, and draw one specific lesson from it for your own idea.",
     },
   },
   {
     stage: 2,
     checkpoint: 5,
     name: "Research synthesised",
-    outcome:
-      "All findings pulled into a single coherent picture that will inform validation",
+    outcome: "All findings pulled into a single coherent picture that will directly inform validation.",
+    title: "Assemble the True Map",
+    subheader: "Scattered findings keep you lost. Pull everything into one coherent picture that points to the opportunity.",
+    standardTagline: "The fragments of the forest have been assembled into a single true map. The party knows where it stands.",
+    goldTagline: "The map is complete and certain. Every finding connects. The way forward is clear and well-founded.",
     t1: {
-      prompt:
-        "Write a one-page research summary — market, competition, user, and timing in a single connected narrative.",
+      prompt: "Write a one-page research summary — covering the market, competition, customer, and timing in a single connected narrative that leads to a clear implication for your idea.",
       tool: "write",
+      title: "Bind the Fragments",
+      subheader: "Write a one-page research summary tying market, competition, customer, and timing into one connected story that leads to a clear implication for your idea.",
     },
     t2: {
-      prompt:
-        "Build a SWOT table for your idea based specifically on what your research revealed.",
+      prompt: "Build a SWOT table for your idea based specifically on what your research revealed — not on general intuition.",
       tool: "table",
+      title: "Weigh Strength and Shadow",
+      subheader: "Build a SWOT table for your idea drawn specifically from what your research revealed, not from general intuition.",
     },
     t3: {
-      prompt:
-        "Map your research findings — show how market context, competitor gaps, user needs, and timing connect to create your opportunity.",
+      prompt: "Map your research findings on the canvas — showing how market context, competitor gaps, customer needs, and timing connect to create the specific opportunity your idea is addressing.",
       tool: "map",
+      title: "Show the Path Through",
+      subheader: "On the canvas, map how market context, competitor gaps, customer needs, and timing connect to form the specific opportunity your idea addresses.",
     },
   },
-  // Stage 3: Validation
+  // Stage 3: Validation — The Arena · The Advocate of Comfortable Lies
   {
     stage: 3,
     checkpoint: 1,
     name: "Assumptions documented",
-    outcome:
-      "The key beliefs the idea rests on are written down and ranked by risk",
+    outcome: "The key beliefs the idea rests on are written down and ranked by risk.",
+    title: "Name Your Gambles",
+    subheader: "The Advocate of Comfortable Lies thrives on beliefs you never examine. Drag every assumption into the light and rank the dangerous ones.",
+    standardTagline: "The party has named its gambles. The most dangerous bets are marked in red.",
+    goldTagline: "Every gamble named, ranked, and inscribed. The party faces its risks with open eyes.",
     t1: {
-      prompt:
-        "List at least eight assumptions your idea currently relies on — about the user, the market, the solution, or the business model.",
+      prompt: "List at least eight assumptions your idea currently relies on — about the customer, the market, the solution, the delivery model, or the economics.",
       tool: "write",
+      title: "Confess the Bets",
+      subheader: "List at least eight assumptions your idea currently relies on, spanning the customer, market, solution, delivery model, and economics.",
     },
     t2: {
-      prompt:
-        "Build a risk ranking table — for each assumption, rate how likely it is to be wrong and how catastrophic it would be. Sort by combined risk.",
+      prompt: "Build a risk ranking table for your assumptions — for each one, rate how likely it is to be wrong and how damaging it would be if it were, then sort by combined risk.",
       tool: "table",
+      title: "Mark the Deadliest",
+      subheader: "Build a risk ranking table rating each assumption on how likely it is to be wrong and how damaging that would be, then sort by combined risk.",
     },
     t3: {
-      prompt:
-        "Map your top three riskiest assumptions — show what depends on each one and what would collapse if it were wrong.",
+      prompt: "Map your top three riskiest assumptions on the canvas — showing what depends on each one and what would collapse if it were wrong.",
       tool: "map",
+      title: "Trace What Would Fall",
+      subheader: "On the canvas, map your three riskiest assumptions and show what depends on each one and what collapses if it proves false.",
     },
   },
   {
     stage: 3,
     checkpoint: 2,
     name: "Validation method chosen",
-    outcome: "A concrete plan for testing the highest-risk assumptions exists",
+    outcome: "A concrete plan for testing the highest-risk assumptions exists — appropriate to the type of venture.",
+    title: "Design the Trial",
+    subheader: "A fair contest needs rules set before the champion enters. Plan a concrete test for your highest-risk assumption.",
+    standardTagline: "The trial has been designed. The arena is prepared. The test will be fair.",
+    goldTagline: "The trial is precisely designed. The champion of truth is ready. No assumption will escape unexamined.",
     t1: {
-      prompt:
-        "Describe the method you'll use to test your most critical assumption — what you will do, who you will involve, and what you will measure.",
+      prompt: "Describe the method you will use to test your most critical assumption — what you will do, who you will involve, and what you will measure or observe.",
       tool: "write",
+      title: "Set the Rules of Combat",
+      subheader: "Describe the method you will use to test your most critical assumption: what you will do, who you will involve, and what you will measure or observe.",
     },
     t2: {
-      prompt:
-        "Define what success and failure look like for your validation test — assumption, method, success threshold, failure threshold.",
+      prompt: "Build a validation plan table — listing each assumption being tested, the method, the success threshold, and the failure threshold.",
       tool: "table",
+      title: "Define Victory and Defeat",
+      subheader: "Build a validation plan table listing each assumption being tested, the method, the success threshold, and the failure threshold. Decide what counts as a win before the trial begins.",
     },
     t3: {
-      prompt:
-        "Build a simple landing page or one-pager that you could put in front of potential users to gauge real interest before building anything.",
-      tool: "link",
+      prompt: "Create the simplest possible artefact that lets you put your idea in front of a real potential customer — a one-pager, a sample, a service offer, a landing page, or a conversation guide — and link or upload it here.",
+      tool: "upload",
+      title: "Forge the Test Blade",
+      subheader: "Create the simplest possible artefact that puts your idea in front of a real potential customer: a one-pager, sample, service offer, landing page, or conversation guide. Upload it here.",
     },
   },
   {
     stage: 3,
     checkpoint: 3,
     name: "Validation run",
-    outcome: "The test has been executed and raw results exist",
+    outcome: "The test has been executed with real people or real market conditions and raw results exist.",
+    title: "Enter the Arena",
+    subheader: "The arena answers whether or not you wished it to. Run the test and record exactly what happened, nothing softened.",
+    standardTagline: "The trial is complete. The arena has spoken, whether we wished it to or not.",
+    goldTagline: "The trial was run in full. Every assumption met the arena. The results stand unaltered.",
     t1: {
-      prompt:
-        "Document the raw results of your validation test — numbers, quotes, and observations exactly as they occurred.",
+      prompt: "Document the raw results of your validation — numbers, quotes, behaviours, and observations exactly as they occurred, unfiltered.",
       tool: "write",
+      title: "Record the Blows",
+      subheader: "Document the raw results of your validation: the numbers, quotes, behaviours, and observations exactly as they occurred, unfiltered.",
     },
     t2: {
-      prompt:
-        "Build a results table — each person or data point, what they said or did, and whether it supported or contradicted your assumption.",
+      prompt: "Build a results table — showing each person or data point in your validation, what they said or did, and whether it supported or contradicted your assumption.",
       tool: "table",
+      title: "Tally Each Strike",
+      subheader: "Build a results table showing each person or data point, what they said or did, and whether it supported or contradicted your assumption.",
     },
     t3: {
-      prompt:
-        "Upload evidence from your validation — interview recordings, survey exports, sign-up screenshots, or any artefact that proves the test happened.",
+      prompt: "Upload evidence from your validation — conversation notes, survey exports, order confirmations, sign-up screenshots, or any artefact that proves the test happened and captures what it found.",
       tool: "upload",
+      title: "Show the Witnesses' Mark",
+      subheader: "Upload evidence that the test happened: conversation notes, survey exports, order confirmations, or sign-up screenshots that prove it ran and capture what it found.",
     },
   },
   {
     stage: 3,
     checkpoint: 4,
     name: "Pivot or proceed decision made",
-    outcome: "A clear, evidence-based direction is documented",
+    outcome: "A clear, evidence-based direction is documented — proceed, pivot, or stop.",
+    title: "Deliver the Verdict",
+    subheader: "The crowd waits. Choose your direction from the evidence: proceed, pivot, or stop, and let the proof command.",
+    standardTagline: "The evidence has been read and a path chosen. The party marches — in one direction.",
+    goldTagline: "The verdict is declared and carved in stone. The evidence commands. The party obeys its truth.",
     t1: {
-      prompt:
-        "Write a clear decision statement — proceed, pivot, or stop — and explain in two or three sentences what specific evidence led you there.",
+      prompt: "Write a clear decision statement — proceed, pivot, or stop — and explain in two or three sentences what specific evidence led you there.",
       tool: "write",
+      title: "Declare the Judgment",
+      subheader: "Write a clear decision statement, proceed, pivot, or stop, and explain in two or three sentences the specific evidence that led you there.",
     },
     t2: {
-      prompt:
-        "Build a before-and-after table showing your original assumptions and what validation proved, disproved, or left uncertain.",
+      prompt: "Build a before-and-after table showing your original assumptions and what validation proved, disproved, or left uncertain about each.",
       tool: "table",
+      title: "Set Belief Against Truth",
+      subheader: "Build a before-and-after table showing your original assumptions alongside what validation confirmed, disproved, or left uncertain about each.",
     },
     t3: {
-      prompt:
-        "Write an updated description of your idea that reflects everything validation taught you — and map what changed in your understanding.",
+      prompt: "Write an updated description of your idea that reflects everything validation taught you — and use the canvas to show what changed in your understanding of the problem, customer, or solution.",
       tool: "map",
+      title: "Redraw the Idea",
+      subheader: "Write an updated description of your idea reflecting everything validation taught you, and use the canvas to show what changed in your understanding of the problem, customer, or solution.",
     },
   },
-  // Stage 4: Design
+  // Stage 4: Offer Design — The Artisan's Quarter · The Unfinished Golem
   {
     stage: 4,
     checkpoint: 1,
-    name: "User journey mapped",
-    outcome: "The end-to-end user experience through the product is documented",
+    name: "Customer journey mapped",
+    outcome: "The end-to-end experience of a customer discovering, choosing, receiving, and getting value from this venture is documented.",
+    title: "Walk the Quarter's Path",
+    subheader: "The Unfinished Golem breaks things at the seams. Walk the customer's full journey before it does.",
+    standardTagline: "The path through the quarter has been walked end to end. Every step is known.",
+    goldTagline: "Every stone placed and every turning signed. The traveller will not be lost.",
     t1: {
-      prompt:
-        "Describe the core user journey in five to eight steps — from first discovering your solution to getting the core value from it.",
+      prompt: "Describe the core customer journey in five to eight steps — from first encountering your venture to getting the core value from it, regardless of whether that value is a product, service, or experience.",
       tool: "write",
+      title: "Lay the Stones",
+      subheader: "Describe the core customer journey in five to eight steps, from first encountering your venture to receiving its core value, whatever form that takes.",
     },
     t2: {
-      prompt:
-        "Map the full user journey — show each step, the user's emotional state, and key decision moments where they might drop off.",
+      prompt: "Map the full customer journey on the canvas — showing each step, the customer's emotional state at each point, and the key moments where they might drop off or lose trust.",
       tool: "map",
+      title: "Map Every Turning",
+      subheader: "On the canvas, map the full journey showing the customer's emotional state at each step and the moments where they might drop off or lose trust.",
     },
     t3: {
-      prompt:
-        "Identify the two or three most critical moments in the journey — for each, describe what must happen and what would go wrong if it doesn't.",
+      prompt: "Identify the two or three most critical moments in the journey — where the experience succeeds or fails — and for each one describe what must happen and what would go wrong if it does not.",
       tool: "write",
+      title: "Guard the Critical Joints",
+      subheader: "A few joints bear the whole structure. Identify the two or three most critical moments in the journey and describe what must happen at each, and what goes wrong if it does not.",
     },
   },
   {
     stage: 4,
     checkpoint: 2,
-    name: "Visual identity established",
-    outcome: "The look, feel, tone and brand language of the product exists",
+    name: "Offer defined in detail",
+    outcome: "What is being sold or delivered — and exactly how it works from the customer's perspective — is documented precisely.",
+    title: "Specify the Work",
+    subheader: "The Golem finds gaps in what is unspecified. Document exactly what is delivered and how the customer experiences every part of it.",
+    standardTagline: "The work has a precise shape. The quarter knows exactly what is being made.",
+    goldTagline: "Every component is specified and accounted for. The Golem can find no gap to break.",
     t1: {
-      prompt:
-        "Write a brand brief — three words describing how it should feel, a colour direction, and the tone of voice.",
+      prompt: "Describe your offer in specific terms — what the customer receives, in what form, over what timeframe, and at what price or exchange — as if explaining it to someone ready to buy.",
       tool: "write",
+      title: "State What Is Made",
+      subheader: "Describe your offer in specific terms: what the customer receives, in what form, over what timeframe, and at what price or exchange, as if explaining it to someone ready to buy.",
     },
     t2: {
-      prompt:
-        "Build a mood board — visual references, colour swatches, and typography examples representing the aesthetic direction.",
-      tool: "map",
+      prompt: "Build an offer specification table — listing every component of what you are delivering, how each component is produced or sourced, and what the customer experiences at each touchpoint.",
+      tool: "table",
+      title: "Itemise the Components",
+      subheader: "Build an offer specification table listing each component you deliver, how each is produced or sourced, and what the customer experiences at each touchpoint.",
     },
     t3: {
-      prompt:
-        "Link your logo or wordmark file — created in Figma or any design tool — and confirm it exists in a usable format.",
-      tool: "link",
+      prompt: "Create the simplest possible representation of your offer — a menu, a product sheet, a service blueprint, a physical sample description, or a one-page spec — and upload it here.",
+      tool: "upload",
+      title: "Display the Sample",
+      subheader: "Create the simplest possible representation of your offer, a menu, product sheet, service blueprint, sample description, or one-page spec, and upload it here.",
     },
   },
   {
     stage: 4,
     checkpoint: 3,
-    name: "Prototype built",
-    outcome:
-      "A tangible, interactive or visual representation of the product exists",
+    name: "Identity and positioning established",
+    outcome: "The look, feel, tone, and market position of the venture exists and is documented.",
+    title: "Raise the Maker's Mark",
+    subheader: "A venture is known by its mark. Define the look, feel, tone, and position that will make yours unmistakable.",
+    standardTagline: "The maker's mark is raised. The venture will be known by its feel and its place.",
+    goldTagline: "The mark is complete in voice, look, and position. None will mistake it for another.",
     t1: {
-      prompt:
-        "Describe what your prototype shows — which screens or components it covers and what a user can do with it.",
+      prompt: "Write a brand brief for your venture — three words that describe how it should feel, the tone of voice it uses, and the single clearest statement of what makes it different from alternatives.",
       tool: "write",
+      title: "Strike the Brand Brief",
+      subheader: "Write a brand brief: three words for how your venture should feel, the tone of voice it uses, and the single clearest statement of what makes it different from alternatives.",
     },
     t2: {
-      prompt:
-        "Link your prototype from Figma or another design tool — interactive enough that someone could click through the core journey.",
-      tool: "link",
+      prompt: "Build a positioning table — showing at least three competitors or alternatives and marking how your venture differs from each on the dimensions your customer cares most about.",
+      tool: "table",
+      title: "Stand Apart in the Quarter",
+      subheader: "Build a positioning table showing at least three competitors or alternatives and marking how your venture differs from each on the dimensions your customer cares about most.",
     },
     t3: {
-      prompt:
-        "Upload a screen recording of yourself walking through the prototype — narrating what each screen does and why you made the design decisions.",
-      tool: "upload",
+      prompt: "Use the canvas to build a visual mood board — collecting references, colour directions, and aesthetic examples that represent the look and feel of this venture.",
+      tool: "map",
+      title: "Compose the Look",
+      subheader: "On the canvas, build a visual mood board collecting references, colour directions, and aesthetic examples that capture the look and feel of this venture.",
     },
   },
   {
     stage: 4,
     checkpoint: 4,
-    name: "Prototype tested with users",
-    outcome:
-      "The prototype has been put in front of real users and feedback is collected",
+    name: "Offer tested with real customers",
+    outcome: "The offer — in whatever form it exists — has been put in front of real potential customers and their response is documented.",
+    title: "Put It in Real Hands",
+    subheader: "The Golem fears work that has been gripped and truly tested. Place the offer before real customers and record honestly what happens.",
+    standardTagline: "Real hands have gripped the work. Their reactions are recorded faithfully.",
+    goldTagline: "Many hands have tested it and every reaction noted. The true design shows itself.",
     t1: {
-      prompt:
-        "Document what happened when at least three target users interacted with your prototype — what each person did, where they got confused, what they said.",
+      prompt: "Document what happened when at least three target customers encountered your offer — what each person did, what they asked, what they hesitated on, and what they said.",
       tool: "write",
+      title: "Watch Them Handle It",
+      subheader: "Document what happened when at least three target customers encountered your offer: what each person did, asked, hesitated on, and said.",
     },
     t2: {
-      prompt:
-        "Build a feedback table — for each user, record the task, whether they succeeded, where they struggled, and any direct quote worth keeping.",
+      prompt: "Build a feedback table from your offer tests — for each person, record what they were shown, whether they expressed intent to buy or use, where they had doubts, and any direct quote worth keeping.",
       tool: "table",
+      title: "Log Intent and Doubt",
+      subheader: "Build a feedback table recording for each person what they were shown, whether they expressed intent to buy or use, where they had doubts, and any quote worth keeping.",
     },
     t3: {
-      prompt:
-        "Upload a recording or photo set from at least one prototype test session — showing the user interacting with the prototype in real time.",
+      prompt: "Upload a recording, photo set, or written transcript from at least one real offer test session — showing a customer engaging with the offer in some form.",
       tool: "upload",
+      title: "Capture the Session",
+      subheader: "Upload a recording, photo set, or written transcript from at least one real offer test session showing a customer engaging with the offer.",
     },
   },
   {
     stage: 4,
     checkpoint: 5,
-    name: "Design finalised",
-    outcome: "Feedback incorporated and final design ready for development",
+    name: "Offer finalised",
+    outcome: "Feedback has been incorporated and the offer is defined clearly enough to deliver.",
+    title: "Still the Golem",
+    subheader: "The Golem stops only when the work is truly finished. Rule on every note from testing and lock the offer for delivery.",
+    standardTagline: "The Golem is stilled. The offer is sealed and ready to deliver.",
+    goldTagline: "The offer is locked. Every note ruled on, every step of handover mapped.",
     t1: {
-      prompt:
-        "List every piece of feedback from prototype testing and mark each as incorporated, rejected, or deferred — with a brief reason.",
+      prompt: "List every piece of feedback from offer testing and mark each as incorporated, rejected, or deferred — with a brief reason for each decision.",
       tool: "table",
+      title: "Rule on Every Note",
+      subheader: "List every piece of feedback from offer testing and mark each as incorporated, rejected, or deferred, with a brief reason for each decision.",
     },
     t2: {
-      prompt:
-        "Link the final design file from Figma or your design tool — the version that a developer could build from.",
-      tool: "link",
+      prompt: "Write the final offer description — the version that will be used in all customer-facing communication — and confirm it reflects everything learned from testing.",
+      tool: "write",
+      title: "Seal the Final Form",
+      subheader: "Write the final offer description, the version used in all customer-facing communication, and confirm it reflects everything testing taught you.",
     },
     t3: {
-      prompt:
-        "Write a design handoff note — key decisions made, edge cases accounted for, and anything a developer needs to know that isn't visible in the file.",
+      prompt: "Write a delivery or fulfilment note covering every step required to get the offer from its current state to the customer's hands — and flag any step that is not yet resolved.",
       tool: "write",
+      title: "Map the Handover",
+      subheader: "Write a delivery or fulfilment note covering every step needed to get the offer from its current state to the customer's hands, and flag any step not yet resolved.",
     },
   },
-  // Stage 5: Development
+  // Stage 5: Build & Deliver — The Mine · The Collapse Specter
   {
     stage: 5,
     checkpoint: 1,
-    name: "Technical architecture decided",
-    outcome:
-      "Tools, stack and infrastructure choices are documented and agreed",
+    name: "Delivery model and operations designed",
+    outcome: "The end-to-end process for producing and delivering the offer — whether manufacturing, service staffing, software build, or supply chain — is documented and agreed.",
+    title: "Plan the Mineworks",
+    subheader: "The Collapse Specter thrives where the dig is unplanned. Map every shaft, support, and dependency before the first cut.",
+    standardTagline: "The mineworks are planned. Every shaft and support is laid out before the dig.",
+    goldTagline: "The full architecture is drawn. Every dependency named, every weak tunnel marked.",
     t1: {
-      prompt:
-        "Write a short technical brief — front end, back end, database, and key third-party services, with one sentence explaining why you chose each.",
+      prompt: "Write a short operations brief covering how the offer will be produced or sourced, how it will reach the customer, and what the key steps are between receiving an order and fulfilling it.",
       tool: "write",
+      title: "Brief the Dig",
+      subheader: "Write a short operations brief covering how the offer is produced or sourced, how it reaches the customer, and the key steps between receiving an order and fulfilling it.",
     },
     t2: {
-      prompt:
-        "Build an architecture table — each component, technology chosen, reason for the choice, and the biggest risk associated with it.",
+      prompt: "Build an operations architecture table — listing each component of your delivery model, the approach chosen, the reason for that choice, and the biggest risk associated with it.",
       tool: "table",
+      title: "Chart the Supports",
+      subheader: "Build an operations architecture table listing each component of your delivery model, the approach chosen, the reason for that choice, and the biggest risk attached to it.",
     },
     t3: {
-      prompt:
-        "Map your system architecture — show how the main components connect, where data flows, and which parts are most dependent on each other.",
+      prompt: "Map your delivery model on the canvas — showing how each part of your operation connects, where dependencies exist, and which parts are most vulnerable to failure.",
       tool: "map",
+      title: "Find the Weak Tunnel",
+      subheader: "On the canvas, map how each part of your operation connects, where the dependencies lie, and which parts are most vulnerable to failure.",
     },
   },
   {
     stage: 5,
     checkpoint: 2,
-    name: "Development environment set up",
-    outcome:
-      "All tools, repositories and workflows are in place and the team can build",
+    name: "Build environment set up",
+    outcome: "All tools, suppliers, platforms, team members, and workflows needed to deliver the offer are in place and confirmed ready.",
+    title: "Light the Shafts",
+    subheader: "No miner descends into a dark, untooled shaft. Get every tool, supplier, platform, and workflow in place and confirmed before the dig begins.",
+    standardTagline: "The shafts are lit and tooled. Every miner is briefed and the work can begin.",
+    goldTagline: "The mine is fully prepared. Every tool in place, every system tested before the first cut.",
     t1: {
-      prompt:
-        "Confirm your repository is set up and at least one test commit has been pushed — describe your branching and review workflow in a short note.",
+      prompt: "Confirm your core delivery infrastructure is set up and describe the workflow your team will use — covering how work gets assigned, how progress is tracked, and how quality is checked.",
       tool: "write",
+      title: "Ready the Workings",
+      subheader: "Confirm your core delivery infrastructure is set up and describe the team workflow: how work gets assigned, how progress is tracked, and how quality is checked.",
     },
     t2: {
-      prompt:
-        "Build a team access table — every team member, their role, and confirming they have access to every tool and environment they need.",
+      prompt: "Build a team and tools access table — listing every person involved in delivery, their role, and confirming they have access to every resource, platform, or supplier they need.",
       tool: "table",
+      title: "Brief Every Miner",
+      subheader: "Build a team and tools access table listing each person involved in delivery, their role, and confirming they have access to every resource, platform, or supplier they need.",
     },
     t3: {
-      prompt:
-        "Upload a screenshot showing the repository, the first successful build, or the development environment running.",
-      tool: "upload",
+      prompt: "Set up a Kanban board for your delivery workflow — with columns covering what is to be built or sourced, what is in progress, what is ready for quality check, and what is done — and populate it with your first delivery tasks.",
+      tool: "kanban",
+      title: "Set the Dig Order",
+      subheader: "Set up a Kanban board for your delivery workflow with columns for to-build or source, in progress, ready for quality check, and done, and populate it with your first delivery tasks.",
     },
   },
   {
     stage: 5,
     checkpoint: 3,
-    name: "Core features built",
-    outcome:
-      "The minimum set of features needed for launch exists and functions",
+    name: "Core offer built or sourced",
+    outcome: "The minimum version of the offer that could be delivered to a real customer exists and functions as intended.",
+    title: "Reach the Vein",
+    subheader: "The mine is real only when ore comes to surface. Build or source the minimum version of the offer that can be delivered to a real customer.",
+    standardTagline: "The vein is reached. A real, deliverable offer exists and has left the mine once.",
+    goldTagline: "The vein runs deep and true. Every promised component is struck and accounted for.",
     t1: {
-      prompt:
-        "List each feature in your minimum viable product and confirm it is built and functional.",
+      prompt: "List each component of your minimum offer and confirm it is built, sourced, or ready — even if rough — and note any component that is still outstanding.",
       tool: "table",
+      title: "Account for the Ore",
+      subheader: "List each component of your minimum offer and confirm it is built, sourced, or ready, even if rough, and note anything still outstanding.",
     },
     t2: {
-      prompt:
-        "Upload a screen recording walking through the working core user journey — from sign-up to the primary value moment — without it breaking.",
+      prompt: "Upload evidence that your core offer exists in a deliverable state — a photo of the product, a recording of the service being delivered, a working demo, or a supplier confirmation.",
       tool: "upload",
+      title: "Bring It to Surface",
+      subheader: "Upload evidence that your core offer exists in a deliverable state: a product photo, a recording of the service, a working demo, or a supplier confirmation.",
     },
     t3: {
-      prompt:
-        "Link a live staging environment where the core features can be accessed and tested by someone outside your team.",
-      tool: "link",
+      prompt: "Deliver the offer to one real person outside your team — a friend, a test customer, or a pilot participant — and document exactly what happened from handover to receipt.",
+      tool: "self_report",
+      title: "First Delivery to Daylight",
+      subheader: "Carry the first load all the way out. Deliver the offer to one real person outside your team and document exactly what happened from handover to receipt.",
     },
   },
   {
     stage: 5,
     checkpoint: 4,
-    name: "Internal testing complete",
-    outcome:
-      "The product has been tested by the team and known issues documented",
+    name: "Internal quality check complete",
+    outcome: "The offer has been reviewed by the team and every known issue is documented — with a clear decision on what to fix before launch.",
+    title: "Shore the Tunnels",
+    subheader: "Find the cracks before the Specter does. Review the offer as a team and decide what must be fixed before the doors open.",
+    standardTagline: "The tunnels have been shored by those who dug them. The weak points are known.",
+    goldTagline: "Every fault found and ruled on. The mine is sound by its builders' own verdict.",
     t1: {
-      prompt:
-        "Build a bug log table — each issue found during internal testing, its severity, which feature it affects, and whether it has been resolved.",
+      prompt: "Build a quality log table — listing each issue found during internal review, its severity, which part of the offer it affects, and whether it has been resolved.",
       tool: "table",
+      title: "Log Every Fault",
+      subheader: "Build a quality log table listing each issue found in internal review, its severity, which part of the offer it affects, and whether it has been resolved.",
     },
     t2: {
-      prompt:
-        "Upload a screen recording of the core journey being tested on at least two different devices or screen sizes.",
+      prompt: "Upload evidence of the offer being tested or reviewed in conditions as close as possible to real customer use — a recording, a photo, a test report, or a written walkthrough.",
       tool: "upload",
+      title: "Test Under Real Load",
+      subheader: "Upload evidence of the offer being tested in conditions as close as possible to real customer use: a recording, photo, test report, or written walkthrough.",
     },
     t3: {
-      prompt:
-        "Write a test summary — what you tested, what passed, what failed, and what you decided to fix before launch versus defer.",
+      prompt: "Write a quality summary — covering what was tested, what passed, what failed, and what you decided to fix before launch versus what you decided to defer.",
       tool: "write",
+      title: "Rule Fix from Defer",
+      subheader: "Write a quality summary covering what was tested, what passed, what failed, and what you will fix before launch versus defer.",
     },
   },
   {
     stage: 5,
     checkpoint: 5,
-    name: "External beta complete",
-    outcome:
-      "Real users outside the team have tested the product and feedback is collected",
+    name: "Pilot or beta complete",
+    outcome: "Real customers outside the team have received or experienced the offer and their feedback is collected.",
+    title: "Send in the First Crews",
+    subheader: "The mine holds only when real crews have walked it. Let real customers outside the team experience the offer and gather their honest accounts.",
+    standardTagline: "Real crews have walked the works. Their accounts are recorded and rated.",
+    goldTagline: "Every crew heard, every fault rated. The shaft has held under real weight.",
     t1: {
-      prompt:
-        "Document what your beta users did and reported — at least five participants with a note on where each came from and what they experienced.",
+      prompt: "Document what your pilot or beta customers experienced — covering at least five participants, where each came from, and what they reported.",
       tool: "write",
+      title: "Record the Crew's Account",
+      subheader: "Document what your pilot or beta customers experienced, covering at least five participants, where each came from, and what they reported.",
     },
     t2: {
-      prompt:
-        "Build a beta feedback table — each participant, issues encountered, direct quotes, and severity rating.",
+      prompt: "Build a pilot feedback table — listing each participant, the issues they encountered, any direct quotes, and a severity rating for each issue.",
       tool: "table",
+      title: "Rate Every Fault Found",
+      subheader: "Build a pilot feedback table listing each participant, the issues they encountered, any direct quotes, and a severity rating for each issue.",
     },
     t3: {
-      prompt:
-        "Create a short survey for your beta users and share the compiled results — showing the distribution of responses to your key questions.",
+      prompt: "Create a short survey for your pilot or beta customers and share the compiled results here — showing how they rate the experience and what they most want improved.",
       tool: "survey",
+      title: "Poll the Returning Miners",
+      subheader: "Create a short survey for your pilot or beta customers and share the compiled results, showing how they rate the experience and what they most want improved.",
     },
   },
   {
     stage: 5,
     checkpoint: 6,
     name: "Launch-ready",
-    outcome:
-      "All pre-launch checklist items resolved and product is ready to ship",
+    outcome: "All pre-launch conditions are met and the venture is ready to serve its first real customers.",
+    title: "Load the Cart",
+    subheader: "Nothing leaves the mine unchecked. Confirm every pre-launch condition is met and the venture is ready to serve its first real customers.",
+    standardTagline: "The cart is loaded and inspected. The mine has done its work.",
+    goldTagline: "Every item passes, a stranger has walked it clean, and the manifest is signed.",
     t1: {
-      prompt:
-        "Build a pre-launch checklist table — critical bugs, core journey, analytics, legal pages — with a pass or fail status for each item.",
+      prompt: "Build a pre-launch checklist table — covering offer quality, delivery readiness, pricing confirmed, legal requirements, customer communication, and any venture-specific conditions — with a pass or fail for each.",
       tool: "table",
+      title: "Run the Final Inspection",
+      subheader: "Build a pre-launch checklist table covering offer quality, delivery readiness, pricing, legal requirements, and customer communication, with a pass or fail for each item.",
     },
     t2: {
-      prompt:
-        "Upload a recording of one person from outside your team attempting to sign up and use the product from scratch — note every issue they encountered.",
-      tool: "upload",
+      prompt: "Ask someone outside your team to go through the full customer journey from first contact to receiving or accessing the offer — without your help — and note every issue they encountered.",
+      tool: "self_report",
+      title: "Send a Stranger Through",
+      subheader: "Ask someone outside your team to complete the full customer journey from first contact to receiving the offer, with no help from you, and note every issue they encounter.",
     },
     t3: {
-      prompt:
-        "Confirm in writing that every item on your checklist is passing and the product is ready to be made public — including the date of this confirmation.",
+      prompt: "Confirm in writing that every item on your pre-launch checklist is passing and the venture is ready to serve paying customers — including the date of this confirmation.",
       tool: "write",
+      title: "Sign the Manifest",
+      subheader: "Confirm in writing that every checklist item is passing and the venture is ready to serve paying customers, including the date of this confirmation.",
     },
   },
-  // Stage 6: Launch
+  // Stage 6: Launch — The Harbour · The Harbourmaster of Hesitation
   {
     stage: 6,
     checkpoint: 1,
     name: "Launch assets prepared",
-    outcome: "Everything needed to go public is created and ready",
+    outcome: "Everything needed to go public and reach the first customers is created and ready.",
+    title: "Rig the Sails",
+    subheader: "The Harbourmaster demands everything in order before the gate opens. Create every asset needed to go public and reach first customers.",
+    standardTagline: "The harbour master has the manifests. The sails are rigged. The cargo is aboard.",
+    goldTagline: "Every manifest signed, every sail rigged to full trim, every item of cargo confirmed aboard.",
     t1: {
-      prompt:
-        "Write the core launch copy — a headline, a two-sentence description, and a call to action — for the primary channel you're launching through.",
+      prompt: "Write the core launch message — a headline, a two-sentence description of what you offer, and a clear call to action — for the primary channel you are launching through.",
       tool: "write",
+      title: "Write the Departure Call",
+      subheader: "Write the core launch message for your primary channel: a headline, a two-sentence description of what you offer, and a clear call to action.",
     },
     t2: {
-      prompt:
-        "Build a launch asset checklist table — every piece of content needed and confirming each is complete.",
+      prompt: "Build a launch asset checklist table — listing every piece of content or material needed across all launch channels and confirming each is complete.",
       tool: "table",
+      title: "Check Every Line",
+      subheader: "Build a launch asset checklist table listing every piece of content or material needed across all launch channels, confirming each is complete.",
     },
     t3: {
-      prompt:
-        "Upload your launch press kit — product description, key facts, screenshots, and a founder quote — ready to send to anyone who asks.",
+      prompt: "Upload your launch kit — a short document or folder containing your offer description, key facts, pricing, visuals, and any founder or team context — ready to share with anyone who asks.",
       tool: "upload",
+      title: "Stow the Cargo",
+      subheader: "Upload your launch kit: a short document or folder containing your offer description, key facts, pricing, visuals, and any founder or team context, ready to share with anyone who asks.",
     },
   },
   {
     stage: 6,
     checkpoint: 2,
-    name: "Product live and announced",
-    outcome: "The product is publicly accessible and the launch has been made",
+    name: "Venture live and announced",
+    outcome: "The venture is publicly reachable and the launch has been made across chosen channels.",
+    title: "Cast Off",
+    subheader: "The Harbourmaster runs out of objections the moment the gate opens. Go publicly live and announce across your channels.",
+    standardTagline: "The ship has left the harbour. The world has seen the sails. There is no returning this to port.",
+    goldTagline: "The fleet has sailed in full formation. Every channel announced. The world cannot unsee us.",
     t1: {
-      prompt:
-        "Confirm the product is live and link to it directly from this checkpoint.",
+      prompt: "Confirm the venture is live and link directly to where customers can find, access, or contact you — so it can be reached by anyone.",
       tool: "link",
+      title: "Open the Harbour Gate",
+      subheader: "Confirm the venture is live and link directly to where customers can find, access, or contact you.",
     },
     t2: {
-      prompt:
-        "Document your launch announcement — link the post, email, or community thread where you announced it — and note the initial response in the first 48 hours.",
-      tool: "link",
+      prompt: "Document your launch announcement — link or upload the post, email, message, or event where you announced — and note the initial response in the first 48 hours.",
+      tool: "upload",
+      title: "Sound the Departure",
+      subheader: "Document your launch announcement, link or upload the post, email, message, or event, and note the initial response in the first 48 hours.",
     },
     t3: {
-      prompt:
-        "Build a launch channel table — every channel you launched through, reach of each, and sign-ups or engagements each produced in the first week.",
+      prompt: "Build a launch channel table — listing every channel used, the reach of each, and the number of leads, enquiries, or customers each produced in the first week.",
       tool: "table",
+      title: "Log the Outbound Channels",
+      subheader: "Build a launch channel table listing every channel used, the reach of each, and the leads, enquiries, or customers each produced in the first week.",
     },
   },
   {
     stage: 6,
     checkpoint: 3,
-    name: "First users acquired",
-    outcome:
-      "Real people outside the team are using the product and initial data exists",
+    name: "First customers acquired",
+    outcome: "Real people outside the team have purchased, signed up, or committed to the offer and initial data exists.",
+    title: "Take On Passengers",
+    subheader: "The voyage is real once souls board by choice. Win real customers who commit and capture your first data.",
+    standardTagline: "The first true sailors have found the ship and boarded of their own will. The voyage has passengers.",
+    goldTagline: "The ship sails full. Real souls aboard by choice. The voyage has begun in earnest.",
     t1: {
-      prompt:
-        "Document your first ten users — where each came from, when they joined, and whether they completed the core journey.",
+      prompt: "Document your first ten customers — where each came from, when they engaged, what they purchased or signed up for, and whether they completed the core journey.",
       tool: "table",
+      title: "Name the First Aboard",
+      subheader: "Document your first ten customers: where each came from, when they engaged, what they purchased or signed up for, and whether they completed the core journey.",
     },
     t2: {
-      prompt:
-        "Build a channel attribution table — which launch channel drove the most sign-ups and which drove the highest-quality engagement.",
+      prompt: "Build a channel attribution table — showing which launch channel drove the most customers and which drove the highest-quality engagement based on your first week of data.",
       tool: "table",
+      title: "Chart the Best Currents",
+      subheader: "Build a channel attribution table showing which launch channel drove the most customers and which drove the highest-quality engagement in your first week of data.",
     },
     t3: {
-      prompt:
-        "Upload a screenshot of your analytics dashboard showing real user activity — page views, sign-ups, or core actions completed — from your first week.",
+      prompt: "Upload evidence of real customer activity — a screenshot of transactions, sign-ups, orders, or enquiries — from your first week.",
       tool: "upload",
+      title: "Show the Full Deck",
+      subheader: "Upload evidence of real customer activity from your first week: screenshots of transactions, sign-ups, orders, or enquiries.",
     },
   },
-  // Stage 7: Iteration
+  // Stage 7: Iteration — The Crossroads Town · The Babel Merchant
   {
     stage: 7,
     checkpoint: 1,
     name: "Feedback collected",
-    outcome: "Structured input from real users exists across multiple channels",
+    outcome: "Structured input from real customers exists across multiple channels.",
+    title: "Hear the Travellers",
+    subheader: "The crossroads is loud with the Babel Merchant's contradictions. Gather structured feedback across every channel and find the signal in the noise.",
+    standardTagline: "The crossroads has spoken. The travellers have shared what the roads were like.",
+    goldTagline: "Every traveller has been heard. Every road condition recorded. The crossroads holds all truths.",
     t1: {
-      prompt:
-        "Write a summary of the feedback you've collected since launch — covering the main themes across all channels.",
+      prompt: "Write a summary of the feedback collected since launch — covering the main themes across all sources.",
       tool: "write",
+      title: "Gather the Road Reports",
+      subheader: "Write a summary of the feedback collected since launch, covering the main themes across all sources.",
     },
     t2: {
-      prompt:
-        "Build a feedback log table — each piece of feedback, its source, whether it is a bug report, feature request, or general observation, and its frequency.",
+      prompt: "Build a feedback log table — listing each piece of feedback, its source, whether it is a complaint, a feature or improvement request, or a general observation, and how frequently it appears.",
       tool: "table",
+      title: "Log Every Voice",
+      subheader: "Build a feedback log table listing each piece of feedback, its source, whether it is a complaint, a request, or a general observation, and how frequently it appears.",
     },
     t3: {
-      prompt:
-        "Create a structured feedback survey and document the compiled results — showing how users rate their experience and what they most want to change.",
+      prompt: "Create a structured feedback survey and document the compiled results — showing how customers rate their experience and what they most want changed.",
       tool: "survey",
+      title: "Send a Straight Question",
+      subheader: "Create a structured feedback survey and document the compiled results, showing how customers rate their experience and what they most want changed.",
     },
   },
   {
     stage: 7,
     checkpoint: 2,
     name: "Priorities set",
-    outcome:
-      "A clear, evidence-based decision on what to address first is documented",
+    outcome: "A clear, evidence-based decision on what to address first is documented.",
+    title: "Choose the True Road",
+    subheader: "The Merchant offers a different map to every traveller. Pick one road from the evidence and commit to it.",
+    standardTagline: "Of all the roads discussed, one has been chosen first. The party moves with purpose.",
+    goldTagline: "The road is chosen with full evidence. Every alternative weighed and set aside. One direction.",
     t1: {
-      prompt:
-        "Group your feedback into themes and write a prioritised list of improvements — ranked by frequency and impact.",
+      prompt: "Group your feedback into themes and write a prioritised list of improvements — ranked by frequency of the issue and the impact of fixing it.",
       tool: "write",
+      title: "Rank the Roads",
+      subheader: "Group your feedback into themes and write a prioritised list of improvements, ranked by how often each issue appears and the impact of fixing it.",
     },
     t2: {
-      prompt:
-        "Build a priority matrix table — each improvement, its frequency, estimated impact, estimated effort, and your priority ranking.",
+      prompt: "Build a priority matrix table — listing each improvement, its frequency in feedback, its estimated impact, its estimated effort, and your priority ranking.",
       tool: "table",
+      title: "Weigh Each Route",
+      subheader: "Build a priority matrix table listing each improvement, its frequency in feedback, its estimated impact, its estimated effort, and your priority ranking.",
     },
     t3: {
-      prompt:
-        "Write an iteration brief — what you're going to work on, why you chose it over other options, and what specific metric you expect to move.",
+      prompt: "Write an iteration brief — describing what you are going to work on, why you chose it over other options, and what specific outcome you expect to move as a result.",
       tool: "write",
+      title: "Commit to the Direction",
+      subheader: "Write an iteration brief describing what you will work on, why you chose it over the alternatives, and the specific outcome you expect to move.",
     },
   },
   {
     stage: 7,
     checkpoint: 3,
-    name: "Improvements shipped",
-    outcome: "The prioritised changes have been built and released",
+    name: "Improvements delivered",
+    outcome: "The prioritised changes have been made and the updated offer or operation is live.",
+    title: "Repair the Road",
+    subheader: "The road is only repaired when travellers can use it. Build and ship the prioritised changes.",
+    standardTagline: "The road has been repaired. Those who travel it next will find it better than those who came before.",
+    goldTagline: "The road is rebuilt to a higher standard than it was first made. The improvement is permanent.",
     t1: {
-      prompt:
-        "Confirm the changes are live and link to the updated product or the changelog from this checkpoint.",
-      tool: "link",
+      prompt: "Confirm the changes are live and link or upload evidence of the updated offer, process, or communication from this checkpoint.",
+      tool: "upload",
+      title: "Open the New Road",
+      subheader: "Confirm the changes are live and upload or link evidence of the updated offer, process, or communication.",
     },
     t2: {
-      prompt:
-        "Build a changes table — each improvement shipped, what feedback drove it, and what specifically changed in the product.",
+      prompt: "Build a changes table — listing each improvement delivered, what feedback drove it, and what specifically changed in the offer or operation.",
       tool: "table",
+      title: "Record the Works",
+      subheader: "Build a changes table listing each improvement delivered, the feedback that drove it, and what specifically changed in the offer or operation.",
     },
     t3: {
-      prompt:
-        "Upload a screen recording showing the improvement in action — demonstrating what the experience looked like before and after the change.",
+      prompt: "Upload evidence showing the improvement in effect — a photo, recording, or customer-facing artefact demonstrating what changed.",
       tool: "upload",
+      title: "Show the Smooth Path",
+      subheader: "Upload evidence showing the improvement in effect: a photo, recording, or customer-facing artefact demonstrating what changed.",
     },
   },
   {
     stage: 7,
     checkpoint: 4,
     name: "Impact measured",
-    outcome:
-      "The effect of changes on user behaviour and metrics is documented",
+    outcome: "The effect of changes on customer behaviour and key metrics is documented.",
+    title: "Measure the Difference",
+    subheader: "Walk the new road and the old and judge honestly. Document the real effect of your changes on the metrics that matter.",
+    standardTagline: "The new road has been walked. The difference has been measured. The crossroads knows its work.",
+    goldTagline: "The impact of every repair is measured and inscribed. The crossroads improves with full knowledge.",
     t1: {
-      prompt:
-        "Write a before-and-after comparison for your key metric — what it was before the changes, what it is now, and what you think caused the difference.",
+      prompt: "Write a before-and-after comparison for your key metric — what it was before the changes, what it is now, and what you think caused the difference.",
       tool: "write",
+      title: "Compare the Crossings",
+      subheader: "Write a before-and-after comparison for your key metric: what it was before the changes, what it is now, and what you think caused the difference.",
     },
     t2: {
-      prompt:
-        "Build a metrics table — each metric tracked, its value before the changes, its value after, and whether the change moved in the direction you expected.",
+      prompt: "Build a metrics table — showing each metric tracked, its value before the changes, its value after, and whether it moved in the direction expected.",
       tool: "table",
+      title: "Tally the Movement",
+      subheader: "Build a metrics table showing each metric tracked, its value before the changes, its value after, and whether it moved in the direction expected.",
     },
     t3: {
-      prompt:
-        "Upload a screenshot of your analytics showing the metric movement — before and after the ship date clearly visible.",
+      prompt: "Upload a screenshot or export from your tracking tool showing the metric movement — with the period before and after the change clearly visible.",
       tool: "upload",
+      title: "Show the Proof of Travel",
+      subheader: "Upload a screenshot or export from your tracking tool showing the metric movement, with the period before and after the change clearly visible.",
     },
   },
-  // Stage 8: Scale
+  // Stage 8: Scale — The Capital · The Iron Bureaucrat
   {
     stage: 8,
     checkpoint: 1,
     name: "Growth channels identified",
-    outcome:
-      "Channels through which new users can be acquired reliably are tested and ranked",
+    outcome: "The channels through which new customers can be acquired reliably are tested and ranked.",
+    title: "Scout the Roads to the Capital",
+    subheader: "Many roads lead to the capital but not all are worth the march. Test and rank the channels that reliably bring new customers.",
+    standardTagline: "The roads to the capital have been scouted. The fastest and truest routes are known.",
+    goldTagline: "Every road to the capital is mapped, graded, and ranked. The most certain route is confirmed.",
     t1: {
-      prompt:
-        "Describe at least four channels through which you could acquire new users and what the effort and cost of each involves.",
+      prompt: "Describe at least four channels through which you could acquire new customers and what the effort, cost, and reach of each involves.",
       tool: "write",
+      title: "Name the Routes",
+      subheader: "Describe at least four channels through which you could acquire new customers, and the effort, cost, and reach of each.",
     },
     t2: {
-      prompt:
-        "Build a channel testing table — each channel tested, input (time or money spent), output (users or leads acquired), and cost per user.",
+      prompt: "Build a channel testing table — showing each channel tested, the input in time or money, the output in customers or leads, and the cost per customer.",
       tool: "table",
+      title: "Test Each Road",
+      subheader: "Build a channel testing table showing each channel tested, the input in time or money, the output in customers or leads, and the cost per customer.",
     },
     t3: {
-      prompt:
-        "Map your growth model — showing current acquisition rate per channel and what each would produce if you doubled investment in it.",
+      prompt: "Map your growth model on the canvas — showing current acquisition rate per channel and what each would produce if you doubled investment in it.",
       tool: "map",
+      title: "Model the Doubling",
+      subheader: "On the canvas, map your growth model showing the current acquisition rate per channel and what each would yield if you doubled investment in it.",
     },
   },
   {
     stage: 8,
     checkpoint: 2,
     name: "Revenue model validated",
-    outcome: "The way the product makes money has been tested with real users",
+    outcome: "The way the venture makes money has been tested with real customers and the economics are understood.",
+    title: "Win the Merchants' Coin",
+    subheader: "The Iron Bureaucrat demands proof the coin is real. Test how the venture makes money with real, paying customers.",
+    standardTagline: "The capital's merchants have been approached. They have paid. The exchange is real.",
+    goldTagline: "The merchants have paid in full, at price, without hesitation. The revenue model is proven true.",
     t1: {
-      prompt:
-        "Describe your revenue model and identify the single biggest assumption it relies on that you haven't yet tested.",
+      prompt: "Describe your revenue model and identify the single biggest assumption it relies on that you have not yet fully tested.",
       tool: "write",
+      title: "Name the Untested Bet",
+      subheader: "Describe your revenue model and identify the single biggest assumption it relies on that you have not yet fully tested.",
     },
     t2: {
-      prompt:
-        "Build a revenue evidence table — documenting each instance of a real user paying or committing to pay, what motivated them, and what plan or price point they chose.",
+      prompt: "Build a revenue evidence table — documenting each instance of a real customer paying or committing to pay, what motivated them, and what price point or package they chose.",
       tool: "table",
+      title: "Record Each Payment",
+      subheader: "Build a revenue evidence table documenting each real customer paying or committing to pay, what motivated them, and the price point or package they chose.",
     },
     t3: {
-      prompt:
-        "Upload evidence of real payment — a screenshot of a transaction, a signed agreement, or a survey result showing willingness to pay at a specific price.",
+      prompt: "Upload evidence of real payment or commitment — a transaction screenshot, a signed agreement, or a documented willingness-to-pay conversation at a specific price.",
       tool: "upload",
+      title: "Show the Treasury Proof",
+      subheader: "Upload evidence of real payment or commitment: a transaction screenshot, a signed agreement, or a documented willingness-to-pay conversation at a specific price.",
     },
   },
   {
     stage: 8,
     checkpoint: 3,
     name: "Operations scaled",
-    outcome:
-      "The team, infrastructure and processes can support significantly more volume",
+    outcome: "The team, infrastructure, and processes can support significantly more volume without breaking.",
+    title: "Widen the Gates",
+    subheader: "Find what breaks first when the crowd doubles, then fix it. Make team, infrastructure, and process hold far greater volume.",
+    standardTagline: "The capital's gates have been widened. What could hold a hundred now holds a thousand.",
+    goldTagline: "The gates, the halls, the systems — all expanded to full scale. The capital is ready for its people.",
     t1: {
-      prompt:
-        "Identify the three biggest bottlenecks in your current operations — the things that would break first if your user base doubled tomorrow.",
+      prompt: "Identify the three biggest bottlenecks in your current operations — the things that would break first if your customer base doubled tomorrow.",
       tool: "write",
+      title: "Find the Choke Points",
+      subheader: "Identify the three biggest bottlenecks in your current operations: the things that would break first if your customer base doubled tomorrow.",
     },
     t2: {
-      prompt:
-        "Build a scaling readiness table — each bottleneck, what you've done to address it, and your current capacity versus what you'd need at 10x current volume.",
+      prompt: "Build a scaling readiness table — listing each bottleneck, what you have done to address it, and your current capacity versus what you would need at ten times current volume.",
       tool: "table",
+      title: "Plan the Expansion",
+      subheader: "Build a scaling readiness table listing each bottleneck, what you have done to address it, and your current capacity against what you would need at ten times volume.",
     },
     t3: {
-      prompt:
-        "Upload a stress test result — a screenshot or report showing your system handling significantly higher load than your current baseline.",
+      prompt: "Upload evidence of a stress or load test — a report, screenshot, or documented pilot run showing your operation handling significantly higher volume than your current baseline.",
       tool: "upload",
+      title: "Prove It Holds",
+      subheader: "Upload evidence of a stress or load test showing your operation handling significantly higher volume than your current baseline.",
     },
   },
   {
     stage: 8,
     checkpoint: 4,
     name: "Partnerships or distribution secured",
-    outcome:
-      "At least one external relationship that accelerates growth is in place",
+    outcome: "At least one external relationship that meaningfully accelerates growth is in place.",
+    title: "Sign the Treaty",
+    subheader: "Some roads open only through alliance. Secure at least one external relationship that meaningfully accelerates your growth.",
+    standardTagline: "A treaty has been signed. The capital now has an ally whose roads lead somewhere ours do not.",
+    goldTagline: "The treaty is sealed and active. The ally's roads are open to us. Our reach extends beyond ourselves.",
     t1: {
-      prompt:
-        "Identify at least three potential partners whose audience or reach would meaningfully accelerate your growth — and explain why each is a good fit.",
+      prompt: "Identify at least three potential partners, distributors, or collaborators whose reach or capability would accelerate your growth — and explain why each is a strong fit.",
       tool: "write",
+      title: "Name the Allies",
+      subheader: "Identify at least three potential partners, distributors, or collaborators whose reach or capability would accelerate your growth, and explain why each is a strong fit.",
     },
     t2: {
-      prompt:
-        "Build a partnership pipeline table — each potential partner, status of the conversation, what you've proposed, and the expected impact if they agree.",
+      prompt: "Build a partnership pipeline table — listing each potential partner, the status of the conversation, what has been proposed, and the expected impact if they agree.",
       tool: "table",
+      title: "Track the Negotiations",
+      subheader: "Build a partnership pipeline table listing each potential partner, the status of the conversation, what has been proposed, and the expected impact if they agree.",
     },
     t3: {
-      prompt:
-        "Upload a signed agreement, a confirmation email, or a formal record of at least one partnership or distribution deal that is now active.",
+      prompt: "Upload a signed agreement, confirmation email, or formal record of at least one partnership or distribution relationship that is now active.",
       tool: "upload",
+      title: "Seal the Pact",
+      subheader: "Upload a signed agreement, confirmation email, or formal record of at least one partnership or distribution relationship that is now active.",
     },
   },
   {
     stage: 8,
     checkpoint: 5,
     name: "Sustainability assessed",
-    outcome: "The long-term health of the venture is honestly evaluated",
+    outcome: "The long-term health of the venture is honestly evaluated — covering finances, team, and risk.",
+    title: "Read the Kingdom's Books",
+    subheader: "A kingdom stands or falls on its ledgers. Honestly evaluate the venture's long-term health across finances, team, and risk.",
+    standardTagline: "The capital's books have been read honestly. The kingdom will stand — if we tend it with care.",
+    goldTagline: "The books are fully read and the verdict is given with clear eyes. The kingdom's future is mapped.",
     t1: {
-      prompt:
-        "Write an honest assessment of your current financial position — runway, monthly burn, and how long you can operate before needing more revenue or investment.",
+      prompt: "Write an honest assessment of your current position — runway or cash flow, monthly costs, and how long you can operate before needing more revenue, investment, or resource.",
       tool: "write",
+      title: "Count the Treasury",
+      subheader: "Write an honest assessment of your current position: runway or cash flow, monthly costs, and how long you can operate before needing more revenue, investment, or resource.",
     },
     t2: {
-      prompt:
-        "Build a 12-month plan table — growth targets, key hires or resources needed, major risks, and the milestones that would tell you you're on track.",
+      prompt: "Build a 12-month plan table — covering growth targets, key hires or resources needed, major risks, and the milestones that would tell you the venture is on track.",
       tool: "table",
+      title: "Chart the Year Ahead",
+      subheader: "Build a 12-month plan table covering growth targets, key hires or resources needed, major risks, and the milestones that tell you the venture is on track.",
     },
     t3: {
-      prompt:
-        "Map the three biggest threats to your venture's survival — what would trigger each one, what the impact would be, and what your response plan is.",
+      prompt: "Map the three biggest threats to the venture's survival on the canvas — showing what would trigger each one, what the impact would be, and what your response plan is.",
       tool: "map",
+      title: "Name the Threats to the Throne",
+      subheader: "On the canvas, map the three biggest threats to the venture's survival, showing what would trigger each, its impact, and your response plan.",
     },
   },
 ];
-
 // ─────────────────────────────────────────────────────────────────────────────
 // BOSS DEFINITIONS
 // ─────────────────────────────────────────────────────────────────────────────

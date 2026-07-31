@@ -99,79 +99,107 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
 // MONSTERS (one per stage — PRD §4.1)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Per Ibhaveda_boss_corruption_table Stage Monsters sheet: each Venture
+// stage has ONE local stage-monster. The 12-boss Super Boss Pool is a
+// separate project-scoped random assignment — see SUPER_BOSS_POOL below.
 const VENTURE_MONSTERS: MonsterConfig[] = [
   {
-    id: "venture_unraveller",
-    name: "The Unraveller",
+    id: "venture_fog_of_vagueness",
+    name: "The Fog of Vagueness",
     stageId: 1,
-    lore: "An ancient void serpent that pulls threads from the fabric of reality — walls crack, roads dissolve, plans collapse.",
-    represents: "Doubt and loss of direction",
-    role: "super_boss",
+    lore: "Pale blue-grey mist that swallows every noticeboard until the founder names the problem exactly.",
+    represents: "Vague problem-framing",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
   {
-    id: "venture_pale_architect",
-    name: "The Pale Architect",
+    id: "venture_pathwarden_wraith",
+    name: "The Pathwarden Wraith",
     stageId: 2,
-    lore: "An undead perfectionist titan who freezes progress in amber — everything looks almost right but nothing moves.",
-    represents: "Paralysis and perfectionism",
-    role: "super_boss",
+    lore: "A tangled forest spectre that hoards every side-path until the founder commits to one route.",
+    represents: "Endless research without direction",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
   {
-    id: "venture_hollow_king",
-    name: "The Hollow King",
+    id: "venture_advocate_of_lies",
+    name: "The Advocate of Comfortable Lies",
     stageId: 3,
-    lore: "A spectral sovereign that drains meaning from actions — tasks complete but feel empty, the world greyscales.",
-    represents: "Loss of purpose",
-    role: "super_boss",
+    lore: "A slick barrister who reframes assumptions as facts — falls silent only when real evidence lands.",
+    represents: "Untested assumptions",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
   {
-    id: "venture_thornwarden",
-    name: "The Thornwarden",
+    id: "venture_unfinished_golem",
+    name: "The Unfinished Golem",
     stageId: 4,
-    lore: "An ancient forest colossus that overgrows paths with thorns — every checkpoint requires twice the effort.",
-    represents: "Bureaucracy and friction",
-    role: "super_boss",
+    lore: "A half-forged stone giant that crumbles the moment the founder ships one buyable offer instead of ten drafts.",
+    represents: "Perpetual polishing without release",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
   {
-    id: "venture_mirror_witch",
-    name: "The Mirror Witch",
+    id: "venture_collapse_specter",
+    name: "The Collapse Specter",
     stageId: 5,
-    lore: "An illusionist sorceress who replaces real progress with reflections — users see what they want rather than what is true.",
-    represents: "Confirmation bias",
-    role: "super_boss",
+    lore: "A dark-grey rubble-shrouded wraith that dispels the moment the founder ships the smallest working version.",
+    represents: "Fear of the first shipped build",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
   {
-    id: "venture_ashen_drake",
-    name: "The Ashen Drake",
+    id: "venture_harbourmaster",
+    name: "The Harbourmaster of Hesitation",
     stageId: 6,
-    lore: "A fire dragon of entropy that burns completed work to ash if left untouched — idle stages decay visually.",
-    represents: "Abandonment and inertia",
-    role: "super_boss",
+    lore: "A bureaucrat wreathed in blue-grey storm-fog that clears the moment the founder names the launch date out loud.",
+    represents: "Hesitation at the launch window",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
   {
-    id: "venture_tide_caller",
-    name: "The Tide Caller",
+    id: "venture_babel_merchant",
+    name: "The Babel Merchant",
     stageId: 7,
-    lore: "An oceanic leviathan that floods the landscape with noise — too many directions, priorities submerged.",
-    represents: "Distraction and scope creep",
-    role: "super_boss",
+    lore: "A shrouded figure of black-and-white static who dissipates the moment the founder commits to one message.",
+    represents: "Message dilution across iterations",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
   {
-    id: "venture_gravemind",
-    name: "The Gravemind",
+    id: "venture_iron_bureaucrat",
+    name: "The Iron Bureaucrat",
     stageId: 8,
-    lore: "A necromantic hive intelligence that raises the corpses of abandoned ideas to block progress.",
-    represents: "Fear of failure",
-    role: "super_boss",
+    lore: "An armored chain-wrapped figure that shatters the moment the founder names one system to automate this quarter.",
+    represents: "Scale-time process paralysis",
+    role: "stage_monster",
     spriteKey: "procedural",
   },
+];
+
+// 12-boss Super Boss Pool — one is RANDOMLY assigned per project at
+// venture creation (see createTemplatedVenture). These are project-
+// scoped villains, NOT per-stage. Sourced from Ibhaveda_boss_corruption_
+// table Sheet 1 "Super Boss Pool - 12 Bosses".
+export const SUPER_BOSS_POOL: readonly {
+  id: string;
+  name: string;
+  represents: string;
+  /** Idle sprite path (south-facing). Optional — populated as art lands. */
+  idleAsset?: string;
+}[] = [
+  { id: "super_unraveller",     name: "The Unraveller",     represents: "Doubt and loss of direction",       idleAsset: "/assets/bosses/village/unraveller/idle.png" },
+  { id: "super_pale_architect", name: "The Pale Architect", represents: "Perfectionism and paralysis" },
+  { id: "super_hollow_king",    name: "The Hollow King",    represents: "Loss of purpose" },
+  { id: "super_thornwarden",    name: "The Thornwarden",    represents: "Bureaucracy and friction" },
+  { id: "super_mirror_witch",   name: "The Mirror Witch",   represents: "Self-deception" },
+  { id: "super_ashen_drake",    name: "The Ashen Drake",    represents: "Abandonment and inertia" },
+  { id: "super_tide_caller",    name: "The Tide Caller",    represents: "Distraction and scope creep",       idleAsset: "/assets/bosses/super-pool/tide-caller/idle.png" },
+  { id: "super_gravemind",      name: "The Gravemind",      represents: "Fear of failure" },
+  { id: "super_rusted_oracle",  name: "The Rusted Oracle",  represents: "Imposter syndrome",                 idleAsset: "/assets/bosses/super-pool/rusted-oracle/idle.png" },
+  { id: "super_wraith_council", name: "The Wraith Council", represents: "Decision paralysis",                idleAsset: "/assets/bosses/super-pool/wraith-council/idle.png" },
+  { id: "super_stonecaller",    name: "The Stonecaller",    represents: "Overwhelm",                         idleAsset: "/assets/bosses/super-pool/stonecaller/idle.png" },
+  { id: "super_veilwalker",     name: "The Veilwalker",     represents: "Isolation and fear of irrelevance", idleAsset: "/assets/bosses/super-pool/veilwalker/idle.png" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -967,3 +967,162 @@ export const getPersonaGender = query({
     return profile?.personaGender ?? null;
   },
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// PRD §3.1 — 10-persona picker (currently 8 supported in the UI).
+// Writes to users.personaId. Schema keeps all 10 literals for
+// backward compat (see convex/schema.ts) — this mutation validates
+// the 8 personas we actually have art for.
+// ─────────────────────────────────────────────────────────────────────
+
+const SUPPORTED_PERSONA_IDS = [
+  "arcanist",
+  "alchemist",
+  "artisan",
+  "drifter",
+  "oracle",
+  "engineer",
+  "healer",
+  "pathfinder",
+] as const;
+
+export const updatePersonaId = mutation({
+  args: {
+    personaId: v.union(
+      v.literal("arcanist"),
+      v.literal("alchemist"),
+      v.literal("artisan"),
+      v.literal("drifter"),
+      v.literal("oracle"),
+      v.literal("engineer"),
+      v.literal("healer"),
+      v.literal("pathfinder"),
+    ),
+  },
+  handler: async ({ db, auth }, args) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!profile) throw new Error("User profile not found");
+
+    // Extra runtime guard — schema allows 10 literals but only 8 are
+    // shipped. Bail loudly if a rogue client sends ranger/sage.
+    if (!SUPPORTED_PERSONA_IDS.includes(args.personaId)) {
+      throw new Error(
+        `Persona "${args.personaId}" is not shipped yet — pick one of ${SUPPORTED_PERSONA_IDS.join(", ")}`,
+      );
+    }
+
+    await db.patch(profile._id, {
+      personaId: args.personaId,
+      updatedAt: Date.now(),
+    });
+    return { success: true, personaId: args.personaId };
+  },
+});
+
+// Read helper — Phaser scenes use this to render the correct sprite.
+export const getMyPersonaId = query({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    return profile?.personaId ?? null;
+  },
+});
+
+// Read another user's persona so the viewer-mode map (visiting someone
+// else's venture) can render the venture owner's character instead of
+// the viewer's. Returns null if the user hasn't picked one — the caller
+// falls back to the default persona in that case.
+export const getPersonaIdForUser = query({
+  args: { userId: v.id("users") },
+  handler: async ({ db }, args) => {
+    const profile = await db.get(args.userId);
+    return profile?.personaId ?? null;
+  },
+});
+
+// ── First-time boss intro cinematic ──────────────────────────────────
+// A one-shot cinematic plays on the user's first visit to /map/world.
+// The Unraveller (main boss) rises up and challenges them, then the
+// four checkpoint bosses reveal one by one. After it plays we mark
+// this flag true so it never plays again for this user.
+
+export const getMyBossIntroSeen = query({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    // Missing field is treated as unseen — first-time users trigger
+    // the cinematic on their first map visit.
+    return profile?.hasSeenBossIntro === true;
+  },
+});
+
+export const markBossIntroSeen = mutation({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!profile) return null;
+    if (profile.hasSeenBossIntro === true) return { alreadySeen: true };
+    await db.patch(profile._id, {
+      hasSeenBossIntro: true,
+      updatedAt: Date.now(),
+    });
+    return { alreadySeen: false };
+  },
+});
+
+// ── Gate of Ibhaveda onboarding intro ────────────────────────────────
+// Plays once, immediately after signup, before username/persona pick.
+// See ibhaveda-onboarding-intro-doc.pdf for the full creative brief.
+
+export const getMyGateIntroSeen = query({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    return profile?.hasSeenGateIntro === true;
+  },
+});
+
+export const markGateIntroSeen = mutation({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!profile) return null;
+    if (profile.hasSeenGateIntro === true) return { alreadySeen: true };
+    await db.patch(profile._id, {
+      hasSeenGateIntro: true,
+      updatedAt: Date.now(),
+    });
+    return { alreadySeen: false };
+  },
+});

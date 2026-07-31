@@ -30,14 +30,32 @@ import { CREATIVE_CHECKPOINT_DEFINITIONS, CREATIVE_STAGES } from "./creative/cre
 
 export type TemplateId = "venture" | "academic" | "lab" | "creative";
 
+interface TaskDef {
+  prompt: string;
+  tool: string;
+  /** Fantasy-flavored task title (v3 spec). Optional so legacy
+   *  templates (academic/lab/creative not yet migrated) still fit. */
+  title?: string;
+  /** Fantasy subheader shown under the task title. */
+  subheader?: string;
+}
+
 interface CheckpointDef {
   stage: number;
   checkpoint: number;
   name: string;
   outcome: string;
-  t1: { prompt: string; tool: string };
-  t2: { prompt: string; tool: string };
-  t3: { prompt: string; tool: string };
+  /** Fantasy-flavored checkpoint title (v3 spec). */
+  title?: string;
+  /** Fantasy subheader shown under the title. */
+  subheader?: string;
+  /** Tagline shown when 2/3 tasks complete. */
+  standardTagline?: string;
+  /** Tagline shown when 3/3 tasks (gold) complete. */
+  goldTagline?: string;
+  t1: TaskDef;
+  t2: TaskDef;
+  t3: TaskDef;
 }
 
 interface StageDef {

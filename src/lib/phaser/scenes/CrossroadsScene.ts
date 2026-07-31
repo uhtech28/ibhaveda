@@ -24,14 +24,95 @@ import { getStageMiniBosses, getStageSuperBoss } from "@/config/stage-bosses";
 import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day";
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
 import { playCpClearBurst } from "../utils/cp-clear-burst";
+import {
+  CorruptionOverlay,
+  type OverlayCheckpoint,
+} from "@/lib/phaser/systems/corruptionOverlay";
+import {
+  ensureCorruptionPattern,
+  motifForStage,
+} from "@/lib/phaser/systems/corruptionPatterns";
+import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
+import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
+import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
+import {
+  getCurrentPersonaId,
+  loadPersonaSprites,
+  personaSpriteKey,
+} from "@/lib/phaser/persona-assets";
 
 const MAP_ASSET = "/assets/maps-v2/crossroads/crossroads-map.png";
 // The crossroads-map.png painted region is 1536×1024. LDtk simplified
 // export previously padded to 2400×1600 with grey filler which let the
 // camera pan into a grey void and left CPs orphaned outside the art.
 // PNG has been cropped to painted-only dims; bounds match exactly.
-const MAP_WIDTH = 1536;
-const MAP_HEIGHT = 1024;
+// Sized to the LDtk painted area (1408×1152) after cropping the void
+// grey padding out of the 2624×1630 export. All 4 CPs already fit
+// inside these bounds — no reposition needed.
+const MAP_WIDTH = 1408;
+const MAP_HEIGHT = 1152;
+
+// Crossroads walkability blockers — authored via the in-map editor
+// (?editZones=1). Rectangles are in map-image pixel coords (1408×1152).
+const BLOCKED_ZONES: readonly { x: number; y: number; w: number; h: number }[] = [
+  { x: 51, y: 67, w: 396, h: 192 },
+  { x: 453, y: 144, w: 114, h: 24 },
+  { x: 516, y: 168, w: 46, h: 48 },
+  { x: 546, y: 168, w: 24, h: 163 },
+  { x: 512, y: 244, w: 36, h: 69 },
+  { x: 366, y: 308, w: 51, h: 20 },
+  { x: 257, y: 305, w: 54, h: 27 },
+  { x: 375, y: 371, w: 52, h: 31 },
+  { x: 258, y: 371, w: 56, h: 29 },
+  { x: 539, y: 328, w: 43, h: 46 },
+  { x: 445, y: 397, w: 20, h: 45 },
+  { x: 253, y: 529, w: 64, h: 156 },
+  { x: 315, y: 657, w: 148, h: 28 },
+  { x: 444, y: 593, w: 20, h: 86 },
+  { x: 97, y: 527, w: 48, h: 171 },
+  { x: 0, y: 607, w: 149, h: 84 },
+  { x: 667, y: 451, w: 41, h: 187 },
+  { x: 259, y: 758, w: 303, h: 177 },
+  { x: 545, y: 981, w: 34, h: 168 },
+  { x: 413, y: 979, w: 155, h: 34 },
+  { x: 408, y: 1014, w: 42, h: 136 },
+  { x: 196, y: 975, w: 48, h: 52 },
+  { x: 4, y: 1074, w: 154, h: 37 },
+  { x: 797, y: 768, w: 153, h: 173 },
+  { x: 1106, y: 770, w: 238, h: 199 },
+  { x: 1126, y: 1086, w: 279, h: 55 },
+  { x: 820, y: 115, w: 140, h: 143 },
+  { x: 1024, y: 107, w: 310, h: 156 },
+  { x: 1338, y: 399, w: 37, h: 41 },
+  { x: 962, y: 345, w: 26, h: 29 },
+  { x: 896, y: 474, w: 105, h: 67 },
+  { x: 1224, y: 618, w: 46, h: 31 },
+  { x: 1351, y: 603, w: 51, h: 33 },
+  { x: 1201, y: 666, w: 122, h: 24 },
+  { x: 1253, y: 511, w: 61, h: 69 },
+  { x: 1153, y: 654, w: 40, h: 34 },
+  { x: 1129, y: 510, w: 34, h: 25 },
+  { x: 1053, y: 486, w: 28, h: 21 },
+  { x: 951, y: 628, w: 23, h: 23 },
+  { x: 881, y: 1047, w: 81, h: 101 },
+  { x: 105, y: 819, w: 23, h: 168 },
+  { x: 15, y: 278, w: 71, h: 109 },
+  { x: 17, y: 282, w: 86, h: 101 },
+];
+
+/** Live custom-zones getter — populated by the in-map editor when
+ *  `?editZones=1` is on the URL. Zero-effect when the editor isn't
+ *  attached. */
+let _customZonesGetter: () => readonly ZoneRect[] = () => [];
+function pointInAnyBlockedZone(x: number, y: number): boolean {
+  for (const z of BLOCKED_ZONES) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  for (const z of _customZonesGetter()) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  return false;
+}
 
 const CHAR_IDLE_ASSET = "/assets/fan-tasy/Character_Idle.webp";
 const CHAR_WALK_ASSET = "/assets/fan-tasy/Character_Walk.webp";
@@ -88,6 +169,8 @@ export class CrossroadsScene extends Phaser.Scene {
   private superBossRevealed = false;
   private todController: TimeOfDayController | null = null;
   private vfxController: AmbientVFXController | null = null;
+  private _corruption: CorruptionOverlay | null = null;
+  private _lastCheckpointStates: CheckpointState[] = [];
 
   constructor() {
     super({ key: "CrossroadsScene" });
@@ -101,6 +184,7 @@ export class CrossroadsScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image("crossroads-composite", MAP_ASSET);
+    loadPersonaSprites(this, getCurrentPersonaId());
     if (!this.textures.exists("village-persona-idle")) {
       this.load.spritesheet("village-persona-idle", CHAR_IDLE_ASSET, {
         frameWidth: 32,
@@ -139,46 +223,57 @@ export class CrossroadsScene extends Phaser.Scene {
     const start = CHECKPOINTS[this.currentIndex];
     cam.centerOn(start.x, start.y);
 
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      dragging = true;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
-      if (!dragging) return;
-      cam.scrollX -= (p.x - lastX) / cam.zoom;
-      cam.scrollY -= (p.y - lastY) / cam.zoom;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointerup", () => {
-      dragging = false;
-    });
-
-    const KEY_PAN_SPEED = 14;
-    const keyboard = this.input.keyboard;
-    if (keyboard) {
-      const cursors = keyboard.createCursorKeys();
-      const wasd = {
-        W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-        A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-        S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-        D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-      };
-      this.events.on("update", () => {
-        const left = cursors.left?.isDown || wasd.A.isDown;
-        const right = cursors.right?.isDown || wasd.D.isDown;
-        const up = cursors.up?.isDown || wasd.W.isDown;
-        const down = cursors.down?.isDown || wasd.S.isDown;
-        const step = KEY_PAN_SPEED / cam.zoom;
-        if (left) cam.scrollX -= step;
-        if (right) cam.scrollX += step;
-        if (up) cam.scrollY -= step;
-        if (down) cam.scrollY += step;
+    // Drag-to-pan — DISABLED while zone-editor is active so left-click
+    // drag can draw rectangles without the map scrolling underneath.
+    const zoneEditorActive =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("editZones") === "1";
+    if (!zoneEditorActive) {
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        dragging = true;
+        lastX = p.x;
+        lastY = p.y;
       });
+      this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+        if (!dragging) return;
+        cam.scrollX -= (p.x - lastX) / cam.zoom;
+        cam.scrollY -= (p.y - lastY) / cam.zoom;
+        lastX = p.x;
+        lastY = p.y;
+      });
+      this.input.on("pointerup", () => {
+        dragging = false;
+      });
+    }
+
+    // WASD/arrow pan — suppressed while zone editor is active so
+    // editorTestWalk can drive the persona for live blocker testing.
+    if (!zoneEditorActive) {
+      const KEY_PAN_SPEED = 14;
+      const keyboard = this.input.keyboard;
+      if (keyboard) {
+        const cursors = keyboard.createCursorKeys();
+        const wasd = {
+          W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+          A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+          S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+          D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+        };
+        this.events.on("update", () => {
+          const left = cursors.left?.isDown || wasd.A.isDown;
+          const right = cursors.right?.isDown || wasd.D.isDown;
+          const up = cursors.up?.isDown || wasd.W.isDown;
+          const down = cursors.down?.isDown || wasd.S.isDown;
+          const step = KEY_PAN_SPEED / cam.zoom;
+          if (left) cam.scrollX -= step;
+          if (right) cam.scrollX += step;
+          if (up) cam.scrollY -= step;
+          if (down) cam.scrollY += step;
+        });
+      }
     }
 
     for (const cp of CHECKPOINTS) {
@@ -200,6 +295,19 @@ export class CrossroadsScene extends Phaser.Scene {
       this.checkpointNodes.push(disc);
     }
 
+    // Corruption overlay — one tile-strip per CP-to-CP segment.
+    const crossroadsPattern = ensureCorruptionPattern(this, motifForStage(7));
+    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
+      x: cp.x,
+      y: cp.y,
+    }));
+    this._corruption = new CorruptionOverlay(this, {
+      checkpoints: overlayCps,
+      patternTextureKey: crossroadsPattern,
+      tint: 0xa1a1aa, // grey/black-white — The Crossroads
+      depth: 5,
+    });
+
     this.spawnCharacter();
     this.spawnMiniBosses();
     this.refreshMiniBossVisibility();
@@ -215,6 +323,44 @@ export class CrossroadsScene extends Phaser.Scene {
       mapWidth: MAP_WIDTH,
       mapHeight: MAP_HEIGHT,
     });
+    // Walkability debug overlay — ?showZones=1 renders BLOCKED_ZONES in
+    // red so they can be verified visually against the painted map.
+    try {
+      const showZones =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("showZones") === "1";
+      if (showZones) {
+        void pointInAnyBlockedZone;
+        const g = this.add.graphics();
+        g.setDepth(50);
+        g.fillStyle(0xff0000, 0.35);
+        g.lineStyle(2, 0xff2222, 1);
+        BLOCKED_ZONES.forEach((z) => {
+          g.fillRect(z.x, z.y, z.w, z.h);
+          g.strokeRect(z.x, z.y, z.w, z.h);
+        });
+      }
+    } catch {
+      /* SSR safety */
+    }
+
+    // In-map zone editor — enabled via ?editZones=1. Zones persist in
+    // localStorage under "ibhaveda-zones-crossroads" (scene-scoped).
+    const editor = attachZoneEditor(this, "crossroads");
+    _customZonesGetter = editor.getCustomZones;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      _customZonesGetter = () => [];
+    });
+
+    // Live test-walk while editing — WASD moves the persona, blockers
+    // hard-stop it, camera follows. No-op unless ?editZones=1.
+    attachEditorTestWalk(this, {
+      getCharacter: () => this.character,
+      isBlocked: (x, y) => pointInAnyBlockedZone(x, y),
+      mapWidth: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+    });
+
     eventBridge.dispatchToReact({ type: "PHASER_READY" });
   }
 
@@ -275,36 +421,67 @@ export class CrossroadsScene extends Phaser.Scene {
 
   public weakenActiveBoss(tasksDone: number, total: number = 3): void {
     const hpBar = this.miniBossHpBars[this.currentIndex];
-    if (!hpBar) return;
-    hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    if (hpBar) {
+      hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    }
+    // Update the corruption overlay for THIS CP's segment. 2/3 → 10%
+    // opacity + weakened monster; 3/3 → 0% + shatter burst.
+    this._corruption?.updateSegment(this.currentIndex, tasksDone);
+  }
+
+  /**
+   * Public: apply a full CheckpointState[] snapshot to the corruption
+   * overlay. Called from the React map page whenever CP progress data
+   * changes (initial load + realtime Convex updates).
+   */
+  public applyCorruptionState(states: CheckpointState[]): void {
+    this._lastCheckpointStates = states;
+    this._corruption?.applyCheckpointStates(states);
   }
 
   private spawnCharacter(): void {
     const active = CHECKPOINTS[this.currentIndex];
-    if (!this.textures.exists("village-persona-idle")) return;
+    const personaId = getCurrentPersonaId();
+    const personaIdleTex = personaSpriteKey(personaId, "idle");
+    const personaWalkTex = personaSpriteKey(personaId, "walk");
+    const idleTexKey = this.textures.exists(personaIdleTex)
+      ? personaIdleTex
+      : "village-persona-idle";
+    const walkTexKey = this.textures.exists(personaWalkTex)
+      ? personaWalkTex
+      : "village-persona-walk";
+    if (!this.textures.exists(idleTexKey)) return;
 
-    if (!this.anims.exists("persona-idle")) {
-      this.anims.create({
-        key: "persona-idle",
-        frames: this.anims.generateFrameNumbers("village-persona-idle", {
-          start: 0,
-          end: 1,
-        }),
-        frameRate: 2,
-        repeat: -1,
-      });
-    }
-    if (!this.anims.exists("persona-walk")) {
-      this.anims.create({
-        key: "persona-walk",
-        frames: this.anims.generateFrameNumbers("village-persona-walk", {
-          start: 10,
-          end: 14,
-        }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
+    // If a previous scene registered these anims against the OLD texture,
+    // drop them so we rebind to the picked persona's sheet.
+    if (this.anims.exists("persona-idle")) this.anims.remove("persona-idle");
+    if (this.anims.exists("persona-walk")) this.anims.remove("persona-walk");
+
+    const idleFrames = this.textures.get(idleTexKey).frameTotal;
+    this.anims.create({
+      key: "persona-idle",
+      frames: this.anims.generateFrameNumbers(idleTexKey, {
+        start: 0,
+        end: Math.max(0, Math.min(idleFrames - 1, 3)),
+      }),
+      frameRate: 4,
+      repeat: -1,
+    });
+
+    const walkFrames = this.textures.get(walkTexKey).frameTotal;
+    const walkStart = walkTexKey === "village-persona-walk" ? 10 : 0;
+    const walkEnd = walkTexKey === "village-persona-walk"
+      ? Math.min(walkFrames - 1, 14)
+      : Math.min(walkFrames - 1, 5);
+    this.anims.create({
+      key: "persona-walk",
+      frames: this.anims.generateFrameNumbers(walkTexKey, {
+        start: walkStart,
+        end: walkEnd,
+      }),
+      frameRate: 10,
+      repeat: -1,
+    });
 
     const groundY = active.y + CHAR_Y_OFFSET + 4;
     this.characterShadow = this.add
@@ -314,7 +491,7 @@ export class CrossroadsScene extends Phaser.Scene {
     this.character = this.add.sprite(
       active.x,
       active.y + CHAR_Y_OFFSET,
-      "village-persona-idle",
+      idleTexKey,
     );
     this.character.setOrigin(0.5, 1);
     this.character.setScale(CHAR_SCALE);

@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "analyze": "ANALYZE=true next build --turbopack",
     "assets:optimize": "node scripts/optimize-assets.mjs",
-    "assets:optimize:dry": "node scripts/optimize-assets.mjs --dry-run"
+    "assets:optimize:dry": "node scripts/optimize-assets.mjs --dry-run",
+    "personas:compose": "node scripts/compose-personas.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.6",
@@ -20,6 +21,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@excalidraw/excalidraw": "^0.18.0",
     "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-avatar": "^1.1.10",
@@ -42,6 +44,8 @@
     "framer-motion": "^12.23.12",
     "howler": "^2.2.4",
     "jotai": "^2.13.1",
+    "jspreadsheet-ce": "^4.15.0",
+    "jsuites": "^5.13.5",
     "jszip": "^3.10.1",
     "ldrs": "^1.1.7",
     "lucide-react": "^0.542.0",

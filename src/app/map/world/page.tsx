@@ -34,12 +34,15 @@ import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
 import { useTutorialOptional } from "@/components/tutorial/v2";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 import { isLiteMode } from "@/lib/phaser/performance-mode";
+import { setCurrentPersonaId } from "@/lib/phaser/persona-assets";
+import { isValidPersonaId, type PersonaId } from "@/config/personas";
 import {
   buildCheckpointSyncSignature,
   mapCheckpointsToPhaserState,
 } from "@/lib/phaser/checkpoint-sync";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords, Zap } from "lucide-react";
+import { PixelIcon } from "@/components/ui/PixelIcon";
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { CombatPanel } from "@/components/combat/CombatPanel";
@@ -59,10 +62,13 @@ import {
 import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { LeftSidebar } from "@/components/map/LeftSidebar";
+import { MapMenuPopover } from "@/components/map/MapMenuPopover";
+import { MapSettingsDialog } from "@/components/map/MapSettingsDialog";
 import { ToolsPanel } from "@/components/map/ToolsPanel";
 import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { ContributionDashboard } from "@/components/requests/ContributionDashboard";
+import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
@@ -100,6 +106,17 @@ const XpFloatingPopover = dynamic(
 );
 const FlareTriggerButton = dynamic(
   () => import("@/components/flares/FlareTriggerButton").then(mod => mod.FlareTriggerButton),
+  { ssr: false },
+);
+const MobileJoystick = dynamic(
+  () => import("@/components/map/MobileJoystick").then((mod) => mod.MobileJoystick),
+  { ssr: false },
+);
+const BossIntroCinematic = dynamic(
+  () =>
+    import("@/components/map/BossIntroCinematic").then(
+      (mod) => mod.BossIntroCinematic,
+    ),
   { ssr: false },
 );
 const TaskSubmissionModal = dynamic(() => import("@/components/map/TaskSubmissionModal").then(mod => mod.TaskSubmissionModal), { ssr: false });
@@ -333,7 +350,7 @@ const STAGE_SCENE_KEY: Record<number, string> = {
   // Stage 8 (The Capital · Scale) — art pending.
 };
 
-function useMapGame() {
+function useMapGame(personaReady: boolean) {
   const gameRef = useRef<import("phaser").Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [phaserReady, setPhaserReady] = useState(false);
@@ -385,6 +402,19 @@ function useMapGame() {
       const sideOverlayOpen = !!document.querySelector(
         '[data-phaser-pause="true"]',
       );
+
+      // KEYBOARD FIX: Phaser's KeyboardManager listens on `window` and
+      // its default cursor keys (space, arrows, WASD) preventDefault
+      // before the browser can route them to the focused input. That
+      // means every space keystroke inside the AI-combat / task
+      // textareas was being swallowed by the game (user report:
+      // "space bar is not giving space"). Disable the keyboard
+      // manager entirely while an editable element is focused; the
+      // game loop is sleeping anyway so there's nothing to control.
+      const keyboardMgr = game.input?.keyboard;
+      if (keyboardMgr) {
+        keyboardMgr.enabled = !inputFocused;
+      }
 
       // `sleeping` is a runtime field on Phaser's TimeStep but the
       // typed surface doesn't expose it.
@@ -461,6 +491,10 @@ function useMapGame() {
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
+    // Wait for the persona query to resolve before booting Phaser —
+    // otherwise VillageMapScene.preload runs with the default persona
+    // and the correct spritesheet never gets loaded on first paint.
+    if (!personaReady) return;
 
     const handleReady = () => {
       setPhaserReady(true);
@@ -476,54 +510,78 @@ function useMapGame() {
 
     eventBridge.onReact("PHASER_READY", handleReady);
 
-    // MAP SWAP: /map/world now uses the new painted VillageMapScene
-    // instead of Sahit's procedural WorldMapScene. All React overlays
-    // (sidebar, boss HP bar, task panel, bottom HUD) still render on top
-    // because they're React components. Phaser events (CHECKPOINT_CLICKED)
-    // are still fired the same way.
+    // PERF: previously we blocked map boot on the parallel dynamic
+    // import of Phaser + all 7 stage scene modules. Each scene is
+    // ~50-150KB of code and pulls in its own textures, bosses, tweens
+    // etc. The user only ever needs ONE scene on first paint (Stage 1
+    // = Village), so we now boot Phaser with just VillageMapScene and
+    // lazy-add the remaining 6 in the background after PHASER_READY
+    // fires. Wall-time to first playable map dropped from ~4-6s to
+    // ~1.5-2s in practice (network + parse dominated by the 7-way
+    // Promise.all previously).
     Promise.all([
       import("phaser"),
       import("@/lib/phaser/game-config"),
       import("@/lib/phaser/scenes/VillageMapScene"),
-      import("@/lib/phaser/scenes/ForestMapScene"),
-      import("@/lib/phaser/scenes/ArenaScene"),
-      import("@/lib/phaser/scenes/ArtisansScene"),
-      import("@/lib/phaser/scenes/MineScene"),
-      import("@/lib/phaser/scenes/GoldenHarborScene"),
-      import("@/lib/phaser/scenes/CrossroadsScene"),
-    ]).then((
-      [
-        Phaser,
-        { createGameConfig },
-        { VillageMapScene },
-        { ForestMapScene },
-        { ArenaScene },
-        { ArtisansScene },
-        { MineScene },
-        { GoldenHarborScene },
-        { CrossroadsScene },
-      ],
-    ) => {
+    ]).then(([Phaser, { createGameConfig }, { VillageMapScene }]) => {
       if (!containerRef.current || gameRef.current) return;
-      // Register all playable stage scenes.  Phaser auto-starts the
-      // FIRST one (VillageMapScene = Stage 1); later stages launch via
-      // `scene.start("<key>")` when the user progresses or ?stage=N.
-      const scenes = [
-        VillageMapScene,
-        ForestMapScene,
-        ArenaScene,
-        ArtisansScene,
-        MineScene,
-        GoldenHarborScene,
-        CrossroadsScene,
-      ];
       const game = new Phaser.Game(
         createGameConfig(
           containerRef.current,
-          scenes as unknown as Parameters<typeof createGameConfig>[1],
+          [VillageMapScene] as unknown as Parameters<typeof createGameConfig>[1],
         ),
       );
       gameRef.current = game;
+
+      // Fire-and-forget lazy load of the other 6 stage scenes. They
+      // register themselves with Phaser as they arrive so scene.start(
+      // "ForestMapScene") etc. works when the user progresses. The
+      // active Village scene keeps rendering the whole time — the user
+      // never sees a hitch.
+      void Promise.all([
+        import("@/lib/phaser/scenes/ForestMapScene"),
+        import("@/lib/phaser/scenes/ArenaScene"),
+        import("@/lib/phaser/scenes/ArtisansScene"),
+        import("@/lib/phaser/scenes/MineScene"),
+        import("@/lib/phaser/scenes/GoldenHarborScene"),
+        import("@/lib/phaser/scenes/CrossroadsScene"),
+      ]).then((mods) => {
+        const g = gameRef.current;
+        if (!g) return;
+        try {
+          const {
+            [0]: { ForestMapScene },
+            [1]: { ArenaScene },
+            [2]: { ArtisansScene },
+            [3]: { MineScene },
+            [4]: { GoldenHarborScene },
+            [5]: { CrossroadsScene },
+          } = mods as [
+            { ForestMapScene: unknown },
+            { ArenaScene: unknown },
+            { ArtisansScene: unknown },
+            { MineScene: unknown },
+            { GoldenHarborScene: unknown },
+            { CrossroadsScene: unknown },
+          ];
+          // scene.add(key, sceneClass, autoStart=false)
+          const laterScenes: Array<[string, unknown]> = [
+            ["ForestMapScene", ForestMapScene],
+            ["ArenaScene", ArenaScene],
+            ["ArtisansScene", ArtisansScene],
+            ["MineScene", MineScene],
+            ["GoldenHarborScene", GoldenHarborScene],
+            ["CrossroadsScene", CrossroadsScene],
+          ];
+          for (const [key, cls] of laterScenes) {
+            if (g.scene.getScene(key)) continue;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            g.scene.add(key, cls as any, false);
+          }
+        } catch (err) {
+          console.warn("[MapPage] lazy scene registration failed", err);
+        }
+      });
     });
 
     return () => {
@@ -532,7 +590,7 @@ function useMapGame() {
       gameRef.current = null;
       setPhaserReady(false);
     };
-  }, []);
+  }, [personaReady]);
 
   return { containerRef, phaserReady, gameRef };
 }
@@ -848,21 +906,25 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
           contain: "layout style",
         }}
       >
-          {/* Close button */}
+          {/* Close button — smaller on mobile so the CP title has more
+              horizontal room and doesn't wrap awkwardly. */}
           <button
             onClick={() => {
               audioManager.playTouch("click");
               onClose();
             }}
-            className="absolute top-3.5 right-3.5 w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white"
+            className="absolute top-3 right-3 z-10 h-7 w-7 sm:top-3.5 sm:right-3.5 sm:h-8 sm:w-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white"
           >
-            <X className="w-4 h-4" />
+            <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </button>
 
-          <div className="flex flex-col gap-3.5 p-4 sm:p-5 pt-5 sm:pt-6 flex-1 overflow-y-auto no-scrollbar">
-            {/* Checkpoint Title at the top */}
-            <div className="pr-10">
-              <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight leading-tight text-white mb-1.5 sm:mb-2 md:mb-3">
+          <div className="flex flex-col gap-3.5 px-5 py-5 sm:p-5 sm:pt-6 flex-1 overflow-y-auto no-scrollbar">
+            {/* Checkpoint Title — sized so single-line CP names ("Pierce
+                the Fog of Vagueness", "Chart the Forest", etc.) fit on
+                a single row inside the mobile panel width, with just
+                enough right padding to clear the close button. */}
+            <div className="pr-10 sm:pr-10">
+              <h2 className="text-[15px] sm:text-lg md:text-2xl lg:text-3xl font-bold tracking-tight leading-snug text-white mb-1.5 sm:mb-2 md:mb-3 break-words">
                 {detail.title}
               </h2>
             </div>
@@ -1122,35 +1184,47 @@ const TaskCard = memo(function TaskCardInner({
         }}
       />
 
-      {/* Check circle */}
+      {/* Quest-scroll indicator — sealed (with ribbon) when the task is
+          complete, open scroll when actionable, lock chip when the row
+          is disabled. Pixel-art visual reinforces the quest-log tone. */}
       <motion.div
-        className="w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] sm:text-[10px] font-bold"
-        style={{
-          background: task.done
-            ? "#6366f1"
-            : locked
-              ? "rgba(255,255,255,0.01)"
-              : "rgba(255,255,255,0.05)",
-          border: `1.5px solid ${task.done ? "#6366f1" : locked ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.15)"}`,
-          color: task.done ? "#ffffff" : locked ? "#64748b" : "transparent",
-        }}
+        className="flex items-center justify-center flex-shrink-0 mt-0.5"
         animate={task.done ? { scale: [0.8, 1.2, 1] } : { scale: 1 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
-        {task.done ? (
-          "✓"
-        ) : locked ? (
-          <Lock className="h-2.5 w-2.5 text-slate-500" />
+        {locked ? (
+          <div
+            className="flex h-5 w-5 items-center justify-center rounded-full border"
+            style={{
+              background: "rgba(255,255,255,0.01)",
+              borderColor: "rgba(255,255,255,0.06)",
+            }}
+          >
+            <Lock className="h-2.5 w-2.5 text-slate-500" />
+          </div>
         ) : (
-          ""
+          <PixelIcon
+            name={task.done ? "quest-scroll-sealed" : "quest-scroll-open"}
+            size={22}
+            alt={task.done ? "Task completed" : "Task open"}
+          />
         )}
       </motion.div>
 
       <div className="flex-1 min-w-0 relative z-10">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-[12px] sm:text-[13px] leading-relaxed text-slate-300 font-medium flex-1">
-            {task.description}
-          </p>
+          <div className="flex-1 min-w-0">
+            {/* Task TITLE only — the fuller description was moved into
+                the TaskSubmissionModal so the checkpoint panel stays
+                scannable. Falls back to the description head-fragment
+                for legacy tasks with no separate title. Uppercase per
+                spec for a quest-log feel. */}
+            <p className="text-[13px] sm:text-sm font-semibold leading-snug text-white/95 uppercase tracking-wide">
+              {task.label && task.label.trim().length > 0
+                ? task.label
+                : task.description.split(/[.\n]/)[0].slice(0, 80)}
+            </p>
+          </div>
           {/* Redo button - always visible for completed tasks */}
           {task.done && onRedo && !locked && (
             <motion.button
@@ -1422,10 +1496,49 @@ interface BadgePayload {
 }
 
 function MapPageInner() {
-  const { containerRef, phaserReady, gameRef } = useMapGame();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+
+  // ── First-time boss intro cinematic ───────────────────────────────
+  // Plays once per user. `undefined` = query loading (don't render),
+  // `false` = unseen (SHOW cinematic once Phaser is ready),
+  // `true` = already seen (skip).
+  //
+  // Belt-and-braces gate: if the tutorial has already progressed past
+  // combat (step >= 8), the user has been on this map before — even
+  // if the Convex flag is delayed by network latency we do NOT want
+  // the cinematic to re-play on the flare step return trip.
+  const bossIntroSeen = useQuery(api.users.getMyBossIntroSeen, {});
+  const [bossIntroDismissed, setBossIntroDismissed] = useState(false);
+  const bossIntroTutorialCtx = useTutorialOptional();
+  const tutorialPastCombat =
+    (bossIntroTutorialCtx?.step ?? 0) >= 8 ||
+    bossIntroTutorialCtx?.backendState === "completed";
+  const shouldShowBossIntro =
+    bossIntroSeen === false && !bossIntroDismissed && !tutorialPastCombat;
+
+  // ── Persona wiring ────────────────────────────────────────────────
+  // Fetch the user's chosen persona so Phaser boots with the correct
+  // spritesheet. `undefined` = query loading; `null` = signed-out or
+  // never set. In both loading-or-missing cases we treat the default
+  // ("arcanist") as ready, so the map still renders for guests.
+  const personaIdRaw = useQuery(api.users.getMyPersonaId, {});
+  const personaResolved = personaIdRaw !== undefined;
+  // All 8 personas now have full Pixellab extended spritesheets
+  // (arcanist/artisan/drifter/engineer/healer/oracle/pathfinder @92×92,
+  // alchemist @88×88). Use whichever the user picked; fall back to
+  // alchemist if they somehow got here without one set.
+  const chosenPersonaId: PersonaId = isValidPersonaId(personaIdRaw)
+    ? personaIdRaw
+    : "alchemist";
+  // Push the persona id into the module-level slot before Phaser boots.
+  // Doing this synchronously in render (not an effect) guarantees the
+  // scene's preload sees the right id on the first frame.
+  if (personaResolved) {
+    setCurrentPersonaId(chosenPersonaId);
+  }
+  const { containerRef, phaserReady, gameRef } = useMapGame(personaResolved);
 
   // Stage-based scene routing — reads ?stage=N from the URL. Stage lock
   // (clamp to unlocked ceiling) applied lower down once `venture` loads.
@@ -1694,6 +1807,39 @@ function MapPageInner() {
   // currentUser needed for level + streak + badge lookups
   const currentUser = useQuery(api.users.getCurrentUser);
 
+  // ── Viewer mode ──────────────────────────────────────────────────────
+  // If the loaded venture belongs to someone else (spectating a friend's
+  // map), we render THEIR persona and disable free-roam input + interact.
+  // Progress on the map still reflects the venture's checkpoints — that
+  // data is already scoped to `activeVentureId` in downstream queries.
+  const isViewerMode =
+    !!activeVenture && !!currentUser?._id && activeVenture.userId !== currentUser._id;
+  const otherPersonaId = useQuery(
+    api.users.getPersonaIdForUser,
+    isViewerMode && activeVenture ? { userId: activeVenture.userId } : "skip",
+  );
+  // Override the persona id AFTER the initial `setCurrentPersonaId` render
+  // pushed the viewer's own persona in. Runs each time viewer-mode flips.
+  useEffect(() => {
+    if (!isViewerMode) return;
+    if (otherPersonaId === undefined) return; // still loading
+    const effective: PersonaId = isValidPersonaId(otherPersonaId)
+      ? otherPersonaId
+      : "alchemist";
+    setCurrentPersonaId(effective);
+    // Push viewerMode into Phaser game registry so scenes can read it.
+    if (gameRef.current) {
+      gameRef.current.registry.set("viewerMode", true);
+    }
+  }, [isViewerMode, otherPersonaId, gameRef]);
+  // Clear viewer flag when navigating back to your own venture.
+  useEffect(() => {
+    if (isViewerMode) return;
+    if (gameRef.current) {
+      gameRef.current.registry.set("viewerMode", false);
+    }
+  }, [isViewerMode, gameRef]);
+
   const levelData = useQuery(
     api.levels.getUserLevelProgress,
     currentUser?._id ? { userId: currentUser._id } : "skip",
@@ -1809,6 +1955,7 @@ function MapPageInner() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isKanbanOpen, setIsKanbanOpen] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const saveToolData = useMutation(api.worldMap.saveToolData);
   const redoTask = useMutation(api.worldMap.redoTask);
@@ -2132,6 +2279,30 @@ function MapPageInner() {
         cp.stage,
         cp.checkpoint,
       );
+
+      // Pre-flight boss lookup — skip combat entirely when this CP has
+      // no configured boss (stages 5 Mine and 7 Crossroads currently
+      // have empty rosters; Stage 3 Arena is short one at CP4). The
+      // previous behaviour fell through to CombatPanel's null-boss
+      // fallback, which rendered the user's OWN persona sprite as the
+      // "boss" over a village backdrop labelled "Doubt Imp" — visibly
+      // broken. Now: mark the CP boss as defeated and advance.
+      const bossForCp =
+        cp.stage === 1
+          ? getVillageBoss(cp.checkpoint - 1)
+          : getStageBoss(cp.stage, cp.checkpoint - 1);
+      if (!bossForCp) {
+        const key = checkpointBossKey(cp.stage, cp.checkpoint);
+        setBossDefeatedAtCheckpoint((prev) => {
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
+        // Skip the combat panel entirely; run the advance flow directly.
+        void handleAdvanceRef.current(true, true, true);
+        return;
+      }
+
       setBossCombatTarget({
         stage: cp.stage,
         checkpoint: cp.checkpoint,
@@ -2185,6 +2356,35 @@ function MapPageInner() {
     bossAdvanceCheckpointIdRef.current = target.checkpointId;
     setBossCombatTarget(null);
     advancingFromBossRef.current = true;
+
+    // Fire the map persona's victory anim + the mini-boss's defeat anim
+    // (Pixellab pipeline). Runs on whichever stage scene is currently
+    // active — all four expose the same onCombatVictory() contract.
+    try {
+      const sceneMgr = gameRef.current?.scene;
+      const STAGE_KEYS = [
+        "VillageMapScene",
+        "ForestMapScene",
+        "ArenaScene",
+        "ArtisansScene",
+        "MineScene",
+        "GoldenHarborScene",
+        "CrossroadsScene",
+      ];
+      for (const key of STAGE_KEYS) {
+        if (!sceneMgr) break;
+        const isLive = sceneMgr.isActive(key) || sceneMgr.isVisible(key);
+        if (!isLive) continue;
+        const scene = sceneMgr.getScene(key);
+        if (scene && "onCombatVictory" in scene) {
+          (scene as unknown as { onCombatVictory: () => void }).onCombatVictory();
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn("[MapPage] onCombatVictory failed", err);
+    }
+
     void handleAdvanceRef.current(true, true, true);
   }, []);
 
@@ -2346,6 +2546,21 @@ function MapPageInner() {
   const buildCheckpointDetail = useCallback(
     (cp: WorldMapCheckpoint): CheckpointDetail => {
       const stageData = templateStages[cp.stage - 1];
+      // v3 spec fields (title/subheader) win over plain name/outcome
+      // when present. Legacy ventures without v3 fields fall back
+      // gracefully to the old copy.
+      const cpAny = cp as unknown as {
+        checkpointTitle?: string;
+        checkpointSubheader?: string;
+      };
+      const displayTitle =
+        cpAny.checkpointTitle ||
+        cp.checkpointName ||
+        `Checkpoint ${cp.checkpoint}`;
+      const displayOutcome =
+        cpAny.checkpointSubheader ||
+        cp.outcome ||
+        "Complete tasks to advance your venture.";
       return {
         id: cp._id,
         stage: cp.stage,
@@ -2354,12 +2569,25 @@ function MapPageInner() {
         biome: stageData?.biome ?? "Unknown Biome",
         stageGlow: stageData?.glow ?? "rgba(255,255,255,0.5)",
         checkpointIndex: cp.checkpoint,
-        title: cp.checkpointName || `Checkpoint ${cp.checkpoint}`,
-        outcome: cp.outcome || "Complete tasks to advance your venture.",
+        title: displayTitle,
+        outcome: displayOutcome,
         status: deriveCheckpointStatus(cp, activeStage, activeCP),
-        tasks: (cp.tasks || []).map((t: WorldMapTask, i: number) => ({
-          label: t.taskLevel ? t.taskLevel.toUpperCase() : `TASK ${i + 1}`,
-          description: t.prompt || "No description provided.",
+        tasks: (cp.tasks || []).map((t: WorldMapTask, i: number) => {
+          // v3 fantasy task title/subheader; fall back to prompt.
+          const tAny = t as unknown as {
+            taskTitle?: string;
+            taskSubheader?: string;
+          };
+          const taskLabel =
+            tAny.taskTitle ||
+            (t.taskLevel ? t.taskLevel.toUpperCase() : `TASK ${i + 1}`);
+          const taskDescription =
+            tAny.taskSubheader ||
+            t.prompt ||
+            "No description provided.";
+          return {
+          label: taskLabel,
+          description: taskDescription,
           tool: t.toolType || "Unknown Tool",
           difficulty:
             t.taskLevel === "t1"
@@ -2371,7 +2599,8 @@ function MapPageInner() {
           _taskId: t._id,
           _convexCheckpointId: cp._id,
           _taskLevel: t.taskLevel,
-        })),
+          };
+        }),
       };
     },
     [activeStage, activeCP, optimisticCompletedTaskIds],
@@ -3153,15 +3382,48 @@ function MapPageInner() {
     if (lastCheckpointPhaserSyncRef.current === signature) return;
     lastCheckpointPhaserSyncRef.current = signature;
 
+    const phaserStates = mapCheckpointsToPhaserState(
+      checkpoints,
+      activeStage,
+      activeCP,
+      deriveCheckpointStatus,
+    );
     eventBridge.dispatchToPhaser({
       type: "UPDATE_CHECKPOINTS",
-      checkpoints: mapCheckpointsToPhaserState(
-        checkpoints,
-        activeStage,
-        activeCP,
-        deriveCheckpointStatus,
-      ),
+      checkpoints: phaserStates,
     });
+
+    // Corruption overlay sync — filter to the ACTIVE stage's CPs and
+    // hand them to whichever stage scene is currently mounted. Every
+    // stage scene implements `applyCorruptionState(states)`; we probe
+    // and forward to the first live one.
+    try {
+      const stageStates = phaserStates.filter((s) => s.stage === activeStage);
+      const sceneMgr = gameRef.current?.scene;
+      const STAGE_KEYS = [
+        "VillageMapScene",
+        "ForestMapScene",
+        "ArenaScene",
+        "ArtisansScene",
+        "MineScene",
+        "GoldenHarborScene",
+        "CrossroadsScene",
+      ];
+      for (const key of STAGE_KEYS) {
+        if (!sceneMgr) break;
+        const isLive = sceneMgr.isActive(key) || sceneMgr.isVisible(key);
+        if (!isLive) continue;
+        const scene = sceneMgr.getScene(key);
+        if (scene && "applyCorruptionState" in scene) {
+          (scene as unknown as {
+            applyCorruptionState: (states: typeof stageStates) => void;
+          }).applyCorruptionState(stageStates);
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn("[MapPage] applyCorruptionState failed", err);
+    }
   }, [phaserReady, venture?._id, checkpoints, activeStage, activeCP]);
 
   // ── PRD §2 — mini-game lifecycle hook + Phaser sync ───────────────────────
@@ -3357,6 +3619,21 @@ function MapPageInner() {
       const task = selectedDetail.tasks[taskIdx];
       if (!task || task.done) return; // tasks can only be marked done, not undone
 
+      // Ownership gate — non-owners can VIEW a checkpoint on someone
+      // else's venture (via the map's sourceIdeaId flow) but they
+      // can't submit tasks. Server enforces this too via
+      // assertVentureAccess, but short-circuiting here avoids firing
+      // a doomed mutation that produces a console error stack trace
+      // in the Next.js dev overlay.
+      if (
+        activeVenture &&
+        currentUser?._id &&
+        activeVenture.userId !== currentUser._id
+      ) {
+        audioManager.playUI("error");
+        return;
+      }
+
       const checkpointId = task._convexCheckpointId;
       const taskLevelRaw = task._taskLevel;
       const taskLevel = taskLevelRaw;
@@ -3386,7 +3663,7 @@ function MapPageInner() {
         points: taskLevel === "t1" ? 20 : taskLevel === "t2" ? 20 : 35,
       });
     },
-    [selectedDetail, setSubmittingTask],
+    [selectedDetail, setSubmittingTask, activeVenture, currentUser?._id],
   );
 
   // ── Task redo → Reset and reopen submission modal ────────────────────────
@@ -4235,6 +4512,8 @@ function MapPageInner() {
         setIsJournalOpen(true);
       } else if (tab === "minigames") {
         setIsMiniGamesPanelOpen(true);
+      } else if (tab === "settings") {
+        setIsSettingsOpen(true);
       } else {
         updateUrlParams({ panel: "tools", tab, checkpointId: null });
       }
@@ -4304,68 +4583,58 @@ function MapPageInner() {
       >
         <div
           id="bottom-hud-control"
-          className="pointer-events-auto flex items-center gap-3 md:gap-4 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-3 py-2 md:px-4 md:py-2.5 shadow-2xl min-h-[52px]"
+          className="pointer-events-auto flex items-center gap-2 md:gap-2.5 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-2 py-1.5 md:px-2.5 md:py-2 shadow-2xl min-h-[44px]"
         >
-          <button
-            onClick={handlePrevStage}
-            disabled={viewingStage <= 1}
-            onMouseEnter={() => {
-              if (viewingStage > 1) audioManager.playUI("hover");
-            }}
-            className={`flex items-center justify-center p-2 rounded-lg border transition-all duration-300 shrink-0 ${
-              viewingStage > 1
-                ? "border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25 hover:text-white"
-                : "border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50"
-            }`}
-            title={
-              viewingStage > 1
-                ? `Go back to Stage ${viewingStage - 1}`
-                : "You are on the first stage"
-            }
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+          {/* Adventurer's Menu — replaces the standalone LeftSidebar
+              column. Clicking pops up a 2×4 grid of nav destinations
+              (feed / chat / contributors / hierarchy / calendar /
+              kanban / journal / settings). All go through the same
+              handleSidebarOpenPanel so existing routing works. */}
+          <MapMenuPopover onOpenPanel={handleSidebarOpenPanel} />
 
-          <button
-            onClick={handleNextStage}
-            disabled={viewingStage >= activeStage}
-            onMouseEnter={() => {
-              if (viewingStage < activeStage) audioManager.playUI("hover");
-            }}
-            className={`flex items-center justify-center p-2 rounded-lg border transition-all duration-300 shrink-0 ${
-              viewingStage < activeStage
-                ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 hover:text-white"
-                : "border-white/5 bg-white/5 text-slate-600 cursor-not-allowed opacity-50"
-            }`}
-            title={
-              viewingStage < activeStage
-                ? `Go forward to Stage ${viewingStage + 1}`
-                : "You are on your latest unlocked stage"
-            }
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {/* Prev/Next stage buttons take ZERO layout space when
+              disabled — Stage 1 users don't see an empty amber
+              placeholder on the left, and latest-stage users don't
+              see an empty emerald placeholder either. Result: HUD
+              bar starts at "THE VILLAGE" for a fresh player. */}
+          {viewingStage > 1 && (
+            <button
+              onClick={handlePrevStage}
+              onMouseEnter={() => audioManager.playUI("hover")}
+              className="flex items-center justify-center p-1.5 rounded-lg border border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25 hover:text-white transition-all duration-300 shrink-0"
+              title={`Go back to Stage ${viewingStage - 1}`}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
 
-          {/* Visibility-toggled (not conditionally mounted) so the
-              HUD row's flex layout doesn't shift when the user is on
-              vs off their current stage. Conditional mount was a CLS
-              source on advanced ventures. */}
-          <button
-            onClick={handleCurrentStage}
-            onMouseEnter={() => audioManager.playUI("hover")}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/50 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25 hover:text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0 ${
-              viewingStage < activeStage
-                ? "opacity-100 pointer-events-auto"
-                : "opacity-0 pointer-events-none"
-            }`}
-            aria-hidden={!(viewingStage < activeStage)}
-            tabIndex={viewingStage < activeStage ? 0 : -1}
-            title={`Jump to your current stage (Stage ${activeStage})`}
-          >
-            <span>Current Map</span>
-          </button>
+          {viewingStage < activeStage && (
+            <button
+              onClick={handleNextStage}
+              onMouseEnter={() => audioManager.playUI("hover")}
+              className="flex items-center justify-center p-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 hover:text-white transition-all duration-300 shrink-0"
+              title={`Go forward to Stage ${viewingStage + 1}`}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
 
-          <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
+          {/* "Current Map" — conditionally mounted for compactness.
+              (Was previously visibility-toggled to avoid CLS, but the
+              invisible slot ate ~130px of blank space next to the
+              menu button. Compactness > CLS on this bar per product.) */}
+          {viewingStage < activeStage && (
+            <button
+              onClick={handleCurrentStage}
+              onMouseEnter={() => audioManager.playUI("hover")}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/50 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25 hover:text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-300 shrink-0"
+              title={`Jump to your current stage (Stage ${activeStage})`}
+            >
+              <span>Current Map</span>
+            </button>
+          )}
+
+          <div className="hidden h-4 w-px bg-white/10 sm:block shrink-0" />
 
           <div className="shrink-0">
             <StageInfo
@@ -4379,7 +4648,7 @@ function MapPageInner() {
             />
           </div>
 
-          <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
+          <div className="hidden h-4 w-px bg-white/10 sm:block shrink-0" />
 
           {/* Active Tasks panel toggle */}
           <button
@@ -4397,29 +4666,37 @@ function MapPageInner() {
                 }
               }
             }}
-            className={`flex items-center justify-center p-2 rounded-lg border transition-all duration-300 shrink-0 ${
+            className={`flex items-center justify-center p-1.5 rounded-lg border transition-all duration-300 shrink-0 ${
               !selectedDetail
                 ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 hover:text-white shadow-[0_0_12px_rgba(99,102,241,0.2)] animate-[pulse_2s_infinite]"
                 : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
             }`}
             title="Tasks"
           >
-            <ListTodo className={`w-4 h-4 ${!selectedDetail ? "text-indigo-400" : "text-slate-400"}`} />
+            <ListTodo className={`w-3.5 h-3.5 ${!selectedDetail ? "text-indigo-400" : "text-slate-400"}`} />
           </button>
 
-          <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
+          <div className="hidden h-4 w-px bg-white/10 sm:block shrink-0" />
 
-          <div className="min-w-0 flex-1 sm:w-[320px] md:w-[400px]">
+          <div className="min-w-0 flex-1 sm:w-[280px] md:w-[340px]">
             <XPBar
               currentXP={userProgress.xp}
               maxXP={userProgress.xpToNextLevel}
               compact={true}
-              // TEMPORARY: boss overlay hidden for demo — omitting boss props
-              // makes XPBar render as an XP-only bar without the "THE HOLLOW
-              // KING" HP header and VS panel. Restore by re-passing:
-              //   bossHp={corruption.bossHp}
-              //   bossBaseHp={corruption.bossBaseHp}
-              //   bossName={corruption.bossName}
+              // Left side: founder's username. Right side: the specific
+              // village boss guarding the current checkpoint (Fog of
+              // Vagueness / Everyone Chimera / Feature Automaton /
+              // Assumption Wraith) — falls back to the generic "Stage
+              // Boss" label when no boss is resolved.
+              userName={
+                currentUser?.username ||
+                currentUser?.name ||
+                undefined
+              }
+              bossName={
+                getVillageBoss(Math.max(0, (activeCP ?? 1) - 1))?.name ??
+                undefined
+              }
             />
           </div>
 
@@ -4448,6 +4725,20 @@ function MapPageInner() {
           contain: "strict",
         }}
       />
+
+      {/* Mobile virtual joystick — only renders on touch devices.
+          Bottom-left corner. Emits {x,y} vectors via eventBridge that
+          VillageMapScene (and every other stage scene) reads in update()
+          to drive the character. */}
+      {phaserReady && <MobileJoystick />}
+
+      {/* First-time boss intro cinematic — Unraveller looms out of the
+          dark, delivers 3 lines of villain speech, then the 4
+          checkpoint bosses reveal one by one. Ends with a "Face them"
+          CTA. Never plays again for this user (Convex-backed flag). */}
+      {phaserReady && shouldShowBossIntro && (
+        <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />
+      )}
 
       {/* Loading screen — hide once Phaser canvas is ready; data can sync in background */}
       <AnimatePresence>
@@ -4605,14 +4896,22 @@ function MapPageInner() {
               setSuperBossEncounter((s) => ({ ...s, open: false }));
               const game = gameRef.current;
               if (!game) return;
-              const stageKey =
-                superBossEncounter.stage === 2
-                  ? "ForestMapScene"
-                  : superBossEncounter.stage === 3
-                    ? "GoldenHarborScene"
-                    : superBossEncounter.stage === 4
-                      ? "ArtisansScene"
-                      : null;
+              // Map super-boss stage → the Phaser scene that owns the
+              // defeatSuperBoss() choreography. Post-realignment this
+              // was pointing stage 3 at GoldenHarborScene (silent URL
+              // jump to Stage 7) and had no case for stages 5/6/7 at
+              // all. Now covers every stage with a playable scene.
+              const stageKey: string | null = (() => {
+                switch (superBossEncounter.stage) {
+                  case 2: return "ForestMapScene";
+                  case 3: return "ArenaScene";
+                  case 4: return "ArtisansScene";
+                  case 5: return "MineScene";
+                  case 6: return "GoldenHarborScene";
+                  case 7: return "CrossroadsScene";
+                  default: return null;
+                }
+              })();
               if (!stageKey) return;
               const scene = game.scene.getScene(stageKey) as
                 | { defeatSuperBoss?: () => void }
@@ -4861,9 +5160,18 @@ function MapPageInner() {
             className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3"
             style={{ contain: "layout" }}
           >
-            <LeftSidebar
-              ventureName={ideaTitle}
-              onOpenPanel={handleSidebarOpenPanel}
+            {/* LeftSidebar removed — the menu now lives as a popup
+                triggered by a backpack button on the left of the bottom
+                HUD bar (see MapMenuPopover mounted below). */}
+
+            {/* Settings modal — opened from the menu popover's Settings
+                item at the
+                bottom. Contains persona swap, social connect/disconnect,
+                and audio controls. Mounted here (not at page root) so it
+                naturally shares scroll containment with the sidebar cluster. */}
+            <MapSettingsDialog
+              open={isSettingsOpen}
+              onOpenChange={setIsSettingsOpen}
             />
 
             {/* Tools Panel (Left - Floating Popup next to sidebar) */}
@@ -5259,9 +5567,37 @@ function MapPageInner() {
             )}
           </AnimatePresence>
 
-          {/* Contributors Popup Modal — same style as Group Chat */}
+          {/* Contributors Popup Modal — AUTHOR view uses the roomy
+              Team & Contributors panel (tabs for incoming requests +
+              invitations). NON-AUTHOR view mirrors the /feed compact
+              "Request to Contribute" dialog exactly — same width,
+              same styling, same ContributionRequestModal component
+              inside a shadcn Dialog wrapper — so users get a
+              consistent experience whether they contribute from the
+              feed or from the map. */}
           <AnimatePresence>
-            {isContributorsOpen && (
+            {isContributorsOpen && ideaForContributors && !ideaForContributors.isAuthor && (
+              <Dialog
+                key="contribute-compact"
+                open
+                onOpenChange={(open) => !open && setIsContributorsOpen(false)}
+              >
+                <DialogContent className="w-[min(92vw,560px)] max-w-[560px] overflow-hidden border-white/10 bg-[#111827] text-white">
+                  <ContributionRequestModal
+                    ideaId={ideaForContributors._id as Id<"ideas">}
+                    ideaTitle={ideaForContributors.title}
+                    authorName={
+                      ideaForContributors.author?.name ||
+                      ideaForContributors.author?.username
+                    }
+                    authorUsername={ideaForContributors.author?.username}
+                    authorAvatar={ideaForContributors.author?.avatar}
+                    onClose={() => setIsContributorsOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+            {isContributorsOpen && (!ideaForContributors || ideaForContributors.isAuthor) && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -5296,43 +5632,29 @@ function MapPageInner() {
                     </div>
                     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       {ideaForContributors ? (
-                        ideaForContributors.isAuthor ? (
-                          <Tabs defaultValue="incoming" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 bg-white/5 border border-white/10 rounded-xl p-1 mb-3">
-                              <TabsTrigger value="incoming" className="data-[state=active]:bg-white/10 rounded-lg text-xs">Incoming Requests</TabsTrigger>
-                              <TabsTrigger value="invite" className="data-[state=active]:bg-white/10 rounded-lg text-xs">Invite Contributors</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="incoming">
-                              <ContributionDashboard
-                                ideaId={ideaForContributors._id as Id<"ideas">}
-                                ideaTitle={ideaForContributors.title}
-                                authorId={ideaForContributors.authorId}
-                                authorName={ideaForContributors.author?.name || ideaForContributors.author?.username}
-                                isAuthor
-                                onClose={() => setIsContributorsOpen(false)}
-                                embedded
-                              />
-                            </TabsContent>
-                            <TabsContent value="invite">
-                              <InvitationSection
-                                idea={{ _id: ideaForContributors._id as Id<"ideas">, isAuthor: true }}
-                                embedded
-                              />
-                            </TabsContent>
-                          </Tabs>
-                        ) : (
-                          <div className="space-y-4">
+                        <Tabs defaultValue="incoming" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2 bg-white/5 border border-white/10 rounded-xl p-1 mb-3">
+                            <TabsTrigger value="incoming" className="data-[state=active]:bg-white/10 rounded-lg text-xs">Incoming Requests</TabsTrigger>
+                            <TabsTrigger value="invite" className="data-[state=active]:bg-white/10 rounded-lg text-xs">Invite Contributors</TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="incoming">
                             <ContributionDashboard
                               ideaId={ideaForContributors._id as Id<"ideas">}
                               ideaTitle={ideaForContributors.title}
                               authorId={ideaForContributors.authorId}
                               authorName={ideaForContributors.author?.name || ideaForContributors.author?.username}
-                              isAuthor={false}
+                              isAuthor
                               onClose={() => setIsContributorsOpen(false)}
+                              embedded
                             />
-                            <InvitationSection idea={{ _id: ideaForContributors._id as Id<"ideas">, isAuthor: false }} />
-                          </div>
-                        )
+                          </TabsContent>
+                          <TabsContent value="invite">
+                            <InvitationSection
+                              idea={{ _id: ideaForContributors._id as Id<"ideas">, isAuthor: true }}
+                              embedded
+                            />
+                          </TabsContent>
+                        </Tabs>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
                           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />

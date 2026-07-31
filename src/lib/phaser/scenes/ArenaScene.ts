@@ -1,12 +1,12 @@
 /**
  * @file ArenaScene.ts
  * @description Stage 3 (Validation · The Arena) map scene.
- *  Mirrors Forest/Harbor/Artisans structure.  Boss art (Advocate of
- *  Comfortable Lies + minis) is pending — mini bosses and super-boss
- *  reveal are stubbed out for now.  When the arena boss ZIPs land, wire
- *  them into stage-bosses.ts under a STAGE_3_ARENA roster and this
- *  scene will pick them up automatically via getStageMiniBosses(3) /
- *  getStageSuperBoss(3).
+ *  Mirrors Forest/Harbor/Artisans structure.  Arena bosses are live:
+ *  Judge of False Precedent (CP0) · Masked Challenger (CP1) · Oracle
+ *  of Doubt (CP2) · Advocate of Comfortable Lies (super).  Sprites
+ *  ship under /assets/bosses/arena/*.  Roster in stage-bosses.ts
+ *  STAGE_3_ARENA; this scene reads them via getStageMiniBosses(3) /
+ *  getStageSuperBoss(3) with no per-CP wiring.
  *
  *  Setting: The Arena — a small-town amphitheatre where assumptions
  *  go on public trial.  Emotional register: ceremonial, high-stakes.
@@ -23,10 +23,44 @@ import { getStageMiniBosses, getStageSuperBoss } from "@/config/stage-bosses";
 import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day";
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
 import { playCpClearBurst } from "../utils/cp-clear-burst";
+import {
+  CorruptionOverlay,
+  type OverlayCheckpoint,
+} from "@/lib/phaser/systems/corruptionOverlay";
+import {
+  ensureCorruptionPattern,
+  motifForStage,
+} from "@/lib/phaser/systems/corruptionPatterns";
+import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
+import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
+import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
+import {
+  getCurrentPersonaId,
+  loadPersonaSprites,
+  personaSpriteKey,
+} from "@/lib/phaser/persona-assets";
 
 const MAP_ASSET = "/assets/maps-v2/arena/arena-map.png";
 const MAP_WIDTH = 2624;
 const MAP_HEIGHT = 1630;
+
+// Arena walkability blockers — authored via the in-map editor
+// (?editZones=1). Rectangles are in map-image pixel coords (2624×1630).
+const BLOCKED_ZONES: readonly { x: number; y: number; w: number; h: number }[] = [];
+
+/** Live custom-zones getter — populated by the in-map editor when
+ *  `?editZones=1` is on the URL. Zero-effect when the editor isn't
+ *  attached. */
+let _customZonesGetter: () => readonly ZoneRect[] = () => [];
+function pointInAnyBlockedZone(x: number, y: number): boolean {
+  for (const z of BLOCKED_ZONES) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  for (const z of _customZonesGetter()) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  return false;
+}
 
 const CHAR_IDLE_ASSET = "/assets/fan-tasy/Character_Idle.webp";
 const CHAR_WALK_ASSET = "/assets/fan-tasy/Character_Walk.webp";
@@ -81,6 +115,8 @@ export class ArenaScene extends Phaser.Scene {
   private superBossRevealed = false;
   private todController: TimeOfDayController | null = null;
   private vfxController: AmbientVFXController | null = null;
+  private _corruption: CorruptionOverlay | null = null;
+  private _lastCheckpointStates: CheckpointState[] = [];
 
   constructor() {
     super({ key: "ArenaScene" });
@@ -94,6 +130,7 @@ export class ArenaScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image("arena-composite", MAP_ASSET);
+    loadPersonaSprites(this, getCurrentPersonaId());
     if (!this.textures.exists("village-persona-idle")) {
       this.load.spritesheet("village-persona-idle", CHAR_IDLE_ASSET, {
         frameWidth: 32,
@@ -134,46 +171,58 @@ export class ArenaScene extends Phaser.Scene {
     const start = CHECKPOINTS[this.currentIndex];
     cam.centerOn(start.x, start.y);
 
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      dragging = true;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
-      if (!dragging) return;
-      cam.scrollX -= (p.x - lastX) / cam.zoom;
-      cam.scrollY -= (p.y - lastY) / cam.zoom;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointerup", () => {
-      dragging = false;
-    });
-
-    const KEY_PAN_SPEED = 14;
-    const keyboard = this.input.keyboard;
-    if (keyboard) {
-      const cursors = keyboard.createCursorKeys();
-      const wasd = {
-        W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-        A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-        S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-        D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-      };
-      this.events.on("update", () => {
-        const left = cursors.left?.isDown || wasd.A.isDown;
-        const right = cursors.right?.isDown || wasd.D.isDown;
-        const up = cursors.up?.isDown || wasd.W.isDown;
-        const down = cursors.down?.isDown || wasd.S.isDown;
-        const step = KEY_PAN_SPEED / cam.zoom;
-        if (left) cam.scrollX -= step;
-        if (right) cam.scrollX += step;
-        if (up) cam.scrollY -= step;
-        if (down) cam.scrollY += step;
+    // Drag-to-pan — DISABLED while zone-editor is active so left-click
+    // drag can draw rectangles without the map scrolling underneath.
+    // Right-click-drag still pans inside the editor.
+    const zoneEditorActive =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("editZones") === "1";
+    if (!zoneEditorActive) {
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        dragging = true;
+        lastX = p.x;
+        lastY = p.y;
       });
+      this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+        if (!dragging) return;
+        cam.scrollX -= (p.x - lastX) / cam.zoom;
+        cam.scrollY -= (p.y - lastY) / cam.zoom;
+        lastX = p.x;
+        lastY = p.y;
+      });
+      this.input.on("pointerup", () => {
+        dragging = false;
+      });
+    }
+
+    // WASD/arrow pan — suppressed while zone editor is active so
+    // editorTestWalk can drive the persona for live blocker testing.
+    if (!zoneEditorActive) {
+      const KEY_PAN_SPEED = 14;
+      const keyboard = this.input.keyboard;
+      if (keyboard) {
+        const cursors = keyboard.createCursorKeys();
+        const wasd = {
+          W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+          A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+          S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+          D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+        };
+        this.events.on("update", () => {
+          const left = cursors.left?.isDown || wasd.A.isDown;
+          const right = cursors.right?.isDown || wasd.D.isDown;
+          const up = cursors.up?.isDown || wasd.W.isDown;
+          const down = cursors.down?.isDown || wasd.S.isDown;
+          const step = KEY_PAN_SPEED / cam.zoom;
+          if (left) cam.scrollX -= step;
+          if (right) cam.scrollX += step;
+          if (up) cam.scrollY -= step;
+          if (down) cam.scrollY += step;
+        });
+      }
     }
 
     for (const cp of CHECKPOINTS) {
@@ -195,6 +244,19 @@ export class ArenaScene extends Phaser.Scene {
       this.checkpointNodes.push(disc);
     }
 
+    // Corruption overlay — one tile-strip per CP-to-CP segment.
+    const arenaPattern = ensureCorruptionPattern(this, motifForStage(3));
+    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
+      x: cp.x,
+      y: cp.y,
+    }));
+    this._corruption = new CorruptionOverlay(this, {
+      checkpoints: overlayCps,
+      patternTextureKey: arenaPattern,
+      tint: 0xd97706, // orange — The Arena
+      depth: 5,
+    });
+
     this.spawnCharacter();
     this.spawnMiniBosses();
     this.refreshMiniBossVisibility();
@@ -211,6 +273,44 @@ export class ArenaScene extends Phaser.Scene {
       mapWidth: MAP_WIDTH,
       mapHeight: MAP_HEIGHT,
     });
+    // Walkability debug overlay — ?showZones=1 renders BLOCKED_ZONES in
+    // red so they can be verified visually against the painted map.
+    try {
+      const showZones =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("showZones") === "1";
+      if (showZones) {
+        void pointInAnyBlockedZone; // keep helper referenced
+        const g = this.add.graphics();
+        g.setDepth(50);
+        g.fillStyle(0xff0000, 0.35);
+        g.lineStyle(2, 0xff2222, 1);
+        BLOCKED_ZONES.forEach((z) => {
+          g.fillRect(z.x, z.y, z.w, z.h);
+          g.strokeRect(z.x, z.y, z.w, z.h);
+        });
+      }
+    } catch {
+      /* SSR safety */
+    }
+
+    // In-map zone editor — enabled via ?editZones=1. Zones persist in
+    // localStorage under "ibhaveda-zones-arena" (scene-scoped).
+    const editor = attachZoneEditor(this, "arena");
+    _customZonesGetter = editor.getCustomZones;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      _customZonesGetter = () => [];
+    });
+
+    // Live test-walk while editing — WASD moves the persona, blockers
+    // hard-stop it, camera follows. No-op unless ?editZones=1.
+    attachEditorTestWalk(this, {
+      getCharacter: () => this.character,
+      isBlocked: (x, y) => pointInAnyBlockedZone(x, y),
+      mapWidth: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+    });
+
     eventBridge.dispatchToReact({ type: "PHASER_READY" });
   }
 
@@ -271,36 +371,69 @@ export class ArenaScene extends Phaser.Scene {
 
   public weakenActiveBoss(tasksDone: number, total: number = 3): void {
     const hpBar = this.miniBossHpBars[this.currentIndex];
-    if (!hpBar) return;
-    hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    if (hpBar) {
+      hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    }
+    // Update the corruption overlay for THIS CP's segment. 2/3 → 10%
+    // opacity + weakened monster; 3/3 → 0% + shatter burst.
+    this._corruption?.updateSegment(this.currentIndex, tasksDone);
+  }
+
+  /**
+   * Public: apply a full CheckpointState[] snapshot to the corruption
+   * overlay. Called from the React map page whenever CP progress data
+   * changes (initial load + realtime Convex updates).
+   */
+  public applyCorruptionState(states: CheckpointState[]): void {
+    this._lastCheckpointStates = states;
+    this._corruption?.applyCheckpointStates(states);
   }
 
   private spawnCharacter(): void {
     const active = CHECKPOINTS[this.currentIndex];
-    if (!this.textures.exists("village-persona-idle")) return;
+    const personaId = getCurrentPersonaId();
+    const personaIdleTex = personaSpriteKey(personaId, "idle");
+    const personaWalkTex = personaSpriteKey(personaId, "walk");
+    const idleTexKey = this.textures.exists(personaIdleTex)
+      ? personaIdleTex
+      : "village-persona-idle";
+    const walkTexKey = this.textures.exists(personaWalkTex)
+      ? personaWalkTex
+      : "village-persona-walk";
+    if (!this.textures.exists(idleTexKey)) return;
 
-    if (!this.anims.exists("persona-idle")) {
-      this.anims.create({
-        key: "persona-idle",
-        frames: this.anims.generateFrameNumbers("village-persona-idle", {
-          start: 0,
-          end: 1,
-        }),
-        frameRate: 2,
-        repeat: -1,
-      });
-    }
-    if (!this.anims.exists("persona-walk")) {
-      this.anims.create({
-        key: "persona-walk",
-        frames: this.anims.generateFrameNumbers("village-persona-walk", {
-          start: 10,
-          end: 14,
-        }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
+    // If a previous scene registered these anims against the OLD texture,
+    // drop them so we rebind to the picked persona's sheet.
+    if (this.anims.exists("persona-idle")) this.anims.remove("persona-idle");
+    if (this.anims.exists("persona-walk")) this.anims.remove("persona-walk");
+
+    const idleFrames = this.textures.get(idleTexKey).frameTotal;
+    this.anims.create({
+      key: "persona-idle",
+      frames: this.anims.generateFrameNumbers(idleTexKey, {
+        start: 0,
+        end: Math.max(0, Math.min(idleFrames - 1, 3)),
+      }),
+      frameRate: 4,
+      repeat: -1,
+    });
+
+    const walkFrames = this.textures.get(walkTexKey).frameTotal;
+    // For legacy Village sheet, useful walk frames are 10..14. For extended
+    // personas, walk frames start at 0. Pick range based on which sheet.
+    const walkStart = walkTexKey === "village-persona-walk" ? 10 : 0;
+    const walkEnd = walkTexKey === "village-persona-walk"
+      ? Math.min(walkFrames - 1, 14)
+      : Math.min(walkFrames - 1, 5);
+    this.anims.create({
+      key: "persona-walk",
+      frames: this.anims.generateFrameNumbers(walkTexKey, {
+        start: walkStart,
+        end: walkEnd,
+      }),
+      frameRate: 10,
+      repeat: -1,
+    });
 
     const groundY = active.y + CHAR_Y_OFFSET + 4;
     this.characterShadow = this.add
@@ -310,7 +443,7 @@ export class ArenaScene extends Phaser.Scene {
     this.character = this.add.sprite(
       active.x,
       active.y + CHAR_Y_OFFSET,
-      "village-persona-idle",
+      idleTexKey,
     );
     this.character.setOrigin(0.5, 1);
     this.character.setScale(CHAR_SCALE);
@@ -372,10 +505,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /**
-   * Reveal the Advocate of Comfortable Lies super boss.  Currently a
-   * stub — fires SUPER_BOSS_ENCOUNTER for wiring parity but with a
-   * placeholder sprite since real art hasn't landed.  Runs the same
-   * choreography as Forest/Harbor/Artisans: rise + head-snap + idle.
+   * Reveal the Advocate of Comfortable Lies super boss.  Fires
+   * SUPER_BOSS_ENCOUNTER with the real Advocate sprite (arena/advocate/
+   * idle.png).  Choreography matches Forest/Harbor/Artisans: rise +
+   * head-snap + idle.
    */
   private revealSuperBoss(): void {
     if (this.superBossRevealed) return;

@@ -17,6 +17,11 @@ import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
+import { useTutorial } from "@/components/tutorial/v2";
+import { WelcomeSplash } from "@/components/onboarding/WelcomeSplash";
+import { GateOfIbhavedaIntro } from "@/components/onboarding/GateOfIbhavedaIntro";
+import { PersonaSelector } from "@/components/persona/PersonaSelector";
+import type { PersonaId } from "@/config/personas";
 
 function slugify(name: string): string {
   return name
@@ -33,6 +38,17 @@ export default function ProfileSetupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [profilePopulated, setProfilePopulated] = useState(false);
+  // Post-signup congrats splash — real gating is in the effect below
+  // once existingProfile has been declared. Initial state stays false
+  // so returning users never see a flash.
+  const [showSplash, setShowSplash] = useState(false);
+  // "Gate of Ibhaveda" onboarding intro — plays once ever, right
+  // after signup, before the name/username form (per creative brief).
+  // Convex-backed via hasSeenGateIntro so returning users skip it.
+  const gateIntroSeen = useQuery(api.users.getMyGateIntroSeen, {});
+  const markGateSeen = useMutation(api.users.markGateIntroSeen);
+  const [gateDismissed, setGateDismissed] = useState(false);
+  const shouldShowGate = gateIntroSeen === false && !gateDismissed;
 
   const [usernameValidation, setUsernameValidation] = useState({
     checking: false,
@@ -66,7 +82,34 @@ export default function ProfileSetupPage() {
 
   const createUserProfile = useMutation(api.users.createUserProfile);
   const updateUserProfile = useMutation(api.users.updateUserProfile);
+  const updatePersonaId = useMutation(api.users.updatePersonaId);
   const existingProfile = useQuery(api.users.getCurrentUser);
+
+  // Persona picker state — flipped to true after the user submits
+  // their name+username on the first-time form. Selecting a persona
+  // fires updatePersonaId then completes the redirect to /feed.
+  const [showPersonaSelector, setShowPersonaSelector] = useState(false);
+  const [personaSubmitting, setPersonaSubmitting] = useState(false);
+
+  // ── Post-signup congrats splash ──────────────────────────────────────
+  // Shown for ~2.5s the FIRST time a fresh signup lands here, then the
+  // name/username form fades in. sessionStorage gate stops it from
+  // re-firing on refresh, and it never runs for returning users (they
+  // already have an existingProfile row).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isLoaded || !userId) return;
+    if (existingProfile === undefined) return; // wait for Convex
+    if (existingProfile) return; // returning user — no splash
+    if (sessionStorage.getItem("welcomeSplashShown") === "1") return;
+    sessionStorage.setItem("welcomeSplashShown", "1");
+    setShowSplash(true);
+  }, [isLoaded, userId, existingProfile]);
+  // Tutorial context — used on submit to advance from the (now-hidden)
+  // profile-setup phase to Step 3 on /feed. Was previously handled
+  // inside Step1Welcome, but that component is disabled per product
+  // request (no Sparky on profile-setup).
+  const tutorial = useTutorial();
 
   useEffect(() => {
     if (!validationUsername) {
@@ -113,12 +156,33 @@ export default function ProfileSetupPage() {
       .replace(/[\s\/\\?#&=:@<>"'`]/g, '');
     setFormData(prev => ({ ...prev, username: normalizedUsername }));
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => { validateUsername(normalizedUsername); }, 500);
+    // Reduced from 500ms -> 200ms for snappier "available" feedback.
+    // Convex handles rapid queries fine; the debounce is only there to
+    // avoid firing on every keystroke.
+    debounceTimer.current = setTimeout(() => { validateUsername(normalizedUsername); }, 200);
   }, [validateUsername]);
 
   useEffect(() => {
     return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, []);
+
+  // Prefetch /feed so the transition after submit is instant instead of
+  // a cold Next.js page load. Fires once on mount, harmless if already
+  // prefetched.
+  useEffect(() => {
+    router.prefetch("/feed");
+  }, [router]);
+
+  // PRODUCT DECISION — /profile-setup is ONLY for first-time name +
+  // username capture on a fresh signup. Users who already have a
+  // Convex profile row should NEVER land on the "Edit Your Profile"
+  // form here (they see it in their profile page instead). This
+  // effect redirects returning users away.
+  useEffect(() => {
+    if (existingProfile && existingProfile.username) {
+      router.replace("/feed");
+    }
+  }, [existingProfile, router]);
 
   useEffect(() => {
     if (user) {
@@ -195,46 +259,52 @@ export default function ProfileSetupPage() {
     if (!userId) return;
     setLoading(true);
     setError("");
-    try {
-      const finalDisplayName = formData.displayName.trim() || formData.username;
-      if (existingProfile) {
-        await updateUserProfile({
-          displayName: finalDisplayName,
-          bio: formData.bio || undefined,
-          avatar: formData.avatar || undefined,
-          industry: formData.industries.length > 0 ? formData.industries[0] : undefined,
-          industries: formData.industries,
-          skills: formData.skills,
-        });
-      } else {
-        await createUserProfile({
-          username: formData.username,
-          displayName: finalDisplayName,
-          bio: formData.bio || undefined,
-          avatar: formData.avatar || undefined,
-          industry: formData.industries.length > 0 ? formData.industries[0] : undefined,
-          industries: formData.industries,
-          skills: formData.skills,
-        });
-      }
-      toast({ title: "Profile completed!", description: "Welcome to the community! Your profile has been successfully set up.", duration: 4000 });
-      try {
-        router.push('/feed');
-        setTimeout(() => {
-          if (typeof window !== 'undefined' && window.location.pathname.includes('profile-setup')) {
-            window.location.href = '/feed';
-          }
-        }, 500);
-      } catch {
-        if (typeof window !== 'undefined') window.location.href = '/feed';
-      }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : `Failed to ${existingProfile ? 'update' : 'create'} profile`;
-      setError(errorMessage);
-      toast({ title: `Failed to ${existingProfile ? 'update' : 'create'} profile`, description: errorMessage, variant: "destructive", duration: 6000 });
-    } finally {
-      setLoading(false);
-    }
+    const finalDisplayName = formData.displayName.trim() || formData.username;
+    const mutationArgs = {
+      displayName: finalDisplayName,
+      bio: formData.bio || undefined,
+      avatar: formData.avatar || undefined,
+      industry: formData.industries.length > 0 ? formData.industries[0] : undefined,
+      industries: formData.industries,
+      skills: formData.skills,
+    };
+
+    // OPTIMISTIC NAVIGATION - fire the mutation but don't await it.
+    // Convex will process the write in the background while the user
+    // is already looking at /feed. Errors surface via toast after the
+    // fact. This saves the ~800ms-2s round-trip wait the user
+    // previously endured before seeing any progress.
+    const mutationPromise = existingProfile
+      ? updateUserProfile(mutationArgs)
+      : createUserProfile({ ...mutationArgs, username: formData.username });
+
+    // Advance the tutorial state so Sparky appears at Step 3 on /feed.
+    // Fire-and-forget; failure is non-blocking (tutorial recovers via
+    // its own Convex subscription on next reconciliation).
+    void tutorial.goTo(3);
+
+    // Kick off navigation immediately (feed was prefetched on mount).
+    toast({
+      title: "Profile completed!",
+      description: "Welcome to the community!",
+      duration: 3000,
+    });
+    router.push("/feed");
+
+    // Track the mutation in the background - surface errors if it fails
+    // while the user is on /feed.
+    mutationPromise.catch((err: unknown) => {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : `Failed to ${existingProfile ? "update" : "create"} profile`;
+      toast({
+        title: `Failed to ${existingProfile ? "update" : "create"} profile`,
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
+      });
+    });
   };
 
   const handleCancel = () => { router.push('/'); };
@@ -304,7 +374,60 @@ export default function ProfileSetupPage() {
     );
   }
 
+  // If an existing profile row is present (returning user, OR the
+  // mutation that JUST resolved a first-time submit), we NEVER render
+  // the Edit form here. Show a lightweight loading state while the
+  // useEffect redirect above pushes us to /feed. Fixes the ~2s flash
+  // of "Edit Your Profile" that appeared between mutation-success
+  // and router.push completing.
+  if (existingProfile && existingProfile.username) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <HeroHeader />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p>Loading your feed…</p>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+        <FooterSection />
+      </div>
+    );
+  }
+
   if (!existingProfile) {
+    // "Gate of Ibhaveda" onboarding intro — DISABLED per product
+    // request. The scaffold component + Convex flag + mutation are
+    // still in the repo (GateOfIbhavedaIntro.tsx, hasSeenGateIntro,
+    // markGateIntroSeen). Re-enable by uncommenting the block below
+    // once real pixel-art / audio replace the placeholder scene.
+    //
+    // if (shouldShowGate) {
+    //   return (
+    //     <GateOfIbhavedaIntro
+    //       onDone={() => {
+    //         setGateDismissed(true);
+    //         void markGateSeen({}).catch(() => {});
+    //       }}
+    //     />
+    //   );
+    // }
+    void shouldShowGate;
+    void markGateSeen;
+    // Congrats splash — takes over the whole viewport for ~2.5s,
+    // then flips showSplash to false and the form below renders.
+    if (showSplash) {
+      return (
+        <WelcomeSplash
+          durationMs={3000}
+          onDone={() => setShowSplash(false)}
+        />
+      );
+    }
     const usernameReady =
       formData.username.length >= 3 &&
       usernameValidation.available !== false &&
@@ -324,6 +447,12 @@ export default function ProfileSetupPage() {
       if (!userId) return;
       setLoading(true);
       setError("");
+
+      // Create the profile — we await it here (unlike the old
+      // optimistic push) so that when the persona selector confirms,
+      // the user row definitely exists before updatePersonaId fires.
+      // The persona picker gives us plenty of visual coverage during
+      // the mutation round-trip, so the user doesn't perceive a wait.
       try {
         await createUserProfile({
           username: formData.username,
@@ -332,21 +461,12 @@ export default function ProfileSetupPage() {
           skills: [],
           industries: [],
         });
-        toast({ title: "All set", description: "Loading your feed…" });
-        try {
-          router.push("/feed");
-          setTimeout(() => {
-            if (
-              typeof window !== "undefined" &&
-              window.location.pathname.includes("profile-setup")
-            ) {
-              window.location.href = "/feed";
-            }
-          }, 500);
-        } catch {
-          if (typeof window !== "undefined") window.location.href = "/feed";
-        }
+        setLoading(false);
+        // Hand off to the persona picker — the redirect to /feed
+        // happens inside handlePersonaConfirm below.
+        setShowPersonaSelector(true);
       } catch (err) {
+        setLoading(false);
         const msg = err instanceof Error ? err.message : "Setup failed";
         setError(msg);
         toast({
@@ -354,10 +474,54 @@ export default function ProfileSetupPage() {
           description: msg,
           variant: "destructive",
         });
-      } finally {
-        setLoading(false);
       }
     };
+
+    const handlePersonaConfirm = async (personaId: PersonaId) => {
+      if (personaSubmitting) return;
+      setPersonaSubmitting(true);
+      // Fire the persona write, but don't block navigation on it —
+      // the value is optimistic locally. If it fails we surface via
+      // toast without dragging the user back to the picker.
+      const personaPromise = updatePersonaId({ personaId });
+      toast({
+        title: "Welcome!",
+        description: "Loading your feed…",
+        duration: 3000,
+      });
+      try {
+        router.push("/feed");
+        // Belt-and-suspenders — hard redirect if the client-side
+        // push didn't leave the page after 500ms.
+        setTimeout(() => {
+          if (
+            typeof window !== "undefined" &&
+            window.location.pathname.includes("profile-setup")
+          ) {
+            window.location.href = "/feed";
+          }
+        }, 500);
+      } catch {
+        if (typeof window !== "undefined") window.location.href = "/feed";
+      }
+      personaPromise.catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Persona save failed";
+        toast({
+          title: "Persona save failed",
+          description: msg,
+          variant: "destructive",
+        });
+      });
+    };
+
+    if (showPersonaSelector) {
+      return (
+        <PersonaSelector
+          onConfirm={handlePersonaConfirm}
+          submitting={personaSubmitting}
+        />
+      );
+    }
 
     return (
       <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
@@ -375,7 +539,7 @@ export default function ProfileSetupPage() {
             <Card className="border-border/50 shadow-xl">
               <CardContent className="p-6 md:p-10">
                 <form onSubmit={handleFirstTimeSubmit} className="space-y-5">
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tutorial="name-block">
                     <Label htmlFor="displayName" className="text-sm font-medium">
                       Your name
                     </Label>
@@ -403,13 +567,20 @@ export default function ProfileSetupPage() {
                           }
                         }
                       }}
+                      // Stop keydown bubbling so no parent handler (Phaser
+                      // WASD/E/SPACE captures warmed by /feed pre-imports,
+                      // tutorial mascot listeners, etc.) can swallow the
+                      // keystrokes before the input receives them.
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onKeyUp={(e) => e.stopPropagation()}
+                      onKeyPress={(e) => e.stopPropagation()}
                       placeholder="Your full name"
                       className="h-11"
                       autoFocus
                       maxLength={60}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tutorial="username-block">
                     <Label htmlFor="username" className="text-sm font-medium">
                       Username
                     </Label>
@@ -417,6 +588,9 @@ export default function ProfileSetupPage() {
                       id="username"
                       value={formData.username}
                       onChange={(e) => handleUsernameChange(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onKeyUp={(e) => e.stopPropagation()}
+                      onKeyPress={(e) => e.stopPropagation()}
                       placeholder="yourname"
                       className="h-11"
                       maxLength={30}

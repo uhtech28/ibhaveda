@@ -54,6 +54,9 @@ export const completeFeedTutorial = mutation({
 
     await ctx.db.patch(user._id, {
       feedTutorialState: "completed",
+      // Persist the terminal step (11) so nothing can re-open the
+      // tutorial at step 10 (flare) by regressing the step field alone.
+      feedTutorialStep: 11,
       updatedAt: now,
     });
 

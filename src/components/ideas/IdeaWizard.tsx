@@ -42,6 +42,7 @@ import { displayFontClass } from "@/components/ideaforge/shared";
 import { audioManager } from "@/lib/audio/audioManager";
 import { type TemplateId } from "@/config/templates";
 import { CrossPostSelector } from "@/components/share/CrossPostSelector";
+import { CrossPostSettingsDialog } from "@/components/share/CrossPostSettingsDialog";
 import { CrossPostSharePanel } from "@/components/share/CrossPostSharePanel";
 import type { ShareablePayload, SharePlatform } from "@/lib/share/types";
 
@@ -148,10 +149,14 @@ export function IdeaWizard({
   const [skills, setSkills] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [files, setFiles] = useState<File[]>([]);
-  // Cross-post share targets — all four platforms selected by default.
+  // Cross-post share targets — controlled by the CrossPostSelector +
+  // Settings dialog. Starts empty; the selector's useEffect populates it
+  // from useCrossPostPreferences (localStorage-backed) on first render.
   const [crossPostTargets, setCrossPostTargets] = useState<Set<SharePlatform>>(
-    new Set(["twitter", "linkedin", "instagram", "facebook"]),
+    new Set(),
   );
+  // Settings dialog open state — CrossPostSelector's gear icon opens it.
+  const [crossPostSettingsOpen, setCrossPostSettingsOpen] = useState(false);
   const [sharePayload, setSharePayload] = useState<{
     payload: ShareablePayload;
     platforms: SharePlatform[];
@@ -170,6 +175,13 @@ export function IdeaWizard({
   // re-render the whole 1000-line wizard. We only track the pause flag
   // and the active boolean up here.
   const [tutorialPaused, setTutorialPaused] = useState(false);
+
+  // TUTORIAL: skip the "Your idea" preview screen entirely — as soon as
+  // Generate finishes populating title+description, auto-submit and go
+  // straight to the map. Product wants: no 3-5s preview flash. This
+  // flag is set in handleGenerate's success path and drained by the
+  // effect that fires handleSubmit once state commits.
+  const [tutorialAutoSubmitPending, setTutorialAutoSubmitPending] = useState(false);
 
   // ── Helpers ──
   const reset = () => {
@@ -190,6 +202,7 @@ export function IdeaWizard({
     setAiHadError(false);
     setIsGeneratingTags(false);
     setSharePayload(null);
+    setTutorialAutoSubmitPending(false);
   };
 
   const close = () => {
@@ -279,12 +292,13 @@ export function IdeaWizard({
         setStep("preview");
       } else {
         reset();
-        // Tutorial mode: skip the template chooser and drop the user
-        // straight onto the AI-description step so the tour highlight
-        // has something to point at.
-        if (tutorialMode) {
-          setStep("outline");
-        }
+        // Tutorial mode PREVIOUSLY skipped the template chooser and
+        // dropped the user straight on the AI-description step. Per
+        // product request the template step is now VISIBLE in the
+        // tutorial too — the flow becomes "click + → pick template →
+        // describe idea", matching what the client expects. The
+        // tutorial state machine (Step2TemplatePick) handles the
+        // template → outline transition automatically.
       }
     }
   }, [isOpen, initialDraft, tutorialMode]);
@@ -312,6 +326,9 @@ export function IdeaWizard({
         setIndustries(result.industries || []);
         setSkills(result.skills || []);
         setVisibility(result.visibility);
+        // Tutorial: no preview screen — as soon as state commits,
+        // fire submit. Effect below picks this up.
+        if (tutorialMode) setTutorialAutoSubmitPending(true);
       }
       setStep("preview");
     } catch {
@@ -496,7 +513,12 @@ export function IdeaWizard({
       // here because the click gesture is gone after the awaits above;
       // browsers would block everything past the first popup. Each
       // button on the share step opens its own tab from a fresh click.
-      if (willCrossPost) {
+      //
+      // TUTORIAL: skip the share dialog entirely — the tutorial is
+      // meant to whisk the user from "post idea" straight to the map.
+      // The "Post on X / LinkedIn / Facebook / Go to my world map"
+      // screen is noise during onboarding.
+      if (willCrossPost && !tutorialMode) {
         const origin =
           typeof window !== "undefined" ? window.location.origin : "";
         setSharePayload({
@@ -523,6 +545,30 @@ export function IdeaWizard({
       setIsSubmitting(false);
     }
   };
+
+  // TUTORIAL: fire handleSubmit the moment title+description commit
+  // during a tutorialMode Generate. We can't call handleSubmit inline
+  // in handleGenerate — closure would see the pre-setState values. This
+  // effect runs after React commits the AI results, so title/description
+  // are populated. User perceives ~1 frame of the preview form before
+  // the spinner takes over — the render guard below hides the preview
+  // form entirely for tutorialMode so nothing visible flashes.
+  useEffect(() => {
+    if (!tutorialMode) return;
+    if (!tutorialAutoSubmitPending) return;
+    if (step !== "preview") return;
+    if (!title.trim() || !description.trim()) return;
+    if (isSubmitting) return;
+    setTutorialAutoSubmitPending(false);
+    void handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+  }, [
+    tutorialMode,
+    tutorialAutoSubmitPending,
+    step,
+    title,
+    description,
+    isSubmitting,
+  ]);
 
   // ── Derived (used in outline + preview badge) ──
   const activeDef = TEMPLATE_DEFS[selectedTemplate];
@@ -672,14 +718,9 @@ export function IdeaWizard({
 
             <div className="flex-1 flex flex-col px-5 py-4 min-h-0">
               <div className="relative flex-1">
-                {tutorialMode && !outline.trim() && (
-                  <>
-                    <span className="pointer-events-none absolute -inset-1.5 rounded-[14px] border-2 border-amber-300 shadow-[0_0_45px_rgba(251,191,36,0.55)] z-10" />
-                    <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 z-20 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0A0E1A] shadow-[0_8px_24px_rgba(251,191,36,0.5)]">
-                      ↓ Describe your idea
-                    </span>
-                  </>
-                )}
+                {/* Amber "Describe your idea" tutorial callout REMOVED
+                    per product request. Same treatment as the amber
+                    "Tap to generate" ring on the Generate button. */}
                 <Textarea
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
@@ -688,6 +729,14 @@ export function IdeaWizard({
                     "min-h-[136px] resize-none rounded-[12px] border-white/5 bg-[#0D1117] p-4 pr-4 text-base leading-6 text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-0 lg:text-sm",
                     isOverOutlineLimit && "border-rose-500/80 focus-visible:ring-rose-400",
                   )}
+                  // Stop keydown from bubbling to any parent listener
+                  // (tutorial scrim, Radix focus trap, Phaser keyboard
+                  // manager on other routes, etc.) that may preventDefault
+                  // on WASD / arrow / Space keys. Ensures every keystroke
+                  // reaches the native textarea intact.
+                  onKeyDown={(e) => e.stopPropagation()}
+                  onKeyUp={(e) => e.stopPropagation()}
+                  onKeyPress={(e) => e.stopPropagation()}
                   autoFocus
                 />
               </div>
@@ -735,14 +784,8 @@ export function IdeaWizard({
                   Cancel
                 </Button>
                 <div className="relative">
-                  {tutorialMode && outline.trim() && (
-                    <>
-                      <span className="pointer-events-none absolute -inset-1.5 rounded-[12px] border-2 border-amber-300 shadow-[0_0_45px_rgba(251,191,36,0.55)]" />
-                      <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0A0E1A] shadow-[0_8px_24px_rgba(251,191,36,0.5)]">
-                        ↓ Tap to generate
-                      </span>
-                    </>
-                  )}
+                  {/* Amber "Tap to generate" tutorial callout REMOVED per
+                      product request — button stands on its own. */}
                   <Button
                     type="button"
                     onClick={() => {
@@ -764,7 +807,13 @@ export function IdeaWizard({
         )}
 
         {/* ── STEP 2: Generating ──────────────────────────────────────────── */}
-        {step === "generating" && (
+        {/* In tutorial mode we also stay on the spinner during the
+            preview step + submit — user should never see the "Your Idea"
+            form flash on screen (product decision). */}
+        {(step === "generating" ||
+          (tutorialMode &&
+            step === "preview" &&
+            (tutorialAutoSubmitPending || isSubmitting))) && (
           <>
             <DialogHeader className="sr-only">
               <DialogTitle>Generating</DialogTitle>
@@ -790,7 +839,14 @@ export function IdeaWizard({
         )}
 
         {/* ── STEP 3: Preview & post ──────────────────────────────────────── */}
-        {step === "preview" && (
+        {/* Hidden in tutorialMode while auto-submit is pending or in
+            flight — the spinner branch above owns the visual during
+            that window. Non-tutorial users still see the full preview. */}
+        {step === "preview" &&
+          !(
+            tutorialMode &&
+            (tutorialAutoSubmitPending || isSubmitting)
+          ) && (
           <form
             onSubmit={handleSubmit}
             className="flex flex-col w-full max-h-[85dvh] sm:max-h-[90vh] overflow-hidden"
@@ -817,9 +873,9 @@ export function IdeaWizard({
               </div>
               <DialogDescription className="text-xs text-[#9CA3AF] mt-0.5">
                 {aiHadError
-                  ? "AI couldn't fill the form this time — please fill it in below."
+                  ? "AI couldn't suggest a title this time — please fill it in below."
                   : !aiHadError && title && description
-                    ? "✨ AI filled the form for you. Review and edit as needed."
+                    ? "✨ AI suggested a title and tags. Your description is exactly as you wrote it."
                     : "Edit anything you want, then post."}
               </DialogDescription>
             </DialogHeader>
@@ -833,6 +889,9 @@ export function IdeaWizard({
                   placeholder="A short, specific title"
                   maxLength={100}
                   className="h-11 rounded-[10px] border-white/5 bg-[#0D1117] px-3 text-base text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0 lg:text-sm"
+                  onKeyDown={(e) => e.stopPropagation()}
+                  onKeyUp={(e) => e.stopPropagation()}
+                  onKeyPress={(e) => e.stopPropagation()}
                   required
                   autoFocus
                 />
@@ -855,6 +914,9 @@ export function IdeaWizard({
                       "w-full resize-none border-0 bg-transparent p-4 pb-12 pr-14 text-base leading-6 text-white outline-none placeholder:text-[#6B7280] focus:ring-0 lg:text-sm [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent",
                       selectedFile ? "h-[136px]" : "h-full overflow-y-auto",
                     )}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onKeyUp={(e) => e.stopPropagation()}
+                    onKeyPress={(e) => e.stopPropagation()}
                     required
                   />
                   {selectedFile && (
@@ -1067,10 +1129,16 @@ export function IdeaWizard({
                 </div>
               </div>
 
-              {/* Cross-post destinations */}
+              {/* Cross-post destinations — compact single checkbox.
+                  Per-platform toggles moved to the Settings dialog. */}
               <CrossPostSelector
                 selected={crossPostTargets}
                 onChange={setCrossPostTargets}
+                onOpenSettings={() => setCrossPostSettingsOpen(true)}
+              />
+              <CrossPostSettingsDialog
+                open={crossPostSettingsOpen}
+                onOpenChange={setCrossPostSettingsOpen}
               />
 
               {submitError && (

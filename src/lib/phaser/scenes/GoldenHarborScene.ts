@@ -15,10 +15,164 @@ import { getStageMiniBosses, getStageSuperBoss } from "@/config/stage-bosses";
 import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day";
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
 import { playCpClearBurst } from "../utils/cp-clear-burst";
+import {
+  CorruptionOverlay,
+  type OverlayCheckpoint,
+} from "@/lib/phaser/systems/corruptionOverlay";
+import {
+  ensureCorruptionPattern,
+  motifForStage,
+} from "@/lib/phaser/systems/corruptionPatterns";
+import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
+import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
+import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
+import {
+  getCurrentPersonaId,
+  loadPersonaSprites,
+  personaSpriteKey,
+} from "@/lib/phaser/persona-assets";
 
 const MAP_ASSET = "/assets/maps-v2/golden-harbor/harbor-map.png";
-const MAP_WIDTH = 2612;
-const MAP_HEIGHT = 1632;
+const MAP_WIDTH = 1664;
+const MAP_HEIGHT = 1024;
+
+// Golden Harbor walkability blockers — authored via the in-map editor
+// (?editZones=1). Rectangles are in map-image pixel coords (1664×1024).
+const BLOCKED_ZONES: readonly { x: number; y: number; w: number; h: number }[] = [
+  { x: 0, y: 67, w: 685, h: 157 },
+  { x: 119, y: 205, w: 552, h: 77 },
+  { x: 779, y: 67, w: 71, h: 202 },
+  { x: 152, y: 255, w: 439, h: 49 },
+  { x: 189, y: 252, w: 411, h: 64 },
+  { x: 213, y: 238, w: 461, h: 91 },
+  { x: 248, y: 271, w: 423, h: 77 },
+  { x: 269, y: 301, w: 357, h: 63 },
+  { x: 305, y: 314, w: 311, h: 61 },
+  { x: 207, y: 689, w: 153, h: 57 },
+  { x: 348, y: 676, w: 47, h: 42 },
+  { x: 375, y: 664, w: 38, h: 33 },
+  { x: 227, y: 565, w: 68, h: 40 },
+  { x: 191, y: 581, w: 75, h: 71 },
+  { x: 447, y: 533, w: 27, h: 40 },
+  { x: 456, y: 544, w: 39, h: 32 },
+  { x: 436, y: 578, w: 34, h: 40 },
+  { x: 411, y: 580, w: 40, h: 37 },
+  { x: 412, y: 588, w: 57, h: 42 },
+  { x: 375, y: 480, w: 31, h: 34 },
+  { x: 407, y: 498, w: 28, h: 49 },
+  { x: 415, y: 526, w: 56, h: 29 },
+  { x: 259, y: 474, w: 126, h: 99 },
+  { x: 365, y: 516, w: 76, h: 58 },
+  { x: 381, y: 544, w: 97, h: 38 },
+  { x: 241, y: 672, w: 135, h: 53 },
+  { x: 278, y: 700, w: 86, h: 28 },
+  { x: 213, y: 692, w: 136, h: 61 },
+  { x: 194, y: 697, w: 148, h: 65 },
+  { x: 223, y: 674, w: 112, h: 91 },
+  { x: 242, y: 687, w: 83, h: 87 },
+  { x: 255, y: 686, w: 61, h: 94 },
+  { x: 273, y: 692, w: 35, h: 98 },
+  { x: 115, y: 586, w: 68, h: 58 },
+  { x: 91, y: 640, w: 59, h: 36 },
+  { x: 242, y: 458, w: 63, h: 98 },
+  { x: 165, y: 537, w: 97, h: 88 },
+  { x: 181, y: 520, w: 94, h: 59 },
+  { x: 198, y: 504, w: 100, h: 51 },
+  { x: 227, y: 491, w: 60, h: 52 },
+  { x: 101, y: 550, w: 128, h: 79 },
+  { x: 4, y: 530, w: 124, h: 260 },
+  { x: 2, y: 268, w: 63, h: 292 },
+  { x: 0, y: 227, w: 56, h: 40 },
+  { x: 558, y: 69, w: 476, h: 114 },
+  { x: 945, y: 185, w: 225, h: 157 },
+  { x: 1124, y: 165, w: 81, h: 226 },
+  { x: 966, y: 72, w: 164, h: 131 },
+  { x: 1562, y: 361, w: 97, h: 335 },
+  { x: 1175, y: 478, w: 118, h: 218 },
+  { x: 992, y: 500, w: 314, h: 89 },
+  { x: 908, y: 512, w: 408, h: 86 },
+  { x: 881, y: 531, w: 456, h: 66 },
+  { x: 1192, y: 658, w: 183, h: 47 },
+  { x: 1234, y: 695, w: 159, h: 27 },
+  { x: 1299, y: 705, w: 139, h: 40 },
+  { x: 1362, y: 750, w: 124, h: 165 },
+  { x: 1378, y: 616, w: 155, h: 260 },
+  { x: 1502, y: 593, w: 157, h: 347 },
+  { x: 1353, y: 860, w: 215, h: 80 },
+  { x: 866, y: 550, w: 378, h: 157 },
+  { x: 596, y: 540, w: 98, h: 34 },
+  { x: 632, y: 566, w: 97, h: 183 },
+  { x: 561, y: 677, w: 192, h: 156 },
+  { x: 728, y: 566, w: 35, h: 183 },
+  { x: 455, y: 713, w: 327, h: 126 },
+  { x: 467, y: 708, w: 124, h: 201 },
+  { x: 407, y: 751, w: 392, h: 154 },
+  { x: 391, y: 763, w: 164, h: 82 },
+  { x: 374, y: 783, w: 136, h: 92 },
+  { x: 342, y: 810, w: 193, h: 33 },
+  { x: 356, y: 789, w: 136, h: 41 },
+  { x: 419, y: 736, w: 154, h: 82 },
+  { x: 445, y: 723, w: 135, h: 82 },
+  { x: 335, y: 819, w: 92, h: 29 },
+  { x: 371, y: 880, w: 467, h: 141 },
+  { x: 1, y: 953, w: 483, h: 64 },
+  { x: 807, y: 859, w: 340, h: 163 },
+  { x: 1122, y: 874, w: 80, h: 144 },
+  { x: 1202, y: 869, w: 108, h: 148 },
+  { x: 1312, y: 874, w: 349, h: 145 },
+  { x: 1217, y: 853, w: 58, h: 52 },
+  { x: 1079, y: 638, w: 77, h: 204 },
+  { x: 1015, y: 610, w: 61, h: 189 },
+  { x: 946, y: 655, w: 144, h: 109 },
+  { x: 832, y: 588, w: 181, h: 151 },
+  { x: 761, y: 769, w: 99, h: 99 },
+  { x: 818, y: 811, w: 107, h: 68 },
+  { x: 926, y: 816, w: 56, h: 80 },
+  { x: 941, y: 832, w: 60, h: 51 },
+  { x: 937, y: 288, w: 81, h: 104 },
+  { x: 905, y: 317, w: 22, h: 51 },
+  { x: 681, y: 311, w: 28, h: 66 },
+  { x: 638, y: 333, w: 38, h: 44 },
+  { x: 713, y: 389, w: 28, h: 27 },
+  { x: 953, y: 398, w: 37, h: 25 },
+  { x: 1023, y: 466, w: 63, h: 68 },
+  { x: 1089, y: 486, w: 89, h: 55 },
+  { x: 965, y: 498, w: 93, h: 62 },
+  { x: 1002, y: 489, w: 57, h: 58 },
+  { x: 1006, y: 474, w: 34, h: 34 },
+  { x: 989, y: 72, w: 319, h: 176 },
+  { x: 1122, y: 69, w: 237, h: 274 },
+  { x: 1360, y: 69, w: 302, h: 269 },
+  { x: 1541, y: 339, w: 105, h: 79 },
+  { x: 1241, y: 559, w: 220, h: 132 },
+  { x: 1422, y: 581, w: 89, h: 84 },
+  { x: 1508, y: 495, w: 92, h: 108 },
+  { x: 653, y: 162, w: 87, h: 24 },
+  { x: 646, y: 141, w: 72, h: 59 },
+  { x: 637, y: 168, w: 66, h: 38 },
+  { x: 937, y: 167, w: 38, h: 56 },
+  { x: 918, y: 134, w: 23, h: 98 },
+  { x: 893, y: 145, w: 21, h: 58 },
+  { x: 864, y: 149, w: 22, h: 40 },
+  { x: 933, y: 267, w: 22, h: 69 },
+  { x: 708, y: 572, w: 155, h: 167 },
+  { x: 448, y: 292, w: 189, h: 115 },
+  { x: 1182, y: 193, w: 112, h: 180 },
+];
+
+/** Live custom-zones getter — populated by the in-map editor when
+ *  `?editZones=1` is on the URL. Zero-effect when the editor isn't
+ *  attached. */
+let _customZonesGetter: () => readonly ZoneRect[] = () => [];
+function pointInAnyBlockedZone(x: number, y: number): boolean {
+  for (const z of BLOCKED_ZONES) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  for (const z of _customZonesGetter()) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  return false;
+}
 
 const CHAR_IDLE_ASSET = "/assets/fan-tasy/Character_Idle.webp";
 const CHAR_WALK_ASSET = "/assets/fan-tasy/Character_Walk.webp";
@@ -41,10 +195,13 @@ interface Checkpoint {
 // Launch assets prepared, Product live and announced, First users
 // acquired). The 4th scene CP "Lighthouse Tip" was orphan — no task data
 // for it in the template. Lighthouse now hosts the super-boss reveal only.
+// Map cropped from 2624×1630 down to 1664×1024 (actual painted area
+// from LDtk delivery). CP3 Warehouse District was outside painted
+// bounds — moved inside. Repaint LDtk canvas to restore full size.
 const CHECKPOINTS: readonly Checkpoint[] = [
-  { index: 0, x: 380, y: 900, label: "Dockside Arrival" },
-  { index: 1, x: 1050, y: 700, label: "Market Square" },
-  { index: 2, x: 1700, y: 1150, label: "Warehouse District" },
+  { index: 0, x: 320, y: 650, label: "Dockside Arrival" },
+  { index: 1, x: 900, y: 400, label: "Market Square" },
+  { index: 2, x: 1350, y: 760, label: "Warehouse District" },
 ];
 
 const BOSS_OFFSETS: readonly { x: number; y: number; scale: number }[] = [
@@ -72,6 +229,8 @@ export class GoldenHarborScene extends Phaser.Scene {
   private superBossRevealed = false;
   private todController: TimeOfDayController | null = null;
   private vfxController: AmbientVFXController | null = null;
+  private _corruption: CorruptionOverlay | null = null;
+  private _lastCheckpointStates: CheckpointState[] = [];
 
   constructor() {
     super({ key: "GoldenHarborScene" });
@@ -88,6 +247,7 @@ export class GoldenHarborScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image("harbor-composite", MAP_ASSET);
+    loadPersonaSprites(this, getCurrentPersonaId());
     if (!this.textures.exists("village-persona-idle")) {
       this.load.spritesheet("village-persona-idle", CHAR_IDLE_ASSET, {
         frameWidth: 32,
@@ -128,46 +288,57 @@ export class GoldenHarborScene extends Phaser.Scene {
     const start = CHECKPOINTS[this.currentIndex];
     cam.centerOn(start.x, start.y);
 
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      dragging = true;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
-      if (!dragging) return;
-      cam.scrollX -= (p.x - lastX) / cam.zoom;
-      cam.scrollY -= (p.y - lastY) / cam.zoom;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointerup", () => {
-      dragging = false;
-    });
-
-    const KEY_PAN_SPEED = 14;
-    const keyboard = this.input.keyboard;
-    if (keyboard) {
-      const cursors = keyboard.createCursorKeys();
-      const wasd = {
-        W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-        A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-        S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-        D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-      };
-      this.events.on("update", () => {
-        const left = cursors.left?.isDown || wasd.A.isDown;
-        const right = cursors.right?.isDown || wasd.D.isDown;
-        const up = cursors.up?.isDown || wasd.W.isDown;
-        const down = cursors.down?.isDown || wasd.S.isDown;
-        const step = KEY_PAN_SPEED / cam.zoom;
-        if (left) cam.scrollX -= step;
-        if (right) cam.scrollX += step;
-        if (up) cam.scrollY -= step;
-        if (down) cam.scrollY += step;
+    // Drag-to-pan — DISABLED while zone-editor is active so left-click
+    // drag can draw rectangles without the map scrolling underneath.
+    const zoneEditorActive =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("editZones") === "1";
+    if (!zoneEditorActive) {
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        dragging = true;
+        lastX = p.x;
+        lastY = p.y;
       });
+      this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+        if (!dragging) return;
+        cam.scrollX -= (p.x - lastX) / cam.zoom;
+        cam.scrollY -= (p.y - lastY) / cam.zoom;
+        lastX = p.x;
+        lastY = p.y;
+      });
+      this.input.on("pointerup", () => {
+        dragging = false;
+      });
+    }
+
+    // WASD/arrow pan — suppressed while zone editor is active so
+    // editorTestWalk can drive the persona for live blocker testing.
+    if (!zoneEditorActive) {
+      const KEY_PAN_SPEED = 14;
+      const keyboard = this.input.keyboard;
+      if (keyboard) {
+        const cursors = keyboard.createCursorKeys();
+        const wasd = {
+          W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+          A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+          S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+          D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+        };
+        this.events.on("update", () => {
+          const left = cursors.left?.isDown || wasd.A.isDown;
+          const right = cursors.right?.isDown || wasd.D.isDown;
+          const up = cursors.up?.isDown || wasd.W.isDown;
+          const down = cursors.down?.isDown || wasd.S.isDown;
+          const step = KEY_PAN_SPEED / cam.zoom;
+          if (left) cam.scrollX -= step;
+          if (right) cam.scrollX += step;
+          if (up) cam.scrollY -= step;
+          if (down) cam.scrollY += step;
+        });
+      }
     }
 
     for (const cp of CHECKPOINTS) {
@@ -189,6 +360,19 @@ export class GoldenHarborScene extends Phaser.Scene {
       this.checkpointNodes.push(disc);
     }
 
+    // Corruption overlay — one tile-strip per CP-to-CP segment.
+    const harborPattern = ensureCorruptionPattern(this, motifForStage(6));
+    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
+      x: cp.x,
+      y: cp.y,
+    }));
+    this._corruption = new CorruptionOverlay(this, {
+      checkpoints: overlayCps,
+      patternTextureKey: harborPattern,
+      tint: 0x64748b, // blue-grey — Golden Harbor
+      depth: 5,
+    });
+
     this.spawnCharacter();
     this.spawnMiniBosses();
     this.refreshMiniBossVisibility();
@@ -201,6 +385,44 @@ export class GoldenHarborScene extends Phaser.Scene {
       mapWidth: MAP_WIDTH,
       mapHeight: MAP_HEIGHT,
     });
+    // Walkability debug overlay — ?showZones=1 renders BLOCKED_ZONES in
+    // red so they can be verified visually against the painted map.
+    try {
+      const showZones =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("showZones") === "1";
+      if (showZones) {
+        void pointInAnyBlockedZone;
+        const g = this.add.graphics();
+        g.setDepth(50);
+        g.fillStyle(0xff0000, 0.35);
+        g.lineStyle(2, 0xff2222, 1);
+        BLOCKED_ZONES.forEach((z) => {
+          g.fillRect(z.x, z.y, z.w, z.h);
+          g.strokeRect(z.x, z.y, z.w, z.h);
+        });
+      }
+    } catch {
+      /* SSR safety */
+    }
+
+    // In-map zone editor — enabled via ?editZones=1. Zones persist in
+    // localStorage under "ibhaveda-zones-harbor" (scene-scoped).
+    const editor = attachZoneEditor(this, "harbor");
+    _customZonesGetter = editor.getCustomZones;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      _customZonesGetter = () => [];
+    });
+
+    // Live test-walk while editing — WASD moves the persona, blockers
+    // hard-stop it, camera follows. No-op unless ?editZones=1.
+    attachEditorTestWalk(this, {
+      getCharacter: () => this.character,
+      isBlocked: (x, y) => pointInAnyBlockedZone(x, y),
+      mapWidth: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+    });
+
     eventBridge.dispatchToReact({ type: "PHASER_READY" });
   }
 
@@ -261,36 +483,69 @@ export class GoldenHarborScene extends Phaser.Scene {
 
   public weakenActiveBoss(tasksDone: number, total: number = 3): void {
     const hpBar = this.miniBossHpBars[this.currentIndex];
-    if (!hpBar) return;
-    hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    if (hpBar) {
+      hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    }
+    // Update the corruption overlay for THIS CP's segment. 2/3 → 10%
+    // opacity + weakened monster; 3/3 → 0% + shatter burst.
+    this._corruption?.updateSegment(this.currentIndex, tasksDone);
+  }
+
+  /**
+   * Public: apply a full CheckpointState[] snapshot to the corruption
+   * overlay. Called from the React map page whenever CP progress data
+   * changes (initial load + realtime Convex updates).
+   */
+  public applyCorruptionState(states: CheckpointState[]): void {
+    this._lastCheckpointStates = states;
+    this._corruption?.applyCheckpointStates(states);
   }
 
   private spawnCharacter(): void {
     const active = CHECKPOINTS[this.currentIndex];
-    if (!this.textures.exists("village-persona-idle")) return;
+    const personaId = getCurrentPersonaId();
+    const personaIdleTex = personaSpriteKey(personaId, "idle");
+    const personaWalkTex = personaSpriteKey(personaId, "walk");
+    const idleTexKey = this.textures.exists(personaIdleTex)
+      ? personaIdleTex
+      : "village-persona-idle";
+    const walkTexKey = this.textures.exists(personaWalkTex)
+      ? personaWalkTex
+      : "village-persona-walk";
+    if (!this.textures.exists(idleTexKey)) return;
 
-    if (!this.anims.exists("persona-idle")) {
-      this.anims.create({
-        key: "persona-idle",
-        frames: this.anims.generateFrameNumbers("village-persona-idle", {
-          start: 0,
-          end: 1,
-        }),
-        frameRate: 2,
-        repeat: -1,
-      });
-    }
-    if (!this.anims.exists("persona-walk")) {
-      this.anims.create({
-        key: "persona-walk",
-        frames: this.anims.generateFrameNumbers("village-persona-walk", {
-          start: 10,
-          end: 14,
-        }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
+    // If a previous scene registered these anims against the OLD texture,
+    // drop them so we rebind to the picked persona's sheet.
+    if (this.anims.exists("persona-idle")) this.anims.remove("persona-idle");
+    if (this.anims.exists("persona-walk")) this.anims.remove("persona-walk");
+
+    const idleFrames = this.textures.get(idleTexKey).frameTotal;
+    this.anims.create({
+      key: "persona-idle",
+      frames: this.anims.generateFrameNumbers(idleTexKey, {
+        start: 0,
+        end: Math.max(0, Math.min(idleFrames - 1, 3)),
+      }),
+      frameRate: 4,
+      repeat: -1,
+    });
+
+    const walkFrames = this.textures.get(walkTexKey).frameTotal;
+    // For legacy Village sheet, useful walk frames are 10..14. For extended
+    // personas, walk frames start at 0. Pick range based on which sheet.
+    const walkStart = walkTexKey === "village-persona-walk" ? 10 : 0;
+    const walkEnd = walkTexKey === "village-persona-walk"
+      ? Math.min(walkFrames - 1, 14)
+      : Math.min(walkFrames - 1, 5);
+    this.anims.create({
+      key: "persona-walk",
+      frames: this.anims.generateFrameNumbers(walkTexKey, {
+        start: walkStart,
+        end: walkEnd,
+      }),
+      frameRate: 10,
+      repeat: -1,
+    });
 
     const groundY = active.y + CHAR_Y_OFFSET + 4;
     this.characterShadow = this.add
@@ -300,7 +555,7 @@ export class GoldenHarborScene extends Phaser.Scene {
     this.character = this.add.sprite(
       active.x,
       active.y + CHAR_Y_OFFSET,
-      "village-persona-idle",
+      idleTexKey,
     );
     this.character.setOrigin(0.5, 1);
     this.character.setScale(CHAR_SCALE);

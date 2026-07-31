@@ -22,7 +22,7 @@
  * progress bar can paint over the navbar shadow).
  */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -30,6 +30,10 @@ import { TutorialProgressBar } from "./TutorialProgressBar";
 import { Step1Welcome } from "./steps/Step1Welcome";
 import { Step2TemplatePick } from "./steps/Step2TemplatePick";
 import { Step3MapGuide } from "./steps/Step3MapGuide";
+import { Step4Contribute } from "./steps/Step4Contribute";
+// SwordDropCelebration was removed from the mount tree per product
+// request. The file is kept in the repo (unused) in case we want to
+// re-enable a completion cinematic later.
 import {
   TutorialContext,
   TUTORIAL_TOTAL_STEPS,
@@ -39,7 +43,18 @@ import {
 
 // Routes where the tutorial progress bar should NEVER appear, even if
 // the tutorial is technically active. Public/marketing surfaces only.
-const PROGRESS_BAR_BLOCKED_ROUTES = ["/", "/sign-in", "/sign-up", "/login", "/register"];
+const PROGRESS_BAR_BLOCKED_ROUTES = [
+  "/",
+  "/sign-in",
+  "/sign-up",
+  "/login",
+  "/register",
+  // /profile-setup no longer participates in the tutorial (Step1Welcome
+  // is disabled). Hiding the 1/8 progress bar keeps that screen quiet
+  // so returning users editing their profile don't see stale tutorial
+  // chrome.
+  "/profile-setup",
+];
 
 function TutorialProgressBarGate(props: {
   visible: boolean;
@@ -104,17 +119,24 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
 
   // ── Derived flags ───────────────────────────────────────────────────────
   // The tutorial is "active" when:
+  //  - Convex query has RESOLVED (remote !== undefined) — critical to
+  //    avoid the initial-render "not_started + step 0" false positive
+  //    that used to clobber completed users' state. Step3MapGuide would
+  //    fire goTo(7) during the load window and persist in_progress back
+  //    to Convex, restarting the tutorial after refresh.
   //  - backend says in_progress or not_started
   //  - AND user hasn't completed/skipped
-  //  - AND step is 1..7 (0 = pre-start, 8 = done)
+  //  - AND step is 1..10 (0 = pre-start, 11 = done)
   //  - AND no explicit override hides it
   // FIX — new users have backendState="not_started" AND step=0, which
   // failed the `step >= 1` check so Sparky never showed up after
   // signup. Treat the "not_started + step 0" combination as step 1
   // active so the dog appears on /profile-setup.
+  const remoteLoaded = remote !== undefined;
   const baseActive =
+    remoteLoaded &&
     (backendState === "in_progress" || backendState === "not_started") &&
-    ((step >= 1 && step <= 7) || (backendState === "not_started" && step === 0));
+    ((step >= 1 && step <= 10) || (backendState === "not_started" && step === 0));
   // Debug: `?tutorial_debug=N` in URL forces the overlay open at step N (1-7).
   // Read after hydration only — accessing window during SSR causes a
   // hydration mismatch with the progress-bar markup.
@@ -123,9 +145,9 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
     const n = Number(
       new URLSearchParams(window.location.search).get("tutorial_debug"),
     );
-    if (Number.isFinite(n) && n >= 1 && n <= 7) setDebugStep(n);
+    if (Number.isFinite(n) && n >= 1 && n <= 10) setDebugStep(n);
   }, []);
-  const debugActive = debugStep >= 1 && debugStep <= 7;
+  const debugActive = debugStep >= 1 && debugStep <= 10;
   const active = activeOverride != null ? activeOverride : (baseActive || debugActive);
   // Effective step — debug override, else real step, else 1 if user
   // is "not_started" (new signup — Step 1 component needs to mount).
@@ -154,7 +176,7 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
     const next = Math.min(step + 1, TUTORIAL_TOTAL_STEPS + 1) as TutorialStep;
     if (next > TUTORIAL_TOTAL_STEPS) {
       // Moving past the last step completes the tutorial.
-      setOptimisticStep(8 as TutorialStep);
+      setOptimisticStep(11 as TutorialStep);
       setOptimisticState("completed");
       try {
         await completeMutation({});
@@ -170,7 +192,7 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
 
   const skip = useCallback(async () => {
     setOptimisticState("skipped");
-    setOptimisticStep(8 as TutorialStep);
+    setOptimisticStep(11 as TutorialStep);
     try {
       await skipMutation({});
     } catch (err) {
@@ -182,7 +204,7 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
 
   const complete = useCallback(async () => {
     setOptimisticState("completed");
-    setOptimisticStep(8 as TutorialStep);
+    setOptimisticStep(11 as TutorialStep);
     try {
       await completeMutation({});
     } catch (err) {
@@ -204,7 +226,11 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
     }
   }, [restartMutation]);
 
-  const setActive = useCallback((nextActive: boolean) => {
+  // `null` clears the override (natural baseActive takes over again).
+  // `true` / `false` force-show / force-hide respectively. See the
+  // TutorialActions.setActive JSDoc for the "why" and the bug this
+  // three-valued API prevents.
+  const setActive = useCallback((nextActive: boolean | null) => {
     setActiveOverride(nextActive);
   }, []);
 
@@ -215,6 +241,9 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
       setActiveOverride(null);
     }
   }, [backendState]);
+
+  // (Post-tutorial sword-drop celebration removed — tutorial now
+  // ends silently once the contribute step completes.)
 
   // ── Context value (stable identity for memoization downstream) ──────────
   const value = useMemo(
@@ -240,16 +269,30 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
           NOT on the landing / public marketing pages. */}
       <TutorialProgressBarGate
         visible={active}
-        step={Math.max(1, Math.min(effectiveStep, TUTORIAL_TOTAL_STEPS))}
-        totalSteps={TUTORIAL_TOTAL_STEPS}
+        // Display renumber: internal steps 1..2 are the invisible
+        // name/username capture during signup. The user-visible
+        // journey starts at internal step 3 ("create first post"),
+        // which they perceive as step 1. Subtract 2 from the internal
+        // step and cap total at 8 so the bar reads 1/8 → 8/8 through
+        // the actual guided flow.
+        step={Math.max(1, Math.min(effectiveStep - 2, 8))}
+        totalSteps={8}
         onSkip={skip}
       />
       {/* Step 1 mounts on /profile-setup when tutorial step === 1. */}
       <Step1Welcome />
       {/* Step 2 mounts on /feed when tutorial step === 2. */}
       <Step2TemplatePick />
-      {/* Step 3 mounts on /map/world */}
+      {/* Step 3 mounts on /map/world (covers combat + flare) */}
       <Step3MapGuide />
+      {/* Step 4 mounts on /feed at step 10 (contribution flow) */}
+      <Step4Contribute />
+      {/* SwordDropCelebration was previously mounted here as a
+          post-tutorial celebration ("You did it! It's dangerous to go
+          alone, take this."). Removed per product request — the
+          tutorial now ends silently once the contribute step completes.
+          The component file is kept in the repo (unused) in case we
+          want to re-enable a completion cinematic later. */}
     </TutorialContext.Provider>
   );
 }

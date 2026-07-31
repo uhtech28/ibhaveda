@@ -54,6 +54,11 @@ export function TutorialHighlight({
   onDimClick,
 }: TutorialHighlightProps) {
   const [rect, setRect] = useState<Rect>(EMPTY_RECT);
+  // Auto-detected border-radius of the target element — updated each measure
+  // so the glow ring visually matches the target (round buttons, rounded
+  // rectangles, sharp panels, etc.). Falls back to the caller's `rx` prop
+  // if the target has no explicit radius.
+  const [autoRadius, setAutoRadius] = useState<number | null>(null);
   const [viewport, setViewport] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const rafRef = useRef<number | null>(null);
 
@@ -95,6 +100,27 @@ export function TutorialHighlight({
         height: r.height + padding * 2,
       });
       setViewport({ w: window.innerWidth, h: window.innerHeight });
+
+      // Read the target's actual border-radius so the ring visually matches.
+      // getComputedStyle returns e.g. "10px" or "999px" — parse the numeric
+      // value and add our padding so the ring's radius outside the padding
+      // matches the target's radius inside.
+      try {
+        const cs = window.getComputedStyle(el);
+        const raw = cs.borderTopLeftRadius || cs.borderRadius || "";
+        const parsed = parseFloat(raw);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          // Cap at half the smaller dimension so we don't over-round on
+          // tiny targets. Add `padding` because the highlight rect is
+          // inflated by `padding` on each side.
+          const maxRadius = Math.min(r.width, r.height) / 2 + padding;
+          setAutoRadius(Math.min(parsed + padding, maxRadius));
+        } else {
+          setAutoRadius(null);
+        }
+      } catch {
+        setAutoRadius(null);
+      }
     };
 
     measure();
@@ -107,10 +133,36 @@ export function TutorialHighlight({
     window.addEventListener("scroll", measure, { passive: true });
     window.addEventListener("resize", measure);
 
+    // Polling safety net — some targets mount async (e.g. Convex
+    // subscription resolves and CheckpointPanel mounts its task rows).
+    // The RAF chain only fires while measure keeps failing; once we
+    // set a rect we stop. But the *target* can appear even after we've
+    // set an empty rect (via ResizeObserver missing the initial mount),
+    // so this interval catches those cases and re-attaches the observer.
+    const poll = window.setInterval(() => {
+      if (cancelled) return;
+      const all = document.querySelectorAll<HTMLElement>(selector);
+      let visibleEl: HTMLElement | null = null;
+      for (const c of Array.from(all)) {
+        const r = c.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          visibleEl = c;
+          break;
+        }
+      }
+      if (visibleEl && visibleEl !== el) {
+        // Element appeared / changed identity — reset observer + measure
+        ro.disconnect();
+        ro.observe(visibleEl);
+      }
+      measure();
+    }, 300);
+
     return () => {
       cancelled = true;
       if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
       ro.disconnect();
+      window.clearInterval(poll);
       window.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
@@ -126,6 +178,14 @@ export function TutorialHighlight({
 
   const hasTarget = rect.width > 0 && rect.height > 0;
 
+  // Effective corner radius:
+  //   1. If we managed to read a border-radius from the target's computed
+  //      style (autoRadius), use that so the ring matches the target
+  //      exactly — round buttons render as circles, rounded rectangles
+  //      keep their curvature, sharp panels stay sharp.
+  //   2. Otherwise fall back to the caller-provided rx prop.
+  const effectiveRx = autoRadius != null ? autoRadius : rx;
+
   return (
     <AnimatePresence>
       {visible && (
@@ -138,7 +198,10 @@ export function TutorialHighlight({
           style={{ pointerEvents: passthroughCutout ? "none" : "auto" }}
           onClick={onDimClick}
         >
-          {/* SVG overlay with hole punched out */}
+          {/* SVG overlay with hole punched out. Position of the cutout
+              rect is applied via SVG attributes directly (no spring) so
+              it stays glued to the target during fast scrolling — a
+              spring transition here caused visible lag/displacement. */}
           <svg
             width="100%"
             height="100%"
@@ -148,17 +211,13 @@ export function TutorialHighlight({
               <mask id="tutorial-highlight-mask">
                 <rect width="100%" height="100%" fill="white" />
                 {hasTarget && (
-                  <motion.rect
-                    initial={false}
-                    animate={{
-                      x: rect.x,
-                      y: rect.y,
-                      width: rect.width,
-                      height: rect.height,
-                    }}
-                    transition={{ type: "spring", stiffness: 240, damping: 30 }}
-                    rx={rx}
-                    ry={rx}
+                  <rect
+                    x={rect.x}
+                    y={rect.y}
+                    width={rect.width}
+                    height={rect.height}
+                    rx={effectiveRx}
+                    ry={effectiveRx}
                     fill="black"
                   />
                 )}
@@ -172,24 +231,23 @@ export function TutorialHighlight({
             />
           </svg>
 
-          {/* Crisp 1.5px ring around the target — professional, no
-              ambient bloom. Earlier version had a 36px outer glow that
-              extended the visual ring far past the actual element. */}
+          {/* Crisp 1.5px ring around the target — position set via inline
+              style (no spring transition) so the ring stays fixed to the
+              target's rect during fast scrolling instead of springing
+              behind it. will-change hints the browser to composite it on
+              the GPU for smoother scroll tracking. */}
           {hasTarget && (
-            <motion.div
-              initial={false}
-              animate={{
+            <div
+              className="absolute pointer-events-none"
+              style={{
                 left: rect.x,
                 top: rect.y,
                 width: rect.width,
                 height: rect.height,
-              }}
-              transition={{ type: "spring", stiffness: 240, damping: 30 }}
-              className="absolute pointer-events-none rounded-lg"
-              style={{
                 boxShadow:
                   "0 0 0 1.5px rgba(251, 191, 36, 0.95), 0 0 10px rgba(251, 191, 36, 0.30)",
-                borderRadius: rx,
+                borderRadius: effectiveRx,
+                willChange: "left, top, width, height",
               }}
             />
           )}

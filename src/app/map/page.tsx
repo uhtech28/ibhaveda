@@ -202,27 +202,24 @@ function MapIntroInner() {
       return;
     }
 
-    if (savedGender === "male" || savedGender === "female") {
-      // Sync to localStorage for backward compatibility
+    // CHARACTER SELECTION + WELCOME OVERLAY REMOVED per product request.
+    // /map is now a pure redirect: figure out the correct ventureId
+    // and push straight to /map/world. If no gender is saved yet,
+    // default to "male" silently so downstream code keeps working
+    // (that value is only used for the pixel-sprite variant on the
+    // world map).
+    if (savedGender !== "male" && savedGender !== "female") {
+      // Fire-and-forget silent default.
+      void updateGender({ gender: "male" }).catch(() => {});
       if (typeof window !== "undefined") {
-        localStorage.setItem("selectedGender", savedGender);
+        localStorage.setItem("selectedGender", "male");
+        localStorage.setItem("tutorial_completed", "true");
       }
-
-      const tutorialCompleted =
-        typeof window !== "undefined"
-          ? localStorage.getItem("tutorial_completed") === "true"
-          : false;
-
-      if (tutorialCompleted) {
-        const vId = createdVentureId || (activeVenture?._id as string | null);
-        const destination = vId ? buildWorldMapUrl(vId) : "/map/world";
-        router.push(destination);
-      } else {
-        setTutorialStep("welcome");
-      }
-    } else {
-      setTutorialStep("gender");
     }
+    const vId = createdVentureId || (activeVenture?._id as string | null);
+    const destination = vId ? buildWorldMapUrl(vId) : "/map/world";
+    router.replace(destination);
+    return;
   }, [
     mounted,
     savedGender,
@@ -258,7 +255,15 @@ function MapIntroInner() {
     }
   };
 
-  const handleWelcomeComplete = () => setTutorialStep("map-intro");
+  // Legacy Sahit tutorial removed — welcome now skips the intermediate
+  // "map-intro" overlay ("This is your venture map ...") and goes
+  // directly to /map/world. The v2 Sparky tutorial owns onboarding now.
+  const handleWelcomeComplete = () => {
+    setTutorialStep("complete");
+    const vId = createdVentureId || (activeVenture?._id as string | null);
+    const destination = vId ? buildWorldMapUrl(vId) : "/map/world";
+    router.push(destination);
+  };
 
   const handleMapIntroComplete = () => {
     setTutorialStep("complete");

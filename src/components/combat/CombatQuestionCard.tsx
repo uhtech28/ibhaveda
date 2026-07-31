@@ -18,15 +18,17 @@
  * pixel sprite so swapping in art is drop-in.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CombatRing } from "./CombatRing";
 import { HPBar } from "./HPBar";
 import { useKeystrokeTelemetry } from "@/lib/hooks/useKeystrokeTelemetry";
 import type {
   CombatCurrentQuestion,
   KeystrokeTelemetry,
 } from "@/lib/combat/types";
+import type { VillageBossInfo } from "@/config/village-bosses";
+import { getPersona, type PersonaId } from "@/config/personas";
+import { PixelIcon } from "@/components/ui/PixelIcon";
 
 interface Props {
   question: CombatCurrentQuestion;
@@ -39,6 +41,14 @@ interface Props {
   onSubmit: (answer: string, telemetry: KeystrokeTelemetry) => void;
   onExpire: (answer: string, telemetry: KeystrokeTelemetry) => void;
   isLocked: boolean;
+  /** Boss identity — enables biome-themed arena + real sprites. */
+  boss?: VillageBossInfo | null;
+  /** Founder persona spritesheet path — usually the Village persona idle
+   *  frame. Renders on the left of the arena as "You". */
+  founderAsset?: string | null;
+  /** The user's actual idea/venture title (e.g. "Retlify AI").  Rendered
+   *  in the "IDEA: BOSS CHALLENGE" header instead of the hardcoded slug. */
+  ideaTitle?: string | null;
 }
 
 export function CombatQuestionCard({
@@ -52,6 +62,9 @@ export function CombatQuestionCard({
   onSubmit,
   onExpire,
   isLocked,
+  boss = null,
+  founderAsset = null,
+  ideaTitle = null,
 }: Props) {
   const [value, setValue] = useState("");
   const { handlers, snapshot, reset } = useKeystrokeTelemetry();
@@ -67,6 +80,12 @@ export function CombatQuestionCard({
   // with effectively no HP change on either side (a parry).
   const lastQuestionIdRef = useRef(question._id);
   const [playerHurt, setPlayerHurt] = useState(false);
+  // OPTIMISTIC persona attack — fires the SECOND the user clicks
+  // Attack, before the server evaluates. Gives instant visual feedback
+  // ("I hit the boss") that doesn't depend on the 2-3s round-trip.
+  // Cleared when the real reaction lands.
+  const [pendingAttack, setPendingAttack] = useState(false);
+  const pendingAttackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [bossDamage, setBossDamage] = useState<number | null>(null);
   const [playerDamage, setPlayerDamage] = useState<number | null>(null);
   const lastBossHpRef = useRef(bossHpCurrent);
@@ -82,6 +101,38 @@ export function CombatQuestionCard({
     const bossDelta = prevBoss - bossHpCurrent; // positive = boss took damage
     const playerDelta = prevPlayer - playerHpCurrent; // positive = player took damage
 
+    // Real reaction lands — clear any optimistic pre-swing.
+    //
+    // We clear on ANY server-truth signal, not just HP changes:
+    //   - bossDelta > 0    → player landed a hit (server confirmed)
+    //   - playerDelta > 0  → boss counter (server confirmed)
+    //   - question advanced → block/miss round (server progressed even
+    //                         though nobody took HP damage)
+    //
+    // Why this matters: the boss sprite maps BOTH `pendingAttack` and
+    // `bossReaction === "hit"|"crit"` to the SAME "hurt" state string.
+    // The sprite is keyed by state string, so as long as the pending →
+    // real transition is direct, the sprite key stays "hurt" and no
+    // remount / no animation restart happens — the optimistic clip
+    // simply IS the confirmation clip.
+    //
+    // The bug that lived here: pendingAttack used to auto-clear on a
+    // short 1500ms timer (see handleSubmitClick below). If the server
+    // took >1.5s to respond (typical is 2-3s), the sprite went
+    // hurt → idle → hurt, playing the HURT clip TWICE with a visible
+    // idle gap between plays. Extending the safety timer + clearing
+    // here on block/miss keeps the state transitions clean.
+    const serverResponded =
+      bossDelta > 0 ||
+      playerDelta > 0 ||
+      question._id !== lastQuestionIdRef.current;
+    if (serverResponded) {
+      setPendingAttack(false);
+      if (pendingAttackTimerRef.current) {
+        clearTimeout(pendingAttackTimerRef.current);
+        pendingAttackTimerRef.current = null;
+      }
+    }
     if (bossDelta > 0) {
       // Player landed a hit. Pick CRIT if delta >= 20% of initial HP.
       const critThreshold = bossHpInitial * 0.2;
@@ -91,12 +142,12 @@ export function CombatQuestionCard({
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        kind === "crit" ? 900 : 700,
+        kind === "crit" ? 1600 : 1300,
       );
       if (damageNumberTimerRef.current) clearTimeout(damageNumberTimerRef.current);
       damageNumberTimerRef.current = setTimeout(
         () => setBossDamage(null),
-        1100,
+        1800,
       );
     } else if (playerDelta > 0) {
       // Boss counter-attacked. Show player damage flash + boss "counter" pose.
@@ -106,12 +157,12 @@ export function CombatQuestionCard({
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        700,
+        1400,
       );
       if (playerHurtTimerRef.current) clearTimeout(playerHurtTimerRef.current);
       playerHurtTimerRef.current = setTimeout(
         () => setPlayerHurt(false),
-        500,
+        1300,
       );
       if (playerDamageNumberTimerRef.current)
         clearTimeout(playerDamageNumberTimerRef.current);
@@ -149,6 +200,8 @@ export function CombatQuestionCard({
       if (damageNumberTimerRef.current) clearTimeout(damageNumberTimerRef.current);
       if (playerDamageNumberTimerRef.current)
         clearTimeout(playerDamageNumberTimerRef.current);
+      if (pendingAttackTimerRef.current)
+        clearTimeout(pendingAttackTimerRef.current);
     };
   }, []);
 
@@ -160,10 +213,56 @@ export function CombatQuestionCard({
     reset();
     setValue("");
     valueRef.current = "";
+    setDialogueDone(false); // hold the timer until this new question's typewriter finishes
   }, [question._id, reset]);
+
+  // Whether the AI dialogue typewriter has finished — controls when
+  // the timer ring is allowed to start counting (product request:
+  // "timer starts after AI completes the question").
+  const [dialogueDone, setDialogueDone] = useState(false);
+
+  // Auto-scroll the textarea into view as soon as the dialogue
+  // finishes typing. Users kept missing the answer box below the
+  // fold and thought the panel was cut off (product report:
+  // "i cant scroll and find the type box to answer").
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (!dialogueDone) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    const t = window.setTimeout(() => {
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        /* older browsers — no-op */
+      }
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [dialogueDone, question._id]);
 
   const handleSubmitClick = useCallback(() => {
     if (isLocked) return;
+    // Fire an OPTIMISTIC persona attack + boss recoil the moment the
+    // user commits to the answer. This gives instant feedback while the
+    // AI evaluates (usually 2-3s). Once the server responds and the
+    // real HP delta comes in, the reactive logic above takes over and
+    // clears this state via setPendingAttack(false).
+    //
+    // Safety timeout is intentionally LONGER than the server p99
+    // round-trip. Previously this was 1500ms, but the server usually
+    // takes 2-3s to score an answer — the safety timer was firing
+    // BEFORE the server responded, dropping the sprite back to "idle"
+    // and then remounting it as "hurt" a moment later when the real
+    // reaction landed. That's the "hurt → pause → hurt again" glitch.
+    // 8s is long enough that in a normal round the reactive useEffect
+    // above always clears pendingAttack first; the timer only fires as
+    // a safety net if the mutation genuinely never resolves.
+    setPendingAttack(true);
+    if (pendingAttackTimerRef.current) clearTimeout(pendingAttackTimerRef.current);
+    pendingAttackTimerRef.current = setTimeout(
+      () => setPendingAttack(false),
+      8000,
+    );
     onSubmit(valueRef.current, snapshot());
   }, [isLocked, onSubmit, snapshot]);
 
@@ -173,8 +272,18 @@ export function CombatQuestionCard({
 
   const onKeyDownComposite = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Stop Phaser (which listens on window for WASD/arrow/E) from
+      // hijacking keystrokes when the user is typing an answer. Same
+      // fix we applied to the wizard textareas — without this,
+      // pressing "a"/"w"/"s"/"d"/"e" moves the persona on the map
+      // behind this modal instead of typing into the answer box.
+      e.stopPropagation();
       handlers.onKeyDown(e);
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !isLocked) {
+      // Plain Enter submits (Shift+Enter still inserts a newline for
+      // multi-line answers). Cmd/Ctrl+Enter also submits — belt and
+      // suspenders. Product asked for one-key submit + hide the
+      // "Cmd/Ctrl + Enter" hint from the UI.
+      if (e.key === "Enter" && !e.shiftKey && !isLocked) {
         e.preventDefault();
         handleSubmitClick();
       }
@@ -184,153 +293,142 @@ export function CombatQuestionCard({
 
   return (
     <div className="relative w-full">
-      {/* Full-panel red flash when the player takes damage (counter-attack). */}
-      <AnimatePresence>
-        {playerHurt && (
-          <motion.div
-            key="player-hurt"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.55, 0] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, times: [0, 0.25, 1] }}
-            className="pointer-events-none absolute -inset-2 z-30 bg-red-500/40 mix-blend-overlay"
-          />
-        )}
-      </AnimatePresence>
+      {/* Full-panel red flash removed — the Pixellab persona HURT
+          clip already conveys the counter-attack. Layering a big red
+          scrim over the whole panel on top of the sprite was reading
+          as an extra unrelated animation. */}
 
-      {/* Title bar — matches the "RETLIFY: BOSS CHALLENGE" header in the mockup. */}
-      <div className="mb-4 flex items-center gap-2 border-2 border-emerald-400 bg-black px-4 py-2">
+      {/* Title bar — shows the founder's actual venture/idea name
+          followed by "BOSS CHALLENGE" (per product feedback: "the
+          most top should be like the old one only with the idea
+          title"). Extra top padding clears the tutorial progress
+          bar which sits at top-16 above the panel. */}
+      <div
+        className="mb-4 flex items-center justify-center gap-2 bg-black px-4 py-2"
+        style={{ marginTop: "3.25rem" }}
+      >
         <span className="text-base text-emerald-400">📍</span>
         <span
-          className="font-mono text-sm font-black uppercase tracking-widest text-emerald-300"
+          className="min-w-0 truncate font-mono text-sm font-black uppercase tracking-widest text-emerald-300"
           style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+          title={ideaTitle ?? undefined}
         >
-          RETLIFY:&nbsp;&nbsp;BOSS CHALLENGE
+          {ideaTitle && ideaTitle.trim().length > 0 ? ideaTitle : "Your Venture"}
+          :&nbsp;&nbsp;BOSS CHALLENGE
         </span>
       </div>
 
-      {/* Main 2-column layout: arena + sidebar */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
-        {/* ── LEFT COLUMN — arena + dialogue + actions ── */}
-        <div className="flex flex-col gap-3">
-          {/* HP cards row */}
-          <motion.div
-            className="grid grid-cols-2 gap-3"
-            animate={
-              playerHurt
-                ? { x: [0, -6, 6, -4, 4, 0] }
-                : { x: 0 }
-            }
-            transition={{ duration: 0.4, ease: "easeOut" }}
-          >
-            <HpCard
-              role="player"
-              label="You"
-              sub="Lv 1"
-              current={playerHpCurrent}
-              initial={playerHpInitial}
-            />
-            <HpCard
-              role="boss"
-              label="Doubt Imp"
-              sub={
-                question.persona === "villain" ? "The Skeptic" : "The Mentor"
+      {/* Single-column layout — sidebar removed per product request. */}
+      <div className="flex flex-col gap-3">
+        {/* Timer BAR — horizontal, professional layout. Sits above
+            the arena. Only starts once (a) a REAL question is loaded
+            (not the "transition" placeholder shown while the next
+            question is being generated), AND (b) the AI dialogue
+            typewriter has finished — otherwise the user watches
+            their timer tick down while they're still reading the
+            question. Prefixed with a "TIMER" label per product request. */}
+        <div className="flex items-center gap-3">
+          {/* Pixel hourglass — icon alone (label dropped per product).
+              Bar fill itself signals green→yellow→red urgency. */}
+          <PixelIcon
+            name="hourglass-blue"
+            size={22}
+            alt="Timer"
+            className="shrink-0"
+          />
+          <div className="flex-1">
+            <CombatTimerBar
+              servedAt={question.servedAt}
+              durationMs={Math.max(240_000, question.durationMs)}
+              onExpire={handleExpire}
+              enabled={
+                dialogueDone &&
+                // Reject the placeholder question that we synthesize
+                // while waiting for the server's next real question.
+                // Its _id is the sentinel string "transition" (set in
+                // PhaseSwitch's fallback), so we key off that.
+                (question._id as unknown as string) !== "transition"
               }
-              current={bossHpCurrent}
-              initial={bossHpInitial}
             />
-          </motion.div>
-
-          {/* Battle scene */}
-          <BattleScene
-            persona={question.persona}
-            bossReaction={bossReaction}
-            playerHurt={playerHurt}
-          />
-
-          {/* Question count chip above dialogue */}
-          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-white/60">
-            <span>
-              Question {questionsAnsweredCount + 1} / {totalQuestions}
-            </span>
-            <PersonaChip persona={question.persona} />
-          </div>
-
-          {/* Dialogue box */}
-          <ReactiveDialogueShell
-            bossReaction={bossReaction}
-            bossDamage={bossDamage}
-            playerDamage={playerDamage}
-          >
-            <DialoguePanel persona={question.persona} prompt={question.prompt} />
-          </ReactiveDialogueShell>
-
-          {/* Answer textarea */}
-          <textarea
-            aria-label="Your answer"
-            className="min-h-[120px] w-full resize-y border-2 border-white/30 bg-black p-3 font-mono text-sm leading-relaxed text-white outline-none focus:border-white disabled:opacity-60"
-            placeholder="Type your answer to defeat the boss…"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onPaste={handlers.onPaste}
-            onKeyDown={onKeyDownComposite}
-            disabled={isLocked}
-            spellCheck={false}
-          />
-
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-mono text-white/40">
-              Cmd/Ctrl + Enter to submit
-            </span>
-            <button
-              type="button"
-              onClick={handleSubmitClick}
-              disabled={isLocked}
-              className="border-2 border-white bg-black px-6 py-2 font-mono text-xs uppercase tracking-wider text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ fontFamily: "var(--font-pixel-display), monospace" }}
-            >
-              Submit Answer
-            </button>
           </div>
         </div>
 
-        {/* ── RIGHT COLUMN — sidebar with objective, score, timer, answer preview ── */}
-        <aside className="flex flex-col gap-3">
-          <SidebarSection title="Objective" color="rose">
-            <p className="text-xs leading-relaxed text-white/85">
-              Defeat the boss by validating your startup answer with concrete,
-              specific reasoning.
-            </p>
-          </SidebarSection>
+        {/* Battle scene — HP bars are rendered UNDER each character
+            inside BattleScene now (platforms removed per product
+            request). */}
+        <BattleScene
+          persona={question.persona}
+          bossReaction={bossReaction}
+          playerHurt={playerHurt}
+          pendingAttack={pendingAttack}
+          bossAsset={boss?.idleAsset ?? null}
+          checkpointIndex={boss?.checkpointIndex ?? null}
+          founderAsset={founderAsset}
+          playerHpCurrent={playerHpCurrent}
+          playerHpInitial={playerHpInitial}
+          bossHpCurrent={bossHpCurrent}
+          bossHpInitial={bossHpInitial}
+          bossName={boss?.name ?? "Doubt Imp"}
+        />
 
-          <SidebarSection title="Damage Dealt" color="amber">
-            <div className="flex items-baseline gap-2">
-              <span className="text-amber-300">⚔</span>
-              <span
-                className="font-mono text-2xl font-black text-emerald-300"
-                style={{ fontFamily: "var(--font-pixel-display), monospace" }}
-              >
-                {Math.max(0, bossHpInitial - bossHpCurrent)}
-              </span>
-              <span className="font-mono text-xs text-white/60">
-                / {bossHpInitial}
-              </span>
-            </div>
-          </SidebarSection>
+        {/* Dialogue box */}
+        <ReactiveDialogueShell
+          bossReaction={bossReaction}
+          bossDamage={bossDamage}
+          playerDamage={playerDamage}
+        >
+          <DialoguePanel
+            persona={question.persona}
+            prompt={question.prompt}
+            onDone={() => setDialogueDone(true)}
+          />
+        </ReactiveDialogueShell>
 
-          <SidebarSection title="Time Left" color="rose">
-            <div className="flex items-center justify-center">
-              <CombatRing
-                servedAt={question.servedAt}
-                durationMs={question.durationMs}
-                onExpire={handleExpire}
-                size={88}
-                strokeWidth={6}
-              />
-            </div>
-          </SidebarSection>
+        {/* Answer textarea */}
+        {/* Copy / paste / cut / right-click BLOCKED per product
+            request — see earlier task. */}
+        <textarea
+          ref={textareaRef}
+          aria-label="Your answer"
+          className="min-h-[120px] w-full resize-y bg-black p-3 font-mono text-sm leading-relaxed text-white outline-none disabled:opacity-60"
+          placeholder="Type your answer to defeat the boss…"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onPaste={(e) => {
+            e.preventDefault();
+            handlers.onPaste(e);
+          }}
+          onCopy={(e) => e.preventDefault()}
+          onCut={(e) => e.preventDefault()}
+          onContextMenu={(e) => e.preventDefault()}
+          onDrop={(e) => e.preventDefault()}
+          onKeyDown={onKeyDownComposite}
+          // Belt-and-suspenders: some browsers dispatch KEYUP/KEYPRESS
+          // events to Phaser via document listeners even when KEYDOWN
+          // is stopped at the React root. Stop them here too so WASD/E
+          // never reach the map scene while the answer box is focused.
+          onKeyUp={(e) => e.stopPropagation()}
+          onKeyPress={(e) => e.stopPropagation()}
+          disabled={isLocked}
+          spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+        />
 
-        </aside>
+        <div className="flex items-center justify-end text-xs">
+          {/* "Cmd/Ctrl + Enter to attack" hint removed per product
+              request — plain Enter now submits, Attack button is
+              self-explanatory. */}
+          <button
+            type="button"
+            onClick={handleSubmitClick}
+            disabled={isLocked}
+            className="border-2 border-white bg-black px-6 py-2 font-mono text-xs uppercase tracking-wider text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+            style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+          >
+            Attack
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -339,6 +437,102 @@ export function CombatQuestionCard({
 // ─────────────────────────────────────────────────────────────────────
 // Sub-components for the mockup layout
 // ─────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────
+// Horizontal timer bar — replaces the circular CombatRing at the top
+// of the panel for a cleaner, more professional layout. Wall-clock
+// driven so tab-hide doesn't skew the countdown. Holds full when
+// `enabled` is false (used to pause the clock while the AI's
+// dialogue is still typing).
+// ─────────────────────────────────────────────────────────────────────
+function CombatTimerBar({
+  servedAt,
+  durationMs,
+  onExpire,
+  enabled = true,
+}: {
+  servedAt: number;
+  durationMs: number;
+  onExpire: () => void;
+  enabled?: boolean;
+}) {
+  const anchorRef = useRef<number>(Date.now());
+  const lastServedRef = useRef<number>(servedAt);
+  const lastEnabledRef = useRef<boolean>(enabled);
+  if (lastServedRef.current !== servedAt) {
+    anchorRef.current = Date.now();
+    lastServedRef.current = servedAt;
+  }
+  if (lastEnabledRef.current !== enabled) {
+    if (enabled) anchorRef.current = Date.now();
+    lastEnabledRef.current = enabled;
+  }
+  const [remainingMs, setRemainingMs] = useState(() => durationMs);
+  const expiredRef = useRef(false);
+
+  // Keep onExpire in a ref so this timer's setInterval effect isn't
+  // torn down every time the parent re-creates the callback (which
+  // was making the bar only tick when the user typed — every
+  // keystroke re-rendered the parent, gave us a fresh onExpire, and
+  // that was the only chance the effect had to run its interval
+  // once).
+  const expireRef = useRef(onExpire);
+  useEffect(() => {
+    expireRef.current = onExpire;
+  }, [onExpire]);
+
+  useEffect(() => {
+    expiredRef.current = false;
+    if (!enabled) {
+      setRemainingMs(durationMs);
+      return;
+    }
+    // Kick an immediate tick + install a 100ms interval that runs
+    // independently of React render cycles / rAF availability.
+    const tick = () => {
+      const remain = Math.max(0, anchorRef.current + durationMs - Date.now());
+      setRemainingMs(remain);
+      if (remain <= 0) {
+        window.clearInterval(id);
+        if (!expiredRef.current) {
+          expiredRef.current = true;
+          expireRef.current();
+        }
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 100);
+    return () => window.clearInterval(id);
+    // NOTE: onExpire deliberately NOT in deps — it's read through
+    // expireRef so the interval survives parent re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servedAt, durationMs, enabled]);
+
+  const fraction = durationMs > 0 ? remainingMs / durationMs : 0;
+  // Colour shifts as time runs low.
+  const fill =
+    fraction > 0.5 ? "#22C55E" : fraction > 0.2 ? "#EAB308" : "#EF4444";
+
+  return (
+    <div
+      role="timer"
+      aria-label="Time remaining for this question"
+      className="w-full"
+    >
+      <div className="relative h-2 w-full overflow-hidden bg-white/8 ring-1 ring-white/20">
+        <div
+          className="absolute inset-y-0 left-0"
+          style={{
+            width: `${Math.max(0, fraction * 100)}%`,
+            background: fill,
+            boxShadow: `0 0 6px ${fill}66`,
+            transition: "width 120ms linear, background 300ms ease",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function HpCard({
   role,
@@ -520,16 +714,26 @@ function SidebarSection({
 function DialoguePanel({
   persona,
   prompt,
+  onDone,
 }: {
   persona: "villain" | "mentor";
   prompt: string;
+  /** Called once when the typewriter finishes typing this prompt. Used
+   *  to release the timer ring so it only starts counting AFTER the
+   *  question is fully visible. */
+  onDone?: () => void;
 }) {
   const typedPrompt = useTypewriter(prompt, 22); // ~45 chars per second
   const isTyping = typedPrompt.length < prompt.length;
+  const wasTypingRef = useRef(isTyping);
+  useEffect(() => {
+    if (wasTypingRef.current && !isTyping) {
+      onDone?.();
+    }
+    wasTypingRef.current = isTyping;
+  }, [isTyping, onDone]);
   return (
-    <div
-      className="flex items-start gap-4 border-2 border-white bg-black p-4"
-    >
+    <div className="flex items-start gap-4 bg-black p-4">
       <Portrait persona={persona} talking={isTyping} />
       <p
         className="flex-1 font-[var(--font-pixel-body)] text-base leading-relaxed text-white"
@@ -692,155 +896,598 @@ function PersonaChip({ persona }: { persona: "villain" | "mentor" }) {
  * over a procedural biome backdrop. Sprites react to hit / crit / counter
  * with shake + filter changes. No image assets.
  */
+/**
+ * Pick the biome-appropriate painted map to use as the combat backdrop.
+ * Inspects the boss's idle-asset path (`/assets/bosses/<biome>/...`) and
+ * returns the corresponding stage map.  Village → village-map, Forest
+ * (stage2) → forest-map, Harbor (stage3) → harbor-map, Artisans (stage4)
+ * → artisans-map.  Falls back to the neutral arena backdrop when the
+ * boss path is missing or unfamiliar.
+ */
+function deriveBiomeMap(bossAsset: string | null | undefined): string {
+  const fallback = "/assets/maps-v2/arena/arena-background.png";
+  if (!bossAsset) return fallback;
+  if (bossAsset.includes("/bosses/village/")) {
+    // Dedicated painted village combat backdrop. Falls back to the
+    // world-map render on 404 so combat is never broken.
+    return "/assets/combat/village-backdrop.png";
+  }
+  if (bossAsset.includes("/bosses/stage2/")) {
+    return "/assets/maps-v2/forest/forest-map.png";
+  }
+  if (bossAsset.includes("/bosses/stage3/")) {
+    return "/assets/maps-v2/golden-harbor/harbor-map.png";
+  }
+  if (bossAsset.includes("/bosses/stage4/")) {
+    return "/assets/maps-v2/artisans/artisans-map.png";
+  }
+  return fallback;
+}
+
+/**
+ * Biome-specific palette for the combat arena.  Instead of trying to
+ * repurpose the world map as a combat backdrop (which reads as "game
+ * screenshot" no matter how much you blur it), each biome gets a clean
+ * Pokemon-style two-plane arena: coloured sky gradient + ground plane
+ * + subtle silhouette horizon line.
+ *
+ * This is what "professional" looks like for a turn-based combat scene:
+ * nothing competes with the characters for attention.
+ */
+interface BiomePalette {
+  skyTop: string;
+  skyBottom: string;
+  ground: string;
+  groundShadow: string;
+  horizonSilhouette: string;
+  glow: string;
+}
+
+const BIOME_PALETTES: Record<string, BiomePalette> = {
+  village: {
+    // Dawn / dusk hour, cottage roofs on the horizon
+    skyTop: "#2a1e3d",
+    skyBottom: "#e88b56",
+    ground: "#3d5a3a",
+    groundShadow: "#1e2a1c",
+    horizonSilhouette: "#1a1523",
+    glow: "rgba(255,180,120,0.35)",
+  },
+  stage2: {
+    // Moonlit forest, misty blue-green
+    skyTop: "#0f1a2e",
+    skyBottom: "#4b6b70",
+    ground: "#1e2d1d",
+    groundShadow: "#0d1a0c",
+    horizonSilhouette: "#0a1219",
+    glow: "rgba(120,200,180,0.28)",
+  },
+  stage3: {
+    // Harbor at gold hour, ocean horizon
+    skyTop: "#1a2540",
+    skyBottom: "#f4b673",
+    ground: "#2c4a5c",
+    groundShadow: "#1a2a35",
+    horizonSilhouette: "#0f1a2a",
+    glow: "rgba(255,190,130,0.38)",
+  },
+  stage4: {
+    // Forge-lit workshop night, amber embers
+    skyTop: "#1a0d1c",
+    skyBottom: "#a83e1a",
+    ground: "#3a2418",
+    groundShadow: "#1c110a",
+    horizonSilhouette: "#0f0710",
+    glow: "rgba(255,130,60,0.42)",
+  },
+  fallback: {
+    skyTop: "#1e1e2e",
+    skyBottom: "#3d3d5c",
+    ground: "#2a2a3a",
+    groundShadow: "#15151f",
+    horizonSilhouette: "#0f0f18",
+    glow: "rgba(200,200,220,0.25)",
+  },
+};
+
+function biomePaletteFromBoss(bossAsset: string | null | undefined): BiomePalette {
+  if (!bossAsset) return BIOME_PALETTES.fallback;
+  if (bossAsset.includes("/bosses/village/")) return BIOME_PALETTES.village;
+  if (bossAsset.includes("/bosses/stage2/")) return BIOME_PALETTES.stage2;
+  if (bossAsset.includes("/bosses/stage3/")) return BIOME_PALETTES.stage3;
+  if (bossAsset.includes("/bosses/stage4/")) return BIOME_PALETTES.stage4;
+  return BIOME_PALETTES.fallback;
+}
+
+/**
+ * Per-biome CP focus points as (x%, y%) on the biome map.  Used to zoom
+ * the combat backdrop into the area around the specific checkpoint the
+ * boss is guarding, so the fight FEELS like it's happening at that
+ * location rather than on a generic wide map.
+ *
+ * Derived from CHECKPOINTS coords in the corresponding scene files
+ * divided by MAP_WIDTH/MAP_HEIGHT.
+ */
+const CP_FOCUS_MAP: Record<string, Array<{ x: number; y: number }>> = {
+  village: [
+    { x: 11.3, y: 21.0 },  // CP1 — The Signboard    (173,215)  / (1536,1024)
+    { x: 38.2, y: 61.8 },  // CP2 — The Bridge       (587,633)
+    { x: 76.6, y: 64.6 },  // CP3 — The Barn         (1177,662)
+    { x: 84.9, y: 31.7 },  // CP4 — The Well         (1304,325)
+  ],
+  stage2: [
+    // Forest (2304×1440) — 5 CPs
+    { x: 14.8, y: 62.5 },  // CP1 — West Threshold   (340,900)
+    { x: 33.9, y: 50.0 },  // CP2 — Whispering Grove (780,720)
+    { x: 52.1, y: 38.2 },  // CP3 — Moonlit Clearing (1200,550)
+    { x: 67.3, y: 69.4 },  // CP4 — Boss Glade       (1550,1000)
+    { x: 86.8, y: 33.3 },  // CP5 — East Exit        (2000,480)
+  ],
+  stage3: [
+    // The Arena (2624×1630) — 4 CPs · Validation stage per venture spec
+    { x: 10.7, y: 36.8 },  // CP1 — The Naming Post   (280, 600)
+    { x: 49.5, y: 49.1 },  // CP2 — The Sand          (1300, 800)
+    { x: 74.3, y: 25.8 },  // CP3 — The Judges' Bench (1950, 420)
+    { x: 86.9, y: 70.6 },  // CP4 — The Verdict Pillar (2280, 1150)
+  ],
+  stage5: [
+    // The Mine · Ironhold (2400×1600) — 6 CPs · Build & Deliver stage
+    { x: 11.3, y: 13.8 },  // CP1 — Mine Head       (270, 220)
+    { x: 76.3, y: 16.3 },  // CP2 — Tool Yard       (1830, 260)
+    { x: 25.0, y: 34.4 },  // CP3 — First Shaft     (600, 550)
+    { x: 54.2, y: 38.8 },  // CP4 — Support Beam    (1300, 620)
+    { x: 32.1, y: 61.3 },  // CP5 — Pilot Chamber   (770, 980)
+    { x: 76.3, y: 51.3 },  // CP6 — Loading Bay     (1830, 820)
+  ],
+  stage7: [
+    // The Crossroads Town (2400×1600) — 4 CPs · Iteration stage
+    { x: 20.8, y: 25.0 },  // CP1 — The Inn Yard         (500, 400)
+    { x: 38.3, y: 45.0 },  // CP2 — The Signpost         (920, 720)
+    { x: 60.4, y: 56.3 },  // CP3 — The Roadworks        (1450, 900)
+    { x: 29.2, y: 68.8 },  // CP4 — The Milestone Marker (700, 1100)
+  ],
+  stage6: [
+    // The Harbour (2612×1632) — 4 CPs · moved from stage 3 to stage 6
+    // to match the canonical venture spec (Launch = The Harbour).
+    { x: 14.5, y: 55.1 },  // CP1 — Dockside         (380,900)
+    { x: 40.2, y: 42.9 },  // CP2 — Market Square    (1050,700)
+    { x: 65.1, y: 70.5 },  // CP3 — Warehouse Dist   (1700,1150)
+    { x: 88.1, y: 31.9 },  // CP4 — Lighthouse Tip   (2300,520)
+  ],
+  stage4: [
+    // Artisans District (2624×1630) — 5 CPs
+    { x: 16.0, y: 58.3 },  // CP1 — Craft Workshop   (420,950)
+    { x: 34.3, y: 44.2 },  // CP2 — Weaver's Alley   (900,720)
+    { x: 51.4, y: 30.7 },  // CP3 — Potter's Kiln    (1350,500)
+    { x: 72.4, y: 67.5 },  // CP4 — Jeweller's Row   (1900,1100)
+    { x: 91.5, y: 29.4 },  // CP5 — Master's Forge   (2400,480)
+  ],
+};
+
+function biomeKeyFromBossAsset(bossAsset: string | null | undefined):
+  keyof typeof CP_FOCUS_MAP | null {
+  if (!bossAsset) return null;
+  if (bossAsset.includes("/bosses/village/")) return "village";
+  if (bossAsset.includes("/bosses/stage2/")) return "stage2";
+  // Harbor bosses live under /bosses/stage3/ on disk (legacy folder
+  // naming) but the biome is now Stage 6 · The Harbour in the spec.
+  // Route their focus to the stage6 CP map instead of stage3.
+  if (bossAsset.includes("/bosses/stage3/")) return "stage6";
+  if (bossAsset.includes("/bosses/stage4/")) return "stage4";
+  return null;
+}
+
+/** Compute the background-position + zoom to focus a specific CP. */
+function focusForCheckpoint(
+  bossAsset: string | null | undefined,
+  checkpointIndex: number | null | undefined,
+): { positionX: string; positionY: string; size: string } {
+  const biome = biomeKeyFromBossAsset(bossAsset);
+  const cps = biome ? CP_FOCUS_MAP[biome] : null;
+  const cp = cps && typeof checkpointIndex === "number" ? cps[checkpointIndex] : null;
+  if (!cp) {
+    // No CP focus available — default to centered arena crop
+    return { positionX: "50%", positionY: "50%", size: "cover" };
+  }
+  // Zoom in on the CP by using a larger background-size and positioning
+  // by the CP's (x%, y%).  180% size ≈ 1.8× zoom which frames the area
+  // around a CP with more surrounding context — the wider view gives
+  // more sense of the biome without turning into a full-map screenshot.
+  return {
+    positionX: `${cp.x}%`,
+    positionY: `${cp.y}%`,
+    size: "180%",
+  };
+}
+
 function BattleScene({
   persona,
   bossReaction,
   playerHurt,
+  pendingAttack = false,
+  bossAsset = null,
+  checkpointIndex = null,
+  founderAsset = null,
+  playerHpCurrent = 10,
+  playerHpInitial = 10,
+  bossHpCurrent = 10,
+  bossHpInitial = 10,
+  bossName = "",
 }: {
   persona: "villain" | "mentor";
   bossReaction: "idle" | "hit" | "crit" | "counter" | "block";
   playerHurt: boolean;
+  /** Optimistic persona pre-swing fired the moment the user submits.
+   *  Bridges the 2-3s server round-trip with instant visual feedback. */
+  pendingAttack?: boolean;
+  bossAsset?: string | null;
+  checkpointIndex?: number | null;
+  founderAsset?: string | null;
+  playerHpCurrent?: number;
+  playerHpInitial?: number;
+  bossHpCurrent?: number;
+  bossHpInitial?: number;
+  bossName?: string;
 }) {
+  // Zoom the painted biome map into the specific CP the boss guards
+  // so the arena reads as "this exact location."
+  const focus = focusForCheckpoint(bossAsset, checkpointIndex);
+
+  // Extract the personaId from the founder asset path so the animated
+  // sprite can load the correct persona's spritesheet family. Example:
+  // "/assets/personas/arcanist/portrait.png" → "arcanist".
+  const personaIdForSprite = useMemo<PersonaId | null>(() => {
+    if (!founderAsset) return null;
+    const m = founderAsset.match(/\/personas\/([^/]+)\//);
+    if (!m) return null;
+    const p = getPersona(m[1] as PersonaId);
+    return p.extended ? (m[1] as PersonaId) : null;
+  }, [founderAsset]);
+
+  // ── Endgame outcome ────────────────────────────────────────────────
+  // When either HP reaches 0, the round is decided. We derive an
+  // `outcome` here so the arena can pivot immediately to a
+  // winner-centered VICTORY loop before the outer PhaseSwitch
+  // transitions to the settled result screen. This gives users a
+  // couple of seconds of celebration/dominance in-scene.
+  const outcome: "active" | "won" | "lost" =
+    bossHpCurrent <= 0 && playerHpCurrent > 0
+      ? "won"
+      : playerHpCurrent <= 0
+        ? "lost"
+        : "active";
+
+  // ── Two-stage cinematic ────────────────────────────────────────────
+  // Stage 1 (0-1500ms after HP hits 0): both sprites stay in place,
+  //   LOSER plays DEFEAT one-shot (kneels / crumbles / dies).
+  // Stage 2 (1500ms+): LOSER fades out, WINNER glides to arena center
+  //   and plays VICTORY on loop until the outer buffer expires.
+  const DEFEAT_STAGE_MS = 1500;
+  const [cinematicStage, setCinematicStage] = useState<
+    "none" | "defeat" | "cheer"
+  >("none");
+  useEffect(() => {
+    if (outcome === "active") {
+      setCinematicStage("none");
+      return;
+    }
+    // Just entered an outcome — start with DEFEAT.
+    setCinematicStage("defeat");
+    const t = window.setTimeout(() => setCinematicStage("cheer"), DEFEAT_STAGE_MS);
+    return () => window.clearTimeout(t);
+  }, [outcome]);
   return (
     <div
-      className="relative h-56 w-full overflow-hidden border-2 border-white"
+      className="relative h-52 w-full overflow-hidden border-2 border-white sm:h-56"
       style={{ imageRendering: "pixelated" }}
     >
-      <BiomeBackdrop />
+      {/* ── Atmospheric backdrop — 4 stacked layers ─────────────────
+          1. Village map heavily BLURRED so it reads as village-themed
+             ATMOSPHERE, not as the literal map with UI markers visible
+          2. Sky gradient overlay at top for depth
+          3. Family-tinted radial vignette for corruption vibe
+          4. Ground plane at bottom with soft horizon so characters
+             have something to stand on
+      ─────────────────────────────────────────────────────────────── */}
 
-      {/* Boss sprite — right side, faces left */}
-      <motion.div
-        className="absolute right-12 top-1/2 -translate-y-1/2"
-        animate={
-          bossReaction === "hit"
-            ? { x: [0, -8, 8, -4, 4, 0], filter: ["brightness(1)", "brightness(1.6)", "brightness(1)"] }
-            : bossReaction === "crit"
-              ? {
-                  x: [0, -14, 14, -10, 10, 0],
-                  rotate: [0, -5, 5, -3, 3, 0],
-                  scale: [1, 1.1, 1],
-                  filter: ["brightness(1)", "brightness(2) drop-shadow(0 0 18px #fb7185)", "brightness(1)"],
-                }
-              : bossReaction === "counter"
-                ? {
-                    x: [0, -28, -8, -16],
-                    filter: ["brightness(1)", "brightness(1.5) drop-shadow(0 0 12px #ef4444)", "brightness(1)"],
-                  }
-                : bossReaction === "block"
-                  ? {
-                      x: [0, -2, 2, 0],
-                      filter: ["brightness(1)", "brightness(0.8) drop-shadow(0 0 12px #60a5fa)", "brightness(1)"],
-                    }
-                  : { y: [0, -3, 0] }
-        }
-        transition={
-          bossReaction === "idle"
-            ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
-            : { duration: bossReaction === "crit" ? 0.7 : 0.55, ease: "easeOut" }
-        }
+      {/* ── Original painted map as backdrop ──────────────────────────
+          Show the actual biome map (village/forest/harbor/artisans)
+          zoomed into the CP the boss guards.  Subtle darkening only —
+          no heavy blur, no fake sky/ground planes — so the map reads
+          clearly as its intended location.
+      ──────────────────────────────────────────────────────────────── */}
+
+      {/* 1. The painted map itself, zoomed to the CP focus point.
+             For Village specifically we layer the dedicated combat
+             painting on top of the world-map fallback — if the
+             painting isn't dropped in yet, the world-map shows
+             through untouched, so combat is never broken.
+
+             Village combat backdrop uses `cover` (no distortion) with
+             `center 35%` positioning so the interesting parts — house,
+             waterfall, bridge, bench — sit in the visible band, and
+             the empty foreground dirt path is what gets cropped. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: bossAsset?.includes("/bosses/village/")
+            ? `url(/assets/combat/village-backdrop.png), url(/assets/maps-v2/village-painted/village-map.png)`
+            : `url(${deriveBiomeMap(bossAsset)})`,
+          backgroundSize: bossAsset?.includes("/bosses/village/")
+            ? "cover, cover"
+            : focus.size,
+          backgroundPosition: bossAsset?.includes("/bosses/village/")
+            ? "center 35%, center 35%"
+            : `${focus.positionX} ${focus.positionY}`,
+          backgroundRepeat: "no-repeat, no-repeat",
+          filter: "brightness(0.78) saturate(0.95)",
+        }}
+      />
+
+      {/* 2. Radial vignette — subtle so the map stays fully visible */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.45) 100%)",
+        }}
+      />
+
+      {/* 3. Bottom shade — grounds the characters, adds visual weight */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-20"
+        style={{
+          background:
+            "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.45) 100%)",
+        }}
+      />
+
+      {/* 4. Feather-light scanlines for combat texture */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.08]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(255,255,255,0.3) 3px, transparent 4px)",
+        }}
+      />
+
+      {/* Platforms REMOVED per product request. HP bars now sit
+          under each character (rendered below the sprite blocks). */}
+
+      {/* Founder HP bar — same left anchor as the sprite (left-8 / sm:left-16)
+          and same width as the sprite (100px), so it sits directly
+          beneath the founder without floating left or right. */}
+      <div
+        className="pointer-events-none absolute bottom-2 left-8 z-10 sm:bottom-3 sm:left-16"
+        style={{ width: 200 }}
       >
-        <BossSprite persona={persona} />
-      </motion.div>
+        <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-widest text-white/85">
+          <span>You</span>
+          <span className="tabular-nums text-white/60">
+            {Math.max(0, Math.round(playerHpCurrent))}/{playerHpInitial}
+          </span>
+        </div>
+        <div className="relative mt-1 h-2 w-full bg-black/70 ring-1 ring-white/30">
+          <div
+            className="absolute inset-y-0 left-0"
+            style={{
+              width: `${
+                playerHpInitial > 0
+                  ? Math.max(0, playerHpCurrent / playerHpInitial) * 100
+                  : 0
+              }%`,
+              background: "#22C55E",
+              transition: "width 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Boss HP bar — right anchor matches the sprite (right-8 / sm:right-16)
+          and width matches the sprite's visible art (~200px inside its
+          300px slot). Sits directly beneath the boss. */}
+      <div
+        className="pointer-events-none absolute bottom-2 right-8 z-10 sm:bottom-3 sm:right-16"
+        style={{ width: 200 }}
+      >
+        <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-widest text-white/85">
+          <span className="truncate pr-2">{bossName}</span>
+          <span className="tabular-nums text-white/60">
+            {Math.max(0, Math.round(bossHpCurrent))}/{bossHpInitial}
+          </span>
+        </div>
+        <div className="relative mt-1 h-2 w-full bg-black/70 ring-1 ring-white/30">
+          <div
+            className="absolute inset-y-0 left-0"
+            style={{
+              width: `${
+                bossHpInitial > 0
+                  ? Math.max(0, bossHpCurrent / bossHpInitial) * 100
+                  : 0
+              }%`,
+              background: "#EF4444",
+              transition: "width 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Boss sprite — right side, faces left. Positioned so both feet
+          rest on the ground shadow line, scaled to feel present against
+          the arena backdrop. */}
+      {/* Boss placement ~2cm lower per product request — negative
+          bottom drops the sprite so its feet sit below the arena's
+          fake ground line. */}
+      {/*
+        ENDGAME BEAT
+        ─────────────────────────────────────────────────────────────
+        The instant HP on either side hits 0 we swap the arena into
+        an endgame layout: the LOSER fades out entirely, the WINNER
+        translates to the center of the arena and plays VICTORY on
+        loop until the round transitions to the settled phase.
+
+        `outcome`:
+          "active" → regular side-by-side combat
+          "won"    → player HP > 0, boss HP == 0 → alchemist cheers
+          "lost"   → player HP == 0             → fog dominates
+      */}
+      {/* Static wrapper — the framer-motion shake/lunge/brightness
+          animations were removed so the Pixellab spritesheet clips
+          (idle / attack / hurt / defeat / victory) are the ONLY source
+          of boss motion. Previously both systems ran in parallel and
+          the framer overlay outlived the sprite clip, which read as a
+          second "phantom" animation replaying the old motion. */}
+      <div
+        className="absolute right-8 sm:right-16"
+        style={{
+          bottom: "-40px",
+          // CINEMATIC LAYOUT
+          // - defeat stage: both sprites stay, loser is animated in-place
+          // - cheer stage: loser (opacity 0) is gone, winner moved to center
+          // - won → boss is the loser; lost → boss is the winner
+          opacity:
+            cinematicStage === "cheer" && outcome === "won" ? 0 : 1,
+          transform:
+            cinematicStage === "cheer" && outcome === "lost"
+              ? "translateX(calc(-50vw + 50%)) scale(1.15)"
+              : undefined,
+          transition:
+            "opacity 500ms ease-out, transform 700ms cubic-bezier(0.4, 0, 0.2, 1)",
+          pointerEvents:
+            cinematicStage === "cheer" && outcome === "won" ? "none" : undefined,
+        }}
+      >
+        {/* Real boss sprite from village-bosses config, falls back to
+            the procedural BossSprite if the asset failed to load.
+            NOTE: some boss idle assets (Fog of Vagueness) are now
+            9-frame HORIZONTAL spritesheets from Pixellab, not single
+            images. Rendering the whole sheet as <img> would show 9
+            small silhouettes in a row. We paint the sheet as a CSS
+            background clipped to the first frame (92×92 within a
+            828×92 sheet) and scale it up to 300×300 for display. */}
+        {bossAsset ? (
+          <BossSpriteFromAsset
+            bossAsset={bossAsset}
+            // Endgame-first: on WIN, boss's opacity has already gone
+            // to 0 above so this state doesn't matter (boss faded out
+            // — but we still send "defeat" for parity in case of
+            // transition frames). On LOSS, boss loops VICTORY as the
+            // dominating pose.
+            // Otherwise regular reactive combat mapping:
+            //   Player attacked → boss shows HURT (real HP hit).
+            //   Boss counter → boss shows ATTACK.
+            //   Optimistic pending-attack → boss shows HURT too.
+            //   BLOCK / idle → idle breathing loop.
+            state={
+              // Cinematic staging:
+              // - won → boss LOSES → DEFEAT then held while faded out
+              // - lost → boss WINS → wait through defeat stage in idle,
+              //                       then VICTORY loop when at center
+              outcome === "won"
+                ? "defeat"
+                : outcome === "lost"
+                  ? cinematicStage === "cheer"
+                    ? "victory"
+                    : "idle"
+                  : bossReaction === "hit" || bossReaction === "crit"
+                    ? "hurt"
+                    : bossReaction === "counter"
+                      ? "attack"
+                      : pendingAttack
+                        ? "hurt"
+                        : "idle"
+            }
+          />
+        ) : (
+          <BossSprite persona={persona} />
+        )}
+      </div>
 
       {/* Player character sprite — left side, faces right.
           When the boss takes damage (HIT/CRIT), the player lunges
           forward to "attack" so the damage looks earned. When the
           player takes damage (COUNTER), the player flinches red and
           shakes. */}
-      <motion.div
-        className="absolute left-12 bottom-6"
-        animate={
-          playerHurt
-            ? {
-                x: [0, -4, 4, -2, 2, 0],
-                filter: [
-                  "brightness(1)",
-                  "brightness(0.5) hue-rotate(320deg)",
-                  "brightness(1)",
-                ],
-              }
-            : bossReaction === "crit"
-              ? {
-                  // Big lunge forward for a critical hit.
-                  x: [0, 60, 80, 30, 0],
-                  y: [0, -8, -4, 0, 0],
-                  scale: [1, 1.12, 1.08, 1, 1],
-                  rotate: [0, 4, 2, 0, 0],
-                  filter: [
-                    "brightness(1)",
-                    "brightness(1.5) drop-shadow(0 0 8px #fde047)",
-                    "brightness(1.2)",
-                    "brightness(1)",
-                    "brightness(1)",
-                  ],
-                }
-              : bossReaction === "hit"
-                ? {
-                    // Standard hit — short forward lunge.
-                    x: [0, 30, 40, 10, 0],
-                    y: [0, -4, 0, 0, 0],
-                    scale: [1, 1.06, 1.04, 1, 1],
-                    filter: [
-                      "brightness(1)",
-                      "brightness(1.3)",
-                      "brightness(1)",
-                      "brightness(1)",
-                      "brightness(1)",
-                    ],
-                  }
-                : bossReaction === "block"
-                  ? {
-                      // Parry stance — small step forward, then back.
-                      x: [0, 12, -2, 0],
-                      filter: [
-                        "brightness(1)",
-                        "brightness(1.1) drop-shadow(0 0 6px #60a5fa)",
-                        "brightness(1)",
-                      ],
-                    }
-                  : { y: [0, -2, 0] }
-        }
-        transition={
-          playerHurt
-            ? { duration: 0.45, ease: "easeOut" }
-            : bossReaction === "crit"
-              ? { duration: 0.75, ease: "easeOut" }
-              : bossReaction === "hit"
-                ? { duration: 0.55, ease: "easeOut" }
-                : bossReaction === "block"
-                  ? { duration: 0.5, ease: "easeOut" }
-                  : { duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.4 }
-        }
+      {/* CINEMATIC LAYOUT
+         - defeat stage: persona stays in place; if losing, plays DEFEAT clip
+         - cheer stage: loser fades to opacity 0; winner slides to center
+                        and loops VICTORY */}
+      <div
+        className="absolute left-8 bottom-8 sm:left-16 sm:bottom-12"
+        style={{
+          opacity:
+            cinematicStage === "cheer" && outcome === "lost" ? 0 : 1,
+          transform:
+            cinematicStage === "cheer" && outcome === "won"
+              ? "translateX(calc(50vw - 50%)) scale(1.15)"
+              : undefined,
+          transition:
+            "opacity 500ms ease-out, transform 700ms cubic-bezier(0.4, 0, 0.2, 1)",
+          pointerEvents:
+            cinematicStage === "cheer" && outcome === "lost" ? "none" : undefined,
+        }}
       >
-        <PlayerSprite />
-      </motion.div>
-
-      {/* Slash effect — appears between player and boss during attacks */}
-      <AnimatePresence>
-        {(bossReaction === "hit" || bossReaction === "crit") && (
-          <motion.div
-            key={`slash-${bossReaction}`}
-            initial={{ opacity: 0, scale: 0.5, x: 120 }}
-            animate={{
-              opacity: [0, 1, 0],
-              scale: bossReaction === "crit" ? [0.5, 2, 2.5] : [0.5, 1.4, 1.6],
-              x: [120, 200, 240],
-            }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-black"
+        {/* Founder — animated Pixellab spritesheet for the alchemist
+            (idle + attack + hurt) so the character actually reacts to
+            each answer. Falls back to the legacy static portrait for
+            non-alchemist personas (which still render as a
+            transparent-background image). Fallback fallback: the
+            procedural PlayerSprite when no asset is available.
+            State mapping mirrors the boss above: player took damage →
+            HURT one-shot; player landed a hit → ATTACK one-shot;
+            otherwise → IDLE breathing loop. */}
+        {founderAsset && personaIdForSprite ? (
+          <AnimatedPersonaSprite
+            personaId={personaIdForSprite}
+            state={
+              // Cinematic staging (matches boss above):
+              // - lost → persona LOSES → DEFEAT clip during defeat stage
+              //          then held while faded out
+              // - won  → persona WINS → wait through defeat stage in idle,
+              //          then VICTORY loop when at center
+              outcome === "lost"
+                ? "defeat"
+                : outcome === "won"
+                  ? cinematicStage === "cheer"
+                    ? "victory"
+                    : "idle"
+                  : playerHurt
+                    ? "hurt"
+                    : bossReaction === "hit" || bossReaction === "crit"
+                      ? "attack"
+                      : pendingAttack
+                        ? "attack"
+                        : "idle"
+            }
+          />
+        ) : founderAsset ? (
+          <div
+            role="img"
+            aria-label="Founder"
             style={{
-              filter: bossReaction === "crit"
-                ? "drop-shadow(0 0 16px #fde047) drop-shadow(0 0 8px #fb7185)"
-                : "drop-shadow(0 0 10px #fbbf24)",
-              color: bossReaction === "crit" ? "#fde047" : "#fbbf24",
+              width: 100,
+              height: 140,
+              backgroundImage: `url(${founderAsset})`,
+              backgroundPosition: "center bottom",
+              backgroundSize: "contain",
+              backgroundRepeat: "no-repeat",
+              imageRendering: "pixelated",
+              filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.7))",
             }}
-            aria-hidden
-          >
-            ⚔
-          </motion.div>
+          />
+        ) : (
+          <PlayerSprite />
         )}
-      </AnimatePresence>
+      </div>
+
+      {/* (Platforms are declared above the sprite blocks for correct
+          z-order — see the "Stone combat platforms" section earlier. */}
+
+      {/* Slash overlay + damage-number popup removed — the Pixellab
+          persona attack clip + boss hurt clip now carry the entire
+          "I hit them" beat. Layered emoji slashes and yellow shakes
+          were competing with the sprite animation and reading as a
+          second, phantom animation. */}
 
       {/* Ground line */}
       <div
@@ -1075,6 +1722,286 @@ function SnowParticles() {
         />
       ))}
     </>
+  );
+}
+
+/**
+ * Generic Pixellab spritesheet player — paints a horizontal N-frame sheet
+ * as an animated CSS background, cycling through frames via `steps(N)`
+ * keyframe animation. Handles both LOOPING idles and ONE-SHOT combat
+ * clips (attack / hurt / defeat / victory).
+ *
+ * The keyframes are injected once per component instance via inline
+ * <style>, keyed on a unique animation name so multiple sheets can
+ * coexist without collisions. When `loop=false`, the final frame is
+ * held via `animation-fill-mode: forwards`, and `onComplete` fires
+ * after (frames/fps)s so the parent can swap back to idle.
+ */
+function AnimatedSpritesheet({
+  sheetUrl,
+  frameCount,
+  frameWidth,
+  frameHeight,
+  displayWidth,
+  fps,
+  loop,
+  flipX = false,
+  filter,
+  onComplete,
+  holdLast = true,
+}: {
+  sheetUrl: string;
+  frameCount: number;
+  frameWidth: number;
+  frameHeight: number;
+  /** Displayed width in CSS px. Height auto-scales to preserve aspect. */
+  displayWidth: number;
+  fps: number;
+  loop: boolean;
+  flipX?: boolean;
+  filter?: string;
+  onComplete?: () => void;
+  /** If true (default), the last frame is held after the animation
+   *  completes (`animation-fill-mode: forwards`). Set to false for
+   *  transient combat clips (attack, hurt) so the sprite doesn't
+   *  visually "die" on the last frame of its recoil. */
+  holdLast?: boolean;
+}) {
+  // Unique keyframe name per (sheet + display size) so re-mounts don't
+  // collide and swapping clips re-triggers the animation from frame 0.
+  const animId = useMemo(
+    () => `spr-${Math.random().toString(36).slice(2, 8)}`,
+    [sheetUrl, displayWidth, loop],
+  );
+  const scale = displayWidth / frameWidth;
+  const displayHeight = frameHeight * scale;
+  const sheetTotalW = frameCount * frameWidth;
+  const durationMs = Math.max(60, (frameCount / Math.max(1, fps)) * 1000);
+
+  // Fire onComplete once for non-looping clips.
+  useEffect(() => {
+    if (loop || !onComplete) return;
+    const t = window.setTimeout(onComplete, durationMs + 30);
+    return () => window.clearTimeout(t);
+  }, [loop, onComplete, durationMs, sheetUrl]);
+
+  // CSS-`steps(N)` sprite technique: the FROM→TO range must span ONE
+  // FULL sheet width, not (N-1) frames. `steps(N)` then divides that
+  // range into N equal jumps of exactly one frame each — snapping the
+  // background from frame 0 → 1 → 2 → ... → N-1 (the final "N"th step
+  // wraps back to frame 0 on the next loop iteration). If we used
+  // -(N-1)*frameW as the endpoint, each step becomes (N-1)/N of a
+  // frame and the sheet visibly slides between frames instead of
+  // snapping — the "sliding left to right" bug.
+  const endX = -(frameCount * frameWidth * scale);
+  const keyframes = `@keyframes ${animId} {
+    from { background-position-x: 0px; }
+    to   { background-position-x: ${endX}px; }
+  }`;
+
+  // `holdLast`: for TERMINAL one-shots (defeat / victory) we want the
+  // final frame to persist. For TRANSIENT one-shots (attack / hurt) we
+  // do NOT want to sit on the last frame — Pixellab's last hurt frame
+  // is a hunched / knelt pose that reads as "defeated". `holdLast` is
+  // wired through the persona/boss sprite wrappers and defaults to
+  // true for backward compat.
+  return (
+    <>
+      <style>{keyframes}</style>
+      <div
+        role="img"
+        aria-label="Sprite"
+        style={{
+          width: displayWidth,
+          height: displayHeight,
+          imageRendering: "pixelated",
+          transform: flipX ? "scaleX(-1)" : undefined,
+          filter,
+          backgroundImage: `url(${sheetUrl})`,
+          backgroundRepeat: "no-repeat",
+          backgroundSize: `${sheetTotalW * scale}px ${displayHeight}px`,
+          backgroundPosition: "0 50%",
+          animationName: animId,
+          animationDuration: `${durationMs}ms`,
+          animationTimingFunction: `steps(${frameCount})`,
+          animationIterationCount: loop ? "infinite" : 1,
+          animationFillMode: holdLast ? "forwards" : "none",
+        }}
+      />
+    </>
+  );
+}
+
+/** Persona state → Pixellab clip. Any persona with an `extended` block
+ *  in personas.ts (alchemist @88×88, arcanist / artisan / drifter /
+ *  engineer / healer / oracle / pathfinder @92×92, etc.) is supported.
+ *  Missing clips (e.g. Oracle has no defeat/victory) gracefully fall
+ *  back to the idle sheet so the sprite never disappears. */
+type PersonaAnimState = "idle" | "attack" | "hurt" | "defeat" | "victory";
+function AnimatedPersonaSprite({
+  personaId,
+  state,
+  onStateComplete,
+  displayWidth = 120,
+}: {
+  personaId: PersonaId;
+  state: PersonaAnimState;
+  onStateComplete?: () => void;
+  displayWidth?: number;
+}) {
+  // Look up the persona's extended config to get the correct frame size,
+  // frame count, and per-clip fps. Falls back to alchemist's 88×88 x9 if
+  // extended is missing (shouldn't happen for the 8 real personas but
+  // keeps the code defensive).
+  const persona = getPersona(personaId);
+  const ext = persona.extended;
+  const frameWidth = ext?.frameWidth ?? 88;
+  const frameHeight = ext?.frameHeight ?? 88;
+  const frameCount = ext?.idleFrames ?? 9;
+  const idleFps = ext?.idleFps ?? 6;
+  const combatFps = ext?.combatFps ?? 8;
+  // If the persona is missing this clip (Oracle etc.), fall back to
+  // idle so we never load a 404 sheet.
+  const resolvedState: PersonaAnimState = ext?.missingClips?.includes(state as never)
+    ? "idle"
+    : state;
+  const sheet = `/assets/personas/${personaId}/${resolvedState}.png`;
+  const isLoop = resolvedState === "idle" || resolvedState === "victory";
+  // Only terminal (defeat / victory) clips freeze on the last frame —
+  // attack and hurt release so the sprite doesn't sit on its knelt /
+  // hunched recoil pose and read as "defeated".
+  const holdLast = state === "defeat" || state === "victory";
+  return (
+    <AnimatedSpritesheet
+      key={`${personaId}:${state}`}
+      sheetUrl={sheet}
+      frameCount={frameCount}
+      frameWidth={frameWidth}
+      frameHeight={frameHeight}
+      displayWidth={displayWidth}
+      fps={state === "idle" || state === "victory" ? idleFps : combatFps}
+      loop={isLoop}
+      holdLast={holdLast}
+      filter="drop-shadow(0 6px 12px rgba(0,0,0,0.7))"
+      onComplete={isLoop ? undefined : onStateComplete}
+    />
+  );
+}
+
+/** Render a boss idle asset that may be either a single-frame image
+ *  (legacy) or a 9-frame horizontal spritesheet (new Pixellab pipeline).
+ *  For Pixellab bosses (Fog of Vagueness), also swap between
+ *  idle/attack/hurt/defeat/victory sheets based on combat state.
+ *
+ *  Sheet detection: any boss asset under a folder that has a matching
+ *  9-frame Pixellab export is registered here. Legacy single-frame
+ *  bosses fall through to a plain <img>.
+ */
+type BossAnimState = "idle" | "attack" | "hurt" | "defeat" | "victory";
+function BossSpriteFromAsset({
+  bossAsset,
+  state = "idle",
+  onStateComplete,
+}: {
+  bossAsset: string;
+  state?: BossAnimState;
+  onStateComplete?: () => void;
+}) {
+  const SPRITESHEET_BOSSES: readonly {
+    /** Substring match against the boss's `idleAsset` path. */
+    match: string;
+    /** Folder that hosts the other state sheets (idle/attack/hurt/…). */
+    folder: string;
+    frames: number;
+    frameWidth: number;
+    frameHeight: number;
+    /** Available state clips in this folder. Fallback to idle otherwise. */
+    states: readonly BossAnimState[];
+  }[] = [
+    {
+      match: "/bosses/village/fog/idle.png",
+      folder: "/assets/bosses/village/fog",
+      frames: 9,
+      frameWidth: 92,
+      frameHeight: 92,
+      states: ["idle", "attack", "hurt", "defeat", "victory"],
+    },
+    {
+      match: "/bosses/village/chimera/idle.png",
+      folder: "/assets/bosses/village/chimera",
+      frames: 9,
+      frameWidth: 92,
+      frameHeight: 92,
+      // Chimera has idle/attack/hurt; missing clips fall back to idle
+      // via the useState_ resolver in BossSpriteFromAsset.
+      states: ["idle", "attack", "hurt"],
+    },
+    {
+      match: "/bosses/village/automaton/idle.png",
+      folder: "/assets/bosses/village/automaton",
+      frames: 9,
+      frameWidth: 92,
+      frameHeight: 92,
+      states: ["idle", "attack", "hurt", "victory"],
+    },
+    {
+      match: "/bosses/village/wraith/idle.png",
+      folder: "/assets/bosses/village/wraith",
+      frames: 9,
+      frameWidth: 92,
+      frameHeight: 92,
+      states: ["idle", "attack", "hurt", "victory"],
+    },
+  ];
+  const sheetDef = SPRITESHEET_BOSSES.find((s) => bossAsset.includes(s.match));
+  if (!sheetDef) {
+    return (
+      <img
+        src={bossAsset}
+        alt="Boss"
+        style={{
+          imageRendering: "pixelated",
+          width: 300,
+          height: 300,
+          objectFit: "contain",
+          transform: "scaleX(-1)",
+          filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.7))",
+        }}
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
+      />
+    );
+  }
+  // Resolve the sheet URL for this state; fall back to idle if the state's
+  // sheet isn't available for this boss.
+  const useState_: BossAnimState = sheetDef.states.includes(state)
+    ? state
+    : "idle";
+  const sheetUrl = `${sheetDef.folder}/${useState_}.png`;
+  const isLoop = useState_ === "idle" || useState_ === "victory";
+  // Terminal (defeat / victory) clips freeze on their last frame.
+  // Transient combat clips (attack / hurt) release so the boss
+  // doesn't sit on its recoil / stunned pose and read as "defeated".
+  const holdLast = useState_ === "defeat" || useState_ === "victory";
+  return (
+    <AnimatedSpritesheet
+      key={useState_}
+      sheetUrl={sheetUrl}
+      frameCount={sheetDef.frames}
+      frameWidth={sheetDef.frameWidth}
+      frameHeight={sheetDef.frameHeight}
+      displayWidth={300}
+      // 7fps for boss combat clips (~1.3s per attack/hurt/defeat/victory).
+      // Slower on the boss than the persona because the boss is larger
+      // and the pixel-art recoil reads better at a slightly gentler cadence.
+      fps={useState_ === "idle" || useState_ === "victory" ? 6 : 7}
+      loop={isLoop}
+      holdLast={holdLast}
+      flipX
+      filter="drop-shadow(0 8px 16px rgba(0,0,0,0.7))"
+      onComplete={isLoop ? undefined : onStateComplete}
+    />
   );
 }
 
@@ -1363,78 +2290,10 @@ function ReactiveDialogueShell({
     >
       {children}
 
-      {/* Floating damage / counter labels */}
-      <AnimatePresence>
-        {bossDamage !== null && (bossReaction === "hit" || bossReaction === "crit") && (
-          <motion.span
-            key={`dmg-${bossDamage}-${bossReaction}`}
-            initial={{ opacity: 0, y: 0, scale: 0.6 }}
-            animate={{
-              opacity: 1,
-              y: -42,
-              scale: bossReaction === "crit" ? 1.6 : 1.2,
-            }}
-            exit={{ opacity: 0, y: -56 }}
-            transition={{ duration: 0.9, ease: "easeOut" }}
-            className={`pointer-events-none absolute left-16 top-2 z-20 font-mono font-black ${
-              bossReaction === "crit"
-                ? "text-base text-rose-300 drop-shadow-[0_0_12px_#fb7185]"
-                : "text-sm text-amber-300 drop-shadow-[0_0_8px_#fbbf24]"
-            }`}
-          >
-            -{bossDamage}{bossReaction === "crit" ? "!!" : ""}
-          </motion.span>
-        )}
-
-        {bossReaction === "counter" && playerDamage !== null && (
-          <motion.span
-            key={`counter-${playerDamage}`}
-            initial={{ opacity: 0, scale: 0.6, x: 0 }}
-            animate={{ opacity: 1, scale: 1.2, x: 32 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="pointer-events-none absolute left-16 top-2 z-20 text-xs font-black font-mono text-red-400 tracking-widest drop-shadow-[0_0_6px_#ef4444]"
-          >
-            COUNTER! -{playerDamage}
-          </motion.span>
-        )}
-
-        {bossReaction === "block" && (
-          <motion.span
-            key="block-label"
-            initial={{ opacity: 0, scale: 0.7, y: 0 }}
-            animate={{ opacity: 1, scale: 1.1, y: -22 }}
-            exit={{ opacity: 0, y: -34 }}
-            transition={{ duration: 0.65, ease: "easeOut" }}
-            className="pointer-events-none absolute left-16 top-2 z-20 text-xs font-black font-mono text-sky-300 tracking-widest drop-shadow-[0_0_8px_#60a5fa]"
-          >
-            BLOCK
-          </motion.span>
-        )}
-      </AnimatePresence>
-
-      {/* Block sparks — two cool-blue glints when both sides parry. */}
-      <AnimatePresence>
-        {bossReaction === "block" && (
-          <>
-            {[0, 1].map((i) => (
-              <motion.span
-                key={`block-spark-${i}`}
-                initial={{ opacity: 0, scale: 0.5, x: 0, y: 0 }}
-                animate={{
-                  opacity: [0, 1, 0],
-                  scale: [0.5, 1.2, 0.4],
-                  x: i === 0 ? -22 : 22,
-                  y: -12,
-                }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut", delay: i * 0.08 }}
-                className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300 shadow-[0_0_10px_#60a5fa]"
-              />
-            ))}
-          </>
-        )}
-      </AnimatePresence>
+      {/* Floating damage/counter/block labels + block-spark particles
+          removed — the Pixellab attack/hurt/defeat/victory spritesheet
+          clips are now the ONLY source of combat feedback so nothing
+          competes with them and reads as "another animation replaying". */}
     </motion.div>
   );
 }

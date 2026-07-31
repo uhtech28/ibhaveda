@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "../../../../convex/_generated/api"
 import { CompactProfileView } from "@/components/user/CompactProfileView"
+import { MyFlaresSection } from "@/components/flares/MyFlaresSection"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { HeroHeader } from "@/components/header"
@@ -82,6 +83,15 @@ export default function ProfilePage() {
           myRequests={myRequests}
           incomingRequests={incomingRequests}
         />
+
+        {/* Owner-only: My Flares — flare history grouped by status.
+            Hidden from other visitors so private state (expired flares,
+            resolved history) isn't leaked. */}
+        {isCurrentUser && realProfile && (
+          <div className="mt-10">
+            <MyFlaresSection userId={realProfile._id} />
+          </div>
+        )}
       </main>
 
       <FooterSection />

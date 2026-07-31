@@ -79,19 +79,12 @@ const fallback = (outline: string): GeneratedDraft => {
     ? firstSentence
     : outline.slice(0, 60).trim() + (outline.length > 60 ? "..." : "");
 
-  // When the AI is unavailable (rate limit / no key / network), still
-  // give the user a meaningful description rather than echoing their
-  // outline verbatim. Pad the outline with a contextual second sentence
-  // so they get a useful starting point to edit.
-  const trimmed = outline.trim().replace(/[.!?]+$/, "");
-  const synthesizedDescription =
-    trimmed.length > 0
-      ? `${trimmed}. The platform aims to deliver this to its target users with a focus on simplicity, reliability, and measurable value. The next step is to validate the core problem with real users before building.`
-      : "Describe your idea, the problem it solves, who it's for, and how it works.";
-
+  // PRODUCT DECISION: description is the user's outline verbatim. AI
+  // only proposes the title/tags — never rewrites what the user typed
+  // into the description box.
   return {
     title: basicTitle || "New Idea",
-    description: synthesizedDescription,
+    description: outline.trim(),
     industries: detectFromKeywords(outline, INDUSTRY_KEYWORDS, 3),
     skills: detectFromKeywords(outline, SKILL_KEYWORDS, 4),
     visibility: "public",
@@ -100,24 +93,26 @@ const fallback = (outline: string): GeneratedDraft => {
 
 // Shared prompt used by both providers — keeps output consistent
 // regardless of which one runs.
+//
+// IMPORTANT: description is *always* the user's outline verbatim. We do
+// NOT ask the AI to write it and we do NOT accept a description field
+// back — see parseDraft where we hard-override with the outline. The
+// AI's job here is title + tags only, per product decision (user
+// complaint: "the description should be same as the user typed, the
+// AI should only write the title, tags, etc.").
 const buildPrompt = (outline: string) => `You are an AI assistant helping builders post ideas on a startup-collaboration platform.
 
-Your task: Generate a structured JSON object based on the user's outline. EXPAND and IMPROVE their idea - don't just copy it.
+Your task: read the user's outline and propose a punchy title + relevant tags for it. DO NOT rewrite or expand the user's description — that field stays exactly as they typed it.
 
 CRITICAL REQUIREMENTS:
-1. Title MUST be catchy, specific, and 5-80 characters (NEVER empty)
-2. Description MUST be 2-4 clear sentences (at least 80 characters) that EXPAND on the outline.
-   - Do NOT copy the outline verbatim.
-   - Describe what the product/idea actually does, who it's for, and the core value.
-   - The description field is REQUIRED and must always be present.
-3. Industries MUST include 1-3 relevant tags
-4. Skills MUST include 1-4 relevant tags
+1. Title MUST be catchy, specific, and 5-80 characters (NEVER empty).
+2. Industries MUST include 1-3 relevant tags.
+3. Skills MUST include 1-4 relevant tags.
 
 Return ONLY valid JSON (no markdown, no code fences, no extra text):
 
 {
   "title": "Catchy Title Here (5-80 chars, REQUIRED)",
-  "description": "Expanded description here. 2-4 sentences. Clear and concrete.",
   "industries": ["Industry1", "Industry2"],
   "skills": ["Skill1", "Skill2", "Skill3"],
   "visibility": "public"
@@ -126,7 +121,7 @@ Return ONLY valid JSON (no markdown, no code fences, no extra text):
 Industry examples: Software, Healthcare, Education, Fintech, AI/ML, Consumer, Climate, Food & Beverage, E-commerce, SaaS
 Skill examples: Design, Backend, Frontend, Product Management, Marketing, Mobile, Data Science, DevOps, UI/UX
 
-User's outline:
+User's outline (do NOT rewrite this text — you're only proposing metadata for it):
 """
 ${outline}
 """
@@ -176,23 +171,10 @@ function parseDraft(raw: string, outline: string): GeneratedDraft | null {
     return null;
   }
 
-  // Description fallback ladder:
-  //   1. Use Gemini's description if it's meaningfully different from the outline
-  //   2. If Gemini omitted/echoed the outline, synthesize from title + outline
-  //      so the user never sees their raw input shown back at them verbatim.
-  const rawDescription =
-    typeof parsed.description === "string" ? parsed.description.trim() : "";
-
-  const normalize = (s: string) =>
-    s.toLowerCase().replace(/\s+/g, " ").trim();
-  const echoedOutline =
-    rawDescription.length > 0 &&
-    normalize(rawDescription) === normalize(outline);
-
-  const description =
-    rawDescription.length === 0 || echoedOutline
-      ? synthesizeDescription(title, outline)
-      : rawDescription.slice(0, 1200);
+  // PRODUCT DECISION: description is ALWAYS the user's outline verbatim.
+  // Whatever the AI returns for `description` is discarded — the user
+  // owns that field. AI only proposes title + tags.
+  const description = outline.trim().slice(0, 1200);
 
   return {
     title,
@@ -203,18 +185,8 @@ function parseDraft(raw: string, outline: string): GeneratedDraft | null {
   };
 }
 
-/**
- * Build a one-sentence description when the AI provider drops the
- * `description` field or echoes the user's outline. Combines the
- * AI-generated title (which is usually decent) with the user's outline
- * so the resulting copy is at least richer than the raw input.
- */
-function synthesizeDescription(title: string, outline: string): string {
-  const trimmedOutline = outline.trim().replace(/[.!?]+$/, "");
-  if (!trimmedOutline) return title;
-  // "A platform for retailers — retlify an online e commerce platform."
-  return `${title} — ${trimmedOutline}.`.slice(0, 1200);
-}
+// (synthesizeDescription removed — description is now always the
+// user's outline verbatim. See parseDraft above.)
 
 // Try OpenAI gpt-4o-mini with strict JSON mode. Returns null on any error
 // so the caller can decide whether to try Gemini next.

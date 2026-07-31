@@ -130,11 +130,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
   const { roots, replies } = groupByParent(comments || []);
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[1fr_auto] w-full">
-      {/* Scrollable comment list */}
+    <div className="grid h-full min-h-0 min-w-0 grid-rows-[1fr_auto] w-full overflow-hidden">
+      {/* Scrollable comment list — overflow-x-hidden so long comment
+          text can never push the container wider than the dialog. */}
       <div
         ref={scrollRef}
-        className="overflow-y-auto pr-1 -mr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-track]:bg-transparent"
+        className="min-w-0 overflow-x-hidden overflow-y-auto pr-1 -mr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {comments === undefined ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-[#6B7280]">
@@ -301,8 +302,8 @@ const CommentItem: React.FC<{
   };
 
   return (
-    <div className={`group ${level > 0 ? "ml-9" : ""}`}>
-      <div className="flex gap-3">
+    <div className={`group min-w-0 ${level > 0 ? "ml-9" : ""}`}>
+      <div className="flex min-w-0 gap-3">
         <Link
           href={comment.author?.username ? `/profile/${comment.author.username}` : "#"}
           className="shrink-0"

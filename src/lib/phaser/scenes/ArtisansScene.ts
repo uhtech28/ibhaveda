@@ -16,10 +16,150 @@ import { getStageMiniBosses, getStageSuperBoss } from "@/config/stage-bosses";
 import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day";
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
 import { playCpClearBurst } from "../utils/cp-clear-burst";
+import {
+  CorruptionOverlay,
+  type OverlayCheckpoint,
+} from "@/lib/phaser/systems/corruptionOverlay";
+import {
+  ensureCorruptionPattern,
+  motifForStage,
+} from "@/lib/phaser/systems/corruptionPatterns";
+import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
+import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
+import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
+import {
+  getCurrentPersonaId,
+  loadPersonaSprites,
+  personaSpriteKey,
+} from "@/lib/phaser/persona-assets";
 
 const MAP_ASSET = "/assets/maps-v2/artisans/artisans-map.png";
-const MAP_WIDTH = 2624;
-const MAP_HEIGHT = 1630;
+const MAP_WIDTH = 1536;
+const MAP_HEIGHT = 1152;
+
+// Artisans walkability blockers — authored via the in-map editor
+// (?editZones=1). Rectangles are in map-image pixel coords (1536×1152).
+const BLOCKED_ZONES: readonly { x: number; y: number; w: number; h: number }[] = [
+  { x: 4, y: 69, w: 55, h: 63 },
+  { x: 229, y: 185, w: 254, h: 94 },
+  { x: 389, y: 280, w: 79, h: 42 },
+  { x: 207, y: 457, w: 117, h: 59 },
+  { x: 396, y: 453, w: 106, h: 61 },
+  { x: 483, y: 183, w: 48, h: 322 },
+  { x: 305, y: 149, w: 257, h: 72 },
+  { x: 529, y: 173, w: 99, h: 73 },
+  { x: 505, y: 242, w: 53, h: 54 },
+  { x: 539, y: 244, w: 46, h: 29 },
+  { x: 629, y: 156, w: 59, h: 127 },
+  { x: 689, y: 224, w: 77, h: 58 },
+  { x: 605, y: 249, w: 179, h: 54 },
+  { x: 592, y: 259, w: 215, h: 76 },
+  { x: 560, y: 278, w: 277, h: 81 },
+  { x: 535, y: 298, w: 61, h: 191 },
+  { x: 600, y: 362, w: 214, h: 107 },
+  { x: 683, y: 473, w: 62, h: 23 },
+  { x: 856, y: 340, w: 56, h: 105 },
+  { x: 913, y: 386, w: 21, h: 97 },
+  { x: 858, y: 446, w: 67, h: 32 },
+  { x: 937, y: 377, w: 58, h: 116 },
+  { x: 935, y: 567, w: 63, h: 133 },
+  { x: 1013, y: 537, w: 147, h: 163 },
+  { x: 1166, y: 571, w: 36, h: 117 },
+  { x: 1191, y: 619, w: 95, h: 72 },
+  { x: 789, y: 68, w: 104, h: 299 },
+  { x: 771, y: 143, w: 67, h: 158 },
+  { x: 891, y: 207, w: 37, h: 123 },
+  { x: 880, y: 217, w: 101, h: 94 },
+  { x: 953, y: 208, w: 58, h: 103 },
+  { x: 889, y: 182, w: 120, h: 41 },
+  { x: 997, y: 234, w: 28, h: 81 },
+  { x: 625, y: 68, w: 65, h: 40 },
+  { x: 506, y: 109, w: 23, h: 39 },
+  { x: 475, y: 139, w: 77, h: 21 },
+  { x: 493, y: 124, w: 39, h: 34 },
+  { x: 325, y: 134, w: 52, h: 34 },
+  { x: 380, y: 133, w: 112, h: 40 },
+  { x: 1062, y: 83, w: 86, h: 85 },
+  { x: 990, y: 103, w: 81, h: 51 },
+  { x: 1109, y: 463, w: 59, h: 42 },
+  { x: 1277, y: 392, w: 117, h: 155 },
+  { x: 1365, y: 514, w: 56, h: 44 },
+  { x: 1304, y: 522, w: 60, h: 101 },
+  { x: 1113, y: 67, w: 419, h: 341 },
+  { x: 978, y: 381, w: 48, h: 102 },
+  { x: 534, y: 567, w: 61, h: 249 },
+  { x: 610, y: 547, w: 148, h: 174 },
+  { x: 785, y: 556, w: 96, h: 95 },
+  { x: 816, y: 634, w: 34, h: 61 },
+  { x: 988, y: 568, w: 125, h: 312 },
+  { x: 688, y: 794, w: 328, h: 62 },
+  { x: 937, y: 561, w: 69, h: 245 },
+  { x: 719, y: 829, w: 132, h: 135 },
+  { x: 810, y: 816, w: 211, h: 122 },
+  { x: 1157, y: 617, w: 87, h: 231 },
+  { x: 1245, y: 689, w: 56, h: 79 },
+  { x: 822, y: 712, w: 58, h: 67 },
+  { x: 732, y: 744, w: 96, h: 54 },
+  { x: 833, y: 780, w: 138, h: 39 },
+  { x: 897, y: 572, w: 96, h: 223 },
+  { x: 291, y: 555, w: 169, h: 112 },
+  { x: 204, y: 187, w: 29, h: 187 },
+  { x: 189, y: 218, w: 35, h: 186 },
+  { x: 265, y: 354, w: 74, h: 64 },
+  { x: 394, y: 354, w: 67, h: 54 },
+  { x: 248, y: 288, w: 99, h: 49 },
+  { x: 206, y: 379, w: 24, h: 114 },
+  { x: 13, y: 338, w: 168, h: 148 },
+  { x: 155, y: 294, w: 26, h: 92 },
+  { x: 149, y: 406, w: 52, h: 91 },
+  { x: 32, y: 560, w: 115, h: 133 },
+  { x: 25, y: 677, w: 131, h: 129 },
+  { x: 123, y: 749, w: 56, h: 88 },
+  { x: 137, y: 727, w: 36, h: 49 },
+  { x: 162, y: 779, w: 57, h: 91 },
+  { x: 152, y: 747, w: 46, h: 74 },
+  { x: 160, y: 707, w: 57, h: 104 },
+  { x: 109, y: 568, w: 76, h: 179 },
+  { x: 129, y: 605, w: 76, h: 169 },
+  { x: 131, y: 808, w: 239, h: 66 },
+  { x: 140, y: 851, w: 245, h: 54 },
+  { x: 194, y: 893, w: 223, h: 41 },
+  { x: 215, y: 920, w: 221, h: 27 },
+  { x: 386, y: 867, w: 41, h: 51 },
+  { x: 406, y: 926, w: 185, h: 42 },
+  { x: 202, y: 937, w: 246, h: 37 },
+  { x: 368, y: 912, w: 147, h: 41 },
+  { x: 507, y: 939, w: 96, h: 26 },
+  { x: 1236, y: 993, w: 47, h: 140 },
+  { x: 16, y: 985, w: 66, h: 36 },
+  { x: 17, y: 1010, w: 72, h: 69 },
+  { x: 2, y: 881, w: 25, h: 102 },
+  { x: 1289, y: 867, w: 54, h: 73 },
+  { x: 1387, y: 621, w: 38, h: 158 },
+  { x: 1359, y: 684, w: 46, h: 94 },
+  { x: 1444, y: 683, w: 85, h: 224 },
+  { x: 1331, y: 831, w: 76, h: 39 },
+  { x: 1424, y: 1008, w: 105, h: 137 },
+  { x: 1184, y: 831, w: 36, h: 42 },
+  { x: 1066, y: 171, w: 93, h: 166 },
+  { x: 1066, y: 338, w: 85, h: 51 },
+  { x: 1087, y: 389, w: 69, h: 73 },
+  { x: 417, y: 579, w: 94, h: 139 },
+];
+
+/** Live custom-zones getter — populated by the in-map editor when
+ *  `?editZones=1` is on the URL. Zero-effect when the editor isn't
+ *  attached. */
+let _customZonesGetter: () => readonly ZoneRect[] = () => [];
+function pointInAnyBlockedZone(x: number, y: number): boolean {
+  for (const z of BLOCKED_ZONES) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  for (const z of _customZonesGetter()) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return true;
+  }
+  return false;
+}
 
 const CHAR_IDLE_ASSET = "/assets/fan-tasy/Character_Idle.webp";
 const CHAR_WALK_ASSET = "/assets/fan-tasy/Character_Walk.webp";
@@ -39,12 +179,16 @@ interface Checkpoint {
   label: string;
 }
 // Stage 4 (Artisans) has 5 CPs in the venture template.
+// Map was cropped from 2624×1630 down to 1536×1152 (the actual painted
+// area from the LDtk delivery). CP4 and CP5 were originally outside the
+// painted bounds — moved inside so both landmarks are visible and
+// reachable. Update these positions after the artist paints more.
 const CHECKPOINTS: readonly Checkpoint[] = [
-  { index: 0, x: 420, y: 950, label: "Craft Workshop" },
-  { index: 1, x: 900, y: 720, label: "Weaver's Alley" },
-  { index: 2, x: 1350, y: 500, label: "Potter's Kiln" },
-  { index: 3, x: 1900, y: 1100, label: "Jeweller's Row" },
-  { index: 4, x: 2400, y: 480, label: "Master's Forge" },
+  { index: 0, x: 300, y: 780, label: "Craft Workshop" },
+  { index: 1, x: 700, y: 600, label: "Weaver's Alley" },
+  { index: 2, x: 1050, y: 420, label: "Potter's Kiln" },
+  { index: 3, x: 900, y: 900, label: "Jeweller's Row" },
+  { index: 4, x: 1400, y: 320, label: "Master's Forge" },
 ];
 
 const BOSS_OFFSETS: readonly { x: number; y: number; scale: number }[] = [
@@ -70,6 +214,8 @@ export class ArtisansScene extends Phaser.Scene {
   private superBossRevealed = false;
   private todController: TimeOfDayController | null = null;
   private vfxController: AmbientVFXController | null = null;
+  private _corruption: CorruptionOverlay | null = null;
+  private _lastCheckpointStates: CheckpointState[] = [];
 
   constructor() {
     super({ key: "ArtisansScene" });
@@ -83,6 +229,7 @@ export class ArtisansScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image("artisans-composite", MAP_ASSET);
+    loadPersonaSprites(this, getCurrentPersonaId());
     if (!this.textures.exists("village-persona-idle")) {
       this.load.spritesheet("village-persona-idle", CHAR_IDLE_ASSET, {
         frameWidth: 32,
@@ -123,46 +270,58 @@ export class ArtisansScene extends Phaser.Scene {
     const start = CHECKPOINTS[this.currentIndex];
     cam.centerOn(start.x, start.y);
 
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      dragging = true;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
-      if (!dragging) return;
-      cam.scrollX -= (p.x - lastX) / cam.zoom;
-      cam.scrollY -= (p.y - lastY) / cam.zoom;
-      lastX = p.x;
-      lastY = p.y;
-    });
-    this.input.on("pointerup", () => {
-      dragging = false;
-    });
-
-    const KEY_PAN_SPEED = 14;
-    const keyboard = this.input.keyboard;
-    if (keyboard) {
-      const cursors = keyboard.createCursorKeys();
-      const wasd = {
-        W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-        A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-        S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-        D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-      };
-      this.events.on("update", () => {
-        const left = cursors.left?.isDown || wasd.A.isDown;
-        const right = cursors.right?.isDown || wasd.D.isDown;
-        const up = cursors.up?.isDown || wasd.W.isDown;
-        const down = cursors.down?.isDown || wasd.S.isDown;
-        const step = KEY_PAN_SPEED / cam.zoom;
-        if (left) cam.scrollX -= step;
-        if (right) cam.scrollX += step;
-        if (up) cam.scrollY -= step;
-        if (down) cam.scrollY += step;
+    // Drag-to-pan — DISABLED while zone-editor is active so the left-
+    // click-drag is free to draw rectangles without the map scrolling
+    // underneath. Right-click-drag still pans inside the editor.
+    const zoneEditorActive =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("editZones") === "1";
+    if (!zoneEditorActive) {
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        dragging = true;
+        lastX = p.x;
+        lastY = p.y;
       });
+      this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+        if (!dragging) return;
+        cam.scrollX -= (p.x - lastX) / cam.zoom;
+        cam.scrollY -= (p.y - lastY) / cam.zoom;
+        lastX = p.x;
+        lastY = p.y;
+      });
+      this.input.on("pointerup", () => {
+        dragging = false;
+      });
+    }
+
+    // WASD/arrow pan — suppressed while zone editor is active so
+    // editorTestWalk can drive the persona for live blocker testing.
+    if (!zoneEditorActive) {
+      const KEY_PAN_SPEED = 14;
+      const keyboard = this.input.keyboard;
+      if (keyboard) {
+        const cursors = keyboard.createCursorKeys();
+        const wasd = {
+          W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+          A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+          S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+          D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+        };
+        this.events.on("update", () => {
+          const left = cursors.left?.isDown || wasd.A.isDown;
+          const right = cursors.right?.isDown || wasd.D.isDown;
+          const up = cursors.up?.isDown || wasd.W.isDown;
+          const down = cursors.down?.isDown || wasd.S.isDown;
+          const step = KEY_PAN_SPEED / cam.zoom;
+          if (left) cam.scrollX -= step;
+          if (right) cam.scrollX += step;
+          if (up) cam.scrollY -= step;
+          if (down) cam.scrollY += step;
+        });
+      }
     }
 
     for (const cp of CHECKPOINTS) {
@@ -184,6 +343,19 @@ export class ArtisansScene extends Phaser.Scene {
       this.checkpointNodes.push(disc);
     }
 
+    // Corruption overlay — one tile-strip per CP-to-CP segment.
+    const artisansPattern = ensureCorruptionPattern(this, motifForStage(4));
+    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
+      x: cp.x,
+      y: cp.y,
+    }));
+    this._corruption = new CorruptionOverlay(this, {
+      checkpoints: overlayCps,
+      patternTextureKey: artisansPattern,
+      tint: 0x9ca3af, // grey — Artisans District
+      depth: 5,
+    });
+
     this.spawnCharacter();
     this.spawnMiniBosses();
     this.refreshMiniBossVisibility();
@@ -196,6 +368,46 @@ export class ArtisansScene extends Phaser.Scene {
       mapWidth: MAP_WIDTH,
       mapHeight: MAP_HEIGHT,
     });
+    // Walkability debug overlay — ?showZones=1 renders BLOCKED_ZONES in
+    // red so they can be verified visually against the painted map.
+    try {
+      const showZones =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("showZones") === "1";
+      if (showZones) {
+        void pointInAnyBlockedZone; // keep helper referenced
+        const g = this.add.graphics();
+        g.setDepth(50);
+        g.fillStyle(0xff0000, 0.35);
+        g.lineStyle(2, 0xff2222, 1);
+        BLOCKED_ZONES.forEach((z) => {
+          g.fillRect(z.x, z.y, z.w, z.h);
+          g.strokeRect(z.x, z.y, z.w, z.h);
+        });
+      }
+    } catch {
+      /* SSR safety */
+    }
+
+    // In-map zone editor — enabled via ?editZones=1. Draws cyan
+    // rectangles + HUD in top-right. Zones persist in localStorage
+    // under key "ibhaveda-zones-artisan" (scene-scoped, no bleed from
+    // Village/Forest editors).
+    const editor = attachZoneEditor(this, "artisan");
+    _customZonesGetter = editor.getCustomZones;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      _customZonesGetter = () => [];
+    });
+
+    // Live test-walk while editing — WASD moves the persona, blockers
+    // hard-stop it, camera follows. No-op unless ?editZones=1.
+    attachEditorTestWalk(this, {
+      getCharacter: () => this.character,
+      isBlocked: (x, y) => pointInAnyBlockedZone(x, y),
+      mapWidth: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+    });
+
     eventBridge.dispatchToReact({ type: "PHASER_READY" });
   }
 
@@ -256,36 +468,69 @@ export class ArtisansScene extends Phaser.Scene {
 
   public weakenActiveBoss(tasksDone: number, total: number = 3): void {
     const hpBar = this.miniBossHpBars[this.currentIndex];
-    if (!hpBar) return;
-    hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    if (hpBar) {
+      hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    }
+    // Update the corruption overlay for THIS CP's segment. 2/3 → 10%
+    // opacity + weakened monster; 3/3 → 0% + shatter burst.
+    this._corruption?.updateSegment(this.currentIndex, tasksDone);
+  }
+
+  /**
+   * Public: apply a full CheckpointState[] snapshot to the corruption
+   * overlay. Called from the React map page whenever CP progress data
+   * changes (initial load + realtime Convex updates).
+   */
+  public applyCorruptionState(states: CheckpointState[]): void {
+    this._lastCheckpointStates = states;
+    this._corruption?.applyCheckpointStates(states);
   }
 
   private spawnCharacter(): void {
     const active = CHECKPOINTS[this.currentIndex];
-    if (!this.textures.exists("village-persona-idle")) return;
+    const personaId = getCurrentPersonaId();
+    const personaIdleTex = personaSpriteKey(personaId, "idle");
+    const personaWalkTex = personaSpriteKey(personaId, "walk");
+    const idleTexKey = this.textures.exists(personaIdleTex)
+      ? personaIdleTex
+      : "village-persona-idle";
+    const walkTexKey = this.textures.exists(personaWalkTex)
+      ? personaWalkTex
+      : "village-persona-walk";
+    if (!this.textures.exists(idleTexKey)) return;
 
-    if (!this.anims.exists("persona-idle")) {
-      this.anims.create({
-        key: "persona-idle",
-        frames: this.anims.generateFrameNumbers("village-persona-idle", {
-          start: 0,
-          end: 1,
-        }),
-        frameRate: 2,
-        repeat: -1,
-      });
-    }
-    if (!this.anims.exists("persona-walk")) {
-      this.anims.create({
-        key: "persona-walk",
-        frames: this.anims.generateFrameNumbers("village-persona-walk", {
-          start: 10,
-          end: 14,
-        }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
+    // If a previous scene registered these anims against the OLD texture,
+    // drop them so we rebind to the picked persona's sheet.
+    if (this.anims.exists("persona-idle")) this.anims.remove("persona-idle");
+    if (this.anims.exists("persona-walk")) this.anims.remove("persona-walk");
+
+    const idleFrames = this.textures.get(idleTexKey).frameTotal;
+    this.anims.create({
+      key: "persona-idle",
+      frames: this.anims.generateFrameNumbers(idleTexKey, {
+        start: 0,
+        end: Math.max(0, Math.min(idleFrames - 1, 3)),
+      }),
+      frameRate: 4,
+      repeat: -1,
+    });
+
+    const walkFrames = this.textures.get(walkTexKey).frameTotal;
+    // For legacy Village sheet, useful walk frames are 10..14. For extended
+    // personas, walk frames start at 0. Pick range based on which sheet.
+    const walkStart = walkTexKey === "village-persona-walk" ? 10 : 0;
+    const walkEnd = walkTexKey === "village-persona-walk"
+      ? Math.min(walkFrames - 1, 14)
+      : Math.min(walkFrames - 1, 5);
+    this.anims.create({
+      key: "persona-walk",
+      frames: this.anims.generateFrameNumbers(walkTexKey, {
+        start: walkStart,
+        end: walkEnd,
+      }),
+      frameRate: 10,
+      repeat: -1,
+    });
 
     const groundY = active.y + CHAR_Y_OFFSET + 4;
     this.characterShadow = this.add
@@ -295,7 +540,7 @@ export class ArtisansScene extends Phaser.Scene {
     this.character = this.add.sprite(
       active.x,
       active.y + CHAR_Y_OFFSET,
-      "village-persona-idle",
+      idleTexKey,
     );
     this.character.setOrigin(0.5, 1);
     this.character.setScale(CHAR_SCALE);

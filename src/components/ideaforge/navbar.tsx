@@ -38,6 +38,15 @@ export function IdeaForgeNavbar({
 }) {
   const pathname = usePathname();
 
+  // Popover mount guard — Radix's internal useId can produce different
+  // aria-controls IDs between SSR and CSR (Next.js flags this as a
+  // hydration mismatch). Delaying mount by one tick means Radix only
+  // generates the ID once, on the client, so there's nothing to mismatch.
+  // Users don't notice: hydration completes in <100ms and the plain
+  // <button> we render pre-mount is visually identical to the trigger.
+  const [popoverReady, setPopoverReady] = useState(false);
+  useEffect(() => setPopoverReady(true), []);
+
   const navMenu = [
     { name: "Feed", href: "/feed", icon: Home },
     { name: "My Ideas", href: "/my-ideas", icon: IdeaBulb },
@@ -98,34 +107,46 @@ export function IdeaForgeNavbar({
               <NotificationBell />
             </div>
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <button type="button" className="shrink-0 rounded-full" aria-label="Open profile menu">
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
-                    <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{getInitials(currentUser?.displayName)}</AvatarFallback>
-                  </Avatar>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56" align="end" forceMount>
-                <div className="grid gap-2">
-                  <Link href={currentUser ? `/profile/${currentUser.username}` : "/sign-in"} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors">
-                    {currentUser?.displayName ?? "Profile"}
-                    {currentUser?.username && (<p className="text-xs text-muted-foreground font-normal truncate">@{currentUser.username}</p>)}
-                  </Link>
-                  <Button variant="ghost" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => signOut()}>
-                    <LogOut className="h-4 w-4" />
-                    <span>Sign Out</span>
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            {popoverReady ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" className="shrink-0 rounded-full" aria-label="Open profile menu">
+                    <Avatar className="h-7 w-7">
+                      <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                      <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{getInitials(currentUser?.displayName)}</AvatarFallback>
+                    </Avatar>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56" align="end">
+                  <div className="grid gap-2">
+                    <Link href={currentUser ? `/profile/${currentUser.username}` : "/sign-in"} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors">
+                      {currentUser?.displayName ?? "Profile"}
+                      {currentUser?.username && (<p className="text-xs text-muted-foreground font-normal truncate">@{currentUser.username}</p>)}
+                    </Link>
+                    <Button variant="ghost" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => signOut()}>
+                      <LogOut className="h-4 w-4" />
+                      <span>Sign Out</span>
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              // Pre-mount placeholder — same button, no Popover attached yet
+              <button type="button" className="shrink-0 rounded-full" aria-label="Open profile menu">
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                  <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{getInitials(currentUser?.displayName)}</AvatarFallback>
+                </Avatar>
+              </button>
+            )}
           </>
         )}
       </div>
 
-      {/* Desktop bar */}
-      <div className={cn(shellMax, "hidden h-16 items-center gap-3 px-4 lg:flex xl:px-6")}>
+      {/* Desktop bar — one consistent gap between every icon slot so
+          the notification bell sits the same distance from its
+          neighbours as everything else in the header. */}
+      <div className={cn(shellMax, "hidden h-16 items-center gap-4 px-4 lg:flex xl:px-6")}>
         {backHref && (
           <Link
             href={backHref}
@@ -156,7 +177,7 @@ export function IdeaForgeNavbar({
           <Plus className="h-5 w-5" />
         </Button>
 
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-4">
           {navMenu.map((item) => {
             const Icon = item.icon;
             const active = isMenuActive(item.href);
@@ -169,8 +190,9 @@ export function IdeaForgeNavbar({
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-6">
           <NotificationBell />
+          {popoverReady ? (
           <Popover>
             <PopoverTrigger asChild>
               <button type="button" className="rounded-full" aria-label="Open profile menu">
@@ -180,7 +202,7 @@ export function IdeaForgeNavbar({
                 </Avatar>
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-56" align="end" forceMount>
+            <PopoverContent className="w-56" align="end">
               <div className="grid gap-2">
                 <Link href={currentUser ? `/profile/${currentUser.username}` : "/sign-in"} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors">
                   {currentUser?.displayName ?? "Profile"}
@@ -193,6 +215,15 @@ export function IdeaForgeNavbar({
               </div>
             </PopoverContent>
           </Popover>
+          ) : (
+            // Pre-mount placeholder — Popover mounts after hydration
+            <button type="button" className="rounded-full" aria-label="Open profile menu">
+              <Avatar className="h-11 w-11 ring-2 ring-[#6366F1]/45 ring-offset-2 ring-offset-[#0A0D12]">
+                <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                <AvatarFallback className="bg-[#1B2440] text-white">{getInitials(currentUser?.displayName)}</AvatarFallback>
+              </Avatar>
+            </button>
+          )}
         </div>
       </div>
     </header>

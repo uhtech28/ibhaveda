@@ -15,6 +15,8 @@ import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
+import { PERSONAS, type PersonaId } from "@/config/personas";
+import { useTutorialOptional } from "@/components/tutorial/v2/useTutorial";
 
 export function FeedClient() {
   const { isLoaded, userId } = useAuth();
@@ -34,6 +36,51 @@ export function FeedClient() {
     feedMeasuredRef.current = false;
     console.log("%c⏱ [Feed] Query started", "color:#7dd3fc;font-weight:bold");
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // PERF: warm the /map/world route the moment /feed mounts. Almost
+  // every /feed user's next click will be either "post idea" (which
+  // lands them on the map) or "go to map" directly, so paying the
+  // Next.js RSC + client bundle download here instead of on click
+  // shaves 1-3s off the perceived "map is loading…" wait later.
+  useEffect(() => {
+    router.prefetch("/map/world");
+  }, [router]);
+
+  // Auto-provision effect removed per product feedback — user wants the
+  // simple name+username capture form for new signups, not silent
+  // auto-provisioning with a derived username.
+
+  // PERF: also warm-start the Phaser core + Village scene module while
+  // the user is browsing /feed. These are the heaviest imports on
+  // /map/world; kicking them off idle-time here means they're already
+  // parsed by the time the user navigates. Guarded so we never race
+  // against the map page's own boot.
+  useEffect(() => {
+    const idle =
+      typeof window !== "undefined" &&
+      "requestIdleCallback" in window
+        ? (window as unknown as {
+            requestIdleCallback: (
+              cb: () => void,
+              opts?: { timeout: number },
+            ) => number;
+          }).requestIdleCallback
+        : (cb: () => void) => window.setTimeout(cb, 300);
+    const cancel =
+      typeof window !== "undefined" &&
+      "cancelIdleCallback" in window
+        ? (window as unknown as {
+            cancelIdleCallback: (id: number) => void;
+          }).cancelIdleCallback
+        : (id: number) => window.clearTimeout(id);
+    const id = idle(() => {
+      // Fire-and-forget: dynamic imports are cached, so /map/world's
+      // own boot will resolve these instantly.
+      void import("phaser").catch(() => {});
+      void import("@/lib/phaser/scenes/VillageMapScene").catch(() => {});
+    }, { timeout: 2500 });
+    return () => cancel(id as number);
   }, []);
 
   const ideasQuery = useQuery(api.ideas.getPublicIdeas, { limit, seed });
@@ -69,16 +116,82 @@ export function FeedClient() {
     }
   }, [isLoaded, router, userId]);
 
-  // PRD §6 AC6 — Profile-completion toast is superseded by the
-  // first-time-user FeedTutorial below. We still need to route users
-  // through profile setup if they haven't completed it, but the
-  // tutorial only mounts AFTER profile setup, so the explicit nag
-  // here is no longer required.
+  // Auto-redirect to /profile-setup DISABLED per product request.
+  // Users should never be pushed to the profile-setup screen
+  // automatically — it only opens when they explicitly click a
+  // "Complete Profile" affordance (e.g. the CTA on empty states).
+  // Rationale: existing users kept getting bounced back to the
+  // "Edit Your Profile" screen on every /feed visit, which felt
+  // like a broken loop. Signup flow still lands on /profile-setup
+  // via Clerk's afterSignUpUrl for first-time username capture; that
+  // path is intentional and unaffected.
+  //
+  // Previously:
+  //   useEffect(() => {
+  //     if (isLoaded && userId && !isProfileLoading && !isProfileComplete) {
+  //       router.push("/profile-setup");
+  //     }
+  //   }, [isLoaded, isProfileComplete, isProfileLoading, router, userId]);
+
+  // ── First-time PERSONA picker ─────────────────────────────────────
+  // Fires the FIRST time a signed-in, profile-complete user with NO
+  // persona set lands on /feed. Once they confirm, the choice sticks
+  // forever (persisted via api.users.updatePersonaId). Dismissed
+  // sessions are remembered via sessionStorage so a hard-refresh
+  // doesn't re-prompt in the same tab.
+  const personaIdRaw = useQuery(api.users.getMyPersonaId, {});
+  const updatePersonaId = useMutation(api.users.updatePersonaId);
+  const [personaPickerOpen, setPersonaPickerOpen] = useState(false);
+  const [personaSubmitting, setPersonaSubmitting] = useState(false);
   useEffect(() => {
-    if (isLoaded && userId && !isProfileLoading && !isProfileComplete) {
-      router.push("/profile-setup");
+    if (!isLoaded || !userId) return;
+    if (personaIdRaw === undefined) return; // still loading
+    if (personaIdRaw !== null) return; // already picked
+    if (isProfileLoading) return;
+    if (!isProfileComplete) return; // wait for username first
+    if (typeof window !== "undefined" && sessionStorage.getItem("personaPickerDismissed") === "1") return;
+    setPersonaPickerOpen(true);
+  }, [isLoaded, userId, personaIdRaw, isProfileLoading, isProfileComplete]);
+  const handlePersonaConfirm = useCallback(
+    async (id: PersonaId) => {
+      setPersonaSubmitting(true);
+      try {
+        await updatePersonaId({ personaId: id });
+        if (typeof window !== "undefined") sessionStorage.setItem("personaPickerDismissed", "1");
+        setPersonaPickerOpen(false);
+      } finally {
+        setPersonaSubmitting(false);
+      }
+    },
+    [updatePersonaId],
+  );
+
+  // ── Hide Sparky / v2 tutorial while the persona picker is open ────
+  // Sparky is mounted globally by TutorialProvider (in the layout);
+  // it auto-shows for any user whose backend state is "not_started".
+  // We flip the tutorial's `activeOverride` to false while the picker
+  // is open, then RELEASE (null) it once persona is picked so the
+  // provider's own `baseActive` computation (which correctly checks
+  // the Convex `feedTutorialState === "completed"` flag) decides
+  // visibility on its own.
+  //
+  // BUG FIX — this branch previously passed `true` in the else,
+  // which force-showed the tutorial for ALREADY-COMPLETED users on
+  // every re-render. That's why the "8/8" progress bar was sticky on
+  // hard refresh even though the Convex completion flag was set. Task
+  // #218 fixed Sparky's speech re-triggering but missed this override
+  // path, so the bar kept coming back. Passing `null` releases the
+  // override and lets `baseActive` (which is false when backendState
+  // is "completed") hide the bar.
+  const tutorial = useTutorialOptional();
+  useEffect(() => {
+    if (!tutorial) return;
+    if (personaPickerOpen) {
+      tutorial.setActive(false);
+    } else {
+      tutorial.setActive(null);
     }
-  }, [isLoaded, isProfileComplete, isProfileLoading, router, userId]);
+  }, [personaPickerOpen, tutorial]);
 
   // First-run tour state.
   const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
@@ -103,11 +216,17 @@ export function FeedClient() {
     ) {
       return;
     }
+    // Don't start the tutorial UNTIL the user has picked a persona —
+    // the picker takes priority as the very first UX beat on /feed
+    // for new signups, and Sparky would otherwise overlap it.
+    if (personaPickerOpen) return;
+    if (personaIdRaw === undefined) return; // still resolving
+    if (personaIdRaw === null) return; // picker will open shortly
     if (tutorialState.state === "not_started" || tutorialState.state === "in_progress") {
       const t = window.setTimeout(() => setTutorialOpen(true), 700);
       return () => window.clearTimeout(t);
     }
-  }, [tutorialState]);
+  }, [tutorialState, personaPickerOpen, personaIdRaw]);
 
   // Whether the user is currently in the tour's compose phase. Used to
   // light up the tutorial highlight on the + button and to switch the
@@ -201,6 +320,63 @@ export function FeedClient() {
         onClose={closeFeedTutorial}
         myIdeaCount={myIdeaCount}
       />
+
+      {/* First-time PERSONA picker — one-click. The very first thing
+          new users see on /feed. Auto-confirms the moment they tap a
+          card (no "Enter the world" step, no other CTAs) so the flow
+          is: pick persona → picker closes → Sparky tutorial starts.
+          Blocks the rest of the UI until they've picked. */}
+      {personaPickerOpen && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center overflow-y-auto bg-black/85 p-4 sm:p-8"
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <div className="my-auto w-full max-w-[900px] rounded-xl bg-[#0a0d12] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.7)] ring-1 ring-white/10">
+            <div className="mb-6 text-center">
+              <h2
+                className="font-mono text-2xl font-black tracking-widest text-white sm:text-3xl"
+                style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+              >
+                Choose your persona
+              </h2>
+              <p className="mt-2 text-sm text-white/60">
+                Your persona is your character throughout every venture.
+                Pick one — you can change it later from your profile.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PERSONAS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={personaSubmitting}
+                  onClick={() => handlePersonaConfirm(p.id)}
+                  className="group flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center transition hover:-translate-y-1 hover:border-white/40 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <div
+                    className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10"
+                    style={{ imageRendering: "pixelated" }}
+                  >
+                    <img
+                      src={p.assets.portrait}
+                      alt={p.displayName}
+                      className="h-full w-full object-contain"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  </div>
+                  <div className="text-sm font-bold text-white">{p.displayName}</div>
+                  <div className="text-xs text-white/60">{p.tagline}</div>
+                </button>
+              ))}
+            </div>
+            {personaSubmitting && (
+              <div className="mt-4 text-center text-xs text-white/60">
+                Setting your persona…
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

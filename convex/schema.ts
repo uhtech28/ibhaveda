@@ -69,6 +69,13 @@ export default defineSchema({
       ),
     ),
     feedTutorialStep: v.optional(v.number()), // Last viewed step index
+    // First-time boss intro cinematic on /map/world. Flipped to true
+    // after the Unraveller + checkpoint reveal plays. Missing = unseen.
+    hasSeenBossIntro: v.optional(v.boolean()),
+    // "Gate of Ibhaveda" onboarding intro cinematic that plays once
+    // right after signup, before username/persona pick. Missing =
+    // unseen; flipped true after the cinematic dismisses.
+    hasSeenGateIntro: v.optional(v.boolean()),
     createdAt: v.number(), // Unix timestamp
     updatedAt: v.number(), // Unix timestamp
   })
@@ -646,6 +653,7 @@ export default defineSchema({
     toolType: v.union(
       v.literal("write"),
       v.literal("table"),
+      v.literal("spreadsheet"),
       v.literal("map"),
       v.literal("survey"),
       v.literal("poll"),
@@ -1202,4 +1210,71 @@ export default defineSchema({
   })
     .index("by_uploader_created", ["uploaderId", "createdAt"])
     .index("by_visibility_created", ["visibility", "createdAt"]),
+
+  // ────────────────────────────────────────────────────────────────────
+  // Social connections — stores OAuth tokens per (user, platform) so
+  // the platform can auto-post ideas to the user's third-party socials
+  // (LinkedIn / X / Facebook / Instagram) when they publish here.
+  //
+  // Tokens are stored raw for now; wrap in encryption via a Convex
+  // env-secret before shipping to production. `providerAccountId` is
+  // the user's ID on the remote platform (URN for LinkedIn, numeric
+  // for Twitter/FB, etc.) — needed for the publish endpoints.
+  //
+  // `autoPost = true` = new ideas fire the auto-post action for this
+  // connection. Users can toggle it off per platform from Settings
+  // without disconnecting.
+  // ────────────────────────────────────────────────────────────────────
+  socialConnections: defineTable({
+    userId: v.id("users"),
+    platform: v.union(
+      v.literal("linkedin"),
+      v.literal("twitter"),
+      v.literal("facebook"),
+      v.literal("instagram"),
+    ),
+    providerAccountId: v.string(),
+    providerDisplayName: v.optional(v.string()),
+    accessToken: v.string(),
+    refreshToken: v.optional(v.string()),
+    // Unix ms when accessToken expires (undefined = provider hasn't
+    // told us; we treat as never-expiring until the API 401s).
+    expiresAt: v.optional(v.number()),
+    scope: v.optional(v.string()),
+    autoPost: v.boolean(),
+    connectedAt: v.number(),
+    lastPostedAt: v.optional(v.number()),
+    // Free-form JSON blob for provider-specific extras (e.g. LinkedIn
+    // person URN, X refresh flow state). Kept as string so schema
+    // doesn't need to grow every time we add a field.
+    meta: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_platform", ["userId", "platform"]),
+
+  // Attempt log — one row per auto-post attempt (success or failure).
+  // Kept small (retained ~30 days by a scheduled prune) so users can
+  // see "why didn't my last idea auto-post to LinkedIn" from a debug
+  // panel without us having to inspect server logs.
+  socialAutoPostAttempts: defineTable({
+    userId: v.id("users"),
+    ideaId: v.id("ideas"),
+    platform: v.union(
+      v.literal("linkedin"),
+      v.literal("twitter"),
+      v.literal("facebook"),
+      v.literal("instagram"),
+    ),
+    status: v.union(
+      v.literal("ok"),
+      v.literal("skipped"),
+      v.literal("failed"),
+    ),
+    providerPostId: v.optional(v.string()),
+    providerPostUrl: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    attemptedAt: v.number(),
+  })
+    .index("by_user_created", ["userId", "attemptedAt"])
+    .index("by_idea", ["ideaId"]),
 });

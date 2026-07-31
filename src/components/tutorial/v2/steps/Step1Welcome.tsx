@@ -36,7 +36,18 @@ export function Step1Welcome() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const active = tutorial.active && tutorial.step === 1 && pathname === "/profile-setup";
+  // DISABLED — per product request the tutorial no longer runs during
+  // the name/username setup phase. Profile-setup is now a quiet form;
+  // Sparky first appears on /feed at Step 2 after the user completes
+  // profile setup. See profile-setup/page.tsx submit handler which
+  // advances the tutorial to step 3 on submit.
+  //
+  // We keep this component mounted (as a no-op) so the import in
+  // TutorialProvider still resolves and existing users with saved
+  // step=1/2 state don't crash. The `active` gate below always
+  // returns false → nothing renders.
+  const active = false;
+  void tutorial; void pathname; void router;
 
   const [dialogue, setDialogue] = useState<DialogueState>("name_talk");
   const [collectedName, setCollectedName] = useState<string>("");
@@ -117,9 +128,20 @@ export function Step1Welcome() {
   }, [active, dialogue]);
 
   // ── Brief-cheer timers — bridge cheer → next talking state ────────────────
+  // Bump the tutorial step so the progress bar reflects field completion:
+  //   name=1/7 → username=2/7 → feed=3/7.
+  // Note: the 2→3 bump is deferred until the user actually clicks Start
+  // building (see the click handler below) so that Sparky's Start-building
+  // guidance stays on-screen at 2/7 while the user is still on
+  // /profile-setup. Bumping to 3 here would deactivate Step1Welcome
+  // (its window is steps 1+2) and Sparky would vanish before the user
+  // clicks the button.
   useEffect(() => {
     if (!active) return;
     if (dialogue === "name_cheer") {
+      // Advance 1 → 2 the moment the name is accepted so the top bar
+      // moves to 2/7 while Sparky cheers and asks for a username.
+      void tutorial.goTo(2);
       const t = window.setTimeout(() => setDialogue("user_talk"), 1600);
       return () => window.clearTimeout(t);
     }
@@ -127,7 +149,7 @@ export function Step1Welcome() {
       const t = window.setTimeout(() => setDialogue("submit_talk"), 1600);
       return () => window.clearTimeout(t);
     }
-  }, [active, dialogue]);
+  }, [active, dialogue, tutorial]);
 
   // ── Listen for Start building click → final cheer + advance step ──────────
   useEffect(() => {
@@ -147,8 +169,10 @@ export function Step1Welcome() {
         label.includes("update profile")
       ) {
         setDialogue("final_cheer");
+        // Bump 2 → 3 right when Start building is clicked so /feed
+        // shows 3/7 the moment the user lands there.
+        void tutorial.goTo(3);
         window.setTimeout(() => {
-          void tutorial.advance();
           router.push("/feed?openCompose=1");
         }, 1500);
       }
@@ -176,9 +200,9 @@ export function Step1Welcome() {
     switch (dialogue) {
       case "name_talk":
         return {
-          text: "Hi! I'm Sparky — what should I call you? Type your name in the box above.",
+          text: "Hi! I'm Sparky. What should I call you? Type your name in the box above.",
           mood: "talking",
-          highlight: "input#displayName",
+          highlight: '[data-tutorial="name-block"]',
           primary: {
             label: "Continue →",
             onClick: () => {
@@ -197,7 +221,7 @@ export function Step1Welcome() {
         return {
           text: "Take your time. When you've typed your name, hit Continue.",
           mood: "idle",
-          highlight: "input#displayName",
+          highlight: '[data-tutorial="name-block"]',
           primary: {
             label: "Continue →",
             onClick: () => {
@@ -219,9 +243,9 @@ export function Step1Welcome() {
         };
       case "user_talk":
         return {
-          text: `Awesome ${collectedName}! Now pick a username — your tag others find you by.`,
+          text: `Awesome ${collectedName}! Now pick a username, your tag others find you by.`,
           mood: "talking",
-          highlight: "input#username",
+          highlight: '[data-tutorial="username-block"]',
           primary: {
             label: "Continue →",
             onClick: () => {
@@ -239,7 +263,7 @@ export function Step1Welcome() {
         return {
           text: "Type a unique username, then hit Continue.",
           mood: "idle",
-          highlight: "input#username",
+          highlight: '[data-tutorial="username-block"]',
           primary: {
             label: "Continue →",
             onClick: () => {
@@ -253,7 +277,7 @@ export function Step1Welcome() {
         };
       case "user_cheer":
         return {
-          text: "Perfect — that username is yours!",
+          text: "Perfect. That username is yours!",
           mood: "celebrating",
           highlight: null,
           primary: { label: "Continue →", onClick: () => setDialogue("submit_talk") },
@@ -290,6 +314,7 @@ export function Step1Welcome() {
         primaryAction={view.primary}
         secondaryAction={view.skip}
         anchor="bottom-right"
+        nearSelector={view.highlight ?? null}
       />
     </>
   );

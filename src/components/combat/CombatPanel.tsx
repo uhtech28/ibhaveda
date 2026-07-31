@@ -10,14 +10,22 @@
  * corner brackets, hard borders, and a black ground colour.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useCombatRound, type CombatPhase } from "@/lib/hooks/useCombatRound";
 import { CombatQuestionCard } from "./CombatQuestionCard";
 import { CombatResultPanel } from "./CombatResultPanel";
 import { AntiCheatWarning } from "./AntiCheatWarning";
 import type { KeystrokeTelemetry } from "@/lib/combat/types";
+import {
+  FAMILY_PALETTE,
+  type VillageBossFamily,
+  type VillageBossInfo,
+} from "@/config/village-bosses";
+import { getPersona, isValidPersonaId } from "@/config/personas";
 
 interface Props {
   roundId: Id<"combatRounds">;
@@ -29,6 +37,13 @@ interface Props {
   /** Called when the user clicks Retry Combat on the defeat screen.
    * Parent should swap the active roundId to remount the panel. */
   onRetryStarted?: (newRoundId: Id<"combatRounds">) => void;
+  /** Boss metadata for the current checkpoint — drives the intro line,
+   *  projectile tint, and boss sprite in the combat frame. When absent,
+   *  falls back to generic "* A foe blocks your path." + red projectile. */
+  boss?: VillageBossInfo | null;
+  /** The user's actual venture / idea title (e.g. "Retlify AI").  Rendered
+   *  in the combat header instead of the demo's hardcoded slug. */
+  ideaTitle?: string | null;
 }
 
 export function CombatPanel({
@@ -37,14 +52,124 @@ export function CombatPanel({
   onAdvanceCheckpoint,
   onClose,
   onRetryStarted,
+  boss = null,
+  ideaTitle = null,
 }: Props) {
   const { phase, submitAnswer, retryCombat, abandon } = useCombatRound(
     roundId,
     checkpointId,
   );
 
+  // Persona portrait — the founder sprite shown facing the boss.
+  // Uses the user's picked persona (all 8 personas now have real
+  // Pixellab portraits + full extended animation sets).
+  const personaIdRaw = useQuery(api.users.getMyPersonaId, {});
+  const personaId = isValidPersonaId(personaIdRaw) ? personaIdRaw : "alchemist";
+  const persona = getPersona(personaId);
+  const founderAssetPath = persona.assets.portrait;
+
   const [submitting, setSubmitting] = useState(false);
   const [showAntiCheatWarning, setShowAntiCheatWarning] = useState(false);
+
+  // ── Cinematic ending buffer ────────────────────────────────────────
+  // The server flips `phase.kind` from "active" → "settled" the instant
+  // the last damage lands. Without a buffer, the CombatQuestionCard
+  // (with its BattleScene endgame beat: loser DEFEAT then winner
+  // VICTORY loop) unmounts immediately and the user is dropped straight
+  // into the static result panel. We want a proper cinematic sequence:
+  //   0.0-1.5s  loser plays DEFEAT (kneels / crumbles)
+  //   1.5-3.5s  loser fades, winner slides to center + VICTORY loop
+  //   3.5s+     result score card
+  // We accomplish this by holding the outer phase as "active" for
+  // CINEMATIC_HOLD_MS after we first see `settled`, while pinning the
+  // last known active-phase view so BattleScene has HP=0 to react to.
+  const CINEMATIC_HOLD_MS = 3500;
+  // Reset the cinematic ref whenever the roundId changes, so a retry
+  // round's ending gets its own fresh cinematic buffer.
+  useEffect(() => {
+    cinematicUntilRef.current = null;
+    lastActiveViewRef.current = null;
+  }, [roundId]);
+  // ── SYNCHRONOUS cinematic arming ────────────────────────────────────
+  // We MUST arm the cinematic timer during the same render that first
+  // sees `phase.kind === "settled"`, otherwise `CombatResultPanel`
+  // renders once before our useEffect fires and the user sees the
+  // score card flash BEFORE the cinematic (that's the bug).
+  //
+  // Both the "when did we first see settled" timestamp AND the "last
+  // known active view snapshot" live in refs updated synchronously
+  // during render — no useEffect race.
+  const cinematicUntilRef = useRef<number | null>(null);
+  const lastActiveViewRef = useRef<
+    | {
+        currentQuestion: null;
+        currentQuestionIndex: number;
+        totalQuestions: number;
+        bossHpInitial: number;
+        playerHpInitial: number;
+        bossHpCurrent: number;
+        playerHpCurrent: number;
+      }
+    | null
+  >(null);
+  // Snapshot the active view every render it's active (cheap; refs
+  // don't trigger re-renders on mutation). This means the moment the
+  // outer phase flips to settled, the ref holds the last live HP.
+  if (phase.kind === "active") {
+    lastActiveViewRef.current = {
+      currentQuestion: null,
+      currentQuestionIndex: phase.view.currentQuestionIndex,
+      totalQuestions: phase.view.totalQuestions,
+      bossHpInitial: phase.view.bossHpInitial,
+      playerHpInitial: phase.view.playerHpInitial,
+      bossHpCurrent: phase.view.bossHpCurrent,
+      playerHpCurrent: phase.view.playerHpCurrent,
+    };
+  }
+  // Arm the buffer on the FIRST render we see settled. Ref write is
+  // idempotent — we only set it if it hasn't been set yet.
+  if (phase.kind === "settled" && cinematicUntilRef.current === null) {
+    cinematicUntilRef.current = Date.now() + CINEMATIC_HOLD_MS;
+  }
+  const cinematicUntil = cinematicUntilRef.current;
+  const inCinematic =
+    cinematicUntil !== null && Date.now() < cinematicUntil;
+  // Force a single re-render at the moment the cinematic buffer
+  // expires, so displayPhase re-evaluates and the score card can
+  // appear.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (cinematicUntil === null) return;
+    const remaining = cinematicUntil - Date.now();
+    if (remaining <= 0) return;
+    const id = window.setTimeout(() => forceTick((n) => n + 1), remaining + 30);
+    return () => window.clearTimeout(id);
+  }, [cinematicUntil]);
+  // Compose the phase we actually render: while in the cinematic
+  // window, synthesize an "active" phase using the last known active
+  // view so BattleScene stays mounted and its outcome flips to
+  // won/lost (which drives the defeat → cheer cinematic).
+  const displayPhase: typeof phase =
+    phase.kind === "settled" && inCinematic && lastActiveViewRef.current !== null
+      ? ({
+          kind: "active",
+          view: {
+            ...lastActiveViewRef.current,
+            // Force loser's HP to 0 so BattleScene's `outcome`
+            // resolves reliably even if the ref captured a tick
+            // before the final damage landed.
+            bossHpCurrent:
+              phase.result.status === "won"
+                ? 0
+                : lastActiveViewRef.current.bossHpCurrent,
+            playerHpCurrent:
+              phase.result.status === "lost"
+                ? 0
+                : lastActiveViewRef.current.playerHpCurrent,
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
+      : phase;
 
   const doSubmit = useCallback(
     async (
@@ -79,12 +204,8 @@ export function CombatPanel({
       const result = await retryCombat();
       const newRoundId = result?.roundId;
       if (newRoundId && onRetryStarted) {
-        // Direct callback — parent swaps the active roundId, which
-        // remounts this panel on the new round (parent should pass
-        // key={roundId} for guaranteed clean remount).
         onRetryStarted(newRoundId);
       } else if (newRoundId && typeof window !== "undefined") {
-        // Legacy fallback: dispatch window event if no callback prop.
         window.dispatchEvent(
           new CustomEvent("combat:retry-started", { detail: { newRoundId } }),
         );
@@ -101,19 +222,57 @@ export function CombatPanel({
     return () => clearTimeout(t);
   }, []);
 
+  // Boss projectile intro — during the encounter intro, the boss lobs a
+  // corrupted energy orb at the player. Purely for cinematic weight.
+  const [projectileState, setProjectileState] = useState<
+    "hidden" | "flying" | "impact"
+  >("hidden");
+  useEffect(() => {
+    const flyT = window.setTimeout(() => setProjectileState("flying"), 400);
+    const hitT = window.setTimeout(() => setProjectileState("impact"), 1150);
+    const clearT = window.setTimeout(() => setProjectileState("hidden"), 1650);
+    return () => {
+      window.clearTimeout(flyT);
+      window.clearTimeout(hitT);
+      window.clearTimeout(clearT);
+    };
+  }, []);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="AI cross-question combat"
+      data-tutorial="combat-panel"
       className="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden"
     >
-      {/* Semi-transparent dimming overlay so the world-map scene
-          remains visible behind the combat dialogue, matching
-          Undertale's overlay-on-scene pattern. */}
-      <div className="pointer-events-none absolute inset-0 bg-black/65 backdrop-blur-[1px]" />
+      {/* Biome-themed background — Village painted map dimmed with a
+          corruption vignette in the boss's family color. The map image
+          reads through at ~40% brightness so users know they're still
+          "in the village" while fighting. */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        style={{
+          backgroundImage: "url(/assets/maps-v2/village-painted/village-map.png)",
+          filter: "brightness(0.4) saturate(0.85)",
+        }}
+      />
+      {/* Dark base overlay so the terrain doesn't overpower the combat UI */}
+      <div className="pointer-events-none absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
+      {/* Family-tinted corruption vignette — mist/undead/machine/etc. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: boss?.family
+            ? `radial-gradient(circle at 50% 50%, transparent 40%, ${FAMILY_PALETTE[boss.family].auraColor}44 100%)`
+            : "radial-gradient(circle at 50% 50%, transparent 40%, rgba(120,0,0,0.35) 100%)",
+        }}
+      />
 
-      {/* Subtle CRT scanlines for retro flavour over the dimmed world */}
+      {/* Outer floating boss sprite removed — the BattleScene inside
+          CombatQuestionCard now renders the boss prominently in the arena,
+          so a second floating copy on the right edge would double up. */}
+
       <div
         className="pointer-events-none absolute inset-0 opacity-20"
         style={{
@@ -122,8 +281,6 @@ export function CombatPanel({
         }}
       />
 
-      {/* Encounter intro — Undertale's classic "* A foe approaches." line.
-          Plain white text on black, no glow, no gradient. */}
       <AnimatePresence>
         {!introPlayed && (
           <motion.div
@@ -139,38 +296,76 @@ export function CombatPanel({
                 className="font-mono text-base uppercase tracking-[0.3em] text-white"
                 style={{ fontFamily: "var(--font-pixel-display), monospace" }}
               >
-                * The Skeptic blocks your path.
+                {boss?.introLine ?? `* ${boss?.name ?? "A foe"} blocks your path.`}
               </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      <BossProjectileIntro state={projectileState} family={boss?.family ?? null} />
+
+      <AnimatePresence>
+        {projectileState === "impact" && (
+          <motion.div
+            key="impact-flash"
+            initial={{ opacity: 0.85 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.32, ease: "easeOut" }}
+            className="pointer-events-none absolute inset-0 z-[92]"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 65%, rgba(255,50,50,0.85) 0%, rgba(180,0,60,0.5) 25%, rgba(0,0,0,0) 55%)",
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       <motion.div
         className="relative mx-auto w-full max-w-2xl px-4 sm:max-w-3xl lg:max-w-5xl"
         initial={{ opacity: 0 }}
-        animate={introPlayed ? { opacity: 1 } : { opacity: 0 }}
-        transition={{ duration: 0.25 }}
+        animate={
+          projectileState === "impact"
+            ? {
+                opacity: introPlayed ? 1 : 0,
+                x: [0, -14, 12, -8, 6, -3, 0],
+                y: [0, 4, -6, 3, -2, 1, 0],
+              }
+            : { opacity: introPlayed ? 1 : 0, x: 0, y: 0 }
+        }
+        transition={{
+          duration: projectileState === "impact" ? 0.45 : 0.25,
+          ease: projectileState === "impact" ? "easeOut" : "easeInOut",
+        }}
       >
-        <CornerBrackets />
+        {/* Corner brackets removed per product request. */}
 
-        <div className="relative max-h-[88vh] overflow-y-auto border-2 border-white bg-black p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)]">
+        <div
+          className="relative max-h-[92vh] overflow-y-auto overscroll-contain no-scrollbar border-2 border-white bg-black p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+          onWheelCapture={(e) => e.stopPropagation()}
+        >
           <button
             type="button"
             onClick={handleClose}
             aria-label="Close combat panel"
-            className="absolute right-3 top-3 font-mono text-lg leading-none text-white/40 transition hover:text-white"
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded font-mono text-3xl leading-none text-white/70 transition hover:bg-white/10 hover:text-white"
           >
             ×
           </button>
 
           <PhaseSwitch
-            phase={phase}
+            phase={displayPhase}
             submitting={submitting}
             onSubmit={(a, t) => doSubmit(a, t, false)}
             onExpire={(a, t) => doSubmit(a, t, true)}
             onAdvance={handleAdvance}
             onRetry={handleRetry}
+            boss={boss}
+            ideaTitle={ideaTitle}
+            // Persona portrait — 96x96 hero art rendered as a static
+            // combat portrait. Same persona the user picked in onboarding
+            // and rides through the venture map.
+            founderAsset={founderAssetPath}
           />
         </div>
       </motion.div>
@@ -183,127 +378,6 @@ export function CombatPanel({
   );
 }
 
-/**
- * Pixel-art encounter zone — approximates an Undertale-style "room"
- * using CSS-drawn brick walls + stone tile floor in perspective.
- * No image assets; everything is procedural.
- */
-function AtmosphericBackground() {
-  return (
-    <>
-      {/* Base black void */}
-      <div className="pointer-events-none absolute inset-0 bg-black" />
-
-      {/* Faint CRT scanlines */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-20"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(255,255,255,0.05) 3px, transparent 4px)",
-        }}
-      />
-
-      {/* Brick-wall pattern across the upper third — suggests a stone
-          chamber wall behind the combatants. */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-1/3"
-        style={{
-          backgroundImage: `
-            linear-gradient(180deg, transparent 0%, transparent 90%, rgba(255,255,255,0.12) 90%, rgba(255,255,255,0.12) 100%),
-            linear-gradient(90deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 48px),
-            linear-gradient(0deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 24px)
-          `,
-          backgroundSize: "auto, 48px 24px, 48px 24px",
-          opacity: 0.6,
-          maskImage:
-            "linear-gradient(180deg, black 30%, transparent 100%)",
-          WebkitMaskImage:
-            "linear-gradient(180deg, black 30%, transparent 100%)",
-        }}
-      />
-
-      {/* Stone tile floor with perspective — diagonal lines suggesting
-          a tiled floor receding into the distance. */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2"
-        style={{
-          backgroundImage: `
-            linear-gradient(90deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 64px),
-            linear-gradient(0deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 32px)
-          `,
-          backgroundSize: "64px 32px",
-          transform: "perspective(400px) rotateX(60deg)",
-          transformOrigin: "center bottom",
-          opacity: 0.7,
-          maskImage:
-            "linear-gradient(0deg, black 0%, transparent 80%)",
-          WebkitMaskImage:
-            "linear-gradient(0deg, black 0%, transparent 80%)",
-        }}
-      />
-
-      {/* A few flickering torch-light points along the walls */}
-      {[
-        { left: "12%", top: "8%", delay: 0 },
-        { left: "88%", top: "10%", delay: 0.7 },
-        { left: "50%", top: "5%", delay: 1.2 },
-      ].map((torch, i) => (
-        <motion.div
-          key={`torch-${i}`}
-          className="pointer-events-none absolute h-3 w-3"
-          style={{
-            left: torch.left,
-            top: torch.top,
-            imageRendering: "pixelated",
-          }}
-          animate={{
-            opacity: [0.5, 1, 0.7, 1, 0.5],
-          }}
-          transition={{
-            duration: 1.4,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: torch.delay,
-          }}
-        >
-          <div
-            className="h-full w-full"
-            style={{
-              background: "#FFE066",
-              boxShadow:
-                "0 0 12px 4px rgba(255,224,102,0.55), 0 0 24px 8px rgba(255,140,0,0.25)",
-            }}
-          />
-        </motion.div>
-      ))}
-
-      {/* Subtle ambient star pinpoints far back */}
-      {[
-        { left: "22%", top: "22%", delay: 0 },
-        { left: "76%", top: "18%", delay: 0.9 },
-        { left: "40%", top: "14%", delay: 1.8 },
-      ].map((s, i) => (
-        <motion.div
-          key={`star-${i}`}
-          className="pointer-events-none absolute h-[2px] w-[2px] bg-white"
-          style={{ left: s.left, top: s.top, imageRendering: "pixelated" }}
-          animate={{ opacity: [0.15, 0.8, 0.15] }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: s.delay,
-          }}
-        />
-      ))}
-    </>
-  );
-}
-
-/**
- * Player SOUL heart — iconic red Undertale soul. Renders as scalable
- * SVG with pixel-perfect heart shape. Optionally pulses on idle.
- */
 export function PlayerSoul({ size = 18 }: { size?: number }) {
   return (
     <motion.svg
@@ -315,17 +389,14 @@ export function PlayerSoul({ size = 18 }: { size?: number }) {
       transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
       aria-label="Player soul"
     >
-      {/* Heart outline (deeper red) */}
       <path
         d="M2 5h2v1h1v1h1V6h2v1h1V6h1V5h2v3h-1v1h-1v1h-1v1h-1v1h-1v-1H6v-1H5v-1H4V9H3V8H2V5z"
         fill="#7a0d0d"
       />
-      {/* Heart fill (bright red) */}
       <path
         d="M3 5h1v1h1v1h1V6h2v1h1V6h1V5h1v3h-1v1h-1v1h-1v1h-1v-1H6v-1H5v-1H4V8H3V5z"
         fill="#FF0033"
       />
-      {/* Highlight */}
       <rect x="4" y="6" width="1" height="1" fill="#FFB3B3" />
     </motion.svg>
   );
@@ -338,6 +409,12 @@ interface PhaseSwitchProps {
   onExpire: (answer: string, telemetry: KeystrokeTelemetry) => void;
   onAdvance: () => void;
   onRetry: () => void;
+  /** Village boss metadata forwarded to CombatQuestionCard. */
+  boss?: VillageBossInfo | null;
+  /** Founder persona asset path forwarded to CombatQuestionCard. */
+  founderAsset?: string | null;
+  /** User's actual idea/venture title forwarded to CombatQuestionCard. */
+  ideaTitle?: string | null;
 }
 
 function PhaseSwitch({
@@ -347,6 +424,9 @@ function PhaseSwitch({
   onExpire,
   onAdvance,
   onRetry,
+  boss = null,
+  founderAsset = null,
+  ideaTitle = null,
 }: PhaseSwitchProps) {
   switch (phase.kind) {
     case "loading":
@@ -354,10 +434,6 @@ function PhaseSwitch({
     case "cap_exhausted":
       return <CapExhaustedState />;
     case "active":
-      // Even when waiting for the next question to be generated, render
-      // the battle scene + HP cards + sidebar so the reaction animations
-      // play on the HP delta and the user sees their answer's impact.
-      // The dialogue panel falls back to a "next question incoming" prompt.
       return (
         <CombatQuestionCard
           question={phase.view.currentQuestion ?? {
@@ -365,7 +441,7 @@ function PhaseSwitch({
             order: phase.view.currentQuestionIndex + 1,
             prompt:
               phase.view.currentQuestionIndex === 0
-                ? "* The Doubt Imp is preparing its first challenge…"
+                ? `* ${boss?.name ?? "The foe"} is preparing its first challenge…`
                 : "* Your answer struck home. Bracing for the next question…",
             persona: "villain",
             complexityTier: "medium",
@@ -381,6 +457,9 @@ function PhaseSwitch({
           onSubmit={onSubmit}
           onExpire={onExpire}
           isLocked={submitting || !phase.view.currentQuestion}
+          boss={boss}
+          founderAsset={founderAsset}
+          ideaTitle={ideaTitle}
         />
       );
     case "settled":
@@ -427,7 +506,6 @@ function CapExhaustedState() {
 }
 
 function CornerBrackets() {
-  // Pixel-art corner brackets reinforcing the terminal feel.
   return (
     <>
       <span
@@ -447,5 +525,161 @@ function CornerBrackets() {
         className="pointer-events-none absolute bottom-2 right-2 h-4 w-4 border-b-2 border-r-2 border-white/60"
       />
     </>
+  );
+}
+
+/**
+ * Corrupted energy orb the boss lobs at the player during the encounter
+ * intro. Renders as an SVG projectile with a trailing tail; on impact it
+ * bursts into 10 crackling shards.
+ */
+function BossProjectileIntro({
+  state,
+  family,
+}: {
+  state: "hidden" | "flying" | "impact";
+  family: VillageBossFamily | null;
+}) {
+  const ORIGIN = { x: "82%", y: "32%" };
+  const TARGET = { x: "28%", y: "68%" };
+  // Pull palette from the shared config so the projectile matches the
+  // boss's family (mist=blue, undead=purple, machine=orange, etc.).
+  // Falls back to red for unknown/missing family.
+  const palette = family
+    ? FAMILY_PALETTE[family]
+    : { particleColor: "#dc2626", coreColor: "#fca5a5", auraColor: "#9333ea" };
+
+  return (
+    <AnimatePresence>
+      {state === "flying" && (
+        <motion.div
+          key="orb"
+          initial={{
+            left: ORIGIN.x,
+            top: ORIGIN.y,
+            opacity: 0,
+            scale: 0.4,
+          }}
+          animate={{
+            left: [ORIGIN.x, "55%", TARGET.x],
+            top: [ORIGIN.y, "38%", TARGET.y],
+            opacity: [0, 1, 1],
+            scale: [0.4, 1, 1.15],
+          }}
+          exit={{ opacity: 0, scale: 0 }}
+          transition={{
+            duration: 0.75,
+            ease: [0.4, 0, 0.6, 1],
+            times: [0, 0.55, 1],
+          }}
+          className="pointer-events-none absolute z-[95] -translate-x-1/2 -translate-y-1/2"
+          style={{ imageRendering: "pixelated" }}
+        >
+          <svg
+            viewBox="0 0 32 32"
+            width={44}
+            height={44}
+            style={{
+              filter: `drop-shadow(0 0 8px ${palette.particleColor}) drop-shadow(0 0 20px ${palette.auraColor})`,
+            }}
+          >
+            {/* Family-tinted outer aura */}
+            <circle cx="16" cy="16" r="13" fill={palette.auraColor} fillOpacity="0.35" />
+            {/* Family-tinted mid glow */}
+            <circle cx="16" cy="16" r="10" fill={palette.particleColor} fillOpacity="0.65" />
+            {/* Family-tinted core */}
+            <circle cx="16" cy="16" r="6.5" fill={palette.coreColor} />
+            {/* Bright hot spot */}
+            <circle cx="14" cy="14" r="2.5" fill="#fef2f2" />
+            {/* Crackling edges use the outer particle color */}
+            <rect x="15" y="1" width="2" height="4" fill={palette.particleColor} />
+            <rect x="15" y="27" width="2" height="4" fill={palette.particleColor} />
+            <rect x="1" y="15" width="4" height="2" fill={palette.particleColor} />
+            <rect x="27" y="15" width="4" height="2" fill={palette.particleColor} />
+          </svg>
+
+          <motion.div
+            className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2"
+            initial={{ opacity: 0, scale: 1 }}
+            animate={{ opacity: [0, 0.6, 0.4], scale: [1, 1.4, 1.8] }}
+            transition={{
+              duration: 0.75,
+              times: [0, 0.5, 1],
+              ease: "linear",
+            }}
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: "50%",
+              background:
+                "radial-gradient(circle, rgba(220,38,38,0.55) 0%, rgba(147,51,234,0.25) 50%, rgba(0,0,0,0) 75%)",
+            }}
+          />
+        </motion.div>
+      )}
+
+      {state === "impact" && <ProjectileImpactBurst target={TARGET} />}
+    </AnimatePresence>
+  );
+}
+
+function ProjectileImpactBurst({
+  target,
+}: {
+  target: { x: string; y: string };
+}) {
+  const shards = Array.from({ length: 10 }, (_, i) => {
+    const angle = (i / 10) * Math.PI * 2;
+    return {
+      id: i,
+      dx: Math.cos(angle) * 90,
+      dy: Math.sin(angle) * 90,
+      rot: (angle * 180) / Math.PI,
+      tint: i % 3 === 0 ? "#fef2f2" : i % 3 === 1 ? "#fca5a5" : "#dc2626",
+    };
+  });
+
+  return (
+    <motion.div
+      key="impact-burst"
+      className="pointer-events-none absolute z-[95] -translate-x-1/2 -translate-y-1/2"
+      style={{ left: target.x, top: target.y }}
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+        initial={{ width: 4, height: 4, opacity: 1 }}
+        animate={{ width: 90, height: 90, opacity: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      />
+      <motion.div
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-red-500"
+        initial={{ width: 8, height: 8, opacity: 0.9 }}
+        animate={{ width: 140, height: 140, opacity: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      />
+      {shards.map((s) => (
+        <motion.div
+          key={s.id}
+          className="absolute left-1/2 top-1/2"
+          initial={{ x: 0, y: 0, opacity: 1, rotate: s.rot }}
+          animate={{
+            x: s.dx,
+            y: s.dy,
+              opacity: 0,
+            rotate: s.rot + 90,
+          }}
+          transition={{ duration: 0.55, ease: "easeOut" }}
+          style={{
+            width: 6,
+            height: 3,
+            background: s.tint,
+            boxShadow: `0 0 6px ${s.tint}`,
+            imageRendering: "pixelated",
+          }}
+        />
+      ))}
+    </motion.div>
   );
 }

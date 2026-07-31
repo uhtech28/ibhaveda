@@ -23,7 +23,7 @@ export const FloatingChatButton: React.FC = () => {
       aria-label="Open chat"
       className="
         fixed z-[45]
-        right-12 bottom-28 lg:right-12 lg:bottom-12
+        right-12 bottom-40 lg:right-12 lg:bottom-24
         flex h-10 w-10 items-center justify-center rounded-full
         bg-primary text-primary-foreground
         border border-white/10

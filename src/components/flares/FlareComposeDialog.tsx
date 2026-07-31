@@ -1,31 +1,44 @@
 "use client";
 
 /**
- * Compose dialog for firing a new flare. Single description field,
- * with a soft character minimum so users don't fire one-word flares
- * that are useless to responders.
+ * Compose dialog for firing a new flare.
  *
- * Keeps the form local — no Convex query subscription — and submits
- * via `fireFlare`. Closes on success.
+ * Layout mirrors the IdeaWizard preview step (title + description +
+ * industries + skills). Difference from the wizard:
+ *   - Heading is "Fire a Flare", not "Your Idea"
+ *   - Title is pre-filled from the linked idea and can be edited
+ *   - Industries + Skills are pre-filled from the linked idea's tags
+ *     but editable
+ *   - Description is empty for the user to describe their problem
+ *   - No file upload, no "post to social platforms" toggle
+ *
+ * The backend still stores everything in the flare's `description`
+ * field; the extra structure here is a UX/UI improvement on top of
+ * the existing single-text flare model.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Radio, Send } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
+import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
+import { cn } from "@/lib/utils";
+import { displayFontClass } from "@/components/ideaforge/shared";
 
 const MIN_DESCRIPTION_CHARS = 20;
 const MAX_DESCRIPTION_CHARS = 600;
+const MAX_TITLE_CHARS = 100;
 
 interface Props {
   open: boolean;
@@ -34,42 +47,124 @@ interface Props {
   checkpointId?: Id<"ventureCheckpoints">;
 }
 
+function parseTagArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+      .map((s) => s.trim());
+  }
+  if (typeof raw !== "string" || raw.trim().length === 0) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+        .map((s) => s.trim());
+    }
+  } catch {
+    /* not JSON — treat as CSV / plain string */
+  }
+  return [raw.trim()];
+}
+
 export function FlareComposeDialog({
   open,
   onOpenChange,
   ventureId,
   checkpointId,
 }: Props) {
+  // ── Fetch venture -> idea so we can pre-fill title + tags ────────────────
+  const venture = useQuery(
+    api.ventures.getVenture,
+    ventureId ? { ventureId } : "skip",
+  );
+  const idea = useQuery(
+    api.ideas.getIdeaById,
+    venture?.ideaId ? { ideaId: venture.ideaId } : "skip",
+  );
+
+  // Pre-fill sources derived from the idea. Wrapped in useMemo so the
+  // effect below doesn't re-fire on every render.
+  const prefill = useMemo(() => {
+    const title = idea?.title ? `Help with: ${idea.title}` : "";
+    const industries = parseTagArray(
+      (idea as { industries?: unknown } | null | undefined)?.industries,
+    );
+    const skills = parseTagArray(
+      (idea as { category?: unknown } | null | undefined)?.category,
+    );
+    return { title, industries, skills };
+  }, [idea]);
+
+  // ── Local form state ─────────────────────────────────────────────────────
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [expertiseTag, setExpertiseTag] = useState("");
+  const [industries, setIndustries] = useState<string[]>([]);
+  const [skills, setSkills] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track whether the user has manually edited each pre-fillable field
+  // so we don't overwrite their edits when Convex resolves late.
+  const [touched, setTouched] = useState({
+    title: false,
+    industries: false,
+    skills: false,
+  });
 
   const fireFlare = useMutation(api.flares.fireFlare);
 
-  // Reset state every time the dialog reopens so a closed-and-reopened
-  // dialog never shows stale text or an old error.
+  // Reset when the dialog reopens.
   useEffect(() => {
     if (open) {
+      setTitle("");
       setDescription("");
-      setExpertiseTag("");
+      setIndustries([]);
+      setSkills([]);
       setError(null);
+      setTouched({ title: false, industries: false, skills: false });
     }
   }, [open]);
 
-  const trimmedLength = description.trim().length;
-  const tooShort = trimmedLength > 0 && trimmedLength < MIN_DESCRIPTION_CHARS;
-  const canSubmit = trimmedLength >= MIN_DESCRIPTION_CHARS && !submitting;
+  // Apply pre-fill values once the idea query resolves, unless the user
+  // has already started typing/selecting.
+  useEffect(() => {
+    if (!open) return;
+    if (!touched.title && prefill.title) setTitle(prefill.title);
+    if (!touched.industries && prefill.industries.length > 0)
+      setIndustries(prefill.industries);
+    if (!touched.skills && prefill.skills.length > 0) setSkills(prefill.skills);
+  }, [open, prefill, touched]);
+
+  const trimmedDescriptionLength = description.trim().length;
+  const tooShort =
+    trimmedDescriptionLength > 0 &&
+    trimmedDescriptionLength < MIN_DESCRIPTION_CHARS;
+  const canSubmit =
+    trimmedDescriptionLength >= MIN_DESCRIPTION_CHARS &&
+    title.trim().length > 0 &&
+    !submitting;
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
+      // Serialise the structured form into the single description field
+      // the backend expects. The first line is the pre-filled/edited
+      // title; the next lines are the actual problem statement. Industries
+      // + skills are appended so responders can filter by relevance.
+      const tags = [
+        ...industries.map((i) => `#${i.replace(/\s+/g, "-").toLowerCase()}`),
+        ...skills.map((s) => `#${s.replace(/\s+/g, "-").toLowerCase()}`),
+      ];
+      const composed = `${title.trim()}\n\n${description.trim()}${
+        tags.length > 0 ? `\n\n${tags.join(" ")}` : ""
+      }`;
+      // Use the first skill as the expertiseTag hint if the user set one.
+      const primarySkill = skills[0]?.trim();
       await fireFlare({
-        description: description.trim(),
-        // Optional expertise hint — backend trims + caps at 60 chars.
-        expertiseTag: expertiseTag.trim() || undefined,
+        description: composed,
+        expertiseTag: primarySkill || undefined,
         ventureId,
         checkpointId,
       });
@@ -85,8 +180,10 @@ export function FlareComposeDialog({
     }
   }, [
     canSubmit,
+    title,
     description,
-    expertiseTag,
+    industries,
+    skills,
     fireFlare,
     ventureId,
     checkpointId,
@@ -95,96 +192,140 @@ export function FlareComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent
+        className="w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[90dvh]"
+        data-tutorial="flare-compose"
+      >
+        <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
+          <div className="flex items-center gap-2">
             <Radio className="h-5 w-5 text-amber-400" />
-            Fire a Flare
-          </DialogTitle>
-          <DialogDescription>
-            Ask the community for help. Be specific about what's blocking
-            you so people can respond usefully.
+            <DialogTitle
+              className={cn(
+                displayFontClass,
+                "text-lg font-semibold text-white",
+              )}
+            >
+              Fire a Flare
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-xs text-[#9CA3AF] mt-0.5">
+            Ask the community for help. Be specific about your problem so
+            people can respond usefully.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          {/* Optional expertise hint — helps responders self-select.
-              Free text so the user can write whatever's specific to
-              their problem (e.g. "react performance", "fundraising
-              pitch", "labor law"). Capped at 60 chars by the backend. */}
-          <div className="space-y-1">
-            <label
-              htmlFor="flare-expertise"
-              className="text-xs font-semibold uppercase tracking-wider text-white/60"
-            >
-              Field of expertise needed
-              <span className="ml-1 text-white/30">(optional)</span>
-            </label>
-            <input
-              id="flare-expertise"
-              type="text"
-              value={expertiseTag}
-              onChange={(e) => setExpertiseTag(e.target.value.slice(0, 60))}
-              placeholder="e.g. marketing, react, fundraising, design"
-              maxLength={60}
-              className="w-full rounded-md border border-white/15 bg-white/[0.02] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/30 transition-colors"
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0">
+          {/* Title — pre-filled from the linked idea */}
+          <div>
+            <Input
+              id="flare-title"
+              value={title}
+              onChange={(e) => {
+                setTouched((t) => ({ ...t, title: true }));
+                setTitle(e.target.value.slice(0, MAX_TITLE_CHARS));
+              }}
+              placeholder="A short, specific title"
+              maxLength={MAX_TITLE_CHARS}
+              className="h-11 rounded-[10px] border-white/5 bg-[#0D1117] px-3 text-base text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-0 lg:text-sm"
+              required
+              autoFocus
               disabled={submitting}
             />
           </div>
 
-          <Textarea
-            placeholder="What are you stuck on? Mention what you've tried so far if it helps."
-            value={description}
-            onChange={(e) =>
-              setDescription(e.target.value.slice(0, MAX_DESCRIPTION_CHARS))
-            }
-            className="min-h-[140px] resize-none"
-            disabled={submitting}
-          />
-
-          <div className="flex items-center justify-between text-xs">
-            <span
-              className={
-                tooShort ? "text-amber-300" : "text-white/40"
+          {/* Description — user describes their problem */}
+          <div>
+            <Textarea
+              id="flare-description"
+              placeholder="What's the problem? What have you tried?"
+              value={description}
+              onChange={(e) =>
+                setDescription(e.target.value.slice(0, MAX_DESCRIPTION_CHARS))
               }
-            >
-              {tooShort
-                ? `A bit more context helps — ${
-                    MIN_DESCRIPTION_CHARS - trimmedLength
-                  } more characters`
-                : "Specific beats vague — what have you tried, what's blocking?"}
-            </span>
-            <span className="font-mono text-white/40">
-              {trimmedLength} / {MAX_DESCRIPTION_CHARS}
-            </span>
+              className="min-h-[140px] rounded-[10px] border-white/5 bg-[#0D1117] p-3 text-sm text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-amber-400"
+              disabled={submitting}
+              onPaste={(e) => e.preventDefault()}
+              onCopy={(e) => e.preventDefault()}
+              onCut={(e) => e.preventDefault()}
+              onContextMenu={(e) => e.preventDefault()}
+              onDrop={(e) => e.preventDefault()}
+              // Stop keydown bubbling so tutorial scrim / Phaser / any
+              // parent key handler can't swallow space or letters.
+              onKeyDown={(e) => e.stopPropagation()}
+              onKeyUp={(e) => e.stopPropagation()}
+              autoComplete="off"
+              autoCorrect="off"
+            />
+            <div className="mt-1 flex items-center justify-between text-[10px]">
+              <span className={tooShort ? "text-amber-300" : "text-white/40"}>
+                {tooShort
+                  ? `A bit more context helps — ${
+                      MIN_DESCRIPTION_CHARS - trimmedDescriptionLength
+                    } more characters`
+                  : "Specific beats vague — what have you tried, what's blocking?"}
+              </span>
+              <span className="font-mono text-white/40 tabular-nums">
+                {trimmedDescriptionLength} / {MAX_DESCRIPTION_CHARS}
+              </span>
+            </div>
+          </div>
+
+          {/* Industries + Skills — pre-filled but editable */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                Industries impacted
+              </label>
+              <IndustriesMultiSelect
+                selectedIndustries={industries}
+                onChange={(next) => {
+                  setTouched((t) => ({ ...t, industries: true }));
+                  setIndustries(next);
+                }}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                Skills needed
+              </label>
+              <SkillsMultiSelect
+                selectedSkills={skills}
+                onChange={(next) => {
+                  setTouched((t) => ({ ...t, skills: true }));
+                  setSkills(next);
+                }}
+              />
+            </div>
           </div>
 
           {error && (
-            <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-sm text-red-300">
+            <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300">
               {error}
             </p>
           )}
         </div>
 
-        <DialogFooter>
+        {/* Footer — back arrow left, Fire Flare right */}
+        <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 pt-3 pb-4 bg-[#0D1117] shrink-0">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded-md border border-white/20 px-3 py-2 text-sm text-white/70 transition hover:border-white/40 hover:text-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-white/[0.06] hover:text-white"
+            aria-label="Cancel"
             disabled={submitting}
           >
-            Cancel
+            ←
           </button>
           <button
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="inline-flex items-center gap-2 rounded-md border border-amber-500 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-[10px] bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_32px_rgba(245,158,11,0.25)] transition hover:from-amber-400 hover:to-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Firing
+                Firing…
               </>
             ) : (
               <>
@@ -193,7 +334,7 @@ export function FlareComposeDialog({
               </>
             )}
           </button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

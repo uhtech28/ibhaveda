@@ -105,6 +105,13 @@ export function SelfReportTool({
                   placeholder={`Enter ${field.label.toLowerCase()}...`}
                   value={(values[field.key] as string) || ""}
                   onChange={(e) => handleChange(field.key, e.target.value)}
+                  onPaste={(e) => e.preventDefault()}
+                  onCopy={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onDrop={(e) => e.preventDefault()}
+                  autoComplete="off"
+                  autoCorrect="off"
                   className="min-h-[100px] resize-y"
                 />
               ) : (
@@ -121,6 +128,13 @@ export function SelfReportTool({
                         : e.target.value,
                     )
                   }
+                  onPaste={(e) => e.preventDefault()}
+                  onCopy={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onDrop={(e) => e.preventDefault()}
+                  autoComplete="off"
+                  autoCorrect="off"
                 />
               )}
             </div>

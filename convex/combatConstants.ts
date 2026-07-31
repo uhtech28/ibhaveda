@@ -25,8 +25,28 @@ export const COMBAT_CONFIG = {
    * flip the body of `userTier()` in combat.ts and Pro becomes live.
    */
   QUESTIONS_PER_ROUND: {
-    free: { min: 2, max: 4 },
+    // Bumped from 2-4 → 3-5 so the interrogation reads as a real VC
+    // due-diligence pass rather than a warm-up chat. The dynamic sizer
+    // in `applyAnswerEvaluation` may still add or trim within this
+    // band as the user's running score evolves.
+    free: { min: 3, max: 5 },
     pro: { min: 5, max: 8 },
+  } as const,
+
+  /**
+   * Dynamic re-sizing rules applied AFTER each answer (see
+   * `adjustTotalQuestionsForRunningScore` in combat.ts). The round can
+   * only grow within `[QUESTIONS_PER_ROUND[tier].min, max]`.
+   *
+   *   avg ≥ EXTEND_IF_STRONG_ABOVE  → shrink budget to answeredCount+1
+   *                                    (finish the round early — they
+   *                                    clearly know their stuff).
+   *   avg ≤ EXTEND_IF_WEAK_BELOW    → expand budget to max
+   *                                    (they need more rope; more questions).
+   */
+  DYNAMIC_QUESTIONS: {
+    SHRINK_IF_STRONG_ABOVE: 4.2, // avg score threshold to end early
+    EXTEND_IF_WEAK_BELOW: 2.4, // avg score threshold to push to max
   } as const,
 
   /**

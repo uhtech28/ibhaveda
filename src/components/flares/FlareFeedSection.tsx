@@ -14,14 +14,14 @@
  * don't each do their own auth lookup.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Loader2, Radio } from "lucide-react";
 import { useQuery } from "convex/react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { FlareCard } from "./FlareCard";
 import { FlareDetailDialog } from "./FlareDetailDialog";
-import { FlareTriggerButton } from "./FlareTriggerButton";
 
 interface Props {
   limit?: number;
@@ -32,6 +32,25 @@ interface Props {
 export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
   const flares = useQuery(api.flares.getOpenFlares, { limit });
   const [openFlareId, setOpenFlareId] = useState<Id<"flares"> | null>(null);
+
+  // Deep-link support: notification tap on a flare_response_* notif
+  // navigates here with ?flare=<flareId> in the URL. On mount, if that
+  // param is present, open the FlareDetailDialog for that flare and
+  // strip the param so back-nav + refresh don't re-trigger.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  useEffect(() => {
+    const flareParam = searchParams?.get("flare");
+    if (flareParam) {
+      setOpenFlareId(flareParam as Id<"flares">);
+      const next = new URLSearchParams(searchParams?.toString() ?? "");
+      next.delete("flare");
+      const qs = next.toString();
+      router.replace(qs ? `/feed?${qs}` : "/feed", { scroll: false });
+    }
+    // Only on first mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <section className="space-y-3">
@@ -47,9 +66,10 @@ export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
             </span>
           )}
         </div>
-        {/* "Fire a Flare" CTA sits in the section header so anyone
-            scrolling past the open flares can request help in two clicks. */}
-        <FlareTriggerButton variant="solid" />
+        {/* "Fire a Flare" CTA intentionally NOT on the feed — flares
+            can only be fired from inside a project on the map (the
+            CheckpointPanel's flare button). Tutorial's flare step
+            points at that map button, not this section. */}
       </header>
 
       {flares === undefined ? (

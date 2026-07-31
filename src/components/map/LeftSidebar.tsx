@@ -3,19 +3,6 @@
 import React from "react";
 import { motion } from "framer-motion";
 import {
-  Grid,
-  Calendar,
-  LayoutDashboard,
-  Settings,
-  HelpCircle,
-  Rss,
-  MessageSquare,
-  Users,
-  GitFork,
-  Scroll,
-  Gamepad2,
-} from "lucide-react";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -23,6 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { audioManager } from "@/lib/audio/audioManager";
+import { PixelIcon, type PixelIconName } from "@/components/ui/PixelIcon";
 
 interface LeftSidebarProps {
   onOpenPanel: (
@@ -44,71 +32,75 @@ interface LeftSidebarProps {
 }
 
 export function LeftSidebar({ onOpenPanel, className, ventureName }: LeftSidebarProps) {
-  const navItems = [
+  // Sidebar mapped to fantasy pixel icons — matches the game world's
+  // visual language. See /public/assets/ui/icons/ (sliced from the 2D
+  // Game Symbol Reference sheet).
+  const navItems: readonly {
+    id:
+      | "feed"
+      | "chat"
+      | "contributors"
+      | "hierarchy"
+      | "calendar"
+      | "kanban"
+      | "journal";
+    pixelIcon: PixelIconName;
+    label: string;
+    bgClass: string;
+    borderClass: string;
+  }[] = [
     {
       id: "feed",
-      icon: Rss,
+      pixelIcon: "scroll-approved",   // Contributions ledger
       label: "Contributions",
-      colorClass: "text-indigo-300 group-hover:text-indigo-200",
       bgClass: "bg-indigo-500/10 hover:bg-indigo-500/20",
       borderClass: "border-indigo-500/20 hover:border-indigo-500/40",
     },
     {
       id: "chat",
-      icon: MessageSquare,
+      pixelIcon: "crystal-ball-purple",
       label: "Group Chat",
-      colorClass: "text-blue-300 group-hover:text-blue-200",
       bgClass: "bg-blue-500/10 hover:bg-blue-500/20",
       borderClass: "border-blue-500/20 hover:border-blue-500/40",
     },
     {
       id: "contributors",
-      icon: Users,
+      pixelIcon: "guild-crest-gold-eagle",
       label: "Contributors",
-      colorClass: "text-sky-300 group-hover:text-sky-200",
       bgClass: "bg-sky-500/10 hover:bg-sky-500/20",
       borderClass: "border-sky-500/20 hover:border-sky-500/40",
     },
     {
       id: "hierarchy",
-      icon: GitFork,
+      pixelIcon: "map-region",
       label: "Hierarchy",
-      colorClass: "text-pink-300 group-hover:text-pink-200",
       bgClass: "bg-pink-500/10 hover:bg-pink-500/20",
       borderClass: "border-pink-500/20 hover:border-pink-500/40",
     },
     {
       id: "calendar",
-      icon: Calendar,
+      pixelIcon: "hourglass-blue",
       label: "Calendar",
-      colorClass: "text-amber-300 group-hover:text-amber-200",
       bgClass: "bg-amber-500/10 hover:bg-amber-500/20",
       borderClass: "border-amber-500/20 hover:border-amber-500/40",
     },
     {
       id: "kanban",
-      icon: LayoutDashboard,
+      pixelIcon: "rune-stone",
       label: "Kanban Board",
-      colorClass: "text-emerald-300 group-hover:text-emerald-200",
       bgClass: "bg-emerald-500/10 hover:bg-emerald-500/20",
       borderClass: "border-emerald-500/20 hover:border-emerald-500/40",
     },
     {
       id: "journal",
-      icon: Scroll,
+      pixelIcon: "journal",
       label: "Journal",
-      colorClass: "text-violet-300 group-hover:text-violet-200",
       bgClass: "bg-violet-500/10 hover:bg-violet-500/20",
       borderClass: "border-violet-500/20 hover:border-violet-500/40",
     },
-    {
-      id: "minigames",
-      icon: Gamepad2,
-      label: "Mini Games",
-      colorClass: "text-fuchsia-300 group-hover:text-fuchsia-200",
-      bgClass: "bg-fuchsia-500/10 hover:bg-fuchsia-500/20",
-      borderClass: "border-fuchsia-500/20 hover:border-fuchsia-500/40",
-    },
+    // Mini Games button removed from sidebar per product decision — the
+    // mini-game spawn points now live directly on the map as easter-eggs
+    // that users discover by exploring. Sidebar entry point retired.
   ] as const;
 
   return (
@@ -143,11 +135,11 @@ export function LeftSidebar({ onOpenPanel, className, ventureName }: LeftSidebar
                       item.borderClass,
                     )}
                   >
-                    <item.icon
-                      className={cn(
-                        "h-5 w-5 sm:h-5.5 sm:w-5.5 transition-colors",
-                        item.colorClass,
-                      )}
+                    <PixelIcon
+                      name={item.pixelIcon}
+                      size={24}
+                      alt={item.label}
+                      className="transition-transform group-hover:scale-105"
                     />
                     <div className="absolute inset-0 rounded-xl bg-white/5 opacity-0 group-hover:opacity-10 transition-opacity" />
                   </button>
@@ -162,7 +154,41 @@ export function LeftSidebar({ onOpenPanel, className, ventureName }: LeftSidebar
             ))}
           </div>
 
-
+          {/* Settings pinned to the bottom — separated by a thin divider
+              so it visually reads as a "system" action distinct from the
+              venture-scoped tabs above. */}
+          <div className="mt-auto pt-3 border-t border-white/10 flex flex-col gap-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    audioManager.playUI("click");
+                    onOpenPanel("settings");
+                  }}
+                  onMouseEnter={() => audioManager.playUI("hover")}
+                  className={cn(
+                    "h-9 w-9 sm:h-10 sm:w-10 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group relative border",
+                    "bg-slate-500/10 hover:bg-slate-500/20",
+                    "border-slate-500/20 hover:border-slate-500/40",
+                  )}
+                >
+                  <PixelIcon
+                    name="saddlebag-backpack"
+                    size={24}
+                    alt="Settings"
+                    className="transition-transform group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 rounded-xl bg-white/5 opacity-0 group-hover:opacity-10 transition-opacity" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="right"
+                className="ml-2 bg-slate-900 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest px-3 py-1.5"
+              >
+                <p>Settings</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </motion.div>
       </TooltipProvider>
     </>

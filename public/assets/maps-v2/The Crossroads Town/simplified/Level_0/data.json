@@ -1,0 +1,15 @@
+{
+	"identifier": "Level_0",
+	"uniqueIdentifer": "8ee473c0-6fc0-11f1-8757-7da8666b9800",
+	"x": 0,
+	"y": 0,
+	"width": 2400,
+	"height": 1600,
+	"bgColor": "#696A79",
+	"neighbourLevels": [],
+	"customFields" : {},
+	"layers": [
+		"The_Crossroads_Town.png"
+	],
+	"entities" : {}
+}

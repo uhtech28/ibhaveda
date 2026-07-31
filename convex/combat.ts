@@ -180,7 +180,13 @@ export const startCombatRound = mutation({
       userId,
       checkpointId,
     );
-    const totalQuestions = questionCountForRound(tier, baseScore);
+    // TUTORIAL: fixed at 2 questions so the first combat is short and
+    // gentle. Every answer is treated as a max hit in applyAnswerEvaluation
+    // below (also guarded by tourActive), so the tutorial user always
+    // wins their first cross-question regardless of what they type.
+    const totalQuestions = tourActive
+      ? 2
+      : questionCountForRound(tier, baseScore);
 
     const roundId = await ctx.db.insert("combatRounds", {
       userId,
@@ -675,9 +681,40 @@ export const questionContextQuery = internalQuery({
       ...recentPriorPrompts,
     ];
 
+    // When the user hasn't submitted any tasks yet (tutorial fight,
+    // "skip task go straight to combat" flow, etc.), fall back to the
+    // venture's underlying idea (title + description) so the AI has
+    // real content to challenge instead of asking blank-submission
+    // questions. Otherwise players get feedback like "your submission
+    // is entirely blank" which reads as scolding rather than combat.
+    let submissionText = filledTexts.join("\n\n---\n\n");
+    if (submissionText.trim().length === 0) {
+      try {
+        const venture = await ctx.db.get(round.ventureId);
+        if (venture?.ideaId) {
+          const idea = await ctx.db.get(venture.ideaId);
+          if (idea) {
+            const parts: string[] = [];
+            if (typeof idea.title === "string" && idea.title.trim()) {
+              parts.push(`IDEA: ${idea.title.trim()}`);
+            }
+            if (
+              typeof idea.description === "string" &&
+              idea.description.trim()
+            ) {
+              parts.push(idea.description.trim());
+            }
+            if (parts.length > 0) submissionText = parts.join("\n\n");
+          }
+        }
+      } catch {
+        /* non-fatal — leave submissionText empty */
+      }
+    }
+
     return {
       userId: round.userId,
-      submissionText: filledTexts.join("\n\n---\n\n"),
+      submissionText,
       priorTaskAnswers: filledTexts,
       recentHistoryForPrompt,
       answersGivenSoFar: currentRoundQuestions.map((q) => q.answer ?? ""),
@@ -867,11 +904,41 @@ export const answerEvaluationContext = internalQuery({
     );
     const submitted = submittedRaw.filter((s) => s.trim().length > 0);
 
+    // Match the fallback in questionContextQuery: when no task
+    // submissions exist (tutorial fight, skip-task flow), score the
+    // answer against the venture's idea title+description instead of
+    // an empty string. Keeps the AI scoring rubric grounded in real
+    // context.
+    let submissionText = submitted.join("\n\n---\n\n");
+    if (submissionText.trim().length === 0) {
+      try {
+        const venture = await ctx.db.get(round.ventureId);
+        if (venture?.ideaId) {
+          const idea = await ctx.db.get(venture.ideaId);
+          if (idea) {
+            const parts: string[] = [];
+            if (typeof idea.title === "string" && idea.title.trim()) {
+              parts.push(`IDEA: ${idea.title.trim()}`);
+            }
+            if (
+              typeof idea.description === "string" &&
+              idea.description.trim()
+            ) {
+              parts.push(idea.description.trim());
+            }
+            if (parts.length > 0) submissionText = parts.join("\n\n");
+          }
+        }
+      } catch {
+        /* non-fatal — leave submissionText empty */
+      }
+    }
+
     return {
       roundId: round._id,
       questionPrompt: question.prompt,
       answer: question.answer ?? "",
-      submissionText: submitted.join("\n\n---\n\n"),
+      submissionText,
       userPriorWritings: submitted,
     };
   },
@@ -898,16 +965,36 @@ export const applyAnswerEvaluation = internalMutation({
     const round = await ctx.db.get(question.roundId);
     if (!round) return;
 
+    // TUTORIAL WIN OVERRIDE — if the user is still on the tour, force
+    // score to 5/5 so every answer takes the boss's HP down decisively.
+    // Combined with totalQuestions=2 set in startCombatRound, the user
+    // is guaranteed to win their first cross-question no matter what
+    // they type. Only applies while the tutorial is active; regular
+    // combat rounds use the real AI score.
+    let effectiveScore = score1to5;
+    const roundUser = await ctx.db.get(round.userId);
+    const tourActive =
+      roundUser?.feedTutorialState === "not_started" ||
+      roundUser?.feedTutorialState === "in_progress";
+    if (tourActive) {
+      effectiveScore = 5;
+      // Suppress anti-cheat flagging during the tutorial — a user typing
+      // "hello world" as their first combat answer would otherwise be
+      // treated as suspicious, and we don't want to greet new users with
+      // a ban warning.
+      antiCheat = { ...antiCheat, flagged: false };
+    }
+
     // 1. Apply damage exchange to current HP.
     const exchange = applyDamageExchange(
       round.bossHpCurrent,
       round.playerHpCurrent,
-      score1to5,
+      effectiveScore,
     );
 
     // 2. Persist question-level evaluation + HP snapshot.
     await ctx.db.patch(questionId, {
-      score1to5,
+      score1to5: effectiveScore,
       aiDetectionConfidence: antiCheat.confidence,
       aiDetectionSignals: antiCheat.signals,
       bossHpAfter: exchange.bossHpAfter,
@@ -933,11 +1020,50 @@ export const applyAnswerEvaluation = internalMutation({
 
     // 5. Decide what happens next.
     const answeredCount = await countAnsweredQuestions(ctx, round._id);
+
+    // 5a. DYNAMIC QUESTION COUNT — adjust the round budget based on how
+    // the founder is actually performing. Skipped during the tutorial
+    // (fixed 2Q for guaranteed win). Otherwise: if the running average
+    // is very high, shrink the round so a strong founder isn't forced
+    // through more busywork; if very low, extend to the tier max so a
+    // struggling founder has more chances to reach victory or a real
+    // lesson. Stays clamped within the tier's [min, max] band.
+    let adjustedTotalQuestions = round.totalQuestions;
+    if (!tourActive) {
+      const answeredQs = await ctx.db
+        .query("combatQuestions")
+        .withIndex("by_round_order", (q) => q.eq("roundId", round._id))
+        .collect();
+      const scores = answeredQs
+        .map((q) => q.score1to5)
+        .filter((s): s is number => typeof s === "number");
+      if (scores.length > 0) {
+        const runningAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const band = COMBAT_CONFIG.QUESTIONS_PER_ROUND[round.tier];
+        const dyn = COMBAT_CONFIG.DYNAMIC_QUESTIONS;
+        if (runningAvg >= dyn.SHRINK_IF_STRONG_ABOVE) {
+          // Founder is crushing it — end the round after this question
+          // if we haven't already crossed min.
+          const proposed = Math.max(band.min, answeredCount);
+          adjustedTotalQuestions = Math.min(round.totalQuestions, proposed);
+        } else if (runningAvg <= dyn.EXTEND_IF_WEAK_BELOW) {
+          // Founder is dodging or struggling — push the budget to max
+          // so they get more chances (and more brutal probes).
+          adjustedTotalQuestions = Math.max(round.totalQuestions, band.max);
+        }
+      }
+      if (adjustedTotalQuestions !== round.totalQuestions) {
+        await ctx.db.patch(round._id, {
+          totalQuestions: adjustedTotalQuestions,
+        });
+      }
+    }
+
     const outcome = resolveOutcome(
       exchange.bossHpAfter,
       exchange.playerHpAfter,
       answeredCount,
-      round.totalQuestions,
+      adjustedTotalQuestions,
     );
 
     if (outcome) {

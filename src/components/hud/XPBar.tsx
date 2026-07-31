@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Zap, Shield, Skull } from "lucide-react";
 import { useAtomValue } from "jotai";
-import { activeVentureAtom, userProgressAtom, checkpointProgressAtom, corruptionStateAtom } from "@/lib/stores/hudStore";
+import { activeVentureAtom, userProgressAtom, checkpointProgressAtom, corruptionStateAtom, currentQuestAtom } from "@/lib/stores/hudStore";
 
 interface XPBarProps {
   currentXP: number;
@@ -13,6 +13,10 @@ interface XPBarProps {
   bossHp?: number;
   bossBaseHp?: number;
   bossName?: string;
+  /** User's display name / username shown on the left side of the
+   *  compact HUD bar (matches the feed post card layout). Falls back
+   *  to the venture / checkpoint name when omitted. */
+  userName?: string;
 }
 
 function formatINR(value: number): string {
@@ -45,6 +49,7 @@ const XPBarComponent = ({
   bossHp,
   bossBaseHp,
   bossName,
+  userName,
 }: XPBarProps) => {
   const percentage = Math.min((currentXP / maxXP) * 100, 100);
   const isNearlyFull = percentage >= 90;
@@ -53,6 +58,10 @@ const XPBarComponent = ({
   const userProgress = useAtomValue(userProgressAtom);
   const checkpointProgress = useAtomValue(checkpointProgressAtom);
   const corruption = useAtomValue(corruptionStateAtom);
+  // Current active checkpoint quest info — used to show the quest name
+  // ("The Signboard", "The Bridge", etc.) in the HUD bar instead of the
+  // venture's ambiguous "UNTITLED PROJECT" title.
+  const currentQuest = useAtomValue(currentQuestAtom);
 
   const totalCP = checkpointProgress.total || 36;
   const completedCP = checkpointProgress.completed || 0;
@@ -61,7 +70,13 @@ const XPBarComponent = ({
   const hasBoss = bossHp !== undefined && bossBaseHp !== undefined && bossHp > 0;
   const bossPercentage = hasBoss ? Math.min((bossHp! / bossBaseHp!) * 100, 100) : 0;
 
-  const projectName = activeVenture?.name ?? "Your Project";
+  // HUD bar label: prefer the current quest / checkpoint name (from
+  // PRD, e.g. "The Signboard") over the venture's raw title. Falls
+  // back to venture name when no quest is active.
+  const projectName =
+    currentQuest?.checkpointName?.trim() ||
+    activeVenture?.name ||
+    "Your Project";
   const projectScore = userProgress.qualityScore ?? 0;
   const valuationScore = userProgress.valuationScore ?? 0;
   const scoreColors = getScoreColor(projectScore);
@@ -215,47 +230,135 @@ const XPBarComponent = ({
   }
 
   // ─── STANDARD COMPACT MODE (NO BOSS ACTIVE) ──────────────────────────────────
+  // Rebuilt to match the venture bar rendered on feed post cards
+  // (see idea-cards.tsx line 377+): user name + XP progress + stage
+  // label on the left, central "VS" chip, boss name + HP + HP% on
+  // the right.  Uses the same gradient background and glow strips.
   if (compact) {
+    // LEFT — show the founder's username (matches feed post card
+    // layout). Falls back to the checkpoint name / venture name when
+    // no userName is passed so the bar still reads sensibly.
+    const stageLabel =
+      userName?.trim() ||
+      currentQuest?.checkpointName?.trim() ||
+      activeVenture?.name ||
+      "Your Venture";
+    // "1/8" style stage index from checkpointProgress; falls back to
+    // the raw completed/total count when no explicit stage counter
+    // is available yet.
+    const stageIndex =
+      currentQuest?.stage != null
+        ? `${currentQuest.stage}/8`
+        : totalCP > 0
+          ? `${completedCP}/${totalCP}`
+          : "1/8";
+    // Boss chip on the right — use the props passed by the parent
+    // (bossHp / bossBaseHp / bossName). When no active boss, show
+    // the default stage-boss placeholder so the bar keeps its
+    // three-column shape.
+    const shownBossName = bossName || "Stage Boss";
+    const shownBossPct = hasBoss ? Math.round(bossPercentage) : 100;
     return (
-      <div className="flex items-center gap-3 font-sans w-full min-w-0 px-1 select-none">
-        {/* Project Name and Icon */}
-        <div className="flex items-center gap-1.5 shrink-0 min-w-0 max-w-[120px] sm:max-w-[180px]">
-          <Shield className="w-3.5 h-3.5 text-cyan-400 shrink-0 drop-shadow-[0_0_6px_rgba(34,211,238,0.7)]" />
-          <span className="text-[10px] font-black uppercase tracking-wider text-cyan-200 truncate leading-none" title={projectName}>
-            {projectName}
-          </span>
+      <div
+        className="relative flex min-w-0 w-full items-stretch overflow-hidden rounded-xl border border-white/8 select-none"
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(6,14,35,0.95) 0%, rgba(10,10,20,0.98) 50%, rgba(35,6,10,0.95) 100%)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
+        {/* Side glow strips */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute bottom-0 left-0 top-0 w-1/3 bg-gradient-to-r from-violet-500/10 to-transparent" />
+          <div className="absolute bottom-0 right-0 top-0 w-1/3 bg-gradient-to-l from-rose-500/8 to-transparent" />
         </div>
 
-        <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
-
-        {/* XP Progress Bar */}
-        <div className="flex-1 min-w-[120px] flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[7.5px] font-mono leading-none">
-            <span className="text-zinc-500 uppercase tracking-widest font-black">Venture Progression</span>
-            <span className="text-cyan-400 font-bold">{Math.round(venturePercentage)}%</span>
+        {/* LEFT — stage label + XP bar + progress */}
+        <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
+          <div className="inline-flex w-fit items-center gap-1.5">
+            <Shield className="h-3 w-3 shrink-0 text-violet-300 drop-shadow-[0_0_6px_rgba(167,139,250,0.6)]" />
+            <span
+              className="truncate text-[9.5px] font-black uppercase leading-none tracking-wider text-violet-100 drop-shadow-[0_0_8px_rgba(167,139,250,0.45)]"
+              title={stageLabel}
+            >
+              {stageLabel}
+            </span>
           </div>
-          <div className="relative h-2.5 w-full overflow-hidden rounded-full border border-white/5 bg-black/50 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
+          <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
             <motion.div
-              className="h-full w-full rounded-full bg-gradient-to-r from-cyan-600 via-indigo-500 to-cyan-400 origin-left"
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: venturePercentage / 100 }}
+              className="h-full origin-left rounded-full bg-gradient-to-r from-violet-700 via-fuchsia-500 to-violet-300"
+              initial={{ width: 0 }}
+              animate={{ width: `${venturePercentage}%` }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             />
-            {/* Shimmer */}
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/3"
-              animate={{ x: ["-100%", "300%"] }}
+              className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+              animate={{ x: ["-100%", "350%"] }}
               transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
             />
           </div>
+          <div className="flex min-w-0 items-baseline gap-1">
+            <span className="truncate text-[8px] font-bold uppercase tracking-wider text-violet-300/90">
+              {stageLabel}
+            </span>
+            <span className="shrink-0 font-mono text-[10px] font-black leading-none text-violet-300">
+              ({stageIndex})
+            </span>
+          </div>
         </div>
 
-        <div className="hidden h-5 w-px bg-white/10 sm:block shrink-0" />
+        {/* CENTER — VS chip with vertical rule */}
+        <div className="relative z-10 flex shrink-0 flex-col items-center justify-center px-2 py-2">
+          <div
+            className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2"
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent, rgba(245,158,11,0.3), rgba(245,158,11,0.65), rgba(245,158,11,0.3), transparent)",
+            }}
+          />
+          <motion.div
+            className="relative z-10 grid h-5 w-5 place-items-center rounded-full bg-[#FACC15] text-[#0A0D12] shadow-[0_0_8px_rgba(250,204,21,0.45)]"
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <span className="select-none text-[7px] font-black leading-none">VS</span>
+          </motion.div>
+        </div>
 
-        {/* Scores Display */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-white/10 text-[9px] font-mono font-bold text-zinc-300 leading-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
-            Valuation: <span className="text-cyan-300 font-black font-mono text-[10px]">{formatINR(valuationScore)}</span>
+        {/* RIGHT — boss name + HP bar + HP% */}
+        <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
+          <div className="flex flex-row-reverse items-center gap-1.5">
+            <motion.div
+              animate={{ opacity: [1, 0.5, 1] }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <Skull className="h-3 w-3 shrink-0 text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+            </motion.div>
+            <span
+              className="truncate text-right text-[9.5px] font-black uppercase leading-none tracking-wider text-rose-200 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]"
+              title={shownBossName}
+            >
+              {shownBossName}
+            </span>
+          </div>
+          <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
+            <motion.div
+              className="h-full origin-left rounded-full bg-gradient-to-r from-rose-700 via-red-500 to-rose-300"
+              initial={{ width: 0 }}
+              animate={{ width: `${shownBossPct}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+            <motion.div
+              className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              animate={{ x: ["-100%", "350%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            />
+          </div>
+          <div className="flex items-baseline justify-end gap-1">
+            <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-500">HP:</span>
+            <span className="font-mono text-[10.5px] font-black leading-none text-rose-400">
+              {shownBossPct}%
+            </span>
           </div>
         </div>
       </div>

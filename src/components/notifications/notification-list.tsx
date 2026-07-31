@@ -160,8 +160,13 @@ const NotificationItem = ({ notification, onMarkAsRead, onDismiss }: Notificatio
     if (hasActionButtons) return
     if (!notification.relatedId) return
     const ideaTypes = ['new_idea','spark_received','comment_received','contribution_request_received','contribution_request_accepted','contribution_request_rejected','invitation_accepted','invitation_rejected']
+    const flareTypes = ['flare_response_received', 'flare_response_helpful']
     if (ideaTypes.includes(notification.type)) {
       window.location.href = `/idea/${notification.relatedId}`
+    } else if (flareTypes.includes(notification.type)) {
+      // Deep-link to the flare detail dialog. FlareFeedSection reads
+      // the ?flare=<id> search param on mount and opens the dialog.
+      window.location.href = `/feed?flare=${notification.relatedId}`
     } else if (notification.type === 'badge_awarded') {
       const username = notification.sender?.username
       if (username) window.location.href = `/profile/${username}`

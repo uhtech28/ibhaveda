@@ -29,9 +29,14 @@ import type { WorldMapScene as WorldMapSceneType } from "./scenes/WorldMapScene"
  * const game = new Phaser.Game(config)
  * ```
  */
+/**
+ * Overloaded signature: accepts either a single scene class (backwards-
+ * compat with the original village-only call) OR an array of scene
+ * classes so multiple stage scenes can register at once.
+ */
 export function createGameConfig(
   parent: HTMLElement,
-  SceneClass?: typeof WorldMapSceneType,
+  SceneClass?: typeof WorldMapSceneType | Array<typeof WorldMapSceneType>,
 ): Phaser.Types.Core.GameConfig {
   // Detect device type and screen size
   const width = parent.clientWidth || window.innerWidth;
@@ -86,7 +91,11 @@ export function createGameConfig(
         gravity: { x: 0, y: 0 },
       },
     },
-    scene: SceneClass ? [SceneClass] : [],
+    scene: SceneClass
+      ? Array.isArray(SceneClass)
+        ? SceneClass
+        : [SceneClass]
+      : [],
     render: {
       antialias: false,
       pixelArt: true,

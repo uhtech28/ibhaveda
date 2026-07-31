@@ -40,7 +40,7 @@ export function CombatResultPanel({
   const isWin = result.outcome === "won";
 
   return (
-    <div className="relative flex flex-col gap-6">
+    <div className="relative flex flex-col gap-3 sm:gap-4">
       {/* Full-panel victory burst — green-gold radial flash + six
           radiating sparkles. Plays once on mount of the win result. */}
       {isWin && (
@@ -114,7 +114,6 @@ export function CombatResultPanel({
 
 function Header({
   isWin,
-  attemptNumber,
 }: {
   isWin: boolean;
   attemptNumber: number;
@@ -122,24 +121,28 @@ function Header({
   return (
     <div className="flex items-end justify-between">
       <div>
+        {/* VICTORY / DEFEAT — now the dominant headline. Bumped up
+            in size and weight so it reads as the primary title. */}
         <p
-          className="font-mono text-[10px] uppercase tracking-widest text-white/40"
+          className={`font-mono text-3xl font-black uppercase tracking-widest md:text-4xl ${
+            isWin ? "text-emerald-300" : "text-red-300"
+          }`}
           style={{ fontFamily: "var(--font-pixel-display), monospace" }}
         >
-          {isWin ? "Victory" : "Defeat"}
+          {isWin ? "VICTORY" : "DEFEAT"}
         </p>
+        {/* "Boss defeated" secondary line — shrunk so it plays a
+            supporting role under the VICTORY headline. */}
         <h2
-          className={`mt-1 text-2xl font-bold ${
-            isWin ? "text-emerald-300" : "text-red-300"
+          className={`mt-1 text-lg font-semibold md:text-xl ${
+            isWin ? "text-emerald-300/80" : "text-red-300/80"
           }`}
           style={{ fontFamily: "var(--font-pixel-display), monospace" }}
         >
           {isWin ? "Boss defeated" : "You were worn down"}
         </h2>
       </div>
-      <span className="font-mono text-[11px] text-white/40">
-        Attempt #{attemptNumber}
-      </span>
+      {/* Attempt counter REMOVED per product request. */}
     </div>
   );
 }
@@ -152,37 +155,38 @@ function HpReplay({
   timeline,
   bossHpInitial,
   playerHpInitial,
-  finalScores,
 }: {
   timeline: Array<{ bossHpAfter: number; playerHpAfter: number }>;
   bossHpInitial: number;
   playerHpInitial: number;
   finalScores: number[];
 }) {
+  // Columns match the actual question count so a 2-question round
+  // doesn't leave two empty grid cells looking cut off. Cap at 4
+  // to keep chip width sane on wide screens.
+  const cols = Math.max(1, Math.min(4, timeline.length));
   return (
-    <div className="border-2 border-white/20 bg-black p-4">
+    <div className="bg-black p-4">
       <p className="font-mono text-[10px] uppercase tracking-widest text-white/40">
         Round replay
       </p>
-      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+      <div
+        className="mt-3 grid gap-3"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+        }}
+      >
         {timeline.map((step, i) => {
-          const score = finalScores[i] ?? 1;
           return (
             <div
               key={i}
-              className="flex flex-col gap-2 border border-white/10 bg-black/40 p-2"
+              className="flex flex-col gap-2 bg-black/40 p-3"
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] text-white/50">
+                <span className="font-mono text-[11px] uppercase tracking-widest text-white/60">
                   Q{i + 1}
                 </span>
-                <span
-                  className={`font-mono text-xs font-semibold ${scoreColour(
-                    score,
-                  )}`}
-                >
-                  {score}/5
-                </span>
+                {/* Per-question score chip HIDDEN per product request. */}
               </div>
               <ReplayBar
                 label="Boss"
@@ -224,7 +228,7 @@ function ReplayBar({
           {Math.max(0, current)}
         </span>
       </div>
-      <div className="h-1.5 w-full bg-black border border-white/20">
+      <div className="h-1.5 w-full bg-white/10">
         <div
           className="h-full transition-[width] duration-300"
           style={{ width: `${frac * 100}%`, background: colour }}
@@ -248,7 +252,7 @@ function scoreColour(s: number): string {
 
 function XpSummary({ points }: { points: number }) {
   return (
-    <div className="flex items-center justify-between border-2 border-white/20 bg-black px-4 py-3">
+    <div className="flex items-center justify-between bg-black px-4 py-3">
       <span className="font-mono text-xs uppercase tracking-widest text-white/60">
         Individual XP
       </span>

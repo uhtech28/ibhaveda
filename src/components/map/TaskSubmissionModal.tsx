@@ -19,6 +19,8 @@ import { audioManager } from "@/lib/audio/audioManager";
 import { WriteTool } from "@/components/tools/write-tool";
 import { TableTool } from "@/components/tools/table-tool";
 import { MapTool } from "@/components/tools/map-tool";
+import { ExcalidrawTool } from "@/components/tools/excalidraw-tool";
+import { SpreadsheetTool } from "@/components/tools/spreadsheet-tool";
 import { SurveyTool } from "@/components/tools/survey-tool";
 import { PollTool } from "@/components/tools/poll-tool";
 import { LinkTool } from "@/components/tools/link-tool";
@@ -173,7 +175,18 @@ function TaskSubmissionModalInner({
       });
     } catch (err) {
       audioManager.playUI("error");
-      setError(err instanceof Error ? err.message : "Submission failed");
+      const raw = err instanceof Error ? err.message : "Submission failed";
+      // Convex serializes throws as "[CONVEX M(...)] [Request ID: ...]
+      // Server Error Uncaught Error: <real message> at handler ..."
+      // — extract just the real message so users don't see a
+      // stack-trace-style dump inside the task modal.
+      const match = raw.match(/Uncaught Error:\s*(.+?)\s*at handler/i);
+      const friendly = match?.[1]
+        ? match[1]
+        : raw
+            .replace(/^\[CONVEX[^\]]*\]\s*\[[^\]]*\]\s*Server Error\s*/i, "")
+            .split("\n")[0];
+      setError(friendly);
     } finally {
       setIsSubmitting(false);
     }
@@ -201,13 +214,29 @@ function TaskSubmissionModalInner({
           />
         );
 
-      case "map":
+      case "spreadsheet":
+        // Excel-like grid via jspreadsheet-ce. Preferred for
+        // competitor comparisons, SWOT, financial rows, market
+        // overview — anywhere the founder benefits from copy-paste
+        // from Excel and cell resizing.
         return (
-          <MapTool
+          <SpreadsheetTool
             prompt={task.description}
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}
-            layout="compact"
+            initialContent={initialDraft as never}
+          />
+        );
+
+      case "map":
+        // Custom MapTool replaced with the professional Excalidraw
+        // whiteboard per product request. Same onSubmit contract; the
+        // JSON payload just carries an Excalidraw scene now.
+        return (
+          <ExcalidrawTool
+            prompt={task.description}
+            isSubmitting={isSubmitting}
+            onSubmit={handleToolSubmit}
           />
         );
 
@@ -347,8 +376,12 @@ function TaskSubmissionModalInner({
               }
             }}
             className="fixed inset-0 z-[101] flex items-center justify-center p-2 sm:p-4 overflow-hidden pointer-events-none"
+            role="dialog"
+            aria-modal="true"
+            data-tutorial="task-modal"
+            data-state={isOpen ? "open" : "closed"}
           >
-            <div className="bg-[#111827] border border-white/10 rounded-xl shadow-2xl flex flex-col w-[96vw] sm:w-[min(92vw,860px)] h-auto max-h-[min(90vh,760px)] overflow-hidden pointer-events-auto">
+            <div className="bg-[#111827] border border-white/10 rounded-xl shadow-2xl flex flex-col w-[96vw] sm:w-[min(88vw,640px)] h-auto max-h-[min(88vh,720px)] overflow-hidden pointer-events-auto">
               {/* Header - Compact */}
               <div className="p-3 sm:px-5 sm:py-3.5 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/15 to-[#8B5CF6]/15 flex-shrink-0">
                 <div className="flex items-center justify-between gap-3">

@@ -48,7 +48,7 @@ export function TutorialProgressBar({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.25 }}
-          className="fixed top-16 left-0 right-0 z-[110] flex items-center justify-center px-4 pointer-events-none"
+          className="fixed top-16 left-0 right-0 z-[10015] flex items-center justify-center px-4 pointer-events-none"
         >
           <div
             className="flex items-center gap-3 pointer-events-auto rounded-full px-3 py-1.5 border border-white/8"
@@ -78,16 +78,11 @@ export function TutorialProgressBar({
             </div>
 
             {/* ── Skip ─────────────────────────────────────────────────── */}
-            {onSkip && (
-              <button
-                type="button"
-                onClick={onSkip}
-                className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40 hover:text-white/80 transition-colors"
-                aria-label="Skip tutorial"
-              >
-                Skip
-              </button>
-            )}
+            {/* SKIP button REMOVED per product request — tutorial cannot
+                be skipped from the progress bar. `onSkip` prop is still
+                accepted for backward compatibility but intentionally
+                unused. */}
+            {onSkip ? null : null}
           </div>
         </motion.div>
       )}
