@@ -5407,11 +5407,26 @@ function MapPageInner() {
                       {ideaForContributors ? (
                         <IdeaHierarchyFlowchart
                           ideaId={ideaForContributors._id as Id<"ideas">}
+                          alwaysRender
                         />
-                      ) : (
+                      ) : venture?.ideaId ? (
+                        // Query in flight — show a spinner.
                         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
                           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                           <span className="text-sm text-slate-400">Loading hierarchy...</span>
+                        </div>
+                      ) : (
+                        // No idea attached to this venture at all — surface
+                        // a clear message instead of a blank dialog.
+                        <div className="flex flex-col items-center justify-center h-48 gap-2 text-center px-6">
+                          <GitBranch className="h-6 w-6 text-slate-500" />
+                          <p className="text-sm font-medium text-slate-200">
+                            No idea linked to this venture
+                          </p>
+                          <p className="max-w-xs text-xs text-slate-500">
+                            Publish an idea from the feed to start building
+                            a hierarchy of sub-ideas and contributors.
+                          </p>
                         </div>
                       )}
                     </div>

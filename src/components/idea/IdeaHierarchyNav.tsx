@@ -100,11 +100,20 @@ type TreeNode = {
 interface IdeaHierarchyFlowchartProps {
   ideaId: Id<"ideas">;
   className?: string;
+  /**
+   * When true, render even for standalone ideas (single-node tree). The
+   * default (`false`) preserves the /idea/[id] page behaviour of hiding
+   * the chart entirely when there's nothing to show — but the map's
+   * Adventurer's-Menu modal passes `true` so users always see the
+   * current idea plus an empty-state hint instead of a blank dialog.
+   */
+  alwaysRender?: boolean;
 }
 
 export function IdeaHierarchyFlowchart({
   ideaId,
   className,
+  alwaysRender = false,
 }: IdeaHierarchyFlowchartProps) {
   const tree = useQuery(api.hierarchy.getIdeaFullTree, { ideaId });
 
@@ -131,12 +140,35 @@ export function IdeaHierarchyFlowchart({
     );
   }
 
-  if (!tree) return null;
+  if (!tree) {
+    // Query returned null (idea was deleted / not found). Show a helpful
+    // empty state only if the caller opted in — otherwise hide as before.
+    if (!alwaysRender) return null;
+    return (
+      <section
+        className={cn(
+          "rounded-2xl border border-white/8 bg-[#0F1726]/85 backdrop-blur-xl p-5",
+          className
+        )}
+      >
+        <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+          <GitBranch className="h-6 w-6 text-[#4B5563]" />
+          <p className="text-sm font-medium text-[#D1D5DB]">
+            Hierarchy unavailable
+          </p>
+          <p className="max-w-xs text-xs text-[#6B7280]">
+            We couldn't load this idea's family tree. Try again in a moment.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   // If this is a standalone idea with no parent and no children, skip the
-  // flowchart — there's nothing to chart.
+  // flowchart on pages that opted out (default). The map's Adventurer's
+  // Menu passes `alwaysRender` so we still render the single node + hint.
   const hasFamily = tree.children.length > 0;
-  if (!hasFamily) return null;
+  if (!hasFamily && !alwaysRender) return null;
 
   return (
     <section
@@ -166,6 +198,19 @@ export function IdeaHierarchyFlowchart({
           <FlowchartNode node={tree} isRoot />
         </div>
       </div>
+
+      {/* Empty-state hint when the tree is just the current idea */}
+      {!hasFamily && (
+        <div className="mt-6 flex flex-col items-center gap-1.5 text-center">
+          <p className="text-xs font-medium text-[#D1D5DB]">
+            No sub-ideas yet
+          </p>
+          <p className="max-w-sm text-[11px] leading-relaxed text-[#6B7280]">
+            When contributors fork your idea or add their own branches,
+            they'll appear here as connected nodes.
+          </p>
+        </div>
+      )}
     </section>
   );
 }
