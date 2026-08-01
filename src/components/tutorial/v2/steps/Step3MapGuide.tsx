@@ -146,6 +146,12 @@ export function Step3MapGuide() {
   // overlap. Flips to false at the finale phase — that's when Sparky
   // steps in with "You're about to face…".
   const [bossSpeaking, setBossSpeaking] = useState(false);
+  // Latches true the first time the FlareComposeDialog actually mounts.
+  // Guards the `flare_opened → done` transition so a false-positive on
+  // the DOM check (e.g. the dialog briefly matching then unmatching)
+  // can't auto-advance the tutorial without the user opening the
+  // compose dialog.
+  const flareWasOpenRef = useRef(false);
   // TRUE while the AI combat panel is on screen. React state (not a
   // sync DOM check inside the memo) so the view updates the moment the
   // panel mounts — the previous inline check ran only when the memo's
@@ -295,9 +301,14 @@ export function Step3MapGuide() {
   }, [active, bossIntroSeen]);
 
   // Reset the fire-once ref when Step3 deactivates so re-entering the
-  // tutorial (e.g. via restart) triggers combat again.
+  // tutorial (e.g. via restart) triggers combat again. Same treatment
+  // for the flare-open latch so a restart doesn't inherit a stale
+  // "was already open" signal from a prior run.
   useEffect(() => {
-    if (!active) forceCombatFiredRef.current = false;
+    if (!active) {
+      forceCombatFiredRef.current = false;
+      flareWasOpenRef.current = false;
+    }
   }, [active]);
 
   useEffect(() => {
@@ -329,24 +340,34 @@ export function Step3MapGuide() {
       } catch {
         /* no-op */
       }
-      // Detect the FlareComposeDialog by its heading text — Radix
-      // dialogs share [role="dialog"] with plenty of other modals so
-      // we key off the "Fire a Flare" title copy specifically.
+      // Detect the FlareComposeDialog by its own data-tutorial marker.
+      // The previous heuristic looked for `role="dialog"` elements whose
+      // innerText contained "fire a flare" — that string appears
+      // verbatim inside Sparky's own flare-stage bubble copy, so once
+      // the mascot painted its text and any other dialog (CombatPanel
+      // fade-out, MapMenuPopover, etc.) briefly overlapped, the check
+      // flipped true and auto-advanced the tutorial past the flare
+      // step without user action.
+      //
+      // The compose dialog tags itself with data-tutorial="flare-compose"
+      // — that attribute only exists on the DialogContent Radix mounts
+      // when open=true, so it's a clean 1:1 signal.
       let flareModalOpen = false;
       try {
-        const dlgs = document.querySelectorAll<HTMLElement>(
-          '[role="dialog"]',
+        const el = document.querySelector<HTMLElement>(
+          '[data-tutorial="flare-compose"]',
         );
-        for (const d of Array.from(dlgs)) {
-          const t = (d.innerText || "").toLowerCase();
-          if (t.includes("fire a flare") || t.includes("fire flare")) {
-            flareModalOpen = true;
-            break;
-          }
+        if (el) {
+          // During the exit animation Radix keeps the element mounted
+          // with data-state="closed" — treat that as already closed so
+          // flare_opened → done still fires without a lag.
+          const state = el.getAttribute("data-state");
+          flareModalOpen = state !== "closed";
         }
       } catch {
         /* no-op */
       }
+      if (flareModalOpen) flareWasOpenRef.current = true;
 
       // NEW FLOW: after combat is dismissed OR the boss-defeated
       // victory screen appears we DO the flare step on the map (the
@@ -386,7 +407,15 @@ export function Step3MapGuide() {
           return "flare_opened";
         }
         // User closed (submitted or dismissed) the flare compose dialog.
-        if (prev === "flare_opened" && !flareModalOpen) {
+        // Belt-and-braces guard: require flareWasOpenRef so a single
+        // transient false-positive from the DOM check can't drive
+        // the tutorial through flare → flare_opened → done in one
+        // polling cycle.
+        if (
+          prev === "flare_opened" &&
+          !flareModalOpen &&
+          flareWasOpenRef.current
+        ) {
           return "done";
         }
         return prev;
