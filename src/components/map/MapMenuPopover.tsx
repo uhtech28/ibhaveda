@@ -25,6 +25,7 @@ export type MapMenuPanelId =
   | "calendar"
   | "kanban"
   | "journal"
+  | "leaderboard"
   | "minigames"
   | "settings"
   | "help";
@@ -42,7 +43,7 @@ const MENU_ITEMS: readonly {
 }[] = [
   { id: "feed",         label: "Contributions", pixelIcon: "scroll-approved",         accent: "border-indigo-500/25 hover:border-indigo-500/60 hover:bg-indigo-500/10" },
   { id: "chat",         label: "Group Chat",    pixelIcon: "crystal-ball-purple",     accent: "border-blue-500/25 hover:border-blue-500/60 hover:bg-blue-500/10" },
-  { id: "contributors", label: "Contributors",  pixelIcon: "guild-crest-gold-eagle",  accent: "border-sky-500/25 hover:border-sky-500/60 hover:bg-sky-500/10" },
+  { id: "leaderboard",  label: "Leaderboard",   pixelIcon: "guild-crest-gold-eagle",  accent: "border-yellow-500/25 hover:border-yellow-500/60 hover:bg-yellow-500/10" },
   { id: "hierarchy",    label: "Hierarchy",     pixelIcon: "map-region",              accent: "border-pink-500/25 hover:border-pink-500/60 hover:bg-pink-500/10" },
   { id: "calendar",     label: "Calendar",      pixelIcon: "hourglass-blue",          accent: "border-amber-500/25 hover:border-amber-500/60 hover:bg-amber-500/10" },
   { id: "kanban",       label: "Kanban Board",  pixelIcon: "rune-stone",              accent: "border-emerald-500/25 hover:border-emerald-500/60 hover:bg-emerald-500/10" },

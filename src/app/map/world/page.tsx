@@ -4510,6 +4510,11 @@ function MapPageInner() {
         setIsKanbanOpen(true);
       } else if (tab === "journal") {
         setIsJournalOpen(true);
+      } else if (tab === "leaderboard") {
+        // Leaderboard is its own full-page surface (/leaderboard) rather
+        // than a right-hand panel — hard-navigate so the user gets the
+        // full podium + your-rank view instead of a cramped sidebar.
+        router.push("/leaderboard");
       } else if (tab === "minigames") {
         setIsMiniGamesPanelOpen(true);
       } else if (tab === "settings") {
@@ -4523,6 +4528,7 @@ function MapPageInner() {
       activeConversationId,
       openGroupChat,
       updateUrlParams,
+      router,
     ],
   );
 

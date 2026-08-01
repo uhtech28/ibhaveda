@@ -1,6 +1,6 @@
 'use client'
 
-import { LogOut, Plus, Home, Users, ArrowLeft, Search } from 'lucide-react'
+import { LogOut, Plus, Home, Users, ArrowLeft, Search, Trophy } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -29,6 +29,7 @@ const menuItems = [
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'My Ideas', href: '/my-ideas', icon: IdeaBulb },
     { name: 'Community', href: '/community', icon: Users },
+    { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
 ]
 
 export const HeroHeader = ({
