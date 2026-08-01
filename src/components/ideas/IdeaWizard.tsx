@@ -590,6 +590,13 @@ export function IdeaWizard({
     >
       <DialogContent
         showCloseButton={!tutorialMode}
+        // data-tutorial marker lets Step2TemplatePick target THIS specific
+        // dialog with its highlight selector, instead of matching any
+        // element with role="dialog" — which caused a stray yellow box to
+        // linger around whatever transient dialog (share panel, notification
+        // panel, contributors modal frame, etc.) happened to be in the DOM
+        // during the /feed → /map/world route commit.
+        data-tutorial="compose-wizard"
         className={cn(
           "w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[85dvh] sm:max-h-[90vh]",
         )}

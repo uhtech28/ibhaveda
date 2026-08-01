@@ -31,8 +31,31 @@ type DialogueState =
   | "to_map";
 
 function isComposeDialogOpen(): boolean {
-  return !!document.querySelector('[role="dialog"][data-state="open"]') ||
-         !!document.querySelector('[role="dialog"]');
+  // Match ONLY the compose wizard (tagged with data-tutorial="compose-wizard"
+  // on its DialogContent). Falling back to any [role="dialog"] would return
+  // true for unrelated dialogs (notification panel, share panel fading out,
+  // contributors modal, etc.) and stall the state machine on write_outline.
+  const wizard = document.querySelector<HTMLElement>(
+    '[data-tutorial="compose-wizard"]',
+  );
+  if (!wizard) return false;
+  // Radix marks `data-state="closed"` during exit animation — treat that as
+  // closed so the write_outline → posting transition fires immediately.
+  const state = wizard.getAttribute("data-state");
+  if (state === "closed") return false;
+  return true;
+}
+
+/**
+ * Find the compose wizard's DialogContent by its data-tutorial marker.
+ * All wizard-scoped DOM queries flow through this helper so an unrelated
+ * dialog opening on the page (share panel, notification bell, contributors
+ * modal) can't accidentally satisfy them.
+ */
+function findComposeWizard(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(
+    '[data-tutorial="compose-wizard"]',
+  );
 }
 
 function findTemplateGrid(): HTMLElement | null {
@@ -42,7 +65,7 @@ function findTemplateGrid(): HTMLElement | null {
 }
 
 function isTemplateSelected(): boolean {
-  const dlg = document.querySelector('[role="dialog"]');
+  const dlg = findComposeWizard();
   if (!dlg) return false;
   return !!dlg.querySelector(
     'button[aria-pressed="true"], button[data-state="selected"], button.ring-2, button.ring-indigo-500',
@@ -50,7 +73,7 @@ function isTemplateSelected(): boolean {
 }
 
 function findOutlineTextarea(): HTMLTextAreaElement | null {
-  const dlg = document.querySelector('[role="dialog"]');
+  const dlg = findComposeWizard();
   if (!dlg) return null;
   return dlg.querySelector<HTMLTextAreaElement>("textarea");
 }
@@ -71,7 +94,7 @@ function detectWizardScreen():
   | "outline"
   | "preview"
   | null {
-  const dlg = document.querySelector<HTMLElement>('[role="dialog"]');
+  const dlg = findComposeWizard();
   if (!dlg) return null;
   const text = (dlg.innerText || "").toLowerCase();
   // Order matters — check most-specific / latest screen first so we
@@ -115,7 +138,7 @@ function isShareDialogOpen(): boolean {
 
 /** Find the compose form (the one containing title + description + Post Idea). */
 function findComposeForm(): HTMLFormElement | null {
-  const dlg = document.querySelector('[role="dialog"]');
+  const dlg = findComposeWizard();
   const scope: Document | Element = dlg ?? document;
   // Prefer a form that contains the known IDs, then fall back to any form.
   const explicit = scope.querySelector<HTMLFormElement>(
@@ -127,7 +150,7 @@ function findComposeForm(): HTMLFormElement | null {
 
 /** Find the "Post Idea" submit button (for click fallback). */
 function findPostIdeaButton(): HTMLButtonElement | null {
-  const dlg = document.querySelector('[role="dialog"]');
+  const dlg = findComposeWizard();
   const scope: Document | Element = dlg ?? document;
   const buttons = scope.querySelectorAll<HTMLButtonElement>(
     'button[type="submit"], button',
@@ -203,6 +226,14 @@ export function Step2TemplatePick() {
   // over on /map/world.
   const [shareOpen, setShareOpen] = useState(false);
 
+  // Ref-tracked flag: did we EVER see the outline textarea populated during
+  // the write_outline beat? The textarea unmounts along with the compose
+  // dialog, so we can't rely on `outlineHasText` at the exact moment of
+  // dialog close — by then the textarea (and its value) are gone. This ref
+  // records "yes, the user typed something" as a durable signal for the
+  // write_outline → posting transition.
+  const hadOutlineTextRef = useRef(false);
+
   // Watch the DOM each tick to detect dialog open / template pick / outline / submit.
   // We now key transitions on the *visible wizard screen* (detected from
   // dialog title text) rather than template-selection heuristics, which
@@ -220,6 +251,11 @@ export function Step2TemplatePick() {
       const outline = findOutlineTextarea();
       const outlineHasText = !!outline && outline.value.trim().length >= 5;
 
+      // Remember if the user ever populated the textarea during this beat.
+      // Sticks true across the dialog-close → route-nav window so the
+      // transition to `posting` can fire even after the textarea unmounts.
+      if (outlineHasText) hadOutlineTextRef.current = true;
+
       setDialogue((prev) => {
         // Dialog just opened.
         if (prev === "click_plus" && dlgOpen) {
@@ -234,8 +270,17 @@ export function Step2TemplatePick() {
         if (prev === "pick_template" && (screen === "outline" || screen === "preview")) {
           return "write_outline";
         }
-        // Outline written -> dialog closed (post submitted) -> posting.
-        if (prev === "write_outline" && outlineHasText && !dlgOpen) return "posting";
+        // Wizard closed while on write_outline → posting.
+        // Deliberately does NOT gate on outlineHasText: the textarea
+        // unmounts with the dialog, so by the time we detect `!dlgOpen`
+        // the value we'd read is already gone (false). The previous
+        // guard here caused a ~1-2s stall on write_outline during the
+        // /feed → /map/world route commit, which let the yellow
+        // highlight box drift onto whatever random dialog-like element
+        // happened to be in the DOM. hadOutlineTextRef is still tracked
+        // above for future use / analytics but isn't needed to gate
+        // this transition.
+        if (prev === "write_outline" && !dlgOpen) return "posting";
         // After posting: show the suggested-contributors modal (step 5
         // per the script). User can send optional requests then hit
         // Continue to move on to the map.
@@ -439,7 +484,13 @@ export function Step2TemplatePick() {
         return {
           text: "Now pick a template that fits what you're building. This decides what your quest looks like.",
           mood: "pointing",
-          highlight: '[role="dialog"]',
+          // Target ONLY the compose wizard (data-tutorial marker). Was
+          // previously the broad `[role="dialog"]` selector which would
+          // continue matching other dialogs (share panel exit animation,
+          // notification bell, contributors modal, etc.) after the wizard
+          // unmounted — producing a lingering yellow highlight box on
+          // /feed for 1-2s during the route commit.
+          highlight: '[data-tutorial="compose-wizard"]',
           skip: { label: "Skip tutorial", onClick: tutorial.skip },
         };
       case "write_outline":
@@ -451,7 +502,9 @@ export function Step2TemplatePick() {
           // we only highlighted the textarea, which meant the scrim
           // swallowed clicks on Generate (user complaint: "generate
           // button not working").
-          highlight: '[role="dialog"]',
+          // Selector scoped to the compose wizard specifically (see
+          // rationale on pick_template above).
+          highlight: '[data-tutorial="compose-wizard"]',
           skip: { label: "Skip tutorial", onClick: tutorial.skip },
         };
       case "posting":
