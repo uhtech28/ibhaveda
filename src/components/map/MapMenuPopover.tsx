@@ -9,7 +9,7 @@
  *   making the popup invisible).
  */
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { audioManager } from "@/lib/audio/audioManager";
@@ -50,75 +50,31 @@ const MENU_ITEMS: readonly {
   { id: "settings",     label: "Settings",      pixelIcon: "saddlebag-backpack",      accent: "border-slate-500/25 hover:border-slate-500/60 hover:bg-slate-500/10" },
 ];
 
-const POPUP_WIDTH = 280;
-const POPUP_GAP = 10;
+// Modal now covers the center of the screen (like the persona picker)
+// rather than a small popover anchored to the button. Kept the const
+// names to minimise diff, but they're no longer used for positioning.
 
 export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [anchor, setAnchor] = useState<{ left: number; bottom: number } | null>(
-    null,
-  );
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
 
   // Portal target only available client-side.
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Position the popup relative to the trigger button. Reruns on resize
-  // / scroll so the popup stays glued to the button.
-  const updateAnchor = useCallback(() => {
-    const el = triggerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setAnchor({
-      left: r.left,
-      // `bottom` in fixed coords = distance from viewport bottom to
-      // button's TOP edge (so the popup sits above the button).
-      bottom: window.innerHeight - r.top + POPUP_GAP,
-    });
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updateAnchor();
-    window.addEventListener("resize", updateAnchor);
-    window.addEventListener("scroll", updateAnchor, true);
-    return () => {
-      window.removeEventListener("resize", updateAnchor);
-      window.removeEventListener("scroll", updateAnchor, true);
-    };
-  }, [open, updateAnchor]);
-
-  // Dismiss on outside click / Esc.
+  // Dismiss on Esc. Outside-click closes via the scrim's own onClick;
+  // no positioning tracking needed — modal is viewport-centered.
   useEffect(() => {
     if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (
-        (triggerRef.current && triggerRef.current.contains(t)) ||
-        (popupRef.current && popupRef.current.contains(t))
-      ) {
-        return;
-      }
-      setOpen(false);
-    };
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    // rAF so the click that opened the popup doesn't immediately close it.
-    const raf = requestAnimationFrame(() => {
-      window.addEventListener("mousedown", handleClick);
-      window.addEventListener("keydown", handleKey);
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("mousedown", handleClick);
-      window.removeEventListener("keydown", handleKey);
-    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
   }, [open]);
+
 
   return (
     <>
@@ -145,61 +101,94 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
       {mounted &&
         createPortal(
           <AnimatePresence>
-            {open && anchor && (
+            {open && (
               <motion.div
-                ref={popupRef}
-                initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
-                role="menu"
-                style={{
-                  position: "fixed",
-                  left: anchor.left,
-                  bottom: anchor.bottom,
-                  width: POPUP_WIDTH,
-                  zIndex: 200,
-                }}
-                className="rounded-xl border border-white/10 bg-[#0A0D12]/95 p-2 shadow-2xl backdrop-blur-xl"
+                key="map-menu-modal"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Adventurer's Menu"
+                onClick={() => setOpen(false)}
+                className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
               >
-                <div className="mb-1.5 border-b border-white/5 px-2 pb-1.5 pt-1">
-                  <p
-                    className="font-mono text-[9px] font-bold uppercase tracking-widest text-white/50"
-                    style={{
-                      fontFamily: "var(--font-pixel-display), monospace",
+                <motion.div
+                  initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 12, scale: 0.96 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0A0D12]/95 p-6 shadow-2xl sm:p-8"
+                >
+                  {/* Close button (top-right) — mirrors persona-picker style */}
+                  <button
+                    type="button"
+                    aria-label="Close menu"
+                    onClick={() => {
+                      audioManager.playUI("click");
+                      setOpen(false);
                     }}
+                    className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/60 transition-all hover:border-white/30 hover:bg-white/[0.08] hover:text-white"
                   >
-                    Adventurer's Menu
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {MENU_ITEMS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        audioManager.playUI("click");
-                        setOpen(false);
-                        onOpenPanel(item.id);
-                      }}
-                      onMouseEnter={() => audioManager.playUI("hover")}
-                      className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-lg border bg-white/[0.02] px-2 py-2.5 transition-all",
-                        item.accent,
-                      )}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
                     >
-                      <PixelIcon
-                        name={item.pixelIcon}
-                        size={28}
-                        alt={item.label}
-                      />
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
-                        {item.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  <header className="mb-5 pr-10">
+                    <p
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-amber-400/80"
+                      style={{
+                        fontFamily: "var(--font-pixel-display), monospace",
+                      }}
+                    >
+                      Adventurer's Menu
+                    </p>
+                    <h2 className="mt-1 text-xl font-semibold text-white sm:text-2xl">
+                      Choose your path
+                    </h2>
+                  </header>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                    {MENU_ITEMS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          audioManager.playUI("click");
+                          setOpen(false);
+                          onOpenPanel(item.id);
+                        }}
+                        onMouseEnter={() => audioManager.playUI("hover")}
+                        className={cn(
+                          "flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border bg-white/[0.02] px-3 py-4 transition-all hover:-translate-y-0.5",
+                          item.accent,
+                        )}
+                      >
+                        <PixelIcon
+                          name={item.pixelIcon}
+                          size={44}
+                          alt={item.label}
+                        />
+                        <span className="text-center text-[11px] font-semibold uppercase tracking-wider text-white/85 sm:text-xs">
+                          {item.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>,
