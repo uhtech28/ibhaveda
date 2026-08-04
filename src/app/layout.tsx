@@ -132,15 +132,17 @@ export default function RootLayout({
           // empty-list case read clearly. (All character-class rules are off in
           // the Clerk dashboard, so this prefix effectively only shows here.)
           passwordComplexity: {
-            // The password-equals-email case is now handled by zxcvbn strength
-            // enforcement (Clerk dashboard → "Enforce minimum password
-            // strength"), which flags it inline. That frees this complexity
-            // sentence to be ONLY about length. `sentencePrefix` + the single
-            // `minimumLength` item render as "Your password must be at least 8
-            // characters." (all character-class rules are off in the dashboard,
-            // so no other items are appended).
-            sentencePrefix: "Your password must be",
-            minimumLength: "at least 8 characters",
+            // NOTE: the built-in password==email rejection renders through this
+            // SAME sentence with an EMPTY requirement list, and it fires on
+            // submit regardless of the zxcvbn strength setting. So the prefix
+            // MUST be a complete, self-contained sentence — if it merely leads
+            // into the (here empty) list, the email error breaks to
+            // "Your password must be ." A length-only hint that also keeps the
+            // email error readable is impossible here; that split needs a
+            // custom form. Keeping one clear self-contained sentence for both.
+            sentencePrefix:
+              "Your password must be at least 8 characters and can't be the same as your email address",
+            minimumLength: "",
           },
         },
       }}
