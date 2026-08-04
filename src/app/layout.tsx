@@ -11,6 +11,7 @@ import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ClarityScript } from "@/components/analytics/ClarityScript";
+import { AuthModalProvider } from "@/components/auth/auth-modal";
 import "./globals.css";
 
 const displayFont = Sora({
@@ -155,12 +156,14 @@ export default function RootLayout({
             <AnalyticsProvider>
               <ClarityScript />
               <ThemeProvider>
-                <ChatProvider>
-                  {children}
-                  <MobileBottomNav />
-                  <Toaster />
-                  <ChatWidget />
-                </ChatProvider>
+                <AuthModalProvider>
+                  <ChatProvider>
+                    {children}
+                    <MobileBottomNav />
+                    <Toaster />
+                    <ChatWidget />
+                  </ChatProvider>
+                </AuthModalProvider>
               </ThemeProvider>
             </AnalyticsProvider>
           </ConvexClientProvider>

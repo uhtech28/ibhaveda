@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { SignedIn, SignedOut, useClerk } from '@clerk/nextjs'
+import { useAuthModal } from '@/components/auth/auth-modal'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -41,7 +42,8 @@ export const HeroHeader = ({
     onOpenTodos?: () => void
     onOpenCalendar?: () => void
 }) => {
-    const { signOut, openSignIn, openSignUp } = useClerk()
+    const { signOut } = useClerk()
+    const { openSignIn, openSignUp } = useAuthModal()
     const currentUser = useQuery(api.users.getCurrentUser)
     const pathname = usePathname()
     const router = useRouter()
@@ -115,8 +117,8 @@ export const HeroHeader = ({
                             </button>
                             <SignedOut>
                                 <div className="flex shrink-0 gap-1">
-                                    <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn({ afterSignInUrl: "/feed" })}>Login</Button>
-                                    <Button size="sm" onClick={() => openSignUp({ afterSignUpUrl: "/profile-setup" })}>Sign Up</Button>
+                                    <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn()}>Login</Button>
+                                    <Button size="sm" onClick={() => openSignUp()}>Sign Up</Button>
                                 </div>
                             </SignedOut>
                             <SignedIn>
@@ -195,8 +197,8 @@ export const HeroHeader = ({
                     <div className="ml-1 flex items-center gap-2">
                         <SignedOut>
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn({ afterSignInUrl: "/feed" })}>Login</Button>
-                                <Button size="sm" onClick={() => openSignUp({ afterSignUpUrl: "/profile-setup" })}>Sign Up</Button>
+                                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn()}>Login</Button>
+                                <Button size="sm" onClick={() => openSignUp()}>Sign Up</Button>
                             </div>
                         </SignedOut>
                         <SignedIn>

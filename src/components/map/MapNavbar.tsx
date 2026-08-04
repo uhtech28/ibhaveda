@@ -5,7 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Home as HomeIcon, Users } from "lucide-react";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, useClerk } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useClerk } from "@clerk/nextjs";
+import { useAuthModal } from "@/components/auth/auth-modal";
 import { useQuery } from "convex/react";
 import { useAtom, useAtomValue } from "jotai";
 import { motion, AnimatePresence } from "framer-motion";
@@ -96,6 +97,7 @@ const menuItems = [
 
 export function MapNavbar() {
   const { signOut } = useClerk();
+  const { openSignIn, openSignUp } = useAuthModal();
   const currentUser = useQuery(api.users.getCurrentUser);
   const pathname = usePathname();
   const router = useRouter();
@@ -303,8 +305,8 @@ export function MapNavbar() {
 
           <SignedOut>
             <div className="flex gap-1 sm:gap-1.5">
-              <SignInButton><Button variant="ghost" size="sm" className="text-slate-300 hover:text-white text-[10px] sm:text-xs px-1.5 sm:px-2 h-7 sm:h-8">Login</Button></SignInButton>
-              <SignUpButton><Button size="sm" className="text-[10px] sm:text-xs px-2 sm:px-2.5 h-7 sm:h-8">Sign Up</Button></SignUpButton>
+              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white text-[10px] sm:text-xs px-1.5 sm:px-2 h-7 sm:h-8" onClick={() => openSignIn()}>Login</Button>
+              <Button size="sm" className="text-[10px] sm:text-xs px-2 sm:px-2.5 h-7 sm:h-8" onClick={() => openSignUp()}>Sign Up</Button>
             </div>
           </SignedOut>
           

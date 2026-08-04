@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { SignUpButton, useClerk, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { GraduationCap, TrendingUp, Rocket, Building2 } from "lucide-react";
+import { useAuthModal } from "@/components/auth/auth-modal";
 
 const SELECTED_ROLE_KEY = "ii.selectedRole";
 
@@ -87,7 +88,7 @@ function PixelField() {
 
 export default function HeroSection() {
   const { isSignedIn } = useUser();
-  const { openSignIn } = useClerk();
+  const { openSignIn, openSignUp } = useAuthModal();
   const router = useRouter();
 
   const handleSelect = (role: string) => {
@@ -151,7 +152,7 @@ export default function HeroSection() {
           >
             <button
               type="button"
-              onClick={() => openSignIn({ afterSignInUrl: "/feed", fallbackRedirectUrl: "/feed" })}
+              onClick={() => openSignIn()}
               className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
             >
               Already a member?{" "}
@@ -257,17 +258,19 @@ export default function HeroSection() {
                 }
 
                 return (
-                  <SignUpButton key={role.key} mode="modal" forceRedirectUrl="/profile-setup">
-                    <button
-                      type="button"
-                      onClick={() => handleSelect(role.key)}
-                      className={cardClass}
-                      style={style}
-                      aria-label={`Sign up as ${role.label}`}
-                    >
-                      {inner}
-                    </button>
-                  </SignUpButton>
+                  <button
+                    key={role.key}
+                    type="button"
+                    onClick={() => {
+                      handleSelect(role.key);
+                      openSignUp();
+                    }}
+                    className={cardClass}
+                    style={style}
+                    aria-label={`Sign up as ${role.label}`}
+                  >
+                    {inner}
+                  </button>
                 );
               })}
             </div>
