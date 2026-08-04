@@ -121,7 +121,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      localization={{
+        unstable__errors: {
+          // Clerk has a built-in (non-configurable) rule that rejects a password
+          // identical/too similar to the account's email. When that fires, Clerk
+          // renders its "character requirements" sentence with an EMPTY list, so
+          // users saw a broken "Your password must contain ." message.
+          // Rewriting the prefix into a complete standalone sentence makes the
+          // empty-list case read clearly. (All character-class rules are off in
+          // the Clerk dashboard, so this prefix effectively only shows here.)
+          passwordComplexity: {
+            sentencePrefix:
+              "Your password can't be the same as your email address — please choose a different one",
+          },
+        },
+      }}
+    >
       <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
         <body
           className="font-sans antialiased"
