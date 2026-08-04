@@ -132,17 +132,15 @@ export default function RootLayout({
           // empty-list case read clearly. (All character-class rules are off in
           // the Clerk dashboard, so this prefix effectively only shows here.)
           passwordComplexity: {
-            // Clerk composes both the grey "requirements hint" AND the red
-            // error from `sentencePrefix` + a list of requirement items.
-            // For the built-in password-equals-email rejection the list is
-            // EMPTY (length is satisfied), so we make the prefix a complete,
-            // self-contained sentence and blank out the only remaining item
-            // (`minimumLength`) so nothing awkward gets appended. Result: the
-            // hint and the error render the same clean sentence. All other
-            // character-class rules are off in the Clerk dashboard.
-            sentencePrefix:
-              "Your password must be at least 8 characters and can't be the same as your email address",
-            minimumLength: "",
+            // The password-equals-email case is now handled by zxcvbn strength
+            // enforcement (Clerk dashboard → "Enforce minimum password
+            // strength"), which flags it inline. That frees this complexity
+            // sentence to be ONLY about length. `sentencePrefix` + the single
+            // `minimumLength` item render as "Your password must be at least 8
+            // characters." (all character-class rules are off in the dashboard,
+            // so no other items are appended).
+            sentencePrefix: "Your password must be",
+            minimumLength: "at least 8 characters",
           },
         },
       }}
