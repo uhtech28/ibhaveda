@@ -61,14 +61,20 @@ export function BossIntroCinematic({ onDone }: Props) {
   const [minionTypedText, setMinionTypedText] = useState("");
 
   // ── Sequence timing (ms) ──────────────────────────────────────────
+  // Slower pacing so the intro reads like a cinematic beat instead of
+  // a burst. Curtain / reveal are shifted out a touch, but the big
+  // pacing wins come from the typewriter speed and the between-line
+  // pauses further down.
   useEffect(() => {
     const timers: number[] = [];
-    timers.push(window.setTimeout(() => setPhase("main-reveal"), 350));
-    timers.push(window.setTimeout(() => setPhase("main-speech"), 2100));
+    timers.push(window.setTimeout(() => setPhase("main-reveal"), 500));
+    timers.push(window.setTimeout(() => setPhase("main-speech"), 2800));
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, []);
 
   // ── Typewriter for main speech ────────────────────────────────────
+  // Character interval bumped 34ms → 55ms and inter-line pause
+  // 1400ms → 2400ms so each line lands with room to breathe.
   useEffect(() => {
     if (phase !== "main-speech") return;
     const line = MAIN_SPEECH_LINES[speechIdx] ?? "";
@@ -86,26 +92,29 @@ export function BossIntroCinematic({ onDone }: Props) {
           } else {
             setPhase("minions");
           }
-        }, 1400);
+        }, 2400);
       }
-    }, 34);
+    }, 55);
     return () => window.clearInterval(id);
   }, [phase, speechIdx]);
 
   // ── Minion reveal sequence ────────────────────────────────────────
+  // Stagger bumped 1400ms → 2000ms per minion and the tail pause
+  // 600ms → 1000ms so the finale button lands after the taunt fully
+  // reads instead of stomping it.
   useEffect(() => {
     if (phase !== "minions") return;
     setMinionIdx(0);
     const timers: number[] = [];
     for (let i = 1; i < VILLAGE_BOSSES.length; i++) {
       timers.push(
-        window.setTimeout(() => setMinionIdx(i), 1400 * i),
+        window.setTimeout(() => setMinionIdx(i), 2000 * i),
       );
     }
     timers.push(
       window.setTimeout(
         () => setPhase("finale"),
-        1400 * VILLAGE_BOSSES.length + 600,
+        2000 * VILLAGE_BOSSES.length + 1000,
       ),
     );
     return () => timers.forEach((t) => window.clearTimeout(t));
@@ -126,15 +135,18 @@ export function BossIntroCinematic({ onDone }: Props) {
     if (phase === "finale") return;
     let i = 0;
     setMinionTypedText("");
+    // Match the main-speech typewriter pace (34→55ms per char) and give
+    // the villain a longer beat (400→800ms) before the taunt starts so
+    // the first minion has settled in the frame first.
     const kick = window.setTimeout(() => {
       const id = window.setInterval(() => {
         i += 1;
         setMinionTypedText(MINIONS_SPEECH_LINE.slice(0, i));
         if (i >= MINIONS_SPEECH_LINE.length) window.clearInterval(id);
-      }, 34);
+      }, 55);
       // Store on window so the cleanup below can clear it.
       (window as unknown as { __unravellerTauntTimer?: number }).__unravellerTauntTimer = id;
-    }, 400);
+    }, 800);
     return () => {
       window.clearTimeout(kick);
       const stored = (window as unknown as {

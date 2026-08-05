@@ -200,21 +200,19 @@ export function Step2TemplatePick() {
     tutorial.step >= 1 &&
     tutorial.step <= 6;
 
-  // FORCE-ADVANCE — bump to step 3 on /feed if the user isn't there yet.
-  // Guarded by a ref so we only fire once per /feed visit.
+  // PROGRESS ADVANCE — used to auto-bump to step 3 on /feed arrival,
+  // which made the progress bar show 1/8 the moment Sparky's intro
+  // pitch appeared (before the user had done anything). That felt like
+  // "persona counted as step 1" from the user's POV.
+  //
+  // Now: we STAY at the real step (1 for a fresh user) while the intro
+  // is on screen. The bar's display remap floors at 0, so during the
+  // intro users see 0/8 (nothing filled). The moment they click
+  // "Let's go" on the intro dialogue, that button handler below calls
+  // goTo(3), which bumps the counter to 1/8 — the actual first
+  // guided step (click +).
   const advancedRef = useRef(false);
-  useEffect(() => {
-    if (!onFeed) {
-      advancedRef.current = false;
-      return;
-    }
-    if (!tutorial.active) return;
-    if (advancedRef.current) return;
-    if (tutorial.step < 3) {
-      advancedRef.current = true;
-      void tutorial.goTo(3);
-    }
-  }, [onFeed, tutorial]);
+  void advancedRef;
 
   // Start on `intro` for a fresh tutorial. Sparky introduces himself,
   // waits for the user to click Continue, then transitions into the
@@ -470,7 +468,14 @@ export function Step2TemplatePick() {
           highlight: null,
           primary: {
             label: "Let's go",
-            onClick: () => setDialogue("click_plus"),
+            onClick: () => {
+              // Advance internal step to 3 (click_plus). Bar was hidden
+              // at 0/8 during the intro pitch; now moves to 1/8.
+              if (tutorial.step < 3) {
+                void tutorial.goTo(3);
+              }
+              setDialogue("click_plus");
+            },
           },
         };
       case "click_plus":
@@ -592,7 +597,11 @@ export function Step2TemplatePick() {
         mood={view.mood}
         primaryAction={view.primary}
         secondaryAction={view.skip}
-        anchor="bottom-right"
+        // Center Sparky on the intro pitch so he feels like a proper
+        // "hello, welcome" moment instead of tucked in a corner. Every
+        // subsequent step reverts to bottom-right so he doesn't cover
+        // the underlying UI (compose dialog, checkpoint, etc.).
+        anchor={dialogue === "intro" ? "center" : "bottom-right"}
         nearSelector={view.highlight ?? null}
       />    </>
   );

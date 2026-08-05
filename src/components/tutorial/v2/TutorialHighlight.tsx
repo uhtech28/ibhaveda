@@ -231,11 +231,14 @@ export function TutorialHighlight({
             />
           </svg>
 
-          {/* Crisp 1.5px ring around the target — position set via inline
-              style (no spring transition) so the ring stays fixed to the
-              target's rect during fast scrolling instead of springing
-              behind it. will-change hints the browser to composite it on
-              the GPU for smoother scroll tracking. */}
+          {/* Single crisp 2px ring around the target — no outer glow.
+              Previous version layered a 10px soft glow on top of the
+              solid outline, which visually read as TWO concentric
+              rings (product feedback: "use a single circle to
+              highlight"). Now just one clean line at 2px so tiny
+              targets look sharp and big targets don't get a diffuse
+              halo. Position set via inline style (no spring) so the
+              ring stays glued to the target during fast scrolling. */}
           {hasTarget && (
             <div
               className="absolute pointer-events-none"
@@ -244,8 +247,7 @@ export function TutorialHighlight({
                 top: rect.y,
                 width: rect.width,
                 height: rect.height,
-                boxShadow:
-                  "0 0 0 1.5px rgba(251, 191, 36, 0.95), 0 0 10px rgba(251, 191, 36, 0.30)",
+                boxShadow: "0 0 0 2px rgba(251, 191, 36, 0.95)",
                 borderRadius: effectiveRx,
                 willChange: "left, top, width, height",
               }}

@@ -84,8 +84,17 @@ const XPBarComponent = ({
   // ─── COMPACT MODE WITH BOSS ACTIVE (VS COMBAT HUD) ─────────────────────────
   if (compact && hasBoss) {
     return (
-      <div className="relative flex items-stretch gap-0 w-full min-w-0 select-none overflow-hidden rounded-xl animate-fade-in"
+      // CSS Grid layout with `minmax(0, 1fr) auto minmax(0, 1fr)` —
+      // this is what actually forces truncate to bite. With plain
+      // flex-1 the two columns still let their long text bleed past
+      // their share into the VS badge and adjacent column (visible
+      // as "INNOVATIVE FINTECH APPLICATIONFOG OF VAGUENESS" mash-up).
+      // `minmax(0, 1fr)` establishes both a hard MIN-width of 0 AND a
+      // flex share of 1fr, so truncate can shrink the text all the way
+      // down to just the ellipsis if needed.
+      <div className="relative grid items-stretch w-full min-w-0 select-none overflow-hidden rounded-xl animate-fade-in"
         style={{
+          gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
           background: "linear-gradient(135deg, rgba(6,14,35,0.95) 0%, rgba(10,10,20,0.98) 50%, rgba(35,6,10,0.95) 100%)",
           border: "1px solid rgba(255,255,255,0.06)",
           boxShadow: "0 0 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
@@ -98,9 +107,14 @@ const XPBarComponent = ({
         </div>
 
         {/* ── PROJECT SIDE ── */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 px-3 py-2 relative">
-          {/* Top: shield icon + project name */}
-          <div className="flex items-center gap-1.5">
+        <div className="min-w-0 overflow-hidden flex flex-col justify-center gap-1.5 px-3 py-2 relative">
+          {/* Top: shield icon + project name.
+              `min-w-0` on this inner flex row is what actually makes
+              `truncate` kick in — without it the row expanded past
+              its parent and pushed the project name across the VS
+              divider into the boss name column (visible collision:
+              "INNOVATIVE FINTECH APPLICATIONFOG OF VAGUENESS"). */}
+          <div className="flex min-w-0 items-center gap-1.5">
             <Shield className="w-3 h-3 shrink-0 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
             <span
               className="text-[9.5px] font-black uppercase tracking-wider text-cyan-200 truncate leading-none drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]"
@@ -177,10 +191,15 @@ const XPBarComponent = ({
           </motion.div>
         </div>
 
-        {/* ── BOSS SIDE ── */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 px-3 py-2 relative">
-          {/* Top: skull icon + boss name */}
-          <div className="flex items-center gap-1.5 flex-row-reverse">
+        {/* ── BOSS SIDE ── (grid column 3 — bounded by minmax(0, 1fr)
+            above so `truncate` on the boss name actually clips it
+            instead of bleeding into the VS badge column). */}
+        <div className="min-w-0 overflow-hidden flex flex-col justify-center gap-1.5 px-3 py-2 relative">
+          {/* Top: skull icon + boss name.
+              Same `min-w-0` fix as the project side — otherwise the
+              boss name would grow past its column and the two
+              names would visually collide across the VS badge. */}
+          <div className="flex min-w-0 items-center gap-1.5 flex-row-reverse">
             <motion.div
               animate={{ opacity: [1, 0.5, 1] }}
               transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
@@ -259,9 +278,13 @@ const XPBarComponent = ({
     const shownBossName = bossName || "Stage Boss";
     const shownBossPct = hasBoss ? Math.round(bossPercentage) : 100;
     return (
+      // Same grid trick as the compact+boss variant above — three
+      // strict columns (project | VS | boss placeholder). Prevents
+      // long stage labels from bleeding across the VS chip.
       <div
-        className="relative flex min-w-0 w-full items-stretch overflow-hidden rounded-xl border border-white/8 select-none"
+        className="relative grid min-w-0 w-full items-stretch overflow-hidden rounded-xl border border-white/8 select-none"
         style={{
+          gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
           background:
             "linear-gradient(135deg, rgba(6,14,35,0.95) 0%, rgba(10,10,20,0.98) 50%, rgba(35,6,10,0.95) 100%)",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
@@ -274,7 +297,7 @@ const XPBarComponent = ({
         </div>
 
         {/* LEFT — stage label + XP bar + progress */}
-        <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
+        <div className="relative min-w-0 overflow-hidden flex flex-col justify-center gap-1.5 px-3 py-2">
           <div className="inline-flex w-fit items-center gap-1.5">
             <Shield className="h-3 w-3 shrink-0 text-violet-300 drop-shadow-[0_0_6px_rgba(167,139,250,0.6)]" />
             <span
@@ -325,9 +348,9 @@ const XPBarComponent = ({
           </motion.div>
         </div>
 
-        {/* RIGHT — boss name + HP bar + HP% */}
-        <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
-          <div className="flex flex-row-reverse items-center gap-1.5">
+        {/* RIGHT — boss name + HP bar + HP% (grid column 3) */}
+        <div className="relative min-w-0 overflow-hidden flex flex-col justify-center gap-1.5 px-3 py-2">
+          <div className="flex min-w-0 flex-row-reverse items-center gap-1.5">
             <motion.div
               animate={{ opacity: [1, 0.5, 1] }}
               transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}

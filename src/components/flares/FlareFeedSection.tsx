@@ -56,9 +56,13 @@ export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
     <section className="space-y-3">
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-3 min-w-0">
+          {/* Header label trimmed from "Open flares" → "Flares"
+              per product request — the OPEN badge on each card
+              already communicates status, so the section label just
+              names the surface. */}
           <h2 className="flex shrink-0 items-center gap-2 text-sm font-medium uppercase tracking-wider text-white/70">
             <Radio className="h-4 w-4 text-amber-400" />
-            Open flares
+            Flares
           </h2>
           {flares && flares.length > 0 && (
             <span className="text-xs text-white/40 truncate">

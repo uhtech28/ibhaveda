@@ -72,7 +72,9 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
-import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon, ListTodo } from "lucide-react";
+// ListTodo dropped — the icon-only "Tasks" button that used to sit
+// beside the biome label in the HUD was removed as decorative.
+import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon } from "lucide-react";
 import { CalendarTool } from "@/components/tools/calendar-tool";
 import { KanbanTool } from "@/components/tools/kanban-tool";
 import { JournalTool } from "@/components/tools/journal-tool";
@@ -106,6 +108,15 @@ const XpFloatingPopover = dynamic(
 );
 const FlareTriggerButton = dynamic(
   () => import("@/components/flares/FlareTriggerButton").then(mod => mod.FlareTriggerButton),
+  { ssr: false },
+);
+// FlareComposeDialog mounted at the page level so the Adventurer's
+// Menu can open it via the new "flare" panel-id (menu → onOpenPanel
+// → setIsFlareComposeOpen). The FlareTriggerButton inside the
+// CheckpointPanel still spins up its OWN copy — this instance is
+// only for the menu-triggered path.
+const FlareComposeDialog = dynamic(
+  () => import("@/components/flares/FlareComposeDialog").then(mod => mod.FlareComposeDialog),
   { ssr: false },
 );
 const MobileJoystick = dynamic(
@@ -1184,15 +1195,16 @@ const TaskCard = memo(function TaskCardInner({
         }}
       />
 
-      {/* Quest-scroll indicator — sealed (with ribbon) when the task is
-          complete, open scroll when actionable, lock chip when the row
-          is disabled. Pixel-art visual reinforces the quest-log tone. */}
-      <motion.div
-        className="flex items-center justify-center flex-shrink-0 mt-0.5"
-        animate={task.done ? { scale: [0.8, 1.2, 1] } : { scale: 1 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-      >
-        {locked ? (
+      {/* Quest-scroll icon REMOVED per product request — the coloured
+          left status stripe already communicates open / done / locked
+          state, so the scroll pixel-art was visual noise next to the
+          uppercase task title. Locked rows still show a small lock
+          chip so users understand why the row is disabled. */}
+      {locked && (
+        <motion.div
+          className="flex items-center justify-center flex-shrink-0 mt-0.5"
+          animate={{ scale: 1 }}
+        >
           <div
             className="flex h-5 w-5 items-center justify-center rounded-full border"
             style={{
@@ -1202,14 +1214,8 @@ const TaskCard = memo(function TaskCardInner({
           >
             <Lock className="h-2.5 w-2.5 text-slate-500" />
           </div>
-        ) : (
-          <PixelIcon
-            name={task.done ? "quest-scroll-sealed" : "quest-scroll-open"}
-            size={22}
-            alt={task.done ? "Task completed" : "Task open"}
-          />
-        )}
-      </motion.div>
+        </motion.div>
+      )}
 
       <div className="flex-1 min-w-0 relative z-10">
         <div className="flex items-start justify-between gap-2">
@@ -1956,13 +1962,24 @@ function MapPageInner() {
   const [isKanbanOpen, setIsKanbanOpen] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Flare compose dialog — opened from the Adventurer's Menu "Flare"
+  // tile (map/world/page.tsx also renders one instance so users can
+  // fire a flare without first navigating to a specific checkpoint).
+  const [isFlareComposeOpen, setIsFlareComposeOpen] = useState(false);
 
   const saveToolData = useMutation(api.worldMap.saveToolData);
   const redoTask = useMutation(api.worldMap.redoTask);
 
+  // kanbanData query is active whenever EITHER the Kanban modal is
+  // open OR the Calendar modal is open — the calendar reads kanban
+  // cards to show tasks on their deadline dates (Kanban↔Calendar
+  // sync). Previously this query only fired when `isKanbanOpen` was
+  // true, so opening the calendar without first opening the kanban
+  // gave the calendar a null `kanbanData` and no cards showed —
+  // that's the "kanban tasks not syncing to calendar" bug.
   const kanbanData = useQuery(
     api.worldMap.getToolData,
-    isKanbanOpen && activeVenture?._id
+    (isKanbanOpen || isCalendarOpen) && activeVenture?._id
       ? { ventureId: activeVenture._id, toolType: "kanban" }
       : "skip",
   );
@@ -1974,20 +1991,62 @@ function MapPageInner() {
       : "skip",
   );
 
+  // journalData similarly needs to be fetched when the calendar is
+  // open, since the calendar surfaces journal entries by date the
+  // same way it surfaces kanban cards.
   const journalData = useQuery(
     api.worldMap.getToolData,
-    isJournalOpen && activeVenture?._id
+    (isJournalOpen || isCalendarOpen) && activeVenture?._id
       ? { ventureId: activeVenture._id, toolType: "journal" }
       : "skip",
   );
 
   const handleToolSubmit = async (toolType: string, data: unknown) => {
-    if (!activeVenture?._id) return;
-    await saveToolData({
-      ventureId: activeVenture._id,
-      toolType,
-      data,
-    });
+    // Always give the user visible feedback — closing the tool's own
+    // modal on click IS the confirmation, regardless of whether the
+    // save succeeded, failed, or was skipped in viewer mode. Without
+    // this, Submit Board / Post Update felt "dead" because the panel
+    // stayed open and the user had no way to tell whether the click
+    // even registered.
+    //
+    // Per-tool close so we don't accidentally dismiss a modal the
+    // user didn't just interact with.
+    const closeTool = () => {
+      if (toolType === "kanban") setIsKanbanOpen(false);
+      else if (toolType === "journal") setIsJournalOpen(false);
+      else if (toolType === "calendar") setIsCalendarOpen(false);
+    };
+
+    if (!activeVenture?._id) {
+      closeTool();
+      return;
+    }
+    // Client-side owner gate — the mutation itself throws
+    // "Unauthorized" when a non-owner tries to save (see
+    // convex/worldMap.ts saveToolData). Silently skip the call in
+    // viewer mode so the console stays clean, but still close the
+    // modal so the user sees their click was registered.
+    if (isViewerMode) {
+      console.info(
+        "[handleToolSubmit] viewer mode — skipping save (read-only venture)",
+      );
+      closeTool();
+      return;
+    }
+    try {
+      await saveToolData({
+        ventureId: activeVenture._id,
+        toolType,
+        data,
+      });
+    } catch (err) {
+      // Belt-and-suspenders: even for owners, network hiccups or
+      // stale auth shouldn't take down the whole page. Log and
+      // continue — the modal still closes so the button feels alive.
+      console.warn("[handleToolSubmit] saveToolData failed:", err);
+    } finally {
+      closeTool();
+    }
   };
 
   // Badge queue — pop-and-show one at a time
@@ -2763,22 +2822,59 @@ function MapPageInner() {
     });
   }, [seedFlags]);
 
-  // Listen for the tutorial's "Start the fight" button. Forces the
+  // Listen for the tutorial's "Start the fight" event. Forces the
   // CombatPanel open on the active checkpoint without making the user
   // grind tasks first.
+  //
+  // Previously this handler silently returned if `activeVenture` or
+  // the matching `cp` weren't ready — which frequently happened when
+  // Step3MapGuide dispatched the event immediately after boss-intro
+  // dismissal, before Convex had hydrated venture/checkpoints. Result:
+  // combat never opened. Now the request is stashed in a ref and
+  // retried the moment those deps finish loading (via the effect
+  // below).
+  const forceCombatPendingRef = useRef(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = () => {
+      forceCombatPendingRef.current = true;
+      // Try immediately in case everything is already loaded.
+      tryFireForceCombat();
+    };
+    const tryFireForceCombat = () => {
+      if (!forceCombatPendingRef.current) return;
       if (!activeVenture) return;
-      const cp = checkpoints.find(
+      if (!checkpoints || checkpoints.length === 0) return;
+      // Primary lookup — the currently-active checkpoint. Works for
+      // the common case where activeStage / activeCP have resolved
+      // by the time the tutorial dispatches its force-combat event.
+      let cp = checkpoints.find(
         (c) => c.stage === activeStage && c.checkpoint === activeCP,
       );
+      // FALLBACK — when activeStage/activeCP are still undefined
+      // (Convex + URL-sync race on first map paint), use the first
+      // NOT-completed checkpoint. That's the natural target the
+      // tutorial wanted anyway, and it prevents the "stuck on map,
+      // need to refresh" bug where the handler kept bailing until
+      // the user manually reloaded the page.
+      if (!cp) {
+        cp =
+          checkpoints.find(
+            (c) => !(c.t1Completed && c.t2Completed && c.t3Completed),
+          ) ?? checkpoints[0];
+      }
       if (!cp) return;
-      const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
-        Boolean,
-      ).length;
+      const doneTasks = [
+        cp.t1Completed,
+        cp.t2Completed,
+        cp.t3Completed,
+      ].filter(Boolean).length;
+      forceCombatPendingRef.current = false;
       startBossCombat(cp, doneTasks);
     };
+    // Retry when any dep changes — covers the race where the event
+    // fires before Convex data lands.
+    tryFireForceCombat();
     window.addEventListener("tutorial:force-combat", handler);
     return () => window.removeEventListener("tutorial:force-combat", handler);
   }, [activeVenture, checkpoints, activeStage, activeCP, startBossCombat]);
@@ -4510,15 +4606,23 @@ function MapPageInner() {
         setIsKanbanOpen(true);
       } else if (tab === "journal") {
         setIsJournalOpen(true);
-      } else if (tab === "leaderboard") {
-        // Leaderboard is its own full-page surface (/leaderboard) rather
-        // than a right-hand panel — hard-navigate so the user gets the
-        // full podium + your-rank view instead of a cramped sidebar.
-        router.push("/leaderboard");
+      } else if (tab === "community") {
+        // Community is its own full-page surface (/community) that
+        // hosts Weekly Top Contributors + Top Projects (leaderboard).
+        // Was previously "leaderboard" pointing at /leaderboard — the
+        // menu item is now Community and the leaderboard content is
+        // exposed as a sub-tab of the Community page.
+        router.push("/community");
       } else if (tab === "minigames") {
         setIsMiniGamesPanelOpen(true);
       } else if (tab === "settings") {
         setIsSettingsOpen(true);
+      } else if (tab === "flare") {
+        // Menu "Flare" tile — opens the compose dialog with the
+        // current venture context so responders see which project
+        // needs help. Checkpoint context stays optional (users
+        // firing from the menu may not be viewing a specific CP).
+        setIsFlareComposeOpen(true);
       } else {
         updateUrlParams({ panel: "tools", tab, checkpointId: null });
       }
@@ -4654,34 +4758,13 @@ function MapPageInner() {
             />
           </div>
 
-          <div className="hidden h-4 w-px bg-white/10 sm:block shrink-0" />
-
-          {/* Active Tasks panel toggle */}
-          <button
-            onClick={() => {
-              if (checkpoints.length > 0 && activeStage && activeCP) {
-                const activeCheckpoint = checkpoints.find(
-                  (cp) => cp.stage === activeStage && cp.checkpoint === activeCP,
-                );
-                if (activeCheckpoint) {
-                  updateUrlParams({ checkpointId: activeCheckpoint._id }, true);
-                  eventBridge.dispatchToPhaser({
-                    type: "SCROLL_TO_CHECKPOINT",
-                    checkpointId: activeCheckpoint._id,
-                  });
-                }
-              }
-            }}
-            className={`flex items-center justify-center p-1.5 rounded-lg border transition-all duration-300 shrink-0 ${
-              !selectedDetail
-                ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 hover:text-white shadow-[0_0_12px_rgba(99,102,241,0.2)] animate-[pulse_2s_infinite]"
-                : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
-            }`}
-            title="Tasks"
-          >
-            <ListTodo className={`w-3.5 h-3.5 ${!selectedDetail ? "text-indigo-400" : "text-slate-400"}`} />
-          </button>
-
+          {/* Active Tasks panel toggle REMOVED per product request —
+              this icon-only button (ListTodo) sat immediately to the
+              right of the biome label and read as a decorative
+              "checklist icon" flanking ANCIENT LIBRARY. Users can still
+              open the task panel by clicking the active checkpoint
+              marker on the Phaser map (primary UX), so removing this
+              shortcut only strips the decoration. */}
           <div className="hidden h-4 w-px bg-white/10 sm:block shrink-0" />
 
           <div className="min-w-0 flex-1 sm:w-[280px] md:w-[340px]">
@@ -4689,14 +4772,16 @@ function MapPageInner() {
               currentXP={userProgress.xp}
               maxXP={userProgress.xpToNextLevel}
               compact={true}
-              // Left side: founder's username. Right side: the specific
-              // village boss guarding the current checkpoint (Fog of
-              // Vagueness / Everyone Chimera / Feature Automaton /
-              // Assumption Wraith) — falls back to the generic "Stage
-              // Boss" label when no boss is resolved.
+              // Left side: the user's PROJECT / venture name (e.g.
+              // "testing") — NOT their username. Previously we passed
+              // currentUser.username here so the HUD showed "USER_PRO
+              // (1/8)" instead of the actual project title. The user
+              // asked for the venture title on the left so the map bar
+              // matches the post-card layout. Fallbacks preserve a
+              // sensible label if the idea / venture name is missing.
               userName={
-                currentUser?.username ||
-                currentUser?.name ||
+                ideaTitle ||
+                activeVenture?.name ||
                 undefined
               }
               bossName={
@@ -5001,15 +5086,34 @@ function MapPageInner() {
               }}
               onAdvanceCheckpoint={() => {
                 setActiveCombatRoundId(null);
-                // First-run tour: skip the post-combat ceremony
-                // (checkpoint walk + animations) and drop the user
-                // straight onto /feed for the final contribute step.
+                // First-run tour: DO NOT navigate away. The Sparky
+                // tutorial now has a "flare" beat that points at the
+                // CheckpointPanel flare button AFTER combat. If we
+                // push to /feed here, the flare step never gets a
+                // chance to render (Sparky skips straight to the
+                // contribute step on /feed). Instead:
+                //   - Close the combat panel (setBossCombatTarget null)
+                //   - Open the CheckpointPanel on the active CP so the
+                //     flare button becomes visible for Sparky to anchor to
+                // The tutorial's own "done" transition (fires after the
+                // user actually fires a flare) is what auto-navigates
+                // to /feed for the contribute step.
                 const tourActiveNow =
                   tourStateForPulse?.state === "not_started" ||
                   tourStateForPulse?.state === "in_progress";
                 if (tourActiveNow) {
                   setBossCombatTarget(null);
-                  router.push("/feed");
+                  const stage = bossCombatTarget.stage;
+                  const cpIndex = bossCombatTarget.checkpoint;
+                  const activeCheckpoint = checkpoints.find(
+                    (cp) => cp.stage === stage && cp.checkpoint === cpIndex,
+                  );
+                  if (activeCheckpoint) {
+                    updateUrlParams(
+                      { checkpointId: activeCheckpoint._id },
+                      true,
+                    );
+                  }
                   return;
                 }
                 finishBossCombatAndAdvance();
@@ -5018,13 +5122,27 @@ function MapPageInner() {
                 dismissBossCombatVisual(bossCombatTarget.stage);
                 setBossCombatTarget(null);
                 setActiveCombatRoundId(null);
-                // Tour exits combat — win or lose — straight to /feed
-                // for the contributor step.
+                // First-run tour: keep the user on the map so Sparky's
+                // flare beat can fire. Open the CheckpointPanel on the
+                // active CP so the flare button is on screen for Sparky
+                // to anchor to. The old behaviour pushed to /feed here
+                // — which meant the flare step never got a target and
+                // the tutorial silently skipped it.
                 if (
                   tourStateForPulse?.state === "not_started" ||
                   tourStateForPulse?.state === "in_progress"
                 ) {
-                  router.push("/feed");
+                  const stage = bossCombatTarget.stage;
+                  const cpIndex = bossCombatTarget.checkpoint;
+                  const activeCheckpoint = checkpoints.find(
+                    (cp) => cp.stage === stage && cp.checkpoint === cpIndex,
+                  );
+                  if (activeCheckpoint) {
+                    updateUrlParams(
+                      { checkpointId: activeCheckpoint._id },
+                      true,
+                    );
+                  }
                 }
               }}
             />
@@ -5178,6 +5296,16 @@ function MapPageInner() {
             <MapSettingsDialog
               open={isSettingsOpen}
               onOpenChange={setIsSettingsOpen}
+            />
+
+            {/* Menu-triggered flare compose. Ventures the user is
+                currently viewing are passed as context so the flare
+                is properly attributed. Checkpoint stays undefined —
+                menu flares are venture-scoped, not CP-scoped. */}
+            <FlareComposeDialog
+              open={isFlareComposeOpen}
+              onOpenChange={setIsFlareComposeOpen}
+              ventureId={activeVenture?._id as Id<"ventures"> | undefined}
             />
 
             {/* Tools Panel (Left - Floating Popup next to sidebar) */}
@@ -5414,6 +5542,7 @@ function MapPageInner() {
                         <IdeaHierarchyFlowchart
                           ideaId={ideaForContributors._id as Id<"ideas">}
                           alwaysRender
+                          bare
                         />
                       ) : venture?.ideaId ? (
                         // Query in flight — show a spinner.
@@ -5468,7 +5597,10 @@ function MapPageInner() {
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
                         <CalendarIcon className="w-5 h-5 text-amber-400" />
-                        Calendar &amp; Syncs
+                        {/* Title trimmed from "Calendar & Syncs" →
+                            "Calendar" per product request — the
+                            "& Syncs" tail was redundant chrome. */}
+                        Calendar
                       </h2>
                       <button
                         onClick={() => setIsCalendarOpen(false)}
@@ -5503,21 +5635,32 @@ function MapPageInner() {
                   onClick={() => setIsKanbanOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
+                {/* Panel height dropped from fixed `h-[700px]` to
+                    `h-auto` so the modal collapses to its content
+                    height — the previous fixed height left a big
+                    blank void below Submit Board when the board had
+                    only a couple of cards. `max-h-[88vh]` still caps
+                    it for very tall boards, and inner content
+                    scrolls when it overflows. */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   transition={{ type: "spring", duration: 0.5 }}
-                  className="relative w-full max-w-[1000px] h-[700px] max-h-[88vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  className="relative w-full max-w-[1000px] h-auto max-h-[88vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
                   style={{
                     background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
                     boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
                   }}
                 >
-                  <div className="flex-1 h-full min-h-0 flex flex-col p-5">
+                  <div className="flex flex-col min-h-0 p-5">
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
-                        <KanbanIcon className="w-5 h-5 text-emerald-400" />
+                        {/* Header icon swapped to the pixel-art
+                            rune-stone that matches the Kanban tile
+                            in the Adventurer's Menu — consistent
+                            visual identity across menu + panel. */}
+                        <PixelIcon name="rune-stone" size={22} alt="Kanban" />
                         Kanban Board
                       </h2>
                       <button
@@ -5527,11 +5670,17 @@ function MapPageInner() {
                         <X className="w-5 h-5" />
                       </button>
                     </div>
-                    <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+                    <div className="min-h-0 overflow-y-auto no-scrollbar">
                       <KanbanTool
                         prompt="Manage your venture tasks and workflow."
                         initialContent={kanbanData}
                         onSubmit={(data) => handleToolSubmit("kanban", data)}
+                        // Read-only when viewing someone else's venture —
+                        // the server rejects saves anyway (see
+                        // saveToolData Unauthorized check), so tell the
+                        // user up-front and disable Submit rather than
+                        // letting them build a board that silently vanishes.
+                        readOnly={isViewerMode}
                       />
                     </div>
                   </div>

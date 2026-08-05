@@ -52,8 +52,12 @@ interface TutorialMascotProps {
   mood?: SparkyMood;
   primaryAction?: { label: string; onClick: () => void };
   secondaryAction?: { label: string; onClick: () => void };
-  /** Fallback anchor when no target selector is set / target isn't found */
-  anchor?: "bottom-right" | "bottom-center" | "bottom-left";
+  /**
+   * Fallback anchor when no target selector is set / target isn't found.
+   * "center" pins Sparky to the true middle of the viewport — used for
+   * the very first intro pitch so he doesn't sit tucked in a corner.
+   */
+  anchor?: "bottom-right" | "bottom-center" | "bottom-left" | "center";
   /**
    * CSS selector for the on-screen element Sparky should stand next to.
    * When provided, Sparky floats near that element and the bubble is
@@ -727,12 +731,17 @@ export function TutorialMascot({
   const bubbleSide: "left" | "right" | "bottom" | "top" =
     placement?.bubbleTailSide ?? "bottom";
 
+  // For "center" mode the outer wrapper uses different positioning
+  // (inset-0 + flex-center) so we don't apply bottom-N/anchorClass to
+  // it. See the fallback branch below.
   const anchorClass =
     anchor === "bottom-right"
       ? "right-4 sm:right-6"
       : anchor === "bottom-center"
         ? "left-1/2 -translate-x-1/2"
-        : "left-4 sm:left-6";
+        : anchor === "center"
+          ? "" // handled with inset-0 wrapper below
+          : "left-4 sm:left-6";
 
   const portal = createPortal(
     <AnimatePresence>
@@ -875,41 +884,75 @@ export function TutorialMascot({
               )}
             </>
           ) : (
-            // FALLBACK MODE: bottom-corner anchor, bubble stacked over Sparky
-            <motion.div
-              key="corner-anchor"
-              initial={{ opacity: 0, y: 60 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ type: "spring", stiffness: 260, damping: 24 }}
-              className={`fixed bottom-4 sm:bottom-6 ${anchorClass} z-[10010] pointer-events-none`}
-              style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-            >
-              <div className="flex flex-col items-end gap-2">
-                {/* pointer-events-none on the bubble wrapper so its
-                    bounding box doesn't intercept clicks meant for
-                    controls beneath (e.g. combat Attack button). The
-                    inner action button re-enables its own hit area.
-                    Skip the wrapper entirely when Sparky is silent so
-                    no empty bubble frame paints above the puppy. */}
-                {hasBubbleContent && (
-                  <div className="pointer-events-none">
-                    <TutorialSpeechBubble
-                      text={text}
-                      primaryAction={wrappedPrimary}
-                      secondaryAction={secondaryAction}
-                      side="bottom"
-                    />
-                  </div>
-                )}
-                <SparkyMascotImage
-                  mood={mood}
-                  speech={activeSpeech}
-                  cheerTick={cheerTick}
-                  suppressRoll={suppressRoll}
-                />
-              </div>
-            </motion.div>
+            // FALLBACK MODE: no highlight target — Sparky renders in a
+            // corner (default) OR at true screen-center when
+            // anchor="center". Center mode uses inset-0 + flex-center
+            // so Sparky sits in the middle of the viewport instead of
+            // tucked in the bottom-right.
+            anchor === "center" ? (
+              <motion.div
+                key="center-anchor"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                className="fixed inset-0 z-[10010] flex items-center justify-center pointer-events-none"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  {hasBubbleContent && (
+                    <div className="pointer-events-none">
+                      <TutorialSpeechBubble
+                        text={text}
+                        primaryAction={wrappedPrimary}
+                        secondaryAction={secondaryAction}
+                        side="bottom"
+                      />
+                    </div>
+                  )}
+                  <SparkyMascotImage
+                    mood={mood}
+                    speech={activeSpeech}
+                    cheerTick={cheerTick}
+                    suppressRoll={suppressRoll}
+                  />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="corner-anchor"
+                initial={{ opacity: 0, y: 60 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 40 }}
+                transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                className={`fixed bottom-4 sm:bottom-6 ${anchorClass} z-[10010] pointer-events-none`}
+                style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+              >
+                <div className="flex flex-col items-end gap-2">
+                  {/* pointer-events-none on the bubble wrapper so its
+                      bounding box doesn't intercept clicks meant for
+                      controls beneath (e.g. combat Attack button). The
+                      inner action button re-enables its own hit area.
+                      Skip the wrapper entirely when Sparky is silent so
+                      no empty bubble frame paints above the puppy. */}
+                  {hasBubbleContent && (
+                    <div className="pointer-events-none">
+                      <TutorialSpeechBubble
+                        text={text}
+                        primaryAction={wrappedPrimary}
+                        secondaryAction={secondaryAction}
+                        side="bottom"
+                      />
+                    </div>
+                  )}
+                  <SparkyMascotImage
+                    mood={mood}
+                    speech={activeSpeech}
+                    cheerTick={cheerTick}
+                    suppressRoll={suppressRoll}
+                  />
+                </div>
+              </motion.div>
+            )
           )}
         </>
       )}

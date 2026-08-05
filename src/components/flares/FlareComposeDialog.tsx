@@ -205,7 +205,7 @@ export function FlareComposeDialog({
                 "text-lg font-semibold text-white",
               )}
             >
-              Fire a Flare
+              Flare
             </DialogTitle>
           </div>
           <DialogDescription className="text-xs text-[#9CA3AF] mt-0.5">
@@ -257,12 +257,20 @@ export function FlareComposeDialog({
               autoCorrect="off"
             />
             <div className="mt-1 flex items-center justify-between text-[10px]">
-              <span className={tooShort ? "text-amber-300" : "text-white/40"}>
+              {/*
+                Helper text simplified — the "Specific beats vague…"
+                hint was removed per product request; when the user
+                has typed enough characters the row now shows nothing
+                on the left instead of a permanent nag. The
+                min-characters coaching still surfaces (only when
+                the current draft is below MIN_DESCRIPTION_CHARS).
+              */}
+              <span className={tooShort ? "text-amber-300" : "text-transparent"}>
                 {tooShort
                   ? `A bit more context helps — ${
                       MIN_DESCRIPTION_CHARS - trimmedDescriptionLength
                     } more characters`
-                  : "Specific beats vague — what have you tried, what's blocking?"}
+                  : ""}
               </span>
               <span className="font-mono text-white/40 tabular-nums">
                 {trimmedDescriptionLength} / {MAX_DESCRIPTION_CHARS}
@@ -305,17 +313,11 @@ export function FlareComposeDialog({
           )}
         </div>
 
-        {/* Footer — back arrow left, Fire Flare right */}
-        <div className="flex items-center justify-between gap-3 border-t border-white/5 px-5 pt-3 pb-4 bg-[#0D1117] shrink-0">
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-white/[0.06] hover:text-white"
-            aria-label="Cancel"
-            disabled={submitting}
-          >
-            ←
-          </button>
+        {/* Footer — Fire Flare CTA only. Back-arrow button removed
+            per product request; the header × already dismisses the
+            dialog so an inline cancel was redundant. `justify-end`
+            keeps the Fire Flare button flush-right. */}
+        <div className="flex items-center justify-end gap-3 border-t border-white/5 px-5 pt-3 pb-4 bg-[#0D1117] shrink-0">
           <button
             type="button"
             onClick={handleSubmit}

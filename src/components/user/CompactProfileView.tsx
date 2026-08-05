@@ -19,6 +19,7 @@ import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
+import { EditProfileModal } from "@/components/user/EditProfileModal";
 
 export interface UserProfile {
   _id: Id<"users">;
@@ -93,6 +94,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"created" | "sparked" | "contributed">("created");
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
+  // Edit Profile modal — opened by the pencil button. Replaces the
+  // previous /profile-setup?edit=1 route (that page is onboarding-only
+  // now). Modal renders inline at the bottom of this component so it
+  // portals into the same subtree we already own.
+  const [editOpen, setEditOpen] = useState(false);
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
   const equippedBadgeIds = profile.equippedBadges || [];
@@ -155,7 +161,9 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   }, [earnedBadges, equippedBadgeIds]);
 
   const handleEditProfile = () => {
-    router.push("/profile-setup");
+    // Opens the modal-based Edit Profile UI (basic fields + Persona /
+    // Social / Audio settings). /profile-setup stays onboarding-only.
+    setEditOpen(true);
   };
 
   const openDialog = (type: "created" | "sparked" | "contributed") => {
@@ -468,6 +476,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         canEquipMore={equippedBadgeIds.length < 3}
         onEquipToggle={selectedBadge ? () => handleEquipToggle(selectedBadge.id) : undefined}
       />
+
+      {/* Owner-only Edit Profile modal — pencil button toggles this */}
+      {isOwner && (
+        <EditProfileModal open={editOpen} onOpenChange={setEditOpen} />
+      )}
     </div>
   );
 }

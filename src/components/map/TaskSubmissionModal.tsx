@@ -17,7 +17,10 @@ import { audioManager } from "@/lib/audio/audioManager";
 
 // Tool components
 import { WriteTool } from "@/components/tools/write-tool";
-import { TableTool } from "@/components/tools/table-tool";
+// TableTool import removed — the legacy grid was replaced by
+// jspreadsheet-ce (SpreadsheetTool); both `table` and `spreadsheet`
+// toolTypes now render that. Left the file on disk for now in case a
+// migration references it; delete when safe.
 import { MapTool } from "@/components/tools/map-tool";
 import { ExcalidrawTool } from "@/components/tools/excalidraw-tool";
 import { SpreadsheetTool } from "@/components/tools/spreadsheet-tool";
@@ -206,19 +209,18 @@ function TaskSubmissionModalInner({
         );
 
       case "table":
-        return (
-          <TableTool
-            prompt={task.description}
-            isSubmitting={isSubmitting}
-            onSubmit={handleToolSubmit}
-          />
-        );
-
       case "spreadsheet":
-        // Excel-like grid via jspreadsheet-ce. Preferred for
-        // competitor comparisons, SWOT, financial rows, market
-        // overview — anywhere the founder benefits from copy-paste
-        // from Excel and cell resizing.
+        // Both `table` and `spreadsheet` toolTypes now render the
+        // jspreadsheet-ce grid. The legacy `TableTool` (Column 1/2/3
+        // stub with a "Paste from Excel/CSV" toggle) was replaced per
+        // product feedback — "we use excel third-party now, why is
+        // the old table tool still showing?" — since the two tools
+        // shipped side-by-side and older tasks in the seeded config
+        // still declare `toolType: "table"`. Routing both here means
+        // every task gets the Excel-like grid without a schema
+        // migration. `initialContent` is cast because the two tools
+        // used different payload shapes; SpreadsheetTool safely
+        // ignores unrecognised keys.
         return (
           <SpreadsheetTool
             prompt={task.description}
@@ -382,11 +384,29 @@ function TaskSubmissionModalInner({
             data-state={isOpen ? "open" : "closed"}
           >
             <div className="bg-[#111827] border border-white/10 rounded-xl shadow-2xl flex flex-col w-[96vw] sm:w-[min(88vw,640px)] h-auto max-h-[min(88vh,720px)] overflow-hidden pointer-events-auto">
-              {/* Header - Compact */}
+              {/* Header — Compact.
+                  Two-line layout: task TITLE (uppercase, main heading,
+                  mirrors the CheckpointPanel row the user just clicked)
+                  above the task DESCRIPTION (subheader / flavour prompt).
+                  Previously the description was rendered alone, so the
+                  panel felt "context-less" — users didn't see which task
+                  they were answering. Falls back to description only if
+                  the task has no title (legacy rows). */}
               <div className="p-3 sm:px-5 sm:py-3.5 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/15 to-[#8B5CF6]/15 flex-shrink-0">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm sm:text-base font-semibold text-white leading-relaxed">
+                    {task.title && task.title.trim().length > 0 && (
+                      <h2 className="text-base sm:text-lg font-black uppercase tracking-wide text-white leading-tight">
+                        {task.title}
+                      </h2>
+                    )}
+                    <p
+                      className={
+                        task.title && task.title.trim().length > 0
+                          ? "mt-1.5 text-xs sm:text-sm font-medium text-white/80 leading-relaxed"
+                          : "text-sm sm:text-base font-semibold text-white leading-relaxed"
+                      }
+                    >
                       {task.description}
                     </p>
                   </div>
@@ -395,7 +415,7 @@ function TaskSubmissionModalInner({
                       audioManager.playUI("click");
                       onClose();
                     }}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-all flex-shrink-0 touch-manipulation group"
+                    className="mt-0.5 p-1.5 rounded-lg bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-all flex-shrink-0 touch-manipulation group"
                     aria-label="Close modal"
                   >
                     <X className="w-4 h-4 text-gray-400 group-hover:text-white" />

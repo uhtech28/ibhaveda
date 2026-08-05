@@ -34,6 +34,12 @@ import {
   useSensors,
   closestCorners,
   DragOverEvent,
+  // useDroppable — needed to register each column as a drop target
+  // so cards can be dropped into empty columns. Without this the
+  // drag handlers' `columns.find((col) => col.id === over.id)` lookup
+  // never matched (dnd-kit only reports card ids under `over.id`
+  // because the SortableContext is the sole registered droppable).
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -75,6 +81,16 @@ interface KanbanToolProps {
   isSubmitting?: boolean;
   isStandalone?: boolean;
   activeVentureId?: Id<"ventures">;
+  /**
+   * When true, the whole board is presented as read-only:
+   *   - Submit Board button disabled with a clear label swap.
+   *   - "View only" banner at the top explains why edits won't save.
+   * Add-task + edit + drag still WORK in local state so the user can
+   * explore/play with the layout, but the save silently no-ops on the
+   * server. Set by the map page when the current user is viewing
+   * someone else's venture (isViewerMode).
+   */
+  readOnly?: boolean;
 }
 
 // Draggable Card Component
@@ -181,32 +197,14 @@ function DraggableCard({
           </p>
         )}
 
-        {/* Bottom Row: Move Actions & Delete */}
+        {/* Bottom Row: Delete only.
+            The arrow "move left / move right" buttons were removed
+            per product request — column moves are handled by the
+            proper drag-and-drop wiring (see useDroppable columns
+            below). The buttons duplicated that affordance and read
+            as clutter next to the trash icon. */}
         <div className="flex items-center justify-between border-t border-white/5 pt-2 mt-1">
-          <div className="flex items-center gap-0.5">
-            {card.column !== "todo" && onMove && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-md"
-                onClick={() => onMove(card.id, card.column === "done" ? "inprogress" : "todo")}
-                title="Move left"
-              >
-                <span className="text-[10px]">←</span>
-              </Button>
-            )}
-            {card.column !== "done" && onMove && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-md"
-                onClick={() => onMove(card.id, card.column === "todo" ? "inprogress" : "done")}
-                title="Move right"
-              >
-                <span className="text-[10px]">→</span>
-              </Button>
-            )}
-          </div>
+          <div />
 
           <Button
             variant="ghost"
@@ -239,6 +237,12 @@ function DroppableColumn({
   onEdit?: (card: KanbanCard) => void;
   contributors?: any[];
 }) {
+  // Register the whole column body as a droppable target. Without
+  // this, dropping a card into an EMPTY column (or the negative
+  // space between cards) never resolved to a column id in the drag
+  // handlers, so the card snapped back to its origin — that was the
+  // "drag and drop not working" bug.
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
   return (
     <div className="space-y-2">
       <div className={`p-2 rounded-md ${column.color}`}>
@@ -251,7 +255,15 @@ function DroppableColumn({
         items={cards.map((c) => c.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-2 min-h-[200px] p-2 border-2 border-dashed border-white/40 rounded-lg bg-white/[0.02]">
+        <div
+          ref={setNodeRef}
+          className={cn(
+            "space-y-2 min-h-[200px] p-2 border-2 border-dashed rounded-lg transition-colors",
+            isOver
+              ? "border-emerald-400/70 bg-emerald-400/10"
+              : "border-white/40 bg-white/[0.02]",
+          )}
+        >
           {cards.length === 0 ? (
             <div className="flex items-center justify-center h-[100px] text-xs text-white/55">
               Drop cards here
@@ -280,6 +292,7 @@ export function KanbanTool({
   initialContent,
   isSubmitting,
   isStandalone,
+  readOnly = false,
 }: KanbanToolProps) {
   const [cards, setCards] = useState<KanbanCard[]>(initialContent?.cards || []);
   const [newCardTitle, setNewCardTitle] = useState("");
@@ -506,6 +519,20 @@ export function KanbanTool({
 
   return (
     <div className="space-y-4 py-1">
+      {/* Read-only banner — only rendered when the viewer isn't the
+          venture owner. Explains up-front that changes won't persist
+          so users don't spend time editing and then find their board
+          empty on refresh. */}
+      {readOnly && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <span className="text-base">👁️</span>
+          <span>
+            <strong className="font-semibold">View only —</strong> you're
+            looking at someone else's board. Changes here won't save.
+          </span>
+        </div>
+      )}
+
       {/* Top Action Bar */}
       <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/5">
         {prompt ? (
@@ -515,14 +542,21 @@ export function KanbanTool({
         ) : (
           <div />
         )}
+        {/*
+          "Add Task" text removed per product request — button is now
+          icon-only (+) since the action is obvious from the plus
+          glyph and the header context. Square aspect + slightly
+          larger icon keep it as a clear affordance without the
+          extra width. Tooltip carries the intent for a11y.
+        */}
         <Button
           onClick={() => setIsModalOpen(true)}
           size="sm"
-          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-300 shrink-0 text-xs"
-          title="Add New Todo"
+          className="flex h-9 w-9 items-center justify-center bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-300 shrink-0 p-0"
+          title="Add task"
+          aria-label="Add task"
         >
-          <Plus className="h-3.5 w-3.5" />
-          <span>Add Task</span>
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
 
@@ -606,13 +640,19 @@ export function KanbanTool({
         </p>
         <Button
           onClick={handleSubmit}
-          disabled={cards.length === 0 || isSubmitting}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 flex items-center justify-center gap-2"
+          disabled={cards.length === 0 || isSubmitting || readOnly}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+          title={readOnly ? "You can't save changes to someone else's board" : undefined}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>{isStandalone ? "Saving..." : "Submitting..."}</span>
+            </>
+          ) : readOnly ? (
+            <>
+              <span>👁️</span>
+              <span>View Only</span>
             </>
           ) : (
             <>

@@ -226,7 +226,15 @@ export function Step3MapGuide() {
       setStage("flare");
       return;
     }
-    let attempts = 0;
+    // Two INDEPENDENT counters so waiting-for-intro doesn't burn the
+    // dispatch budget. Previously both phases shared one counter — if
+    // the cinematic ran ~15s (30 ticks), the dispatch phase inherited
+    // `attempts=30` and its `< 20` reschedule check was already false,
+    // so we'd fire the event ONCE and give up. If that one dispatch
+    // hit before activeVenture/checkpoints hydrated on the map page,
+    // the listener silently returned and combat never opened.
+    let introAttempts = 0;   // capped at 60 (~30s) while intro plays
+    let dispatchAttempts = 0; // capped at 30 (~15s) once we start firing
     let cancelled = false;
     const tryDispatch = () => {
       if (cancelled || forceCombatFiredRef.current) return;
@@ -247,8 +255,8 @@ export function Step3MapGuide() {
       const introQueryLoading = bossIntroSeen === undefined;
       if (introUp) {
         // Cinematic is on screen right now — hold combat.
-        attempts++;
-        if (attempts < 60) {
+        introAttempts++;
+        if (introAttempts < 60) {
           window.setTimeout(tryDispatch, 500);
         } else {
           forceCombatFiredRef.current = true;
@@ -258,8 +266,8 @@ export function Step3MapGuide() {
       if (introWillPlay && !introDismissedRef.current) {
         // Cinematic hasn't mounted yet OR mounted-and-not-yet-dismissed.
         // Give it up to ~30s to appear + finish before we bail.
-        attempts++;
-        if (attempts < 60) {
+        introAttempts++;
+        if (introAttempts < 60) {
           window.setTimeout(tryDispatch, 500);
         } else {
           forceCombatFiredRef.current = true;
@@ -268,23 +276,27 @@ export function Step3MapGuide() {
       }
       if (introQueryLoading) {
         // Wait for the query to resolve before deciding.
-        attempts++;
-        if (attempts < 40) {
+        introAttempts++;
+        if (introAttempts < 40) {
           window.setTimeout(tryDispatch, 500);
-        } else {
-          // Query never resolved — proceed anyway rather than dead-end.
+          return;
         }
-        if (attempts < 40) return;
+        // Query never resolved after ~20s — fall through and dispatch
+        // anyway rather than dead-end the whole tutorial.
       }
 
-      attempts++;
+      // Dispatch phase — fires the event once per tick until either
+      // the combat panel appears or we hit the dispatch budget.
+      dispatchAttempts++;
       try {
         window.dispatchEvent(new CustomEvent("tutorial:force-combat"));
       } catch {
         /* no-op */
       }
-      // Poll for combat to appear; stop after ~10s.
-      if (attempts < 20) {
+      // Poll for combat to appear; keep firing for ~15s so
+      // activeVenture / checkpoints have plenty of time to hydrate
+      // even on slow Convex round-trips.
+      if (dispatchAttempts < 30) {
         window.setTimeout(tryDispatch, 500);
       } else {
         forceCombatFiredRef.current = true; // give up, don't retry forever
@@ -550,7 +562,7 @@ export function Step3MapGuide() {
         return {
           text: bossSpeaking
             ? ""
-            : `You're about to face ${TUTORIAL_MONSTER_NAME}, who'll question your idea. Defend it, fight back, defeat him to advance. You've got this!`,
+            : `You're about to face ${TUTORIAL_MONSTER_NAME}, who'll question your idea. Defend it, fight back, and make him retreat so you can advance. You've got this!`,
           mood: bossSpeaking ? "idle" : "talking",
           near: null,
           highlight: null,
@@ -567,7 +579,7 @@ export function Step3MapGuide() {
         return {
           text: combatOpenState
             ? ""
-            : `You're about to face ${TUTORIAL_MONSTER_NAME}, who'll question your idea. Defend it, fight back, defeat him to advance. You've got this!`,
+            : `You're about to face ${TUTORIAL_MONSTER_NAME}, who'll question your idea. Defend it, fight back, and make him retreat so you can advance. You've got this!`,
           mood: combatOpenState ? "idle" : "pointing",
           near: '[data-tutorial="combat-panel"], [aria-label="AI Combat"], [data-combat-panel]',
           highlight: combatOpenState
@@ -582,7 +594,12 @@ export function Step3MapGuide() {
         // the user would land on the flare copy while the victory
         // panel is still covering the checkpoint UI.
         return {
-          text: `Congratulations, you defeated ${TUTORIAL_MONSTER_NAME}! Amazing work. Just two more things and you'll have everything you need.`,
+          // Copy correction per product: the boss doesn't get truly
+          // DEFEATED after a single AI-combat round — that only happens
+          // after every task under this checkpoint is complete. What
+          // just happened is a retreat. Sparky says so explicitly so
+          // the user understands why the map still shows the boss.
+          text: `Congratulations, ${TUTORIAL_MONSTER_NAME} retreated! You'll fully defeat it once every task under this checkpoint is done. Just two more things and you'll have everything you need.`,
           mood: "celebrating",
           near: null,
           highlight: null,

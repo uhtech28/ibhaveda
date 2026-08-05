@@ -54,7 +54,10 @@ interface CalendarToolProps {
   isSubmitting?: boolean;
   isStandalone?: boolean;
   kanbanData?: {
-    cards: Array<{ id: string; title: string; column: "todo" | "inprogress" | "done"; updatedAt?: number }>;
+    // `deadline` added so the calendar can key kanban cards off the
+    // user-typed due date (see getItemsForDate below). Matches the
+    // KanbanCard shape defined in kanban-tool.tsx.
+    cards: Array<{ id: string; title: string; column: "todo" | "inprogress" | "done"; updatedAt?: number; deadline?: number }>;
     timestamp: number;
   } | null;
   journalData?: {
@@ -158,9 +161,20 @@ export function CalendarTool({
       ? journalData.entries.filter((entry) => isSameDay(new Date(entry.timestamp), date))
       : [];
       
+    // Kanban ↔ Calendar sync — a card shows up on its DEADLINE day
+    // (the "due date" the user typed when adding the task). This is
+    // what makes a Kanban task added on Aug 4 with a deadline of
+    // Aug 20 appear on Aug 20 in the calendar, not on Aug 4.
+    //
+    // Fallback (card.updatedAt / kanbanData.timestamp) keeps legacy
+    // cards without a deadline visible on the day they were last
+    // touched, so the calendar isn't silently missing them. Product
+    // request: "kanban and calendar should have sync — if I'm adding
+    // any task in kanban it should show in calendar too."
     const dayKanbans = kanbanData?.cards
       ? kanbanData.cards.filter((card) => {
-          const cardTime = card.updatedAt || kanbanData.timestamp;
+          const cardTime =
+            card.deadline || card.updatedAt || kanbanData.timestamp;
           return isSameDay(new Date(cardTime), date);
         })
       : [];
@@ -200,19 +214,12 @@ export function CalendarTool({
 
   return (
     <div className="space-y-3">
-      {/* Premium Header - Super Compact */}
-      <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-white/10 shadow-lg flex items-center justify-between relative overflow-hidden">
-        <div className="relative z-10">
-          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-indigo-400 leading-none">
-            {format(selectedDate, "EEEE")}
-          </p>
-          <h2 className="text-base font-black text-white tracking-tight mt-1 leading-none">
-            {format(selectedDate, "MMMM d, yyyy")}
-          </h2>
-        </div>
-        <CalendarIcon className="w-5 h-5 text-indigo-400 shrink-0" />
-      </div>
-
+      {/* Purple "Thursday / August 20, 2026" header block removed per
+          product request ("remove the top written august to make the
+          calendar compact"). The selected date is still visible in
+          the top-right chip inside the row below (see the
+          {format(selectedDate, "d MMM")} chip), and the month name
+          is rendered as the grid caption. No information lost. */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1">
           <Tabs
@@ -226,8 +233,19 @@ export function CalendarTool({
             </TabsList>
           </Tabs>
         </div>
-        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">
-          {events.length} {events.length === 1 ? "Item" : "Items"}
+        {/*
+          Chip now shows the currently-selected date (e.g. "4 AUG")
+          rather than an item count. The item count already appears
+          inside the day cell + the day-detail list below, so echoing
+          it here was noise — the date is the more useful anchor
+          because it tells the user which day the panel is scoped to
+          at a glance. Compact `d MMM` format keeps the chip narrow.
+        */}
+        <div
+          className="text-[9px] font-black text-indigo-200 uppercase tracking-widest bg-indigo-500/15 border border-indigo-400/25 px-2 py-0.5 rounded"
+          title={format(selectedDate, "EEEE, MMMM d, yyyy")}
+        >
+          {format(selectedDate, "d MMM")}
         </div>
       </div>
 

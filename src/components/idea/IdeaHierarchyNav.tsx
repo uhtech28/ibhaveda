@@ -108,12 +108,23 @@ interface IdeaHierarchyFlowchartProps {
    * current idea plus an empty-state hint instead of a blank dialog.
    */
   alwaysRender?: boolean;
+  /**
+   * When true, strip the outer bordered `<section>` chrome (rounded
+   * border + "IDEA HIERARCHY / Click any node to jump there" sub-
+   * header). Used when the flowchart is rendered inside a parent
+   * modal that already provides those affordances — avoids the
+   * "double box" visible on the map's Adventurer's-Menu hierarchy
+   * dialog per product feedback ("remove the second box, keep the
+   * flowchart direct").
+   */
+  bare?: boolean;
 }
 
 export function IdeaHierarchyFlowchart({
   ideaId,
   className,
   alwaysRender = false,
+  bare = false,
 }: IdeaHierarchyFlowchartProps) {
   const tree = useQuery(api.hierarchy.getIdeaFullTree, { ideaId });
 
@@ -170,27 +181,36 @@ export function IdeaHierarchyFlowchart({
   const hasFamily = tree.children.length > 0;
   if (!hasFamily && !alwaysRender) return null;
 
+  // In `bare` mode strip the bordered section + inline sub-header —
+  // the parent modal already renders "Idea Hierarchy" as its title,
+  // so nesting a second identical header inside was the "second box"
+  // the user asked to remove.
+  const Wrapper: React.ElementType = bare ? "div" : "section";
   return (
-    <section
-      aria-label="Idea hierarchy"
+    <Wrapper
+      aria-label={bare ? undefined : "Idea hierarchy"}
       className={cn(
-        "rounded-2xl border border-white/8 bg-[#0F1726]/85 backdrop-blur-xl p-5",
-        className
+        bare
+          ? ""
+          : "rounded-2xl border border-white/8 bg-[#0F1726]/85 backdrop-blur-xl p-5",
+        className,
       )}
     >
-      <div className="flex items-center justify-between gap-2 pb-3 mb-5 border-b border-white/8">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#6366F1]/15 text-[#C7D2FE]">
-            <GitBranch className="h-3.5 w-3.5" />
-          </span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
-            Idea hierarchy
+      {!bare && (
+        <div className="flex items-center justify-between gap-2 pb-3 mb-5 border-b border-white/8">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#6366F1]/15 text-[#C7D2FE]">
+              <GitBranch className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
+              Idea hierarchy
+            </span>
+          </div>
+          <span className="text-[10px] text-[#6B7280]">
+            Click any node to jump there
           </span>
         </div>
-        <span className="text-[10px] text-[#6B7280]">
-          Click any node to jump there
-        </span>
-      </div>
+      )}
 
       {/* Horizontally scrollable so wide trees don't break the layout */}
       <div className="overflow-x-auto pb-2">
@@ -211,7 +231,7 @@ export function IdeaHierarchyFlowchart({
           </p>
         </div>
       )}
-    </section>
+    </Wrapper>
   );
 }
 

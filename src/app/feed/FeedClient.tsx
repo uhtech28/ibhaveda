@@ -15,7 +15,8 @@ import { CommentsSection } from "@/components/comments/CommentsSection";
 import { ContributionRequestModal } from "@/components/requests/ContributionRequestModal";
 import { useProfileCompletion } from "@/lib/hooks/use-profile-completion";
 import { FeedTutorial } from "@/components/tutorial/FeedTutorial";
-import { PERSONAS, type PersonaId } from "@/config/personas";
+// Persona config no longer needed here — persona selection moved to
+// the dedicated /persona-setup route.
 import { useTutorialOptional } from "@/components/tutorial/v2/useTutorial";
 
 export function FeedClient() {
@@ -134,64 +135,79 @@ export function FeedClient() {
   //   }, [isLoaded, isProfileComplete, isProfileLoading, router, userId]);
 
   // ── First-time PERSONA picker ─────────────────────────────────────
-  // Fires the FIRST time a signed-in, profile-complete user with NO
-  // persona set lands on /feed. Once they confirm, the choice sticks
-  // forever (persisted via api.users.updatePersonaId). Dismissed
-  // sessions are remembered via sessionStorage so a hard-refresh
-  // doesn't re-prompt in the same tab.
+  // Persona selection now lives on a dedicated /persona-setup route so
+  // Sparky can't briefly flash between /feed mount and picker mount.
+  // Here we only detect "no persona yet" and hard-navigate away — no
+  // in-page modal, no picker mount on /feed.
+  //
+  // Guard order matters:
+  //   1. Wait for auth + profile query to resolve.
+  //   2. Only redirect once we know profile is complete (username exists).
+  //   3. Skip the redirect if the user has already picked a persona OR
+  //      already dismissed the picker in this browser session.
   const personaIdRaw = useQuery(api.users.getMyPersonaId, {});
-  const updatePersonaId = useMutation(api.users.updatePersonaId);
-  const [personaPickerOpen, setPersonaPickerOpen] = useState(false);
-  const [personaSubmitting, setPersonaSubmitting] = useState(false);
+  // Local flag that stays TRUE from the moment we know the user needs
+  // to pick a persona through the router.replace() nav. Used below to
+  // suppress Sparky during the redirect window so nothing renders on
+  // /feed while we're on our way out.
+  const personaMissing =
+    personaIdRaw === null || personaIdRaw === undefined;
   useEffect(() => {
     if (!isLoaded || !userId) return;
     if (personaIdRaw === undefined) return; // still loading
-    if (personaIdRaw !== null) return; // already picked
+    if (personaIdRaw !== null) return; // already picked — no redirect
     if (isProfileLoading) return;
     if (!isProfileComplete) return; // wait for username first
-    if (typeof window !== "undefined" && sessionStorage.getItem("personaPickerDismissed") === "1") return;
-    setPersonaPickerOpen(true);
-  }, [isLoaded, userId, personaIdRaw, isProfileLoading, isProfileComplete]);
-  const handlePersonaConfirm = useCallback(
-    async (id: PersonaId) => {
-      setPersonaSubmitting(true);
-      try {
-        await updatePersonaId({ personaId: id });
-        if (typeof window !== "undefined") sessionStorage.setItem("personaPickerDismissed", "1");
-        setPersonaPickerOpen(false);
-      } finally {
-        setPersonaSubmitting(false);
-      }
-    },
-    [updatePersonaId],
-  );
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("personaPickerDismissed") === "1"
+    ) {
+      // User already saw the picker in this tab — don't loop them back.
+      return;
+    }
+    // replace() so /feed isn't left in browser history behind the
+    // persona screen.
+    router.replace("/persona-setup");
+  }, [
+    isLoaded,
+    userId,
+    personaIdRaw,
+    isProfileLoading,
+    isProfileComplete,
+    router,
+  ]);
 
-  // ── Hide Sparky / v2 tutorial while the persona picker is open ────
+  // ── Hide Sparky / v2 tutorial until persona is chosen ─────────────
   // Sparky is mounted globally by TutorialProvider (in the layout);
   // it auto-shows for any user whose backend state is "not_started".
-  // We flip the tutorial's `activeOverride` to false while the picker
-  // is open, then RELEASE (null) it once persona is picked so the
-  // provider's own `baseActive` computation (which correctly checks
-  // the Convex `feedTutorialState === "completed"` flag) decides
-  // visibility on its own.
   //
-  // BUG FIX — this branch previously passed `true` in the else,
-  // which force-showed the tutorial for ALREADY-COMPLETED users on
-  // every re-render. That's why the "8/8" progress bar was sticky on
-  // hard refresh even though the Convex completion flag was set. Task
-  // #218 fixed Sparky's speech re-triggering but missed this override
-  // path, so the bar kept coming back. Passing `null` releases the
-  // override and lets `baseActive` (which is false when backendState
-  // is "completed") hide the bar.
+  // We keep the tutorial suppressed while:
+  //   - the persona query is still loading (undefined), OR
+  //   - persona is null (user hasn't picked yet; redirect to
+  //     /persona-setup is in flight).
+  //
+  // This covers the race window where /feed mounts, the tutorial-state
+  // query resolves first, and Sparky would otherwise briefly render
+  // before the persona-id query resolves and we can navigate away.
+  //
+  // Once persona is present we RELEASE (null) the override so the
+  // provider's own `baseActive` computation (which correctly checks the
+  // Convex `feedTutorialState === "completed"` flag) decides visibility.
+  //
+  // BUG FIX HISTORY — the else branch previously passed `true`, which
+  // force-showed the tutorial for ALREADY-COMPLETED users on every
+  // re-render, resurrecting the "8/8" progress bar on hard refresh
+  // (task #218 fixed Sparky's speech but missed this override path).
+  // Passing `null` releases the override cleanly.
   const tutorial = useTutorialOptional();
   useEffect(() => {
     if (!tutorial) return;
-    if (personaPickerOpen) {
+    if (personaMissing) {
       tutorial.setActive(false);
     } else {
       tutorial.setActive(null);
     }
-  }, [personaPickerOpen, tutorial]);
+  }, [personaMissing, tutorial]);
 
   // First-run tour state.
   const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
@@ -217,16 +233,15 @@ export function FeedClient() {
       return;
     }
     // Don't start the tutorial UNTIL the user has picked a persona —
-    // the picker takes priority as the very first UX beat on /feed
-    // for new signups, and Sparky would otherwise overlap it.
-    if (personaPickerOpen) return;
-    if (personaIdRaw === undefined) return; // still resolving
-    if (personaIdRaw === null) return; // picker will open shortly
+    // the persona-setup route takes priority as the very first UX beat
+    // for new signups. If persona is missing, /feed will redirect out
+    // anyway, so also skip opening the tutorial here.
+    if (personaMissing) return;
     if (tutorialState.state === "not_started" || tutorialState.state === "in_progress") {
       const t = window.setTimeout(() => setTutorialOpen(true), 700);
       return () => window.clearTimeout(t);
     }
-  }, [tutorialState, personaPickerOpen, personaIdRaw]);
+  }, [tutorialState, personaMissing]);
 
   // Whether the user is currently in the tour's compose phase. Used to
   // light up the tutorial highlight on the + button and to switch the
@@ -321,62 +336,11 @@ export function FeedClient() {
         myIdeaCount={myIdeaCount}
       />
 
-      {/* First-time PERSONA picker — one-click. The very first thing
-          new users see on /feed. Auto-confirms the moment they tap a
-          card (no "Enter the world" step, no other CTAs) so the flow
-          is: pick persona → picker closes → Sparky tutorial starts.
-          Blocks the rest of the UI until they've picked. */}
-      {personaPickerOpen && (
-        <div
-          className="fixed inset-0 z-[95] flex items-center justify-center overflow-y-auto bg-black/85 p-4 sm:p-8"
-          onWheel={(e) => e.stopPropagation()}
-        >
-          <div className="my-auto w-full max-w-[900px] rounded-xl bg-[#0a0d12] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.7)] ring-1 ring-white/10">
-            <div className="mb-6 text-center">
-              <h2
-                className="font-mono text-2xl font-black tracking-widest text-white sm:text-3xl"
-                style={{ fontFamily: "var(--font-pixel-display), monospace" }}
-              >
-                Choose your persona
-              </h2>
-              <p className="mt-2 text-sm text-white/60">
-                Your persona is your character throughout every venture.
-                Pick one — you can change it later from your profile.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {PERSONAS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  disabled={personaSubmitting}
-                  onClick={() => handlePersonaConfirm(p.id)}
-                  className="group flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center transition hover:-translate-y-1 hover:border-white/40 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <div
-                    className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10"
-                    style={{ imageRendering: "pixelated" }}
-                  >
-                    <img
-                      src={p.assets.portrait}
-                      alt={p.displayName}
-                      className="h-full w-full object-contain"
-                      style={{ imageRendering: "pixelated" }}
-                    />
-                  </div>
-                  <div className="text-sm font-bold text-white">{p.displayName}</div>
-                  <div className="text-xs text-white/60">{p.tagline}</div>
-                </button>
-              ))}
-            </div>
-            {personaSubmitting && (
-              <div className="mt-4 text-center text-xs text-white/60">
-                Setting your persona…
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Persona picker used to live here as a modal overlay. It now
+          runs on the dedicated /persona-setup route so Sparky can't
+          briefly flash between /feed mount and picker mount. See the
+          redirect effect above — new users get punted out before any
+          feed content paints. */}
     </>
   );
 }

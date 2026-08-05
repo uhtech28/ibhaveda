@@ -2056,20 +2056,36 @@ export const submitTaskContent = mutation({
         : null;
       const projectLabel = ideaForPost?.title ?? "my venture";
       const tierLabel = String(args.taskLevel).toUpperCase();
-      const checkpointOutcome = checkpointDefForScore?.outcome ?? "";
-      const taskLabel = checkpointOutcome
-        ? `${tierLabel} · ${checkpointOutcome}`
-        : `${tierLabel} task`;
+      // Pull the actual fantasy task title ("SPEAK ITS NAME" etc.)
+      // from the template checkpoint def. `checkpointDefForScore`
+      // is already resolved above via getCheckpointDef(). Falls
+      // back to the checkpoint outcome, then the tier label, so
+      // the title always renders something.
+      const taskDef =
+        args.taskLevel === "t1"
+          ? checkpointDefForScore?.t1
+          : args.taskLevel === "t2"
+            ? checkpointDefForScore?.t2
+            : checkpointDefForScore?.t3;
+      const taskTitle =
+        (taskDef?.title && taskDef.title.trim().length > 0
+          ? taskDef.title
+          : checkpointDefForScore?.outcome) || `${tierLabel} task`;
       const summary =
         typeof args.content === "string"
           ? args.content.trim().slice(0, 400)
           : "";
       await ctx.db.insert("ideas", {
         authorId: user._id,
-        title: `✅ Completed: ${taskLabel}`,
+        // New post format per product request:
+        //   heading: "{ProjectName} : {TaskName}"  → "Retlify : Speak its name"
+        //   body:    the user's actual answer (summary of args.content)
+        // Fallback body still names the project + stage/CP if the
+        // submission had no textual content (e.g. an upload).
+        title: `${projectLabel} : ${taskTitle}`,
         description: summary
-          ? `${summary}\n\n— from "${projectLabel}", Stage ${checkpoint.stage} · Checkpoint ${checkpoint.checkpoint}`
-          : `Cleared a ${tierLabel} task in "${projectLabel}" — Stage ${checkpoint.stage}, Checkpoint ${checkpoint.checkpoint}.`,
+          ? summary
+          : `Completed "${taskTitle}" in "${projectLabel}" — Stage ${checkpoint.stage}, Checkpoint ${checkpoint.checkpoint}.`,
         category: "milestone",
         visibility: "public",
         sparkCount: 0,

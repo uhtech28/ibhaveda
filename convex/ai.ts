@@ -45,6 +45,16 @@ const INDUSTRY_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
   [/\b(food|beverage|restaurant|delivery|cafe|dining)\b/i, "Food & Beverage"],
   [/\b(travel|tourism|hotel|booking|flight)\b/i, "Travel"],
   [/\b(real estate|property|housing|rent)\b/i, "Real Estate"],
+  // Expanded keyword coverage per product feedback ("AI isn't giving
+  // tags") — short outlines like "online game" / "dating app" now
+  // resolve to a sensible industry instead of an empty tag array.
+  [/\b(game|gaming|multiplayer|esport|arcade|puzzle)\b/i, "Gaming"],
+  [/\b(social|network|feed|chat|messaging|friends|dating)\b/i, "Social"],
+  [/\b(video|streaming|podcast|music|audio|entertainment|media)\b/i, "Media"],
+  [/\b(productivity|todo|task|calendar|notes|workflow)\b/i, "Productivity"],
+  [/\b(fashion|apparel|clothing|beauty|cosmetic)\b/i, "Consumer"],
+  [/\b(logistics|shipping|supply chain|warehouse)\b/i, "Logistics"],
+  [/\b(security|cyber|privacy|encryption)\b/i, "Security"],
 ];
 
 const SKILL_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
@@ -57,6 +67,14 @@ const SKILL_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
   [/\b(mobile|ios|android|react native|flutter|swift|kotlin)\b/i, "Mobile"],
   [/\b(devops|infrastructure|ci\/?cd|kubernetes|docker|cloud)\b/i, "DevOps"],
   [/\b(ml|machine learning|model|training|pytorch|tensorflow)\b/i, "Data Science"],
+  // Broader skill coverage so short outlines still land at least one
+  // relevant chip (users report "no tags at all" for 2-word inputs).
+  [/\b(game|gaming|unity|unreal|godot)\b/i, "Game Development"],
+  [/\b(app|application|software|website|web app|platform|tool)\b/i, "Frontend"],
+  [/\b(online|internet|web|browser)\b/i, "Frontend"],
+  [/\b(video|streaming|audio|music)\b/i, "Media"],
+  [/\b(chat|messaging|social|community)\b/i, "Product Management"],
+  [/\b(sales|business|revenue|customer)\b/i, "Sales"],
 ];
 
 function detectFromKeywords(
@@ -72,21 +90,48 @@ function detectFromKeywords(
   return Array.from(hits);
 }
 
+/**
+ * Title-case a short string so a fallback title like "online game"
+ * renders as "Online Game" (matches what an AI would produce). Leaves
+ * already-capitalized runs alone so acronyms (SaaS, AI, iOS) survive.
+ */
+function toTitleCase(s: string): string {
+  return s
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => (/[A-Z]/.test(w) ? w : w[0].toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
 const fallback = (outline: string): GeneratedDraft => {
   // Extract a basic title from the outline (first sentence or first 60 chars)
   const firstSentence = outline.split(/[.!?]/)[0].trim();
-  const basicTitle = firstSentence.length > 0 && firstSentence.length <= 80
-    ? firstSentence
-    : outline.slice(0, 60).trim() + (outline.length > 60 ? "..." : "");
+  const rawTitle =
+    firstSentence.length > 0 && firstSentence.length <= 80
+      ? firstSentence
+      : outline.slice(0, 60).trim() + (outline.length > 60 ? "..." : "");
+
+  // Title-case the fallback so "online game" → "Online Game" — feels
+  // like a real AI suggestion rather than the raw outline echo.
+  const basicTitle = toTitleCase(rawTitle) || "New Idea";
 
   // PRODUCT DECISION: description is the user's outline verbatim. AI
   // only proposes the title/tags — never rewrites what the user typed
   // into the description box.
+  //
+  // Guarantee at least one industry + one skill so the wizard never
+  // shows an empty tag row (user complaint: "AI isn't giving tags").
+  // Falls back to broad generic chips when no keywords hit.
+  const industries = detectFromKeywords(outline, INDUSTRY_KEYWORDS, 3);
+  const skills = detectFromKeywords(outline, SKILL_KEYWORDS, 4);
+  if (industries.length === 0) industries.push("Consumer");
+  if (skills.length === 0) skills.push("Product Management");
+
   return {
-    title: basicTitle || "New Idea",
+    title: basicTitle,
     description: outline.trim(),
-    industries: detectFromKeywords(outline, INDUSTRY_KEYWORDS, 3),
-    skills: detectFromKeywords(outline, SKILL_KEYWORDS, 4),
+    industries,
+    skills,
     visibility: "public",
   };
 };

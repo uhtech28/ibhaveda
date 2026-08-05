@@ -77,13 +77,21 @@ export function CombatPanel({
   // (with its BattleScene endgame beat: loser DEFEAT then winner
   // VICTORY loop) unmounts immediately and the user is dropped straight
   // into the static result panel. We want a proper cinematic sequence:
-  //   0.0-1.5s  loser plays DEFEAT (kneels / crumbles)
-  //   1.5-3.5s  loser fades, winner slides to center + VICTORY loop
-  //   3.5s+     result score card
+  //   0.0-1.6s  (win only) RETREAT banner reads "<Boss> is retreating!"
+  //             over a still arena — Sparky-narrated ending beat
+  //   1.6-3.8s  loser plays DEFEAT (slow crumble); winner holds idle
+  //   3.8-6.5s  loser fades, winner slides to center + slow VICTORY loop
+  //   6.5s+     result score card
+  //
+  // On LOSS we skip the retreat beat so the sequence is ~4.5s. The
+  // hold is a single value that covers both — the extra second of
+  // buffer on loss just means the winner (boss) VICTORY loop runs a
+  // little longer, which reads fine.
+  //
   // We accomplish this by holding the outer phase as "active" for
   // CINEMATIC_HOLD_MS after we first see `settled`, while pinning the
   // last known active-phase view so BattleScene has HP=0 to react to.
-  const CINEMATIC_HOLD_MS = 3500;
+  const CINEMATIC_HOLD_MS = 6500;
   // Reset the cinematic ref whenever the roundId changes, so a retry
   // round's ending gets its own fresh cinematic buffer.
   useEffect(() => {
@@ -321,8 +329,14 @@ export function CombatPanel({
         )}
       </AnimatePresence>
 
+      {/* Panel width narrowed from lg:max-w-5xl → lg:max-w-3xl so
+          Sparky's bottom-right speech bubble (rendered outside this
+          modal, portalled by the tutorial layer) no longer overlaps
+          the Advance button + score column. The 3xl cap (48rem) still
+          fits every arena/dialogue/answer element comfortably on
+          desktop while leaving a clear gutter for the mascot bubble. */}
       <motion.div
-        className="relative mx-auto w-full max-w-2xl px-4 sm:max-w-3xl lg:max-w-5xl"
+        className="relative mx-auto w-full max-w-2xl px-4 sm:max-w-3xl"
         initial={{ opacity: 0 }}
         animate={
           projectileState === "impact"
@@ -340,15 +354,31 @@ export function CombatPanel({
       >
         {/* Corner brackets removed per product request. */}
 
+        {/*
+          Outer chrome is dropped for the SETTLED phase so the new
+          ornate victory panel (border + banner + XP badge) can own
+          the visual language of the result screen. During active
+          combat / cinematic we keep the black + white pixel frame —
+          same look users have been fighting inside since the arena
+          loaded.
+        */}
         <div
-          className="relative max-h-[92vh] overflow-y-auto overscroll-contain no-scrollbar border-2 border-white bg-black p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+          className={
+            displayPhase.kind === "settled"
+              ? "relative max-h-[92vh] overflow-y-auto overscroll-contain no-scrollbar"
+              : "relative max-h-[92vh] overflow-y-auto overscroll-contain no-scrollbar border-2 border-white bg-black p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+          }
           onWheelCapture={(e) => e.stopPropagation()}
         >
           <button
             type="button"
             onClick={handleClose}
             aria-label="Close combat panel"
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded font-mono text-3xl leading-none text-white/70 transition hover:bg-white/10 hover:text-white"
+            className={
+              displayPhase.kind === "settled"
+                ? "absolute right-5 top-5 z-20 flex h-9 w-9 items-center justify-center rounded-md border border-yellow-500/40 bg-black/60 font-mono text-2xl leading-none text-yellow-200/80 transition hover:border-yellow-400 hover:bg-black/80 hover:text-yellow-100"
+                : "absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded font-mono text-3xl leading-none text-white/70 transition hover:bg-white/10 hover:text-white"
+            }
           >
             ×
           </button>
@@ -470,6 +500,16 @@ function PhaseSwitch({
           playerHpInitial={phase.view.playerHpInitial}
           onAdvance={onAdvance}
           onRetryCombat={onRetry}
+          // Real sprites for the Q1/Q2 replay cards — same idle-frame
+          // assets the arena rendered. Replaces the procedural pixel
+          // avatars per product request ("boss and persona should be
+          // real").
+          bossAsset={boss?.idleAsset ?? null}
+          founderAsset={founderAsset}
+          // Boss display name for the "{BossName} RETREATED" ribbon
+          // on the victory card. Falls back inside CombatResultPanel
+          // to "BOSS" if null.
+          bossName={boss?.name ?? null}
         />
       );
   }

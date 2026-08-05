@@ -71,24 +71,19 @@ const StageInfoComponent = ({
   }
 
   if (compact) {
+    // Icon container removed per product request — the biome label
+    // (e.g. "ANCIENT LIBRARY") is now shown as clean text on its own,
+    // without the flanking library/checklist decoration that used to
+    // sit either side of it in the map HUD bar.
     return (
       <motion.div
-        className="flex items-center gap-2.5 font-sans group"
+        className="flex items-center font-sans group"
         initial={{ x: -10, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
       >
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-800 shadow-md">
-          <span className="text-[18px] flex items-center justify-center text-white">
-            <PremiumIcon name={stageIcon} className="w-5 h-5" strokeWidth={1.5} />
-          </span>
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-        </div>
-
-        <div className="flex flex-col justify-center gap-0.5">
-          <span className="hidden sm:block truncate text-[12px] font-black uppercase tracking-tight text-white">
-            {biomeName}
-          </span>
-        </div>
+        <span className="hidden sm:block truncate text-[12px] font-black uppercase tracking-tight text-white">
+          {biomeName}
+        </span>
       </motion.div>
     );
   }

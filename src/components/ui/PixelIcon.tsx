@@ -40,7 +40,39 @@ export type PixelIconName =
   | "hammer"
   | "anvil-forge"
   | "scroll-pending"
-  | "scroll-approved";
+  | "scroll-approved"
+  // Campfire flare icon shipped for the FlareTriggerButton — pixel
+  // art of a wood pyre with three tongues of flame. Matches the
+  // "signal fire" mental model for flares.
+  | "flare-campfire"
+  // v2 — center-cropped square version of flare-campfire so the icon
+  // fills the tile properly at small sizes (the original was a wide
+  // 1383×877 banner that shrank to a letterbox at 44px).
+  | "flare-campfire-v2"
+  // Custom Adventurer's Menu tiles — user-supplied PNGs shipped in
+  // `/public/assets/ui/icons/menu-*-v1.png`. Suffix `-v1` because the
+  // read-only mount forbids overwriting an existing file; bumping the
+  // suffix is how we swap versions if the art needs iterating later
+  // (same pattern used for sparky-v2 and flare-campfire-v2).
+  | "menu-contributions-v1"
+  | "menu-quests-v1"
+  | "menu-community-v1"
+  | "menu-hierarchy-v1"
+  | "menu-calendar-v1"
+  | "menu-kanban-v1"
+  | "menu-flare-v1"
+  // v2 — same art, but the slate-blue-gray background has been
+  // flood-filled to transparent (via scipy label + border-connected
+  // component detection). Icons now sit directly on the tile's dark
+  // gradient instead of inside a blue square. Bump the suffix again
+  // if the artwork needs revisions later.
+  | "menu-contributions-v2"
+  | "menu-quests-v2"
+  | "menu-community-v2"
+  | "menu-hierarchy-v2"
+  | "menu-calendar-v2"
+  | "menu-kanban-v2"
+  | "menu-flare-v2";
 
 export interface PixelIconProps {
   name: PixelIconName;

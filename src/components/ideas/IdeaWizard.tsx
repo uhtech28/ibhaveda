@@ -34,7 +34,11 @@ import {
   Rocket,
   Palette,
   FlaskConical,
-  Microscope,
+  // BookOpen replaces the Microscope icon for the academic template
+  // per product request ("Academic Paper instead of Research Project
+  // and you can use an open Book for the icon"). Microscope no longer
+  // referenced anywhere in this file — dropping the import too.
+  BookOpen,
   Upload,
   type LucideIcon,
 } from "lucide-react";
@@ -72,8 +76,12 @@ const TEMPLATE_DEFS: Record<TemplateId, TemplateDef> = {
     accent: "rgba(251,191,36,0.12)",
   },
   academic: {
-    icon: Microscope,
-    title: "Research Project",
+    // Icon + label updated per product request — the academic
+    // template surfaces as "Academic Paper" with an open-book icon
+    // (BookOpen from lucide) so the mental model reads clearer than
+    // the previous "Research Project + microscope".
+    icon: BookOpen,
+    title: "Academic Paper",
     subtitle: "JIF score",
     color: "#d4a853",
     accent: "rgba(212,168,83,0.12)",
@@ -778,18 +786,11 @@ export function IdeaWizard({
                   Fill Manually <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
+              {/* Cancel button removed per product request — the
+                  header's × close button already dismisses the wizard,
+                  so an inline Cancel was redundant and cluttered the
+                  primary CTA row. */}
               <div className="flex gap-2.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    audioManager.playTouch("click");
-                    close();
-                  }}
-                  className="h-9 rounded-[10px] border-white/5 bg-[#0D1117] px-4 text-sm text-[#9CA3AF] hover:bg-white/[0.08] hover:text-white"
-                >
-                  Cancel
-                </Button>
                 <div className="relative">
                   {/* Amber "Tap to generate" tutorial callout REMOVED per
                       product request — button stands on its own. */}
@@ -804,8 +805,7 @@ export function IdeaWizard({
                     disabled={!outline.trim() || isOverOutlineLimit}
                     className="h-9 rounded-[10px] bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-5 text-sm font-semibold text-white hover:from-[#5053df] hover:to-[#7c4ee4] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate
+                    Create
                   </Button>
                 </div>
               </div>
@@ -1136,17 +1136,78 @@ export function IdeaWizard({
                 </div>
               </div>
 
-              {/* Cross-post destinations — compact single checkbox.
-                  Per-platform toggles moved to the Settings dialog. */}
-              <CrossPostSelector
-                selected={crossPostTargets}
-                onChange={setCrossPostTargets}
-                onOpenSettings={() => setCrossPostSettingsOpen(true)}
-              />
-              <CrossPostSettingsDialog
-                open={crossPostSettingsOpen}
-                onOpenChange={setCrossPostSettingsOpen}
-              />
+              {/*
+                Cross-post checkbox REMOVED from the post form per
+                product request — the master switch + per-platform
+                connect/disconnect + auto-post toggles all live in
+                Settings (edit-profile pencil). Keeping a second copy
+                inline here was just clutter, and it made the wizard
+                look like the setting had to be re-configured every
+                time someone posted. The wizard still respects the
+                user's saved preferences at submit time via
+                `crossPostTargets` (populated from
+                `useCrossPostPreferences` on first render).
+
+                Public / private visibility toggle takes its slot.
+                Radio-style pair so the current mode is always visible
+                at a glance without a click. Default remains "public";
+                private posts don't cross-post regardless of prefs.
+              */}
+              <div className="flex items-center gap-2 rounded-[10px] border border-white/10 bg-[#0D1117] p-1">
+                <button
+                  type="button"
+                  onClick={() => setVisibility("public")}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                    visibility === "public"
+                      ? "bg-[#6366F1]/20 text-[#C7D2FE] ring-1 ring-[#6366F1]/40"
+                      : "text-white/60 hover:bg-white/5 hover:text-white/80"
+                  }`}
+                  aria-pressed={visibility === "public"}
+                >
+                  <svg
+                    width={13}
+                    height={13}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  Public
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibility("private")}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                    visibility === "private"
+                      ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40"
+                      : "text-white/60 hover:bg-white/5 hover:text-white/80"
+                  }`}
+                  aria-pressed={visibility === "private"}
+                >
+                  <svg
+                    width={13}
+                    height={13}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  Private
+                </button>
+              </div>
 
               {submitError && (
                 <div className="flex items-center gap-2 p-2.5 rounded-[10px] bg-red-500/10 border border-red-500/20">

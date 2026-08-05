@@ -51,9 +51,21 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  srOnlyTitle = "Dialog",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /**
+   * Screen-reader-only title text injected as a hidden DialogTitle
+   * inside the content. Silences Radix's "DialogContent requires a
+   * DialogTitle" a11y warning globally — callers no longer need to
+   * remember to add one for every modal. Callers that DO render their
+   * own visible DialogTitle in children still get proper labelling
+   * (their explicit title takes visual precedence; the hidden one is
+   * a safety net for the a11y tree). Override this prop to give
+   * screen-reader users a more meaningful label than "Dialog".
+   */
+  srOnlyTitle?: string
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -68,6 +80,14 @@ function DialogContent({
         )}
         {...props}
       >
+        {/* Screen-reader-only fallback title — satisfies Radix's a11y
+            requirement for every DialogContent without forcing every
+            callsite to include a DialogTitle. Rendered first so it
+            registers early; a caller-provided visible DialogTitle in
+            children still shows and Radix picks up both ids. */}
+        <DialogPrimitive.Title className="sr-only">
+          {srOnlyTitle}
+        </DialogPrimitive.Title>
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close

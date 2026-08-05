@@ -302,57 +302,58 @@ export function CombatQuestionCard({
           followed by "BOSS CHALLENGE" (per product feedback: "the
           most top should be like the old one only with the idea
           title"). Extra top padding clears the tutorial progress
-          bar which sits at top-16 above the panel. */}
+          bar which sits at top-16 above the panel. Circular timer
+          sits inline on the right per product request "timer at top". */}
       <div
-        className="mb-4 flex items-center justify-center gap-2 bg-black px-4 py-2"
-        style={{ marginTop: "3.25rem" }}
+        className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 bg-black px-4 py-1"
+        style={{ marginTop: "1.5rem" }}
       >
-        <span className="text-base text-emerald-400">📍</span>
-        <span
-          className="min-w-0 truncate font-mono text-sm font-black uppercase tracking-widest text-emerald-300"
-          style={{ fontFamily: "var(--font-pixel-display), monospace" }}
-          title={ideaTitle ?? undefined}
-        >
-          {ideaTitle && ideaTitle.trim().length > 0 ? ideaTitle : "Your Venture"}
-          :&nbsp;&nbsp;BOSS CHALLENGE
-        </span>
+        {/* Left spacer — keeps the title visually centered while the
+            timer takes up the right cell. */}
+        <div />
+        <div className="flex min-w-0 items-center justify-center gap-2">
+          <span className="text-base text-emerald-400">📍</span>
+          {/*
+            Title now names the ACTUAL boss (e.g. "Fog of Vagueness
+            Challenge") instead of the generic "BOSS CHALLENGE". Falls
+            back to the venture title, then to "Boss Challenge" if
+            nothing is known — belt & suspenders so the header always
+            renders something meaningful.
+          */}
+          <span
+            className="min-w-0 truncate font-mono text-sm font-black uppercase tracking-widest text-emerald-300"
+            style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+            title={boss?.name ?? ideaTitle ?? undefined}
+          >
+            {boss?.name && boss.name.trim().length > 0
+              ? boss.name
+              : ideaTitle && ideaTitle.trim().length > 0
+                ? ideaTitle
+                : "Boss"}
+            &nbsp;&nbsp;Challenge
+          </span>
+        </div>
+        {/* Timer cell — right-aligned so the ring sits at the top of
+            the panel rather than floating inside the arena. */}
+        <div className="flex items-center justify-end">
+          <CombatTimerRing
+            servedAt={question.servedAt}
+            durationMs={Math.max(240_000, question.durationMs)}
+            onExpire={handleExpire}
+            enabled={
+              dialogueDone &&
+              (question._id as unknown as string) !== "transition"
+            }
+            size={48}
+            stroke={4}
+          />
+        </div>
       </div>
 
-      {/* Single-column layout — sidebar removed per product request. */}
-      <div className="flex flex-col gap-3">
-        {/* Timer BAR — horizontal, professional layout. Sits above
-            the arena. Only starts once (a) a REAL question is loaded
-            (not the "transition" placeholder shown while the next
-            question is being generated), AND (b) the AI dialogue
-            typewriter has finished — otherwise the user watches
-            their timer tick down while they're still reading the
-            question. Prefixed with a "TIMER" label per product request. */}
-        <div className="flex items-center gap-3">
-          {/* Pixel hourglass — icon alone (label dropped per product).
-              Bar fill itself signals green→yellow→red urgency. */}
-          <PixelIcon
-            name="hourglass-blue"
-            size={22}
-            alt="Timer"
-            className="shrink-0"
-          />
-          <div className="flex-1">
-            <CombatTimerBar
-              servedAt={question.servedAt}
-              durationMs={Math.max(240_000, question.durationMs)}
-              onExpire={handleExpire}
-              enabled={
-                dialogueDone &&
-                // Reject the placeholder question that we synthesize
-                // while waiting for the server's next real question.
-                // Its _id is the sentinel string "transition" (set in
-                // PhaseSwitch's fallback), so we key off that.
-                (question._id as unknown as string) !== "transition"
-              }
-            />
-          </div>
-        </div>
-
+      {/* Single-column layout — sidebar removed per product request.
+          Tight gap-2 so header + arena + textarea + Attack all fit in
+          one viewport without scrolling. */}
+      <div className="flex flex-col gap-2">
         {/* Battle scene — HP bars are rendered UNDER each character
             inside BattleScene now (platforms removed per product
             request). */}
@@ -380,6 +381,10 @@ export function CombatQuestionCard({
           <DialoguePanel
             persona={question.persona}
             prompt={question.prompt}
+            // Pass the current boss's idle-frame path so the portrait
+            // shows the actual monster face (Fog of Vagueness, Wraith,
+            // Unraveller, etc.) instead of the generic red SVG villain.
+            bossAsset={boss?.idleAsset ?? null}
             onDone={() => setDialogueDone(true)}
           />
         </ReactiveDialogueShell>
@@ -390,7 +395,7 @@ export function CombatQuestionCard({
         <textarea
           ref={textareaRef}
           aria-label="Your answer"
-          className="min-h-[120px] w-full resize-y bg-black p-3 font-mono text-sm leading-relaxed text-white outline-none disabled:opacity-60"
+          className="min-h-[72px] w-full resize-y bg-black p-2 font-mono text-sm leading-relaxed text-white outline-none disabled:opacity-60"
           placeholder="Type your answer to defeat the boss…"
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -423,7 +428,7 @@ export function CombatQuestionCard({
             type="button"
             onClick={handleSubmitClick}
             disabled={isLocked}
-            className="border-2 border-white bg-black px-6 py-2 font-mono text-xs uppercase tracking-wider text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+            className="border-2 border-white bg-black px-5 py-1.5 font-mono text-xs uppercase tracking-wider text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
             style={{ fontFamily: "var(--font-pixel-display), monospace" }}
           >
             Attack
@@ -439,11 +444,130 @@ export function CombatQuestionCard({
 // ─────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────
-// Horizontal timer bar — replaces the circular CombatRing at the top
-// of the panel for a cleaner, more professional layout. Wall-clock
-// driven so tab-hide doesn't skew the countdown. Holds full when
-// `enabled` is false (used to pause the clock while the AI's
-// dialogue is still typing).
+// Circular timer ring — sits in the top-right corner of the arena.
+// Shares the same wall-clock-driven countdown as CombatTimerBar so
+// tab-hide doesn't skew the timer, and pauses (holds full) while the
+// AI dialogue typewriter is running.
+// ─────────────────────────────────────────────────────────────────────
+function CombatTimerRing({
+  servedAt,
+  durationMs,
+  onExpire,
+  enabled = true,
+  size = 56,
+  stroke = 5,
+}: {
+  servedAt: number;
+  durationMs: number;
+  onExpire: () => void;
+  enabled?: boolean;
+  size?: number;
+  stroke?: number;
+}) {
+  const anchorRef = useRef<number>(Date.now());
+  const lastServedRef = useRef<number>(servedAt);
+  const lastEnabledRef = useRef<boolean>(enabled);
+  if (lastServedRef.current !== servedAt) {
+    anchorRef.current = Date.now();
+    lastServedRef.current = servedAt;
+  }
+  if (lastEnabledRef.current !== enabled) {
+    if (enabled) anchorRef.current = Date.now();
+    lastEnabledRef.current = enabled;
+  }
+  const [remainingMs, setRemainingMs] = useState(() => durationMs);
+  const expiredRef = useRef(false);
+  const expireRef = useRef(onExpire);
+  useEffect(() => {
+    expireRef.current = onExpire;
+  }, [onExpire]);
+
+  useEffect(() => {
+    expiredRef.current = false;
+    if (!enabled) {
+      setRemainingMs(durationMs);
+      return;
+    }
+    const tick = () => {
+      const remain = Math.max(0, anchorRef.current + durationMs - Date.now());
+      setRemainingMs(remain);
+      if (remain <= 0) {
+        window.clearInterval(id);
+        if (!expiredRef.current) {
+          expiredRef.current = true;
+          expireRef.current();
+        }
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 100);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servedAt, durationMs, enabled]);
+
+  const fraction = durationMs > 0 ? remainingMs / durationMs : 0;
+  const fill =
+    fraction > 0.5 ? "#22C55E" : fraction > 0.2 ? "#EAB308" : "#EF4444";
+
+  // Ring geometry
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - fraction);
+  // Format countdown mm:ss for the label in the middle.
+  const totalSec = Math.max(0, Math.ceil(remainingMs / 1000));
+  const mm = Math.floor(totalSec / 60);
+  const ss = totalSec % 60;
+  const label = `${mm}:${ss.toString().padStart(2, "0")}`;
+
+  return (
+    <div
+      role="timer"
+      aria-label={`Time remaining: ${label}`}
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <svg width={size} height={size} className="absolute inset-0 -rotate-90">
+        {/* Track */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.14)"
+          strokeWidth={stroke}
+        />
+        {/* Progress */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={fill}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          style={{
+            transition: "stroke-dashoffset 120ms linear, stroke 300ms ease",
+            filter: `drop-shadow(0 0 4px ${fill}88)`,
+          }}
+        />
+      </svg>
+      {/* Center label — mm:ss countdown */}
+      <span
+        className="font-mono text-[10px] font-bold tabular-nums text-white/90"
+        style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Horizontal timer bar — kept in case a caller wants the horizontal
+// layout back. No longer rendered in the main combat panel (see
+// CombatTimerRing above for the current circular version).
 // ─────────────────────────────────────────────────────────────────────
 function CombatTimerBar({
   servedAt,
@@ -714,10 +838,14 @@ function SidebarSection({
 function DialoguePanel({
   persona,
   prompt,
+  bossAsset,
   onDone,
 }: {
   persona: "villain" | "mentor";
   prompt: string;
+  /** Boss's idle-frame asset path. When provided, the portrait shows
+   *  the actual boss face instead of the procedural SVG placeholder. */
+  bossAsset?: string | null;
   /** Called once when the typewriter finishes typing this prompt. Used
    *  to release the timer ring so it only starts counting AFTER the
    *  question is fully visible. */
@@ -734,12 +862,21 @@ function DialoguePanel({
   }, [isTyping, onDone]);
   return (
     <div className="flex items-start gap-4 bg-black p-4">
-      <Portrait persona={persona} talking={isTyping} />
+      {/* Prefer the real boss face — clipped to the first frame of the
+          idle spritesheet via background-image + background-position so
+          wide horizontal sheets don't render as a strip of tiny copies.
+          Falls back to the procedural SVG portrait when no bossAsset is
+          available (dev / preview / non-village scenes). */}
+      {bossAsset && persona === "villain" ? (
+        <BossFacePortrait bossAsset={bossAsset} />
+      ) : (
+        <Portrait persona={persona} talking={isTyping} />
+      )}
       <p
         className="flex-1 font-[var(--font-pixel-body)] text-base leading-relaxed text-white"
         style={{ fontFamily: "var(--font-pixel-body), monospace" }}
       >
-        <span className="mr-2 text-white/90">*</span>
+        {/* Undertale-style `*` prefix removed per product request. */}
         {typedPrompt}
         {isTyping && (
           <span
@@ -750,6 +887,113 @@ function DialoguePanel({
           </span>
         )}
       </p>
+    </div>
+  );
+}
+
+/**
+ * 64×64 portrait cell that shows the CURRENT boss's face by clipping
+ * to the first frame of the idle spritesheet. Uses a background image
+ * with background-size:cover + background-position:left so:
+ *   - single-image PNGs render normally (cover fills the box)
+ *   - wide horizontal spritesheets show only the leftmost (idle) frame
+ *     instead of stretching all frames to fit
+ */
+function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
+  // Zoom into the FACE of the boss idle sprite so it fills the 64×64
+  // cell. Calibrated from actual assets — Fog of Vagueness (verified
+  // by pixel scan): 828×92 sheet, 9 frames of 92×92, boss silhouette
+  // spans y:24–68; head + shoulders sit at y:24–44 (~22% to 48%),
+  // horizontally centered in the middle ~33% of frame width.
+  //
+  // Strategy:
+  //   1. Measure natural width/height on img load — synchronously if
+  //      the image is already cached (avoids the "grid of tiny copies"
+  //      caused by the img painting once at squished cell size before
+  //      React's state update lands).
+  //   2. Treat height as one-frame size (square-frame convention).
+  //   3. Scale the whole sheet so FACE_FRAC × frame maps to 64 px.
+  //   4. Absolute-position the img so the desired face rect of frame 0
+  //      lands at (0,0) of the box; overflow:hidden clips the rest.
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  // Preload the sprite via a detached Image() so we KNOW the natural
+  // dimensions before the visible <img> even mounts. The previous
+  // ref-callback + onLoad combo left the portrait as an empty red box
+  // when the img mounted with complete=false and then onLoad fired
+  // during a render pass where the state update didn't stick.
+  useEffect(() => {
+    let cancelled = false;
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      setDims({ w: probe.naturalWidth, h: probe.naturalHeight });
+    };
+    probe.onerror = () => {
+      // If the asset fails, fall back to reasonable defaults so we
+      // still render SOMETHING instead of an empty red cell.
+      if (cancelled) return;
+      setDims({ w: 92, h: 92 });
+    };
+    probe.src = bossAsset;
+    return () => {
+      cancelled = true;
+    };
+  }, [bossAsset]);
+
+  const BOX = 64;
+  // Middle-third of the frame width (~33%) = the head+shoulders
+  // column for a standing sprite. Smaller values zoom in tighter.
+  const FACE_FRACTION = 0.33;
+  // Face top edge as a fraction of frame height. 0.22 puts frame-y
+  // ≈ 20 at the top of the window — just above where the head starts
+  // (y ≈ 24 for Fog of Vagueness).
+  const FACE_TOP_FRAC = 0.22;
+
+  const frameSize = dims ? Math.min(dims.w, dims.h) : 64;
+  const displayFrame = BOX / FACE_FRACTION; // 64/0.33 ≈ 194
+  const scale = displayFrame / frameSize; // native → display
+  const renderedW = dims ? dims.w * scale : BOX;
+  const renderedH = dims ? dims.h * scale : BOX;
+
+  const faceLeftDisplay = frameSize
+    ? ((frameSize * (1 - FACE_FRACTION)) / 2) * scale
+    : 0;
+  const faceTopDisplay = frameSize ? frameSize * FACE_TOP_FRAC * scale : 0;
+
+  return (
+    <div
+      className="shrink-0 relative overflow-hidden"
+      style={{
+        width: BOX,
+        height: BOX,
+        background: "#3a1212",
+        border: "2px solid #FF6B6B",
+        imageRendering: "pixelated",
+      }}
+      aria-label="Boss portrait"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        // Force remount when the asset changes so stale dims from a
+        // previous boss don't apply to the new sprite.
+        key={bossAsset}
+        src={bossAsset}
+        alt=""
+        style={{
+          position: "absolute",
+          left: -faceLeftDisplay,
+          top: -faceTopDisplay,
+          width: renderedW,
+          height: renderedH,
+          imageRendering: "pixelated",
+          userSelect: "none",
+          pointerEvents: "none",
+          // Never render the img before dims are known — otherwise the
+          // browser stretches the whole spritesheet into the cell,
+          // producing the "many tiny copies" artifact.
+          visibility: dims ? "visible" : "hidden",
+        }}
+      />
     </div>
   );
 }
@@ -1157,29 +1401,88 @@ function BattleScene({
         ? "lost"
         : "active";
 
-  // ── Two-stage cinematic ────────────────────────────────────────────
-  // Stage 1 (0-1500ms after HP hits 0): both sprites stay in place,
-  //   LOSER plays DEFEAT one-shot (kneels / crumbles / dies).
-  // Stage 2 (1500ms+): LOSER fades out, WINNER glides to arena center
-  //   and plays VICTORY on loop until the outer buffer expires.
-  const DEFEAT_STAGE_MS = 1500;
-  const [cinematicStage, setCinematicStage] = useState<
-    "none" | "defeat" | "cheer"
-  >("none");
+  // ── Three-stage cinematic ──────────────────────────────────────────
+  // Stage 0 (win only) RETREAT (0 - 1600ms): a gamified banner reads
+  //   "<Boss Name> is retreating!" over the still arena. Boss holds
+  //   idle, persona holds idle. Gives the moment weight instead of
+  //   snapping straight into a defeat animation.
+  // Stage 1 DEFEAT (1600 - 3800ms on win, 0 - 2200ms on loss): the
+  //   loser plays its DEFEAT clip at reduced FPS so users actually
+  //   see each frame (kneels / crumbles / dies).
+  // Stage 2 CHEER (3800ms+ on win, 2200ms+ on loss): loser fades out,
+  //   winner glides to arena center and plays VICTORY on loop at a
+  //   deliberately slow cadence.
+  //
+  // Total cinematic length (win): 1600 + 2200 + ~2700 cheer buffer ≈
+  // 6.5s — the parent CombatPanel's CINEMATIC_HOLD_MS is bumped to
+  // 6500ms to keep the score card from cutting in early.
+  const RETREAT_STAGE_MS = 1600;
+  const DEFEAT_STAGE_MS = 2200;
+  type CinematicStage = "none" | "retreat" | "defeat" | "cheer";
+  const [cinematicStage, setCinematicStage] = useState<CinematicStage>("none");
   useEffect(() => {
     if (outcome === "active") {
       setCinematicStage("none");
       return;
     }
-    // Just entered an outcome — start with DEFEAT.
+    if (outcome === "won") {
+      // WIN sequence: retreat banner → boss defeat → persona cheer.
+      // The "retreating" beat is a gamification flourish requested by
+      // product — it re-frames the ending as the villain fleeing, not
+      // just an HP-bar-hits-zero moment.
+      setCinematicStage("retreat");
+      const t1 = window.setTimeout(
+        () => setCinematicStage("defeat"),
+        RETREAT_STAGE_MS,
+      );
+      const t2 = window.setTimeout(
+        () => setCinematicStage("cheer"),
+        RETREAT_STAGE_MS + DEFEAT_STAGE_MS,
+      );
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
+    }
+    // LOSS: skip the retreat beat (the boss is triumphant, no retreat).
     setCinematicStage("defeat");
-    const t = window.setTimeout(() => setCinematicStage("cheer"), DEFEAT_STAGE_MS);
+    const t = window.setTimeout(
+      () => setCinematicStage("cheer"),
+      DEFEAT_STAGE_MS,
+    );
     return () => window.clearTimeout(t);
   }, [outcome]);
+  // "Screen gets bigger when you attack" — we detect any active
+  // attack/reaction beat and use it to (1) enlarge the arena visually
+  // via a subtle CSS scale, and (2) key a slower FPS on the sprite
+  // clips (see AnimatedPersonaSprite / BossSpriteFromAsset below).
+  //
+  // The scale is applied to the border-box container; overflow:hidden
+  // keeps the enlarged sprites clipped to the arena bounds so nothing
+  // spills into the dialogue below. We hold the zoom for the full
+  // reaction window rather than a fixed timer so it fully covers the
+  // (now slower) attack/hurt animations.
+  const isAttackingNow =
+    pendingAttack ||
+    bossReaction === "hit" ||
+    bossReaction === "crit" ||
+    bossReaction === "counter";
+
   return (
     <div
       className="relative h-52 w-full overflow-hidden border-2 border-white sm:h-56"
-      style={{ imageRendering: "pixelated" }}
+      style={{
+        imageRendering: "pixelated",
+        // Cinematic "zoom in on the fight" when the user commits to
+        // an attack. transformOrigin biased slightly toward the boss
+        // (where the impact lands) so the boss sprite feels featured
+        // during the crit / hit / counter reaction. Cinematic scale
+        // is muted (1.05) — big enough to feel like a camera push,
+        // small enough not to jitter the layout underneath.
+        transform: isAttackingNow ? "scale(1.05)" : "scale(1)",
+        transformOrigin: "70% 65%",
+        transition: "transform 550ms cubic-bezier(0.4, 0, 0.2, 1)",
+      }}
     >
       {/* ── Atmospheric backdrop — 4 stacked layers ─────────────────
           1. Village map heavily BLURRED so it reads as village-themed
@@ -1255,11 +1558,14 @@ function BattleScene({
           under each character (rendered below the sprite blocks). */}
 
       {/* Founder HP bar — same left anchor as the sprite (left-8 / sm:left-16)
-          and same width as the sprite (100px), so it sits directly
-          beneath the founder without floating left or right. */}
+          and same width as the persona sprite (120px, matches
+          AnimatedPersonaSprite's displayWidth) so the founder is
+          horizontally CENTERED under the bar. Previously the bar was
+          200px wide against a 120px sprite, so the character sat pushed
+          to the left edge instead of dead-center. */}
       <div
         className="pointer-events-none absolute bottom-2 left-8 z-10 sm:bottom-3 sm:left-16"
-        style={{ width: 200 }}
+        style={{ width: 120 }}
       >
         <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-widest text-white/85">
           <span>You</span>
@@ -1284,11 +1590,13 @@ function BattleScene({
       </div>
 
       {/* Boss HP bar — right anchor matches the sprite (right-8 / sm:right-16)
-          and width matches the sprite's visible art (~200px inside its
-          300px slot). Sits directly beneath the boss. */}
+          and width matches the boss sprite's displayWidth (300px in
+          BossSpriteFromAsset). That centers the boss horizontally under
+          its HP bar instead of floating it toward the right edge like
+          the previous 200px bar did. */}
       <div
         className="pointer-events-none absolute bottom-2 right-8 z-10 sm:bottom-3 sm:right-16"
-        style={{ width: 200 }}
+        style={{ width: 300 }}
       >
         <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-widest text-white/85">
           <span className="truncate pr-2">{bossName}</span>
@@ -1379,12 +1687,18 @@ function BattleScene({
             //   Optimistic pending-attack → boss shows HURT too.
             //   BLOCK / idle → idle breathing loop.
             state={
-              // Cinematic staging:
-              // - won → boss LOSES → DEFEAT then held while faded out
-              // - lost → boss WINS → wait through defeat stage in idle,
-              //                       then VICTORY loop when at center
+              // Cinematic staging with the new RETREAT beat:
+              // - won → RETREAT: hold idle so the banner reads over a
+              //         still boss (feels like the boss is FROZEN
+              //         mid-thought before fleeing). DEFEAT + CHEER:
+              //         play defeat clip once, then hold last frame
+              //         while the boss fades out during CHEER.
+              // - lost → boss WINS → wait through defeat stage in
+              //          idle, then VICTORY loop when at center.
               outcome === "won"
-                ? "defeat"
+                ? cinematicStage === "retreat"
+                  ? "idle"
+                  : "defeat"
                 : outcome === "lost"
                   ? cinematicStage === "cheer"
                     ? "victory"
@@ -1413,8 +1727,17 @@ function BattleScene({
          - cheer stage: loser fades to opacity 0; winner slides to center
                         and loops VICTORY */}
       <div
-        className="absolute left-8 bottom-8 sm:left-16 sm:bottom-12"
+        className="absolute left-8 sm:left-16"
         style={{
+          // Ground-plane tuning:
+          //   bottom-8 / bottom-12  → floated 32–48px above the path
+          //   bottom: -40px         → sank below the visible arena
+          //                           (works for the tall boss sprite
+          //                            but the smaller persona sprite
+          //                            gets clipped)
+          //   bottom: 8px           → sits right on the street line,
+          //                           feet meeting the boss's ground.
+          bottom: 8,
           opacity:
             cinematicStage === "cheer" && outcome === "lost" ? 0 : 1,
           transform:
@@ -1439,12 +1762,25 @@ function BattleScene({
         {founderAsset && personaIdForSprite ? (
           <AnimatedPersonaSprite
             personaId={personaIdForSprite}
+            slowMotion={
+              // Slow the ATTACK / HURT clips so the user can actually
+              // see the swing/recoil instead of it whipping past in
+              // half a second. Applied only during active reactions —
+              // idle stays at its normal breathing cadence.
+              pendingAttack ||
+              bossReaction === "hit" ||
+              bossReaction === "crit" ||
+              bossReaction === "counter"
+            }
             state={
-              // Cinematic staging (matches boss above):
-              // - lost → persona LOSES → DEFEAT clip during defeat stage
-              //          then held while faded out
-              // - won  → persona WINS → wait through defeat stage in idle,
-              //          then VICTORY loop when at center
+              // Cinematic staging (matches boss above), now with the
+              // RETREAT beat woven in:
+              // - lost → persona LOSES → DEFEAT clip during defeat
+              //          stage then held while faded out.
+              // - won  → persona WINS → hold IDLE during retreat +
+              //          defeat stages (proud stance while the boss
+              //          crumbles), then VICTORY loop at center
+              //          during cheer.
               outcome === "lost"
                 ? "defeat"
                 : outcome === "won"
@@ -1488,6 +1824,79 @@ function BattleScene({
           "I hit them" beat. Layered emoji slashes and yellow shakes
           were competing with the sprite animation and reading as a
           second, phantom animation. */}
+
+      {/* ── Sparky companion ────────────────────────────────────────
+          Small idle Sparky sprite tucked to the LEFT of the persona
+          so the founder isn't alone in the arena — reads as "Sparky
+          is helping fight". Swaps to the CHEER loop when the persona
+          wins and the cinematic reaches the CHEER stage. Fades when
+          the persona loses (Sparky is dejected too). Kept purely
+          decorative — no pointer-events, no state escalation into
+          the tutorial's global Sparky module. */}
+      <div
+        className="pointer-events-none absolute z-[6] left-1 sm:left-4"
+        style={{
+          bottom: 6,
+          opacity:
+            cinematicStage === "cheer" && outcome === "lost" ? 0.35 : 1,
+          transition: "opacity 500ms ease-out",
+        }}
+        aria-hidden
+      >
+        <AnimatedSpritesheet
+          key={
+            cinematicStage === "cheer" && outcome === "won"
+              ? "sparky-cheer"
+              : "sparky-idle"
+          }
+          sheetUrl={
+            cinematicStage === "cheer" && outcome === "won"
+              ? "/assets/tutorial/sparky-v2/cheer.png"
+              : "/assets/tutorial/sparky-v2/idle.png"
+          }
+          frameCount={
+            cinematicStage === "cheer" && outcome === "won" ? 9 : 8
+          }
+          frameWidth={68}
+          frameHeight={68}
+          displayWidth={48}
+          fps={cinematicStage === "cheer" && outcome === "won" ? 9 : 6}
+          loop
+          filter="drop-shadow(0 4px 8px rgba(0,0,0,0.7))"
+        />
+      </div>
+
+      {/* ── Retreat announcement banner ─────────────────────────────
+          Gamified beat that fires ONLY on WIN, ONLY during the
+          RETREAT stage (first ~1.6s of the ending). Reads
+          "{Boss Name} is retreating!" as an in-arena headline before
+          the boss's DEFEAT clip actually starts, giving the ending
+          narrative weight instead of the old "boss just kneels" jump-
+          cut. Purely visual — no click handlers. */}
+      <AnimatePresence>
+        {cinematicStage === "retreat" && outcome === "won" && (
+          <motion.div
+            key="retreat-banner"
+            initial={{ opacity: 0, scale: 0.85, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="pointer-events-none absolute inset-0 z-[20] flex items-center justify-center px-3"
+          >
+            <div
+              className="border-2 border-amber-300 bg-black/85 px-4 py-2 shadow-[0_0_28px_rgba(251,191,36,0.55)] sm:px-6 sm:py-3"
+              style={{ backdropFilter: "blur(2px)" }}
+            >
+              <p
+                className="text-center font-mono text-sm font-black uppercase tracking-widest text-amber-300 sm:text-base"
+                style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+              >
+                {bossName} is retreating!
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Ground line */}
       <div
@@ -1843,11 +2252,18 @@ function AnimatedPersonaSprite({
   state,
   onStateComplete,
   displayWidth = 120,
+  slowMotion = false,
 }: {
   personaId: PersonaId;
   state: PersonaAnimState;
   onStateComplete?: () => void;
   displayWidth?: number;
+  /** When true, ATTACK / HURT clips play at reduced FPS so the user
+   *  can actually see each frame of the swing/recoil. Used during
+   *  reaction beats in the combat card. Terminal clips (defeat /
+   *  victory) always play at their cinematic-slow cadence
+   *  independent of this flag. */
+  slowMotion?: boolean;
 }) {
   // Look up the persona's extended config to get the correct frame size,
   // frame count, and per-clip fps. Falls back to alchemist's 88×88 x9 if
@@ -1871,6 +2287,23 @@ function AnimatedPersonaSprite({
   // attack and hurt release so the sprite doesn't sit on its knelt /
   // hunched recoil pose and read as "defeated".
   const holdLast = state === "defeat" || state === "victory";
+  // Per-state FPS map:
+  //   idle    → persona's natural breathing cadence.
+  //   victory → slower loop so the cheer reads as jubilant, not manic.
+  //   defeat  → very slow so the crumble is legible frame-by-frame.
+  //   attack/hurt → normal combat cadence, halved when slowMotion is on
+  //                so the user sees the swing/recoil clearly during
+  //                the arena-zoom moment.
+  const resolvedFps =
+    state === "idle"
+      ? idleFps
+      : state === "victory"
+        ? 4
+        : state === "defeat"
+          ? 3
+          : slowMotion
+            ? Math.max(3, Math.round(combatFps * 0.5))
+            : combatFps;
   return (
     <AnimatedSpritesheet
       key={`${personaId}:${state}`}
@@ -1879,7 +2312,7 @@ function AnimatedPersonaSprite({
       frameWidth={frameWidth}
       frameHeight={frameHeight}
       displayWidth={displayWidth}
-      fps={state === "idle" || state === "victory" ? idleFps : combatFps}
+      fps={resolvedFps}
       loop={isLoop}
       holdLast={holdLast}
       filter="drop-shadow(0 6px 12px rgba(0,0,0,0.7))"
@@ -1984,6 +2417,21 @@ function BossSpriteFromAsset({
   // Transient combat clips (attack / hurt) release so the boss
   // doesn't sit on its recoil / stunned pose and read as "defeated".
   const holdLast = useState_ === "defeat" || useState_ === "victory";
+  // Per-state FPS for the boss:
+  //   idle    → gentle breathing loop.
+  //   victory → slow triumphant loop (loss ending only).
+  //   defeat  → very slow crumble so each frame reads clearly during
+  //             the arena-zoom moment after the retreat banner.
+  //   attack/hurt → slowed from the old snappy 7fps to 4fps so the
+  //                 impact clip is legible when the arena zooms in.
+  const resolvedFps =
+    useState_ === "idle"
+      ? 6
+      : useState_ === "victory"
+        ? 4
+        : useState_ === "defeat"
+          ? 3
+          : 4;
   return (
     <AnimatedSpritesheet
       key={useState_}
@@ -1992,10 +2440,7 @@ function BossSpriteFromAsset({
       frameWidth={sheetDef.frameWidth}
       frameHeight={sheetDef.frameHeight}
       displayWidth={300}
-      // 7fps for boss combat clips (~1.3s per attack/hurt/defeat/victory).
-      // Slower on the boss than the persona because the boss is larger
-      // and the pixel-art recoil reads better at a slightly gentler cadence.
-      fps={useState_ === "idle" || useState_ === "victory" ? 6 : 7}
+      fps={resolvedFps}
       loop={isLoop}
       holdLast={holdLast}
       flipX

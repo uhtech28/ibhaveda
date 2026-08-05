@@ -268,14 +268,21 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
       {/* Persistent progress bar — visible only on tutorial pages,
           NOT on the landing / public marketing pages. */}
       <TutorialProgressBarGate
-        visible={active}
+        // Also hide the bar while the user is still watching Sparky's
+        // intro pitch (before they've hit "Let's go"). At that moment
+        // effectiveStep is still 1 — the guided flow hasn't begun —
+        // and showing "1/8" made the persona picker feel counted as
+        // step 1. The bar reappears the instant Step2 bumps to step 3.
+        visible={active && effectiveStep >= 3}
         // Display renumber: internal steps 1..2 are the invisible
         // name/username capture during signup. The user-visible
         // journey starts at internal step 3 ("create first post"),
         // which they perceive as step 1. Subtract 2 from the internal
         // step and cap total at 8 so the bar reads 1/8 → 8/8 through
-        // the actual guided flow.
-        step={Math.max(1, Math.min(effectiveStep - 2, 8))}
+        // the actual guided flow. Floor at 0 (not 1) so any race
+        // where the bar renders before the visibility gate updates
+        // still displays 0 instead of a fake 1/8.
+        step={Math.max(0, Math.min(effectiveStep - 2, 8))}
         totalSteps={8}
         onSkip={skip}
       />

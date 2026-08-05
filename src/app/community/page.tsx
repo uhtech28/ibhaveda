@@ -138,7 +138,7 @@ export default function CommunityPage() {
           </div>
 
           <LeaderboardErrorBoundary>
-            <WeeklyLeaderboard />
+            <WeeklyPodiumTabs />
           </LeaderboardErrorBoundary>
 
           {/* Users Grid */}
@@ -274,6 +274,59 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
   );
 };
 
+/**
+ * WeeklyPodiumTabs — switchable podium: Top Contributors (people) vs
+ * Top Projects (ideas). Product asked for a Top Projects section next
+ * to Top Contributors — implemented as an in-place tab so they share
+ * the same podium layout instead of adding a second full section that
+ * pushes the user grid off-screen. State-only, no URL sync (the whole
+ * page already reads/writes `?q=` for search — keeping this local
+ * avoids an unrelated URL churn).
+ */
+const WeeklyPodiumTabs = () => {
+  const [tab, setTab] = React.useState<"contributors" | "projects">(
+    "contributors",
+  );
+
+  return (
+    <div className="mb-16">
+      {/* Tab switcher — same visual weight for both tabs so neither
+          feels "primary". Uses the same yellow-gold accent as the
+          Trophy header for consistency. */}
+      <div className="flex items-center justify-center gap-2 mb-6">
+        <button
+          type="button"
+          onClick={() => setTab("contributors")}
+          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold transition-all ${
+            tab === "contributors"
+              ? "border-yellow-500/60 bg-yellow-500/10 text-yellow-300"
+              : "border-border/60 text-muted-foreground hover:border-yellow-500/30 hover:text-foreground"
+          }`}
+          aria-pressed={tab === "contributors"}
+        >
+          <Trophy className="w-4 h-4" />
+          Top Contributors
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("projects")}
+          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold transition-all ${
+            tab === "projects"
+              ? "border-yellow-500/60 bg-yellow-500/10 text-yellow-300"
+              : "border-border/60 text-muted-foreground hover:border-yellow-500/30 hover:text-foreground"
+          }`}
+          aria-pressed={tab === "projects"}
+        >
+          <Lightbulb className="w-4 h-4" />
+          Top Projects
+        </button>
+      </div>
+
+      {tab === "contributors" ? <WeeklyLeaderboard /> : <WeeklyTopProjects />}
+    </div>
+  );
+};
+
 const WeeklyLeaderboard = () => {
   const topUsers = useQuery(api.leaderboard.getWeeklyLeaderboard, { limit: 3 });
 
@@ -287,7 +340,7 @@ const WeeklyLeaderboard = () => {
   const third = topUsers[2];
 
   return (
-    <div className="mb-16">
+    <div>
       <div className="flex items-center justify-center gap-3 mb-8">
         <Trophy className="w-8 h-8 text-yellow-500" />
         <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
@@ -317,6 +370,172 @@ const WeeklyLeaderboard = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+/**
+ * WeeklyTopProjects — Top-3 ideas podium. Ranks by spark count with
+ * contribution count as tiebreaker and creation recency as final
+ * tiebreaker, matching the "Trending Ideas" logic already used in
+ * `IdeaRightRail` (single source of truth for what "trending" means
+ * on this app). Reads from the same `getPublicIdeasFast` query the
+ * feed uses so we don't add a second server-side query for ranking.
+ */
+const WeeklyTopProjects = () => {
+  const publicIdeas = useQuery(api.ideas.getPublicIdeasFast);
+
+  const ranked = React.useMemo(() => {
+    if (!publicIdeas) return [] as typeof publicIdeas;
+    return [...publicIdeas]
+      .sort(
+        (a, b) =>
+          (b.sparkCount || 0) - (a.sparkCount || 0) ||
+          (b.contributionCount || 0) - (a.contributionCount || 0) ||
+          (b.createdAt || 0) - (a.createdAt || 0),
+      )
+      .slice(0, 3);
+  }, [publicIdeas]);
+
+  if (publicIdeas === undefined) return null; // loading — fail silently
+  if (ranked.length === 0) return null;
+
+  const [first, second, third] = ranked;
+
+  return (
+    <div>
+      <div className="flex items-center justify-center gap-3 mb-8">
+        <Lightbulb className="w-8 h-8 text-yellow-500" />
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
+          Weekly Top Projects
+        </h2>
+        <Lightbulb className="w-8 h-8 text-yellow-500" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
+        <div className="md:order-2">
+          {first && <ProjectPodiumCard idea={first} rank={1} />}
+        </div>
+        <div className="md:order-1">
+          {second ? (
+            <ProjectPodiumCard idea={second} rank={2} />
+          ) : (
+            <div className="hidden md:block" />
+          )}
+        </div>
+        <div className="md:order-3">
+          {third ? (
+            <ProjectPodiumCard idea={third} rank={3} />
+          ) : (
+            <div className="hidden md:block" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Podium card for an idea/project. Mirrors PodiumCard's layout so the
+ * two tabs feel like the same widget. Metric shown is spark count
+ * (the driver of the ranking) so the number the user sees explains
+ * why the project placed where it did.
+ *
+ * `ProjectPodiumItem` is a structural subset of what `getPublicIdeasFast`
+ * returns — declared inline (rather than piped through the Convex type
+ * pipeline) so the file stays self-contained and doesn't couple its
+ * types to `useQuery`'s complex generic.
+ */
+interface ProjectPodiumItem {
+  _id: string;
+  title: string;
+  sparkCount?: number;
+  contributionCount?: number;
+  createdAt?: number;
+  author?: { username?: string | null } | null;
+}
+
+const ProjectPodiumCard: React.FC<{ idea: ProjectPodiumItem; rank: 1 | 2 | 3 }> = ({
+  idea,
+  rank,
+}) => {
+  const styles = RANK_STYLES[rank];
+  const isFirst = rank === 1;
+  const heightClass =
+    rank === 1
+      ? "md:min-h-[300px]"
+      : rank === 2
+        ? "md:min-h-[240px]"
+        : "md:min-h-[210px]";
+  const sparks = idea.sparkCount ?? 0;
+
+  return (
+    <Card
+      className={`relative overflow-hidden border-2 ${styles.border} ${styles.bg} ${heightClass} shadow-lg flex flex-col items-center justify-center text-center transition-transform duration-300 hover:scale-[1.03] ${
+        isFirst ? "p-6 md:p-8" : "p-4 md:p-5"
+      }`}
+    >
+      <div
+        className={`absolute top-0 left-0 w-full ${isFirst ? "h-1.5" : "h-1"} ${styles.accent}`}
+      />
+
+      <div
+        className={`flex items-center justify-center rounded-full text-white font-bold shadow-md ${styles.accent} ${
+          isFirst ? "w-12 h-12 text-lg -mt-2 mb-3" : "w-9 h-9 text-sm -mt-1 mb-2"
+        }`}
+        aria-label={`Rank ${rank}`}
+      >
+        #{rank}
+      </div>
+
+      <Link
+        href={`/idea/${idea._id}`}
+        className="w-full flex flex-col items-center"
+      >
+        {/* Reuse the avatar slot for the idea's Lightbulb icon so the
+            card silhouette matches the user PodiumCard exactly. */}
+        <div
+          className={`shadow-md border-4 ${styles.avatarRing} rounded-full bg-background flex items-center justify-center ${
+            isFirst ? "w-24 h-24 mb-4" : "w-16 h-16 mb-3"
+          }`}
+        >
+          <Lightbulb
+            className={`text-yellow-400 ${isFirst ? "w-10 h-10" : "w-7 h-7"}`}
+          />
+        </div>
+
+        <h3
+          className={`font-bold text-foreground truncate w-full hover:text-primary transition-colors ${
+            isFirst ? "text-xl" : "text-base"
+          }`}
+        >
+          {idea.title}
+        </h3>
+        <p
+          className={`text-muted-foreground ${
+            isFirst ? "text-xs mb-4" : "text-[11px] mb-3"
+          }`}
+        >
+          @{idea.author?.username ?? "anonymous"}
+        </p>
+
+        <div
+          className={`bg-background rounded-full border border-border/50 flex items-center gap-1.5 ${
+            isFirst ? "px-4 py-1.5" : "px-3 py-1"
+          }`}
+        >
+          <span
+            className={`font-bold font-mono ${styles.pointsText} ${isFirst ? "text-base" : "text-sm"}`}
+          >
+            {sparks}
+          </span>
+          <span
+            className={`text-muted-foreground font-medium uppercase tracking-wider ${isFirst ? "text-xs" : "text-[10px]"}`}
+          >
+            Sparks
+          </span>
+        </div>
+      </Link>
+    </Card>
   );
 };
 

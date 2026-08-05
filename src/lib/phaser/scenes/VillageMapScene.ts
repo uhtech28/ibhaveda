@@ -171,7 +171,12 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     // bottom-edge at yOffset, and the character occupies the mid section
     // of the frame. yOffset=+8 nudges the feet visually onto the ground.
     yOffset: 8,
-    offsetX: 105, // east of CP1 — persona stands on marker facing east
+    // All Village bosses now sit at a small +30 east offset from
+    // their CP marker so they appear ON the checkpoint while leaving
+    // just enough gap on the LEFT for the persona to stand there
+    // without overlapping. Product request: "bosses should be on
+    // checkpoint, make character stand on left side."
+    offsetX: 30, // slightly east of CP1 — persona stands on its west side
 
     taunts: [
       "Your idea has no edges...",
@@ -204,7 +209,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     // their 92-frame than the old single-image bosses did.
     scale: 1.5,
     yOffset: 8,
-    offsetX: -110, // west of CP2 (path bends east so guardian sits west)
+    offsetX: 30, // slightly east of CP2 — persona stands on its west side (consistent left-of-boss framing)
 
     taunts: [
       "One arm for gamers, one for parents...",
@@ -235,7 +240,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     victoryFrameCount: 9,
     scale: 1.5,
     yOffset: 8,
-    offsetX: 105, // east of CP3
+    offsetX: 30, // slightly east of CP3 — persona on the west (left) side
 
     taunts: [
       "Add one more feature. Just one.",
@@ -265,7 +270,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     victoryFrameCount: 9,
     scale: 1.5,
     yOffset: 8,
-    offsetX: -105, // west of CP4 — Unraveller lives east so Wraith guards west approach
+    offsetX: 30, // slightly east of CP4 — persona on the west (left) side (unified with other village bosses)
 
     taunts: [
       "You assume they'll pay.",

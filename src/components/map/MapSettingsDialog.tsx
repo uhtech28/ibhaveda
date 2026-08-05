@@ -66,8 +66,6 @@ interface Props {
 }
 
 export function MapSettingsDialog({ open, onOpenChange }: Props) {
-  const [tab, setTab] = useState<Tab>("persona");
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-[#0a0d12] border border-white/10 text-white">
@@ -80,18 +78,44 @@ export function MapSettingsDialog({ open, onOpenChange }: Props) {
           </DialogTitle>
         </DialogHeader>
 
-        {/* Tab bar */}
-        <div className="flex gap-1 border-b border-white/10 pb-2 mb-3">
-          <TabButton active={tab === "persona"} onClick={() => setTab("persona")} icon={<UserIcon className="h-4 w-4" />} label="Persona" />
-          <TabButton active={tab === "social"} onClick={() => setTab("social")} icon={<Share2 className="h-4 w-4" />} label="Social" />
-          <TabButton active={tab === "audio"} onClick={() => setTab("audio")} icon={<Volume2 className="h-4 w-4" />} label="Audio" />
-        </div>
-
-        {tab === "persona" && <PersonaTab onClose={() => onOpenChange(false)} />}
-        {tab === "social" && <SocialTab />}
-        {tab === "audio" && <AudioTab />}
+        {/* Shared body — same three-tab layout is also rendered inside
+            the /profile-setup Edit Profile page so users have ONE
+            place to change Persona / Social / Audio settings. */}
+        <UserSettingsBody onCloseParent={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Reusable Settings body — Persona + Social + Audio tabs. Used inside
+ * the in-map `MapSettingsDialog` and inline on the Edit Profile page
+ * (profile-setup) so users have one place to manage these preferences.
+ */
+export function UserSettingsBody({
+  onCloseParent,
+}: {
+  /** Called after a Persona swap so the parent modal (if any) can
+   *  close before the reload kicks in. Optional — inline usages just
+   *  omit it. */
+  onCloseParent?: () => void;
+}) {
+  const [tab, setTab] = useState<Tab>("persona");
+  return (
+    <div>
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-white/10 pb-2 mb-3">
+        <TabButton active={tab === "persona"} onClick={() => setTab("persona")} icon={<UserIcon className="h-4 w-4" />} label="Persona" />
+        <TabButton active={tab === "social"} onClick={() => setTab("social")} icon={<Share2 className="h-4 w-4" />} label="Social" />
+        <TabButton active={tab === "audio"} onClick={() => setTab("audio")} icon={<Volume2 className="h-4 w-4" />} label="Audio" />
+      </div>
+
+      {tab === "persona" && (
+        <PersonaTab onClose={() => onCloseParent?.()} />
+      )}
+      {tab === "social" && <SocialTab />}
+      {tab === "audio" && <AudioTab />}
+    </div>
   );
 }
 

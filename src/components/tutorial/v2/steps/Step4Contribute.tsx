@@ -43,6 +43,29 @@ function findContributeModal(): HTMLElement | null {
   return null;
 }
 
+/**
+ * Find the primary "Send Request" button inside the currently-open
+ * contribute modal. Matches on visible text so it works across
+ * refactors that don't change copy. Returns null when the modal
+ * isn't mounted or the button hasn't rendered yet.
+ */
+function findSendRequestButton(): HTMLButtonElement | null {
+  const modal = findContributeModal();
+  if (!modal) return null;
+  const buttons = modal.querySelectorAll<HTMLButtonElement>("button");
+  for (const b of Array.from(buttons)) {
+    const label = (b.textContent || "").trim().toLowerCase();
+    if (
+      label === "send request" ||
+      label.startsWith("send request") ||
+      label.includes("send contribution")
+    ) {
+      return b;
+    }
+  }
+  return null;
+}
+
 export function Step4Contribute() {
   const tutorial = useTutorial();
   const pathname = usePathname();
@@ -56,18 +79,60 @@ export function Step4Contribute() {
     tutorial.active && onFeed && tutorial.step >= 9 && tutorial.step <= 10;
 
   const [stage, setStage] = useState<Stage>("contribute");
+  // Set to true the instant the user commits to Send Request. Until
+  // this flag is true, we treat the contribute modal closing as an
+  // ESCAPE (user tried to X-out or backdrop-dismiss) and re-open the
+  // stage rather than advancing the tutorial. Per product rule:
+  // "for the contribution part of tutorial it's compulsory to send
+  //  request — till then Continue and other buttons should not work".
+  const sentRequestRef = useRef(false);
+
+  // Attach a click listener to the "Send Request" button whenever the
+  // modal is up. Fires sentRequestRef=true synchronously on click so
+  // the "modal closed" handler below can tell a real send from an
+  // escape. Re-installed on every stage/tick — button remounts and
+  // enable/disable transitions won't strand a stale handler.
+  useEffect(() => {
+    if (!active) return;
+    if (stage !== "contribute_opened") return;
+    const install = () => {
+      const btn = findSendRequestButton();
+      if (!btn) return null;
+      const onClick = () => {
+        sentRequestRef.current = true;
+      };
+      btn.addEventListener("click", onClick, { capture: true });
+      return () => btn.removeEventListener("click", onClick, { capture: true } as EventListenerOptions);
+    };
+    // First install attempt + re-check every 400ms until we bind. The
+    // modal renders lazily so the button isn't necessarily present on
+    // the first tick.
+    let cleanup: (() => void) | null = install();
+    const id = window.setInterval(() => {
+      if (cleanup) return;
+      cleanup = install();
+    }, 400);
+    return () => {
+      window.clearInterval(id);
+      if (cleanup) cleanup();
+    };
+  }, [active, stage]);
 
   // Poll DOM for stage transitions — the contribute modal opening
   // signals the user has clicked a Contribute button on one of the
-  // idea cards; closing it moves to "complete" which fires the
-  // tutorial completion.
+  // idea cards; closing it moves to "complete" ONLY IF the user
+  // actually pressed Send Request. Otherwise we revert to the
+  // "contribute" stage so the user has to reopen the modal and
+  // actually submit — no ESC / X escape from this tutorial beat.
   useEffect(() => {
     if (!active) return;
     const id = window.setInterval(() => {
       const contribModal = !!findContributeModal();
       setStage((prev) => {
         if (prev === "contribute" && contribModal) return "contribute_opened";
-        if (prev === "contribute_opened" && !contribModal) return "complete";
+        if (prev === "contribute_opened" && !contribModal) {
+          return sentRequestRef.current ? "complete" : "contribute";
+        }
         return prev;
       });
     }, 400);
@@ -85,6 +150,28 @@ export function Step4Contribute() {
       void tutorial.goTo(10);
     }
   }, [active, stage, tutorial]);
+
+  // Block Escape from dismissing the contribute modal while it's
+  // open — Radix Dialog closes on Escape by default, which would let
+  // the user skip Send Request. Capture-phase listener swallows the
+  // event before Radix sees it. Only active during contribute_opened
+  // so users can still ESC out of everything else on the page.
+  useEffect(() => {
+    if (!active) return;
+    if (stage !== "contribute_opened") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => {
+      window.removeEventListener("keydown", onKey, {
+        capture: true,
+      } as EventListenerOptions);
+    };
+  }, [active, stage]);
 
   // Complete the tutorial when the contribute modal closes.
   const completeFiredRef = useRef(false);
@@ -128,15 +215,17 @@ export function Step4Contribute() {
           highlight: null,
         };
       case "contribute_opened":
+        // Continue CTA REMOVED per product rule: sending the request
+        // is compulsory to finish the tutorial — no bypass. Sparky
+        // just cheers the user on; the ONLY way forward is clicking
+        // Send Request inside the modal. The click-lock CSS block
+        // below disables the modal's X and backdrop so users can't
+        // dismiss without committing either.
         return {
-          text: "Nice, that's a contribution request. Fill it in when you're ready, or hit Continue to move on.",
+          text: "Fill it in and hit Send Request — that's how the tutorial wraps up.",
           mood: "celebrating",
           near: null,
           highlight: null,
-          primary: {
-            label: "Continue",
-            onClick: () => setStage("complete"),
-          },
         };
       case "complete":
         return {
@@ -165,10 +254,43 @@ export function Step4Contribute() {
         primaryAction={view.primary}
         anchor="bottom-right"
         nearSelector={view.near}
-        // Contribute stage needs free scroll on the feed so users can
-        // browse all the cards; no click-blocking scrim.
-        noScrim={stage === "contribute"}
+        // Suppress the click-blocking scrim on BOTH:
+        //   - "contribute" stage — user needs to scroll and click
+        //     Contribute on any of the feed cards.
+        //   - "contribute_opened" stage — the Radix dialog is open
+        //     and the ONLY control the user must click is inside it
+        //     (Send Request). The scrim's full-viewport shield was
+        //     intercepting the Send Request button click, making the
+        //     button appear "dead". Dismissal is already blocked by
+        //     the CSS lockdown below (X + backdrop + Escape all
+        //     no-op during this stage) so the scrim isn't needed for
+        //     containment either.
+        noScrim={stage === "contribute" || stage === "contribute_opened"}
       />
+      {/* ── Contribute-modal lockdown ───────────────────────────────
+          Once the modal is open, the ONLY way forward is Send Request.
+          We visually pulse the button and disable both the X close
+          button and the backdrop-dismiss so the user can't skip the
+          step by dismissing the dialog. Textareas / inputs / the
+          submit button remain fully interactive. */}
+      {stage === "contribute_opened" && (
+        <style jsx global>{`
+          /* Disable the modal's X close button — user MUST press
+             Send Request to advance the tutorial. */
+          [role="dialog"] button[aria-label="Close"],
+          [role="dialog"] [data-slot="dialog-close"] {
+            pointer-events: none !important;
+            opacity: 0.25 !important;
+            cursor: not-allowed !important;
+          }
+          /* Disable backdrop click-to-dismiss on the Radix overlay.
+             The modal content sits above the overlay in z-order so
+             its interactivity is unaffected. */
+          [data-slot="dialog-overlay"] {
+            pointer-events: none !important;
+          }
+        `}</style>
+      )}
       {/* Global CSS pulse — one ring around whichever affordance is
           currently the user's target for this stage. Auto-clears when
           the modal opens (stage_opened) so the ring doesn't fight the

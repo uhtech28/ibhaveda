@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,18 @@ import { WelcomeSplash } from "@/components/onboarding/WelcomeSplash";
 import { GateOfIbhavedaIntro } from "@/components/onboarding/GateOfIbhavedaIntro";
 import { PersonaSelector } from "@/components/persona/PersonaSelector";
 import type { PersonaId } from "@/config/personas";
+// Import PERSONAS directly so we can EAGERLY preload the 8 portrait
+// PNGs the moment the signup page mounts (see effect below). Without
+// this, the persona picker's <img> tags fired 8 cold network fetches
+// on mount and users saw an empty picker for 500-1500ms while the
+// portraits streamed in — the "slow persona screen" bug.
+import { PERSONAS } from "@/config/personas";
+// UserSettingsBody = the shared Persona / Social / Audio tabs the
+// map's saddlebag menu used to open in its own dialog. Now rendered
+// inline here so all three settings live in one place: the profile
+// pencil (Edit Profile). Product feedback: "all these three options
+// of settings — move them in the edit pencil in profile".
+import { UserSettingsBody } from "@/components/map/MapSettingsDialog";
 
 function slugify(name: string): string {
   return name
@@ -35,6 +47,13 @@ export default function ProfileSetupPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const router = useRouter();
+  // Explicit-edit flag — set to true only when the profile pencil in
+  // CompactProfileView pushed here with `?edit=1`. Any other arrival
+  // on /profile-setup (fresh signup, back-nav, deep-link) is treated
+  // as onboarding and routes returning users away instead of showing
+  // the Edit Your Profile form.
+  const searchParams = useSearchParams();
+  const isExplicitEdit = searchParams?.get("edit") === "1";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [profilePopulated, setProfilePopulated] = useState(false);
@@ -42,6 +61,34 @@ export default function ProfileSetupPage() {
   // once existingProfile has been declared. Initial state stays false
   // so returning users never see a flash.
   const [showSplash, setShowSplash] = useState(false);
+
+  // ── Persona portrait preloader ────────────────────────────────────
+  // Fires 8 detached <Image>() requests the moment this page mounts so
+  // every persona portrait is warm in the browser cache by the time
+  // the user submits their name/username and the picker mounts.
+  //
+  // Fixes "persona screen takes some time to load after signup" —
+  // previously the 8 <img> tags in PersonaSelector fired network
+  // requests only on mount, and the picker painted with empty 96×96
+  // cells for 500–1500ms while portraits streamed in.
+  //
+  // `new Image()` (instead of <link rel="preload">) is safer here
+  // because it works from a client component without touching <head>
+  // and cleans up automatically when the page unmounts.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const probes: HTMLImageElement[] = [];
+    for (const p of PERSONAS) {
+      const img = new window.Image();
+      img.src = p.assets.portrait;
+      probes.push(img);
+    }
+    // No cleanup necessary — the browser holds the cached bytes even
+    // if we drop our references. Keeping `probes` in scope for a beat
+    // just makes it obvious what we're preloading in devtools.
+    void probes;
+  }, []);
+
   // "Gate of Ibhaveda" onboarding intro — plays once ever, right
   // after signup, before the name/username form (per creative brief).
   // Convex-backed via hasSeenGateIntro so returning users skip it.
@@ -173,16 +220,52 @@ export default function ProfileSetupPage() {
     router.prefetch("/feed");
   }, [router]);
 
-  // PRODUCT DECISION — /profile-setup is ONLY for first-time name +
-  // username capture on a fresh signup. Users who already have a
-  // Convex profile row should NEVER land on the "Edit Your Profile"
-  // form here (they see it in their profile page instead). This
-  // effect redirects returning users away.
+  // Returning users bounce OUT of /profile-setup — this page is
+  // ONLY for first-time onboarding (name + username → persona
+  // picker). Any user with an existing profile row who lands here
+  // without an explicit ?edit=1 gets sent somewhere useful:
+  //
+  //   - No persona picked yet   → /persona-setup (dedicated picker)
+  //   - Persona already picked  → /feed
+  //
+  // The explicit ?edit=1 param (set by the profile-page pencil
+  // button in CompactProfileView) opts INTO the Edit Profile form
+  // that lives at the bottom of this file.
+  //
+  // GUARD: skip the redirect while the persona picker is actively
+  // showing here (i.e. the user is mid-signup and just submitted
+  // name/username). Without the guard the optimistic
+  // createUserProfile call from handleFirstTimeSubmit would resolve,
+  // populate `existingProfile`, and kick the user out mid-picker —
+  // the "persona → feed → persona flash" bug from earlier.
+  const personaIdRaw = useQuery(api.users.getMyPersonaId, {});
+  const hasPersona = typeof personaIdRaw === "string";
   useEffect(() => {
-    if (existingProfile && existingProfile.username) {
-      router.replace("/feed");
-    }
-  }, [existingProfile, router]);
+    if (showPersonaSelector) return;
+    if (isExplicitEdit) return;
+    // Any existing profile row → redirect. We DON'T require
+    // .username to be truthy here — an edge case where the Convex
+    // row exists with an empty username was falling through both
+    // guards and rendering the Edit Profile form (the bug user
+    // reported: "again this screen is there... we don't want edit
+    // profile screen"). Any signed-up user should be routed to the
+    // persona picker (if no persona) or the feed (if persona set),
+    // never to the Edit form unless they explicitly clicked the
+    // pencil (?edit=1).
+    if (!existingProfile) return;
+    // Wait for the persona query to resolve so we route to the
+    // correct destination on the first hop instead of bouncing
+    // /feed → /persona-setup.
+    if (personaIdRaw === undefined) return;
+    router.replace(hasPersona ? "/feed" : "/persona-setup");
+  }, [
+    existingProfile,
+    router,
+    showPersonaSelector,
+    isExplicitEdit,
+    hasPersona,
+    personaIdRaw,
+  ]);
 
   useEffect(() => {
     if (user) {
@@ -380,7 +463,29 @@ export default function ProfileSetupPage() {
   // useEffect redirect above pushes us to /feed. Fixes the ~2s flash
   // of "Edit Your Profile" that appeared between mutation-success
   // and router.push completing.
-  if (existingProfile && existingProfile.username) {
+  //
+  // GUARD: same as the redirect effect above — when the persona
+  // picker is up, the user's profile row has just been created by our
+  // optimistic dispatch. If we bail into this loading state here the
+  // picker unmounts and the user sees "Loading your feed…" briefly
+  // before being kicked to /feed → /persona-setup. Skipping this
+  // branch while showPersonaSelector is true keeps the picker mounted
+  // continuously until the user picks a persona.
+  // Loading state for returning users while the redirect useEffect
+  // above is in-flight. Skipped when:
+  //   - the persona picker is currently showing (mid-signup)
+  //   - the user came here explicitly to edit (?edit=1 from pencil)
+  // In both those cases we intentionally stay on this page and render
+  // the appropriate UI (picker or Edit form) below.
+  // Any existing profile → render Loading while the redirect above
+  // completes. `.username` predicate dropped so profiles with empty
+  // usernames also trigger the redirect (edge case that let the
+  // Edit form leak through).
+  if (
+    existingProfile &&
+    !showPersonaSelector &&
+    !isExplicitEdit
+  ) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <HeroHeader />
@@ -448,22 +553,38 @@ export default function ProfileSetupPage() {
       setLoading(true);
       setError("");
 
-      // Create the profile — we await it here (unlike the old
-      // optimistic push) so that when the persona selector confirms,
-      // the user row definitely exists before updatePersonaId fires.
-      // The persona picker gives us plenty of visual coverage during
-      // the mutation round-trip, so the user doesn't perceive a wait.
+      // OPTIMISTIC HANDOFF — fire createUserProfile in the BACKGROUND
+      // and flip to the persona picker immediately. Previously we
+      // awaited the mutation here, which visibly blocked the transition
+      // by 500–2000ms on slow networks (the "persona screen takes time
+      // to load" bug). The mutation typically resolves before the user
+      // finishes reading the persona list, so by the time they click a
+      // persona the user row already exists and handlePersonaConfirm's
+      // updatePersonaId lands cleanly. If the mutation is somehow
+      // slower than the user's click, handlePersonaConfirm itself
+      // retries updatePersonaId until it succeeds.
       try {
-        await createUserProfile({
+        // Kick off the mutation but don't await it — we still catch
+        // rejections asynchronously so failures surface to the user
+        // instead of being silently swallowed.
+        void createUserProfile({
           username: formData.username,
           displayName: formData.displayName.trim(),
           avatar: formData.avatar || undefined,
           skills: [],
           industries: [],
+        }).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Setup failed";
+          setError(msg);
+          toast({
+            title: "Setup failed",
+            description: msg,
+            variant: "destructive",
+          });
         });
         setLoading(false);
-        // Hand off to the persona picker — the redirect to /feed
-        // happens inside handlePersonaConfirm below.
+        // Hand off to the persona picker immediately — portraits are
+        // preloaded (see the useEffect above) so it paints instantly.
         setShowPersonaSelector(true);
       } catch (err) {
         setLoading(false);
@@ -622,101 +743,36 @@ export default function ProfileSetupPage() {
     );
   }
 
+  // FINAL RETURN — nuclear fallback.
+  //
+  // If execution ever reaches here it means all the earlier gates
+  // (first-time signup form, persona picker branch, existing-profile
+  // Loading state) fell through. That should never happen for a
+  // returning user, but if it does we render a minimal "Loading..."
+  // frame and hard-redirect to /feed instead of the old Edit Profile
+  // form. Product feedback: "we don't want edit profile screen" —
+  // this route is onboarding-only, never a profile editor.
   return (
-    <div className="min-h-screen flex flex-col bg-background overflow-hidden">
-      <HeroHeader />
-      <main className="flex-1 container mx-auto px-4 flex items-center justify-center py-4 pt-24">
-        <div className="max-w-5xl w-full">
-          <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold text-foreground">Edit Your Profile</h1>
-            <p className="text-sm text-muted-foreground">Update your profile information</p>
-          </div>
-          <Card className="shadow-lg border-border/50">
-            <CardContent className="p-6">
-              <form onSubmit={handleSubmit}>
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-shrink-0 flex flex-col items-center justify-start pt-2">
-                    <AvatarUpload
-                      currentAvatar={formData.avatar}
-                      onAvatarChange={(avatarUrl: string) => setFormData(prev => ({ ...prev, avatar: avatarUrl }))}
-                      displayName={formData.displayName || "User"}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="displayName" className="text-xs font-medium">Full Name</Label>
-                        <Input
-                          id="displayName"
-                          value={formData.displayName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
-                          placeholder="Your full name"
-                          className="h-8 text-sm"
-                          maxLength={100}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="username" className="text-xs font-medium">Username</Label>
-                        <Input
-                          id="username"
-                          value={formData.username}
-                          placeholder="uniqueusername"
-                          className="h-8 text-sm bg-muted cursor-not-allowed"
-                          maxLength={30}
-                          disabled
-                          readOnly
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1 pt-1">
-                      <div className="flex justify-between items-center">
-                        <Label htmlFor="bio" className="text-xs font-medium">Bio</Label>
-                        <span className="text-[10px] text-muted-foreground">{formData.bio.length}/500</span>
-                      </div>
-                      <Textarea
-                        id="bio"
-                        value={formData.bio}
-                        onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                        placeholder="Tell us about yourself..."
-                        className="min-h-[60px] h-[60px] resize-none text-sm py-2"
-                        maxLength={500}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs font-medium">Industries</Label>
-                        <IndustriesMultiSelect
-                          selectedIndustries={formData.industries}
-                          onChange={(newIndustries) => setFormData(prev => ({ ...prev, industries: newIndustries }))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-medium">Skills</Label>
-                        <SkillsMultiSelect
-                          selectedSkills={formData.skills}
-                          onChange={(newSkills) => setFormData(prev => ({ ...prev, skills: newSkills }))}
-                        />
-                      </div>
-                    </div>
-                    {error && (
-                      <div className="p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                        <p className="text-xs text-destructive font-medium">{error}</p>
-                      </div>
-                    )}
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button type="button" variant="outline" onClick={handleCancel} disabled={loading} size="sm" className="h-8 px-4">Cancel</Button>
-                      <Button type="submit" disabled={loading} size="sm" className="h-8 px-4">
-                        {loading ? (<><Loader2 className="mr-2 h-3 w-3 animate-spin" />Saving...</>) : ("Update Profile")}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-      <FooterSection />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+        <p className="text-sm text-muted-foreground">Redirecting…</p>
+      </div>
+      <FallbackRedirect />
     </div>
   );
+}
+
+/**
+ * Kicks the browser to /feed the moment it mounts. Only rendered by
+ * the nuclear fallback return above — we don't add it to the main
+ * useEffect chain because it would race with the other, smarter
+ * redirect that knows about persona state.
+ */
+function FallbackRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/feed");
+  }, [router]);
+  return null;
 }

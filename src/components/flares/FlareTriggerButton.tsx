@@ -12,7 +12,11 @@
  */
 
 import React, { useState } from "react";
-import { Radio } from "lucide-react";
+// Icon: uses the same user-supplied menu-flare art (v2, background
+// stripped) that renders on the Adventurer's Menu Flare tile — keeps
+// visual identity consistent between the tile that opens the compose
+// dialog and the button that also opens it from the CheckpointPanel.
+import { PixelIcon } from "@/components/ui/PixelIcon";
 import type { Id } from "@convex/_generated/dataModel";
 import { FlareComposeDialog } from "./FlareComposeDialog";
 
@@ -43,7 +47,11 @@ export function FlareTriggerButton({
         className={buttonClass}
         data-tutorial="flare-button"
       >
-        <Radio className={variant === "solid" ? "h-4 w-4" : "h-3.5 w-3.5"} />
+        <PixelIcon
+          name="menu-flare-v2"
+          size={variant === "solid" ? 20 : 18}
+          alt="Flare"
+        />
         Flare
       </button>
 
