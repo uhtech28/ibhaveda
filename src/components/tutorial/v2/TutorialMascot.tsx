@@ -831,9 +831,17 @@ export function TutorialMascot({
           {!noScrim && <TutorialScrim targetRect={targetRect} />}
           {isMobile ? (
             // ── MOBILE LAYOUT ─────────────────────────────────────────
-            // Bubble docked to viewport bottom at full width; Sparky
-            // perches above the bubble at its center. Sparky+bubble
-            // never collide because they occupy different vertical bands.
+            // MOBILE-ONLY change: Sparky+bubble group is now VERTICALLY
+            // CENTERED in the viewport instead of bottom-docked.
+            // Previously the group sat 12px above the viewport bottom,
+            // leaving ~80% of the phone screen empty above — user
+            // reported "Sparky should be at centre". A fixed inset-0
+            // flex-center wrapper handles the centering so we don't
+            // fight framer-motion's own transform on the inner
+            // motion.div. Desktop layout below is unchanged.
+            <div
+              className="pointer-events-none fixed inset-0 z-[10010] flex items-center justify-center"
+            >
             <motion.div
               key="mobile-tutorial"
               initial={{ opacity: 0, y: 40 }}
@@ -841,11 +849,9 @@ export function TutorialMascot({
               exit={{ opacity: 0, y: 40 }}
               transition={{ type: "spring", stiffness: 260, damping: 26 }}
               style={{
-                position: "fixed",
-                left: BUBBLE_SIDE_INSET_MOBILE,
-                right: BUBBLE_SIDE_INSET_MOBILE,
-                bottom: `calc(${BUBBLE_BOTTOM_INSET_MOBILE}px + env(safe-area-inset-bottom, 0px))`,
-                zIndex: 10010,
+                width: "100%",
+                paddingLeft: BUBBLE_SIDE_INSET_MOBILE,
+                paddingRight: BUBBLE_SIDE_INSET_MOBILE,
                 pointerEvents: "none", // children opt in
               }}
             >
@@ -891,6 +897,7 @@ export function TutorialMascot({
                 )}
               </div>
             </motion.div>
+            </div>
           ) : isFollowing && placement ? (
             // FOLLOWING MODE: Sparky and bubble as two independently-positioned
             // fixed elements. No flex, no layout prop — just direct pixel

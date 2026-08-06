@@ -60,16 +60,12 @@ export function PersonaSelector({
           className="persona-grid"
           role="radiogroup"
           aria-label="Persona"
-          style={{
-            display: "grid",
-            // Locked 4-column desktop layout so we always get 4-up / 4-down
-            // instead of the auto-fit spilling into 5 cols on wide screens.
-            // Tablet/mobile fallback handled below via the .persona-grid
-            // media query still living in <style jsx> at the bottom of
-            // this file.
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: 14,
-          }}
+          // Grid layout + responsive breakpoints live in the .persona-grid
+          // rule in <style jsx> below. Previously an inline
+          // `gridTemplateColumns: repeat(4, minmax(0, 1fr))` was set here,
+          // which stomped over the mobile media query (inline style beats
+          // class-based rule specificity) and forced 4 columns on phones —
+          // making each tile ~120px wide and mangling the taglines.
         >
           {PERSONAS.map((p) => {
             const active = p.id === selectedId;
@@ -284,11 +280,22 @@ export function PersonaSelector({
         .persona-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 16px;
+          gap: 14px;
         }
-        @media (max-width: 780px) {
+        /* Tablet — 3 columns so the grid stays legible under 900px
+           and doesn't jump straight to 2. */
+        @media (max-width: 900px) {
+          .persona-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+        /* Mobile — 2 columns from 640px down. Anything above 640px is
+           the tablet 3-col grid; below is the phone 2-col grid. Also
+           tightens gap so the cards can breathe on narrow screens. */
+        @media (max-width: 640px) {
           .persona-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
           }
         }
         .persona-card {
