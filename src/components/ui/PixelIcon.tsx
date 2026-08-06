@@ -67,6 +67,10 @@ export type PixelIconName =
   // gradient instead of inside a blue square. Bump the suffix again
   // if the artwork needs revisions later.
   | "menu-contributions-v2"
+  // v3 — user-supplied hammer icon that replaces the v2 map-scroll
+  // for the Contributions tile. Ships alongside v2 rather than
+  // overwriting so any surface still referencing v2 keeps working.
+  | "menu-contributions-v3"
   | "menu-quests-v2"
   | "menu-community-v2"
   | "menu-hierarchy-v2"

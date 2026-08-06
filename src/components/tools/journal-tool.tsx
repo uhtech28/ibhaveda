@@ -21,6 +21,9 @@ interface JournalToolProps {
   onSubmit: (content: { entries: JournalEntry[]; timestamp: number }) => void;
   initialContent?: { entries: JournalEntry[]; timestamp: number };
   isSubmitting?: boolean;
+  /** Skip rendering the prompt line — used inside TaskSubmissionModal,
+   *  which puts the prompt in its own header. */
+  hidePrompt?: boolean;
 }
 
 // Custom Toggle Switch Component
@@ -64,6 +67,7 @@ export function JournalTool({
   onSubmit,
   initialContent,
   isSubmitting,
+  hidePrompt = false,
 }: JournalToolProps) {
   const [title, setTitle] = useState(initialContent?.entries?.[0]?.title || "");
   const [entry, setEntry] = useState(initialContent?.entries?.[0]?.entry || "");
@@ -101,7 +105,7 @@ export function JournalTool({
 
   return (
     <div className="space-y-5 py-2">
-      {prompt && (
+      {prompt && !hidePrompt && (
         <p className="text-xs text-zinc-400 font-medium leading-relaxed">
           {prompt}
         </p>

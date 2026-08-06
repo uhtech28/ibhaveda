@@ -17,6 +17,11 @@ interface XPBarProps {
    *  compact HUD bar (matches the feed post card layout). Falls back
    *  to the venture / checkpoint name when omitted. */
   userName?: string;
+  /** Stage name (e.g. "The Village", "The Forest") — rendered as a
+   *  small subtitle under the project name on the left of the combat
+   *  HUD bar, replacing the standalone stage marker that used to sit
+   *  to the left of the bar. */
+  stageName?: string;
 }
 
 function formatINR(value: number): string {
@@ -50,6 +55,7 @@ const XPBarComponent = ({
   bossBaseHp,
   bossName,
   userName,
+  stageName,
 }: XPBarProps) => {
   const percentage = Math.min((currentXP / maxXP) * 100, 100);
   const isNearlyFull = percentage >= 90;
@@ -320,9 +326,18 @@ const XPBarComponent = ({
               transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
             />
           </div>
+          {/* Bottom row: STAGE / BIOME name ("The Village", "The
+              Forest", …) with the {n/8} checkpoint index. Previously
+              this echoed the project name (stageLabel duplicated
+              top → bottom), which read as an accidental repetition
+              and provided no new information. Uses the `stageName`
+              prop passed by /map/world/page.tsx (the same string the
+              standalone StageInfo pill used to show on the far
+              left of the HUD — that pill has now been removed since
+              the biome label lives inline here). */}
           <div className="flex min-w-0 items-baseline gap-1">
             <span className="truncate text-[8px] font-bold uppercase tracking-wider text-violet-300/90">
-              {stageLabel}
+              {stageName?.trim() || "Stage"}
             </span>
             <span className="shrink-0 font-mono text-[10px] font-black leading-none text-violet-300">
               ({stageIndex})

@@ -257,6 +257,19 @@ export default function ProfileSetupPage() {
     // correct destination on the first hop instead of bouncing
     // /feed → /persona-setup.
     if (personaIdRaw === undefined) return;
+    // If the user just finished the persona picker in this tab, we
+    // set `personaPickerDismissed=1` right before navigating to
+    // /feed. If a stale render of /profile-setup somehow re-mounts
+    // (e.g. router race during window.location.replace), respect the
+    // flag and go straight to /feed — never bounce back through
+    // /persona-setup after the user has already picked.
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("personaPickerDismissed") === "1"
+    ) {
+      router.replace("/feed");
+      return;
+    }
     router.replace(hasPersona ? "/feed" : "/persona-setup");
   }, [
     existingProfile,
@@ -553,39 +566,37 @@ export default function ProfileSetupPage() {
       setLoading(true);
       setError("");
 
-      // OPTIMISTIC HANDOFF — fire createUserProfile in the BACKGROUND
-      // and flip to the persona picker immediately. Previously we
-      // awaited the mutation here, which visibly blocked the transition
-      // by 500–2000ms on slow networks (the "persona screen takes time
-      // to load" bug). The mutation typically resolves before the user
-      // finishes reading the persona list, so by the time they click a
-      // persona the user row already exists and handlePersonaConfirm's
-      // updatePersonaId lands cleanly. If the mutation is somehow
-      // slower than the user's click, handlePersonaConfirm itself
-      // retries updatePersonaId until it succeeds.
+      // AWAIT the profile-create mutation BEFORE navigating. Prior
+      // fire-and-forget + inline-picker approach caused a
+      // "picker → feed flash → picker" race because /profile-setup
+      // was flipping to the persona picker while the mutation was
+      // still in flight — subsequent Convex query snapshots on /feed
+      // saw the pre-persona view of the user row and bounced back to
+      // /persona-setup. Cleaner deterministic flow:
+      //   sign up → /profile-setup form → /persona-setup picker
+      //          → /feed (via hard-nav after persona picked)
+      // No inline picker, no feed in between.
       try {
-        // Kick off the mutation but don't await it — we still catch
-        // rejections asynchronously so failures surface to the user
-        // instead of being silently swallowed.
-        void createUserProfile({
+        await createUserProfile({
           username: formData.username,
           displayName: formData.displayName.trim(),
           avatar: formData.avatar || undefined,
           skills: [],
           industries: [],
-        }).catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : "Setup failed";
-          setError(msg);
-          toast({
-            title: "Setup failed",
-            description: msg,
-            variant: "destructive",
-          });
         });
         setLoading(false);
-        // Hand off to the persona picker immediately — portraits are
-        // preloaded (see the useEffect above) so it paints instantly.
-        setShowPersonaSelector(true);
+        toast({
+          title: "Profile created",
+          description: "Now pick your persona.",
+          duration: 2000,
+        });
+        // Hard nav so the fresh /persona-setup mount doesn't inherit
+        // any stale query snapshot from this page's client cache.
+        if (typeof window !== "undefined") {
+          window.location.replace("/persona-setup");
+        } else {
+          router.replace("/persona-setup");
+        }
       } catch (err) {
         setLoading(false);
         const msg = err instanceof Error ? err.message : "Setup failed";
@@ -601,38 +612,51 @@ export default function ProfileSetupPage() {
     const handlePersonaConfirm = async (personaId: PersonaId) => {
       if (personaSubmitting) return;
       setPersonaSubmitting(true);
-      // Fire the persona write, but don't block navigation on it —
-      // the value is optimistic locally. If it fails we surface via
-      // toast without dragging the user back to the picker.
-      const personaPromise = updatePersonaId({ personaId });
-      toast({
-        title: "Welcome!",
-        description: "Loading your feed…",
-        duration: 3000,
-      });
+      // AWAIT the persona write BEFORE navigating.
+      //
+      // The previous (fire-and-forget) implementation caused a
+      // three-stage flicker for every fresh signup:
+      //   1. Persona picker renders on /profile-setup (1-2 s).
+      //   2. router.push("/feed") fires immediately — mutation still
+      //      in flight, so /feed's `personaIdRaw` query resolves to
+      //      NULL, triggering /feed → /persona-setup redirect (1-2 s
+      //      of feed showing before the redirect lands).
+      //   3. /persona-setup mounts, picker renders AGAIN.
+      // Awaiting the mutation eliminates the race — by the time
+      // navigation kicks off, the persona query has the new value on
+      // its next fetch, /feed's redirect guard sees it, and there's
+      // no bounce. Also seed sessionStorage so any surviving race
+      // path (e.g. Convex query cache lag) doesn't loop us back
+      // through the picker.
       try {
-        router.push("/feed");
-        // Belt-and-suspenders — hard redirect if the client-side
-        // push didn't leave the page after 500ms.
-        setTimeout(() => {
-          if (
-            typeof window !== "undefined" &&
-            window.location.pathname.includes("profile-setup")
-          ) {
-            window.location.href = "/feed";
-          }
-        }, 500);
-      } catch {
-        if (typeof window !== "undefined") window.location.href = "/feed";
-      }
-      personaPromise.catch((err: unknown) => {
+        await updatePersonaId({ personaId });
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("personaPickerDismissed", "1");
+        }
+        toast({
+          title: "Welcome!",
+          description: "Loading your feed…",
+          duration: 3000,
+        });
+        // Hard replace() — the persona picker + profile-setup form
+        // should never be reachable by back-button once this succeeds.
+        // Also use window.location for the hop so the whole app tree
+        // re-mounts fresh (avoids stale Convex query snapshots
+        // holding onto the pre-persona view of the user row).
+        if (typeof window !== "undefined") {
+          window.location.replace("/feed");
+        } else {
+          router.replace("/feed");
+        }
+      } catch (err) {
+        setPersonaSubmitting(false);
         const msg = err instanceof Error ? err.message : "Persona save failed";
         toast({
           title: "Persona save failed",
           description: msg,
           variant: "destructive",
         });
-      });
+      }
     };
 
     if (showPersonaSelector) {

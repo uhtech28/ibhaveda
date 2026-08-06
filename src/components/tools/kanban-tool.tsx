@@ -91,6 +91,10 @@ interface KanbanToolProps {
    * someone else's venture (isViewerMode).
    */
   readOnly?: boolean;
+  /** When true, skip rendering the prompt line inside the tool's
+   *  top bar — the TaskSubmissionModal already renders the prompt
+   *  as a subheading in its blue header. */
+  hidePrompt?: boolean;
 }
 
 // Draggable Card Component
@@ -293,6 +297,7 @@ export function KanbanTool({
   isSubmitting,
   isStandalone,
   readOnly = false,
+  hidePrompt = false,
 }: KanbanToolProps) {
   const [cards, setCards] = useState<KanbanCard[]>(initialContent?.cards || []);
   const [newCardTitle, setNewCardTitle] = useState("");
@@ -535,7 +540,7 @@ export function KanbanTool({
 
       {/* Top Action Bar */}
       <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/5">
-        {prompt ? (
+        {prompt && !hidePrompt ? (
           <p className="text-xs text-zinc-400 font-medium leading-relaxed">
             {prompt}
           </p>
@@ -634,33 +639,18 @@ export function KanbanTool({
         </DragOverlay>
       </DndContext>
 
+      {/* Footer strip: card counter + drag/drop hint. The Submit /
+          Save Board button was removed per product ask ("remove
+          submit board and submit plan option") — the tool now
+          persists automatically via the drag-drop mutation, and the
+          in-task-modal Submit is still rendered by
+          TaskSubmissionModal outside this component. When a task
+          modal wants Submit back, wire a fresh button in that
+          modal — this tool no longer owns the CTA. */}
       <div className="pt-3 border-t border-white/5">
-        <p className="text-xs text-muted-foreground mb-3">
+        <p className="text-xs text-muted-foreground">
           Total cards: {cards.length} | Drag and drop cards between columns
         </p>
-        <Button
-          onClick={handleSubmit}
-          disabled={cards.length === 0 || isSubmitting || readOnly}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-          title={readOnly ? "You can't save changes to someone else's board" : undefined}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{isStandalone ? "Saving..." : "Submitting..."}</span>
-            </>
-          ) : readOnly ? (
-            <>
-              <span>👁️</span>
-              <span>View Only</span>
-            </>
-          ) : (
-            <>
-              <Check className="h-4 w-4" />
-              <span>{isStandalone ? "Save Board" : "Submit Board"}</span>
-            </>
-          )}
-        </Button>
       </div>
 
       {/* Add Task Modal */}

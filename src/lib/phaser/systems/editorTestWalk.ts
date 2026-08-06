@@ -39,16 +39,27 @@ export interface EditorTestWalkOptions {
   walkAnimKey?: string;
   /** Anim key to play when idle. Default `"persona-idle"`. */
   idleAnimKey?: string;
+  /**
+   * Override the URL gate — set `true` to unconditionally enable the
+   * movement loop (used by non-Village stage scenes so users can walk
+   * their persona around the Forest / Arena / Crossroads / Artisans /
+   * Mine / Golden Harbor maps just like they can in the Village).
+   * Set `false` (or omit) to preserve legacy behaviour: enabled only
+   * when the zone editor is active via `?editZones=1`.
+   */
+  force?: boolean;
 }
 
 export function attachEditorTestWalk(
   scene: Phaser.Scene,
   opts: EditorTestWalkOptions,
 ): void {
-  // Only when the editor is active.
-  const enabled =
+  // Enable when EITHER the caller forced it on (regular play on the
+  // non-Village scenes) OR the zone editor is active via URL.
+  const editorActive =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("editZones") === "1";
+  const enabled = opts.force === true || editorActive;
   if (!enabled) return;
 
   const speed = opts.speed ?? 220;

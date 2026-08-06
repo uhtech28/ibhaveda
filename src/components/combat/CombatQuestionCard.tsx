@@ -29,6 +29,7 @@ import type {
 import type { VillageBossInfo } from "@/config/village-bosses";
 import { getPersona, type PersonaId } from "@/config/personas";
 import { PixelIcon } from "@/components/ui/PixelIcon";
+import { getBossFaceUrl } from "@/lib/bosses/bossFaces";
 
 interface Props {
   question: CombatCurrentQuestion;
@@ -135,40 +136,51 @@ export function CombatQuestionCard({
     }
     if (bossDelta > 0) {
       // Player landed a hit. Pick CRIT if delta >= 20% of initial HP.
+      // Reaction hold times bumped ~50% (was 1300/1600ms) so the
+      // slower attack/hurt clips (4fps × 9 frames = ~2.25s) can play
+      // through fully and the arena-zoom cinematic actually lands.
+      // Product feedback: "on attack screen zooms and animations
+      // are played slow for user to see them".
       const critThreshold = bossHpInitial * 0.2;
       const kind: ReactionKind = bossDelta >= critThreshold ? "crit" : "hit";
       setBossReaction(kind);
       setBossDamage(Math.round(bossDelta));
+      // Timers bumped ~40% (2400 → 3400, 2000 → 2800, 2600 → 3600)
+      // to accommodate the further-slowed combat clips
+      // (3 fps × 9 frames = 3.0s) so the boss finishes its hurt/attack
+      // animation before we swap it back to idle.
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        kind === "crit" ? 1600 : 1300,
+        kind === "crit" ? 3400 : 2800,
       );
       if (damageNumberTimerRef.current) clearTimeout(damageNumberTimerRef.current);
       damageNumberTimerRef.current = setTimeout(
         () => setBossDamage(null),
-        1800,
+        3600,
       );
     } else if (playerDelta > 0) {
       // Boss counter-attacked. Show player damage flash + boss "counter" pose.
+      // Same extension as above so the boss's ATTACK clip plays out
+      // fully and the persona's HURT recoil is legible.
       setBossReaction("counter");
       setPlayerHurt(true);
       setPlayerDamage(Math.round(playerDelta));
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        1400,
+        3200,
       );
       if (playerHurtTimerRef.current) clearTimeout(playerHurtTimerRef.current);
       playerHurtTimerRef.current = setTimeout(
         () => setPlayerHurt(false),
-        1300,
+        3000,
       );
       if (playerDamageNumberTimerRef.current)
         clearTimeout(playerDamageNumberTimerRef.current);
       playerDamageNumberTimerRef.current = setTimeout(
         () => setPlayerDamage(null),
-        1100,
+        1800,
       );
     } else if (
       // Question advanced but neither side took >1 HP of damage.
@@ -336,6 +348,10 @@ export function CombatQuestionCard({
         {/* Timer cell — right-aligned so the ring sits at the top of
             the panel rather than floating inside the arena. */}
         <div className="flex items-center justify-end">
+          {/* Smaller ring per product request ("decrease the size of
+              time and don't mention time inside it"). Bumped from 48
+              → 28px with proportionally-thinner stroke — timer now
+              reads as a subtle status pip rather than a big clock. */}
           <CombatTimerRing
             servedAt={question.servedAt}
             durationMs={Math.max(240_000, question.durationMs)}
@@ -344,8 +360,8 @@ export function CombatQuestionCard({
               dialogueDone &&
               (question._id as unknown as string) !== "transition"
             }
-            size={48}
-            stroke={4}
+            size={28}
+            stroke={3}
           />
         </div>
       </div>
@@ -385,6 +401,11 @@ export function CombatQuestionCard({
             // shows the actual monster face (Fog of Vagueness, Wraith,
             // Unraveller, etc.) instead of the generic red SVG villain.
             bossAsset={boss?.idleAsset ?? null}
+            // Also pass the boss's display name — DialoguePanel prefers
+            // the hand-picked face portrait from src/lib/bosses/bossFaces
+            // when we have one for this boss, and only falls back to
+            // clipping the idle spritesheet when we don't.
+            bossName={boss?.name ?? null}
             onDone={() => setDialogueDone(true)}
           />
         </ReactiveDialogueShell>
@@ -513,7 +534,10 @@ function CombatTimerRing({
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - fraction);
-  // Format countdown mm:ss for the label in the middle.
+  // mm:ss label kept for the a11y aria-label only — the numeric
+  // countdown was removed from the visible UI per product request
+  // ("don't mention time inside it"). Screen readers still announce
+  // it via `aria-label` on the wrapper.
   const totalSec = Math.max(0, Math.ceil(remainingMs / 1000));
   const mm = Math.floor(totalSec / 60);
   const ss = totalSec % 60;
@@ -553,13 +577,9 @@ function CombatTimerRing({
           }}
         />
       </svg>
-      {/* Center label — mm:ss countdown */}
-      <span
-        className="font-mono text-[10px] font-bold tabular-nums text-white/90"
-        style={{ fontFamily: "var(--font-pixel-display), monospace" }}
-      >
-        {label}
-      </span>
+      {/* Numeric mm:ss label removed — arc length + colour communicate
+          remaining time visually. `label` still populates aria-label
+          above for screen-reader accessibility. */}
     </div>
   );
 }
@@ -839,6 +859,7 @@ function DialoguePanel({
   persona,
   prompt,
   bossAsset,
+  bossName,
   onDone,
 }: {
   persona: "villain" | "mentor";
@@ -846,6 +867,11 @@ function DialoguePanel({
   /** Boss's idle-frame asset path. When provided, the portrait shows
    *  the actual boss face instead of the procedural SVG placeholder. */
   bossAsset?: string | null;
+  /** Boss's display name — used to resolve the hand-picked head-shot
+   *  portrait in src/lib/bosses/bossFaces. When we have a face for
+   *  this boss it renders in the red cell; otherwise we fall back to
+   *  clipping the idle spritesheet. */
+  bossName?: string | null;
   /** Called once when the typewriter finishes typing this prompt. Used
    *  to release the timer ring so it only starts counting AFTER the
    *  question is fully visible. */
@@ -860,14 +886,17 @@ function DialoguePanel({
     }
     wasTypingRef.current = isTyping;
   }, [isTyping, onDone]);
+  // Prefer the hand-picked face-portrait for this boss when we have
+  // one — those are cropped as clean head-shots, so they fill the
+  // red 64×64 cell without the aggressive spritesheet-clipping math
+  // BossFacePortrait needs. Falls through to spritesheet clipping,
+  // then to the procedural SVG.
+  const bossFaceUrl = persona === "villain" ? getBossFaceUrl(bossName) : null;
   return (
     <div className="flex items-start gap-4 bg-black p-4">
-      {/* Prefer the real boss face — clipped to the first frame of the
-          idle spritesheet via background-image + background-position so
-          wide horizontal sheets don't render as a strip of tiny copies.
-          Falls back to the procedural SVG portrait when no bossAsset is
-          available (dev / preview / non-village scenes). */}
-      {bossAsset && persona === "villain" ? (
+      {bossFaceUrl ? (
+        <BossFaceImagePortrait src={bossFaceUrl} bossName={bossName ?? ""} />
+      ) : bossAsset && persona === "villain" ? (
         <BossFacePortrait bossAsset={bossAsset} />
       ) : (
         <Portrait persona={persona} talking={isTyping} />
@@ -892,12 +921,68 @@ function DialoguePanel({
 }
 
 /**
+ * Preferred portrait renderer — takes a URL to a hand-picked boss
+ * head-shot (from `src/lib/bosses/bossFaces.ts`, backed by JPEGs in
+ * `public/assets/bosses/faces/`) and fills the red 64×64 cell with
+ * `object-fit: cover`. No spritesheet-frame arithmetic needed
+ * because these assets are cropped head-shots, not gameplay sheets.
+ *
+ * The red border + dark fill are kept from BossFacePortrait so both
+ * renderers visually match — the user only sees the difference in
+ * clarity of the face, not in the frame chrome.
+ */
+function BossFaceImagePortrait({
+  src,
+  bossName,
+}: {
+  src: string;
+  bossName: string;
+}) {
+  const BOX = 64;
+  return (
+    <div
+      className="shrink-0 relative overflow-hidden"
+      style={{
+        width: BOX,
+        height: BOX,
+        background: "#3a1212",
+        border: "2px solid #FF6B6B",
+        imageRendering: "pixelated",
+      }}
+      aria-label={`${bossName} portrait`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={bossName}
+        width={BOX}
+        height={BOX}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          // Face jpegs are hand-composed — no scaling artifacts to
+          // worry about here, but we keep pixelated to match the
+          // rest of the arena's rendering vibe.
+          imageRendering: "pixelated",
+          display: "block",
+        }}
+        draggable={false}
+      />
+    </div>
+  );
+}
+
+/**
  * 64×64 portrait cell that shows the CURRENT boss's face by clipping
  * to the first frame of the idle spritesheet. Uses a background image
  * with background-size:cover + background-position:left so:
  *   - single-image PNGs render normally (cover fills the box)
  *   - wide horizontal spritesheets show only the leftmost (idle) frame
  *     instead of stretching all frames to fit
+ *
+ * Fallback path — used when we don't have a hand-picked head-shot
+ * (via BossFaceImagePortrait) for the current boss.
  */
 function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
   // Zoom into the FACE of the boss idle sprite so it fills the 64×64
@@ -1416,7 +1501,11 @@ function BattleScene({
   // Total cinematic length (win): 1600 + 2200 + ~2700 cheer buffer ≈
   // 6.5s — the parent CombatPanel's CINEMATIC_HOLD_MS is bumped to
   // 6500ms to keep the score card from cutting in early.
-  const RETREAT_STAGE_MS = 1600;
+  // Retreat stage extended (was 1600ms) so the boss's translate +
+  // fade + shrink animation has time to READ — the 1400ms transform
+  // transition wants at least 1400ms of visible time plus a small
+  // hold beat at the end. Defeat clip cadence unchanged.
+  const RETREAT_STAGE_MS = 2200;
   const DEFEAT_STAGE_MS = 2200;
   type CinematicStage = "none" | "retreat" | "defeat" | "cheer";
   const [cinematicStage, setCinematicStage] = useState<CinematicStage>("none");
@@ -1650,17 +1739,40 @@ function BattleScene({
         style={{
           bottom: "-40px",
           // CINEMATIC LAYOUT
-          // - defeat stage: both sprites stay, loser is animated in-place
-          // - cheer stage: loser (opacity 0) is gone, winner moved to center
-          // - won → boss is the loser; lost → boss is the winner
+          // - retreat stage (WIN only): boss slides ~180px to the RIGHT
+          //   + fades to 40% + shrinks slightly, so it visually
+          //   RETREATS off the arena rather than just standing there
+          //   waiting for the defeat clip. Product ask: "at end when
+          //   boss is defeated a retreated animation should be played
+          //   for boss".
+          // - defeat stage: both sprites stay, loser plays its defeat
+          //   clip in place.
+          // - cheer stage: loser (opacity 0) is gone, winner moved to
+          //   center.
+          //   won → boss is the loser; lost → boss is the winner.
           opacity:
-            cinematicStage === "cheer" && outcome === "won" ? 0 : 1,
+            cinematicStage === "cheer" && outcome === "won"
+              ? 0
+              : cinematicStage === "retreat" && outcome === "won"
+                ? 0.45
+                : 1,
           transform:
             cinematicStage === "cheer" && outcome === "lost"
               ? "translateX(calc(-50vw + 50%)) scale(1.15)"
+              : cinematicStage === "retreat" && outcome === "won"
+                ? "translateX(180px) scale(0.85)"
+                : undefined,
+          filter:
+            cinematicStage === "retreat" && outcome === "won"
+              ? "blur(1px) saturate(0.6)"
               : undefined,
+          // Slower ease during retreat so the flee reads as deliberate
+          // and cinematic — the boss backing away in defeat, not just
+          // sliding out.
           transition:
-            "opacity 500ms ease-out, transform 700ms cubic-bezier(0.4, 0, 0.2, 1)",
+            cinematicStage === "retreat" && outcome === "won"
+              ? "opacity 900ms ease-in, transform 1400ms cubic-bezier(0.22, 1, 0.36, 1), filter 900ms ease-in"
+              : "opacity 500ms ease-out, transform 700ms cubic-bezier(0.4, 0, 0.2, 1)",
           pointerEvents:
             cinematicStage === "cheer" && outcome === "won" ? "none" : undefined,
         }}
@@ -1836,7 +1948,10 @@ function BattleScene({
       <div
         className="pointer-events-none absolute z-[6] left-1 sm:left-4"
         style={{
-          bottom: 6,
+          // Shifted ~1cm (~37px at 96dpi) upward per product request so
+          // Sparky sits higher and reads as tucked NEXT TO the persona
+          // rather than at the arena floor line.
+          bottom: 43,
           opacity:
             cinematicStage === "cheer" && outcome === "lost" ? 0.35 : 1,
           transition: "opacity 500ms ease-out",
@@ -2287,23 +2402,26 @@ function AnimatedPersonaSprite({
   // attack and hurt release so the sprite doesn't sit on its knelt /
   // hunched recoil pose and read as "defeated".
   const holdLast = state === "defeat" || state === "victory";
-  // Per-state FPS map:
+  // Per-state FPS map — slowed further per product ask ("in AI
+  // combat the animation speed should be slow"):
   //   idle    → persona's natural breathing cadence.
-  //   victory → slower loop so the cheer reads as jubilant, not manic.
+  //   victory → slow loop so the cheer reads as jubilant, not manic.
   //   defeat  → very slow so the crumble is legible frame-by-frame.
-  //   attack/hurt → normal combat cadence, halved when slowMotion is on
-  //                so the user sees the swing/recoil clearly during
-  //                the arena-zoom moment.
+  //   attack/hurt → normal combat cadence, further slowed when
+  //                slowMotion is on so the user sees the swing/recoil
+  //                clearly during the arena-zoom moment. Floor
+  //                dropped 3 → 2 and multiplier 0.5 → 0.4 for a
+  //                more deliberate 3s clip at 9 frames.
   const resolvedFps =
     state === "idle"
       ? idleFps
       : state === "victory"
-        ? 4
+        ? 3
         : state === "defeat"
-          ? 3
+          ? 2
           : slowMotion
-            ? Math.max(3, Math.round(combatFps * 0.5))
-            : combatFps;
+            ? Math.max(2, Math.round(combatFps * 0.4))
+            : Math.max(3, Math.round(combatFps * 0.7));
   return (
     <AnimatedSpritesheet
       key={`${personaId}:${state}`}
@@ -2340,50 +2458,227 @@ function BossSpriteFromAsset({
   state?: BossAnimState;
   onStateComplete?: () => void;
 }) {
-  const SPRITESHEET_BOSSES: readonly {
-    /** Substring match against the boss's `idleAsset` path. */
-    match: string;
-    /** Folder that hosts the other state sheets (idle/attack/hurt/…). */
-    folder: string;
+  // Per-CLIP frame counts because most bosses have short 4-frame idle
+  // loops but longer 9-frame combat clips (attack / hurt / defeat /
+  // victory). The old single-shared-count schema silently broke
+  // every boss whose idle had a different frame count than its
+  // attack sheet, so they rendered as static images even when the
+  // combat clips were on disk.
+  type ClipSpec = {
     frames: number;
     frameWidth: number;
     frameHeight: number;
-    /** Available state clips in this folder. Fallback to idle otherwise. */
-    states: readonly BossAnimState[];
+  };
+  const SPRITESHEET_BOSSES: readonly {
+    /** Substring match against the boss's `idleAsset` path. */
+    match: string;
+    /** Folder that hosts the state sheets (idle/attack/hurt/…). */
+    folder: string;
+    /** Per-clip frame spec. Missing entries fall back to `idle`. */
+    clips: Partial<Record<BossAnimState, ClipSpec>>;
   }[] = [
+    // ── Village bosses ────────────────────────────────────────────
     {
       match: "/bosses/village/fog/idle.png",
       folder: "/assets/bosses/village/fog",
-      frames: 9,
-      frameWidth: 92,
-      frameHeight: 92,
-      states: ["idle", "attack", "hurt", "defeat", "victory"],
+      clips: {
+        idle:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        defeat:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
     },
     {
       match: "/bosses/village/chimera/idle.png",
       folder: "/assets/bosses/village/chimera",
-      frames: 9,
-      frameWidth: 92,
-      frameHeight: 92,
-      // Chimera has idle/attack/hurt; missing clips fall back to idle
-      // via the useState_ resolver in BossSpriteFromAsset.
-      states: ["idle", "attack", "hurt"],
+      clips: {
+        idle:   { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:   { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
     },
     {
       match: "/bosses/village/automaton/idle.png",
       folder: "/assets/bosses/village/automaton",
-      frames: 9,
-      frameWidth: 92,
-      frameHeight: 92,
-      states: ["idle", "attack", "hurt", "victory"],
+      clips: {
+        idle:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
     },
     {
       match: "/bosses/village/wraith/idle.png",
       folder: "/assets/bosses/village/wraith",
-      frames: 9,
-      frameWidth: 92,
-      frameHeight: 92,
-      states: ["idle", "attack", "hurt", "victory"],
+      clips: {
+        idle:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    // ── Arena bosses ─────────────────────────────────────────────
+    // Idle: 4-frame short loop @ 88px; combat clips: 9-frame @ 88px.
+    {
+      match: "/bosses/arena/advocate/idle.png",
+      folder: "/assets/bosses/arena/advocate",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/arena/judge/idle.png",
+      folder: "/assets/bosses/arena/judge",
+      clips: {
+        idle:    { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack:  { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:    { frames: 9, frameWidth: 88, frameHeight: 88 },
+        victory: { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/arena/masked-challenger/idle.png",
+      folder: "/assets/bosses/arena/masked-challenger",
+      clips: {
+        idle:   { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/arena/oracle-of-doubt/idle.png",
+      folder: "/assets/bosses/arena/oracle-of-doubt",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    // ── Stage 2 (Forest) bosses ──────────────────────────────────
+    {
+      match: "/bosses/stage2/forest-colossus/idle.png",
+      folder: "/assets/bosses/stage2/forest-colossus",
+      clips: {
+        idle:   { frames: 4, frameWidth: 96, frameHeight: 96 },
+        attack: { frames: 9, frameWidth: 96, frameHeight: 96 },
+        hurt:   { frames: 9, frameWidth: 96, frameHeight: 96 },
+      },
+    },
+    {
+      match: "/bosses/stage2/forest-sorceress/idle.png",
+      folder: "/assets/bosses/stage2/forest-sorceress",
+      clips: {
+        idle:   { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:   { frames: 9, frameWidth: 92, frameHeight: 92 },
+        defeat: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/stage2/thornbearer/idle.png",
+      folder: "/assets/bosses/stage2/thornbearer",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+        defeat: { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    // ── Super-Boss Pool (project-scoped villains) ────────────────
+    {
+      match: "/bosses/super-pool/rusted-oracle/idle.png",
+      folder: "/assets/bosses/super-pool/rusted-oracle",
+      clips: {
+        idle:    { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        defeat:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/super-pool/stonecaller/idle.png",
+      folder: "/assets/bosses/super-pool/stonecaller",
+      clips: {
+        // Stonecaller ships a single-frame idle placeholder; combat
+        // clips are the full 9-frame sheets.
+        idle:    { frames: 1, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/super-pool/tide-caller/idle.png",
+      folder: "/assets/bosses/super-pool/tide-caller",
+      clips: {
+        // Tide-caller sheets are XL — 164px per frame.
+        idle:    { frames: 9, frameWidth: 164, frameHeight: 164 },
+        attack:  { frames: 9, frameWidth: 164, frameHeight: 164 },
+        hurt:    { frames: 9, frameWidth: 164, frameHeight: 164 },
+        defeat:  { frames: 9, frameWidth: 164, frameHeight: 164 },
+        victory: { frames: 9, frameWidth: 164, frameHeight: 164 },
+      },
+    },
+    {
+      match: "/bosses/super-pool/veilwalker/idle.png",
+      folder: "/assets/bosses/super-pool/veilwalker",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        defeat: { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/super-pool/wraith-council/idle.png",
+      folder: "/assets/bosses/super-pool/wraith-council",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+        defeat: { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    // ── Incoming / next-stage bosses ─────────────────────────────
+    // All 9-frame × 92 with the newer "retreat" clip (used as the
+    // hurt fallback where hurt art isn't shipped yet).
+    {
+      match: "/bosses/incoming/babel-merchant/idle.png",
+      folder: "/assets/bosses/incoming/babel-merchant",
+      clips: {
+        idle:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/incoming/collapse-specter/idle.png",
+      folder: "/assets/bosses/incoming/collapse-specter",
+      clips: {
+        idle:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/incoming/harbourmaster/idle.png",
+      folder: "/assets/bosses/incoming/harbourmaster",
+      clips: {
+        idle:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/incoming/iron-bureaucrat/idle.png",
+      folder: "/assets/bosses/incoming/iron-bureaucrat",
+      clips: {
+        idle:    { frames: 9, frameWidth: 92, frameHeight: 92 },
+        attack:  { frames: 9, frameWidth: 92, frameHeight: 92 },
+        victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
     },
   ];
   const sheetDef = SPRITESHEET_BOSSES.find((s) => bossAsset.includes(s.match));
@@ -2406,39 +2701,52 @@ function BossSpriteFromAsset({
       />
     );
   }
-  // Resolve the sheet URL for this state; fall back to idle if the state's
-  // sheet isn't available for this boss.
-  const useState_: BossAnimState = sheetDef.states.includes(state)
-    ? state
-    : "idle";
+  // Resolve the sheet URL for this state via a per-state FALLBACK
+  // CHAIN. Previously a missing clip silently degraded straight to
+  // "idle" — which meant e.g. a boss without a `defeat` sheet just
+  // stood still on the VICTORY cinematic (silent-win bug), and a boss
+  // without `hurt` didn't react to hits at all. The chain now picks
+  // the closest available clip: hurt→attack→idle (a recoil reads as
+  // a shortened attack), defeat→hurt→idle (stun frame reads as KO),
+  // victory→attack→idle (dominating pose reads as victory). Idle is
+  // guaranteed to exist so `spec` is always defined.
+  const FALLBACK_CHAIN: Record<BossAnimState, BossAnimState[]> = {
+    idle:    ["idle"],
+    attack:  ["attack", "idle"],
+    hurt:    ["hurt", "attack", "idle"],
+    defeat:  ["defeat", "hurt", "idle"],
+    victory: ["victory", "attack", "idle"],
+  };
+  const useState_: BossAnimState =
+    FALLBACK_CHAIN[state].find((s) => sheetDef.clips[s]) ?? "idle";
+  const spec = sheetDef.clips[useState_] ?? sheetDef.clips.idle!;
   const sheetUrl = `${sheetDef.folder}/${useState_}.png`;
   const isLoop = useState_ === "idle" || useState_ === "victory";
   // Terminal (defeat / victory) clips freeze on their last frame.
   // Transient combat clips (attack / hurt) release so the boss
   // doesn't sit on its recoil / stunned pose and read as "defeated".
   const holdLast = useState_ === "defeat" || useState_ === "victory";
-  // Per-state FPS for the boss:
+  // Per-state FPS for the boss — slowed further per product ask
+  // ("in AI combat the animation speed should be slow"):
   //   idle    → gentle breathing loop.
   //   victory → slow triumphant loop (loss ending only).
-  //   defeat  → very slow crumble so each frame reads clearly during
-  //             the arena-zoom moment after the retreat banner.
-  //   attack/hurt → slowed from the old snappy 7fps to 4fps so the
-  //                 impact clip is legible when the arena zooms in.
+  //   defeat  → very slow crumble so each frame reads clearly.
+  //   attack/hurt → slowed from 4fps → 3fps (9 frames ≈ 3s clip).
   const resolvedFps =
     useState_ === "idle"
-      ? 6
+      ? 5
       : useState_ === "victory"
-        ? 4
+        ? 3
         : useState_ === "defeat"
-          ? 3
-          : 4;
+          ? 2
+          : 3;
   return (
     <AnimatedSpritesheet
       key={useState_}
       sheetUrl={sheetUrl}
-      frameCount={sheetDef.frames}
-      frameWidth={sheetDef.frameWidth}
-      frameHeight={sheetDef.frameHeight}
+      frameCount={spec.frames}
+      frameWidth={spec.frameWidth}
+      frameHeight={spec.frameHeight}
       displayWidth={300}
       fps={resolvedFps}
       loop={isLoop}

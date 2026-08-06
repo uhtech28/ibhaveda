@@ -2049,6 +2049,21 @@ export const submitTaskContent = mutation({
     // milestone post so the user's progress is visible to the network
     // without them having to compose anything. Wrapped so a feed
     // failure can never block the task submission.
+    //
+    // Post format (locked in per product spec):
+    //   TITLE:  "{ProjectName} : {TaskName}"
+    //           e.g. "Retlify : Speak Its Name"
+    //   BODY:   the user's actual answer to the task (trimmed to 400
+    //           chars). If the tool payload isn't a string (Excalidraw
+    //           scene, spreadsheet JSON, kanban board), fall back to a
+    //           "Completed X in Y — Stage N, Checkpoint M" line so the
+    //           post still has content.
+    //
+    // Task title matches the new UI Title Case ("Chart the
+    // Affliction" — small connector words like "the / of / in" stay
+    // lowercase unless first / last). Applied here so the feed post
+    // reads exactly like the CheckpointPanel row the user just
+    // completed instead of shouting "CHART THE AFFLICTION" in caps.
     try {
       const ventureForPost = await ctx.db.get(checkpoint.ventureId);
       const ideaForPost = ventureForPost?.ideaId
@@ -2067,21 +2082,42 @@ export const submitTaskContent = mutation({
           : args.taskLevel === "t2"
             ? checkpointDefForScore?.t2
             : checkpointDefForScore?.t3;
-      const taskTitle =
+      const rawTaskTitle =
         (taskDef?.title && taskDef.title.trim().length > 0
           ? taskDef.title
           : checkpointDefForScore?.outcome) || `${tierLabel} task`;
+      // Title-case with small-word exceptions — mirrors the same
+      // transform TaskSubmissionModal / CheckpointPanel apply on
+      // the client, so the auto-post reads consistently with the
+      // in-app UI.
+      const SMALL_WORDS = new Set([
+        "a", "an", "and", "as", "at", "but", "by", "for", "if", "in",
+        "nor", "of", "on", "or", "the", "to", "up", "vs", "via", "with",
+      ]);
+      const capitalise = (w: string) =>
+        w.length === 0
+          ? w
+          : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      const toTitleCase = (raw: string): string => {
+        const trimmed = raw.trim();
+        if (trimmed.length === 0) return trimmed;
+        const words = trimmed.split(/\s+/);
+        return words
+          .map((w, i) => {
+            const lower = w.toLowerCase();
+            const isFirstOrLast = i === 0 || i === words.length - 1;
+            if (!isFirstOrLast && SMALL_WORDS.has(lower)) return lower;
+            return capitalise(w);
+          })
+          .join(" ");
+      };
+      const taskTitle = toTitleCase(rawTaskTitle);
       const summary =
         typeof args.content === "string"
           ? args.content.trim().slice(0, 400)
           : "";
       await ctx.db.insert("ideas", {
         authorId: user._id,
-        // New post format per product request:
-        //   heading: "{ProjectName} : {TaskName}"  → "Retlify : Speak its name"
-        //   body:    the user's actual answer (summary of args.content)
-        // Fallback body still names the project + stage/CP if the
-        // submission had no textual content (e.g. an upload).
         title: `${projectLabel} : ${taskTitle}`,
         description: summary
           ? summary

@@ -91,7 +91,6 @@ interface CheckpointDef {
 }
 
 export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
-  // Stage 1: Ideation — The Village · The Fog of Vagueness
   {
     stage: 1,
     checkpoint: 1,
@@ -204,7 +203,6 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
       subheader: "See the village as it could be once the fog lifts. Write a one-page vision of this idea three years from now: what it does, who it serves, and why it exists, tied directly to the problem and soul you have named.",
     },
   },
-  // Stage 2: Research — The Forest · The Pathwarden Wraith
   {
     stage: 2,
     checkpoint: 1,
@@ -345,7 +343,6 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
       subheader: "On the canvas, map how market context, competitor gaps, customer needs, and timing connect to form the specific opportunity your idea addresses.",
     },
   },
-  // Stage 3: Validation — The Arena · The Advocate of Comfortable Lies
   {
     stage: 3,
     checkpoint: 1,
@@ -452,13 +449,12 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
       subheader: "Build a before-and-after table showing your original assumptions alongside what validation confirmed, disproved, or left uncertain about each.",
     },
     t3: {
-      prompt: "Write an updated description of your idea that reflects everything validation taught you — and use the canvas to show what changed in your understanding of the problem, customer, or solution.",
+      prompt: "Use the canvas to show what changed in your understanding of the problem, customer, or solution, now that validation has taught you what it has.",
       tool: "map",
       title: "Redraw the Idea",
-      subheader: "Write an updated description of your idea reflecting everything validation taught you, and use the canvas to show what changed in your understanding of the problem, customer, or solution.",
+      subheader: "On the canvas, show what changed in your understanding of the problem, customer, or solution, now that validation has taught you what it has.",
     },
   },
-  // Stage 4: Offer Design — The Artisan's Quarter · The Unfinished Golem
   {
     stage: 4,
     checkpoint: 1,
@@ -581,10 +577,10 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
     standardTagline: "The Golem is stilled. The offer is sealed and ready to deliver.",
     goldTagline: "The offer is locked. Every note ruled on, every step of handover mapped.",
     t1: {
-      prompt: "List every piece of feedback from offer testing and mark each as incorporated, rejected, or deferred — with a brief reason for each decision.",
+      prompt: "Build a feedback resolution table — listing every piece of feedback from offer testing and marking each as incorporated, rejected, or deferred, with a brief reason for each decision.",
       tool: "table",
       title: "Rule on Every Note",
-      subheader: "List every piece of feedback from offer testing and mark each as incorporated, rejected, or deferred, with a brief reason for each decision.",
+      subheader: "Build a feedback resolution table. List every piece of feedback from offer testing and mark each as incorporated, rejected, or deferred, with a brief reason for each decision.",
     },
     t2: {
       prompt: "Write the final offer description — the version that will be used in all customer-facing communication — and confirm it reflects everything learned from testing.",
@@ -599,7 +595,6 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
       subheader: "Write a delivery or fulfilment note covering every step needed to get the offer from its current state to the customer's hands, and flag any step not yet resolved.",
     },
   },
-  // Stage 5: Build & Deliver — The Mine · The Collapse Specter
   {
     stage: 5,
     checkpoint: 1,
@@ -666,10 +661,10 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
     standardTagline: "The vein is reached. A real, deliverable offer exists and has left the mine once.",
     goldTagline: "The vein runs deep and true. Every promised component is struck and accounted for.",
     t1: {
-      prompt: "List each component of your minimum offer and confirm it is built, sourced, or ready — even if rough — and note any component that is still outstanding.",
+      prompt: "Build a component readiness table — listing each component of your minimum offer and confirming it is built, sourced, or ready, even if rough, with a note on anything still outstanding.",
       tool: "table",
       title: "Account for the Ore",
-      subheader: "List each component of your minimum offer and confirm it is built, sourced, or ready, even if rough, and note anything still outstanding.",
+      subheader: "Build a component readiness table listing each component of your minimum offer, confirming it is built, sourced, or ready, even if rough, and noting anything still outstanding.",
     },
     t2: {
       prompt: "Upload evidence that your core offer exists in a deliverable state — a photo of the product, a recording of the service being delivered, a working demo, or a supplier confirmation.",
@@ -768,7 +763,6 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
       subheader: "Confirm in writing that every checklist item is passing and the venture is ready to serve paying customers, including the date of this confirmation.",
     },
   },
-  // Stage 6: Launch — The Harbour · The Harbourmaster of Hesitation
   {
     stage: 6,
     checkpoint: 1,
@@ -835,10 +829,10 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
     standardTagline: "The first true sailors have found the ship and boarded of their own will. The voyage has passengers.",
     goldTagline: "The ship sails full. Real souls aboard by choice. The voyage has begun in earnest.",
     t1: {
-      prompt: "Document your first ten customers — where each came from, when they engaged, what they purchased or signed up for, and whether they completed the core journey.",
+      prompt: "Build a first-customers table — documenting your first ten customers: where each came from, when they engaged, what they purchased or signed up for, and whether they completed the core journey.",
       tool: "table",
       title: "Name the First Aboard",
-      subheader: "Document your first ten customers: where each came from, when they engaged, what they purchased or signed up for, and whether they completed the core journey.",
+      subheader: "Build a first-customers table documenting your first ten customers: where each came from, when they engaged, what they purchased or signed up for, and whether they completed the core journey.",
     },
     t2: {
       prompt: "Build a channel attribution table — showing which launch channel drove the most customers and which drove the highest-quality engagement based on your first week of data.",
@@ -853,7 +847,6 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
       subheader: "Upload evidence of real customer activity from your first week: screenshots of transactions, sign-ups, orders, or enquiries.",
     },
   },
-  // Stage 7: Iteration — The Crossroads Town · The Babel Merchant
   {
     stage: 7,
     checkpoint: 1,
@@ -966,7 +959,6 @@ export const CHECKPOINT_DEFINITIONS: CheckpointDef[] = [
       subheader: "Upload a screenshot or export from your tracking tool showing the metric movement, with the period before and after the change clearly visible.",
     },
   },
-  // Stage 8: Scale — The Capital · The Iron Bureaucrat
   {
     stage: 8,
     checkpoint: 1,

@@ -11,6 +11,8 @@ import { useChat } from "./ChatContext";
 import { formatDistanceToNow } from "date-fns";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { NewDirectMessagePanel } from "./NewDirectMessageDialog";
+// Shared close cluster — [saddlebag → reopen Adventurer's Menu] + [×].
+import { PanelCloseCluster } from "@/components/map/PanelCloseCluster";
 
 /**
  * Inbox preview text for a conversation's most-recent message.
@@ -76,9 +78,7 @@ const GroupList: React.FC<GroupListProps> = memo(({ onClose }) => {
           <MessageSquare className="w-3.5 h-3.5" />
           Chats
         </h3>
-        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-          <X className="w-4 h-4" />
-        </Button>
+        <PanelCloseCluster onClose={onClose} />
       </div>
 
       <Tabs

@@ -86,6 +86,11 @@ interface ExcalidrawToolProps {
    *  Submit row all fit inside the compact task modal without the
    *  Submit button falling off the bottom edge. */
   height?: number;
+  /** When true, skip rendering the prompt banner above the canvas.
+   *  Used by the TaskSubmissionModal, which now shows the prompt as
+   *  a subheading inside its own blue header block — rendering it
+   *  here as well produced a duplicate "Before any cure..." line. */
+  hidePrompt?: boolean;
 }
 
 export function ExcalidrawTool({
@@ -94,6 +99,7 @@ export function ExcalidrawTool({
   initialContent,
   isSubmitting = false,
   height = 320,
+  hidePrompt = false,
 }: ExcalidrawToolProps) {
   const apiRef = useRef<AnyRef>(null);
 
@@ -189,7 +195,7 @@ export function ExcalidrawTool({
     // scrolled content. `min-h-0` lets the flex canvas shrink inside
     // the modal's overflow-y-auto container.
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {prompt ? (
+      {prompt && !hidePrompt ? (
         <p className="rounded-md border border-white/8 bg-white/[0.02] px-3 py-2 text-xs leading-relaxed text-white/70">
           {prompt}
         </p>

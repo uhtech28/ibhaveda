@@ -49,7 +49,6 @@ interface LabCheckpointDef {
 }
 
 export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
-  // Stage 1: Brief & Question — The Observatory · The Mirage Lens
   {
     stage: 1,
     checkpoint: 1,
@@ -134,7 +133,6 @@ export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
       subheader: "Identify what would prove your hypothesis wrong, and confirm in a short note that your Lab is capable of producing that result if it exists.",
     },
   },
-  // Stage 2: Research & Background — The Ancient Library · The Librarian of Lost Questions
   {
     stage: 2,
     checkpoint: 1,
@@ -219,7 +217,6 @@ export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
       subheader: "Set up a Kanban board with columns for resources still to acquire, resources in hand, and resources confirmed and tested, and populate it with every item from your list.",
     },
   },
-  // Stage 3: Design & Planning — The Cartographer's Tower · The Cartographer of Crooked Maps
   {
     stage: 3,
     checkpoint: 1,
@@ -332,7 +329,6 @@ export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
       subheader: "Confirm in a journal entry that your Lab meets all relevant safety and ethical requirements for your context, noting any condition still unresolved and your plan to resolve it.",
     },
   },
-  // Stage 4: Build & Execute — The Forge · The Saboteur of the Forge
   {
     stage: 4,
     checkpoint: 1,
@@ -445,7 +441,6 @@ export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
       subheader: "Upload a photo, recording, or file from the full execution showing the Lab in progress and confirming it was completed as planned.",
     },
   },
-  // Stage 5: Test & Evaluate — The Alchemist's Laboratory · The Alchemist of Wishful Results
   {
     stage: 5,
     checkpoint: 1,
@@ -586,7 +581,6 @@ export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
       subheader: "Write a description of what a stronger version of this Lab would look like: the specific changes you would make to reduce the limitations and improve confidence in the output.",
     },
   },
-  // Stage 6: Iterate & Refine — The Crossroads Town · The Babel Merchant
   {
     stage: 6,
     checkpoint: 1,
@@ -671,7 +665,6 @@ export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
       subheader: "Upload the output or documentation from your refined version so the two versions can be directly compared side by side.",
     },
   },
-  // Stage 7: Document & Present — The Grand Hall · The Silencer of Findings
   {
     stage: 7,
     checkpoint: 1,
@@ -718,14 +711,14 @@ export const LAB_CHECKPOINT_DEFINITIONS: LabCheckpointDef[] = [
     t2: {
       prompt: "Upload your presentation file, a photo of your physical exhibit, or a screen recording of your demo — so it exists here as a record before you present.",
       tool: "upload",
-      title: "Build the Slide or Demo Outline",
-      subheader: "Build a slide-by-slide or section-by-section outline of your presentation, listing the key message or finding for each section.",
+      title: "Send the Presentation",
+      subheader: "Upload your presentation file, a photo of your physical exhibit, or a screen recording of your demo, so it exists here as a record before you present.",
     },
     t3: {
       prompt: "Run through your presentation or demo and log any moment where you couldn't explain something clearly without reading from your notes — then fix those moments and confirm in a journal entry.",
       tool: "journal",
-      title: "Upload the Presentation",
-      subheader: "Upload your completed presentation or demonstration materials in their final form, ready to deliver.",
+      title: "Confirm It Runs Clean",
+      subheader: "Run through your presentation or demo and log any moment where you could not explain something clearly without reading from your notes. Fix those moments and confirm in a journal entry.",
     },
   },
   {

@@ -22,6 +22,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CombatRoundResult } from "@/lib/combat/types";
+import { useTutorial } from "@/components/tutorial/v2/useTutorial";
 
 interface Props {
   result: CombatRoundResult;
@@ -66,6 +67,16 @@ export function CombatResultPanel({
   // when the user wants to inspect their round in depth. Also removes
   // the ambiguity of what a hypothetical "Stats" click would do.
   const [showStats, setShowStats] = useState(false);
+
+  // Tutorial focus mode — when the guided tutorial is on the combat
+  // step (7 = intro/retreat text, 8 = active fight, 9 = flare
+  // transition), the ONLY action that should register is CONTINUE.
+  // STATS is dimmed + disabled, replay-card chevrons deactivate, and
+  // CONTINUE gets a pulsing highlight so users can't miss it and
+  // can't wander off the guided path.
+  const tutorial = useTutorial();
+  const tutorialMode =
+    tutorial.active && tutorial.step >= 7 && tutorial.step <= 9;
 
   return (
     <div
@@ -139,43 +150,50 @@ export function CombatResultPanel({
         />
       )}
 
-      {/* Winged VICTORY / DEFEAT banner header */}
-      <div className="relative z-20 flex flex-col items-center px-6 pb-4 pt-8 sm:pt-10">
+      {/* Winged VICTORY / DEFEAT banner header — compact top padding
+          so the whole panel fits on one screen without scrolling. */}
+      <div className="relative z-20 flex flex-col items-center px-4 pb-2 pt-4 sm:px-6 sm:pt-5">
         <VictoryBanner isWin={isWin} />
         <OutcomeRibbon isWin={isWin} bossName={bossName} />
       </div>
 
-      {/* Round replay — golden diamond divider header + Q cards */}
-      <div className="relative z-20 px-6 pb-4">
-        <SectionDivider label="ROUND REPLAY" isWin={isWin} />
-        <HpReplay
-          timeline={result.hpTimeline}
-          bossHpInitial={bossHpInitial}
-          playerHpInitial={playerHpInitial}
-          finalScores={result.perQuestionScores}
-          showStats={showStats}
-          isWin={isWin}
-          bossAsset={bossAsset}
-          founderAsset={founderAsset}
-        />
+      {/* Round replay — ornate golden bordered panel like reference REWARDS box */}
+      <div className="relative z-20 px-4 pb-2 sm:px-6">
+        <PanelBox label="ROUND REPLAY" isWin={isWin} disabled={tutorialMode}>
+          <HpReplay
+            timeline={result.hpTimeline}
+            bossHpInitial={bossHpInitial}
+            playerHpInitial={playerHpInitial}
+            finalScores={result.perQuestionScores}
+            showStats={showStats}
+            isWin={isWin}
+            bossAsset={bossAsset}
+            founderAsset={founderAsset}
+          />
+        </PanelBox>
       </div>
 
-      {/* XP badge reveal with counter + spark */}
-      <div className="relative z-20 px-6 pb-4">
-        <SectionDivider label="INDIVIDUAL XP" isWin={isWin} />
-        <XpBadgeReveal points={result.individualPointsAwarded} isWin={isWin} />
+      {/* XP badge reveal — ornate golden bordered panel like reference SCORE SUMMARY box */}
+      <div className="relative z-20 px-4 pb-2 sm:px-6">
+        <PanelBox label="INDIVIDUAL XP" isWin={isWin} disabled={tutorialMode}>
+          <XpBadgeReveal points={result.individualPointsAwarded} isWin={isWin} />
+        </PanelBox>
       </div>
 
-      {/* Actions — STATS toggle + ADVANCE / RETRY */}
-      <div className="relative z-20 flex flex-wrap items-center justify-center gap-3 px-6 pb-8 pt-2">
+      {/* Actions — STATS toggle + ADVANCE / RETRY. In tutorial mode
+          STATS is disabled + dimmed and CONTINUE gets a pulsing
+          highlight so the only thing the user can (or wants to) do
+          is press it. */}
+      <div className="relative z-20 flex flex-wrap items-center justify-center gap-3 px-4 pb-4 pt-1 sm:px-6 sm:pb-6">
         <StatsButton
           expanded={showStats}
           onClick={() => setShowStats((v) => !v)}
+          disabled={tutorialMode}
         />
         {isWin ? (
-          <AdvanceButton onClick={onAdvance} />
+          <AdvanceButton onClick={onAdvance} highlight={tutorialMode} />
         ) : (
-          <RetryButton onClick={onRetryCombat} />
+          <RetryButton onClick={onRetryCombat} highlight={tutorialMode} />
         )}
       </div>
     </div>
@@ -293,82 +311,42 @@ function StarField() {
 // ─────────────────────────────────────────────────────────────────────
 
 function VictoryBanner({ isWin }: { isWin: boolean }) {
+  // Reference-mock rework — the small winged plaque was replaced with
+  // a big flat gold pixel-art title crowned by a sword-with-wings
+  // ornament floating ABOVE the text, and a thin gold underline
+  // divider below. Matches the client's pinned reference layout
+  // ("VICTORY! / BOSS DEFEATED" heading over a navy card).
   const label = isWin ? "VICTORY!" : "DEFEAT!";
-  const primary = isWin ? "#fde047" : "#fca5a5";
-  const secondary = isWin ? "#b45309" : "#7f1d1d";
-  const glow = isWin ? "rgba(250,204,21,0.55)" : "rgba(239,68,68,0.55)";
+  const gold = isWin ? "#F5C542" : "#fca5a5";
+  const goldDeep = isWin ? "#8a5a0f" : "#7f1d1d";
+  const outline = isWin ? "#1a0f00" : "#2a0a0a";
+  const glow = isWin ? "rgba(245,197,66,0.55)" : "rgba(239,68,68,0.45)";
 
   return (
-    <div
-      className="relative flex items-center justify-center"
-      style={{ maxWidth: 520, width: "100%" }}
-    >
-      {/*
-        Layer order (bottom → top) to match the reference pixel-art:
-          1. Sword — rendered FIRST behind the banner so the blade
-             visibly extends both above AND below the banner slab.
-          2. Wings — left / right of the banner, layer z-0.
-          3. Central banner — z-10, overlays the middle of the sword
-             so only the tip + pommel show around it.
-      */}
+    <div className="relative flex flex-col items-center gap-1">
+      {/* Sword-with-wings crest above the title — compact (32px tall)
+          so the header doesn't eat vertical space. */}
+      <SwordWithWings gold={gold} goldDeep={goldDeep} />
 
-      {/* Rising sword — passes THROUGH the banner. Top is the blade
-          tip, bottom is the pommel; the crossguard sits inside the
-          banner where the "VICTORY" text is centered. */}
-      <svg
-        aria-hidden
-        className="absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2"
-        width={30}
-        height={130}
-        viewBox="0 0 30 130"
-        style={{ filter: `drop-shadow(0 0 8px ${glow})` }}
-      >
-        {/* Blade — long pixel-art blade with a chamfered tip */}
-        <polygon points="15,2 19,10 19,80 11,80 11,10" fill="#e5e7eb" />
-        {/* Blade highlight (left edge) */}
-        <polygon points="15,2 17,10 17,80 15,80" fill="#f9fafb" />
-        {/* Blade shadow (right edge) */}
-        <polygon points="19,10 19,80 17,80 17,10" fill="#9ca3af" />
-        {/* Crossguard — hidden behind the banner but shown here */}
-        <rect x="2" y="78" width="26" height="6" fill={primary} />
-        <rect x="2" y="78" width="26" height="2" fill="#fff8e1" opacity="0.6" />
-        <rect x="2" y="82" width="26" height="2" fill={secondary} />
-        {/* Grip */}
-        <rect x="12" y="86" width="6" height="24" fill="#5b3a1a" />
-        <rect x="12" y="86" width="2" height="24" fill="#3a2410" />
-        {/* Pommel */}
-        <circle cx="15" cy="118" r="6" fill={primary} />
-        <circle cx="15" cy="118" r="3" fill={secondary} />
-        <circle cx="14" cy="116" r="1.5" fill="#fff8e1" opacity="0.7" />
-      </svg>
-
-      {/* Left wing */}
-      <Wing side="left" primary={primary} secondary={secondary} />
-
-      {/* Central banner — chamfered corners toned down to match the
-          reference (small notches instead of big diagonal cuts) so
-          the outline reads as a chunky pixel-art plaque. Sword sits
-          behind (z-0) with the banner overlaying at z-10. */}
+      {/* Big pixel-art title — CSS text with heavy layered strokes
+          so it reads as chunky pixel gold matching the reference
+          without needing a bespoke bitmap font. Sized down from the
+          previous clamp(48,8vw,88) so the whole panel fits above
+          the fold on typical laptop screens. */}
       <div
-        className="relative z-10 mx-1 flex items-center justify-center px-8 py-3 sm:px-14 sm:py-4"
-        style={{
-          background: `linear-gradient(180deg, ${primary} 0%, ${secondary} 100%)`,
-          border: `3px solid ${secondary}`,
-          clipPath:
-            "polygon(0 12%, 4% 0, 96% 0, 100% 12%, 100% 88%, 96% 100%, 4% 100%, 0 88%)",
-          boxShadow: `0 0 24px ${glow}, inset 0 0 12px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.25)`,
-        }}
+        className="relative"
+        style={{ filter: `drop-shadow(0 0 16px ${glow})` }}
       >
         <span
-          className="relative text-3xl font-black uppercase tracking-widest sm:text-4xl"
+          className="block leading-none"
           style={{
             fontFamily: "var(--font-pixel-display), monospace",
-            color: "#fff8e1",
-            // Layered text-shadow for a proper pixel-art beveled look —
-            // dark stroke below + soft glow behind. Matches the crunchy
-            // typography in the reference image.
-            textShadow: `0 2px 0 ${secondary}, 0 3px 0 rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.6)`,
-            letterSpacing: "0.15em",
+            fontSize: "clamp(36px, 6vw, 60px)",
+            fontWeight: 900,
+            letterSpacing: "0.05em",
+            color: gold,
+            WebkitTextStroke: `2px ${outline}`,
+            textShadow: `0 3px 0 ${goldDeep}, 0 5px 0 ${outline}, 0 7px 10px rgba(0,0,0,0.7)`,
             imageRendering: "pixelated",
           }}
         >
@@ -376,68 +354,70 @@ function VictoryBanner({ isWin }: { isWin: boolean }) {
         </span>
       </div>
 
-      {/* Right wing */}
-      <Wing side="right" primary={primary} secondary={secondary} />
+      {/* Thin dividing line below the title — matches the reference's
+          horizontal gold rule between VICTORY and BOSS DEFEATED. */}
+      <div
+        className="mt-1 h-px w-full max-w-[440px]"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${gold} 15%, ${gold} 85%, transparent)`,
+          opacity: 0.7,
+        }}
+      />
     </div>
   );
 }
 
-function Wing({
-  side,
-  primary,
-  secondary,
+/** Sword-with-wings ornament above the VICTORY title — thin pixel-art
+ *  crest that centres the sword blade with two feathered wings flared
+ *  out either side, all rendered in the same gold palette as the
+ *  title. Sits at ~40px tall so it doesn't dominate the header. */
+function SwordWithWings({
+  gold,
+  goldDeep,
 }: {
-  side: "left" | "right";
-  primary: string;
-  secondary: string;
+  gold: string;
+  goldDeep: string;
 }) {
-  // Right wing is the left wing mirrored via scaleX(-1).
   return (
     <svg
       aria-hidden
-      className="relative z-0 shrink-0"
-      width={70}
-      height={64}
-      viewBox="0 0 70 64"
-      style={{
-        transform: side === "right" ? "scaleX(-1)" : undefined,
-        filter: `drop-shadow(0 4px 6px rgba(0,0,0,0.5))`,
-      }}
+      width={106}
+      height={32}
+      viewBox="0 0 140 42"
+      style={{ filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.5))` }}
     >
-      {/* Wing outline — three overlapping feather layers */}
+      {/* Central sword — vertical blade + crossguard + pommel */}
+      <polygon points="70,2 73,8 73,30 67,30 67,8" fill="#e5e7eb" />
+      <polygon points="70,2 71,8 71,30 70,30" fill="#f9fafb" />
+      <rect x="60" y="28" width="20" height="4" fill={gold} />
+      <rect x="60" y="28" width="20" height="1" fill="#fff8e1" opacity="0.6" />
+      <rect x="60" y="31" width="20" height="1" fill={goldDeep} />
+      <rect x="68" y="32" width="4" height="6" fill={goldDeep} />
+      <circle cx="70" cy="40" r="2.5" fill={gold} />
+
+      {/* Left wing */}
       <path
-        d="M70 32 C 55 8, 30 4, 8 16 C 2 20, 0 28, 6 32 C 20 26, 38 30, 50 40 C 55 44, 62 42, 70 32 Z"
-        fill={primary}
-        stroke={secondary}
-        strokeWidth="1.5"
+        d="M60 22 C 45 12, 25 10, 10 18 C 18 20, 35 24, 50 30 C 55 32, 58 28, 60 22 Z"
+        fill={gold}
+        stroke={goldDeep}
+        strokeWidth="1"
       />
-      {/* Feather 2 */}
-      <path
-        d="M62 34 C 48 20, 26 18, 14 26 C 22 26, 40 32, 52 42 C 56 44, 60 40, 62 34 Z"
-        fill="#fff7cc"
-        opacity={0.55}
-      />
-      {/* Feather segments */}
-      {[0, 1, 2, 3, 4].map((i) => {
-        const x = 20 + i * 8;
-        const y1 = 18 + i * 3;
-        const y2 = 32 + i * 3;
-        return (
-          <line
-            key={i}
-            x1={x}
-            y1={y1}
-            x2={x + 6}
-            y2={y2}
-            stroke={secondary}
-            strokeWidth="0.8"
-            opacity={0.7}
-          />
-        );
-      })}
+      {/* Right wing (mirror) */}
+      <g transform="translate(140 0) scale(-1 1)">
+        <path
+          d="M60 22 C 45 12, 25 10, 10 18 C 18 20, 35 24, 50 30 C 55 32, 58 28, 60 22 Z"
+          fill={gold}
+          stroke={goldDeep}
+          strokeWidth="1"
+        />
+      </g>
     </svg>
   );
 }
+
+// Legacy `Wing` component removed — the new SwordWithWings crest
+// above VictoryBanner supersedes it. Old callsites were only inside
+// the old VictoryBanner block that was rewritten above.
 
 // ─────────────────────────────────────────────────────────────────────
 // Outcome ribbon — "BOSS RETREATED" / "YOU WERE WORN DOWN"
@@ -450,13 +430,12 @@ function OutcomeRibbon({
   isWin: boolean;
   bossName: string | null;
 }) {
-  const primary = isWin ? "#fde047" : "#fca5a5";
-  const secondary = isWin ? "#78350f" : "#7f1d1d";
-  // "{BossName} RETREATED" / "{BossName} STRUCK YOU DOWN" — replaces
-  // the generic "BOSS" placeholder with the actual boss's name from
-  // the parent's combat config. Falls back to "BOSS" when no name is
-  // available so the ribbon never renders blank. Uppercased so it
-  // matches the pixel-display banner typography.
+  // Reference-matched subtitle — no thin dashes, just a bold gold
+  // outlined line ("BOSS DEFEATED / RETREATED") sitting directly
+  // under the VICTORY! title. Same chunky pixel-art voice.
+  const gold = isWin ? "#F5C542" : "#fca5a5";
+  const goldDeep = isWin ? "#8a5a0f" : "#7f1d1d";
+  const outline = isWin ? "#1a0f00" : "#2a0a0a";
   const displayName = (bossName && bossName.trim().length > 0
     ? bossName
     : "Boss"
@@ -465,31 +444,128 @@ function OutcomeRibbon({
     ? `${displayName} RETREATED`
     : `${displayName} STRUCK YOU DOWN`;
   return (
-    <div className="mt-1 flex items-center gap-2">
+    <div className="mt-1 flex items-center justify-center">
       <span
-        className="inline-block h-px w-8"
-        style={{ background: `linear-gradient(90deg, transparent, ${primary})` }}
-      />
-      <span
-        className="text-xs font-black uppercase tracking-[0.35em] sm:text-sm"
+        className="text-[11px] font-black uppercase tracking-[0.4em] sm:text-xs"
         style={{
           fontFamily: "var(--font-pixel-display), monospace",
-          color: primary,
-          textShadow: `0 1px 0 ${secondary}, 0 2px 3px rgba(0,0,0,0.6)`,
+          color: gold,
+          WebkitTextStroke: `0.8px ${outline}`,
+          textShadow: `0 2px 0 ${goldDeep}, 0 3px 4px rgba(0,0,0,0.55)`,
         }}
       >
         {label}
       </span>
-      <span
-        className="inline-block h-px w-8"
-        style={{ background: `linear-gradient(90deg, ${primary}, transparent)` }}
-      />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // Section divider — "◇ LABEL ◇" with hairline gold rules
+// ─────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────
+// PanelBox — ornate gold-bordered container that wraps a labeled
+// section (ROUND REPLAY / INDIVIDUAL XP), styled to match the
+// reference REWARDS / SCORE SUMMARY panels: chunky double-line pixel
+// border, corner studs, and an inline notched header ribbon with the
+// section name in pixel-art gold. Loss variant uses red accents.
+// ─────────────────────────────────────────────────────────────────────
+
+function PanelBox({
+  label,
+  isWin,
+  children,
+  disabled = false,
+}: {
+  label: string;
+  isWin: boolean;
+  children: React.ReactNode;
+  /** Tutorial-mode: dim the content so the eye is drawn to CONTINUE. */
+  disabled?: boolean;
+}) {
+  const gold = isWin ? "#F5C542" : "#f87171";
+  const goldDeep = isWin ? "#8a5a0f" : "#7f1d1d";
+  const goldSoft = isWin ? "rgba(245,197,66,0.35)" : "rgba(248,113,113,0.35)";
+  const bgFill = isWin ? "rgba(9,14,36,0.55)" : "rgba(36,9,9,0.55)";
+  const outline = isWin ? "#1a0f00" : "#2a0a0a";
+  return (
+    <div className="relative mt-2">
+      {/* Outer border box */}
+      <div
+        className="relative rounded-md px-3 pb-3 pt-5 sm:px-4 sm:pt-6"
+        style={{
+          border: `2px solid ${gold}`,
+          boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.55), inset 0 0 22px ${goldSoft}, 0 0 12px rgba(0,0,0,0.4)`,
+          background: bgFill,
+          backdropFilter: "blur(1px)",
+        }}
+      >
+        {/* Inline notched header ribbon — floats over the top border */}
+        <div className="pointer-events-none absolute -top-3 left-1/2 z-10 -translate-x-1/2 select-none">
+          <span
+            className="inline-block px-3 py-[3px] text-[10px] font-black uppercase tracking-[0.4em] sm:text-xs"
+            style={{
+              fontFamily: "var(--font-pixel-display), monospace",
+              color: gold,
+              WebkitTextStroke: `0.6px ${outline}`,
+              textShadow: `0 1px 0 ${goldDeep}, 0 2px 3px rgba(0,0,0,0.55)`,
+              background:
+                "linear-gradient(180deg, #14224a 0%, #0b1030 100%)",
+              border: `2px solid ${gold}`,
+              boxShadow: `0 0 8px ${goldSoft}, inset 0 0 6px rgba(0,0,0,0.55)`,
+              // Faceted "banner" edges — clipped notches on both sides.
+              clipPath:
+                "polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%)",
+            }}
+          >
+            {label}
+          </span>
+        </div>
+
+        {/* Corner studs — small diamond markers at each inner corner */}
+        {(["tl", "tr", "bl", "br"] as const).map((c) => (
+          <span
+            key={c}
+            aria-hidden
+            className="pointer-events-none absolute z-0"
+            style={{
+              width: 6,
+              height: 6,
+              transform: "rotate(45deg)",
+              background: gold,
+              boxShadow: `0 0 4px ${gold}`,
+              top: c.startsWith("t") ? -3 : undefined,
+              bottom: c.startsWith("b") ? -3 : undefined,
+              left: c.endsWith("l") ? -3 : undefined,
+              right: c.endsWith("r") ? -3 : undefined,
+            }}
+          />
+        ))}
+
+        {/* Wrapper applies the tutorial-focus dim so the box's title
+            ribbon + border still read normally, but the inner content
+            (HP bars, XP badge) recedes visually to nudge attention
+            toward CONTINUE. Pointer-events off in dim mode so the
+            HP-replay cells + STATS toggle stay unclickable. */}
+        <div
+          style={{
+            opacity: disabled ? 0.42 : 1,
+            pointerEvents: disabled ? "none" : "auto",
+            transition: "opacity 240ms ease-out",
+            filter: disabled ? "saturate(0.6)" : "none",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SectionDivider — legacy thin divider (kept for potential reuse; no
+// longer called by the main layout, which now uses PanelBox).
 // ─────────────────────────────────────────────────────────────────────
 
 function SectionDivider({
@@ -1104,15 +1180,20 @@ function XpBadgeReveal({
 function StatsButton({
   expanded,
   onClick,
+  disabled = false,
 }: {
   expanded: boolean;
   onClick: () => void;
+  /** Tutorial focus mode — dim + block clicks. */
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       aria-pressed={expanded}
+      aria-disabled={disabled}
+      disabled={disabled}
       className="group inline-flex items-center gap-2 rounded-md border-2 px-5 py-2.5 font-mono text-xs font-black uppercase tracking-widest transition-all"
       style={{
         fontFamily: "var(--font-pixel-display), monospace",
@@ -1121,6 +1202,9 @@ function StatsButton({
         borderColor: "rgba(250,204,21,0.55)",
         boxShadow:
           "0 4px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
+        opacity: disabled ? 0.35 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
+        filter: disabled ? "saturate(0.5)" : "none",
       }}
     >
       {/* Simple bar-chart icon */}
@@ -1140,33 +1224,130 @@ function StatsButton({
   );
 }
 
-function AdvanceButton({ onClick }: { onClick: () => void }) {
+function AdvanceButton({
+  onClick,
+  highlight = false,
+}: {
+  onClick: () => void;
+  /** Tutorial focus mode — add a pulsing gold ring so users can't
+   *  miss the only enabled control on the panel. */
+  highlight?: boolean;
+}) {
+  // "CONTINUE" pixel-art button matching the reference theme:
+  // gold-outlined navy pill flanked by chunky arrow flourishes on each
+  // side. Retains the green advance semantics via the interior fill
+  // hue but adopts the ornate pixel border language of the panel.
+  const gold = "#F5C542";
+  const goldDeep = "#8a5a0f";
+  const outline = "#1a0f00";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-md border-2 px-6 py-2.5 font-mono text-xs font-black uppercase tracking-widest transition-all hover:brightness-110"
-      style={{
-        fontFamily: "var(--font-pixel-display), monospace",
-        color: "#dcfce7",
-        background: "linear-gradient(180deg, #16a34a 0%, #14532d 100%)",
-        borderColor: "#4ade80",
-        boxShadow:
-          "0 4px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15), 0 0 22px rgba(74,222,128,0.35)",
-      }}
-    >
-      Advance
-      {/* Chevron / triangle */}
-      <svg aria-hidden width={12} height={12} viewBox="0 0 12 12">
-        <polygon points="2,1 11,6 2,11" fill="#dcfce7" />
-      </svg>
-    </button>
+    <div className="relative flex items-center gap-2">
+      {/* Pulsing highlight ring — only in tutorial mode. Framer-motion
+          scale + opacity loop reads as a soft "look here" beacon
+          without being obnoxious. */}
+      {highlight && (
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-md"
+          style={{
+            boxShadow: `0 0 0 3px ${gold}, 0 0 24px 4px rgba(245,197,66,0.6)`,
+          }}
+          initial={{ opacity: 0.55, scale: 1 }}
+          animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.06, 1] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+      <PixelArrowFlourish direction="left" color={gold} />
+      <button
+        type="button"
+        onClick={onClick}
+        className="group inline-flex items-center gap-3 rounded-md px-7 py-3 font-mono text-sm font-black uppercase tracking-[0.35em] transition-all hover:brightness-110"
+        style={{
+          fontFamily: "var(--font-pixel-display), monospace",
+          color: gold,
+          background:
+            "linear-gradient(180deg, #14224a 0%, #0b1030 100%)",
+          border: `2px solid ${gold}`,
+          WebkitTextStroke: `0.6px ${outline}`,
+          textShadow: `0 2px 0 ${goldDeep}, 0 3px 4px rgba(0,0,0,0.55)`,
+          boxShadow: highlight
+            ? "0 4px 0 rgba(0,0,0,0.55), inset 0 0 16px rgba(245,197,66,0.4), 0 0 26px rgba(245,197,66,0.55)"
+            : "0 4px 0 rgba(0,0,0,0.55), inset 0 0 12px rgba(245,197,66,0.25), 0 0 18px rgba(245,197,66,0.35)",
+        }}
+      >
+        Continue
+        <svg
+          aria-hidden
+          width={12}
+          height={12}
+          viewBox="0 0 12 12"
+          style={{ imageRendering: "pixelated" }}
+        >
+          <polygon points="2,1 11,6 2,11" fill={gold} />
+        </svg>
+      </button>
+      <PixelArrowFlourish direction="right" color={gold} />
+    </div>
   );
 }
 
-function RetryButton({ onClick }: { onClick: () => void }) {
+// Chunky pixel-art arrow flourish rendered on either side of the
+// CONTINUE button (mirrors the reference theme). Purely decorative.
+function PixelArrowFlourish({
+  direction,
+  color,
+}: {
+  direction: "left" | "right";
+  color: string;
+}) {
   return (
-    <button
+    <svg
+      aria-hidden
+      width={22}
+      height={16}
+      viewBox="0 0 22 16"
+      style={{
+        transform: direction === "right" ? "scaleX(-1)" : undefined,
+        filter: `drop-shadow(0 0 4px ${color}66)`,
+        imageRendering: "pixelated",
+      }}
+    >
+      {/* Two stacked chevrons pointing at the button */}
+      <polygon points="0,8 8,0 12,0 4,8 12,16 8,16" fill={color} />
+      <polygon
+        points="10,8 18,0 22,0 14,8 22,16 18,16"
+        fill={color}
+        opacity={0.7}
+      />
+    </svg>
+  );
+}
+
+function RetryButton({
+  onClick,
+  highlight = false,
+}: {
+  onClick: () => void;
+  /** Tutorial focus mode — add a pulsing red ring so users notice
+   *  the only enabled action after a defeat. */
+  highlight?: boolean;
+}) {
+  return (
+    <div className="relative inline-flex items-center">
+      {highlight && (
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-md"
+          style={{
+            boxShadow:
+              "0 0 0 3px #f87171, 0 0 24px 4px rgba(248,113,113,0.6)",
+          }}
+          initial={{ opacity: 0.55, scale: 1 }}
+          animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.06, 1] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+      <button
       type="button"
       onClick={() => {
         console.log("[combat] Retry button clicked");
@@ -1187,5 +1368,6 @@ function RetryButton({ onClick }: { onClick: () => void }) {
         <polygon points="2,1 11,6 2,11" fill="#fee2e2" />
       </svg>
     </button>
+    </div>
   );
 }

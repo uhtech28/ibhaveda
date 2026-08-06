@@ -231,28 +231,12 @@ export function TutorialHighlight({
             />
           </svg>
 
-          {/* Single crisp 2px ring around the target — no outer glow.
-              Previous version layered a 10px soft glow on top of the
-              solid outline, which visually read as TWO concentric
-              rings (product feedback: "use a single circle to
-              highlight"). Now just one clean line at 2px so tiny
-              targets look sharp and big targets don't get a diffuse
-              halo. Position set via inline style (no spring) so the
-              ring stays glued to the target during fast scrolling. */}
-          {hasTarget && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: rect.x,
-                top: rect.y,
-                width: rect.width,
-                height: rect.height,
-                boxShadow: "0 0 0 2px rgba(251, 191, 36, 0.95)",
-                borderRadius: effectiveRx,
-                willChange: "left, top, width, height",
-              }}
-            />
-          )}
+          {/* Amber ring around the target REMOVED per product ask
+              ("remove golden outline from these 2 boxes completely").
+              The dim-overlay cutout above still spotlights the
+              target — it just no longer has a golden rim. If we
+              want a subtle highlight back in the future, restore
+              the div below with a lower-opacity boxShadow. */}
         </motion.div>
       )}
     </AnimatePresence>

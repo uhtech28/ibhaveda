@@ -51,6 +51,13 @@ type Stage =
   | "boss_intro"
   | "combat"
   | "victory"
+  // NEW — saddlebag onboarding beat. The Flare button was moved out
+  // of the CheckpointPanel into the Adventurer's Menu (opened by the
+  // saddlebag icon in the map HUD), so we now walk the user to that
+  // saddlebag first. Sparky points at the icon, everything else is
+  // click-blocked. When the user opens the menu we advance to
+  // "flare" which now points at the Flare tile inside the menu.
+  | "saddlebag"
   | "flare"
   | "flare_opened"
   | "done";
@@ -323,6 +330,47 @@ export function Step3MapGuide() {
     }
   }, [active]);
 
+  // WATCHDOG — "stuck at Sparky's about-to-face line, needed refresh"
+  // fix. The primary force-combat dispatch above is one-shot (retries
+  // for ~15s then gives up). If ANY of these race conditions hit
+  // during that window the panel never opens:
+  //   - Convex `startCombatRound` mutation stalled or errored silently
+  //   - CheckpointPanel opened first (from URL param) and swallowed
+  //     the render slot the CombatPanel needs
+  //   - Browser tab was backgrounded during the retry budget → all
+  //     setTimeouts throttled → budget burned without a real attempt
+  //   - `bossCombatTarget` was set but `activeCombatRoundId` never
+  //     landed, leaving the "The boss is awakening…" spinner up
+  //     without ever mounting CombatPanel
+  // While the tutorial is parked at `stage === "combat"` and neither
+  // the combat panel nor the awakening spinner is visible, re-fire
+  // the event every 3 s. Cancels itself as soon as combat opens.
+  useEffect(() => {
+    if (!active) return;
+    if (stage !== "combat") return;
+    const tick = window.setInterval(() => {
+      const combatOpen = !!findCombatPanel();
+      // Awakening spinner has this exact text — if it's up, combat
+      // IS starting, don't spam more dispatches.
+      const spinnerUp =
+        typeof document !== "undefined" &&
+        document.body.innerText.includes("The boss is awakening");
+      if (combatOpen || spinnerUp) return;
+      // Reset the one-shot latch so Step3's tryDispatch loop can run
+      // again the next time this effect ticks. Then fire the event
+      // directly so we don't wait a full poll cycle.
+      forceCombatFiredRef.current = false;
+      try {
+        window.dispatchEvent(new CustomEvent("tutorial:force-combat"));
+      } catch {
+        /* no-op */
+      }
+    }, 3000);
+    return () => window.clearInterval(tick);
+    // findCombatPanel is stable via useCallback in the enclosing scope
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, stage]);
+
   useEffect(() => {
     if (!active) return;
     const id = window.setInterval(() => {
@@ -353,17 +401,6 @@ export function Step3MapGuide() {
         /* no-op */
       }
       // Detect the FlareComposeDialog by its own data-tutorial marker.
-      // The previous heuristic looked for `role="dialog"` elements whose
-      // innerText contained "fire a flare" — that string appears
-      // verbatim inside Sparky's own flare-stage bubble copy, so once
-      // the mascot painted its text and any other dialog (CombatPanel
-      // fade-out, MapMenuPopover, etc.) briefly overlapped, the check
-      // flipped true and auto-advanced the tutorial past the flare
-      // step without user action.
-      //
-      // The compose dialog tags itself with data-tutorial="flare-compose"
-      // — that attribute only exists on the DialogContent Radix mounts
-      // when open=true, so it's a clean 1:1 signal.
       let flareModalOpen = false;
       try {
         const el = document.querySelector<HTMLElement>(
@@ -380,6 +417,20 @@ export function Step3MapGuide() {
         /* no-op */
       }
       if (flareModalOpen) flareWasOpenRef.current = true;
+
+      // Detect the Adventurer's Menu modal being open — this is what
+      // advances the saddlebag → flare beat. The menu tiles carry
+      // `data-tutorial="menu-tile-*"` markers only when the menu is
+      // mounted, so querying for the Flare tile is a clean 1:1
+      // signal that the menu is open AND our target is on screen.
+      let adventurersMenuOpen = false;
+      try {
+        adventurersMenuOpen = !!document.querySelector(
+          '[data-tutorial="menu-tile-flare"]',
+        );
+      } catch {
+        /* no-op */
+      }
 
       // NEW FLOW: after combat is dismissed OR the boss-defeated
       // victory screen appears we DO the flare step on the map (the
@@ -413,6 +464,12 @@ export function Step3MapGuide() {
           (!combat || bossDefeated)
         ) {
           return "victory";
+        }
+        // User opened the Adventurer's Menu (saddlebag → flare).
+        // Only triggers from the saddlebag stage — we don't want a
+        // menu-open at some later moment to yank the tutorial back.
+        if (prev === "saddlebag" && adventurersMenuOpen) {
+          return "flare";
         }
         // User opened the flare compose dialog.
         if (prev === "flare" && flareModalOpen) {
@@ -553,17 +610,17 @@ export function Step3MapGuide() {
           highlight: null,
         };
       case "boss_intro":
-        // The Unraveller speaks first (intro monologue + minions taunt)
-        // inside the cinematic. While the villain is talking Sparky is
-        // silent — empty text = no bubble. Once the boss's speech is
-        // done (finale phase → data-boss-speaking=false), Sparky steps
-        // in with the "You're about to face…" line so the user has a
-        // friendly heads-up right before "Face them".
+        // Sparky stays SILENT for the entire boss cinematic per
+        // product ask ("here sparky will speak at end when the boss
+        // dialog is over remove this one"). The old fallback line
+        // ("You're about to face …") that used to fire once the
+        // villain finished has been removed — the villain gets the
+        // stage to themselves. Sparky's "you're about to face" beat
+        // still lives in the `combat` step below, so users get the
+        // heads-up right before combat opens instead.
         return {
-          text: bossSpeaking
-            ? ""
-            : `You're about to face ${TUTORIAL_MONSTER_NAME}, who'll question your idea. Defend it, fight back, and make him retreat so you can advance. You've got this!`,
-          mood: bossSpeaking ? "idle" : "talking",
+          text: "",
+          mood: "idle",
           near: null,
           highlight: null,
         };
@@ -624,20 +681,37 @@ export function Step3MapGuide() {
               } catch {
                 /* no-op */
               }
-              setStage("flare");
+              setStage("saddlebag");
             },
           },
         };
-      case "flare":
-        // Fires right after the user hits Continue on the victory
-        // beat. Sparky points at the Flare button inside the
-        // CheckpointPanel ("task bar of the map"). Advance is driven
-        // by the DOM poller detecting the FlareComposeDialog opening.
+      case "saddlebag":
+        // NEW onboarding beat — Flare was moved from the CP panel
+        // into the Adventurer's Menu (saddlebag). Sparky points at
+        // the saddlebag icon in the HUD, everything else is
+        // click-blocked (see noScrim below — saddlebag is NOT in
+        // the noScrim list, so the scrim's punch-out is around only
+        // the saddlebag). When the user opens the menu we advance
+        // to "flare".
         return {
-          text: "Nice work! If you're ever stuck, fire a Flare from your checkpoint panel. People can jump in to help without joining your project.",
+          text:
+            "This is your saddlebag. It holds every tool you'll need on your journey. Tap to open!",
           mood: "pointing",
-          near: '[data-tutorial="flare-button"]',
-          highlight: '[data-tutorial="flare-button"]',
+          near: '[data-tutorial="saddlebag-button"]',
+          highlight: '[data-tutorial="saddlebag-button"]',
+        };
+      case "flare":
+        // Fires once the Adventurer's Menu is open. Sparky points at
+        // the Flare TILE inside the menu (previously the Flare
+        // button lived on the CheckpointPanel; product moved it to
+        // the menu so this step now targets `menu-tile-flare`).
+        // Advance is driven by the DOM poller detecting the
+        // FlareComposeDialog opening.
+        return {
+          text: "Nice work! If you're ever stuck, fire a Flare from here. People can jump in to help without joining your project.",
+          mood: "pointing",
+          near: '[data-tutorial="menu-tile-flare"]',
+          highlight: '[data-tutorial="menu-tile-flare"]',
         };
       case "flare_opened":
         // Flare compose dialog is up — Sparky sits back and cheers
@@ -682,14 +756,18 @@ export function Step3MapGuide() {
         // to interact freely with the underlying UI:
         //   - boss_intro / victory / done: overlays that own their own
         //     CTAs (Face them / Continue) — a scrim would eat clicks
-        //   - flare / flare_opened: user needs to click the flare
-        //     button inside the CheckpointPanel and fill the compose
-        //     dialog without a scrim in the way
+        //   - flare_opened: user is inside the flare compose dialog
+        //     which sits on top of everything, no scrim needed
+        // NOTE: the `flare` stage KEEPS the scrim on so the user can
+        // ONLY click the Flare tile — the other 8 Adventurer's Menu
+        // tiles were previously all clickable during this step, which
+        // let users wander off the guided path. TutorialScrim punches
+        // a hole around the highlighted target so the Flare tile
+        // itself stays fully interactive.
         noScrim={
           stage === "boss_intro" ||
           stage === "victory" ||
           stage === "done" ||
-          stage === "flare" ||
           stage === "flare_opened"
         }
         // Silence the roll animation whenever the villain is speaking
@@ -697,32 +775,38 @@ export function Step3MapGuide() {
         // puppy would pull attention off the primary content.
         suppressRoll={bossSpeaking || combatOpenState}
       />
-      {/* Global CSS pulse ring around the CheckpointPanel's flare
-          button during the flare step. Matches the same styling used
-          by Step4Contribute's contribute-button pulse. */}
+      {/* Global CSS pulse ring around the Flare tile inside the
+          Adventurer's Menu during the flare step. NOTE: the selector
+          was previously `[data-tutorial="flare-button"]` (from when
+          Flare was a CheckpointPanel button), but the button was
+          moved into the menu tiles and now carries
+          `data-tutorial="menu-tile-flare"` — so the old selector
+          matched nothing and the tile rendered without any
+          highlight. */}
       {stage === "flare" && (
         <style jsx global>{`
-          [data-tutorial="flare-button"] {
+          [data-tutorial="menu-tile-flare"] {
             position: relative !important;
+            z-index: 10006 !important;
             box-shadow:
-              0 0 0 2px rgba(253, 224, 71, 0.85),
-              0 0 18px rgba(253, 224, 71, 0.55),
-              0 0 42px rgba(253, 224, 71, 0.28) !important;
+              0 0 0 3px rgba(253, 224, 71, 0.9),
+              0 0 22px rgba(253, 224, 71, 0.65),
+              0 0 48px rgba(253, 224, 71, 0.32) !important;
             border-radius: 12px !important;
             animation: sparky-map-flare-pulse 1.4s ease-in-out infinite !important;
           }
           @keyframes sparky-map-flare-pulse {
             0%, 100% {
               box-shadow:
-                0 0 0 2px rgba(253, 224, 71, 0.85),
-                0 0 18px rgba(253, 224, 71, 0.55),
-                0 0 42px rgba(253, 224, 71, 0.28);
+                0 0 0 3px rgba(253, 224, 71, 0.9),
+                0 0 22px rgba(253, 224, 71, 0.65),
+                0 0 48px rgba(253, 224, 71, 0.32);
             }
             50% {
               box-shadow:
-                0 0 0 3px rgba(253, 224, 71, 1),
-                0 0 28px rgba(253, 224, 71, 0.85),
-                0 0 60px rgba(253, 224, 71, 0.45);
+                0 0 0 4px rgba(253, 224, 71, 1),
+                0 0 32px rgba(253, 224, 71, 0.9),
+                0 0 66px rgba(253, 224, 71, 0.5);
             }
           }
         `}</style>

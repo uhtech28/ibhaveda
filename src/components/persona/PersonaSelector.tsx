@@ -46,7 +46,8 @@ export function PersonaSelector({
     <div className="persona-splash">
       <div className="persona-wrap">
         <header className="persona-header">
-          <p className="persona-eyebrow">Step 2 of 2 — pick your builder</p>
+          {/* "Step 2 of 2 — pick your builder" eyebrow removed per
+              product request — the header now leads with the title. */}
           <h1 className="persona-title">Choose your persona</h1>
           <p className="persona-sub">
             The archetype you pick shapes how the world sees you and
@@ -80,9 +81,6 @@ export function PersonaSelector({
             const cardStyle: React.CSSProperties = {
               // Grid slot fills — every card same footprint so tagline
               // length variance doesn't warp row alignment.
-              // Roomier cards: larger portrait cell + more breathing
-              // padding, still designed to fit the whole page above the
-              // fold on a ~720px viewport.
               minHeight: 196,
               display: "flex",
               flexDirection: "column",
@@ -90,23 +88,24 @@ export function PersonaSelector({
               justifyContent: "flex-start",
               gap: 14,
               padding: "22px 20px 20px",
-              borderRadius: 16,
+              // Platform surface language: 18px radius, #0F1726 fill,
+              // white/8 border. On select: switch to the platform
+              // indigo (#6366F1) accent — same as the feed's
+              // Contribute/Sub-ideas hover state.
+              borderRadius: 18,
               cursor: "pointer",
               textAlign: "center",
               fontFamily: "inherit",
               color: "inherit",
-              // Visible card outline. Uses the persona's accent color
-              // when selected, otherwise a bright-enough white so it
-              // reads clearly on the dark purple bg.
               border: active
-                ? `2px solid ${p.accent}`
-                : "1px solid rgba(255,255,255,0.22)",
+                ? "1px solid rgba(99, 102, 241, 0.7)"
+                : "1px solid rgba(255, 255, 255, 0.08)",
               background: active
-                ? "rgba(255,255,255,0.10)"
-                : "rgba(255,255,255,0.05)",
+                ? "rgba(99, 102, 241, 0.08)"
+                : "rgba(15, 23, 38, 0.85)",
               boxShadow: active
-                ? `0 16px 40px -14px ${p.accent}80, 0 0 0 1px ${p.accent}`
-                : "0 4px 12px rgba(0,0,0,0.25)",
+                ? "0 0 24px rgba(99, 102, 241, 0.22), 0 0 0 1px rgba(99, 102, 241, 0.5)"
+                : "0 8px 24px rgba(0, 0, 0, 0.3)",
               transition:
                 "border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease",
             };
@@ -174,14 +173,16 @@ export function PersonaSelector({
                   </div>
                 </div>
 
-                {/* Name + tagline */}
+                {/* Name + tagline — platform typography. Name uses
+                    solid white like feed card titles, tagline uses
+                    #9CA3AF muted like feed card descriptions. */}
                 <div style={{ textAlign: "center" }}>
                   <div
                     style={{
                       fontSize: 15,
                       fontWeight: 700,
-                      color: "#f6f4fa",
-                      marginBottom: 3,
+                      color: "#ffffff",
+                      marginBottom: 4,
                       letterSpacing: "0.2px",
                     }}
                   >
@@ -189,9 +190,9 @@ export function PersonaSelector({
                   </div>
                   <div
                     style={{
-                      fontSize: 11.5,
-                      color: "#a49bc0",
-                      lineHeight: 1.35,
+                      fontSize: 12,
+                      color: "#9ca3af",
+                      lineHeight: 1.4,
                       minHeight: 28,
                     }}
                   >
@@ -224,63 +225,60 @@ export function PersonaSelector({
             disabled={!selectedId || submitting}
             className="persona-cta"
           >
-            {submitting ? "Entering…" : "Enter the world →"}
+            {/* Label simplified from "Enter the world →" to just
+                "Begin" (arrow removed) per product ask. Matches the
+                calmer CTA voice used elsewhere on the platform. */}
+            {submitting ? "Beginning…" : "Begin"}
           </button>
         </div>
       </div>
 
       <style jsx>{`
+        /* All colors + radii aligned with the platform's feed-card
+           design language (see idea-cards.tsx):
+             surfaces  → #0F1726
+             borders   → rgba(255,255,255,0.08)   (i.e. border-white/8)
+             body text → #D1D5DB
+             muted     → #9CA3AF
+             accent    → #6366F1 (indigo)
+             radii     → 18px cards, 12px pills
+           So the persona picker reads as part of the same product as
+           the feed rather than a bespoke onboarding surface. */
         .persona-splash {
           position: fixed;
           inset: 0;
           z-index: 100000;
           color: #f6f4fa;
-          font-family: "Inter", system-ui, sans-serif;
+          font-family: var(--font-sans, "Inter", system-ui, sans-serif);
           overflow-y: auto;
-          background:
-            radial-gradient(ellipse 900px 600px at 50% -5%, rgba(143, 92, 232, 0.2), transparent 60%),
-            radial-gradient(ellipse 700px 500px at 85% 15%, rgba(226, 115, 154, 0.1), transparent 60%),
-            radial-gradient(ellipse 700px 500px at 10% 30%, rgba(246, 178, 94, 0.08), transparent 60%),
-            linear-gradient(180deg, #07050c 0%, #0d0a17 45%, #140f22 100%);
+          background: #050810;
           animation: personaFadeIn 0.35s ease-out;
         }
         .persona-wrap {
-          /* Compact vertical rhythm so the whole flow — header, 4×2
-             grid, and Enter-the-world footer — fits within a single
-             viewport on desktop with no scroll. Was 56/96px + gap 36
-             which pushed the footer below the fold. */
           max-width: 1080px;
           margin: 0 auto;
-          padding: 22px 24px 24px;
+          padding: 28px 24px 28px;
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 20px;
         }
         .persona-header {
           text-align: center;
         }
-        .persona-eyebrow {
-          font-size: 10px;
-          letter-spacing: 3px;
-          text-transform: uppercase;
-          color: #c9a45c;
-          font-weight: 700;
-          margin-bottom: 6px;
-        }
         .persona-title {
-          font-family: "Space Grotesk", "Inter", sans-serif;
+          font-family: var(--font-display, "Space Grotesk", "Inter", sans-serif);
           font-weight: 700;
-          font-size: clamp(22px, 3.5vw, 32px);
-          line-height: 1.1;
+          font-size: clamp(24px, 3.5vw, 34px);
+          line-height: 1.15;
           letter-spacing: -0.4px;
-          color: #f6f4fa;
-          margin-bottom: 6px;
+          color: #ffffff;
+          margin-bottom: 8px;
         }
         .persona-sub {
-          color: #a49bc0;
-          font-size: 12.5px;
-          line-height: 1.45;
-          max-width: 520px;
+          color: #9ca3af;
+          font-size: 13px;
+          line-height: 1.5;
+          max-width: 540px;
           margin: 0 auto;
         }
         .persona-grid {
@@ -392,11 +390,14 @@ export function PersonaSelector({
           align-items: center;
           justify-content: space-between;
           gap: 20px;
-          padding: 14px 18px;
-          border-radius: 16px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          backdrop-filter: blur(12px);
+          padding: 16px 20px;
+          /* Same 18px radius, #0F1726 fill and white/8 border used on
+             every feed card — the footer reads as a peer of the
+             cards above, not a bespoke onboarding chrome. */
+          border-radius: 18px;
+          background: rgba(15, 23, 38, 0.85);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(24px);
         }
         @media (max-width: 640px) {
           .persona-footer {
@@ -412,41 +413,44 @@ export function PersonaSelector({
         .persona-preview-name {
           font-size: 14px;
           font-weight: 700;
-          color: #f6f4fa;
+          color: #ffffff;
           margin-bottom: 4px;
         }
         .persona-preview-desc {
-          font-size: 12.5px;
-          color: #a49bc0;
+          font-size: 13px;
+          color: #d1d5db;
           line-height: 1.55;
         }
         .persona-preview-desc.muted {
-          color: #786e96;
+          color: #9ca3af;
         }
+        /* CTA now matches the platform's primary indigo action:
+           #6366F1 fill, white text, 12px radius, subtle indigo glow —
+           same treatment used on Post Idea, Send Request, and the
+           Advance button in the CheckpointPanel. */
         .persona-cta {
           flex-shrink: 0;
-          padding: 12px 22px;
+          padding: 12px 26px;
           border-radius: 12px;
-          border: none;
-          background: linear-gradient(120deg, #f6b25e, #e2739a 55%, #8f5ce8);
-          background-size: 180% 180%;
-          color: #160b23;
+          border: 1px solid rgba(99, 102, 241, 0.5);
+          background: #6366f1;
+          color: #ffffff;
           font-family: inherit;
-          font-weight: 700;
+          font-weight: 600;
           font-size: 14px;
-          letter-spacing: 0.2px;
+          letter-spacing: 0.1px;
           cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease,
-            background-position 0.6s ease;
-          box-shadow: 0 12px 30px -10px rgba(226, 115, 154, 0.45);
+          transition: background 0.18s ease, transform 0.18s ease,
+            box-shadow 0.18s ease;
+          box-shadow: 0 8px 24px -8px rgba(99, 102, 241, 0.5);
         }
         .persona-cta:hover:not(:disabled) {
-          background-position: 100% 50%;
-          transform: translateY(-2px);
-          box-shadow: 0 16px 36px -10px rgba(226, 115, 154, 0.6);
+          background: #7b7dff;
+          transform: translateY(-1px);
+          box-shadow: 0 12px 32px -8px rgba(99, 102, 241, 0.6);
         }
         .persona-cta:disabled {
-          opacity: 0.5;
+          opacity: 0.4;
           cursor: not-allowed;
         }
         @keyframes personaFadeIn {

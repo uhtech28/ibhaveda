@@ -48,7 +48,6 @@ interface CreativeCheckpointDef {
 }
 
 export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
-  // Stage 1: Concept & Inspiration — The Sacred Grove · The Silence That Smothers
   {
     stage: 1,
     checkpoint: 1,
@@ -67,14 +66,14 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t2: {
       prompt: "Can you use the canvas to capture the emotional territory of what you want to make — images, words, colours, textures — anything that maps the feeling rather than describes it?",
       tool: "map",
-      title: "Choose the Vessel",
-      subheader: "The impulse needs a form to live in. In two sentences, state the form and medium you are working in and why they suit what you are trying to make.",
+      title: "Map the Feeling",
+      subheader: "The impulse resists plain words. On the canvas, capture the emotional territory of what you want to make — images, words, colours, textures, anything that maps the feeling rather than describes it.",
     },
     t3: {
       prompt: "Can you write a stream-of-consciousness page about what's driving this piece and then highlight the two or three sentences that feel most true?",
       tool: "write",
-      title: "Define the Piece",
-      subheader: "Give the work a precise description: what it is, what it is about, and what you want it to do or make someone feel. Specific enough that the piece knows what it must become.",
+      title: "Sit With the Raw Draft",
+      subheader: "Write a stream-of-consciousness page about what is driving this piece, then highlight the two or three sentences that feel most true.",
     },
   },
   {
@@ -95,14 +94,14 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t2: {
       prompt: "Can you build a form comparison table — showing how your creative impulse would work in at least two different forms, and making a deliberate argument for why your chosen form is superior?",
       tool: "table",
-      title: "Describe the Piece in Full",
-      subheader: "Write a specific description of the piece: what it is, what it is about, and what you want it to do or make a reader or viewer feel.",
+      title: "Weigh the Forms",
+      subheader: "Build a form comparison table showing how your creative impulse would work in at least two different forms, and make a deliberate argument for why your chosen form is superior.",
     },
     t3: {
       prompt: "Can you identify at least one constraint your chosen form imposes — a word limit, a duration, a physical dimension — and write a note on how that constraint will shape what you make?",
       tool: "write",
-      title: "Name What It Must Become",
-      subheader: "Write a short note on what success looks like for this piece: the specific effect it should have when it reaches its audience.",
+      title: "Name the Constraint",
+      subheader: "Identify at least one constraint your chosen form imposes — a word limit, a duration, a physical dimension — and write a note on how that constraint will shape what you make.",
     },
   },
   {
@@ -118,22 +117,21 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
       prompt: "Can you describe your piece in three sentences — what it is about, what form it takes, and what you want someone to feel or think after experiencing it?",
       tool: "write",
       title: "Give It a Name",
-      subheader: "Write a working title or name for the piece and a one-sentence description of what it is.",
+      subheader: "Describe your piece in three sentences: what it is about, what form it takes, and what you want someone to feel or think after experiencing it.",
     },
     t2: {
       prompt: "Can you use the canvas to map the concept — its central tension or question, its emotional arc, and the key moments or elements it will contain?",
       tool: "map",
-      title: "State the Concept",
-      subheader: "Write a specific description of the piece: what it is, what it is about, and the core feeling or idea at its centre.",
+      title: "Map the Concept",
+      subheader: "On the canvas, map the concept — its central tension or question, its emotional arc, and the key moments or elements it will contain.",
     },
     t3: {
       prompt: "Can you write a one-paragraph artist's statement for the piece as if it were already finished — describing what it is, what it explores, and why you made it?",
       tool: "write",
-      title: "Confirm the Intent",
-      subheader: "Write a short note on what success looks like when this piece reaches its audience: the specific response or effect you are working toward.",
+      title: "Write the Artist's Statement",
+      subheader: "Write a one-paragraph artist's statement for the piece as if it were already finished: what it is, what it explores, and why you made it.",
     },
   },
-  // Stage 2: References & Influences — The Gallery of Echoes · The Curator of Derivative Ghosts
   {
     stage: 2,
     checkpoint: 1,
@@ -152,14 +150,14 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t2: {
       prompt: "Can you use the canvas to build an influence map — collecting images, excerpts, or references organised by what quality of your concept each one speaks to?",
       tool: "map",
-      title: "Study What Each Does",
-      subheader: "Build an influences table listing each work, the specific craft decision you are learning from it, and how that decision is relevant to your piece.",
+      title: "Build the Influence Map",
+      subheader: "On the canvas, build an influence map — collecting images, excerpts, or references organised by what quality of your concept each one speaks to.",
     },
     t3: {
       prompt: "Can you link at least three of your influences — to a streaming platform, an archive, a digital edition, or any accessible source — so they can be experienced directly?",
       tool: "link",
-      title: "Find Your Position",
-      subheader: "Write a short statement of where your piece sits relative to its influences: what it takes from them, what it departs from, and what it does that none of them do.",
+      title: "Link the Sources",
+      subheader: "Link at least three of your influences — to a streaming platform, an archive, a digital edition, or any accessible source — so they can be experienced directly.",
     },
   },
   {
@@ -174,20 +172,20 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you pick your three most relevant influences and describe specifically how each one achieves its effect — what choices the creator made and what you can learn from them?",
       tool: "write",
-      title: "Analyse One Influence",
-      subheader: "Choose one influence and write a close analysis of a specific craft decision it makes: how it opens, how it builds, how it uses its form. What does it do and how does it do it?",
+      title: "Study How They Work",
+      subheader: "Pick your three most relevant influences and describe specifically how each achieves its effect: what choices the creator made and what you can learn from them.",
     },
     t2: {
       prompt: "Can you build a craft analysis table — listing each influence, the specific technique or decision you're studying, and how you could adapt it for your own piece?",
       tool: "table",
-      title: "Compare Two Approaches",
-      subheader: "Choose two influences that handle a similar challenge differently and build a table comparing their approaches, noting what each achieves and what each sacrifices.",
+      title: "Build the Craft Table",
+      subheader: "Build a craft analysis table listing each influence, the specific technique or decision you are studying, and how you could adapt it for your own piece.",
     },
     t3: {
       prompt: "Can you write a detailed craft analysis of one influence — examining how it works, what choices it makes, and why those choices are effective — long enough to reveal something you hadn't noticed before?",
       tool: "write",
-      title: "Name What Only You Can Make",
-      subheader: "Based on your analysis, write a paragraph defining your creative position: what your piece inherits from these works and what it does that they do not.",
+      title: "Go Deep on One",
+      subheader: "Write a detailed craft analysis of one influence: how it works, what choices it makes, and why those choices are effective — long enough to reveal something you had not noticed before.",
     },
   },
   {
@@ -202,20 +200,20 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you describe what your piece shares with its influences and what it does differently — naming at least one similarity and one deliberate departure?",
       tool: "write",
-      title: "Confirm the Genuine Works",
-      subheader: "Review your list of influences and confirm each is a work you have actually engaged with, not one you are referencing by reputation. Note any you need to go back and read, watch, or listen to.",
+      title: "Name the Departure",
+      subheader: "Describe what your piece shares with its influences and what it does differently, naming at least one similarity and one deliberate departure.",
     },
     t2: {
       prompt: "Can you map your creative position on the canvas — placing your influences around the space and marking where your piece sits relative to them?",
       tool: "map",
-      title: "Replace Any Ghost",
-      subheader: "If any influence in your list is one you know only by reputation, replace it with a work you genuinely know, and update your influences table accordingly.",
+      title: "Map Your Position",
+      subheader: "On the canvas, map your creative position — placing your influences around the space and marking where your piece sits relative to them.",
     },
     t3: {
       prompt: "Can you write a positioning statement — describing your piece in relation to at least two influences and making clear what makes it its own thing?",
       tool: "write",
       title: "State the Full Position",
-      subheader: "Write a complete creative position statement: the works you are drawing from, what each contributes, and the specific gap or opportunity your piece is working into.",
+      subheader: "Write a positioning statement describing your piece in relation to at least two influences and making clear what makes it its own thing.",
     },
   },
   {
@@ -230,23 +228,22 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you describe the voice, tone, and pace of your piece in five adjectives — and write a sentence for each explaining what it means in practice?",
       tool: "write",
-      title: "Decide the Style",
-      subheader: "Write a style note for your piece: the specific aesthetic decisions you are committing to in tone, register, pacing, or visual approach.",
+      title: "Name the Voice",
+      subheader: "Describe the voice, tone, and pace of your piece in five adjectives, and write a sentence for each explaining what it means in practice.",
     },
     t2: {
       prompt: "Can you build a style guide table — listing at least three concrete decisions about structure, language, visual language, or sound, with a note on how each one serves the concept?",
       tool: "table",
       title: "Build the Style Guide",
-      subheader: "Build a style guide table listing each major aesthetic decision, the reason for it, and how it relates to the influences that shaped it.",
+      subheader: "Build a style guide table listing at least three concrete decisions about structure, language, visual language, or sound, with a note on how each one serves the concept.",
     },
     t3: {
       prompt: "Can you use the canvas to create a mood board for your piece — capturing the aesthetic character through images, colours, textures, and references rather than words?",
       tool: "map",
-      title: "Confirm the Gallery Is Genuine",
-      subheader: "Review every reference and influence you have listed and confirm the gallery as a whole reflects where your piece actually comes from. Write a short note confirming it is complete and authentic.",
+      title: "Compose the Mood Board",
+      subheader: "On the canvas, create a mood board for your piece — capturing the aesthetic character through images, colours, textures, and references rather than words.",
     },
   },
-  // Stage 3: Drafting & Creation — The Wilderness · The Beast of the Unfinished
   {
     stage: 3,
     checkpoint: 1,
@@ -271,8 +268,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t3: {
       prompt: "Can you identify the single most important structural decision you've made and write a paragraph defending why it's the right choice for this piece?",
       tool: "write",
-      title: "Name the Hardest Ground",
-      subheader: "Identify the part of the piece you are most uncertain about, structurally or creatively, and write a short note on your current thinking for how to cross it.",
+      title: "Defend the Load-Bearing Choice",
+      subheader: "Identify the single most important structural decision you have made and write a paragraph defending why it is the right choice for this piece.",
     },
   },
   {
@@ -287,8 +284,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you create the opening of your piece and upload it here — the first scene, verse, image, or sequence in whatever format is native to your medium?",
       tool: "upload",
-      title: "Write the Opening",
-      subheader: "Write the opening of your piece, the first scene, stanza, paragraph, sequence, or movement, however rough.",
+      title: "Write and Send the Opening",
+      subheader: "Create the opening of your piece and upload it here — the first scene, verse, image, or sequence in whatever form is native to your medium.",
     },
     t2: {
       prompt: "Can you write a note on what your opening needs to do — what it must set up for the rest of the piece to work — and check that your draft does those things?",
@@ -299,8 +296,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t3: {
       prompt: "Can you create two alternative openings, upload both, and write a short explanation of why one works better?",
       tool: "upload",
-      title: "Revise Once",
-      subheader: "Make one round of revisions to the opening based on your own assessment. Note the specific change you made and why.",
+      title: "Try Two Openings",
+      subheader: "Create two alternative openings, upload both, and write a short explanation of why one works better.",
     },
   },
   {
@@ -315,20 +312,20 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you create the middle section of your piece and upload it here — the bulk of the content — following the structure you planned?",
       tool: "upload",
-      title: "Draft the Core",
-      subheader: "Write the main body of your piece: the middle sections, the central argument, the sustained movement, or the bulk of the work. It does not need to be finished, but it needs to exist.",
+      title: "Send the Core to Surface",
+      subheader: "Create the middle section of your piece and upload it here — the bulk of the content — following the structure you planned.",
     },
     t2: {
       prompt: "Can you identify the moment in your piece where the emotional stakes are highest and write a note confirming it exists in your draft and describing where it falls?",
       tool: "write",
-      title: "Check the Tension",
-      subheader: "Read what you have drafted and write a note on whether the middle holds its energy or loses it, and what the most significant problem in the draft currently is.",
+      title: "Find the Peak",
+      subheader: "Identify the moment in your piece where the emotional stakes are highest, and write a note confirming it exists in your draft and describing where it falls.",
     },
     t3: {
       prompt: "Can you review the core of your piece, identify the single section that isn't working yet, rewrite it, and upload the revised version alongside the original?",
       tool: "upload",
-      title: "Address the Biggest Problem",
-      subheader: "Make one targeted revision to the part of the core you identified as weakest, and note what you changed and why.",
+      title: "Rework the Weak Point",
+      subheader: "Review the core of your piece, identify the single section that is not working yet, rewrite it, and upload the revised version alongside the original.",
     },
   },
   {
@@ -343,8 +340,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you create the ending of your piece and upload it here — the conclusion, resolution, or final movement?",
       tool: "upload",
-      title: "Write the Ending",
-      subheader: "Write the closing of your piece, the final scene, stanza, paragraph, sequence, or movement, however rough.",
+      title: "Send the Ending to Surface",
+      subheader: "Create the ending of your piece and upload it here — the conclusion, resolution, or final movement.",
     },
     t2: {
       prompt: "Can you write a note on how the ending responds to what the opening set up — and whether it earns what came before it?",
@@ -355,8 +352,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t3: {
       prompt: "Can you create two alternative endings, upload both, and write a short argument for why one is the right conclusion for this piece?",
       tool: "upload",
-      title: "Revise the Ending Once",
-      subheader: "Make one round of revisions to the ending. Note the specific change and why you made it.",
+      title: "Try Two Endings",
+      subheader: "Create two alternative endings, upload both, and write a short argument for why one is the right conclusion for this piece.",
     },
   },
   {
@@ -371,20 +368,20 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you upload the complete assembled draft — all sections combined into a single file in whatever format is native to your medium?",
       tool: "upload",
-      title: "Assemble the Draft",
-      subheader: "Put together all sections into a single complete draft and read it through from beginning to end for the first time.",
+      title: "Assemble the Full Draft",
+      subheader: "Upload the complete assembled draft — all sections combined into a single file in whatever form is native to your medium.",
     },
     t2: {
       prompt: "Can you experience your piece as an audience member would and write an honest note on your first reaction to it as a whole?",
       tool: "write",
-      title: "Write the First Whole-Draft Assessment",
-      subheader: "Write a short note on how the piece reads as a whole: what works, what does not, and what the single most important thing to address in revision is.",
+      title: "Read It as an Audience Would",
+      subheader: "Experience your piece as an audience member would and write an honest note on your first reaction to it as a whole.",
     },
     t3: {
       prompt: "Can you share the assembled draft with one trusted person and document their reaction before you explain anything about your intentions?",
       tool: "self_report",
-      title: "Name What the Beast Still Threatens",
-      subheader: "Identify the part of the draft most at risk of being abandoned or unresolved, and write a short note on your plan for addressing it in revision.",
+      title: "Hand It to a Stranger",
+      subheader: "Share the assembled draft with one trusted person and document their reaction before you explain anything about your intentions.",
     },
   },
   {
@@ -399,23 +396,22 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you list at least five specific things in the draft that aren't working — being precise about where each issue occurs and what the problem is?",
       tool: "write",
-      title: "Read It as a Stranger",
-      subheader: "Read the full draft as if you did not write it and write a short note on your honest first impression: what landed, what did not, and what confused you.",
+      title: "Name Five Weak Spots",
+      subheader: "List at least five specific things in the draft that are not working, being precise about where each issue occurs and what the problem is.",
     },
     t2: {
       prompt: "Can you build a self-review table — listing each issue, its location in the piece, what type of problem it is (structural, tonal, pacing, missing element), and your proposed approach to fixing it?",
       tool: "table",
-      title: "List What Needs Work",
-      subheader: "Make a list of at least five specific things you want to address in revision, being precise about where each issue occurs in the draft.",
+      title: "Build the Self-Review Table",
+      subheader: "Build a self-review table listing each issue, its location in the piece, what type of problem it is (structural, tonal, pacing, missing element), and your proposed approach to fixing it.",
     },
     t3: {
       prompt: "Can you review the draft against the concept you defined in Stage 1 and write a note on any place where the piece has drifted — and whether the drift is a problem or an improvement?",
       tool: "write",
-      title: "Confirm the Draft Is Complete",
-      subheader: "Confirm in writing that every section of the piece exists in draft form, even if rough, and that nothing has been skipped or left entirely blank.",
+      title: "Check the Drift",
+      subheader: "Review the draft against the concept you defined in Stage 1 and write a note on any place where the piece has drifted, and whether the drift is a problem or an improvement.",
     },
   },
-  // Stage 4: Feedback & Critique — The Village Square · The Crowd of False Validation
   {
     stage: 4,
     checkpoint: 1,
@@ -468,8 +464,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t3: {
       prompt: "Can you collect feedback from two readers and build a comparison table — showing where they agree, where they diverge, and what that difference tells you about your piece?",
       tool: "table",
-      title: "Separate Signal from Noise",
-      subheader: "Write a short note on which pieces of feedback you heard from more than one source and which were unique to one reader, and what that pattern tells you.",
+      title: "Build the Comparison Table",
+      subheader: "Collect feedback from two readers and build a comparison table showing where they agree, where they diverge, and what that difference tells you about your piece.",
     },
   },
   {
@@ -484,8 +480,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you write a revision plan based on your interpreted feedback — a list of specific changes you intend to make in priority order with a reason for each?",
       tool: "write",
-      title: "Interpret the Feedback",
-      subheader: "Write a paragraph on what the feedback, taken as a whole, is telling you about the piece: what is working, what is not, and what the most important thing to address is.",
+      title: "Write the Revision Plan",
+      subheader: "Write a revision plan based on your interpreted feedback: a list of specific changes you intend to make in priority order, with a reason for each.",
     },
     t2: {
       prompt: "Can you build an interpretation table — marking each piece of feedback as: address it, acknowledge but keep as is, or disagree and why?",
@@ -500,7 +496,6 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
       subheader: "Identify the piece of feedback that is hardest to hear but most likely to be right, and write a short note on why it is probably true and what you will do about it.",
     },
   },
-  // Stage 5: Refinement & Polish — The Artisan's Workshop · The Perfectionist's Spectre
   {
     stage: 5,
     checkpoint: 1,
@@ -525,8 +520,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t3: {
       prompt: "Can you share your revision plan with your reader and document whether they feel the proposed changes address what they flagged?",
       tool: "self_report",
-      title: "Set the Finishing Condition",
-      subheader: "Write a short note defining what done looks like for this piece: the specific conditions that will tell you the revision is complete and you are ready to release.",
+      title: "Test the Plan on a Reader",
+      subheader: "Share your revision plan with your reader and document whether they feel the proposed changes address what they flagged.",
     },
   },
   {
@@ -541,8 +536,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you upload the revised version of your piece after structural changes — and write a note describing what you changed and what it did to the piece?",
       tool: "upload",
-      title: "Make the Structural Changes",
-      subheader: "Make every structural revision on your list: reorder sections, cut or expand major parts, address the overall arc. Document each change you made.",
+      title: "Send the Structural Revision",
+      subheader: "Upload the revised version of your piece after structural changes, and write a note describing what you changed and what it did to the piece.",
     },
     t2: {
       prompt: "Can you write a note confirming the structural changes haven't created new inconsistencies — where the piece now contradicts itself or loses its thread?",
@@ -553,8 +548,8 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t3: {
       prompt: "Can you document what you cut from the piece — listing each removed element and why its removal strengthens the whole?",
       tool: "write",
-      title: "Note What Structural Work Remains",
-      subheader: "If any structural issue remains unresolved, name it and write a short note on your plan for addressing it before moving to line-level polish.",
+      title: "Name What You Cut",
+      subheader: "Document what you cut from the piece: list each removed element and why its removal strengthens the whole.",
     },
   },
   {
@@ -569,20 +564,20 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you upload the polished version of your piece — after going through line by line, element by element, refining everything that can be sharper or more precise?",
       tool: "upload",
-      title: "Polish Every Line",
-      subheader: "Work through the piece line by line or detail by detail, refining the language, pacing, or craft elements until each is at its best.",
+      title: "Send the Polished Version",
+      subheader: "Upload the polished version of your piece — after going through line by line, element by element, refining everything that can be sharper or more precise.",
     },
     t2: {
       prompt: "Can you identify the three weakest moments in the polished piece and upload a revised version of each — showing the before and after?",
       tool: "upload",
-      title: "Check for Consistency",
-      subheader: "Read the full revised piece and build a short checklist confirming consistency of voice, tense, style, and any recurring element across the whole work.",
+      title: "Fix the Weakest Moments",
+      subheader: "Identify the three weakest moments in the polished piece and upload a revised version of each, showing the before and after.",
     },
     t3: {
       prompt: "Can you record yourself reading or performing the piece aloud and upload the recording — using what you hear to catch anything that doesn't sound right that you couldn't catch by reading silently?",
       tool: "upload",
-      title: "Make the Final Cuts",
-      subheader: "Identify anything in the piece that does not earn its place, a line, a moment, a detail, and remove or rework it. Write a note on what you cut and why.",
+      title: "Record It Aloud",
+      subheader: "Record yourself reading or performing the piece aloud and upload the recording, using what you hear to catch anything that does not sound right that you could not catch by reading silently.",
     },
   },
   {
@@ -597,23 +592,22 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you upload the final version of your piece — the version that represents your fullest creative intention at this stage?",
       tool: "upload",
-      title: "Complete the Final Version",
-      subheader: "Make your final revisions and confirm the piece exists in the form you intend to release. Write a note confirming this is the final version.",
+      title: "Send the Final Version",
+      subheader: "Upload the final version of your piece — the version that represents your fullest creative intention at this stage.",
     },
     t2: {
       prompt: "Can you write a short note to yourself documenting what this piece taught you — about the subject, about your craft, about the process?",
       tool: "write",
-      title: "Read It Once More",
-      subheader: "Read the final piece through one last time and write a short note confirming it is ready: that it does what you intended and that further revision would not improve it.",
+      title: "Write What It Taught You",
+      subheader: "Write a short note to yourself documenting what this piece taught you: about the subject, about your craft, about the process.",
     },
     t3: {
       prompt: "Can you share the final piece with someone who hasn't seen it before and document what they said they experienced — without you explaining anything?",
       tool: "self_report",
-      title: "Write the Release Note",
-      subheader: "Write a short note on what this piece is, what it is trying to do, and why you made it, in the form you would share with an audience when you release it.",
+      title: "Watch a Fresh Reader Meet It",
+      subheader: "Share the final piece with someone who has not seen it before and document what they said they experienced, without you explaining anything.",
     },
   },
-  // Stage 6: Release & Sharing — The Harbour · The Harbourmaster of Hesitation
   {
     stage: 6,
     checkpoint: 1,
@@ -626,20 +620,20 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you upload the piece in its release format — formatted, exported, or packaged in the form your audience will receive it?",
       tool: "upload",
-      title: "Choose the Format",
-      subheader: "Decide on the format in which you will release or share the piece and write a short note confirming it is the right form for the audience you have in mind.",
+      title: "Send the Release Format",
+      subheader: "Upload the piece in its release format: formatted, exported, or packaged in the form your audience will receive it.",
     },
     t2: {
       prompt: "Can you confirm the release format is correct and complete by experiencing it the way your audience will — write a note on anything you found that needed fixing?",
       tool: "self_report",
-      title: "Prepare the Release File",
-      subheader: "Prepare the piece in its final release format: the document, audio, video, image, or link that you will share. Confirm it is correct and complete.",
+      title: "Experience It as Your Audience Will",
+      subheader: "Confirm the release format is correct and complete by experiencing it the way your audience will, and write a note on anything you found that needed fixing.",
     },
     t3: {
       prompt: "Can you prepare a second release format — a digital and print version, or a high-resolution and web-optimised version — and upload both?",
       tool: "upload",
-      title: "Name the Audience",
-      subheader: "Write a short note on who you are releasing this work to, why they are the right audience for this piece, and what you want them to do or feel when they encounter it.",
+      title: "Prepare a Second Format",
+      subheader: "Prepare a second release format — a digital and print version, or a high-resolution and web-optimised version — and upload both.",
     },
   },
   {
@@ -654,20 +648,20 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you describe the specific audience for this piece and write a note on where that audience currently discovers new work in this form?",
       tool: "write",
-      title: "Name the Channel",
-      subheader: "Identify the specific platform, venue, community, or context where you will share this piece and write a sentence on why it is the right fit.",
+      title: "Name the Audience",
+      subheader: "Describe the specific audience for this piece and write a note on where that audience currently discovers new work in this form.",
     },
     t2: {
       prompt: "Can you build a channel comparison table — listing at least three possible release channels, the audience each gives you access to, and your reasoning for which to prioritise?",
       tool: "table",
-      title: "Confirm the Audience",
-      subheader: "Write a short note on who you expect to encounter the work in this channel and what you hope they take from it.",
+      title: "Build the Channel Table",
+      subheader: "Build a channel comparison table listing at least three possible release channels, the audience each gives you access to, and your reasoning for which to prioritise.",
     },
     t3: {
       prompt: "Can you link the specific platform, publication, or venue you've chosen — and confirm it is the right fit for both the piece and its intended audience?",
       tool: "link",
-      title: "Plan the Sharing",
-      subheader: "Write a short plan for how you will share the work: when, in what form, with what accompanying message or context, and how you will know it has been received.",
+      title: "Link the Chosen Venue",
+      subheader: "Link the specific platform, publication, or venue you have chosen, and confirm it is the right fit for both the piece and its intended audience.",
     },
   },
   {
@@ -682,14 +676,14 @@ export const CREATIVE_CHECKPOINT_DEFINITIONS: CreativeCheckpointDef[] = [
     t1: {
       prompt: "Can you link the released piece from this checkpoint — so it is publicly accessible and findable?",
       tool: "link",
-      title: "Release the Work",
-      subheader: "Share the piece in the channel and format you have prepared. Confirm it has been released and link or upload the evidence.",
+      title: "Link the Released Work",
+      subheader: "Link the released piece from this checkpoint, so it is publicly accessible and findable.",
     },
     t2: {
       prompt: "Can you document who you shared the piece with — at least ten people actively reached, not just posted and waiting — and write a note on how each responded?",
       tool: "write",
-      title: "Document the Initial Response",
-      subheader: "Write a short note on the initial response to the work: who saw it, what they said, and how it landed.",
+      title: "Document Who You Reached",
+      subheader: "Document who you shared the piece with — at least ten people actively reached, not just posted and waiting — and write a note on how each responded.",
     },
     t3: {
       prompt: "Can you write a short reflection on the release — what happened when the piece met its audience, what surprised you, and what you would do differently in how you shared it?",

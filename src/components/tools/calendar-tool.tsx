@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,6 +84,29 @@ export function CalendarTool({
 
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [outlineDate, setOutlineDate] = useState<Date | null>(null);
+
+  // Ref on the "Add Event / Add Milestone" quick-action row so the
+  // top-right + button (next to the WED 5 AUG chip) can smooth-scroll
+  // the user straight down to it — the calendar grid can be tall
+  // enough that those buttons are off-screen on shorter viewports.
+  const quickAddRef = useRef<HTMLDivElement | null>(null);
+  const scrollToQuickAdd = () => {
+    // Open the Event form as part of the jump so the user lands with
+    // the input focused and ready to type — otherwise they'd scroll
+    // to two buttons and have to click one first, which is the extra
+    // step the + shortcut is supposed to eliminate.
+    setShowEventForm(true);
+    setShowMilestoneForm(false);
+    // Next frame so the newly-rendered form is in the DOM before we
+    // measure / scroll (otherwise scrollIntoView targets the pre-open
+    // position and the form pops in below the fold).
+    requestAnimationFrame(() => {
+      quickAddRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
 
   useEffect(() => {
     if (initialContent?.events) {
@@ -234,18 +257,35 @@ export function CalendarTool({
           </Tabs>
         </div>
         {/*
-          Chip now shows the currently-selected date (e.g. "4 AUG")
-          rather than an item count. The item count already appears
-          inside the day cell + the day-detail list below, so echoing
-          it here was noise — the date is the more useful anchor
-          because it tells the user which day the panel is scoped to
-          at a glance. Compact `d MMM` format keeps the chip narrow.
+          Chip shows day-of-week + date so the user gets both the
+          weekday context and the numeric anchor at a glance
+          ("Wed 5 Aug" instead of just "5 Aug"). Format `EEE d MMM`
+          keeps it compact (three-letter day, day-of-month, three-
+          letter month). Full weekday + year still available on
+          hover via the title tooltip.
+          Adjacent + button — shortcut that scrolls straight down to
+          the Add Event / Add Milestone quick-actions row and opens
+          the Event form ready for input. Product ask: "where its
+          written 5 aug wednesday add a + button clicking + redirect
+          u to the bottom of calendar which has add event add
+          milestone option".
         */}
-        <div
-          className="text-[9px] font-black text-indigo-200 uppercase tracking-widest bg-indigo-500/15 border border-indigo-400/25 px-2 py-0.5 rounded"
-          title={format(selectedDate, "EEEE, MMMM d, yyyy")}
-        >
-          {format(selectedDate, "d MMM")}
+        <div className="flex items-center gap-1.5">
+          <div
+            className="text-[9px] font-black text-indigo-200 uppercase tracking-widest bg-indigo-500/15 border border-indigo-400/25 px-2 py-0.5 rounded"
+            title={format(selectedDate, "EEEE, MMMM d, yyyy")}
+          >
+            {format(selectedDate, "EEE d MMM")}
+          </div>
+          <button
+            type="button"
+            onClick={scrollToQuickAdd}
+            aria-label="Add event or milestone"
+            title="Add event or milestone"
+            className="flex h-6 w-6 items-center justify-center rounded-md border border-indigo-400/25 bg-indigo-500/15 text-indigo-200 transition hover:border-indigo-400/60 hover:bg-indigo-500/25 hover:text-white"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
@@ -423,8 +463,9 @@ export function CalendarTool({
         )}
       </div>
 
-      {/* Quick Add Buttons */}
-      <div className="flex gap-2">
+      {/* Quick Add Buttons — ref used as the scroll target for the
+          + shortcut next to the WED 5 AUG chip up top. */}
+      <div ref={quickAddRef} className="flex gap-2 scroll-mt-3">
         <Button
           variant="outline"
           size="sm"
@@ -585,29 +626,12 @@ export function CalendarTool({
           </div>
         )}
 
-        {/* Submit Section */}
-        <div className="pt-2 border-t border-white/5 space-y-2">
-          <Button
-            onClick={handleSubmit}
-            disabled={events.length === 0 || isSubmitting}
-            className="w-full bg-indigo-500 hover:bg-indigo-600 text-white h-10 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg shadow-indigo-500/20 transition-all"
-          >
-            {isSubmitting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <>
-                <Check className="mr-1.5 h-3.5 w-3.5" />
-                {isStandalone ? `Save Plan (${events.length})` : `Submit Plan (${events.length})`}
-              </>
-            )}
-          </Button>
-
-          {events.length === 0 && (
-            <p className="text-[8px] text-center text-slate-600 font-bold uppercase tracking-widest">
-              Add at least one item to proceed
-            </p>
-          )}
-        </div>
+        {/* Submit Plan button + "Add at least one item to proceed"
+            helper removed per product ask ("remove submit board and
+            submit plan option"). The tool now autosaves any newly
+            added events; a task-modal-scoped Submit is still owned
+            by TaskSubmissionModal when the calendar is used inside
+            a task flow. */}
       </div>
 
       {/* Registry Outline Popup Modal */}

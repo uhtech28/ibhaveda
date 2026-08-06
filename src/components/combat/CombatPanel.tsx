@@ -91,7 +91,11 @@ export function CombatPanel({
   // We accomplish this by holding the outer phase as "active" for
   // CINEMATIC_HOLD_MS after we first see `settled`, while pinning the
   // last known active-phase view so BattleScene has HP=0 to react to.
-  const CINEMATIC_HOLD_MS = 6500;
+  // Bumped from 6500 → 7500 to cover the extended retreat cinematic
+  // (retreat 2200ms + defeat 2200ms + cheer ~3100ms buffer). The
+  // retreat stage got 600ms longer so the boss's translate + fade
+  // has time to play through; the score card was cutting in early.
+  const CINEMATIC_HOLD_MS = 7500;
   // Reset the cinematic ref whenever the roundId changes, so a retry
   // round's ending gets its own fresh cinematic buffer.
   useEffect(() => {

@@ -165,9 +165,28 @@ export function FeedClient() {
       // User already saw the picker in this tab — don't loop them back.
       return;
     }
-    // replace() so /feed isn't left in browser history behind the
-    // persona screen.
-    router.replace("/persona-setup");
+    // DEBOUNCE the redirect. The pre-fix "picker → feed → picker"
+    // flicker was caused by /feed firing this redirect the moment its
+    // personaIdRaw query resolved to null, even though an
+    // updatePersonaId mutation was IN FLIGHT and about to land in the
+    // very next tick. Delaying the redirect by ~1.2s lets any recent
+    // mutation propagate through the Convex reactive query cache —
+    // if it lands, `personaIdRaw` becomes a string, the guard at
+    // the top of the effect returns early on the retry render, and
+    // the timeout is cancelled by the cleanup below.
+    const t = window.setTimeout(() => {
+      // Re-check the session flag right before nav — the
+      // profile-setup hard-reload path may have written it after
+      // the current effect closure captured the old value.
+      if (
+        typeof window !== "undefined" &&
+        sessionStorage.getItem("personaPickerDismissed") === "1"
+      ) {
+        return;
+      }
+      router.replace("/persona-setup");
+    }, 1200);
+    return () => window.clearTimeout(t);
   }, [
     isLoaded,
     userId,
@@ -255,6 +274,36 @@ export function FeedClient() {
     tourActiveOrLoading && (!ideaCountKnown || myIdeaCount === 0);
 
   const ideas = stableIdeas;
+
+  // Belt-and-braces guard: if the user is here WITHOUT a persona and
+  // the session dismissal flag isn't set, render a black loader
+  // while the redirect useEffect above kicks them to /persona-setup.
+  //
+  // Critical difference from an earlier iteration: we require
+  // `personaIdRaw === null` (definitely missing, query has landed),
+  // NOT `personaMissing` (which is true while the query is still
+  // undefined). Using the broader `personaMissing` here blackscreened
+  // EVERY /feed mount for the ~200ms the persona query took to
+  // resolve — and if `isProfileLoading` was still true, Sparky and
+  // the feed never rendered at all. Users with a persona should see
+  // the feed instantly, without a black flash.
+  const showPersonaBlockingLoader =
+    isLoaded &&
+    !!userId &&
+    personaIdRaw === null &&
+    !isProfileLoading &&
+    isProfileComplete &&
+    !(
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("personaPickerDismissed") === "1"
+    );
+  if (showPersonaBlockingLoader) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+      </div>
+    );
+  }
 
   return (
     <>

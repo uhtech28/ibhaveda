@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface TutorialSpeechBubbleProps {
@@ -41,6 +42,14 @@ export function TutorialSpeechBubble({
   typeSpeed = 24,
   fullWidth = false,
 }: TutorialSpeechBubbleProps) {
+  // Bubble stays WHITE. Product ask for the intro-only black BACKDROP
+  // (dimming the feed underneath) is handled below by rendering a
+  // full-screen fixed scrim behind the bubble — not by darkening
+  // the bubble itself. Match on the leading phrase of Sparky's very
+  // first line so we don't have to thread a variant prop through
+  // every render site.
+  const isIntroDialogue = text.trim().startsWith("Hi, I'm Sparky");
+  const bubbleBg = "white";
   // ── Typewriter state ─────────────────────────────────────────────────────
   const [shown, setShown] = useState("");
   const [done, setDone] = useState(false);
@@ -80,8 +89,39 @@ export function TutorialSpeechBubble({
           ? "top"
           : "left";
 
+  // Portal the intro-only black scrim to document.body so it lives
+  // OUTSIDE this component's parent stacking context (the mascot's
+  // z-[10010] fixed container). If the scrim renders as a sibling of
+  // the bubble inside that container, its z-[10009] wins vs. the
+  // bubble's auto z-index — the scrim ends up ON TOP of the bubble
+  // and Sparky, so the user sees a full black viewport with no
+  // dialogue. Portaling escapes the stacking context and lets the
+  // fixed inset-0 + z-[9998] genuinely sit UNDERNEATH the bubble
+  // (z-[10010]) and Sparky (z-[10011]).
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+  const scrim =
+    isIntroDialogue && portalReady && typeof document !== "undefined"
+      ? createPortal(
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            aria-hidden
+            className="fixed inset-0 z-[9998] pointer-events-none"
+            style={{ background: "#000000" }}
+          />,
+          document.body,
+        )
+      : null;
+
   return (
-    <motion.div
+    <>
+      {scrim}
+      <motion.div
       initial={{ opacity: 0, scale: 0.8, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.8, y: 10 }}
@@ -94,8 +134,11 @@ export function TutorialSpeechBubble({
       className={`relative pointer-events-none ${fullWidth ? "w-full" : "w-[260px]"}`}
     >
       <div
-        className="relative rounded-2xl bg-white px-5 py-4 shadow-xl border-2 border-amber-300/70"
-        style={{ boxShadow: "0 10px 30px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04)" }}
+        className="relative rounded-2xl px-5 py-4 shadow-xl"
+        style={{
+          background: bubbleBg,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04)",
+        }}
       >
         {/* ── Bubble tail ─────────────────────────────────────────────── */}
         {/* Positioned on the SIDE of the bubble, not the bottom, so the
@@ -106,18 +149,17 @@ export function TutorialSpeechBubble({
         <div
           className="absolute w-4 h-4"
           style={(() => {
-            // Position + rotation per side. The 4-square is centered on the
-            // bubble's outer edge so half pokes out. Borders match the
-            // bubble's amber rim on the two edges that face OUTWARD.
-            const amber = "2px solid rgba(252, 211, 77, 0.7)";
+            // Position + rotation per side. The 4-square is centered on
+            // the bubble's outer edge so half pokes out. Amber outline
+            // dropped per product ask ("remove the golden border") —
+            // the tail is now just a rotated square sharing the
+            // bubble's fill colour, no rim.
             if (tailDirection === "right") {
               return {
                 top: "62%",
                 right: "0px",
                 transform: "translate(50%, -50%) rotate(45deg)",
-                background: "white",
-                borderTop: amber,
-                borderRight: amber,
+                background: bubbleBg,
               };
             }
             if (tailDirection === "left") {
@@ -125,9 +167,7 @@ export function TutorialSpeechBubble({
                 top: "62%",
                 left: "0px",
                 transform: "translate(-50%, -50%) rotate(45deg)",
-                background: "white",
-                borderBottom: amber,
-                borderLeft: amber,
+                background: bubbleBg,
               };
             }
             if (tailDirection === "top") {
@@ -136,9 +176,7 @@ export function TutorialSpeechBubble({
                 top: "0px",
                 left: "50%",
                 transform: "translate(-50%, -50%) rotate(45deg)",
-                background: "white",
-                borderTop: amber,
-                borderLeft: amber,
+                background: bubbleBg,
               };
             }
             // bottom — bubble sits ABOVE Sparky, tail points DOWN.
@@ -149,9 +187,7 @@ export function TutorialSpeechBubble({
               bottom: "0px",
               right: "30%",
               transform: "translate(50%, 50%) rotate(45deg)",
-              background: "white",
-              borderRight: amber,
-              borderBottom: amber,
+              background: bubbleBg,
             };
           })() as React.CSSProperties}
         />
@@ -205,5 +241,6 @@ export function TutorialSpeechBubble({
         </AnimatePresence>
       </div>
     </motion.div>
+    </>
   );
 }

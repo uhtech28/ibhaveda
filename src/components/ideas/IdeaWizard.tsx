@@ -507,15 +507,21 @@ export function IdeaWizard({
         }
       }
 
-      toast({
-        title: visibility === "public" ? "Idea posted!" : "Saved as private",
-        description:
-          visibility === "public"
-            ? willCrossPost
-              ? "Now pick where else to share it."
-              : "Loading your world map…"
-            : "Only you can see it — toggle to Public any time.",
-      });
+      // Success toast skipped during the first-run tutorial — Sparky
+      // is already narrating the "posted → world map" beat, so an
+      // extra floating notification was noise. Non-tutorial posts
+      // still get the confirmation toast.
+      if (!tutorialMode) {
+        toast({
+          title: visibility === "public" ? "Idea posted!" : "Saved as private",
+          description:
+            visibility === "public"
+              ? willCrossPost
+                ? "Now pick where else to share it."
+                : "Loading your world map…"
+              : "Only you can see it — toggle to Public any time.",
+        });
+      }
 
       // Hand off to the share step. We can't open the platform tabs
       // here because the click gesture is gone after the awaits above;

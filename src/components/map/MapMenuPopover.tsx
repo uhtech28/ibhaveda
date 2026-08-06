@@ -63,19 +63,25 @@ const MENU_ITEMS: readonly {
   // Contributions tile — user-supplied menu PNG. Opens the Team &
   // Contributors panel (Incoming Requests + Invite Contributors
   // tabs, both with skill-tag filtering).
-  { id: "contributors", label: "Contributions", pixelIcon: "menu-contributions-v2",   accent: "border-indigo-500/25 hover:border-indigo-500/60 hover:bg-indigo-500/10" },
+  // Contributions tile — swapped from v2 (map-scroll) to v3 (hammer)
+  // per user upload. The tile still opens the ContributionRequestModal
+  // (with skill tags) via handleSidebarOpenPanel; only the artwork
+  // changed.
+  { id: "contributors", label: "Contributions", pixelIcon: "menu-contributions-v3",   accent: "border-indigo-500/25 hover:border-indigo-500/60 hover:bg-indigo-500/10" },
   // Quests tile — user-supplied menu PNG. Wired to the existing
   // minigames panel-id (product treats the two as the same "extras"
   // surface).
   { id: "minigames",    label: "Quests",        pixelIcon: "menu-quests-v2",          accent: "border-teal-500/25 hover:border-teal-500/60 hover:bg-teal-500/10" },
   { id: "chat",         label: "Group Chat",    pixelIcon: "crystal-ball-purple",     accent: "border-blue-500/25 hover:border-blue-500/60 hover:bg-blue-500/10" },
-  // Previously a second "Contributors" tile (guild-crest icon) lived
-  // here — removed because the Contributions tile above now opens the
-  // same Team & Contributors panel and two identical entry points was
-  // confusing. The guild-crest slot is repurposed below as Community,
-  // routing to /community (Weekly Top Contributors + Top Projects
-  // podium) so the yellow "guild" slot still has content.
-  { id: "community",    label: "Community",     pixelIcon: "menu-community-v2",       accent: "border-yellow-500/25 hover:border-yellow-500/60 hover:bg-yellow-500/10" },
+  // Guild tile — pixel-art guild-crest icon, opens the Team &
+  // Contributors panel (Incoming Requests + Invite Contributors
+  // tabs) that used to open from the Contributions tile. Product
+  // rename: was "Community" routing to /community; now it's
+  // "Guild" and it fires the `community` panel-id which the map
+  // page's handleSidebarOpenPanel now maps to
+  // setIsContributorsOpen(true). Kept the internal id as
+  // "community" to avoid a wider MapMenuPanelId union rename.
+  { id: "community",    label: "Guild",         pixelIcon: "menu-community-v2",       accent: "border-yellow-500/25 hover:border-yellow-500/60 hover:bg-yellow-500/10" },
   // Hierarchy now uses the treasure-map scroll icon per product
   // request — reads better as a "map of your idea tree" than the
   // generic map-region tile that was there before.
@@ -118,6 +124,18 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
     return () => window.removeEventListener("keydown", handleKey);
   }, [open]);
 
+  // External open hook — tool panels (Journal, Calendar, Kanban,
+  // Group Chat, Idea Hierarchy, Contributors) render a saddlebag
+  // button next to their × close via <PanelCloseCluster>. Clicking
+  // it fires a `map-menu:open` window event which this listener
+  // catches and flips `open=true`. Keeps the panels decoupled from
+  // this component's internal state.
+  useEffect(() => {
+    const handleOpen = () => setOpen(true);
+    window.addEventListener("map-menu:open", handleOpen);
+    return () => window.removeEventListener("map-menu:open", handleOpen);
+  }, []);
+
 
   return (
     <>
@@ -126,6 +144,11 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
         type="button"
         aria-label="Open menu"
         aria-expanded={open}
+        // Tutorial hook — the saddlebag onboarding step highlights
+        // this button so the user knows to open the Adventurer's Menu
+        // (which now contains Flare after the CheckpointPanel Flare
+        // button was moved).
+        data-tutorial="saddlebag-button"
         onClick={() => {
           audioManager.playUI("click");
           setOpen((v) => !v);
@@ -221,6 +244,10 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
                         key={item.id}
                         type="button"
                         role="menuitem"
+                        // Tutorial hook — the saddlebag onboarding
+                        // step highlights the Flare tile after the
+                        // Adventurer's Menu opens.
+                        data-tutorial={`menu-tile-${item.id}`}
                         onClick={() => {
                           audioManager.playUI("click");
                           setOpen(false);

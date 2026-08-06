@@ -51,7 +51,6 @@ interface AcademicCheckpointDef {
 }
 
 export const ACADEMIC_CHECKPOINT_DEFINITIONS: AcademicCheckpointDef[] = [
-  // Stage 1: Topic & Question — The Ancient Library · The Librarian of Lost Questions
   {
     stage: 1,
     checkpoint: 1,
@@ -136,7 +135,6 @@ export const ACADEMIC_CHECKPOINT_DEFINITIONS: AcademicCheckpointDef[] = [
       subheader: "Write a significance paragraph explaining what would be gained by answering this question and who would benefit from knowing the answer.",
     },
   },
-  // Stage 2: Literature Review — The Ruins · The Keeper of Incomplete Records
   {
     stage: 2,
     checkpoint: 1,
@@ -277,7 +275,6 @@ export const ACADEMIC_CHECKPOINT_DEFINITIONS: AcademicCheckpointDef[] = [
       subheader: "Write the opening paragraph of your literature review, the version that would appear in your finished piece, situating your work and making the case for your contribution.",
     },
   },
-  // Stage 3: Methodology — The Cartographer's Tower · The Cartographer of Crooked Maps
   {
     stage: 3,
     checkpoint: 1,
@@ -362,7 +359,6 @@ export const ACADEMIC_CHECKPOINT_DEFINITIONS: AcademicCheckpointDef[] = [
       subheader: "Share your methodology with one other person, ask them to identify any step that is unclear or missing, and write a note on what they found and how you responded.",
     },
   },
-  // Stage 4: Writing & Drafting — The Scriptorium · The Blank Page Wraith
   {
     stage: 4,
     checkpoint: 1,
@@ -531,7 +527,6 @@ export const ACADEMIC_CHECKPOINT_DEFINITIONS: AcademicCheckpointDef[] = [
       subheader: "Share the complete draft with at least one reader and ask them one question: does the piece answer the research question it sets out to answer? Document their response.",
     },
   },
-  // Stage 5: Review & Revision — The Council Chamber · The Councillor of False Consensus
   {
     stage: 5,
     checkpoint: 1,
@@ -644,7 +639,6 @@ export const ACADEMIC_CHECKPOINT_DEFINITIONS: AcademicCheckpointDef[] = [
       subheader: "Confirm the piece meets every formatting requirement of your target venue. Write a checklist note covering margin size, font, spacing, word count, and reference style.",
     },
   },
-  // Stage 6: Submission & Publication — The Grand Archive · The Gatekeeper of Unearned Entry
   {
     stage: 6,
     checkpoint: 1,

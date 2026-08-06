@@ -224,6 +224,7 @@ function TaskSubmissionModalInner({
         return (
           <SpreadsheetTool
             prompt={task.description}
+            hidePrompt
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}
             initialContent={initialDraft as never}
@@ -234,9 +235,13 @@ function TaskSubmissionModalInner({
         // Custom MapTool replaced with the professional Excalidraw
         // whiteboard per product request. Same onSubmit contract; the
         // JSON payload just carries an Excalidraw scene now.
+        // hidePrompt: the modal header already renders the description
+        // as a subheading — passing this stops the tool from showing
+        // the same text again inside its canvas frame.
         return (
           <ExcalidrawTool
             prompt={task.description}
+            hidePrompt
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}
           />
@@ -308,6 +313,7 @@ function TaskSubmissionModalInner({
         return (
           <JournalTool
             prompt={task.description}
+            hidePrompt
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}
           />
@@ -317,6 +323,7 @@ function TaskSubmissionModalInner({
         return (
           <KanbanTool
             prompt={task.description}
+            hidePrompt
             isSubmitting={isSubmitting}
             onSubmit={handleToolSubmit}
           />
@@ -384,38 +391,75 @@ function TaskSubmissionModalInner({
             data-state={isOpen ? "open" : "closed"}
           >
             <div className="bg-[#111827] border border-white/10 rounded-xl shadow-2xl flex flex-col w-[96vw] sm:w-[min(88vw,640px)] h-auto max-h-[min(88vh,720px)] overflow-hidden pointer-events-auto">
-              {/* Header — Compact.
-                  Two-line layout: task TITLE (uppercase, main heading,
-                  mirrors the CheckpointPanel row the user just clicked)
-                  above the task DESCRIPTION (subheader / flavour prompt).
-                  Previously the description was rendered alone, so the
-                  panel felt "context-less" — users didn't see which task
-                  they were answering. Falls back to description only if
-                  the task has no title (legacy rows). */}
-              <div className="p-3 sm:px-5 sm:py-3.5 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/15 to-[#8B5CF6]/15 flex-shrink-0">
-                <div className="flex items-start justify-between gap-3">
+              {/* Header — ONLY the task TITLE lives inside the blue
+                  gradient bar (per product ask: "only heading in blue
+                  headline for all task, not sub heading in blue"). The
+                  task DESCRIPTION is rendered directly below the blue
+                  bar as plain body copy so it still reads as a
+                  subheading right under the title, just no longer
+                  tinted by the blue block. Title is sentence-case
+                  ("Chart the affliction" instead of "CHART THE
+                  AFFLICTION") to match the CheckpointPanel row style. */}
+              <div className="px-3 py-2 sm:px-5 sm:py-2.5 border-b border-white/10 bg-gradient-to-r from-[#6366F1]/15 to-[#8B5CF6]/15 flex-shrink-0">
+                {/* items-center (was items-start) so the title text
+                    and the × button share a vertical center line —
+                    the × sat noticeably higher than the title before
+                    because items-start pinned both to the top edge
+                    but the title's larger font pushed its baseline
+                    down. */}
+                <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    {task.title && task.title.trim().length > 0 && (
-                      <h2 className="text-base sm:text-lg font-black uppercase tracking-wide text-white leading-tight">
-                        {task.title}
+                    {task.title && task.title.trim().length > 0 ? (
+                      <h2 className="text-base sm:text-lg font-black tracking-wide text-white leading-tight">
+                        {(() => {
+                          // Title Case with common small-word
+                          // exceptions: capitalise the first letter
+                          // of every word EXCEPT short articles /
+                          // prepositions / conjunctions (unless
+                          // they're the first or last word). Gives
+                          // "Chart the Affliction" instead of the
+                          // sentence-case "Chart the affliction"
+                          // (user asked: "just capital A for
+                          // affliction").
+                          const SMALL_WORDS = new Set([
+                            "a", "an", "and", "as", "at", "but", "by",
+                            "for", "if", "in", "nor", "of", "on", "or",
+                            "the", "to", "up", "vs", "via", "with",
+                          ]);
+                          const capitalise = (w: string) =>
+                            w.length === 0
+                              ? w
+                              : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+                          const raw = task.title.trim();
+                          if (raw.length === 0) return raw;
+                          const words = raw.split(/\s+/);
+                          return words
+                            .map((w, i) => {
+                              const lower = w.toLowerCase();
+                              const isFirstOrLast =
+                                i === 0 || i === words.length - 1;
+                              if (!isFirstOrLast && SMALL_WORDS.has(lower)) {
+                                return lower;
+                              }
+                              return capitalise(w);
+                            })
+                            .join(" ");
+                        })()}
                       </h2>
+                    ) : (
+                      // Legacy rows with no separate title — fall back
+                      // to the description as the heading.
+                      <p className="text-sm sm:text-base font-semibold text-white leading-relaxed">
+                        {task.description}
+                      </p>
                     )}
-                    <p
-                      className={
-                        task.title && task.title.trim().length > 0
-                          ? "mt-1.5 text-xs sm:text-sm font-medium text-white/80 leading-relaxed"
-                          : "text-sm sm:text-base font-semibold text-white leading-relaxed"
-                      }
-                    >
-                      {task.description}
-                    </p>
                   </div>
                   <button
                     onClick={() => {
                       audioManager.playUI("click");
                       onClose();
                     }}
-                    className="mt-0.5 p-1.5 rounded-lg bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-all flex-shrink-0 touch-manipulation group"
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-all flex-shrink-0 touch-manipulation group"
                     aria-label="Close modal"
                   >
                     <X className="w-4 h-4 text-gray-400 group-hover:text-white" />
@@ -423,9 +467,40 @@ function TaskSubmissionModalInner({
                 </div>
               </div>
 
-              {/* Content Area - Compact responsive with hidden scrollbar */}
-              <div 
-                className="flex-1 overflow-y-auto p-3 sm:p-5 min-h-0 safe-bottom [&>div]:border-0 [&>div]:bg-transparent [&>div]:shadow-none [&>div>div:first-child]:hidden [&>div>div:last-child]:p-0"
+              {/* Task DESCRIPTION as a subheading — sits directly
+                  UNDER the blue header (not tinted by it) so the
+                  heading/subheading pair still reads together. Only
+                  shown when the task actually has a separate title
+                  (otherwise the description IS the heading above).
+                  Tight top padding so it visually hugs the blue bar
+                  instead of floating with a big gap between them. */}
+              {task.title && task.title.trim().length > 0 && (
+                <div className="px-3 sm:px-5 pt-2 sm:pt-2.5 flex-shrink-0">
+                  <p className="text-xs sm:text-sm font-normal text-white/70 leading-relaxed">
+                    {task.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Content Area - Compact responsive with hidden scrollbar.
+                  CSS strips duplicated chrome so the tool renders naked
+                  inside the modal:
+                    - `[&>div]:*` neutralises the Card-based tools'
+                      outer border/shadow/background.
+                    - `[&_[data-slot="card-header"]]:hidden` hides the
+                      shadcn CardHeader (CardTitle + CardDescription) —
+                      the modal's own blue header now shows the task
+                      title + description, so re-rendering them inside
+                      the Card was a duplicate. Using the `data-slot`
+                      attribute (not `:first-child`) so non-Card tools
+                      like ExcalidrawTool / SpreadsheetTool don't have
+                      their first div child (the canvas!) hidden by
+                      accident.
+                    - `[&_[data-slot="card-content"]]:p-0` drops the
+                      Card body padding so the inner form flushes with
+                      the modal's own padding. */}
+              <div
+                className='flex-1 overflow-y-auto p-3 sm:p-5 min-h-0 safe-bottom [&>div]:border-0 [&>div]:bg-transparent [&>div]:shadow-none [&_[data-slot="card-header"]]:hidden [&_[data-slot="card-content"]]:p-0'
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 <style dangerouslySetInnerHTML={{__html: `

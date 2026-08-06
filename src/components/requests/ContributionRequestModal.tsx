@@ -13,9 +13,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 // within `Dialog`" — so we render bare div/h2 elements that keep the
 // original shadcn styling (flex/gap/font-semibold) without needing
 // the Dialog context.
-import { CheckCircle2, Clock, XCircle, UserPlus } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, UserPlus, Sparkles } from "lucide-react";
 import { notifyRequestSent } from "@/components/requests/notification-toast";
 import Link from "next/link";
+// Skill-tag picker — matches the same component used in profile setup
+// and idea creation, so the vocabulary of tags stays consistent across
+// the app. Caps selection at 5 so authors' incoming-request lists
+// don't get spammed with a laundry list of every skill.
+import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 
 interface ContributionRequestModalProps {
   ideaId: Id<"ideas">;
@@ -24,20 +29,37 @@ interface ContributionRequestModalProps {
   authorUsername?: string;
   authorAvatar?: string;
   onClose: () => void;
+  /**
+   * Render the skill-tag picker + header subtitle above the message
+   * textarea. Product split:
+   *   - /feed "Contribute" button (from IdeaCards)  → false (simple
+   *     message-only form, matches the pre-tags UX)
+   *   - Map's Adventurer's Menu CONTRIBUTIONS tile → true (full
+   *     gamified form with SkillsMultiSelect)
+   *
+   * Default = false so the feed stays untouched. Callers on the map
+   * pass `showSkillTags` explicitly.
+   */
+  showSkillTags?: boolean;
 }
 
-export const ContributionRequestModal: React.FC<ContributionRequestModalProps> = ({ 
-  ideaId, 
-  ideaTitle, 
+export const ContributionRequestModal: React.FC<ContributionRequestModalProps> = ({
+  ideaId,
+  ideaTitle,
   authorName,
   authorUsername,
   authorAvatar,
-  onClose 
+  onClose,
+  showSkillTags = false,
 }) => {
   const createRequestMutation = useMutation(api.contributionRequests.createContributionRequest);
   const userRequests = useQuery(api.contributionRequests.getMyRequests);
   
   const [message, setMessage] = useState("");
+  // Skill tags the contributor is offering — capped at 5 by the
+  // SkillsMultiSelect component itself. Server also dedupes + caps
+  // so the mutation is safe against hand-crafted calls.
+  const [skills, setSkills] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [existingRequest, setExistingRequest] = useState<Doc<"contributionRequests"> | null>(null);
@@ -107,9 +129,14 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
       await createRequestMutation({
         ideaId,
         message: message.trim(),
+        // Only send when the user picked at least one — keeps the
+        // server payload tidy and matches the schema's optional
+        // shape for legacy rows.
+        skills: skills.length > 0 ? skills : undefined,
       });
 
       setMessage("");
+      setSkills([]);
       notifyRequestSent();
       onClose();
     } catch (err: unknown) {
@@ -190,16 +217,61 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
 
   return (
     <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-6 overflow-hidden">
-      <div className="flex flex-col gap-2 text-left">
+      <div className="flex flex-col gap-1.5 text-left">
         <h2 className="text-lg leading-none font-semibold">
           Request to Contribute
         </h2>
+        {/* Subtitle only makes sense when the tag picker is present —
+            without tags there's nothing to explain beyond the
+            textarea. Product ask: "for the feed keep contribution
+            that was earlier there [simple form], keep this for
+            gamification". */}
+        {showSkillTags && (
+          <p className="text-xs text-white/60 leading-relaxed">
+            Tell the author what you can help with. Add skill tags so
+            they know exactly where you fit.
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">
         {projectProfileHeader}
 
-        <div>
+        {/* ── SKILL TAGS ────────────────────────────────────────────
+            Only rendered on the gamification path (map's Adventurer's
+            Menu → CONTRIBUTIONS tile). The /feed "Contribute" button
+            deliberately hides this so its dialog stays as short and
+            frictionless as it was before the tag picker shipped. */}
+        {showSkillTags && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/70">
+                <Sparkles className="h-3 w-3 text-[#C7D2FE]" />
+                Skills you're offering
+              </label>
+              <span className="text-[10px] text-white/40">
+                {skills.length}/5
+              </span>
+            </div>
+            <SkillsMultiSelect
+              selectedSkills={skills}
+              onChange={setSkills}
+              placeholder="Add skills you'd bring…"
+              maxSelection={5}
+            />
+          </div>
+        )}
+
+        {/* ── MESSAGE ─────────────────────────────────────────────── */}
+        <div className="space-y-2">
+          {/* Label only shown alongside the skill picker so the
+              feed's compact form doesn't get an extra header line
+              above a textarea that used to be label-less. */}
+          {showSkillTags && (
+            <label className="block text-xs font-semibold uppercase tracking-wider text-white/70">
+              Message
+            </label>
+          )}
           <div
             className={`relative rounded-[22px] border bg-[#0A0D12] transition-colors focus-within:bg-[#111827] ${
               isOverMessageLimit
@@ -223,10 +295,34 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
               required
             />
           </div>
-          {isOverMessageLimit && (
-            <p className="mt-1.5 pl-3 text-[11px] font-medium text-rose-400">
-              Max character count reached
-            </p>
+          {/* Char-count row is a gamification-flow addition — the
+              feed's original dialog never had one, so we only render
+              it when showSkillTags is on. The over-limit warning
+              still shows in either mode because it's a real error
+              the user needs to see. */}
+          {showSkillTags ? (
+            <div className="flex items-center justify-between px-1">
+              {isOverMessageLimit ? (
+                <p className="text-[11px] font-medium text-rose-400">
+                  Max character count reached
+                </p>
+              ) : (
+                <span />
+              )}
+              <span
+                className={`text-[10px] tabular-nums ${
+                  message.length > 1000 ? "text-amber-400" : "text-white/40"
+                }`}
+              >
+                {message.length}/1200
+              </span>
+            </div>
+          ) : (
+            isOverMessageLimit && (
+              <p className="mt-1.5 pl-3 text-[11px] font-medium text-rose-400">
+                Max character count reached
+              </p>
+            )
           )}
           {error && <p className="mt-2 pl-3 text-[11px] text-rose-400">{error}</p>}
         </div>

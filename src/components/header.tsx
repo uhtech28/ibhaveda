@@ -1,11 +1,11 @@
 'use client'
 
-import { LogOut, Plus, Home, Users, ArrowLeft, Search, Trophy } from 'lucide-react'
+import { LogOut, Plus, Home, Users, ArrowLeft, Search } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
-import { SignedIn, SignedOut, useClerk } from '@clerk/nextjs'
+import { SignedIn, SignedOut, useAuth, useClerk } from '@clerk/nextjs'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -29,7 +29,10 @@ const menuItems = [
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'My Ideas', href: '/my-ideas', icon: IdeaBulb },
     { name: 'Community', href: '/community', icon: Users },
-    { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
+    // Leaderboard entry removed per product ask — the trophy icon sat
+    // between Community and Notifications, and the /leaderboard content
+    // now lives inside /community as a tab, so the standalone nav item
+    // was redundant.
 ]
 
 export const HeroHeader = ({
@@ -42,7 +45,23 @@ export const HeroHeader = ({
     onOpenTodos?: () => void
     onOpenCalendar?: () => void
 }) => {
-    const { signOut, openSignIn, openSignUp } = useClerk()
+    const { signOut, openSignIn: clerkOpenSignIn, openSignUp: clerkOpenSignUp } = useClerk()
+    // Belt-and-braces guard — <SignedOut> already hides the login/signup
+    // buttons for authed users, but during Clerk's hydration window the
+    // buttons briefly render and a rapid click fires openSignIn/openSignUp
+    // against an already-active session. Clerk logs a dev-only
+    // `cannot_render_single_session_enabled` notice in that case.
+    // Wrapping the calls in a signed-in check makes them a no-op when
+    // there's no work to do.
+    const { isSignedIn } = useAuth()
+    const openSignIn: typeof clerkOpenSignIn = (opts) => {
+        if (isSignedIn) return
+        return clerkOpenSignIn(opts)
+    }
+    const openSignUp: typeof clerkOpenSignUp = (opts) => {
+        if (isSignedIn) return
+        return clerkOpenSignUp(opts)
+    }
     const currentUser = useQuery(api.users.getCurrentUser)
     const pathname = usePathname()
     const router = useRouter()

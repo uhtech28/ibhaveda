@@ -56,14 +56,13 @@ import {
 } from "../persona-assets";
 import { getPersona } from "@/config/personas";
 import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
-import {
-  CorruptionOverlay,
-  type OverlayCheckpoint,
-} from "@/lib/phaser/systems/corruptionOverlay";
-import {
-  ensureCorruptionPattern,
-  motifForStage,
-} from "@/lib/phaser/systems/corruptionPatterns";
+// Corruption overlay + pattern helpers imports kept for the TYPE
+// (`CorruptionOverlay | null` on the private field below) but the
+// runtime constructor + pattern builders are no longer called —
+// the corruption mechanism was pulled per product request. The
+// files stay on disk so re-enabling is a matter of restoring the
+// `new CorruptionOverlay(...)` block in create().
+import { CorruptionOverlay } from "@/lib/phaser/systems/corruptionOverlay";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 
 const MAP_ASSET = "/assets/maps-v2/village-painted/village-map.png";
@@ -167,16 +166,23 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     // clipping the top off the visible camera. 1.5 gives ~140px on screen,
     // which fits and reads clean.
     scale: 1.5,
-    // Sit closer to the CP marker — sprite origin (0.5, 1) puts the frame's
-    // bottom-edge at yOffset, and the character occupies the mid section
-    // of the frame. yOffset=+8 nudges the feet visually onto the ground.
-    yOffset: 8,
+    // Sprite origin (0.5, 1) puts the frame's bottom-edge at yOffset.
+    // Trimmed from +80 → +62 per product ask ("monster just half cm
+    // upward") — half a centimetre on a typical monitor is ~18px, so
+    // pulling the offset back by that amount lifts the boss just
+    // enough for its feet to sit on the CP disc's northern half
+    // rather than crushing into its centre.
+    yOffset: 62,
     // All Village bosses now sit at a small +30 east offset from
     // their CP marker so they appear ON the checkpoint while leaving
     // just enough gap on the LEFT for the persona to stand there
     // without overlapping. Product request: "bosses should be on
     // checkpoint, make character stand on left side."
-    offsetX: 30, // slightly east of CP1 — persona stands on its west side
+    // Zeroed — boss sits EXACTLY on the CP marker per product ask
+    // ("boss exact on check point"). Persona now stands at the CP's
+    // top-left (see CHAR_X_OFFSET / CHAR_Y_OFFSET), which keeps the
+    // two sprites separate without needing to nudge the boss.
+    offsetX: 0,
 
     taunts: [
       "Your idea has no edges...",
@@ -208,8 +214,8 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     // Match Fog's tuned scale/yOffset — Pixellab bosses fill more of
     // their 92-frame than the old single-image bosses did.
     scale: 1.5,
-    yOffset: 8,
-    offsetX: 30, // slightly east of CP2 — persona stands on its west side (consistent left-of-boss framing)
+    yOffset: 62, // Unified with CP1 — sprite feet on the CP disc.
+    offsetX: 0, // ON the CP marker — persona sits at CP top-left (unified with CP1).
 
     taunts: [
       "One arm for gamers, one for parents...",
@@ -239,8 +245,8 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     victoryKey: "boss-automaton-victory",
     victoryFrameCount: 9,
     scale: 1.5,
-    yOffset: 8,
-    offsetX: 30, // slightly east of CP3 — persona on the west (left) side
+    yOffset: 62, // Unified with CP1 — sprite feet on the CP disc.
+    offsetX: 0, // ON the CP marker — persona sits at CP top-left (unified with CP1).
 
     taunts: [
       "Add one more feature. Just one.",
@@ -269,8 +275,8 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     victoryKey: "boss-wraith-victory",
     victoryFrameCount: 9,
     scale: 1.5,
-    yOffset: 8,
-    offsetX: 30, // slightly east of CP4 — persona on the west (left) side (unified with other village bosses)
+    yOffset: 62, // Unified with CP1 — sprite feet on the CP disc.
+    offsetX: 0, // ON the CP marker — persona sits at CP top-left (unified with CP1).
 
     taunts: [
       "You assume they'll pay.",
@@ -312,10 +318,17 @@ const MAP_HEIGHT = 1024;
 // gives ~54px on screen) and desktop (1.4x zoom = 107px on screen).
 const CHAR_SCALE = 2.4;
 // Character stands ON the checkpoint marker — origin is bottom-center
-// so feet land exactly on the marker's y position. No offset needed.
-// +18 so the persona's feet land visually ON the marker disc rather than
-// at its geometric center (marker is drawn with radius ~30 from cp.y).
-const CHAR_Y_OFFSET = 18;
+// Character spawns at the TOP-LEFT of the checkpoint marker on
+// every map. Product spec ("make sure where i have placed the
+// character, default all character at this map and all will be
+// here only at starting position") — regardless of which persona
+// the user picked, they land here on first mount and every
+// subsequent CP arrival. This is the "starting position" contract
+// for the whole world map. The boss occupies the CP disc itself
+// (offsetX: 0 in VILLAGE_MINI_BOSSES), so top-left keeps the two
+// sprites from overlapping while still reading as "at CP1".
+const CHAR_X_OFFSET = -60;
+const CHAR_Y_OFFSET = -45;
 
 interface CheckpointDef {
   id: number;
@@ -689,6 +702,23 @@ export class VillageMapScene extends Phaser.Scene {
 
     // 3. Drag-to-pan (works for mouse + touch on mobile via Phaser's
     // pointer abstraction).
+    //
+    // ── Ghost-drag fix ────────────────────────────────────────────────
+    // Bug seen in the wild: opening the CheckpointPanel by clicking a
+    // marker sometimes left `dragging = true` forever. Repro: mouse
+    // DOWN on the Phaser canvas → React mounts the panel → mouse
+    // UP happens over the panel's DOM, which stops event propagation
+    // so Phaser's `pointerup` never fires → the next mouse MOVE (with
+    // no button held) still passes the `if (!dragging) return` guard
+    // and pans the camera. User perceives this as "the map moves as
+    // the mouse pointer moves" whenever the CP panel is open.
+    //
+    // Two-layer fix:
+    //   (a) In pointermove, verify `p.isDown` — a real drag requires a
+    //       held button. If nothing is pressed, force-release dragging.
+    //   (b) Add a window-level pointerup listener so button-release
+    //       outside the canvas (e.g. on the CP panel) also resets the
+    //       flag. Cleaned up on scene shutdown.
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
@@ -704,6 +734,14 @@ export class VillageMapScene extends Phaser.Scene {
       dragDistance = 0;
     });
     this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+      // Guard (a): if we THINK we're dragging but no button is
+      // actually held, the pointerup was swallowed by an overlay
+      // (CheckpointPanel, tools sheet, etc.). Reset and bail so the
+      // camera stops chasing the cursor.
+      if (dragging && !p.isDown) {
+        dragging = false;
+        return;
+      }
       if (!dragging) return;
       const dx = p.x - lastX;
       const dy = p.y - lastY;
@@ -716,6 +754,23 @@ export class VillageMapScene extends Phaser.Scene {
     this.input.on("pointerup", () => {
       dragging = false;
     });
+    // Guard (b): mouseup / touchend anywhere on the page (including on
+    // top of React overlays) also clears the drag flag.
+    const releaseDrag = () => {
+      dragging = false;
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("mouseup", releaseDrag);
+      window.addEventListener("touchend", releaseDrag);
+      window.addEventListener("touchcancel", releaseDrag);
+      window.addEventListener("blur", releaseDrag);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        window.removeEventListener("mouseup", releaseDrag);
+        window.removeEventListener("touchend", releaseDrag);
+        window.removeEventListener("touchcancel", releaseDrag);
+        window.removeEventListener("blur", releaseDrag);
+      });
+    }
 
     // 3b. Keyboard capture — arrow keys + WASD drive the CHARACTER
     //     (free-roam), not the camera. E / Space open the nearest CP.
@@ -769,25 +824,16 @@ export class VillageMapScene extends Phaser.Scene {
     }
     this.refreshCheckpointStates();
 
-    // 4b. Corruption overlay — one tile-strip per CP-to-CP segment.
-    // Implements Ibhaveda_boss_corruption_table spec: strips start at
-    // full opacity, fade to ~10% when their owning CP hits 2/3 tasks,
-    // and to 0% + shatter burst at 3/3. `applyCorruptionState` is
-    // called from React whenever the CP data changes.
-    const villagePattern = ensureCorruptionPattern(this, motifForStage(1));
-    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
-      x: cp.x,
-      y: cp.y,
-    }));
-    this._corruption = new CorruptionOverlay(this, {
-      checkpoints: overlayCps,
-      patternTextureKey: villagePattern,
-      tint: 0xbdd4e7, // pale blue-grey — matches "Fog of Vagueness"
-      depth: 5, // above map (0), well below character (100+)
-      // Weakened-monster sprite reuses the fog boss idle sheet.
-      weakenedSpriteKey: "boss-fog-idle",
-      weakenedFrame: { width: 92, height: 92 },
-    });
+    // 4b. Corruption overlay — DISABLED per product ask ("remove
+    // the corruption mechanism for now WHATEVER U HAVE ADDED").
+    // The CorruptionOverlay class + `corruptionPatterns` helpers
+    // are still on disk (see systems/corruptionOverlay.ts) — we
+    // just don't instantiate them here anymore, so no procedural
+    // cracks / atmosphere dim / particles / spore emitters render
+    // on the Village map. `_corruption` stays null, and every
+    // `this._corruption?.…` callsite silently no-ops. Re-enable
+    // by restoring this block.
+    this._corruption = null;
 
     // 4c. Debug overlay for walkability blocked zones — enabled via
     // ?showZones=1 URL parameter. Red translucent rectangles let you
@@ -880,22 +926,6 @@ export class VillageMapScene extends Phaser.Scene {
     const char = this.character;
     if (!char) return;
 
-    // Yield to scripted walks (tween-driven checkpoint transitions).
-    if (this.scriptedMovement) {
-      // Watchdog: if we think a scripted walk is running but no tween
-      // is actually alive, the tween was interrupted (scene pause /
-      // remount race / combat overlay teardown) and lost its
-      // onComplete. Release the lock so free-roam input works again.
-      if (!this._walkTween || !this._walkTween.isPlaying?.()) {
-        this.scriptedMovement = false;
-        this.isWalking = false;
-        this._walkTween = null;
-      } else {
-        this.updateInteractHint();
-        return;
-      }
-    }
-
     // Viewer mode: we're spectating someone else's map. Persona stays
     // parked; no keyboard/joystick input applied. Interact hint is also
     // skipped since there's nothing to interact with (task modal is
@@ -909,8 +939,10 @@ export class VillageMapScene extends Phaser.Scene {
       return;
     }
 
-    // Read directional input. Keyboard is polled; joystick vector was
-    // pushed via eventBridge in create's handler.
+    // Read directional input FIRST so we can use it to detect "player
+    // wants control" before the scripted/busy gates below. Keyboard is
+    // polled; joystick vector was pushed via eventBridge in create's
+    // handler.
     let dx = 0;
     let dy = 0;
     if (this.cursors && this.wasd) {
@@ -927,9 +959,56 @@ export class VillageMapScene extends Phaser.Scene {
     const magnitude = Math.hypot(dx, dy);
     const moving = magnitude > 0.05;
 
+    // PLAYER-INTENT OVERRIDE — if the user is actively pressing a
+    // movement key (WASD / arrows / joystick), release ANY stuck
+    // scripted-walk or combat-anim lock and let them regain control.
+    // Bug seen in the wild: character frozen at a checkpoint because a
+    // walk tween lost its onComplete (scene remount race after opening
+    // the CheckpointPanel) or a persona victory anim's complete event
+    // never fired — the watchdogs eventually clear these, but "press
+    // WASD → move" should be instant, not delayed. This override IS
+    // the recovery path.
+    if (moving) {
+      if (this.scriptedMovement) {
+        if (this._walkTween) {
+          try { this._walkTween.stop(); } catch { /* tween already gone */ }
+          try { this._walkTween.remove(); } catch { /* already removed */ }
+          this._walkTween = null;
+        }
+        this.scriptedMovement = false;
+        this.isWalking = false;
+      }
+      if (this._personaAnimBusy) {
+        this._personaAnimBusy = false;
+        if (this._personaAnimBusyTimer !== null) {
+          window.clearTimeout(this._personaAnimBusyTimer);
+          this._personaAnimBusyTimer = null;
+        }
+      }
+    }
+
+    // Yield to scripted walks (tween-driven checkpoint transitions).
+    if (this.scriptedMovement) {
+      // Watchdog: if we think a scripted walk is running but no tween
+      // is actually alive, the tween was interrupted (scene pause /
+      // remount race / combat overlay teardown) and lost its
+      // onComplete. Release the lock so free-roam input works again.
+      if (!this._walkTween || !this._walkTween.isPlaying?.()) {
+        this.scriptedMovement = false;
+        this.isWalking = false;
+        this._walkTween = null;
+      } else {
+        this.updateInteractHint();
+        return;
+      }
+    }
+
     // Don't accept free-roam input while a persona combat one-shot
     // (attack/hurt/defeat/victory) is mid-play — otherwise the anim
-    // is restarted on the next frame and never resolves.
+    // is restarted on the next frame and never resolves. The
+    // player-intent override above already released this flag if the
+    // user is actively pressing a movement key, so this gate now only
+    // catches the "combat plays out with no input" case.
     if (this._personaAnimBusy) {
       // Keep shadow glued to character even during the busy anim.
       if (this.characterShadow) {
@@ -993,16 +1072,24 @@ export class VillageMapScene extends Phaser.Scene {
 
       // Swap to walk animation only if the KEY has actually changed —
       // otherwise Phaser restarts the clip every frame and freezes at
-      // frame 0, killing the illusion of walking.
+      // frame 0, killing the illusion of walking. Guard the play() call
+      // so a missing animation clip (persona sheet loaded but anim not
+      // registered — happens on legacy personas without the extended
+      // directional walk keys) doesn't throw and break the update loop;
+      // position updates above already ran regardless.
       if (this._currentPersonaAnimKey !== walkKey) {
-        char.play(walkKey);
-        this._currentPersonaAnimKey = walkKey;
+        if (this.anims.exists(walkKey)) {
+          try { char.play(walkKey); } catch { /* anim glitch — skip */ }
+          this._currentPersonaAnimKey = walkKey;
+        }
         this.isWalking = true;
       }
     } else if (this.isWalking) {
       const idleKey = this._personaIdleAnimKey ?? "persona-idle";
-      char.play(idleKey);
-      this._currentPersonaAnimKey = idleKey;
+      if (this.anims.exists(idleKey)) {
+        try { char.play(idleKey); } catch { /* anim glitch — skip */ }
+        this._currentPersonaAnimKey = idleKey;
+      }
       this.isWalking = false;
     }
 
@@ -1105,14 +1192,27 @@ export class VillageMapScene extends Phaser.Scene {
   // ─────────────────────────────────────────────────────────────────────
 
   private spawnMiniBosses(): void {
-    // Boss continuity flow (per product spec): each CP's boss is visible
-    // ONLY when the persona is on that CP. Cleared CPs stay hidden,
-    // future CPs stay hidden until reached. This keeps the map from
-    // feeling cluttered and reinforces "this boss is your current
-    // obstacle". Visibility is enforced in refreshMiniBossVisibility.
-    for (const def of VILLAGE_MINI_BOSSES) {
+    // NEW BOSS CONTINUITY MODEL (per product spec):
+    // ONE stage boss (Fog of Vagueness for the Village) walks the whole
+    // path — it starts at CP1, RETREATS to CP2 when CP1's tasks are
+    // done, retreats to CP3 when CP2's tasks are done, retreats to CP4
+    // when CP3's are done, and finally DIES on CP4 when its tasks are
+    // done. That means we only spawn ONE physical sprite (the first
+    // def in VILLAGE_MINI_BOSSES = Fog) and reposition it on advance;
+    // the remaining boss defs (Chimera / Doubt Imp / Metric Ghost) stay
+    // in the config for boss-name lookups and taunt copy but their
+    // sprites are not instantiated on the world map.
+    //
+    // See `advanceToNextCheckpoint` for the retreat tween; see
+    // `refreshMiniBossVisibility` for the "only render the moving boss"
+    // rule that replaces the old per-CP visibility gating.
+    for (let idx = 0; idx < VILLAGE_MINI_BOSSES.length; idx += 1) {
+      const def = VILLAGE_MINI_BOSSES[idx];
+      // Only CP1 (idx 0) actually spawns a sprite — the moving boss.
+      // Other CPs push nulls so downstream array-index math is safe.
+      const isMovingBoss = idx === 0;
       const cp = CHECKPOINTS[def.checkpointIndex];
-      if (!cp || !this.textures.exists(def.idleKey)) {
+      if (!isMovingBoss || !cp || !this.textures.exists(def.idleKey)) {
         this.miniBossSprites.push(null);
         this.miniBossBobTweens.push(null);
         this.miniBossTendrilStoppers.push(null);
@@ -1293,9 +1393,16 @@ export class VillageMapScene extends Phaser.Scene {
       // cleanly, so no other code path needs to change.
       const tendrilStop: (() => void) | null = null;
       const aura = null;
-      // P2 #10 — HP bar (with boss name chip) — kept, this is
-      // gameplay-critical UI, not animation.
-      const hpBar = addBossHpBar(this, sprite, 1, def.name);
+      // Boss HP bar above the sprite removed on the world map per
+      // product ask ("you can remove fog of vagueness XP bar on the
+      // map"). The same HP is still shown in the bottom HUD's
+      // PROJECT vs BOSS bar and inside CombatPanel, so no gameplay
+      // information is lost — this only strips the floating red
+      // sliver that was crowding the boss sprite. The array slot
+      // still gets a `null` push below so downstream index math
+      // (miniBossHpBars[i], setHp guarded by `if (hp) …`) keeps
+      // working unchanged.
+      const hpBar = null;
 
       // No taunt loop — boss stands still.
       const tauntStop: (() => void) | null = null;
@@ -1363,26 +1470,80 @@ export class VillageMapScene extends Phaser.Scene {
    * Called after refreshCheckpointStates() so it reflects the latest.
    */
   private refreshMiniBossVisibility(): void {
+    // New model: there's only ONE physical boss sprite (index 0 — the
+    // moving stage boss). It stays visible for the whole stage — its
+    // POSITION changes on advance (see retreatBossTo). Cleared / final
+    // state (boss dispelled) is enforced by the dispel path, not by
+    // this method. Other array slots hold nulls, so setVisible loops
+    // just no-op them.
     for (let i = 0; i < VILLAGE_MINI_BOSSES.length; i++) {
       const sprite = this.miniBossSprites[i];
       if (!sprite) continue;
-      // Only show the boss at the CURRENT checkpoint. Cleared bosses
-      // stay hidden (they've been defeated), and future bosses stay
-      // hidden until the persona reaches them. Keeps the map focused
-      // on "this is the obstacle in front of you right now".
-      const isActive = i === this.currentIndex;
-      sprite.setVisible(isActive);
-      // Hide the boss's aura + HP bar in lockstep so the map is clean
-      // for cleared/future checkpoints.
+      // The moving boss lives at index 0 and is always visible until
+      // the final CP is cleared. Every other slot is either null
+      // (skipped above) or a legacy sprite that shouldn't render.
+      const isMovingBoss = i === 0;
+      sprite.setVisible(isMovingBoss);
       const aura = this.miniBossAuras[i];
-      if (aura) aura.setVisible(isActive);
+      if (aura) aura.setVisible(isMovingBoss);
       const hpBar = this.miniBossHpBars[i];
-      if (hpBar) hpBar.setVisible(isActive);
+      if (hpBar) hpBar.setVisible(isMovingBoss);
     }
     // Super Boss (Unraveller) — kept hidden for now per demo constraint.
     // The updateSuperBossReveal is still called so the code path stays
     // exercised; if the super boss sprite is present it will update alpha.
     this.updateSuperBossReveal();
+  }
+
+  /**
+   * Retreat the (single) moving stage boss from its current checkpoint
+   * to the target checkpoint. Called by advanceToNextCheckpoint when
+   * the user clears a non-final CP — the boss backs away toward the
+   * next CP marker (with its aura + HP bar dragged along) so the map
+   * reads as "the boss just retreated" instead of "the boss died and a
+   * new one popped up". On the FINAL CP we don't call this — we
+   * dispelMiniBoss(0) so the boss dies on-screen.
+   */
+  private retreatBossTo(targetCpIdx: number): void {
+    const sprite = this.miniBossSprites[0];
+    const def = VILLAGE_MINI_BOSSES[0];
+    if (!sprite || !def) return;
+    const target = CHECKPOINTS[targetCpIdx];
+    if (!target) return;
+
+    const targetX = target.x + def.offsetX;
+    const targetY = target.y + def.yOffset;
+    // Face the direction of retreat (flipX flip while moving east).
+    const movingEast = targetX > sprite.x;
+    sprite.setFlipX(!movingEast); // face AWAY from the direction of travel
+    // Aura, HP bar, and any lingering fx should track the sprite too.
+    const aura = this.miniBossAuras[0];
+    const hpBar = this.miniBossHpBars[0];
+    const RETREAT_MS = 1400;
+
+    this.tweens.add({
+      targets: sprite,
+      x: targetX,
+      y: targetY,
+      duration: RETREAT_MS,
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        // Face the character again once retreat lands.
+        sprite.setFlipX(def.offsetX > 0);
+      },
+    });
+    if (aura) {
+      this.tweens.add({
+        targets: aura,
+        x: targetX,
+        y: targetY - sprite.displayHeight * 0.5,
+        duration: RETREAT_MS,
+        ease: "Sine.easeInOut",
+      });
+    }
+    // HP bar tracks the sprite via its own follow loop, so no manual
+    // tween is required — moving the sprite is enough.
+    void hpBar;
   }
 
   private updateSuperBossReveal(): void {
@@ -2183,9 +2344,10 @@ export class VillageMapScene extends Phaser.Scene {
 
     // Persistent soft ground shadow so the character feels planted on the
     // marker instead of floating. Sits BELOW the character sprite depth so
-    // it renders under their feet.
+    // it renders under their feet. Uses the same (CHAR_X_OFFSET,
+    // CHAR_Y_OFFSET) as the sprite so it tracks the top-left standpoint.
     this.characterShadow = this.add.ellipse(
-      active.x,
+      active.x + CHAR_X_OFFSET,
       active.y + CHAR_Y_OFFSET + 4,
       54,
       14,
@@ -2195,7 +2357,7 @@ export class VillageMapScene extends Phaser.Scene {
     this.characterShadow.setDepth(95); // just under character (100)
 
     this.character = this.add.sprite(
-      active.x,
+      active.x + CHAR_X_OFFSET,
       active.y + CHAR_Y_OFFSET,
       idleTextureKey,
     );
@@ -2318,9 +2480,9 @@ export class VillageMapScene extends Phaser.Scene {
     // CP4) → teleport since a long walk mid-load would look janky.
     if (!this.character) return;
     if (Math.abs(this.currentIndex - prev) === 1) {
-      this.walkCharacterTo(cp.x, cp.y + CHAR_Y_OFFSET);
+      this.walkCharacterTo(cp.x + CHAR_X_OFFSET, cp.y + CHAR_Y_OFFSET);
     } else {
-      this.character.setPosition(cp.x, cp.y + CHAR_Y_OFFSET);
+      this.character.setPosition(cp.x + CHAR_X_OFFSET, cp.y + CHAR_Y_OFFSET);
     }
   }
 
@@ -2538,9 +2700,19 @@ export class VillageMapScene extends Phaser.Scene {
     // the boss, walk to the next CP, pan camera. Gold variant used for
     // 3/3 task completion (bigger, brighter).
     this.isAnimating = true;
+    // Snapshot BEFORE incrementing — decides retreat vs. dispel.
+    const isFinalCp = this.currentIndex >= CHECKPOINTS.length - 1;
     this.playCompassCalibration(from.x, from.y, gold, () => {
-      // Now dispel the boss (after the compass has locked direction)
-      this.dispelMiniBoss(this.currentIndex);
+      // Boss behaviour:
+      //   - Non-final CP (1, 2, 3): the ONE stage boss RETREATS to the
+      //     next CP. It's still alive, just backed away.
+      //   - Final CP (4): the boss dies here. Play the dispel VFX +
+      //     shatter and free the sprite for good.
+      if (isFinalCp) {
+        this.dispelMiniBoss(0);
+      } else {
+        this.retreatBossTo(this.currentIndex + 1);
+      }
       // Reward — checkpoint clear grants a bigger XP burst than a task.
       // Gold clears (all 3 tasks perfect) give +75 vs. the standard +50.
       eventBridge.dispatchToReact({
@@ -2548,7 +2720,7 @@ export class VillageMapScene extends Phaser.Scene {
         amount: gold ? 75 : 50,
         label: gold ? "Gold Checkpoint" : "Checkpoint",
       });
-      if (this.currentIndex >= CHECKPOINTS.length - 1) {
+      if (isFinalCp) {
         // Last checkpoint cleared → dramatic Unraveller reveal, then celebrate.
         void this.fullRevealSuperBoss().then(() => this.celebrate());
         return;
@@ -2565,9 +2737,10 @@ export class VillageMapScene extends Phaser.Scene {
         this.maybeShowActiveBossTaunt(),
       );
 
-      // Walk the character from previous CP to this one.
+      // Walk the character from previous CP to this one — landing on
+      // the top-left standpoint of the new CP (see CHAR_X_OFFSET).
       if (this.character) {
-        this.walkCharacterTo(to.x, to.y + CHAR_Y_OFFSET);
+        this.walkCharacterTo(to.x + CHAR_X_OFFSET, to.y + CHAR_Y_OFFSET);
       }
 
       // Pan camera at the same speed so it stays roughly on the character.

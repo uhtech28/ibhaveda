@@ -23,14 +23,11 @@ import { getStageMiniBosses, getStageSuperBoss } from "@/config/stage-bosses";
 import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day";
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
 import { playCpClearBurst } from "../utils/cp-clear-burst";
-import {
-  CorruptionOverlay,
-  type OverlayCheckpoint,
-} from "@/lib/phaser/systems/corruptionOverlay";
-import {
-  ensureCorruptionPattern,
-  motifForStage,
-} from "@/lib/phaser/systems/corruptionPatterns";
+// Corruption overlay disabled — only the type import remains for
+// the `_corruption: CorruptionOverlay | null` field. Pattern
+// helpers (ensureCorruptionPattern / motifForStage / OverlayCheckpoint)
+// were used by the now-removed `new CorruptionOverlay(...)` block.
+import { CorruptionOverlay } from "@/lib/phaser/systems/corruptionOverlay";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
 import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
@@ -216,11 +213,14 @@ export class ArenaScene extends Phaser.Scene {
           const right = cursors.right?.isDown || wasd.D.isDown;
           const up = cursors.up?.isDown || wasd.W.isDown;
           const down = cursors.down?.isDown || wasd.S.isDown;
+          // WASD camera-pan disabled — the character-movement helper
+          // (attachEditorTestWalk with force:true) now owns
+          // WASD/arrows and centres the camera on the persona.
+          // Keeping this handler as a no-op preserves the
+          // surrounding block for future non-WASD input we
+          // might want to attach here.
           const step = KEY_PAN_SPEED / cam.zoom;
-          if (left) cam.scrollX -= step;
-          if (right) cam.scrollX += step;
-          if (up) cam.scrollY -= step;
-          if (down) cam.scrollY += step;
+          void step; void left; void right; void up; void down;
         });
       }
     }
@@ -250,12 +250,12 @@ export class ArenaScene extends Phaser.Scene {
       x: cp.x,
       y: cp.y,
     }));
-    this._corruption = new CorruptionOverlay(this, {
-      checkpoints: overlayCps,
-      patternTextureKey: arenaPattern,
-      tint: 0xd97706, // orange — The Arena
-      depth: 5,
-    });
+    // Corruption overlay DISABLED per product ask ("remove the
+    // corruption mechanism for now WHATEVER U HAVE ADDED"). The
+    // CorruptionOverlay class stays on disk; we just don't
+    // instantiate it. `this._corruption` stays null and every
+    // `this._corruption?.…` callsite silently no-ops.
+    this._corruption = null;
 
     this.spawnCharacter();
     this.spawnMiniBosses();
@@ -309,6 +309,11 @@ export class ArenaScene extends Phaser.Scene {
       isBlocked: (x, y) => pointInAnyBlockedZone(x, y),
       mapWidth: MAP_WIDTH,
       mapHeight: MAP_HEIGHT,
+      // Force-enable free-roam movement on this stage scene
+      // (previously WASD only worked with ?editZones=1). Restores
+      // parity with VillageMapScene — user reported "characters are
+      // not walking" on Forest/Arena/Crossroads/Artisans/Mine/GH.
+      force: true,
     });
 
     eventBridge.dispatchToReact({ type: "PHASER_READY" });

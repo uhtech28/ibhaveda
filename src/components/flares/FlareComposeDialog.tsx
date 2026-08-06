@@ -18,7 +18,10 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Radio, Send } from "lucide-react";
+import { Loader2 } from "lucide-react";
+// Pixel-art campfire icon — matches the Flare tile in the
+// Adventurer's Menu so the compose dialog reads as the same feature.
+import { PixelIcon } from "@/components/ui/PixelIcon";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -198,7 +201,7 @@ export function FlareComposeDialog({
       >
         <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
           <div className="flex items-center gap-2">
-            <Radio className="h-5 w-5 text-amber-400" />
+            <PixelIcon name="menu-flare-v2" size={22} alt="Flare" />
             <DialogTitle
               className={cn(
                 displayFontClass,
@@ -330,10 +333,11 @@ export function FlareComposeDialog({
                 Firing…
               </>
             ) : (
-              <>
-                <Send className="h-4 w-4" />
-                Fire Flare
-              </>
+              // Send / paper-plane glyph removed per product ask —
+              // the CTA now reads as text only. Loader spinner during
+              // submit stays because it's a live status affordance,
+              // not decoration.
+              "Fire Flare"
             )}
           </button>
         </div>

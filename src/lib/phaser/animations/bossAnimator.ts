@@ -532,49 +532,34 @@ export function addBossHpBar(
   scene: Phaser.Scene,
   sprite: Phaser.GameObjects.Sprite,
   initialHpPct: number = 1,
-  bossName?: string,
+  // `bossName` is kept as a parameter for backwards-compat with the
+  // callers in every scene (Village / Forest / Arena / …). The name
+  // chip that used to render here has been REMOVED per product ask
+  // ("remove boss name title") — the same boss name is now shown in
+  // the bottom HUD's "PROJECT vs BOSS" bar, so painting it above the
+  // sprite too was duplicated chrome that also crowded the boss
+  // silhouette. Argument stays so callsites don't need to change.
+  _bossName?: string,
 ): BossHpBar {
-  // Dimensions — 3-4x larger than the previous 60×5 sliver so the HUD
-  // reads as a proper game UI element rather than a scratch.
+  // Dimensions — the chip is gone; only the HP bar remains, so
+  // totalH shrinks to just the bar height. `totalW` still adds a
+  // small horizontal padding for the backing panel.
   const barW = 120;
   const barH = 8;
-  const chipH = 16;
-  const totalH = chipH + 4 + barH; // chip + gap + bar
+  const totalH = barH;
   const totalW = barW + 8; // 4px padding each side
 
   // Container anchored ABOVE the top of the sprite so it never overlaps
   // the boss's head / body. Old anchor was 55% of displayHeight from the
   // bottom (i.e. inside the sprite); with the scaled-up 2.2x bosses that
   // put the chip on the boss's forehead. New anchor: sprite top - 20px
-  // gap. Total container height ~30px, so the visible bar sits ~6-35px
-  // above the sprite crown.
+  // gap. Now that the name chip is gone, only the HP bar sits there.
   const anchorY = sprite.y - sprite.displayHeight - 20;
   const container = scene.add.container(sprite.x, anchorY);
   container.setDepth(sprite.depth + 4);
 
-  // ── Boss name chip ──────────────────────────────────────────────
-  const chipY = -totalH / 2 + chipH / 2;
-  const chipBg = scene.add
-    .rectangle(0, chipY, totalW, chipH, 0x0f0f18, 0.92)
-    .setStrokeStyle(1.5, 0xd4af37, 1);
-  const nameText = scene.add
-    .text(0, chipY, (bossName ?? "").toUpperCase(), {
-      fontFamily: "monospace",
-      fontSize: "10px",
-      color: "#f5e6c8",
-      fontStyle: "bold",
-      resolution: 2,
-    } as unknown as Phaser.Types.GameObjects.Text.TextStyle)
-    .setOrigin(0.5)
-    .setLetterSpacing?.(2);
-  // Fallback if setLetterSpacing isn't available on this Phaser version
-  if (nameText.setLetterSpacing === undefined) {
-    nameText.setText((bossName ?? "").toUpperCase().split("").join(" "));
-  }
-  container.add([chipBg, nameText]);
-
   // ── HP bar ──────────────────────────────────────────────────────
-  const barY = chipY + chipH / 2 + 4 + barH / 2;
+  const barY = -totalH / 2 + barH / 2;
   const barBg = scene.add
     .rectangle(0, barY, totalW, barH, 0x0f0f18, 0.92)
     .setStrokeStyle(1.5, 0xd4af37, 1);

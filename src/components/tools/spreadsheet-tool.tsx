@@ -90,6 +90,9 @@ interface SpreadsheetToolProps {
    *  covers persona-card / SWOT / competitor-grid without scrolling. */
   initialRows?: number;
   initialCols?: number;
+  /** When true, skip rendering the prompt banner above the grid —
+   *  TaskSubmissionModal shows it in its header already. */
+  hidePrompt?: boolean;
 }
 
 const DEFAULT_HEADERS = ["Column A", "Column B", "Column C", "Column D", "Column E"];
@@ -101,6 +104,7 @@ export function SpreadsheetTool({
   isSubmitting = false,
   initialRows = 8,
   initialCols = 5,
+  hidePrompt = false,
 }: SpreadsheetToolProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<AnyRef>(null);
@@ -221,7 +225,7 @@ export function SpreadsheetTool({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {prompt ? (
+      {prompt && !hidePrompt ? (
         <p className="rounded-md border border-white/8 bg-white/[0.02] px-3 py-2 text-xs leading-relaxed text-white/70">
           {prompt}
         </p>

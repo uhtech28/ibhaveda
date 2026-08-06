@@ -43,6 +43,11 @@ import {
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords, Zap } from "lucide-react";
 import { PixelIcon } from "@/components/ui/PixelIcon";
+// Shared saddlebag + × close cluster rendered in the top-right of
+// every tool panel. Clicking the saddlebag closes the panel AND
+// reopens the Adventurer's Menu via a window event that
+// MapMenuPopover listens for.
+import { PanelCloseCluster } from "@/components/map/PanelCloseCluster";
 import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { CombatPanel } from "@/components/combat/CombatPanel";
@@ -98,10 +103,10 @@ const StageClearedToast = dynamic(
   () => import("@/components/village/StageClearedToast"),
   { ssr: false },
 );
-const DailyChallengesCard = dynamic(
-  () => import("@/components/gamification/DailyChallengesCard").then((m) => m.DailyChallengesCard),
-  { ssr: false },
-);
+// DailyChallengesCard dynamic import removed — the top-right card
+// was pulled from /map/world (see the deleted render block below).
+// Component file still exists in @/components/gamification/ if we
+// bring it back on another surface.
 const XpFloatingPopover = dynamic(
   () => import("@/components/xp/XpFloatingPopover"),
   { ssr: false },
@@ -808,15 +813,19 @@ function CheckpointPanelSkeleton() {
   return (
     <motion.div
       key="cp-skeleton"
-      initial={{ x: "100%", opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: "100%", opacity: 0 }}
+      initial={{ y: 12, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 12, opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 32 }}
-      className="absolute right-4 top-20 bottom-24 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
+      // Centered — matches the real CheckpointPanel wrapper style
+      // so the skeleton lands in the same spot as its replacement
+      // and there's no "jump from right to center" when the real
+      // panel takes over.
+      className="fixed inset-0 z-[75] flex items-center justify-center pointer-events-none p-4"
       style={{ contain: "layout paint" }}
     >
       <div
-        className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-full"
+        className="pointer-events-auto flex flex-col font-sans rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-[calc(100vh-8rem)] w-[calc(100%-2rem)] sm:w-[400px] md:w-[440px] max-w-full"
         style={{
           background:
             "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
@@ -900,58 +909,74 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
       key="cp-panel"
       data-phaser-pause="true"
       data-tutorial="checkpoint-panel"
-      initial={{ x: "100%", opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: "100%", opacity: 0 }}
+      // Centered pop-in / pop-out instead of the old slide-in-from-
+      // right so the entry/exit motion matches the new dead-center
+      // resting position.
+      initial={{ y: 12, opacity: 0, scale: 0.98 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: 12, opacity: 0, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 300, damping: 32 }}
-      className="absolute right-4 top-20 bottom-24 z-[75] flex flex-col justify-center pointer-events-none w-[calc(100%-2rem)] sm:w-[360px] md:w-[385px] max-w-full"
+      // Centered rather than right-anchored per product ask ("the
+      // tasks have to be in the centre"). Uses a fixed inset + flex
+      // centering so the panel lands dead-center of the viewport at
+      // its intrinsic width — feels like a modal without stealing
+      // the modal treatment (no dim scrim, map behind still
+      // interactive). z-[75] keeps it above the Phaser canvas but
+      // below the Adventurer's Menu (z-[200]) and tool modals.
+      className="fixed inset-0 z-[75] flex items-center justify-center pointer-events-none p-4"
       style={{ contain: "layout paint" }}
     >
       <div
-        className="pointer-events-auto flex flex-col font-sans w-full rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-full"
+        // Aligned with the platform's post-card visual language
+        // (see IdeaCard in components/ideaforge/idea-cards.tsx):
+        //   - rounded-[18px] instead of rounded-3xl → same corner
+        //     radius the feed cards, tabs, and search bar all use.
+        //   - border-white/8 (was white/10) → matches every card /
+        //     input on /feed.
+        //   - bg-[#0F1726]/85 backdrop-blur-xl → identical stack to
+        //     the sticky filter bar + all feed surfaces.
+        //   - font-sans on the whole panel forces platform body
+        //     font instead of Phaser fantasy defaults.
+        className="pointer-events-auto flex flex-col font-sans rounded-[18px] border border-white/8 bg-[#0F1726]/85 backdrop-blur-xl overflow-hidden shadow-2xl h-auto max-h-[calc(100vh-8rem)] w-[calc(100%-2rem)] sm:w-[400px] md:w-[440px] max-w-full"
         style={{
-          background:
-            "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
-          backdropFilter: "blur(24px)",
           boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
           contain: "layout style",
         }}
       >
-          {/* Close button — smaller on mobile so the CP title has more
-              horizontal room and doesn't wrap awkwardly. */}
-          <button
-            onClick={() => {
-              audioManager.playTouch("click");
-              onClose();
-            }}
-            className="absolute top-3 right-3 z-10 h-7 w-7 sm:top-3.5 sm:right-3.5 sm:h-8 sm:w-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white"
-          >
-            <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </button>
+          {/* Close cluster — [saddlebag → reopen Adventurer's Menu]
+              + [×]. Matches the pattern the other tool panels
+              (Journal, Chats, Calendar, Idea Hierarchy, Team &
+              Contributors) already use, so users always have a
+              one-click way to jump between panels. */}
+          <div className="absolute top-3 right-3 z-10 sm:top-3.5 sm:right-3.5">
+            <PanelCloseCluster
+              onClose={() => {
+                audioManager.playTouch("click");
+                onClose();
+              }}
+            />
+          </div>
 
           <div className="flex flex-col gap-3.5 px-5 py-5 sm:p-5 sm:pt-6 flex-1 overflow-y-auto no-scrollbar">
-            {/* Checkpoint Title — sized so single-line CP names ("Pierce
-                the Fog of Vagueness", "Chart the Forest", etc.) fit on
-                a single row inside the mobile panel width, with just
-                enough right padding to clear the close button. */}
-            <div className="pr-10 sm:pr-10">
-              <h2 className="text-[15px] sm:text-lg md:text-2xl lg:text-3xl font-bold tracking-tight leading-snug text-white mb-1.5 sm:mb-2 md:mb-3 break-words">
+            {/* Checkpoint Title + inline outcome — sized so single-line
+                CP names ("Pierce the Fog of Vagueness", "Chart the
+                Forest", etc.) fit on a single row inside the mobile
+                panel width, with just enough right padding to clear
+                the close button. Uses the same #D1D5DB body-text
+                colour the feed cards use for secondary copy, so
+                headings + subheadings read consistently across the
+                platform. */}
+            {/* Right padding widened from pr-10 → pr-20 to clear the
+                new saddlebag + × cluster (two 32px buttons + gap ≈
+                72px). Prevents the title crashing into the cluster
+                on narrow panel widths. */}
+            <div className="pr-20 sm:pr-20">
+              <h2 className="text-[15px] sm:text-lg md:text-2xl font-bold tracking-tight leading-snug text-white mb-1.5 sm:mb-2 md:mb-3 break-words">
                 {detail.title}
               </h2>
-            </div>
-
-            {/* Outcome */}
-            <div
-              className="text-[12px] sm:text-[13px] md:text-sm lg:text-base leading-relaxed font-medium px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-3.5 lg:py-4 rounded-lg sm:rounded-xl backdrop-blur-md"
-              style={{
-                color: "#cbd5e1",
-                borderLeft: `3px solid ${detail.stageGlow}`,
-                background:
-                  "linear-gradient(90deg, rgba(255,255,255,0.05), transparent)",
-                fontFamily: "var(--font-sans)",
-              }}
-            >
-              {detail.outcome}
+              <p className="text-[12px] sm:text-[13px] md:text-sm leading-relaxed text-[#D1D5DB]">
+                {detail.outcome}
+              </p>
             </div>
 
             {/* Tasks */}
@@ -1002,7 +1027,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
           {!isLocked && (
               <div className="p-2.5 sm:p-3 pt-0 flex flex-col gap-2">
                 {!isGold && canAdvance && (
-                  <div className="flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-wider text-indigo-300/70">
+                  <div className="flex items-center justify-between px-1 text-[11px] font-medium text-[#9CA3AF]">
                     <span>Tasks {doneTasks}/{totalTasks}</span>
                   </div>
                 )}
@@ -1021,23 +1046,30 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                     canAdvance && !isAdvancing ? { scale: 1.02, y: -1 } : {}
                   }
                   whileTap={canAdvance && !isAdvancing ? { scale: 0.98 } : {}}
-                  className="w-full py-1.5 sm:py-2 rounded-md text-[9px] sm:text-[10px] tracking-[0.06em] uppercase font-black transition-all duration-300 relative overflow-hidden"
+                  // Sized + coloured like the platform's primary
+                  // action buttons (Post Idea, Contribute, Send
+                  // Request on the feed): 12px radius, small padding
+                  // step-up, sentence-case at 12-13px, indigo
+                  // gradient/border. Was uppercase 9-10px "quest
+                  // log" chrome that read out-of-place next to the
+                  // feed's calmer CTA style.
+                  className="w-full py-2.5 sm:py-3 rounded-[12px] text-[12px] sm:text-[13px] font-semibold transition-all duration-300 relative overflow-hidden"
                   style={{
                     background: isGold
                       ? "linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.1))"
                       : canAdvance
-                        ? "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(79, 70, 229, 0.1))"
+                        ? "linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(79, 70, 229, 0.12))"
                         : "rgba(255, 255, 255, 0.03)",
                     border: isGold
                       ? "1px solid rgba(234, 179, 8, 0.4)"
                       : canAdvance
                         ? "1px solid rgba(99, 102, 241, 0.4)"
-                        : "1px solid rgba(255, 255, 255, 0.1)",
+                        : "1px solid rgba(255, 255, 255, 0.08)",
                     color: isGold
                       ? "#fde047"
                       : canAdvance
-                        ? "#818cf8"
-                        : "#64748b",
+                        ? "#C7D2FE"
+                        : "#9CA3AF",
                     cursor:
                       canAdvance && !isAdvancing ? "pointer" : "not-allowed",
                     boxShadow: isGold
@@ -1083,17 +1115,12 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                   </span>
                 </motion.button>
 
-                {/* Contextual "Fire a Flare" — pre-fills the ventureId and
-                    checkpointId so a responder sees exactly where the user
-                    is stuck. Sits below the Advance button so it's easy to
-                    reach when tasks feel blocked. */}
-                <div className="pt-1">
-                  <FlareTriggerButton
-                    variant="subtle"
-                    ventureId={ventureId}
-                    checkpointId={detail.id as Id<"ventureCheckpoints">}
-                  />
-                </div>
+                {/* Flare button removed from the checkpoint task panel
+                    per product request — the Flare tile in the
+                    Adventurer's Menu (bottom-HUD saddlebag → Flare)
+                    still fires a flare with the correct venture +
+                    checkpoint context via the same FlareComposeDialog,
+                    so this in-panel duplicate was redundant. */}
               </div>
             )}
       </div>
@@ -1166,21 +1193,27 @@ const TaskCard = memo(function TaskCardInner({
       }}
       whileHover={locked || task.done ? {} : { x: 4 }}
       whileTap={locked || task.done ? {} : { scale: 0.98 }}
-      className="flex items-start gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl relative overflow-hidden group/task transition-colors"
+      // Row visual language aligned with the platform's idea-card
+      // action rows (see idea-cards.tsx line 372 area): 12-14px
+      // border-radius, border-white/8, hover state uses the same
+      // #6366F1 tint (with faint indigo glow) that the "Contribute"
+      // and "Sub-ideas" buttons on feed cards use. Keeps the
+      // CheckpointPanel visually part of the same UI family.
+      className="flex items-start gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-[12px] relative overflow-hidden group/task transition-all duration-200 hover:border-[#6366F1]/40 hover:shadow-[0_0_24px_rgba(99,102,241,0.16)]"
       style={{
         background: task.done
-          ? "rgba(99, 102, 241, 0.05)"
+          ? "rgba(99, 102, 241, 0.06)"
           : locked
             ? "rgba(255, 255, 255, 0.01)"
             : "rgba(255, 255, 255, 0.02)",
         border: "1px solid",
         borderColor: task.done
-          ? "rgba(99, 102, 241, 0.2)"
+          ? "rgba(99, 102, 241, 0.25)"
           : locked
-            ? "rgba(255, 255, 255, 0.02)"
-            : "rgba(255,255,255,0.05)",
+            ? "rgba(255, 255, 255, 0.04)"
+            : "rgba(255, 255, 255, 0.08)",
         cursor: locked ? "default" : task.done ? "default" : "pointer",
-        opacity: locked ? 0.4 : task.done ? 0.6 : 1,
+        opacity: locked ? 0.4 : task.done ? 0.7 : 1,
       }}
     >
       {/* Hover glow */}
@@ -1223,12 +1256,30 @@ const TaskCard = memo(function TaskCardInner({
             {/* Task TITLE only — the fuller description was moved into
                 the TaskSubmissionModal so the checkpoint panel stays
                 scannable. Falls back to the description head-fragment
-                for legacy tasks with no separate title. Uppercase per
-                spec for a quest-log feel. */}
-            <p className="text-[13px] sm:text-sm font-semibold leading-snug text-white/95 uppercase tracking-wide">
-              {task.label && task.label.trim().length > 0
-                ? task.label
-                : task.description.split(/[.\n]/)[0].slice(0, 80)}
+                for legacy tasks with no separate title.
+                Sentence-case per product request ("only keep first
+                letter capital") — was ALL-CAPS quest-log style, now
+                just capitalise the first letter and lowercase the
+                rest so titles read like a normal sentence
+                ("Speak its name" instead of "SPEAK ITS NAME"). */}
+            {/* Task title uses the same weight + colour as the
+                platform's primary body text (see feed idea-card
+                titles) — the `tracking-wide` from the old quest-log
+                style is gone since the sentence-case titles read
+                cleaner at normal letter-spacing. */}
+            <p className="text-[13px] sm:text-sm font-semibold leading-snug text-white">
+              {(() => {
+                const raw =
+                  task.label && task.label.trim().length > 0
+                    ? task.label
+                    : task.description.split(/[.\n]/)[0].slice(0, 80);
+                const trimmed = raw.trim();
+                if (trimmed.length === 0) return trimmed;
+                return (
+                  trimmed.charAt(0).toUpperCase() +
+                  trimmed.slice(1).toLowerCase()
+                );
+              })()}
             </p>
           </div>
           {/* Redo button - always visible for completed tasks */}
@@ -1957,6 +2008,14 @@ function MapPageInner() {
   const [isMiniGamesPanelOpen, setIsMiniGamesPanelOpen] = useState(false);
   const [isContributorsOpen, setIsContributorsOpen] = useState(false);
   const [isContributionsOpen, setIsContributionsOpen] = useState(false);
+  // Dedicated state for the "send contribution request" modal — the
+  // Adventurer's Menu CONTRIBUTIONS tile now opens this form directly
+  // (with skill-tag picker), decoupled from the Team & Contributors
+  // panel which moved to the GUILD tile. Keeping this separate from
+  // `isContributorsOpen` because that state's render branches on
+  // author-vs-non-author; CONTRIBUTIONS always wants the send-request
+  // dialog regardless of viewer role.
+  const [isSendContributionOpen, setIsSendContributionOpen] = useState(false);
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isKanbanOpen, setIsKanbanOpen] = useState(false);
@@ -4595,7 +4654,14 @@ function MapPageInner() {
         }
         setIsGroupChatOpen(true);
       } else if (tab === "contributors") {
-        setIsContributorsOpen(true);
+        // CONTRIBUTIONS tile (scroll icon). Rewired per product ask:
+        // "in replacement in contributions use the send contribution
+        // tab that was there which includes tags too". Opens the
+        // ContributionRequestModal — the same skill-tag-aware form
+        // /feed uses when someone clicks "Contribute" on a project
+        // card — instead of the old author-only Team & Contributors
+        // panel (which now lives under the GUILD tile below).
+        setIsSendContributionOpen(true);
       } else if (tab === "feed") {
         setIsContributionsOpen(true);
       } else if (tab === "hierarchy") {
@@ -4607,14 +4673,41 @@ function MapPageInner() {
       } else if (tab === "journal") {
         setIsJournalOpen(true);
       } else if (tab === "community") {
-        // Community is its own full-page surface (/community) that
-        // hosts Weekly Top Contributors + Top Projects (leaderboard).
-        // Was previously "leaderboard" pointing at /leaderboard — the
-        // menu item is now Community and the leaderboard content is
-        // exposed as a sub-tab of the Community page.
-        router.push("/community");
+        // GUILD tile (was "Community" — renamed per product ask
+        // "name it as guid"). Opens the Team & Contributors panel
+        // (Incoming Requests + Invite Contributors tabs) — the panel
+        // that used to open from CONTRIBUTIONS. The tile keeps its
+        // internal id of "community" for backwards-compat with the
+        // MapMenuPanelId union; only the label + destination changed.
+        // The /community full-page surface (Weekly Top Contributors +
+        // Top Projects leaderboard) is still reachable from the
+        // header nav — moving it off the map menu freed the slot for
+        // the Guild panel.
+        setIsContributorsOpen(true);
       } else if (tab === "minigames") {
-        setIsMiniGamesPanelOpen(true);
+        // "Quests" tile in the Adventurer's Menu (labelled Quests,
+        // technical id still "minigames" for backwards-compat).
+        // Product ask: "quest should show the task". Open the
+        // CheckpointPanel for the user's currently active
+        // checkpoint so the tasks list appears — this matches
+        // clicking the CP marker on the map. Fallback: open the
+        // first checkpoint in the current stage. Very last fallback:
+        // open the old minigames panel if we somehow can't find any
+        // checkpoint (shouldn't happen for a live venture).
+        const currentCp =
+          checkpoints.find(
+            (cp) => cp.stage === activeStage && cp.checkpoint === activeCP,
+          ) ??
+          checkpoints.find((cp) => cp.stage === activeStage) ??
+          checkpoints[0];
+        if (currentCp) {
+          updateUrlParams(
+            { checkpointId: currentCp._id, panel: null, tab: null },
+            true,
+          );
+        } else {
+          setIsMiniGamesPanelOpen(true);
+        }
       } else if (tab === "settings") {
         setIsSettingsOpen(true);
       } else if (tab === "flare") {
@@ -4633,6 +4726,12 @@ function MapPageInner() {
       openGroupChat,
       updateUrlParams,
       router,
+      // Added when Quests tile was rewired to open the active
+      // CheckpointPanel — reads live checkpoint state to pick the
+      // right one.
+      checkpoints,
+      activeStage,
+      activeCP,
     ],
   );
 
@@ -4744,28 +4843,13 @@ function MapPageInner() {
             </button>
           )}
 
-          <div className="hidden h-4 w-px bg-white/10 sm:block shrink-0" />
-
-          <div className="shrink-0">
-            <StageInfo
-              stageName={stageInfo.stageName}
-              stageIcon={stageInfo.stageIcon}
-              biomeName={stageInfo.biomeName}
-              stage={stageInfo.stage}
-              currentCheckpoint={stageInfo.currentCheckpoint}
-              totalCheckpointsInStage={stageInfo.totalCheckpointsInStage}
-              compact={true}
-            />
-          </div>
-
-          {/* Active Tasks panel toggle REMOVED per product request —
-              this icon-only button (ListTodo) sat immediately to the
-              right of the biome label and read as a decorative
-              "checklist icon" flanking ANCIENT LIBRARY. Users can still
-              open the task panel by clicking the active checkpoint
-              marker on the Phaser map (primary UX), so removing this
-              shortcut only strips the decoration. */}
-          <div className="hidden h-4 w-px bg-white/10 sm:block shrink-0" />
+          {/* Standalone StageInfo pill removed per product request —
+              the biome label ("THE VILLAGE" with its chest icon) used
+              to sit here to the left of the XP bar, but the same
+              biome name is now rendered inline as the SUBHEADING
+              inside the XPBar itself (top row = project name, bottom
+              row = stage/biome name). Keeping it in two places was
+              redundant and ate horizontal space on smaller viewports. */}
 
           <div className="min-w-0 flex-1 sm:w-[280px] md:w-[340px]">
             <XPBar
@@ -4784,6 +4868,11 @@ function MapPageInner() {
                 activeVenture?.name ||
                 undefined
               }
+              // Stage/biome name ("The Village", "The Forest", …)
+              // shown as the subheading under the project name
+              // inside the XPBar. Replaces the standalone StageInfo
+              // pill that used to sit to the left of the bar.
+              stageName={stageInfo.biomeName}
               bossName={
                 getVillageBoss(Math.max(0, (activeCP ?? 1) - 1))?.name ??
                 undefined
@@ -4919,20 +5008,13 @@ function MapPageInner() {
           {/* Floating "+N XP" popovers on task submit / CP clear / boss defeat */}
           <XpFloatingPopover />
 
-          {/* Daily challenges — fixed to top-right so it's visible on load
-              without blocking the map interactions.  Hidden during:
-                - the Sparky tutorial (competing focus)
-                - CheckpointPanel open (would overlap the task list)
-                - Any other modal / boss encounter / celebration (invisible
-                  overlays sit on top anyway, but explicit hide avoids
-                  z-index race conditions like this Daily card overlapping
-                  the checkpoint dialog).
-             */}
-          {!tutorialActive && !selectedDetail && !bossCombatTarget && (
-            <div className="pointer-events-auto fixed right-4 top-20 z-[10005] hidden w-[280px] sm:block">
-              <DailyChallengesCard compact />
-            </div>
-          )}
+          {/* Daily Challenges card removed per product request — was
+              taking up top-right screen real estate on load and the
+              challenges themselves (fire a flare, submit N tasks) are
+              already surfaced through Sparky's tutorial + the flare
+              button, so the top-right card was redundant. The
+              DailyChallengesCard component is still available for the
+              profile page if we want to bring it back there. */}
 
           {/* Village demo — Stage 1 Complete finale after Unraveller reveal.
               When the user dismisses this we also fire PREVIEW_NEXT_STAGE
@@ -5527,15 +5609,16 @@ function MapPageInner() {
                   <div className="flex-1 h-full min-h-0 flex flex-col p-5">
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
-                        <GitBranch className="w-5 h-5 text-indigo-400" />
+                        {/* Pixel-art scroll icon matching the
+                            Hierarchy tile in the Adventurer's Menu
+                            so panel + menu share the same visual
+                            identity. */}
+                        <PixelIcon name="menu-hierarchy-v2" size={22} alt="Idea Hierarchy" />
                         Idea Hierarchy
                       </h2>
-                      <button
-                        onClick={() => setIsHierarchyOpen(false)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <PanelCloseCluster
+                        onClose={() => setIsHierarchyOpen(false)}
+                      />
                     </div>
                     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       {ideaForContributors ? (
@@ -5596,18 +5679,17 @@ function MapPageInner() {
                   <div className="flex-1 h-full min-h-0 flex flex-col p-5">
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
-                        <CalendarIcon className="w-5 h-5 text-amber-400" />
+                        {/* Pixel-art hourglass matching the Calendar
+                            tile in the Adventurer's Menu. */}
+                        <PixelIcon name="menu-calendar-v2" size={22} alt="Calendar" />
                         {/* Title trimmed from "Calendar & Syncs" →
                             "Calendar" per product request — the
                             "& Syncs" tail was redundant chrome. */}
                         Calendar
                       </h2>
-                      <button
-                        onClick={() => setIsCalendarOpen(false)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <PanelCloseCluster
+                        onClose={() => setIsCalendarOpen(false)}
+                      />
                     </div>
                     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       <CalendarTool
@@ -5663,12 +5745,9 @@ function MapPageInner() {
                         <PixelIcon name="rune-stone" size={22} alt="Kanban" />
                         Kanban Board
                       </h2>
-                      <button
-                        onClick={() => setIsKanbanOpen(false)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <PanelCloseCluster
+                        onClose={() => setIsKanbanOpen(false)}
+                      />
                     </div>
                     <div className="min-h-0 overflow-y-auto no-scrollbar">
                       <KanbanTool
@@ -5714,15 +5793,14 @@ function MapPageInner() {
                   <div className="flex-1 h-full min-h-0 flex flex-col p-5">
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
-                        <JournalIcon className="w-5 h-5 text-violet-400" />
+                        {/* Pixel-art leather journal matching the
+                            Journal tile in the Adventurer's Menu. */}
+                        <PixelIcon name="journal" size={22} alt="Journal" />
                         Journal
                       </h2>
-                      <button
-                        onClick={() => setIsJournalOpen(false)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <PanelCloseCluster
+                        onClose={() => setIsJournalOpen(false)}
+                      />
                     </div>
                     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       <JournalTool
@@ -5734,6 +5812,44 @@ function MapPageInner() {
                   </div>
                 </motion.div>
               </div>
+            )}
+          </AnimatePresence>
+
+          {/* Send-Contribution Modal — dedicated dialog opened by the
+              Adventurer's Menu CONTRIBUTIONS tile (scroll icon).
+              Renders the same skill-tag ContributionRequestModal that
+              /feed uses for the "Contribute" button on project cards.
+              Kept separate from `isContributorsOpen` so the flow is
+              deterministic regardless of the viewer's author status. */}
+          <AnimatePresence>
+            {isSendContributionOpen && ideaForContributors && (
+              <Dialog
+                key="send-contribution-map"
+                open
+                onOpenChange={(open) => !open && setIsSendContributionOpen(false)}
+              >
+                <DialogContent className="w-[min(92vw,560px)] max-w-[560px] overflow-hidden border-white/10 bg-[#111827] text-white">
+                  {/* showSkillTags — this instance is the map's
+                      gamification path (Adventurer's Menu →
+                      CONTRIBUTIONS), which product wants to keep the
+                      richer skill-tag picker + char counter. The
+                      /feed "Contribute" button omits this prop, so
+                      it falls back to the original simple
+                      message-only dialog. */}
+                  <ContributionRequestModal
+                    ideaId={ideaForContributors._id as Id<"ideas">}
+                    ideaTitle={ideaForContributors.title}
+                    authorName={
+                      ideaForContributors.author?.name ||
+                      ideaForContributors.author?.username
+                    }
+                    authorUsername={ideaForContributors.author?.username}
+                    authorAvatar={ideaForContributors.author?.avatar}
+                    onClose={() => setIsSendContributionOpen(false)}
+                    showSkillTags
+                  />
+                </DialogContent>
+              </Dialog>
             )}
           </AnimatePresence>
 
@@ -5790,15 +5906,17 @@ function MapPageInner() {
                   <div className="flex-1 h-full min-h-0 flex flex-col p-5">
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
-                        <Users className="w-5 h-5 text-indigo-400" />
+                        {/* Pixel-art guild crest matching the Guild
+                            tile in the Adventurer's Menu — this panel
+                            IS the Guild view (Incoming Requests +
+                            Invite Contributors), so it shares the
+                            same shield icon. */}
+                        <PixelIcon name="menu-community-v2" size={22} alt="Team & Contributors" />
                         Team &amp; Contributors
                       </h2>
-                      <button
-                        onClick={() => setIsContributorsOpen(false)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <PanelCloseCluster
+                        onClose={() => setIsContributorsOpen(false)}
+                      />
                     </div>
                     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       {ideaForContributors ? (

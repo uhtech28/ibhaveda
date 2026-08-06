@@ -144,20 +144,33 @@ export default function HeroSection() {
         <div className="relative z-10 w-full max-w-5xl flex flex-col items-center">
 
 
-          {/* ── Already a member ── */}
-          <div
-            className="mb-4"
-            style={{ animation: "lp-reveal-simple 600ms ease both" }}
-          >
-            <button
-              type="button"
-              onClick={() => openSignIn({ afterSignInUrl: "/feed", fallbackRedirectUrl: "/feed" })}
-              className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
+          {/* ── Already a member ──
+              Hide entirely when the user is already signed in — Clerk
+              throws a dev-only "cannot_render_single_session_enabled"
+              warning if openSignIn() fires with an active session.
+              Signed-in visitors landing here should just go straight
+              to /feed instead. */}
+          {!isSignedIn && (
+            <div
+              className="mb-4"
+              style={{ animation: "lp-reveal-simple 600ms ease both" }}
             >
-              Already a member?{" "}
-              <span className="text-[#F7D66D] font-semibold hover:underline">Log in</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isSignedIn) {
+                    router.push("/feed");
+                    return;
+                  }
+                  openSignIn({ afterSignInUrl: "/feed", fallbackRedirectUrl: "/feed" });
+                }}
+                className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
+              >
+                Already a member?{" "}
+                <span className="text-[#F7D66D] font-semibold hover:underline">Log in</span>
+              </button>
+            </div>
+          )}
 
           {/* ── Hero copy ── */}
           <div

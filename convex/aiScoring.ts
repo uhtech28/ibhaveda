@@ -1,11 +1,18 @@
 import { v } from "convex/values";
 import { action, mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { awardPointsHelper } from "./levels";
 import {
   computeCumulativeVentureScores,
   finalizeCompletedStageScores,
 } from "./cumulativeVentureScore";
+import {
+  getTemplateConfig,
+  taskSubmissionDelta,
+  goldBonusDelta,
+  applyDelta,
+} from "./projectScoreSpec";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AI-GENERATED CONTENT DETECTION (text-only signals — no model call)
@@ -1146,15 +1153,22 @@ export const getVentureCumulativeHUDScores = query({
   handler: async (ctx, args) => {
     const venture = await ctx.db.get(args.ventureId);
     if (!venture) {
-      return { qualityScore: 0, valuationScore: 0 };
+      return {
+        qualityScore: 0,
+        valuationScore: 0,
+        templateId: "venture" as const,
+        projectScoreRaw: getTemplateConfig("venture").startValue,
+      };
     }
 
+    // Legacy per-stage rollup — kept intact for HUD callers (XPBar,
+    // QualityScore) that still consume qualityScore + valuationScore.
     const stageScores = await ctx.db
       .query("qualityScores")
       .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
       .collect();
 
-    return computeCumulativeVentureScores(
+    const legacy = computeCumulativeVentureScores(
       stageScores.map((row) => ({
         stageNumber: row.stageNumber,
         totalScore: row.totalScore,
@@ -1162,6 +1176,99 @@ export const getVentureCumulativeHUDScores = query({
       })),
       venture.currentStage,
     );
+
+    // ── Ibhaveda Project Score (spec §2) ─────────────────────────────
+    // Walk every real per-task submission event, apply the spec's
+    // stage-scaled Gold ceiling × tier weight × quality multiplier.
+    // Add Gold-bonus deltas for checkpoints that earned goldBonus.
+    // This is the ONLY source of the value shown on feed cards.
+    const templateId = (venture.templateId ?? "venture") as
+      | "venture"
+      | "academic"
+      | "lab"
+      | "creative";
+    const cfg = getTemplateConfig(templateId);
+
+    const [checkpoints, tasks] = await Promise.all([
+      ctx.db
+        .query("ventureCheckpoints")
+        .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
+        .collect(),
+      ctx.db
+        .query("ventureTasks")
+        .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
+        .collect(),
+    ]);
+
+    // Build lookup: checkpointId → stage number + goldBonusEarned flag
+    const cpMeta = new Map<
+      string,
+      { stage: number; goldBonusEarned: boolean }
+    >();
+    for (const cp of checkpoints) {
+      cpMeta.set(cp._id as unknown as string, {
+        stage: cp.stage,
+        goldBonusEarned: cp.goldBonusEarned === true,
+      });
+    }
+
+    // Group tasks by checkpoint so we can compute per-checkpoint gold
+    // bonuses using the average of the checkpoint's task scores.
+    const tasksByCp = new Map<string, typeof tasks>();
+    for (const t of tasks) {
+      const key = t.checkpointId as unknown as string;
+      const bucket = tasksByCp.get(key) ?? [];
+      bucket.push(t);
+      tasksByCp.set(key, bucket);
+    }
+
+    let projectScoreRaw = cfg.startValue;
+
+    for (const [cpKey, cpTasks] of tasksByCp.entries()) {
+      const meta = cpMeta.get(cpKey);
+      if (!meta) continue;
+
+      // Collect the AI evaluation for each completed task. Evaluations
+      // are stored per submission; if a task has multiple attempts we
+      // take the highest (spec §2.6: "final_score = max(final, base)"
+      // — combat can never drop a submission below its base).
+      const taskEvals: Array<{ level: "t1" | "t2" | "t3"; total: number }> = [];
+
+      for (const t of cpTasks) {
+        if (t.status !== "completed") continue;
+        const evals = await ctx.db
+          .query("aiEvaluations")
+          .withIndex("by_task", (q) =>
+            q.eq("taskId", t._id as unknown as Id<"ventureTasks">),
+          )
+          .collect();
+        if (evals.length === 0) continue;
+        const bestTotal = Math.max(...evals.map((e) => e.totalScore ?? 0));
+        taskEvals.push({ level: t.taskLevel, total: bestTotal });
+      }
+
+      // Per-task deltas — one submission event apiece (spec §2.2).
+      for (const te of taskEvals) {
+        const magnitude = taskSubmissionDelta(cfg, meta.stage, te.level, te.total);
+        projectScoreRaw = applyDelta(cfg, projectScoreRaw, magnitude);
+      }
+
+      // Gold bonus — only when the checkpoint is fully gold-cleared.
+      // Averages the completed tasks' scores for the multiplier so a
+      // 3/3 clear at mixed quality still lands proportionally.
+      if (meta.goldBonusEarned && taskEvals.length > 0) {
+        const avg =
+          taskEvals.reduce((sum, te) => sum + te.total, 0) / taskEvals.length;
+        const magnitude = goldBonusDelta(cfg, meta.stage, avg);
+        projectScoreRaw = applyDelta(cfg, projectScoreRaw, magnitude);
+      }
+    }
+
+    return {
+      ...legacy,
+      templateId,
+      projectScoreRaw,
+    };
   },
 });
 

@@ -7,6 +7,10 @@ export const createContributionRequest = mutation({
   args: {
     ideaId: v.id("ideas"),
     message: v.string(),
+    // Optional skill tags the contributor is offering. Max 5 to keep
+    // author-side filtering focused. Empty / undefined = no skills
+    // declared (legacy behaviour).
+    skills: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     try {
@@ -35,6 +39,17 @@ export const createContributionRequest = mutation({
       }
       if (!args.message?.trim()) throw new Error("Message is required");
       if (args.message.length > 1200) throw new Error("Message must be 1200 characters or less");
+      // Dedupe + cap skills to 5 defensively (UI already caps, but a
+      // hand-crafted mutation call could bypass it).
+      const cleanedSkills = args.skills
+        ? Array.from(
+            new Set(
+              args.skills
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0),
+            ),
+          ).slice(0, 5)
+        : undefined;
 
       const now = Date.now();
 
@@ -64,6 +79,7 @@ export const createContributionRequest = mutation({
         contributorId: user._id,
         authorId: idea.authorId,
         message: args.message.trim(),
+        skills: cleanedSkills && cleanedSkills.length > 0 ? cleanedSkills : undefined,
         status: "pending",
         createdAt: now,
         updatedAt: now,

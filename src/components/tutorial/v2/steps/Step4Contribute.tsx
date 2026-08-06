@@ -26,7 +26,13 @@ import { TutorialMascot, type SparkyMood } from "../TutorialMascot";
 import { TutorialHighlight } from "../TutorialHighlight";
 import { useTutorial } from "../useTutorial";
 
-type Stage = "contribute" | "contribute_opened" | "complete";
+// "finale" — final send-off message shown after the user hits Send
+// Request. Sparky congratulates them and offers a Continue CTA that
+// triggers the actual tutorial.complete() persist. "complete" is
+// the terminal state where the mascot unmounts. Product ask:
+// "AFTER last step sparky should say last message Tutorial
+// complete! …"
+type Stage = "contribute" | "contribute_opened" | "finale" | "complete";
 
 function findContributeModal(): HTMLElement | null {
   const dlgs = document.querySelectorAll<HTMLElement>('[role="dialog"]');
@@ -131,7 +137,12 @@ export function Step4Contribute() {
       setStage((prev) => {
         if (prev === "contribute" && contribModal) return "contribute_opened";
         if (prev === "contribute_opened" && !contribModal) {
-          return sentRequestRef.current ? "complete" : "contribute";
+          // Route the "sent request" branch through the new "finale"
+          // beat so Sparky can deliver the closing message before we
+          // actually persist tutorial.complete(). The "no-send"
+          // branch still bounces the user back to the contribute
+          // stage — Send Request remains compulsory to finish.
+          return sentRequestRef.current ? "finale" : "contribute";
         }
         return prev;
       });
@@ -144,7 +155,9 @@ export function Step4Contribute() {
   useEffect(() => {
     if (!active) return;
     if (
-      (stage === "contribute" || stage === "contribute_opened") &&
+      (stage === "contribute" ||
+        stage === "contribute_opened" ||
+        stage === "finale") &&
       tutorial.step < 10
     ) {
       void tutorial.goTo(10);
@@ -226,6 +239,23 @@ export function Step4Contribute() {
           mood: "celebrating",
           near: null,
           highlight: null,
+        };
+      case "finale":
+        // Product-authored closing message. Continue click flips to
+        // the terminal "complete" stage, whose effect (see above)
+        // calls tutorial.complete() and persists the finished state
+        // to Convex — that persist is what stops the tour from ever
+        // coming back on subsequent visits (hard refresh included).
+        return {
+          text:
+            "Tutorial complete! Start building, explore other projects, and remember, Sparky's here whenever you need help.",
+          mood: "celebrating",
+          near: null,
+          highlight: null,
+          primary: {
+            label: "Continue",
+            onClick: () => setStage("complete"),
+          },
         };
       case "complete":
         return {

@@ -240,6 +240,12 @@ export default defineSchema({
     contributorId: v.id("users"),
     authorId: v.id("users"),
     message: v.string(),
+    // Skill tags the contributor is offering (e.g. "design", "react",
+    // "product-strategy"). Optional so legacy requests without tags
+    // still validate. Populated by the ContributionRequestModal's
+    // SkillsMultiSelect picker so authors can filter incoming
+    // requests by skill.
+    skills: v.optional(v.array(v.string())),
     status: v.union(
       v.literal("pending"),
       v.literal("accepted"),

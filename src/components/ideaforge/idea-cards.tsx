@@ -15,6 +15,10 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { getTemplateSafe, type TemplateId } from "@/config/templates";
 import {
+  formatProjectScore,
+  getTemplateConfig,
+} from "@/lib/scoring/projectScore";
+import {
   cardSurface,
   codeFontClass,
   ComposerDraft,
@@ -59,10 +63,32 @@ function getProgressPercentage(summary: VentureSummary) {
   return Math.min(100, Math.round((summary.completedCheckpoints / summary.totalCheckpoints) * 100));
 }
 
-function formatDollarValue(value?: number) {
-  const baseIdeaValue = 100_000;
-  const earnedValue = Math.max(0, Math.round(value ?? 0));
-  return `$${(baseIdeaValue + earnedValue).toLocaleString("en-US")}`;
+/**
+ * Format the per-template Project Score chip shown at the top of
+ * every idea/venture feed card. Display side of the Ibhaveda Project
+ * Score spec (see convex/projectScoreSpec.ts):
+ *
+ *   Venture  → USD, rounded to nearest $10,000
+ *   Academic → JIF, 1 decimal
+ *   Lab      → p-value, 4 decimals, floored at 0.05
+ *   Creative → Fans, rounded to nearest 1,000
+ *
+ * `projectScoreRaw` is computed server-side by walking every real
+ * per-task submission event, applying stage-scaled Gold ceilings +
+ * per-tier weights + quality multipliers per spec §2 — see
+ * `getVentureCumulativeHUDScores` in convex/aiScoring.ts. Client
+ * only formats.
+ */
+function formatProjectScoreChip(
+  templateId: string | null | undefined,
+  cumulativeScores:
+    | {
+        projectScoreRaw?: number;
+      }
+    | null
+    | undefined,
+): string {
+  return formatProjectScore(templateId, cumulativeScores?.projectScoreRaw);
 }
 
 function getStageSummary(summary: VentureSummary) {
@@ -76,6 +102,43 @@ function getStageSummary(summary: VentureSummary) {
     totalStages,
     label: stage?.biomeName ?? stage?.name ?? `Stage ${currentStage}`,
   };
+}
+
+/**
+ * Small pill-style chip that renders a project's current Project
+ * Score in its template's native unit ($ / JIF / p-value / fans).
+ * Replaces the old hardcoded "$100,000" plate on every card so
+ * Academic/Lab/Creative projects stop lying about their scoring
+ * unit.
+ */
+function ProjectScoreChip({
+  templateId,
+  cumulativeScores,
+}: {
+  templateId: string | null | undefined;
+  cumulativeScores:
+    | {
+        projectScoreRaw?: number;
+      }
+    | null
+    | undefined;
+}) {
+  const cfg = getTemplateConfig(templateId);
+  const value = formatProjectScoreChip(templateId, cumulativeScores);
+  return (
+    <span
+      className={cn(
+        displayFontClass,
+        "shrink-0 rounded-full border border-white/8 bg-black/25 px-2.5 py-1 text-right text-[13px] font-semibold leading-tight text-orange-300",
+      )}
+      title={`Project ${cfg.displayLabel} — Ibhaveda Project Score`}
+    >
+      <span className="mr-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/55">
+        {cfg.displayLabel}
+      </span>
+      {value}
+    </span>
+  );
 }
 
 function MeshBanner({ title }: { title: string }) {
@@ -750,9 +813,13 @@ export function IdeaStoryCard({
           </button>
           <div className="flex shrink-0 items-center gap-2">
             {ventureSummary && (
-              <span className={cn(displayFontClass, "shrink-0 text-[18px] font-semibold leading-tight text-orange-300")}>
-                {formatDollarValue(cumulativeScores?.valuationScore)}
-              </span>
+              <ProjectScoreChip
+                templateId={
+                  ventureSummary.templateId ??
+                  (cumulativeScores?.templateId as TemplateId | undefined)
+                }
+                cumulativeScores={cumulativeScores}
+              />
             )}
             {ownerAction && (
               <div className="flex items-center gap-2">

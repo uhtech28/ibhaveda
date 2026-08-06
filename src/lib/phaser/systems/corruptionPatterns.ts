@@ -110,16 +110,54 @@ export function motifForStage(stage: number): CorruptionMotif {
 // on a TileSprite — that's why blobs are pushed inward from edges.
 
 function drawFog(g: Phaser.GameObjects.Graphics): void {
-  // Pale blue-grey cloud puffs — a few soft circles.
-  g.fillStyle(0xa8b8c8, 0.55);
-  g.fillCircle(9, 10, 6);
-  g.fillCircle(20, 8, 5);
-  g.fillCircle(14, 22, 7);
-  g.fillCircle(26, 24, 4);
-  // Softer secondary pass for haze depth.
-  g.fillStyle(0xc4d0dc, 0.35);
-  g.fillCircle(6, 26, 4);
-  g.fillCircle(28, 14, 3);
+  // "Doubt and Loss of Direction" tile — pixel-art crack + spore
+  // motif that replaces the old fog-puff. Renders in pure white so
+  // the CorruptionOverlay's tint parameter can recolor it to any
+  // purple in the palette. Structure per the new spec (retro
+  // SNES / Stardew / Eastward vibe):
+  //   • jagged crack line running diagonally across the tile
+  //   • bright inner-crack pixels (the "glow" hint — recoloured to
+  //     the palette's brighter #B37CFF via tint)
+  //   • a few scattered dust / spore pixels
+  //   • one tiny corrupted flower cluster
+  // Kept SPARSE so the biome art beneath is untouched — the tile
+  // averages ~12% coverage, so at overlay alpha 1.0 the road /
+  // grass still reads clearly through the pattern.
+  // Main jagged crack (zig-zag) — outer dark stroke.
+  g.lineStyle(1, 0xffffff, 0.85);
+  g.beginPath();
+  g.moveTo(2, 4);
+  g.lineTo(8, 10);
+  g.lineTo(6, 15);
+  g.lineTo(14, 20);
+  g.lineTo(12, 26);
+  g.lineTo(20, 30);
+  g.moveTo(20, 2);
+  g.lineTo(24, 8);
+  g.lineTo(22, 14);
+  g.lineTo(30, 18);
+  g.strokePath();
+  // Bright inner glow pixels along the crack (single-pixel bright
+  // dots — tinted brighter via the CorruptionOverlay's "glow layer"
+  // that renders this same tile at higher alpha).
+  g.fillStyle(0xffffff, 0.9);
+  g.fillRect(7, 9, 1, 1);
+  g.fillRect(13, 19, 1, 1);
+  g.fillRect(21, 29, 1, 1);
+  g.fillRect(23, 7, 1, 1);
+  g.fillRect(29, 17, 1, 1);
+  // Tiny corrupted spore / flower pixels — sparse, decorative.
+  g.fillStyle(0xffffff, 0.55);
+  g.fillRect(26, 12, 2, 2);
+  g.fillRect(4, 22, 2, 1);
+  g.fillRect(17, 5, 1, 2);
+  // Dust flecks in the "empty" grass area between cracks.
+  g.fillStyle(0xffffff, 0.35);
+  g.fillRect(11, 3, 1, 1);
+  g.fillRect(15, 12, 1, 1);
+  g.fillRect(28, 24, 1, 1);
+  g.fillRect(2, 14, 1, 1);
+  g.fillRect(19, 25, 1, 1);
 }
 
 function drawVines(g: Phaser.GameObjects.Graphics): void {

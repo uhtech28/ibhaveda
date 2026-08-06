@@ -190,8 +190,13 @@ export function IdeaHierarchyFlowchart({
     <Wrapper
       aria-label={bare ? undefined : "Idea hierarchy"}
       className={cn(
+        // Flex column + full height in bare (in-modal) mode so the
+        // canvas's `flex-1` actually stretches to fill the modal
+        // body and the flowchart lands in the vertical center.
+        // Without this the wrapper collapses to its content height
+        // and flex-1 has nothing to expand into.
         bare
-          ? ""
+          ? "flex flex-col h-full min-h-0"
           : "rounded-2xl border border-white/8 bg-[#0F1726]/85 backdrop-blur-xl p-5",
         className,
       )}
@@ -212,25 +217,19 @@ export function IdeaHierarchyFlowchart({
         </div>
       )}
 
-      {/* Horizontally scrollable so wide trees don't break the layout */}
-      <div className="overflow-x-auto pb-2">
+      {/* Flowchart canvas — centered BOTH horizontally and vertically
+          within the modal so the root node sits in the middle when
+          it's the only node, and stays visually anchored as branches
+          grow around it (FlowchartNode's recursive column layout
+          keeps children stacked under the root, and the shared
+          horizontal-scroll wrapper prevents wide trees from breaking
+          the modal width). Empty-state hint text ("No sub-ideas
+          yet" + descriptive line) removed per product request. */}
+      <div className="flex-1 min-h-[300px] flex items-center justify-center overflow-x-auto overflow-y-auto py-4">
         <div className="flex justify-center min-w-fit px-4">
           <FlowchartNode node={tree} isRoot />
         </div>
       </div>
-
-      {/* Empty-state hint when the tree is just the current idea */}
-      {!hasFamily && (
-        <div className="mt-6 flex flex-col items-center gap-1.5 text-center">
-          <p className="text-xs font-medium text-[#D1D5DB]">
-            No sub-ideas yet
-          </p>
-          <p className="max-w-sm text-[11px] leading-relaxed text-[#6B7280]">
-            When contributors fork your idea or add their own branches,
-            they'll appear here as connected nodes.
-          </p>
-        </div>
-      )}
     </Wrapper>
   );
 }

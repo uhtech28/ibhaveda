@@ -3,7 +3,10 @@ export default function WorldMapLoading() {
   const loadingText = "Entering the World...";
 
   return (
-    <main className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050810] text-white">
+    <main
+      data-tutorial-hide="true"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050810] text-white"
+    >
       <p className="map-load-glitch" data-text={loadingText}>
         {loadingText}
       </p>

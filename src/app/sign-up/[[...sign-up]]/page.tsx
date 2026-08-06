@@ -30,6 +30,14 @@ export default function SignUpPage() {
         routing="path"
         path="/sign-up"
         signInUrl="/sign-in"
+        // Post-signup landing: /profile-setup handles first-time
+        // profile creation, then hard-navigates to /feed once the
+        // persona is picked. Without this, the default Clerk config
+        // sends fresh signups to `/` which lets the persona-picker
+        // race (picker → feed → picker) reappear.
+        afterSignUpUrl="/profile-setup"
+        forceRedirectUrl="/profile-setup"
+        fallbackRedirectUrl="/profile-setup"
         appearance={{
           variables: {
             colorBackground: isDark ? '#0f0f0f' : '#ffffff',

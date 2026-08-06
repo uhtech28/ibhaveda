@@ -1,37 +1,36 @@
 "use client";
 
 /**
- * /persona-setup — dedicated post-signup persona selection screen.
+ * /persona-setup — the SINGLE post-signup screen.
  *
- * Runs BETWEEN account creation (or profile-setup form completion) and
- * the first /feed visit. Sole job: get the user's persona chosen and
- * persisted before Sparky's onboarding tutorial ever mounts.
+ * All signup CTAs on the site now land users here directly. The
+ * intermediate /profile-setup name/username form has been dropped
+ * from the flow because it was racing with /feed's redirect guard
+ * and producing the "picker → feed flash → picker" glitch.
  *
- * Why a dedicated route (rather than a modal on /feed):
- *   - The tutorial provider auto-shows Sparky as soon as its own Convex
- *     query resolves. If the picker lives on /feed, there's a race
- *     between the tutorial-state query and the persona-id query — the
- *     tutorial usually wins, so Sparky briefly appears (1–2s) before
- *     the picker mounts over it. That "flash" is the glitch the user
- *     reported.
- *   - Isolating persona selection to its own route means /feed only
- *     renders after the persona is guaranteed set. No race, no flash.
+ * On first mount for a brand-new user we AUTO-PROVISION the Convex
+ * profile row from Clerk data (Clerk username / fullName / imageUrl)
+ * so the picker appears immediately without asking the user to
+ * re-type what Clerk already collected. Once the row exists we
+ * render the picker; once the user picks a persona we hard-reload
+ * to /feed.
  *
- * Gating:
- *   - Unauth → punt to /sign-in.
- *   - Already has persona → push to /feed (never gate-keep past this
- *     point).
- *   - Persona query still loading → skeleton.
- *
- * Post-confirm:
- *   - Persist persona via updatePersonaId, then router.replace("/feed").
- *   - Session-storage flag also set so a hard-refresh during the same
- *     tab doesn't loop us back here mid-nav.
+ * Flow:
+ *   Sign up (Clerk modal)
+ *     ↓
+ *   /persona-setup mounts, auto-provisions profile row
+ *     ↓
+ *   Picker renders (never leaves this screen until user picks)
+ *     ↓
+ *   updatePersonaId AWAITED, then window.location.replace("/feed")
+ *     ↓
+ *   /feed loads with persona already set → Sparky intro plays on
+ *   its black scrim → tutorial continues
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { PersonaSelector } from "@/components/persona/PersonaSelector";
@@ -39,13 +38,19 @@ import type { PersonaId } from "@/config/personas";
 
 export default function PersonaSetupPage() {
   const { isLoaded, userId } = useAuth();
+  const { user } = useUser();
   const router = useRouter();
 
   const personaIdRaw = useQuery(
     api.users.getMyPersonaId,
     isLoaded && userId ? {} : "skip",
   );
+  const existingProfile = useQuery(
+    api.users.getCurrentUser,
+    isLoaded && userId ? {} : "skip",
+  );
   const updatePersonaId = useMutation(api.users.updatePersonaId);
+  const createUserProfile = useMutation(api.users.createUserProfile);
   const [submitting, setSubmitting] = useState(false);
 
   // Bounce unauthenticated visitors.
@@ -56,13 +61,47 @@ export default function PersonaSetupPage() {
     }
   }, [isLoaded, userId, router]);
 
-  // Bounce users who already picked — /persona-setup is one-shot.
+  // AUTO-PROVISION on first mount. If Clerk says we're logged in but
+  // no Convex profile row exists, silently create one using Clerk's
+  // suggested username / fullName / avatar. Guarded by a ref so a
+  // React StrictMode double-mount can't fire the mutation twice.
+  const provisionedRef = useRef(false);
+  useEffect(() => {
+    if (provisionedRef.current) return;
+    if (!isLoaded || !userId || !user) return;
+    if (existingProfile === undefined) return; // still loading
+    if (existingProfile) return; // row already exists — nothing to do
+    provisionedRef.current = true;
+    const suggestedUsername = (user.username || user.firstName || "user")
+      .toLowerCase()
+      .replace(/[\s\/\\?#&=:@<>"'`]/g, "");
+    const suggestedName = user.fullName || suggestedUsername;
+    const avatar = user.imageUrl || "";
+    void createUserProfile({
+      username: suggestedUsername,
+      displayName: suggestedName,
+      avatar: avatar || undefined,
+      skills: [],
+      industries: [],
+    }).catch(() => {
+      // If provisioning fails (e.g. race on username uniqueness), we
+      // fall through to the picker anyway once existingProfile settles.
+      provisionedRef.current = false;
+    });
+  }, [isLoaded, userId, user, existingProfile, createUserProfile]);
+
+  // Already-picked → bounce to /feed. Small debounce so a rapid
+  // picker → mutation → hard-reload sequence doesn't fire an extra
+  // soft redirect mid-navigation.
   useEffect(() => {
     if (personaIdRaw === undefined || personaIdRaw === null) return;
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("personaPickerDismissed", "1");
-    }
-    router.replace("/feed");
+    const t = window.setTimeout(() => {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("personaPickerDismissed", "1");
+      }
+      router.replace("/feed");
+    }, 600);
+    return () => window.clearTimeout(t);
   }, [personaIdRaw, router]);
 
   const handleConfirm = useCallback(
@@ -74,8 +113,17 @@ export default function PersonaSetupPage() {
         if (typeof window !== "undefined") {
           sessionStorage.setItem("personaPickerDismissed", "1");
         }
-        // Use replace() so back-button doesn't bring the picker back.
-        router.replace("/feed");
+        // Hard reload into /feed rather than router.replace so the
+        // whole client re-mounts with the fresh persona ID baked in.
+        // A soft push occasionally raced with the Convex reactive
+        // query cache (still returning null one tick after mutation
+        // ack), which sent the user back through the /feed →
+        // /persona-setup redirect — the picker flash bug.
+        if (typeof window !== "undefined") {
+          window.location.replace("/feed");
+        } else {
+          router.replace("/feed");
+        }
       } catch {
         // If the mutation fails, unfreeze so the user can retry.
         setSubmitting(false);
@@ -84,12 +132,17 @@ export default function PersonaSetupPage() {
     [submitting, updatePersonaId, router],
   );
 
-  // Loading state — auth still resolving OR persona query in flight.
+  // Loading state — auth still resolving, persona query in flight,
+  // OR profile row still being auto-provisioned. All three land the
+  // user on the spinner momentarily instead of the picker so we
+  // never render an unmanaged partial state.
   const loading =
     !isLoaded ||
     !userId ||
     personaIdRaw === undefined ||
-    personaIdRaw !== null; // already-picked case triggers a redirect above
+    personaIdRaw !== null || // already-picked case triggers redirect above
+    existingProfile === undefined ||
+    existingProfile === null; // provisioning in flight
 
   if (loading) {
     return (

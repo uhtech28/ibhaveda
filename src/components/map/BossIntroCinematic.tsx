@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { VILLAGE_BOSSES } from "@/config/village-bosses";
+import { STAGES } from "@/config/stages.config";
 import { audioManager } from "@/lib/audio/audioManager";
 
 interface Props {
@@ -291,18 +292,20 @@ export function BossIntroCinematic({ onDone }: Props) {
             }
             transition={{ duration: 0.9, delay: 0.6, ease: "easeOut" }}
           >
-            <div className="text-[9px] font-bold uppercase tracking-[0.34em] text-rose-300/70 sm:text-[10px] sm:tracking-[0.5em]">
+            {/* Header re-palette per product ask ("color combo similar
+                to the platform"). The pink → wine-red gradient was
+                replaced with the platform's cool violet/indigo
+                treatment: #9CA3AF muted eyebrow + white heading with
+                soft #6366F1 halo. Reads as part of the same product
+                surface as the feed / checkpoint panels. */}
+            <div className="text-[9px] font-bold uppercase tracking-[0.34em] text-[#9CA3AF] sm:text-[10px] sm:tracking-[0.5em]">
               Stage 1 Overseer
             </div>
             <div
-              className="mt-1 whitespace-nowrap text-[26px] font-black leading-none tracking-tight sm:text-[42px]"
+              className="mt-1 whitespace-nowrap text-[26px] font-black leading-none tracking-tight text-white sm:text-[42px]"
               style={{
-                fontFamily: "'Space Grotesk', var(--font-sans), sans-serif",
-                background:
-                  "linear-gradient(180deg, #ffe0eb 0%, #e2739a 55%, #a4123f 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                textShadow: "0 6px 26px rgba(214,34,90,0.35)",
+                fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)",
+                textShadow: "0 6px 26px rgba(99, 102, 241, 0.35)",
               }}
             >
               The Unraveller
@@ -333,14 +336,17 @@ export function BossIntroCinematic({ onDone }: Props) {
                 // tail pointing down-right toward the boss.
                 className="pointer-events-none absolute inset-x-3 top-[19%] mx-auto w-auto max-w-[420px] sm:inset-x-auto sm:left-[6%] sm:top-[24%] sm:w-[min(88vw,380px)] md:left-[8%]"
               >
+                {/* Villain bubble — dark #0F1726 surface + white/8
+                    border, matching every other card on the platform.
+                    Speaker dot uses the platform indigo (#6366F1) so
+                    the accent stays consistent with the CTA below. */}
                 <div
-                  className="relative rounded-2xl border px-4 py-3 shadow-2xl sm:px-5 sm:py-4"
+                  className="relative rounded-[18px] border px-4 py-3 shadow-2xl sm:px-5 sm:py-4"
                   style={{
-                    background:
-                      "linear-gradient(160deg, rgba(28,10,22,0.98) 0%, rgba(14,4,12,0.98) 100%)",
-                    borderColor: "rgba(214,34,90,0.45)",
-                    boxShadow:
-                      "0 24px 60px -18px rgba(214,34,90,0.55), 0 0 30px rgba(214,34,90,0.15) inset",
+                    background: "rgba(15, 23, 38, 0.9)",
+                    borderColor: "rgba(255, 255, 255, 0.08)",
+                    backdropFilter: "blur(24px)",
+                    boxShadow: "0 24px 60px -18px rgba(0, 0, 0, 0.7)",
                   }}
                 >
                   {/* Speaker label */}
@@ -348,11 +354,11 @@ export function BossIntroCinematic({ onDone }: Props) {
                     <span
                       className="inline-block h-2 w-2 rounded-full"
                       style={{
-                        background: "#e2739a",
-                        boxShadow: "0 0 8px rgba(214,34,90,0.7)",
+                        background: "#6366F1",
+                        boxShadow: "0 0 8px rgba(99, 102, 241, 0.7)",
                       }}
                     />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-rose-300/85 sm:text-[10px] sm:tracking-[0.32em]">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#9CA3AF] sm:text-[10px] sm:tracking-[0.32em]">
                       The Unraveller
                     </span>
                   </div>
@@ -389,12 +395,15 @@ export function BossIntroCinematic({ onDone }: Props) {
                       above boss, tail points straight down). On desktop
                       the tail shifts to the right edge because the
                       bubble hangs upper-left of the boss. */}
+                  {/* Tail — outer stroke uses the same white/8 border
+                      as the bubble; inner fill matches the #0F1726
+                      surface. */}
                   <div
                     className="absolute -bottom-3 left-1/2 -translate-x-1/2 h-0 w-0 sm:left-auto sm:right-8 sm:translate-x-0"
                     style={{
                       borderLeft: "10px solid transparent",
                       borderRight: "10px solid transparent",
-                      borderTop: "12px solid rgba(214,34,90,0.45)",
+                      borderTop: "12px solid rgba(255, 255, 255, 0.08)",
                     }}
                   />
                   <div
@@ -402,7 +411,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                     style={{
                       borderLeft: "8px solid transparent",
                       borderRight: "8px solid transparent",
-                      borderTop: "10px solid rgba(14,4,12,0.98)",
+                      borderTop: "10px solid rgba(15, 23, 38, 0.9)",
                     }}
                   />
                 </div>
@@ -440,14 +449,16 @@ export function BossIntroCinematic({ onDone }: Props) {
                       // the roomy 148px layout.
                       className="flex w-[74px] flex-col items-center gap-1 sm:w-[148px] sm:gap-2"
                     >
+                      {/* Minion card — repalatted from rose-tinted to
+                          the platform's #0F1726 surface + white/8
+                          border so it matches the feed card visual
+                          language. */}
                       <div
                         className="relative flex h-[64px] w-[64px] items-center justify-center rounded-xl sm:h-[108px] sm:w-[108px] sm:rounded-2xl"
                         style={{
-                          background:
-                            "linear-gradient(150deg, rgba(214,34,90,0.18), rgba(15,5,25,0.6))",
-                          border: "1px solid rgba(255,255,255,0.12)",
-                          boxShadow:
-                            "0 12px 32px -12px rgba(0,0,0,0.7), inset 0 0 24px rgba(214,34,90,0.15)",
+                          background: "rgba(15, 23, 38, 0.85)",
+                          border: "1px solid rgba(255, 255, 255, 0.08)",
+                          boxShadow: "0 8px 24px -8px rgba(0, 0, 0, 0.5)",
                         }}
                       >
                         {/* Some village boss idles (Fog, Chimera, Automaton,
@@ -505,19 +516,30 @@ export function BossIntroCinematic({ onDone }: Props) {
                         )}
                         {i === minionIdx && phase === "minions" && (
                           <motion.div
-                            className="absolute -inset-1 rounded-xl border-2 border-rose-400/50 sm:rounded-2xl"
+                            className="absolute -inset-1 rounded-xl border-2 sm:rounded-2xl"
+                            style={{ borderColor: "rgba(99, 102, 241, 0.55)" }}
                             initial={{ opacity: 1 }}
                             animate={{ opacity: 0 }}
                             transition={{ duration: 1.2 }}
                           />
                         )}
                       </div>
+                      {/* Label swapped from BOSS name → STAGE name
+                          per product ask ("use stage name instead of
+                          boss name"). Each of the 4 mini-boss cards
+                          in this cinematic previews the corresponding
+                          venture stage the user will progress
+                          through, so surfacing the biome / stage name
+                          ("The Village", "The Forest", "The Arena",
+                          "The Artisan's Quarter") reads as a roadmap
+                          preview rather than "here are four bosses
+                          named X, Y, Z, W". */}
                       <div className="text-center">
-                        <div className="text-[7px] font-bold uppercase tracking-wider text-rose-300/60 sm:text-[9px] sm:tracking-widest">
+                        <div className="text-[7px] font-bold uppercase tracking-wider text-[#9CA3AF] sm:text-[9px] sm:tracking-widest">
                           Stage {i + 1}
                         </div>
                         <div className="mt-0.5 text-[9px] font-bold leading-tight text-white/95 sm:text-[12px]">
-                          {boss.name}
+                          {STAGES[i]?.name ?? boss.name}
                         </div>
                       </div>
                     </motion.div>
@@ -542,19 +564,25 @@ export function BossIntroCinematic({ onDone }: Props) {
                 transition={{ delay: 0.6, duration: 0.6, ease: "easeOut" }}
                 className="absolute inset-x-0 bottom-[260px] z-[210] flex flex-col items-center gap-3 sm:bottom-6"
               >
+                {/* CTA re-styled to match the platform's primary
+                    indigo action (same treatment as Post Idea,
+                    Send Request, and the CheckpointPanel Advance
+                    button). Was a peach/pink/violet gradient with
+                    a right-arrow suffix — both replaced per
+                    product ask ("make the color combo similar to
+                    the platform, also remove arrow"). */}
                 <motion.button
                   onClick={handleDismiss}
-                  whileHover={{ scale: 1.04, y: -2 }}
+                  whileHover={{ scale: 1.03, y: -1 }}
                   whileTap={{ scale: 0.97 }}
-                  className="pointer-events-auto rounded-full px-6 py-3 text-[12px] font-black uppercase tracking-[0.24em] text-white sm:px-8 sm:text-[13px] sm:tracking-[0.28em]"
+                  className="pointer-events-auto rounded-[12px] px-8 py-3 text-[13px] font-semibold text-white sm:px-10 sm:text-sm"
                   style={{
-                    background:
-                      "linear-gradient(115deg, #f0b25e 0%, #e2739a 45%, #8f5ce8 100%)",
-                    boxShadow:
-                      "0 18px 40px -14px rgba(226,115,154,0.6), inset 0 0 16px rgba(255,255,255,0.15)",
+                    background: "#6366F1",
+                    border: "1px solid rgba(99, 102, 241, 0.5)",
+                    boxShadow: "0 12px 32px -10px rgba(99, 102, 241, 0.55)",
                   }}
                 >
-                  Face them →
+                  Face them
                 </motion.button>
               </motion.div>
             )}

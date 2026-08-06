@@ -40,7 +40,23 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
   const activeConversationId = conversationId || directConversationId || resolvedGroupConversationId;
 
-  const messages = useQuery(api.chat.getConversationMessages, isAuthenticated && activeConversationId ? { conversationId: activeConversationId } : "skip");
+  // Guard against `virtual:` placeholder IDs — ChannelList generates
+  // these for channels the user hasn't opened yet, so no real Convex
+  // row exists behind them. Firing getConversationMessages with a
+  // virtual ID would throw ArgumentValidationError because the
+  // validator expects a real `v.id("conversations")`. When we detect
+  // a virtual ID we skip the query and let the parent flow create the
+  // conversation (ChannelList swaps the virtual ID for a real one on
+  // click, which re-renders this component with a valid ID).
+  const isVirtualId =
+    typeof activeConversationId === "string" &&
+    activeConversationId.startsWith("virtual:");
+  const messages = useQuery(
+    api.chat.getConversationMessages,
+    isAuthenticated && activeConversationId && !isVirtualId
+      ? { conversationId: activeConversationId }
+      : "skip",
+  );
   const displayedMessages = messages !== undefined
     ? messages
     : (ideaId && groupChannels && groupChannels.length === 0)
@@ -67,7 +83,12 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
   // visible Members pill in the header rather than just a settings cog.
   const groupMembers = useQuery(
     api.chat.getGroupMembers,
-    isAuthenticated && ideaId && activeConversationId ? { conversationId: activeConversationId } : "skip"
+    // Same `virtual:` guard as getConversationMessages above —
+    // getGroupMembers takes a real `v.id("conversations")` too, so
+    // passing a placeholder would throw ArgumentValidationError.
+    isAuthenticated && ideaId && activeConversationId && !isVirtualId
+      ? { conversationId: activeConversationId }
+      : "skip",
   );
 
   useEffect(() => {

@@ -87,11 +87,19 @@ const BUBBLE_W = 260;         // matches TutorialSpeechBubble w-[260px]
 const BUBBLE_H_EST = 180;     // rough max estimate; used for fit checks
 const GAP = 12;               // gap between group and target
 const INNER_GAP = 16;         // gap between bubble and Sparky (base value)
-// When the bubble is flipped-above Sparky, shift its bottom edge ~1cm
-// closer to his head so the group reads as tighter and takes less
-// vertical space overall. Negative because bubble.top = sparkyTop -
-// INNER_GAP + BUBBLE_FLIP_DOWNSHIFT (positive value = bubble sits lower).
-const BUBBLE_FLIP_DOWNSHIFT = 37; // ~1cm at 96dpi
+// When the bubble is flipped-above Sparky, shift its bottom edge a
+// few pixels closer to his head so the group reads tightly grouped —
+// but MUST stay < INNER_GAP so the bubble never lands INSIDE Sparky.
+// bubble.top (flipped) = sparkyTop - INNER_GAP + BUBBLE_FLIP_DOWNSHIFT
+// so the final gap between bubble bottom and Sparky top edge is
+// (INNER_GAP - BUBBLE_FLIP_DOWNSHIFT). Setting downshift = 8 keeps
+// an ~8px visible gap so the tail tip reads as pointing AT Sparky
+// instead of being embedded in his forehead.
+// Previous value of 37 overshot INNER_GAP by 21px, causing the
+// bubble to physically overlap Sparky on steps like the saddlebag
+// tutorial hint (product feedback: "Sparky and bubble are
+// overlapping"). Anything ≥ INNER_GAP re-introduces that bug.
+const BUBBLE_FLIP_DOWNSHIFT = 8;
 const VIEWPORT_MARGIN = 12;
 
 // Mobile
@@ -622,6 +630,56 @@ export function TutorialMascot({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Track whether a combat modal OR a route-transition overlay is
+  // currently on screen — we hide the global Sparky mascot in either
+  // case. Combat has its own inline Sparky sprite in the arena; the
+  // route-loading overlays (e.g. /map/world's "Entering the World...")
+  // aren't tutorial surfaces and shouldn't flash Sparky for the ~1s
+  // the loading screen is up.
+  //
+  // A parent renders `data-tutorial="combat-panel"` on the combat
+  // wrapper; a route-transition overlay renders `data-tutorial-hide=
+  // "true"` on its root. Both are observed via MutationObserver on
+  // <body> so Sparky snaps back the instant they close.
+  const [suppressedByOverlay, setSuppressedByOverlay] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const check = () => {
+      setSuppressedByOverlay(
+        !!document.querySelector(
+          '[data-tutorial="combat-panel"], [data-tutorial-hide="true"]',
+        ),
+      );
+    };
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-tutorial", "data-tutorial-hide"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  // Debounced-visible gate — prevents the "1-2s Sparky flash" bug
+  // where a step's `visible` briefly flips true during a route change
+  // (pathname updates before the destination page's tutorial state
+  // resolves), then flips back to false. If visible turns true and
+  // then turns false again within this window, Sparky never mounts.
+  // Only sustained visibility (>=DEBOUNCE_MS) actually paints.
+  const DEBOUNCE_MS = 500;
+  const [visibleStable, setVisibleStable] = useState(false);
+  useEffect(() => {
+    if (!visible) {
+      // Immediate hide — no debounce on the way out so exits stay snappy.
+      setVisibleStable(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setVisibleStable(true), DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [visible]);
+
   // ── Talk trigger — set while the speech bubble is still typing ────────
   const [isTyping, setIsTyping] = useState(false);
   useEffect(() => {
@@ -660,8 +718,12 @@ export function TutorialMascot({
       }
     : undefined;
 
+  // Follow-target only wires up once Sparky is *actually* going to
+  // render — same debounce-gate as the portal below — so the rAF
+  // measurement loop doesn't spin during the 500ms flash window.
+  const willActuallyRender = visible && visibleStable && !suppressedByOverlay;
   const { placement, targetRect } = useFollowTarget(
-    visible ? nearSelector : null,
+    willActuallyRender ? nearSelector : null,
   );
 
   // ── Track viewport width so we can switch to a mobile layout on narrow
@@ -711,7 +773,20 @@ export function TutorialMascot({
 
   if (!mounted) return null;
 
-  const activeSpeech = visible && text && isTyping ? text : null;
+  // Hide Sparky while any suppress-overlay is on screen (combat modal
+  // or a route-transition loader — see `suppressedByOverlay` above).
+  // These surfaces either have their own inline Sparky or aren't
+  // tutorial contexts at all, so the global puppy would either
+  // duplicate or flash for 1-2s during navigation.
+  if (suppressedByOverlay) return null;
+
+  // Sparky only renders after `visible` has been stable for
+  // DEBOUNCE_MS (see `visibleStable` above). Every read of the
+  // effective visible flag below routes through this so brief
+  // route-transition flashes never mount the puppy or its bubble.
+  const effectiveVisible = visible && visibleStable;
+
+  const activeSpeech = effectiveVisible && text && isTyping ? text : null;
   const isFollowing = placement !== null;
 
   // Only render the speech-bubble frame when there's actual content to
@@ -745,7 +820,7 @@ export function TutorialMascot({
 
   const portal = createPortal(
     <AnimatePresence>
-      {visible && (
+      {effectiveVisible && (
         <>
           {/* Scrim — blocks all page clicks except the highlighted target
               and Sparky's bubble. Ensures the user must advance via Sparky's
@@ -924,8 +999,16 @@ export function TutorialMascot({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 40 }}
                 transition={{ type: "spring", stiffness: 260, damping: 24 }}
-                className={`fixed bottom-4 sm:bottom-6 ${anchorClass} z-[10010] pointer-events-none`}
-                style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+                // Shifted ~5cm (~189px at 96dpi) upward per product
+                // request so Sparky clears the feed's floating chat
+                // button and the "Request Sent" toast that pops from
+                // the bottom-right during the contribute step. Prior
+                // position (bottom-4 / sm:bottom-6) had Sparky and
+                // his bubble tucked behind those chrome elements.
+                className={`fixed ${anchorClass} z-[10010] pointer-events-none`}
+                style={{
+                  bottom: "calc(213px + env(safe-area-inset-bottom, 0px))",
+                }}
               >
                 <div className="flex flex-col items-end gap-2">
                   {/* pointer-events-none on the bubble wrapper so its
