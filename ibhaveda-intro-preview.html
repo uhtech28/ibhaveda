@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- viewport-fit=cover so env(safe-area-inset-*) resolves properly on
+     iOS notch/home-indicator devices. user-scalable=no + touch-action:
+     manipulation kill the 300ms tap delay and the pinch-zoom that
+     would otherwise fight the CSS keyframe cinematic. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Ibhaveda — Gate of Ibhaveda (Onboarding Intro Preview)</title>
+<!--
+  Ibhaveda Onboarding Intro — "The Gate of Ibhaveda"
+  Standalone preview per the creative brief (7 beats, ~23–24s).
+
+  Runs entirely in-browser. No external dependencies. Web Audio API
+  generates the cue-sync stand-in (chiptune synth). All art is
+  procedural SVG so this file is self-contained — swap in the real
+  pixel-art assets (doors, corridor, throne, map) by pointing the
+  <use href="#..."/> references to <img> tags instead.
+
+  On end (or Continue tap):
+    - window.postMessage({ type: "ibhaveda:intro-done" }, "*");
+    - dispatches CustomEvent("ibhaveda:intro-done") on document.
+  NOT wired into the app funnel — that's a separate integration.
+-->
+<style>
+  :root {
+    --navy-deep: #05081a;
+    --navy-mid:  #0b1030;
+    --navy-warm: #14224a;
+    --purple:    #2a1548;
+    --purple-hi: #6b3fa0;
+    --gold:      #f5c542;
+    --gold-hi:   #ffdf7a;
+    --gold-deep: #8a5a0f;
+    --pink:      #d977a8;
+    --stone:     #4a4658;
+    --stone-hi:  #6d6880;
+    --torch:     #ff9a2b;
+    --parchment: #d9c290;
+    --parchment-shade: #b39d6a;
+    --ink:       #3a2412;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: "Courier New", "Consolas", monospace;
+    color: var(--gold);
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    user-select: none;
+    -webkit-user-select: none;
+    /* iOS Safari: kill the gray flash on any tap; kill rubber-band
+       overscroll while the cinematic is playing (would leak black
+       from the letterbox into the visible frame during flicks). */
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+  }
+  button {
+    /* Snappy taps + no long-press context menu on iOS. */
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+  }
+
+  /* ── Letterbox stage ─────────────────────────────────────────────────
+     Full-viewport black, holds a 16:9 stage centered. */
+  #frame {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    background: #000;
+    z-index: 1;
+  }
+  #stage {
+    position: relative;
+    /* Prefer dvh (dynamic viewport height) so iOS Safari's URL bar
+       collapse/expand doesn't resize the 16:9 letterbox stage
+       mid-intro. Fallback to vh for browsers without dvh. */
+    width: 100vw;
+    height: calc(100vw * 9 / 16);
+    max-height: 100vh;
+    max-height: 100dvh;
+    max-width: calc(100vh * 16 / 9);
+    max-width: calc(100dvh * 16 / 9);
+    overflow: hidden;
+    background: var(--navy-deep);
+    box-shadow: 0 0 120px rgba(0,0,0,0.9) inset;
+    isolation: isolate;
+  }
+
+  /* Each beat lives in its own absolutely-positioned layer, activated
+     by keyframes on the master timeline. Layers are stacked back-to-
+     front in DOM order and toggled with opacity + transforms. */
+  .layer {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    will-change: opacity, transform, filter;
+  }
+
+  /* ── Start-gate overlay (browsers require a user gesture for audio) */
+  #start-gate {
+    position: absolute; inset: 0; z-index: 999;
+    display: grid; place-items: center;
+    background: radial-gradient(ellipse at center, #14224a 0%, #05081a 70%);
+    cursor: pointer;
+    color: var(--gold-hi);
+    text-align: center;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    font-weight: 700;
+    text-shadow: 0 2px 0 var(--gold-deep), 0 0 12px rgba(245,197,66,0.35);
+    transition: opacity 0.5s ease;
+  }
+  #start-gate .pulse {
+    font-size: clamp(12px, 1.5vw, 16px);
+    padding: 12px 24px;
+    border: 2px solid var(--gold);
+    animation: pulse 1.4s ease-in-out infinite;
+    box-shadow: 0 0 24px rgba(245,197,66,0.3), inset 0 0 12px rgba(245,197,66,0.15);
+    background: rgba(11,16,48,0.6);
+  }
+  @keyframes pulse {
+    0%,100% { transform: scale(1);   box-shadow: 0 0 24px rgba(245,197,66,0.3), inset 0 0 12px rgba(245,197,66,0.15); }
+    50%     { transform: scale(1.04); box-shadow: 0 0 40px rgba(245,197,66,0.55), inset 0 0 18px rgba(245,197,66,0.25); }
+  }
+  #start-gate.hidden { opacity: 0; pointer-events: none; }
+
+  /* ── Continue button (wax seal) ───────────────────────────────────── */
+  #continue {
+    position: absolute;
+    left: 50%;
+    /* Clear the iOS home indicator when in fullscreen. env() resolves
+       to 0 on Android / non-notch devices, so no downside. */
+    bottom: calc(6% + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 100;
+    padding: 10px 24px;
+    background: linear-gradient(180deg, #7a1a1a 0%, #4a0d0d 100%);
+    color: #fff2c8;
+    border: 3px solid var(--gold);
+    border-radius: 999px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    font-size: clamp(10px, 1vw, 13px);
+    font-weight: 800;
+    cursor: pointer;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.6);
+    box-shadow:
+      0 4px 0 rgba(0,0,0,0.55),
+      inset 0 0 12px rgba(0,0,0,0.5),
+      0 0 22px rgba(245,197,66,0.35);
+    opacity: 0.55;
+    transition: opacity 0.3s, transform 0.15s;
+    /* Larger hit-area on touch devices even at small sizes. */
+    min-height: 44px;
+  }
+  #continue:hover { opacity: 1; transform: translateX(-50%) scale(1.05); }
+  #continue::before, #continue::after {
+    content: "❋"; margin: 0 8px; color: var(--gold);
+  }
+
+  /* Skip label — corner mini-hint */
+  #skip-hint {
+    position: absolute;
+    right: 2%; top: 2%;
+    z-index: 100;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: rgba(245,197,66,0.55);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     BEAT 1 — MATERIALIZE (0.0s → 2.3s)
+     Scattered points of light ignite, then coalesce into door outline.
+     ═══════════════════════════════════════════════════════════════════ */
+  .particle {
+    position: absolute;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--gold-hi);
+    box-shadow: 0 0 8px var(--gold), 0 0 14px var(--purple-hi);
+    opacity: 0;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     Doors — SVG-based, two halves that can rotate open. Sits inside
+     .doors-scene which handles the whole-frame push-through animation.
+     ═══════════════════════════════════════════════════════════════════ */
+  .doors-scene {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    perspective: 900px;
+    transform-origin: 50% 50%;
+    opacity: 0;
+  }
+  .doors-frame {
+    position: relative;
+    width: min(60%, 42vh);
+    aspect-ratio: 3 / 4;
+    transform-style: preserve-3d;
+  }
+  .doors-frame svg { width: 100%; height: 100%; display: block; }
+  .door-half {
+    transform-origin: center;
+    transition: none;
+    transform-box: fill-box;
+  }
+  .door-half.left  { transform-origin: 0% 50%; }
+  .door-half.right { transform-origin: 100% 50%; }
+
+  /* Torch flame */
+  .torch-flame {
+    animation: torch-flicker 0.18s steps(2) infinite;
+    transform-origin: center bottom;
+  }
+  @keyframes torch-flicker {
+    0%   { transform: scaleY(1) scaleX(1);   filter: brightness(1.15); }
+    50%  { transform: scaleY(1.1) scaleX(0.95); filter: brightness(1.35); }
+    100% { transform: scaleY(0.95) scaleX(1.05); filter: brightness(1.05); }
+  }
+
+  /* Purple sparkle stars around doors */
+  .starfield {
+    position: absolute; inset: 0;
+    pointer-events: none;
+  }
+  .star {
+    position: absolute;
+    width: 3px; height: 3px;
+    background: var(--purple-hi);
+    border-radius: 50%;
+    opacity: 0.7;
+    box-shadow: 0 0 4px currentColor;
+    animation: twinkle 2.4s ease-in-out infinite;
+  }
+  .star.gold { background: var(--gold); color: var(--gold); }
+  .star.pink { background: var(--pink); color: var(--pink); }
+  @keyframes twinkle {
+    0%,100% { opacity: 0.25; transform: scale(1); }
+    50%     { opacity: 1;    transform: scale(1.3); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     BEAT 3 — CORRIDOR
+     Stone columns + torches scroll past. Uses two column strips that
+     scroll horizontally on repeat, plus a perspective floor.
+     ═══════════════════════════════════════════════════════════════════ */
+  #corridor {
+    position: absolute; inset: 0;
+    opacity: 0;
+    background:
+      linear-gradient(180deg, #050914 0%, #0e1530 40%, #1a1428 100%);
+    overflow: hidden;
+    perspective: 700px;
+    perspective-origin: 50% 45%;
+  }
+  #corridor .floor {
+    position: absolute; inset: 55% 0 0 0;
+    background:
+      repeating-linear-gradient(90deg,
+        #241a2e 0%, #241a2e 6%, #322340 6%, #322340 12%),
+      linear-gradient(180deg, #322240 0%, #12081c 100%);
+    transform: rotateX(72deg);
+    transform-origin: 50% 0%;
+    box-shadow: inset 0 40px 60px rgba(0,0,0,0.7);
+  }
+  #corridor .ceiling {
+    position: absolute; inset: 0 0 55% 0;
+    background:
+      repeating-linear-gradient(90deg,
+        #12081c 0%, #12081c 6%, #1a0e26 6%, #1a0e26 12%),
+      linear-gradient(0deg, #322240 0%, #050510 100%);
+    transform: rotateX(-72deg);
+    transform-origin: 50% 100%;
+  }
+  #corridor .wall {
+    position: absolute; top: 0; bottom: 0;
+    width: 30%;
+    overflow: hidden;
+  }
+  #corridor .wall.left  { left: 0;  transform-origin: right center;
+                          background: linear-gradient(90deg, #3a2f4d 0%, #14102a 100%); }
+  #corridor .wall.right { right: 0; transform-origin: left center;
+                          background: linear-gradient(-90deg, #3a2f4d 0%, #14102a 100%); }
+
+  .col-strip {
+    position: absolute; inset: 0;
+    display: flex; align-items: stretch;
+    animation: scroll-cols 1.4s linear infinite;
+  }
+  @keyframes scroll-cols {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-25%); }
+  }
+  .col {
+    flex: 0 0 25%;
+    display: flex; flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+  }
+  .col::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, #58486e 0%, #2a1e42 100%);
+    border-left: 4px solid #7a6b90;
+    border-right: 4px solid #1a1028;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.65);
+  }
+  .col-torch {
+    position: absolute;
+    left: 50%; top: 20%;
+    transform: translateX(-50%);
+    width: 24px; height: 34px;
+    z-index: 2;
+    animation: torch-flicker 0.16s steps(2) infinite;
+  }
+  .col-torch::before {
+    content: ""; position: absolute; inset: 0 6px 22% 6px;
+    background: radial-gradient(circle at 50% 40%, #ffe07a 0%, var(--torch) 40%, #7a1a00 100%);
+    border-radius: 40% 40% 30% 30%;
+    filter: blur(0.5px);
+  }
+  .col-torch::after {
+    content: ""; position: absolute; left: 50%; bottom: 0;
+    width: 8px; height: 20%;
+    background: #3a2412;
+    transform: translateX(-50%);
+  }
+  .torch-glow {
+    position: absolute;
+    left: 50%; top: 8%;
+    transform: translateX(-50%);
+    width: 100%; height: 60%;
+    background: radial-gradient(circle at 50% 30%, rgba(255,180,60,0.55) 0%, rgba(255,120,20,0.18) 40%, transparent 70%);
+    animation: torch-flicker 0.16s steps(2) infinite;
+    pointer-events: none;
+  }
+
+  /* Forward-motion vignette pulse */
+  #corridor .push-lines {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.6) 90%);
+    pointer-events: none;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     BEAT 4 — THRONE ROOM
+     Wide chamber, deep vanishing point, throne silhouette centered.
+     ═══════════════════════════════════════════════════════════════════ */
+  #throne {
+    position: absolute; inset: 0;
+    opacity: 0;
+    background:
+      radial-gradient(ellipse at 50% 55%, #2a1a48 0%, #0a0620 65%, #000 100%);
+    overflow: hidden;
+  }
+  #throne .arches {
+    position: absolute; left: 0; right: 0; top: 5%; bottom: 30%;
+    display: flex; justify-content: space-around; align-items: end;
+  }
+  #throne .arch {
+    width: 12%; height: 100%;
+    background:
+      radial-gradient(ellipse at 50% 100%, transparent 40%, #241635 42%, #3a2a55 60%, #12081c 100%);
+    border-top-left-radius: 50% 40%;
+    border-top-right-radius: 50% 40%;
+    filter: brightness(0.9);
+  }
+  #throne .arch::after {
+    content: ""; position: absolute; inset: 30% 30% 0 30%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255,180,60,0.35) 0%, transparent 65%);
+  }
+  #throne .throne-shape {
+    position: absolute;
+    left: 50%; bottom: 15%;
+    transform: translateX(-50%);
+    width: 22%; aspect-ratio: 5 / 8;
+    background:
+      linear-gradient(180deg, #6b3fa0 0%, #2a1548 100%);
+    border: 4px solid var(--gold);
+    box-shadow: 0 0 40px rgba(245,197,66,0.35), inset 0 0 24px rgba(0,0,0,0.6);
+    clip-path: polygon(20% 100%, 20% 30%, 0 30%, 0 20%, 30% 20%, 30% 0, 70% 0, 70% 20%, 100% 20%, 100% 30%, 80% 30%, 80% 100%);
+  }
+  #throne .throne-glow {
+    position: absolute;
+    left: 50%; bottom: 10%;
+    transform: translateX(-50%);
+    width: 60%; height: 60%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(245,197,66,0.28) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  #throne .floor-tiles {
+    position: absolute; inset: 60% 0 0 0;
+    background:
+      repeating-linear-gradient(90deg,
+        #322240 0%, #322240 8%, #14102a 8%, #14102a 16%),
+      linear-gradient(180deg, #241a2e 0%, #050914 100%);
+    transform: rotateX(72deg);
+    transform-origin: 50% 0%;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     BEAT 5 & 6 — TILT + TABLE + PARCHMENT
+     The whole "room" tilts so the camera looks down at a wooden table,
+     then a rolled parchment on the table unrolls to reveal the map.
+     ═══════════════════════════════════════════════════════════════════ */
+  #tabletop {
+    position: absolute; inset: 0;
+    opacity: 0;
+    background: radial-gradient(ellipse at 50% 50%, #1a1024 0%, #050510 80%);
+    display: grid; place-items: center;
+    perspective: 1000px;
+  }
+  #tabletop .table {
+    width: 82%; aspect-ratio: 16 / 9;
+    background:
+      repeating-linear-gradient(90deg,
+        #4a3220 0%, #4a3220 3%, #3a2418 3%, #3a2418 6%),
+      linear-gradient(180deg, #5a3d24 0%, #3a2418 100%);
+    border: 6px solid #2a1808;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.7), inset 0 0 40px rgba(0,0,0,0.5);
+    position: relative;
+    display: grid; place-items: center;
+  }
+  #tabletop .scroll-wrapper {
+    width: 88%; height: 82%;
+    position: relative;
+    display: grid; place-items: center;
+  }
+  #tabletop .scroll-rolled {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 16%; height: 55%;
+    background: linear-gradient(90deg, #b39d6a 0%, #d9c290 20%, #f0dba0 50%, #d9c290 80%, #b39d6a 100%);
+    border-radius: 4px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.55), inset 0 0 8px rgba(0,0,0,0.3);
+  }
+  #tabletop .scroll-rolled::before,
+  #tabletop .scroll-rolled::after {
+    content: ""; position: absolute; left: -6px; right: -6px;
+    height: 12px;
+    background: linear-gradient(90deg, #6b4a20 0%, #8a5a0f 50%, #6b4a20 100%);
+    border-radius: 6px;
+  }
+  #tabletop .scroll-rolled::before { top: -6px; }
+  #tabletop .scroll-rolled::after  { bottom: -6px; }
+
+  #tabletop .parchment {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%) scaleX(0);
+    transform-origin: center center;
+    width: 100%; height: 82%;
+    background:
+      radial-gradient(ellipse at 50% 50%, #f0dba0 0%, #d9c290 60%, #b39d6a 100%),
+      linear-gradient(180deg, #d9c290 0%, #b39d6a 100%);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.55), inset 0 0 40px rgba(60,40,10,0.35);
+    border-radius: 4px;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  /* Map SVG sits inside .parchment. Rendered by a big inline <svg>
+     below in the DOM. */
+
+  /* Title text that burns in on top of the parchment */
+  .map-title {
+    position: absolute;
+    left: 50%; top: 12%;
+    transform: translateX(-50%);
+    text-align: center;
+    letter-spacing: 0.08em;
+    color: #6b3410;
+    text-shadow:
+      0 2px 0 rgba(0,0,0,0.15),
+      0 0 20px rgba(245,197,66,0.5);
+    font-family: "Cinzel", "Trajan Pro", "Times New Roman", serif;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0;
+  }
+  .map-title .welcome {
+    display: block;
+    font-size: clamp(10px, 1.4vw, 18px);
+    letter-spacing: 0.4em;
+    color: #7a4a10;
+    margin-bottom: 6px;
+  }
+  .map-title .land {
+    display: block;
+    font-size: clamp(24px, 4vw, 52px);
+    color: transparent;
+    -webkit-text-stroke: 1px var(--gold-deep);
+    background: linear-gradient(180deg, var(--gold-hi) 0%, var(--gold) 40%, #b8790a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    filter: drop-shadow(0 2px 0 #4a2a08) drop_shadow(0 0 12px rgba(245,197,66,0.6));
+  }
+
+  /* Flash overlay for threshold */
+  .flash {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 50%, #fff8dc 0%, transparent 65%);
+    opacity: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  /* Beat-cue timeline debug (hidden by default) */
+  #debug {
+    position: absolute; left: 8px; bottom: 8px;
+    color: rgba(245,197,66,0.35);
+    font-size: 10px;
+    z-index: 200;
+    pointer-events: none;
+    letter-spacing: 0.1em;
+    display: none;
+  }
+  body.debug #debug { display: block; }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     MASTER TIMELINE
+     Each layer opacity/transform is choreographed with a single 24s
+     keyframe animation. Percent stops = time / 24 * 100.
+     Beats:
+       0.0–2.3   Materialize      → particles + door outline
+       2.3–3.9   Doors Open       → halves swing open, light spills
+       3.9–5.5   Threshold        → doors scale up + slide off, flash
+       5.5–9.5   Corridor         → scroll past columns
+       9.5–11.5  Throne Room      → decelerate to still
+       11.5–13.7 Tilt Down        → whole scene tilts
+       13.7–17.5 Unroll           → parchment unrolls on table
+       17.5–24.0 Reveal & Hold    → map + title + Continue seal
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Beat 1: particles fade in fast, then coalesce (handled via JS
+     scattering — CSS handles per-particle animation). */
+  .particle {
+    animation: particle-ignite 2.3s ease-out forwards;
+  }
+  @keyframes particle-ignite {
+    0%   { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(1); }
+    30%  { opacity: 1; transform: translate(var(--sx), var(--sy)) scale(1.3); }
+    100% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  }
+
+  /* Doors: fade-in glow outline over 0.4s starting ~1.6s, then hold. */
+  .doors-scene {
+    animation: doors-scene 24s linear forwards;
+  }
+  @keyframes doors-scene {
+    0%    { opacity: 0; transform: scale(0.85); filter: brightness(0.4); }
+    6.7%  { opacity: 0; transform: scale(0.85); filter: brightness(0.4); }  /* 1.6s */
+    9.6%  { opacity: 1; transform: scale(1);    filter: brightness(1); }    /* 2.3s */
+    /* Hold shut until 2.3s → 3.9s doors open */
+    16.3% { opacity: 1; transform: scale(1.15); filter: brightness(1.4); }  /* 3.9s */
+    /* Threshold push 3.9s → 5.5s */
+    22.9% { opacity: 0; transform: scale(4.2);  filter: brightness(2.4); }  /* 5.5s */
+    100%  { opacity: 0; transform: scale(4.2); }
+  }
+
+  .door-half.left  { animation: door-swing-left  24s linear forwards; }
+  .door-half.right { animation: door-swing-right 24s linear forwards; }
+  @keyframes door-swing-left {
+    0%,9.6% { transform: rotateY(0);   }
+    16.3%   { transform: rotateY(-92deg); }
+    100%    { transform: rotateY(-92deg); }
+  }
+  @keyframes door-swing-right {
+    0%,9.6% { transform: rotateY(0);  }
+    16.3%   { transform: rotateY(92deg); }
+    100%    { transform: rotateY(92deg); }
+  }
+
+  .through-glow {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255,220,150,0.75) 0%, rgba(120,60,20,0.15) 50%, transparent 75%);
+    opacity: 0;
+    animation: through-glow 24s linear forwards;
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+  @keyframes through-glow {
+    0%,9.6%  { opacity: 0; }
+    16.3%    { opacity: 0.9; }
+    22.9%    { opacity: 0.3; }
+    100%     { opacity: 0; }
+  }
+
+  .flash {
+    animation: threshold-flash 24s linear forwards;
+  }
+  @keyframes threshold-flash {
+    0%,19% { opacity: 0; }
+    20.5%  { opacity: 1; }
+    24%    { opacity: 0; }
+    100%   { opacity: 0; }
+  }
+
+  /* Corridor: reveal after threshold, animate columns scrolling. */
+  #corridor {
+    animation: corridor-life 24s linear forwards;
+  }
+  @keyframes corridor-life {
+    0%,20%  { opacity: 0; }
+    24%     { opacity: 1; }   /* 5.76s */
+    39.6%   { opacity: 1; }   /* 9.5s — start fade to throne */
+    47.9%   { opacity: 0; }   /* 11.5s */
+    100%    { opacity: 0; }
+  }
+  #corridor .col-strip {
+    animation-duration: 1.6s;
+  }
+  /* Slow corridor motion at end (decel into throne room). */
+  #corridor.decel .col-strip {
+    animation-duration: 4s;
+    animation-timing-function: ease-out;
+  }
+
+  /* Throne room fades in over corridor's tail. */
+  #throne {
+    animation: throne-life 24s linear forwards;
+  }
+  @keyframes throne-life {
+    0%,39.6% { opacity: 0; transform: scale(1.05); }
+    47.9%    { opacity: 1; transform: scale(1); }
+    54.6%    { opacity: 1; transform: scale(1); }    /* 13.1s */
+    57.1%    { opacity: 0; transform: scale(1) rotateX(45deg); } /* 13.7s tilt done */
+    100%     { opacity: 0; }
+  }
+
+  /* Table + parchment: appear after throne, tilt visualized via
+     transform origin from bottom for a "camera pitching down" feel. */
+  #tabletop {
+    animation: tabletop-life 24s linear forwards;
+  }
+  @keyframes tabletop-life {
+    0%,47.9%  { opacity: 0; transform: rotateX(-30deg) translateY(20%); }
+    52.1%     { opacity: 0; transform: rotateX(-30deg) translateY(20%); }  /* 12.5s */
+    57.1%     { opacity: 1; transform: rotateX(0deg)  translateY(0); }     /* 13.7s: tilt done */
+    100%      { opacity: 1; transform: rotateX(0deg) translateY(0); }
+  }
+
+  #tabletop .scroll-rolled {
+    animation: scroll-lifecycle 24s linear forwards;
+  }
+  @keyframes scroll-lifecycle {
+    0%,57.1% { opacity: 1; transform: translate(-50%, -50%) scaleX(1) scaleY(1); }
+    62%      { opacity: 1; transform: translate(-50%, -50%) scaleX(1) scaleY(1.05); }  /* 14.9s tiny bounce */
+    64%      { opacity: 0; }
+    100%     { opacity: 0; }
+  }
+
+  #tabletop .parchment {
+    animation: parchment-unroll 24s linear forwards;
+  }
+  @keyframes parchment-unroll {
+    0%,57.1% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.02) scaleY(0.4); }
+    62%      { opacity: 1; transform: translate(-50%, -50%) scaleX(0.05) scaleY(0.9); } /* 14.9s */
+    72.9%    { opacity: 1; transform: translate(-50%, -50%) scaleX(1) scaleY(1); }      /* 17.5s */
+    100%     { opacity: 1; transform: translate(-50%, -50%) scaleX(1) scaleY(1); }
+  }
+
+  .map-title {
+    animation: title-burn-in 24s linear forwards;
+  }
+  @keyframes title-burn-in {
+    0%,72.9%  { opacity: 0; filter: blur(4px) brightness(1.6); }
+    77%       { opacity: 1; filter: blur(0)   brightness(1); }  /* 18.5s */
+    100%      { opacity: 1; filter: blur(0)   brightness(1); }
+  }
+
+  #continue {
+    animation: continue-in 24s linear forwards;
+  }
+  @keyframes continue-in {
+    0%,79%  { opacity: 0; transform: translateX(-50%) scale(0.7); }
+    83%     { opacity: 0.55; transform: translateX(-50%) scale(1); }  /* 20s */
+    100%    { opacity: 0.55; transform: translateX(-50%) scale(1); }
+  }
+</style>
+</head>
+<body>
+
+<div id="frame">
+  <div id="stage">
+
+    <!-- ─── Start gate ─────────────────────────────────────────────────
+         Required because most browsers won't let us start Web Audio
+         without a user gesture. Also lets the user "arrive" rather
+         than being ambushed by sound. -->
+    <div id="start-gate">
+      <div class="pulse">▶  Click to enter Ibhaveda</div>
+    </div>
+
+    <!-- ─── Beat 1: Materialize particles ─────────────────────────── -->
+    <div class="layer" id="particles-layer"></div>
+
+    <!-- ─── Beats 1B/2/2B: Doors ──────────────────────────────────── -->
+    <div class="layer doors-scene" id="doors-scene">
+      <div class="starfield" id="door-stars"></div>
+      <div class="through-glow"></div>
+
+      <div class="doors-frame">
+        <!-- SVG double doors, cross motif, gold glow trim.
+             Two halves rotated open via .door-half.left/right. -->
+        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="doorWood" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%"  stop-color="#3a1e5a"/>
+              <stop offset="50%" stop-color="#2a1548"/>
+              <stop offset="100%" stop-color="#150826"/>
+            </linearGradient>
+            <linearGradient id="frameStone" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#6d5d90"/>
+              <stop offset="100%" stop-color="#2a1e42"/>
+            </linearGradient>
+            <radialGradient id="innerGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff2a8"/>
+              <stop offset="60%" stop-color="#f5c542" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#f5c542" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="goldGlow">
+              <feGaussianBlur stdDeviation="3"/>
+              <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- Stone arch frame -->
+          <path d="M20 400 L20 140 Q20 20 150 20 Q280 20 280 140 L280 400 Z"
+                fill="url(#frameStone)" stroke="#12081c" stroke-width="4"/>
+          <!-- Frame highlights -->
+          <path d="M40 400 L40 145 Q40 40 150 40 Q260 40 260 145 L260 400"
+                fill="none" stroke="#f5c542" stroke-width="2" opacity="0.7" filter="url(#goldGlow)"/>
+
+          <!-- Left door half -->
+          <g class="door-half left">
+            <rect x="45" y="55" width="105" height="330" fill="url(#doorWood)"
+                  stroke="#150826" stroke-width="2"/>
+            <!-- door planks -->
+            <line x1="70"  y1="70" x2="70"  y2="380" stroke="#150826" stroke-width="1"/>
+            <line x1="100" y1="70" x2="100" y2="380" stroke="#150826" stroke-width="1"/>
+            <line x1="125" y1="70" x2="125" y2="380" stroke="#150826" stroke-width="1"/>
+            <!-- Cross motif -->
+            <g fill="none" stroke="#f5c542" stroke-width="2" filter="url(#goldGlow)">
+              <rect x="88" y="130" width="20" height="6"/>
+              <rect x="94" y="110" width="8"  height="46"/>
+              <rect x="82" y="140" width="8"  height="8"/>
+              <rect x="108" y="140" width="8" height="8"/>
+              <circle cx="98" cy="133" r="2" fill="#fff2a8" stroke="none"/>
+            </g>
+            <!-- Handle -->
+            <circle cx="140" cy="230" r="4" fill="#f5c542" filter="url(#goldGlow)"/>
+            <rect x="138" y="234" width="4" height="12" fill="#8a5a0f"/>
+          </g>
+
+          <!-- Right door half -->
+          <g class="door-half right">
+            <rect x="150" y="55" width="105" height="330" fill="url(#doorWood)"
+                  stroke="#150826" stroke-width="2"/>
+            <line x1="175" y1="70" x2="175" y2="380" stroke="#150826" stroke-width="1"/>
+            <line x1="200" y1="70" x2="200" y2="380" stroke="#150826" stroke-width="1"/>
+            <line x1="228" y1="70" x2="228" y2="380" stroke="#150826" stroke-width="1"/>
+            <g fill="none" stroke="#f5c542" stroke-width="2" filter="url(#goldGlow)">
+              <rect x="192" y="130" width="20" height="6"/>
+              <rect x="198" y="110" width="8"  height="46"/>
+              <rect x="186" y="140" width="8"  height="8"/>
+              <rect x="212" y="140" width="8"  height="8"/>
+              <circle cx="202" cy="133" r="2" fill="#fff2a8" stroke="none"/>
+            </g>
+            <circle cx="162" cy="230" r="4" fill="#f5c542" filter="url(#goldGlow)"/>
+            <rect x="160" y="234" width="4" height="12" fill="#8a5a0f"/>
+          </g>
+
+          <!-- Inner glow spilling through the seam (visible when doors open) -->
+          <rect x="120" y="55" width="60" height="330" fill="url(#innerGlow)" opacity="0.9"/>
+
+          <!-- Corner studs -->
+          <g fill="#f5c542" filter="url(#goldGlow)">
+            <rect x="14" y="14" width="8" height="8" transform="rotate(45 18 18)"/>
+            <rect x="278" y="14" width="8" height="8" transform="rotate(45 282 18)"/>
+            <rect x="14" y="386" width="8" height="8" transform="rotate(45 18 390)"/>
+            <rect x="278" y="386" width="8" height="8" transform="rotate(45 282 390)"/>
+          </g>
+
+          <!-- Purple banners flanking -->
+          <g opacity="0.85">
+            <polygon points="0,60 12,60 6,90" fill="#5b3080"/>
+            <polygon points="300,60 288,60 294,90" fill="#5b3080"/>
+          </g>
+
+          <!-- Torch flames left/right -->
+          <g class="torch-flame" transform="translate(0 240)">
+            <ellipse cx="6" cy="0" rx="4" ry="8" fill="#ff9a2b"/>
+            <ellipse cx="6" cy="-3" rx="2" ry="4" fill="#ffe07a"/>
+          </g>
+          <g class="torch-flame" transform="translate(294 240)">
+            <ellipse cx="0" cy="0" rx="4" ry="8" fill="#ff9a2b"/>
+            <ellipse cx="0" cy="-3" rx="2" ry="4" fill="#ffe07a"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ─── Beat 2B threshold flash ─────────────────────────────── -->
+    <div class="layer flash"></div>
+
+    <!-- ─── Beat 3: Corridor flythrough ─────────────────────────── -->
+    <div class="layer" id="corridor">
+      <div class="ceiling"></div>
+      <div class="floor"></div>
+      <div class="wall left">
+        <div class="col-strip">
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+        </div>
+      </div>
+      <div class="wall right">
+        <div class="col-strip">
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+          <div class="col"><div class="col-torch"></div><div class="torch-glow"></div></div>
+        </div>
+      </div>
+      <div class="push-lines"></div>
+    </div>
+
+    <!-- ─── Beat 4: Throne room ─────────────────────────────────── -->
+    <div class="layer" id="throne">
+      <div class="floor-tiles"></div>
+      <div class="arches">
+        <div class="arch"></div>
+        <div class="arch"></div>
+        <div class="arch"></div>
+        <div class="arch"></div>
+        <div class="arch"></div>
+      </div>
+      <div class="throne-glow"></div>
+      <div class="throne-shape"></div>
+    </div>
+
+    <!-- ─── Beats 5-7: Table + Parchment + Map ──────────────────── -->
+    <div class="layer" id="tabletop">
+      <div class="table">
+        <div class="scroll-wrapper">
+          <div class="scroll-rolled"></div>
+          <div class="parchment">
+            <!-- Procedural pixel-art map SVG. Land of Ibhaveda: hills,
+                 winding paths, small settlements, ornamental border.  -->
+            <svg viewBox="0 0 600 340" preserveAspectRatio="xMidYMid slice"
+                 xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                 style="position:absolute;inset:0;width:100%;height:100%">
+              <defs>
+                <pattern id="parchTex" width="4" height="4" patternUnits="userSpaceOnUse">
+                  <rect width="4" height="4" fill="#d9c290"/>
+                  <circle cx="1" cy="1" r="0.4" fill="#b39d6a" opacity="0.5"/>
+                  <circle cx="3" cy="3" r="0.3" fill="#c4a97a" opacity="0.6"/>
+                </pattern>
+                <filter id="mapShadow">
+                  <feGaussianBlur stdDeviation="0.6"/>
+                </filter>
+              </defs>
+
+              <!-- Base parchment texture -->
+              <rect width="600" height="340" fill="url(#parchTex)"/>
+              <!-- Weathered edges -->
+              <rect width="600" height="340" fill="url(#innerGlow)" opacity="0.15"/>
+
+              <!-- Ornate corner flourishes -->
+              <g fill="#8a5a0f" opacity="0.85">
+                <path d="M12 12 L60 12 L54 20 L20 20 L20 54 L12 60 Z"/>
+                <path d="M588 12 L540 12 L546 20 L580 20 L580 54 L588 60 Z"/>
+                <path d="M12 328 L60 328 L54 320 L20 320 L20 286 L12 280 Z"/>
+                <path d="M588 328 L540 328 L546 320 L580 320 L580 286 L588 280 Z"/>
+              </g>
+
+              <!-- Rivers -->
+              <path d="M40 210 Q90 200 130 220 T220 210 T310 220 T410 200 T550 210"
+                    fill="none" stroke="#4a7ba8" stroke-width="4" opacity="0.75"/>
+              <path d="M40 210 Q90 200 130 220 T220 210 T310 220 T410 200 T550 210"
+                    fill="none" stroke="#88b0d0" stroke-width="1.5" opacity="0.9"/>
+
+              <!-- Forest clusters (pixel-tree triangles) -->
+              <g fill="#3a6b3a">
+                <g transform="translate(70 100)"><polygon points="0,20 10,0 20,20"/><polygon points="15,22 25,4 35,22"/><polygon points="30,20 40,2 50,20"/></g>
+                <g transform="translate(160 90)"><polygon points="0,20 10,0 20,20"/><polygon points="15,22 25,4 35,22"/></g>
+                <g transform="translate(440 120)"><polygon points="0,20 10,0 20,20"/><polygon points="15,22 25,4 35,22"/><polygon points="30,20 40,2 50,20"/></g>
+                <g transform="translate(500 240)"><polygon points="0,20 10,0 20,20"/><polygon points="15,22 25,4 35,22"/></g>
+                <g transform="translate(80 250)"><polygon points="0,20 10,0 20,20"/><polygon points="15,22 25,4 35,22"/><polygon points="30,20 40,2 50,20"/></g>
+              </g>
+              <!-- Tree trunks -->
+              <g fill="#4a2c14">
+                <rect x="79" y="120" width="2" height="4"/><rect x="94" y="122" width="2" height="4"/><rect x="109" y="120" width="2" height="4"/>
+                <rect x="169" y="110" width="2" height="4"/><rect x="184" y="112" width="2" height="4"/>
+                <rect x="449" y="140" width="2" height="4"/><rect x="464" y="142" width="2" height="4"/><rect x="479" y="140" width="2" height="4"/>
+              </g>
+
+              <!-- Mountains -->
+              <g fill="#6d5d80" stroke="#3a2f4d" stroke-width="1">
+                <polygon points="240,150 275,90 310,150"/>
+                <polygon points="290,150 325,80 360,150"/>
+                <polygon points="345,150 375,100 405,150"/>
+              </g>
+              <g fill="#a89ec0" opacity="0.9">
+                <polygon points="270,100 275,90 280,100"/>
+                <polygon points="320,90 325,80 330,90"/>
+              </g>
+
+              <!-- Winding gold path from lower-left to upper-right (the journey) -->
+              <path d="M60 300 Q140 280 200 260 Q260 240 310 220 Q370 200 430 180 Q500 155 550 130"
+                    fill="none" stroke="#8a5a0f" stroke-width="4" stroke-linecap="round" stroke-dasharray="6 3" opacity="0.9"/>
+              <path d="M60 300 Q140 280 200 260 Q260 240 310 220 Q370 200 430 180 Q500 155 550 130"
+                    fill="none" stroke="#f5c542" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 3"/>
+
+              <!-- Settlements (X markers and dots) -->
+              <g fill="#7a1a1a">
+                <circle cx="200" cy="260" r="4"/>
+                <circle cx="310" cy="220" r="4"/>
+                <circle cx="430" cy="180" r="4"/>
+                <circle cx="550" cy="130" r="4"/>
+              </g>
+              <g fill="#fff2c8" stroke="#7a1a1a" stroke-width="0.6">
+                <text x="196" y="278" font-size="8" font-family="serif">The Village</text>
+                <text x="306" y="238" font-size="8" font-family="serif">Crossroads</text>
+                <text x="424" y="198" font-size="8" font-family="serif">Artisans</text>
+                <text x="540" y="148" font-size="9" font-family="serif" font-weight="bold" fill="#7a1a1a">Capital</text>
+              </g>
+
+              <!-- Compass rose -->
+              <g transform="translate(70 60)">
+                <circle r="18" fill="none" stroke="#8a5a0f" stroke-width="1.5"/>
+                <polygon points="0,-16 3,0 0,4 -3,0" fill="#7a1a1a"/>
+                <polygon points="0,16 3,0 0,-4 -3,0" fill="#3a2412"/>
+                <text x="0" y="-22" text-anchor="middle" font-size="7" font-family="serif" fill="#3a2412" font-weight="bold">N</text>
+              </g>
+
+              <!-- Border ornament -->
+              <rect x="8" y="8" width="584" height="324" fill="none"
+                    stroke="#8a5a0f" stroke-width="2"/>
+              <rect x="14" y="14" width="572" height="312" fill="none"
+                    stroke="#8a5a0f" stroke-width="0.5" stroke-dasharray="2 2" opacity="0.6"/>
+            </svg>
+
+            <!-- Title text over the map -->
+            <div class="map-title">
+              <span class="welcome">Welcome to</span>
+              <span class="land">The Land of Ibhaveda</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Persistent chrome -->
+    <div id="skip-hint">SKIP · SPACE</div>
+    <button id="continue" type="button">Continue</button>
+
+    <div id="debug"></div>
+
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// Ibhaveda Intro — beat-scheduler + Web Audio synth cues
+// ─────────────────────────────────────────────────────────────────────
+(function () {
+  "use strict";
+
+  const TOTAL_MS = 24000;
+
+  // ── Particle field (Beat 1) ────────────────────────────────────────
+  // Scatter ~30 particles inside a rough door-outline region and let
+  // them animate via CSS `particle-ignite`.
+  const particlesLayer = document.getElementById("particles-layer");
+  const stars = document.getElementById("door-stars");
+  const stage = document.getElementById("stage");
+
+  function seedParticles() {
+    const rect = { w: 100, h: 100 }; // percentage-based
+    const centerX = 50, centerY = 50;
+    const N = 32;
+    for (let i = 0; i < N; i++) {
+      const p = document.createElement("span");
+      p.className = "particle";
+      // scatter around center in a rough door shape (taller than wide)
+      const angle = Math.random() * Math.PI * 2;
+      const r = 15 + Math.random() * 20;
+      const sx = Math.cos(angle) * r * 1.2 + "vh";
+      const sy = Math.sin(angle) * r * 1.6 + "vh";
+      p.style.setProperty("--sx", sx);
+      p.style.setProperty("--sy", sy);
+      p.style.left = centerX + "%";
+      p.style.top  = centerY + "%";
+      p.style.animationDelay = (Math.random() * 0.9) + "s";
+      p.style.animationDuration = (1.4 + Math.random() * 0.8) + "s";
+      particlesLayer.appendChild(p);
+    }
+    // Star sparkles that persist around doors
+    for (let i = 0; i < 24; i++) {
+      const s = document.createElement("span");
+      s.className = "star" + (i % 4 === 0 ? " gold" : i % 7 === 0 ? " pink" : "");
+      s.style.left = (Math.random() * 100) + "%";
+      s.style.top  = (Math.random() * 100) + "%";
+      s.style.animationDelay = (Math.random() * 2.4) + "s";
+      stars.appendChild(s);
+    }
+  }
+  seedParticles();
+
+  // ── Web Audio: chiptune stand-in for the composed 8-bit score ─────
+  // The PDF calls out specific cues at each beat. This synth is a
+  // proof-of-sync per the brief — production ships composed audio.
+  let audioCtx = null;
+  let masterGain = null;
+  let padOscA = null, padOscB = null, padGain = null;
+  let heartbeatTimer = null;
+
+  function initAudio() {
+    if (audioCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.28;
+    masterGain.connect(audioCtx.destination);
+  }
+
+  function tone(freq, dur, type, vol, when) {
+    if (!audioCtx) return;
+    when = when != null ? when : audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type || "square";
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(vol, when + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, when + dur);
+    o.connect(g); g.connect(masterGain);
+    o.start(when);
+    o.stop(when + dur + 0.05);
+  }
+
+  function noise(dur, vol, filterFreq, when) {
+    if (!audioCtx) return;
+    when = when != null ? when : audioCtx.currentTime;
+    const bufferSize = audioCtx.sampleRate * dur;
+    const buf = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.frequency.value = filterFreq || 800;
+    filt.Q.value = 1;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(vol, when + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, when + dur);
+    src.connect(filt); filt.connect(g); g.connect(masterGain);
+    src.start(when);
+    src.stop(when + dur + 0.05);
+  }
+
+  function ambientPadStart() {
+    if (!audioCtx || padOscA) return;
+    padOscA = audioCtx.createOscillator();
+    padOscB = audioCtx.createOscillator();
+    padGain = audioCtx.createGain();
+    padOscA.type = "sine"; padOscA.frequency.value = 55; // A1
+    padOscB.type = "sine"; padOscB.frequency.value = 82.4; // E2
+    padGain.gain.value = 0;
+    padOscA.connect(padGain); padOscB.connect(padGain);
+    padGain.connect(masterGain);
+    padOscA.start(); padOscB.start();
+    // Slow swell in over Beat 1
+    padGain.gain.linearRampToValueAtTime(0.14, audioCtx.currentTime + 2.0);
+  }
+
+  function ambientPadStop(fade) {
+    if (!padGain) return;
+    padGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    padGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + (fade || 0.5));
+  }
+
+  // ── Cue schedule (times in ms match the PDF's beat map) ───────────
+  // Each cue is a function called from a setTimeout.
+  const cues = [
+    { at: 0,    fn: () => { ambientPadStart(); } },
+    // Beat 1 — sparse crystalline blips as points ignite
+    { at: 200,  fn: () => tone(880, 0.12, "triangle", 0.15) },
+    { at: 480,  fn: () => tone(1174, 0.10, "triangle", 0.13) },
+    { at: 780,  fn: () => tone(987, 0.11, "triangle", 0.14) },
+    { at: 1100, fn: () => tone(1318, 0.10, "triangle", 0.12) },
+    { at: 1400, fn: () => tone(1567, 0.10, "triangle", 0.14) },
+    { at: 1700, fn: () => tone(1760, 0.14, "triangle", 0.16) },
+    // Beat 2 — creak → whoosh → swelling chord (2.3s → 3.9s)
+    { at: 2300, fn: () => { noise(0.9, 0.18, 220); tone(65, 0.9, "sawtooth", 0.10); } }, // creak
+    { at: 3000, fn: () => noise(0.7, 0.22, 1400) },                                        // whoosh
+    { at: 3400, fn: () => {
+        tone(261.6, 0.9, "triangle", 0.14); // C4
+        tone(329.6, 0.9, "triangle", 0.12); // E4
+        tone(392,   0.9, "triangle", 0.10); // G4
+    }},
+    // Beat 2B — sharp whoosh-thud on threshold (3.9s → 5.5s)
+    { at: 4200, fn: () => { noise(0.5, 0.24, 900); } },
+    { at: 4700, fn: () => { tone(60, 0.35, "sawtooth", 0.24); noise(0.12, 0.28, 200); } }, // thud
+    // Beat 3 — measured 8-bit arpeggio + torch pulse + heartbeat (5.5s → 9.5s)
+    { at: 5500, fn: () => {
+        const notes = [261.6, 329.6, 392, 523.2, 392, 329.6];
+        const now = audioCtx.currentTime;
+        for (let i = 0; i < notes.length * 2; i++) {
+          tone(notes[i % notes.length], 0.18, "square", 0.09, now + i * 0.3);
+        }
+        // heartbeat bass pulses
+        for (let i = 0; i < 8; i++) {
+          tone(55, 0.18, "sine", 0.18, now + i * 0.5);
+        }
+    }},
+    { at: 6000, fn: () => noise(0.15, 0.12, 600) },
+    { at: 6800, fn: () => noise(0.15, 0.12, 600) },
+    { at: 7600, fn: () => noise(0.15, 0.12, 600) },
+    { at: 8400, fn: () => noise(0.15, 0.12, 600) },
+    // Beat 4 — arrival chord (warm sustain) at 9.5s
+    { at: 9500, fn: () => {
+        // Big sustained major chord with reverb-y feel via long release
+        [220, 277.2, 329.6, 440].forEach((f, i) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = "sine";
+          o.frequency.value = f;
+          const t = audioCtx.currentTime;
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.14 - i*0.02, t + 0.15);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
+          o.connect(g); g.connect(masterGain);
+          o.start(t); o.stop(t + 2.2);
+        });
+    }},
+    // Beat 5 — descending three-note motif for tilt down (11.5s → 13.7s)
+    { at: 11500, fn: () => {
+        const t = audioCtx.currentTime;
+        tone(523.2, 0.35, "triangle", 0.12, t);        // C5
+        tone(392,   0.35, "triangle", 0.12, t + 0.4);  // G4
+        tone(261.6, 0.5,  "triangle", 0.14, t + 0.8);  // C4
+        noise(0.4, 0.05, 300, t + 0.2);                // soft cloth rustle
+    }},
+    // Beat 6 — paper rustle + rising arpeggio for unroll (13.7s → 17.5s)
+    { at: 13700, fn: () => {
+        noise(1.6, 0.13, 3800);
+        const t = audioCtx.currentTime;
+        const notes = [261.6, 329.6, 392, 523.2, 659.3, 784, 1047];
+        notes.forEach((n, i) => tone(n, 0.16, "triangle", 0.09, t + i * 0.28));
+    }},
+    // Beat 7 — triumphant fanfare + stamp thunk (17.5s)
+    { at: 17500, fn: () => {
+        const t = audioCtx.currentTime;
+        // Fanfare
+        tone(523.2, 0.25, "square", 0.14, t + 0);
+        tone(659.3, 0.25, "square", 0.14, t + 0.15);
+        tone(784,   0.6,  "square", 0.16, t + 0.30);
+        tone(1046.5,0.9,  "square", 0.14, t + 0.6);
+        // Bass
+        tone(65.4, 0.9, "sawtooth", 0.15, t + 0);
+        tone(98,   0.9, "sawtooth", 0.13, t + 0.3);
+    }},
+    { at: 19500, fn: () => {
+        // Stamp thunk on seal appear
+        const t = audioCtx.currentTime;
+        tone(45, 0.4, "sawtooth", 0.28, t);
+        noise(0.18, 0.22, 220, t);
+    }},
+    // Beat 7 tail — settle into loopable idle sting
+    { at: 20500, fn: () => {
+        // Slow soft chord underneath the hold
+        [130.8, 164.8, 196].forEach((f, i) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          const t = audioCtx.currentTime;
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.05, t + 1.0);
+          o.connect(g); g.connect(masterGain);
+          o.start(t);
+          // Stop when intro ends
+          setTimeout(() => { g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5); o.stop(audioCtx.currentTime + 0.6); }, 3000);
+        });
+    }},
+  ];
+
+  // ── Corridor deceleration handoff (visual only, not audio) ────────
+  const corridorLayer = document.getElementById("corridor");
+  const cueTimers = [];
+  function scheduleCorridorDecel() {
+    // At 9.0s, add .decel so the column-scroll slows visibly.
+    cueTimers.push(setTimeout(() => corridorLayer.classList.add("decel"), 8800));
+  }
+
+  // ── Debug HUD (append ?debug=1 to URL) ────────────────────────────
+  const params = new URLSearchParams(location.search);
+  if (params.get("debug") === "1") document.body.classList.add("debug");
+  const debugEl = document.getElementById("debug");
+  let started = false;
+  let startTs = 0;
+  function tickDebug() {
+    if (!started) return;
+    const elapsed = ((performance.now() - startTs) / 1000).toFixed(1);
+    debugEl.textContent = "t = " + elapsed + "s / 24.0s";
+    if (elapsed < 24) requestAnimationFrame(tickDebug);
+  }
+
+  // ── Sequence start ────────────────────────────────────────────────
+  const gate = document.getElementById("start-gate");
+  const continueBtn = document.getElementById("continue");
+  let dispatched = false;
+
+  function fireDone(reason) {
+    if (dispatched) return;
+    dispatched = true;
+    try { window.postMessage({ type: "ibhaveda:intro-done", reason }, "*"); } catch (_) {}
+    document.dispatchEvent(new CustomEvent("ibhaveda:intro-done", { detail: { reason } }));
+    // Visual: fade the stage to signal completion
+    stage.style.transition = "opacity 0.6s ease";
+    stage.style.opacity = "0.35";
+    setTimeout(() => {
+      const done = document.createElement("div");
+      done.style.cssText = "position:absolute;inset:0;display:grid;place-items:center;font-size:12px;letter-spacing:0.3em;color:#f5c542;text-transform:uppercase;z-index:200;text-align:center;padding:24px";
+      done.innerHTML = "Intro complete — event <code>ibhaveda:intro-done</code> fired.<br><br>Reload to replay.";
+      stage.appendChild(done);
+    }, 600);
+  }
+
+  function start() {
+    if (started) return;
+    started = true;
+    initAudio();
+    // Resume in case the context started suspended
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    startTs = performance.now();
+    gate.classList.add("hidden");
+    setTimeout(() => gate.remove(), 700);
+    // Schedule all audio cues
+    cues.forEach((c) => {
+      cueTimers.push(setTimeout(c.fn, c.at));
+    });
+    scheduleCorridorDecel();
+    // Auto-dismiss at TOTAL_MS + 1s hold
+    cueTimers.push(setTimeout(() => fireDone("auto"), TOTAL_MS + 1000));
+    tickDebug();
+  }
+
+  function skip() {
+    // Cancel remaining cues immediately, silence pad, fire done.
+    cueTimers.forEach((t) => clearTimeout(t));
+    ambientPadStop(0.3);
+    fireDone("skip");
+  }
+
+  gate.addEventListener("click", start);
+  continueBtn.addEventListener("click", skip);
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" || e.code === "Escape" || e.code === "Enter") {
+      e.preventDefault();
+      if (!started) start(); else skip();
+    }
+  });
+
+  // Expose for external skip if embedded
+  window.IbhavedaIntro = { skip, isPlaying: () => started && !dispatched };
+})();
+</script>
+</body>
+</html>

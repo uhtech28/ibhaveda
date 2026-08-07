@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { TutorialSpeechBubble } from "./TutorialSpeechBubble";
@@ -641,8 +647,22 @@ export function TutorialMascot({
   // wrapper; a route-transition overlay renders `data-tutorial-hide=
   // "true"` on its root. Both are observed via MutationObserver on
   // <body> so Sparky snaps back the instant they close.
-  const [suppressedByOverlay, setSuppressedByOverlay] = useState(false);
-  useEffect(() => {
+  // Lazy-init from the current DOM state so if a suppress-overlay is
+  // already on screen when this component mounts (e.g. the /map/world
+  // page is loaded directly with the "Entering the World…" loader
+  // already painted), we start in the suppressed state — no one-frame
+  // race where Sparky peeks through before the useEffect runs.
+  const [suppressedByOverlay, setSuppressedByOverlay] = useState(() => {
+    if (typeof document === "undefined") return false;
+    return !!document.querySelector(
+      '[data-tutorial="combat-panel"], [data-tutorial-hide="true"]',
+    );
+  });
+  // useLayoutEffect (not useEffect) so the observer subscription
+  // happens BEFORE the browser paints the first frame. Combined with
+  // the lazy initializer above this closes the last frame-race window
+  // that let Sparky flash on top of a legitimately-hidden route.
+  useLayoutEffect(() => {
     if (typeof document === "undefined") return;
     const check = () => {
       setSuppressedByOverlay(
@@ -680,20 +700,48 @@ export function TutorialMascot({
     return () => window.clearTimeout(timer);
   }, [visible]);
 
+  // ── Text stability gate ───────────────────────────────────────────────
+  // The mount debounce (`visibleStable`) only fires on visible false→true.
+  // Once mounted, any `text` change fires the typewriter effect below
+  // synchronously — which meant transitional copy (e.g. Step2's
+  // "Cool. Posting your idea now…" swapping out ~400ms later) would
+  // still paint a partial line before being replaced. `stableText`
+  // debounces the incoming text prop by the same window: only text
+  // that survives ≥DEBOUNCE_MS ever becomes the active speech string.
+  // Clears immediately when text becomes empty so exits are snappy.
+  const TEXT_DEBOUNCE_MS = 400;
+  const [stableText, setStableText] = useState<string>(() => text || "");
+  useEffect(() => {
+    if (!text) {
+      setStableText("");
+      return;
+    }
+    if (text === stableText) return;
+    const timer = window.setTimeout(
+      () => setStableText(text),
+      TEXT_DEBOUNCE_MS,
+    );
+    return () => window.clearTimeout(timer);
+    // stableText intentionally excluded — we don't want to reset the
+    // timer on our own setState update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
   // ── Talk trigger — set while the speech bubble is still typing ────────
   const [isTyping, setIsTyping] = useState(false);
   useEffect(() => {
-    if (!visible || !text) {
+    if (!visible || !stableText) {
       setIsTyping(false);
       return;
     }
     setIsTyping(true);
     const TYPE_SPEED_MS = 24;
     const INITIAL_DELAY_MS = 80;
-    const totalDurationMs = INITIAL_DELAY_MS + text.length * TYPE_SPEED_MS;
+    const totalDurationMs =
+      INITIAL_DELAY_MS + stableText.length * TYPE_SPEED_MS;
     const timer = window.setTimeout(() => setIsTyping(false), totalDurationMs);
     return () => window.clearTimeout(timer);
-  }, [text, visible]);
+  }, [stableText, visible]);
 
   // ── Cheer trigger — increments on Continue click or mood="celebrating"
   const [cheerTick, setCheerTick] = useState(0);
@@ -726,15 +774,43 @@ export function TutorialMascot({
     willActuallyRender ? nearSelector : null,
   );
 
-  // ── Track viewport width so we can switch to a mobile layout on narrow
-  //    screens (where Sparky + bubble can't fit side-by-side beside a target).
-  const [vw, setVw] = useState<number>(() =>
-    typeof window !== "undefined" ? window.innerWidth : 1024,
-  );
+  // ── Track viewport width AND height so we can switch to a mobile layout
+  //    on narrow screens AND make dock decisions using the *visible* viewport.
+  //
+  //    iOS Safari's dynamic URL bar changes window.innerHeight as the user
+  //    scrolls — reading innerHeight directly makes the Sparky dock flip
+  //    from bottom→top→bottom every time the address bar collapses or
+  //    expands. `visualViewport` reflects the true visible area and fires
+  //    resize/scroll events for both toolbar changes AND on-screen keyboard
+  //    open/close on both iOS and Android.
+  const readVw = () =>
+    typeof window !== "undefined"
+      ? (window.visualViewport?.width ?? window.innerWidth)
+      : 1024;
+  const readVh = () =>
+    typeof window !== "undefined"
+      ? (window.visualViewport?.height ?? window.innerHeight)
+      : 800;
+  const [vw, setVw] = useState<number>(readVw);
+  const [vh, setVh] = useState<number>(readVh);
   useEffect(() => {
-    const onResize = () => setVw(window.innerWidth);
+    const onResize = () => {
+      setVw(readVw());
+      setVh(readVh());
+    };
     window.addEventListener("resize", onResize, { passive: true });
-    return () => window.removeEventListener("resize", onResize);
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener("resize", onResize, { passive: true });
+      vv.addEventListener("scroll", onResize, { passive: true });
+    }
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (vv) {
+        vv.removeEventListener("resize", onResize);
+        vv.removeEventListener("scroll", onResize);
+      }
+    };
   }, []);
   const isMobile = vw < MOBILE_BREAKPOINT;
 
@@ -786,7 +862,14 @@ export function TutorialMascot({
   // route-transition flashes never mount the puppy or its bubble.
   const effectiveVisible = visible && visibleStable;
 
-  const activeSpeech = effectiveVisible && text && isTyping ? text : null;
+  // Speech + bubble content read from `stableText` (debounced), not
+  // the raw `text` prop, so transitional strings that get replaced
+  // within TEXT_DEBOUNCE_MS never paint. This is what stops
+  // "Cool. Posting your idea now…" flashing during the ~400ms window
+  // between the compose wizard closing and the SuggestedContributors
+  // modal mounting.
+  const activeSpeech =
+    effectiveVisible && stableText && isTyping ? stableText : null;
   const isFollowing = placement !== null;
 
   // Only render the speech-bubble frame when there's actual content to
@@ -795,7 +878,7 @@ export function TutorialMascot({
   // bubble entirely so users don't see an empty white card floating
   // above the puppy.
   const hasBubbleContent =
-    !!(text && text.trim().length > 0) ||
+    !!(stableText && stableText.trim().length > 0) ||
     !!primaryAction ||
     !!secondaryAction;
 
@@ -831,73 +914,125 @@ export function TutorialMascot({
           {!noScrim && <TutorialScrim targetRect={targetRect} />}
           {isMobile ? (
             // ── MOBILE LAYOUT ─────────────────────────────────────────
-            // MOBILE-ONLY change: Sparky+bubble group is now VERTICALLY
-            // CENTERED in the viewport instead of bottom-docked.
-            // Previously the group sat 12px above the viewport bottom,
-            // leaving ~80% of the phone screen empty above — user
-            // reported "Sparky should be at centre". A fixed inset-0
-            // flex-center wrapper handles the centering so we don't
-            // fight framer-motion's own transform on the inner
-            // motion.div. Desktop layout below is unchanged.
-            <div
-              className="pointer-events-none fixed inset-0 z-[10010] flex items-center justify-center"
-            >
-            <motion.div
-              key="mobile-tutorial"
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ type: "spring", stiffness: 260, damping: 26 }}
-              style={{
-                width: "100%",
-                paddingLeft: BUBBLE_SIDE_INSET_MOBILE,
-                paddingRight: BUBBLE_SIDE_INSET_MOBILE,
-                pointerEvents: "none", // children opt in
-              }}
-            >
-              <div style={{ position: "relative" }}>
-                {/* Sparky above the bubble, centered above the tail */}
+            // Sparky+bubble stack docks to the viewport edge OPPOSITE
+            // the highlighted target's center. Prevents the puppy from
+            // sitting on top of centered modals (product feedback:
+            // "in mobile view sparky overlapping" — Describe Your Idea
+            // & Template Picker screens where Sparky's head landed
+            // inside the modal's input).
+            //
+            // Rules:
+            //   • target above midline → stack docks to BOTTOM edge
+            //   • target below midline → stack docks to TOP edge
+            //   • no target → default to BOTTOM edge (previously the
+            //     mobile default; user asked for center once but that
+            //     interacts badly with centered modals so we err on
+            //     out-of-the-way instead)
+            //
+            // The bubble is full-width (minus 12px insets) and Sparky
+            // peeks out of the bubble on whichever edge faces the
+            // target so the tail direction reads correctly.
+            (() => {
+              // Use the tracked `vh` from state (backed by visualViewport
+              // where available) instead of reading window.innerHeight
+              // directly — iOS Safari's URL bar changes innerHeight
+              // mid-scroll and the dock would flip top↔bottom.
+              const targetCenterY = targetRect
+                ? (targetRect.top + targetRect.bottom) / 2
+                : null;
+              // Default DOCK: bottom. Swap to top only when the target
+              // sits in the lower half (so stack ends up above target).
+              const dockTop =
+                targetCenterY !== null && targetCenterY > vh * 0.55;
+              // Sparky peeks toward the target: if we're docked at
+              // bottom (target is above us) Sparky sits at the TOP of
+              // the bubble; if docked at top, Sparky sits at the BOTTOM.
+              const sparkyOnTop = !dockTop;
+              return (
                 <div
+                  className="pointer-events-none fixed inset-x-0 z-[10010] flex justify-center"
                   style={{
-                    position: "absolute",
-                    top: -(SPARKY_SIZE_MOBILE - 8),
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: SPARKY_SIZE_MOBILE,
-                    height: SPARKY_SIZE_MOBILE,
-                    pointerEvents: "none",
-                    zIndex: 1,
+                    top: dockTop ? BUBBLE_BOTTOM_INSET_MOBILE : undefined,
+                    bottom: dockTop
+                      ? undefined
+                      : `calc(${BUBBLE_BOTTOM_INSET_MOBILE}px + env(safe-area-inset-bottom, 0px))`,
+                    // Extra top padding when docked-top so the peeking-
+                    // out Sparky doesn't collide with the notch/status bar.
+                    paddingTop: dockTop ? SPARKY_SIZE_MOBILE - 8 : 0,
                   }}
                 >
-                  <AnimatedSparky
-                    size={SPARKY_SIZE_MOBILE}
-                    speech={activeSpeech}
-                    cheerTick={cheerTick}
-                    autoRoll={true}
-                    suppressRoll={suppressRoll}
-                    showSpeechBubble={false}
-                    ariaLabel="Sparky the tutorial mascot"
-                  />
+                  <motion.div
+                    key="mobile-tutorial"
+                    initial={{
+                      opacity: 0,
+                      y: dockTop ? -40 : 40,
+                    }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{
+                      opacity: 0,
+                      y: dockTop ? -40 : 40,
+                    }}
+                    transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                    style={{
+                      width: "100%",
+                      paddingLeft: BUBBLE_SIDE_INSET_MOBILE,
+                      paddingRight: BUBBLE_SIDE_INSET_MOBILE,
+                      pointerEvents: "none", // children opt in
+                    }}
+                  >
+                    <div style={{ position: "relative" }}>
+                      {/* Sparky peeks out of the bubble on the side
+                          that faces the highlighted target. */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: sparkyOnTop
+                            ? -(SPARKY_SIZE_MOBILE - 8)
+                            : undefined,
+                          bottom: sparkyOnTop
+                            ? undefined
+                            : -(SPARKY_SIZE_MOBILE - 8),
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          width: SPARKY_SIZE_MOBILE,
+                          height: SPARKY_SIZE_MOBILE,
+                          pointerEvents: "none",
+                          zIndex: 1,
+                        }}
+                      >
+                        <AnimatedSparky
+                          size={SPARKY_SIZE_MOBILE}
+                          speech={activeSpeech}
+                          cheerTick={cheerTick}
+                          autoRoll={true}
+                          suppressRoll={suppressRoll}
+                          showSpeechBubble={false}
+                          ariaLabel="Sparky the tutorial mascot"
+                        />
+                      </div>
+                      {/* Full-width bubble on mobile. pointerEvents:none
+                          so the bubble body doesn't intercept clicks meant
+                          for the panel underneath — the primary action
+                          button inside opts back in via its own class.
+                          Hidden when Sparky has nothing to say. Tail side
+                          matches Sparky's peek side so the arrow points
+                          at him correctly. */}
+                      {hasBubbleContent && (
+                        <div style={{ pointerEvents: "none" }}>
+                          <TutorialSpeechBubble
+                            text={stableText}
+                            primaryAction={wrappedPrimary}
+                            secondaryAction={secondaryAction}
+                            side={sparkyOnTop ? "top" : "bottom"}
+                            fullWidth
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
                 </div>
-                {/* Full-width bubble on mobile. pointerEvents:none so
-                    the bubble body doesn't intercept clicks meant for
-                    the panel underneath — the primary action button
-                    inside opts back in via its own class. Hidden when
-                    Sparky has nothing to say. */}
-                {hasBubbleContent && (
-                  <div style={{ pointerEvents: "none" }}>
-                    <TutorialSpeechBubble
-                      text={text}
-                      primaryAction={wrappedPrimary}
-                      secondaryAction={secondaryAction}
-                      side="top"
-                      fullWidth
-                    />
-                  </div>
-                )}
-              </div>
-            </motion.div>
-            </div>
+              );
+            })()
           ) : isFollowing && placement ? (
             // FOLLOWING MODE: Sparky and bubble as two independently-positioned
             // fixed elements. No flex, no layout prop — just direct pixel
@@ -956,7 +1091,7 @@ export function TutorialMascot({
                     }}
                   >
                     <TutorialSpeechBubble
-                      text={text}
+                      text={stableText}
                       primaryAction={wrappedPrimary}
                       secondaryAction={secondaryAction}
                       side={bubbleSide}
@@ -984,7 +1119,7 @@ export function TutorialMascot({
                   {hasBubbleContent && (
                     <div className="pointer-events-none">
                       <TutorialSpeechBubble
-                        text={text}
+                        text={stableText}
                         primaryAction={wrappedPrimary}
                         secondaryAction={secondaryAction}
                         side="bottom"
@@ -1027,7 +1162,7 @@ export function TutorialMascot({
                   {hasBubbleContent && (
                     <div className="pointer-events-none">
                       <TutorialSpeechBubble
-                        text={text}
+                        text={stableText}
                         primaryAction={wrappedPrimary}
                         secondaryAction={secondaryAction}
                         side="bottom"

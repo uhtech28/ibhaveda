@@ -97,7 +97,19 @@ export function useCombatRound(
       });
       return { kind: "settled", view: viewToShape(view), result };
     }
-    return { kind: "loading" };
+    // Bug fix (Q2 gap): when the server has already flipped the round
+    // to won/lost but getRoundResult hasn't resolved yet (~2-3s
+    // roundtrip on last-question resolution), don't drop into the
+    // "loading" branch — that renders the panel's LoadingState (empty
+    // black "Preparing combat…" card), which visibly unmounts the
+    // arena mid-cinematic on Q2 only.
+    //
+    // Instead keep the panel in an active-shape phase using the
+    // server's already-zeroed HP; BattleScene plays the HP drain
+    // continuously and the transition to `settled` happens the moment
+    // the result query lands. On Q1 (round still active) this branch
+    // is unreachable, so behaviour there is unchanged.
+    return { kind: "active", view: viewToShape(view) };
   }, [view, result]);
 
   return { phase, submitAnswer, retryCombat, abandon };

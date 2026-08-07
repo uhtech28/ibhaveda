@@ -17,8 +17,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 
 // Base + knob dimensions in CSS pixels.
-const BASE_SIZE = 130;
-const KNOB_SIZE = 58;
+// Sized to still comfortably clear Apple's 44px min-hit-area guideline
+// on the knob while taking up much less screen real estate than the
+// previous 130/58 setup, which was covering roughly a quarter of the
+// visible map on phones (product feedback: "reduce the size of joystick").
+const BASE_SIZE = 90;
+const KNOB_SIZE = 40;
 const RADIUS = (BASE_SIZE - KNOB_SIZE) / 2;
 
 interface Props {
@@ -149,8 +153,8 @@ export function MobileJoystick({ hidden = false }: Props) {
       <style jsx>{`
         .mobile-joystick-base {
           position: fixed;
-          left: 24px;
-          bottom: 96px;
+          left: 20px;
+          bottom: calc(80px + env(safe-area-inset-bottom, 0px));
           width: ${BASE_SIZE}px;
           height: ${BASE_SIZE}px;
           border-radius: 50%;
@@ -167,6 +171,7 @@ export function MobileJoystick({ hidden = false }: Props) {
           -webkit-tap-highlight-color: transparent;
           z-index: 70;
           backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
         }
         .mobile-joystick-knob {
           position: absolute;

@@ -583,6 +583,16 @@ export function Step2TemplatePick() {
     );
   }
 
+  // Hide Sparky during the `posting` beat. The compose wizard unmounts
+  // in one paint but the SuggestedContributorsDialog can't render
+  // until userIdeas resolves (~400ms+), leaving Sparky sitting alone
+  // on /feed typing "Cool. Posting your idea now…" for ~1-2s before
+  // the contributors modal takes over. Product feedback: Sparky flash
+  // bug — screenshot 2. Keeping the mascot mounted with visible=false
+  // (rather than removing the element entirely) preserves the exit
+  // animation and prevents a hard cut.
+  const sparkyVisible = dialogue !== "posting";
+
   return (
     <>
       <TutorialHighlight
@@ -592,7 +602,7 @@ export function Step2TemplatePick() {
         rx={12}
       />
       <TutorialMascot
-        visible
+        visible={sparkyVisible}
         text={view.text}
         mood={view.mood}
         primaryAction={view.primary}

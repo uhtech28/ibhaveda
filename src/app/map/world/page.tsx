@@ -549,6 +549,22 @@ function useMapGame(personaReady: boolean) {
       );
       gameRef.current = game;
 
+      // iOS Safari intercepts touch drags on the canvas with native
+      // page-pan / pinch-zoom / double-tap-zoom, causing the map to
+      // jitter or the whole page to rubber-band during a drag. Lock
+      // touch-action once here so it applies to every stage scene
+      // (village + all lazy-loaded stages below use the same canvas).
+      // Also kill the iOS gray tap-flash.
+      try {
+        const canvas = game.canvas as HTMLCanvasElement | undefined;
+        if (canvas) {
+          canvas.style.touchAction = "none";
+          canvas.style.webkitTapHighlightColor = "transparent";
+        }
+      } catch {
+        /* no-op */
+      }
+
       // Fire-and-forget lazy load of the other 6 stage scenes. They
       // register themselves with Phaser as they arrive so scene.start(
       // "ForestMapScene") etc. works when the user progresses. The
@@ -1442,6 +1458,12 @@ function StageResetNotice({
 function LoadingScreen() {
   return (
     <div
+      // data-tutorial-hide tells TutorialMascot to suppress Sparky
+      // while this overlay is on screen. Without it, Sparky was
+      // painting his intro line for ~1-2s over the "Entering the
+      // World…" loader on every /map/world visit (product feedback:
+      // Sparky flash bug — screenshot 1).
+      data-tutorial-hide="true"
       className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
       style={{ background: "#050810" }}
     >
@@ -1602,27 +1624,15 @@ function MapPageInner() {
   const paramStage = searchParams?.get("stage");
   const requestedStage = paramStage ? parseInt(paramStage, 10) : null;
 
+  // NOTE: the actual scene-routing effect lives below, once `venture`
+  // has been loaded so we can read `venture.currentStage` and drive
+  // the scene from the venture's real state — not just the URL param.
+  // See the effect that depends on [phaserReady, activeStage,
+  // requestedStage] later in this component.
+  //
   // STAGE_COMPLETE listener is registered further down, after
   // `activeVentureId` is defined — its handler needs a stable, current
   // reference to the venture id to persist stage advancement to Convex.
-  useEffect(() => {
-    if (!phaserReady || !gameRef.current) return;
-    const stage =
-      requestedStage && Number.isFinite(requestedStage)
-        ? requestedStage
-        : null;
-    if (!stage || stage === 1) return; // Village is the default; nothing to swap
-    const targetKey = STAGE_SCENE_KEY[stage];
-    if (!targetKey) return;
-    const sceneMgr = gameRef.current.scene;
-    // Stop every registered scene, then start the target.
-    for (const key of Object.values(STAGE_SCENE_KEY)) {
-      if (sceneMgr.isActive(key) || sceneMgr.isVisible(key)) {
-        sceneMgr.stop(key);
-      }
-    }
-    sceneMgr.start(targetKey);
-  }, [phaserReady, requestedStage, gameRef]);
 
   const {
     selectedConversationId,
@@ -2373,6 +2383,65 @@ function MapPageInner() {
     router.replace(qs ? `/map/world?${qs}` : "/map/world", { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venture?.currentStage, requestedStage]);
+
+  // ── Scene routing — drive Phaser scene from venture.currentStage ─────
+  // Bug fix: previously scene selection only fired when the URL had
+  // ?stage=N. Users landing on /map/world?ventureId=… with a venture
+  // whose currentStage was 3 saw the Village art despite the HUD bar
+  // correctly reading "The Arena". Root cause: only one useEffect
+  // hardcoded `stage = requestedStage` (URL param) and returned early
+  // for stage 1 / null. Now the effect derives the target stage from
+  // (URL override → activeStage) and swaps whenever either changes.
+  //
+  // Lazy-registered scenes (Forest/Arena/etc. are loaded async by the
+  // useMapGame hook) may not be present yet on first mount. When
+  // getScene() returns null we schedule a retry on the next frame
+  // until the target scene registers, then fire the swap. Idempotent —
+  // returns immediately if the target scene is already active.
+  useEffect(() => {
+    if (!phaserReady || !gameRef.current) return;
+    const desiredStage =
+      requestedStage && Number.isFinite(requestedStage)
+        ? requestedStage
+        : activeStage;
+    const targetKey = STAGE_SCENE_KEY[desiredStage];
+    if (!targetKey) return;
+    const game = gameRef.current;
+    const sceneMgr = game.scene;
+
+    let rafId = 0;
+    let cancelled = false;
+
+    const attemptSwap = () => {
+      if (cancelled) return;
+      if (!gameRef.current) return;
+      // If the target scene isn't registered yet (still lazy-loading),
+      // retry on the next animation frame.
+      if (!sceneMgr.getScene(targetKey)) {
+        rafId = requestAnimationFrame(attemptSwap);
+        return;
+      }
+      // Already active — nothing to do.
+      if (sceneMgr.isActive(targetKey) || sceneMgr.isVisible(targetKey)) {
+        return;
+      }
+      // Stop any other stage scene that's currently running so we
+      // don't stack multiple map scenes on top of each other.
+      for (const key of Object.values(STAGE_SCENE_KEY)) {
+        if (key === targetKey) continue;
+        if (sceneMgr.isActive(key) || sceneMgr.isVisible(key)) {
+          sceneMgr.stop(key);
+        }
+      }
+      sceneMgr.start(targetKey);
+    };
+
+    attemptSwap();
+    return () => {
+      cancelled = true;
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [phaserReady, activeStage, requestedStage, gameRef]);
 
   useEffect(() => {
     if (!checkpoints.length) return;
@@ -4874,8 +4943,23 @@ function MapPageInner() {
               // pill that used to sit to the left of the bar.
               stageName={stageInfo.biomeName}
               bossName={
-                getVillageBoss(Math.max(0, (activeCP ?? 1) - 1))?.name ??
-                undefined
+                // Bug fix: HUD used to hardcode getVillageBoss() on
+                // every stage, which meant Forest/Arena/Artisans etc.
+                // all printed Village boss names ("Fog of Vagueness"
+                // etc.) on the bottom bar even though the actual scene
+                // rendered a different biome. Now stage-aware: uses
+                // getStageBoss with activeStage so the label matches
+                // what the map shows. Falls back to getVillageBoss on
+                // stages that don't yet have a roster in
+                // stage-bosses.ts (currently stages 5, 7, 8 — art
+                // pending). Returns undefined only if truly nothing
+                // is defined for the stage/CP combination.
+                (activeStage === 1
+                  ? getVillageBoss(Math.max(0, (activeCP ?? 1) - 1))?.name
+                  : getStageBoss(
+                      activeStage,
+                      Math.max(0, (activeCP ?? 1) - 1),
+                    )?.name) ?? undefined
               }
             />
           </div>
@@ -6364,6 +6448,9 @@ export default function MapPage() {
     <Suspense
       fallback={
         <div
+          // data-tutorial-hide keeps Sparky suppressed during this
+          // Suspense fallback (see LoadingScreen comment above).
+          data-tutorial-hide="true"
           className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
           style={{ background: "#050810", fontFamily: "var(--font-sans)" }}
         >

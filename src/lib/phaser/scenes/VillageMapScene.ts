@@ -680,6 +680,12 @@ export class VillageMapScene extends Phaser.Scene {
     // 2. Camera — centered on first checkpoint, drag-to-pan.
     // Adaptive zoom by viewport width so mobile shows more of the map.
     // Desktop stays untouched at 1.4x.
+    //
+    // Mobile brackets brought in line with the other stage scenes
+    // (Arena/Forest/Artisans etc.) after product feedback that the
+    // village view was cropping too tightly around the character on
+    // phones. Previous values (0.7/0.9/1.15) were noticeably higher
+    // than every other scene's mobile zoom.
     const cam = this.cameras.main;
     cam.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     const vw =
@@ -688,17 +694,33 @@ export class VillageMapScene extends Phaser.Scene {
         : this.scale.width || 1920;
     let initialZoom: number;
     if (vw < 480) {
-      initialZoom = 0.7; // small phones — show most of the map width
+      initialZoom = 0.55; // small phones — show most of the map width
     } else if (vw < 768) {
-      initialZoom = 0.9; // large phones
+      initialZoom = 0.7; // large phones
     } else if (vw < 1024) {
-      initialZoom = 1.15; // tablets
+      initialZoom = 1.0; // tablets
     } else {
-      initialZoom = 1.4; // desktop — untouched (same as before)
+      initialZoom = 1.4; // desktop — untouched
     }
     cam.setZoom(initialZoom);
     const start = CHECKPOINTS[0];
     cam.centerOn(start.x, start.y);
+
+    // Lock native touch gestures on the canvas so iOS Safari doesn't
+    // intercept our Phaser drag-to-pan with page pan / pinch-zoom /
+    // double-tap zoom. Without this the map jitters on iPhones during
+    // a drag and the whole page can rubber-band. Android Chrome
+    // honours the same rule — no downside.
+    try {
+      const canvas = this.game.canvas as HTMLCanvasElement | undefined;
+      if (canvas) {
+        canvas.style.touchAction = "none";
+        // Also kill the gray tap-flash on iOS.
+        canvas.style.webkitTapHighlightColor = "transparent";
+      }
+    } catch {
+      /* no-op — canvas may not be available in headless test envs */
+    }
 
     // 3. Drag-to-pan (works for mouse + touch on mobile via Phaser's
     // pointer abstraction).

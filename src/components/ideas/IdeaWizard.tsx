@@ -1285,7 +1285,17 @@ export function IdeaWizard({
                   setSharePayload(null);
                   setStep("template");
                   close();
-                  router.push(`/map/world?ventureId=${vId}`);
+                  // In tutorialMode, DON'T navigate — the tutorial's
+                  // Step2 owns the transition to the SuggestedContributors
+                  // dialog and then to /map/world via its own Continue
+                  // button. Auto-pushing here made the tutorial race past
+                  // the contributors step entirely on desktop (poll
+                  // interval couldn't catch the closed-wizard state before
+                  // pathname changed and the whole tutorial unmounted).
+                  // Product report: "add this step in pc view too".
+                  if (!tutorialMode) {
+                    router.push(`/map/world?ventureId=${vId}`);
+                  }
                 }}
               />
             </div>

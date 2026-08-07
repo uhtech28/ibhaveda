@@ -137,50 +137,48 @@ export function CombatQuestionCard({
     if (bossDelta > 0) {
       // Player landed a hit. Pick CRIT if delta >= 20% of initial HP.
       // Reaction hold times bumped ~50% (was 1300/1600ms) so the
-      // slower attack/hurt clips (4fps × 9 frames = ~2.25s) can play
-      // through fully and the arena-zoom cinematic actually lands.
-      // Product feedback: "on attack screen zooms and animations
-      // are played slow for user to see them".
+      // Snappy attack cadence — the earlier "slow so users can see"
+      // tuning made the fight feel sluggish (product feedback: "after
+      // attack screen zoom and animations in slow speed playing").
+      // We now play through the boss/persona clips at ~9fps so each
+      // 9-frame reaction lands in ~1s and the arena cinematic keeps
+      // pace with the swing/recoil.
       const critThreshold = bossHpInitial * 0.2;
       const kind: ReactionKind = bossDelta >= critThreshold ? "crit" : "hit";
       setBossReaction(kind);
       setBossDamage(Math.round(bossDelta));
-      // Timers bumped ~40% (2400 → 3400, 2000 → 2800, 2600 → 3600)
-      // to accommodate the further-slowed combat clips
-      // (3 fps × 9 frames = 3.0s) so the boss finishes its hurt/attack
-      // animation before we swap it back to idle.
+      // Timers cut roughly 3× (was 2800/3400/3600 ms) so the boss
+      // returns to idle right as the ~1s hurt clip finishes.
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        kind === "crit" ? 3400 : 2800,
+        kind === "crit" ? 1100 : 900,
       );
       if (damageNumberTimerRef.current) clearTimeout(damageNumberTimerRef.current);
       damageNumberTimerRef.current = setTimeout(
         () => setBossDamage(null),
-        3600,
+        1200,
       );
     } else if (playerDelta > 0) {
       // Boss counter-attacked. Show player damage flash + boss "counter" pose.
-      // Same extension as above so the boss's ATTACK clip plays out
-      // fully and the persona's HURT recoil is legible.
       setBossReaction("counter");
       setPlayerHurt(true);
       setPlayerDamage(Math.round(playerDelta));
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        3200,
+        1100,
       );
       if (playerHurtTimerRef.current) clearTimeout(playerHurtTimerRef.current);
       playerHurtTimerRef.current = setTimeout(
         () => setPlayerHurt(false),
-        3000,
+        1000,
       );
       if (playerDamageNumberTimerRef.current)
         clearTimeout(playerDamageNumberTimerRef.current);
       playerDamageNumberTimerRef.current = setTimeout(
         () => setPlayerDamage(null),
-        1800,
+        900,
       );
     } else if (
       // Question advanced but neither side took >1 HP of damage.
@@ -260,20 +258,15 @@ export function CombatQuestionCard({
     // real HP delta comes in, the reactive logic above takes over and
     // clears this state via setPendingAttack(false).
     //
-    // Safety timeout is intentionally LONGER than the server p99
-    // round-trip. Previously this was 1500ms, but the server usually
-    // takes 2-3s to score an answer — the safety timer was firing
-    // BEFORE the server responded, dropping the sprite back to "idle"
-    // and then remounting it as "hurt" a moment later when the real
-    // reaction landed. That's the "hurt → pause → hurt again" glitch.
-    // 8s is long enough that in a normal round the reactive useEffect
-    // above always clears pendingAttack first; the timer only fires as
-    // a safety net if the mutation genuinely never resolves.
+    // Safety timeout must outlast the server p99 round-trip (~2-3s)
+    // so it never fires before the real HP reaction lands and
+    // clears pendingAttack. 4s balances that requirement against
+    // holding the arena-zoom overlay too long on real timeouts.
     setPendingAttack(true);
     if (pendingAttackTimerRef.current) clearTimeout(pendingAttackTimerRef.current);
     pendingAttackTimerRef.current = setTimeout(
       () => setPendingAttack(false),
-      8000,
+      4000,
     );
     onSubmit(valueRef.current, snapshot());
   }, [isLocked, onSubmit, snapshot]);
@@ -722,7 +715,7 @@ function HpCard({
               style={{
                 width: `${fraction * 100}%`,
                 background: fill,
-                transition: "width 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: "width 200ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             />
           </div>
@@ -1563,14 +1556,14 @@ function BattleScene({
       style={{
         imageRendering: "pixelated",
         // Cinematic "zoom in on the fight" when the user commits to
-        // an attack. transformOrigin biased slightly toward the boss
-        // (where the impact lands) so the boss sprite feels featured
-        // during the crit / hit / counter reaction. Cinematic scale
-        // is muted (1.05) — big enough to feel like a camera push,
-        // small enough not to jitter the layout underneath.
-        transform: isAttackingNow ? "scale(1.05)" : "scale(1)",
+        // an attack. Zoom is subtle (1.03) and the transition is
+        // short (200ms) so the camera push reads as a quick emphasis
+        // instead of a slow-motion crawl. transformOrigin biases
+        // toward the boss so the impact side feels featured during
+        // the crit / hit / counter reaction.
+        transform: isAttackingNow ? "scale(1.03)" : "scale(1)",
         transformOrigin: "70% 65%",
-        transition: "transform 550ms cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: "transform 200ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
       {/* ── Atmospheric backdrop — 4 stacked layers ─────────────────
@@ -2329,6 +2322,32 @@ function AnimatedSpritesheet({
   // is a hunched / knelt pose that reads as "defeated". `holdLast` is
   // wired through the persona/boss sprite wrappers and defaults to
   // true for backward compat.
+  //
+  // Single-frame guard: a `frames: 1` sheet has nothing to animate.
+  // With steps(1) the background instantly jumps to -frameWidth (off
+  // the sheet) each cycle, which erases the sprite mid-loop. Render a
+  // plain static <img>-style block instead so registry entries for
+  // bosses that ship only a single-frame idle placeholder still show
+  // the sprite cleanly through the AnimatedSpritesheet pipeline.
+  if (frameCount <= 1) {
+    return (
+      <div
+        role="img"
+        aria-label="Sprite"
+        style={{
+          width: displayWidth,
+          height: displayHeight,
+          imageRendering: "pixelated",
+          transform: flipX ? "scaleX(-1)" : undefined,
+          filter,
+          backgroundImage: `url(${sheetUrl})`,
+          backgroundRepeat: "no-repeat",
+          backgroundSize: `${displayWidth}px ${displayHeight}px`,
+          backgroundPosition: "0 50%",
+        }}
+      />
+    );
+  }
   return (
     <>
       <style>{keyframes}</style>
@@ -2412,16 +2431,19 @@ function AnimatedPersonaSprite({
   //                clearly during the arena-zoom moment. Floor
   //                dropped 3 → 2 and multiplier 0.5 → 0.4 for a
   //                more deliberate 3s clip at 9 frames.
+  // Persona FPS aligned with the boss's snappier tuning above.
+  // slowMotion still eases the clip a touch during the arena zoom
+  // but not enough to feel like actual slow motion.
   const resolvedFps =
     state === "idle"
       ? idleFps
       : state === "victory"
-        ? 3
+        ? 5
         : state === "defeat"
-          ? 2
+          ? 4
           : slowMotion
-            ? Math.max(2, Math.round(combatFps * 0.4))
-            : Math.max(3, Math.round(combatFps * 0.7));
+            ? Math.max(6, Math.round(combatFps * 0.8))
+            : Math.max(9, combatFps);
   return (
     <AnimatedSpritesheet
       key={`${personaId}:${state}`}
@@ -2680,6 +2702,105 @@ function BossSpriteFromAsset({
         victory: { frames: 9, frameWidth: 92, frameHeight: 92 },
       },
     },
+    // ── Village super-boss (single-frame idle only for now) ─────
+    // Registering with frames:1 still routes through
+    // AnimatedSpritesheet so filter/scale/flipX behaviour matches
+    // the animated bosses. Combat clips will fall back to idle via
+    // FALLBACK_CHAIN until real sheets ship.
+    {
+      match: "/bosses/village/unraveller/idle.png",
+      folder: "/assets/bosses/village/unraveller",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    // ── Stage 2 bosses missing from earlier pass ────────────────
+    {
+      match: "/bosses/stage2/shadow-specter/idle.png",
+      folder: "/assets/bosses/stage2/shadow-specter",
+      clips: {
+        idle: { frames: 1, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/stage2/forest-wraith/idle.png",
+      folder: "/assets/bosses/stage2/forest-wraith",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    // ── Stage 3 / Harbour bosses (all single-frame idle for now) ─
+    {
+      match: "/bosses/stage3/harbor-merchant/idle.png",
+      folder: "/assets/bosses/stage3/harbor-merchant",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/stage3/harbor-mist/idle.png",
+      folder: "/assets/bosses/stage3/harbor-mist",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/stage3/harbor-official/idle.png",
+      folder: "/assets/bosses/stage3/harbor-official",
+      clips: {
+        idle: { frames: 1, frameWidth: 96, frameHeight: 96 },
+      },
+    },
+    {
+      match: "/bosses/stage3/leviathan/idle.png",
+      folder: "/assets/bosses/stage3/leviathan",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/stage3/sea-serpent/idle.png",
+      folder: "/assets/bosses/stage3/sea-serpent",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    // ── Stage 4 / Artisans bosses (all single-frame idle) ───────
+    {
+      match: "/bosses/stage4/armor-golem/idle.png",
+      folder: "/assets/bosses/stage4/armor-golem",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/stage4/artisan-automaton/idle.png",
+      folder: "/assets/bosses/stage4/artisan-automaton",
+      clips: {
+        idle: { frames: 1, frameWidth: 96, frameHeight: 96 },
+      },
+    },
+    {
+      match: "/bosses/stage4/forge-dragon/idle.png",
+      folder: "/assets/bosses/stage4/forge-dragon",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/stage4/spectral-king/idle.png",
+      folder: "/assets/bosses/stage4/spectral-king",
+      clips: {
+        idle: { frames: 1, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/stage4/undead-titan/idle.png",
+      folder: "/assets/bosses/stage4/undead-titan",
+      clips: {
+        idle: { frames: 1, frameWidth: 88, frameHeight: 88 },
+      },
+    },
   ];
   const sheetDef = SPRITESHEET_BOSSES.find((s) => bossAsset.includes(s.match));
   if (!sheetDef) {
@@ -2726,20 +2847,21 @@ function BossSpriteFromAsset({
   // Transient combat clips (attack / hurt) release so the boss
   // doesn't sit on its recoil / stunned pose and read as "defeated".
   const holdLast = useState_ === "defeat" || useState_ === "victory";
-  // Per-state FPS for the boss — slowed further per product ask
-  // ("in AI combat the animation speed should be slow"):
+  // Per-state FPS for the boss — snappier tuning (product feedback:
+  // "animations in slow speed playing"). A 9-frame reaction at 9fps
+  // lands in ~1s, matching the shortened arena-zoom hold above.
   //   idle    → gentle breathing loop.
-  //   victory → slow triumphant loop (loss ending only).
-  //   defeat  → very slow crumble so each frame reads clearly.
-  //   attack/hurt → slowed from 4fps → 3fps (9 frames ≈ 3s clip).
+  //   victory → moderate triumphant loop (loss ending only).
+  //   defeat  → slower crumble so the terminal frames read clearly.
+  //   attack/hurt → snappy 9 fps (9 frames ≈ 1s clip).
   const resolvedFps =
     useState_ === "idle"
-      ? 5
+      ? 6
       : useState_ === "victory"
-        ? 3
+        ? 5
         : useState_ === "defeat"
-          ? 2
-          : 3;
+          ? 4
+          : 9;
   return (
     <AnimatedSpritesheet
       key={useState_}
