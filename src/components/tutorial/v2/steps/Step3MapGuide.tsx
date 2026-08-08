@@ -694,7 +694,7 @@ export function Step3MapGuide() {
           // after every task under this checkpoint is complete. What
           // just happened is a retreat. Sparky says so explicitly so
           // the user understands why the map still shows the boss.
-          text: `Congratulations, ${TUTORIAL_MONSTER_NAME} retreated! You'll fully defeat it once every task under this checkpoint is done. Just two more things and you'll have everything you need.`,
+          text: `Congratulations, the “${TUTORIAL_MONSTER_NAME}” retreated! Just two more things and you'll have everything you need.`,
           mood: "celebrating",
           // Anchor Sparky next to the Victory PANEL specifically —
           // combat-victory-panel is a ~720px centered card, small

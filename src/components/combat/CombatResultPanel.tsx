@@ -155,16 +155,13 @@ export function CombatResultPanel({
             option"). Users advance via CONTINUE only. */}
 
         {/* Transparent clickable overlay on the baked-in CONTINUE
-            button. The image's own CONTINUE artwork serves as the
-            visible button; our overlay makes the region clickable
-            and handles the tutorial-mode focus ring. During
-            tutorialMode the overlay's onClick is a no-op — the user
-            MUST advance via Sparky's own Continue button (which
-            calls onAdvance programmatically). Product ask: "block
-            the continue button in victory box" during the tutorial
-            so the user can't skip Sparky's narration. */}
+            button. Product ask reverted — the tutorial's Sparky
+            Continue button and the Victory panel's own CONTINUE
+            button are now BOTH live during the tutorial. Either one
+            advances (both call onAdvance). Users can pick whichever
+            they see first. */}
         <BakedContinueOverlay
-          onClick={tutorialMode ? () => {} : onAdvance}
+          onClick={onAdvance}
           highlight={tutorialMode}
         />
       </div>

@@ -94,15 +94,23 @@ function MetricDisplay() {
         {isHighCorruption ? "☠" : <PremiumIcon name={metric.icon} className="w-5 h-5" strokeWidth={1.5} />}
       </div>
       <div className="flex flex-col">
-        <span
-          className="text-[9px] font-medium uppercase tracking-widest"
-          style={{
-            color: isHighCorruption ? "#ef4444" : isWarningCorruption ? "#f59e0b" : colors.secondary,
-            fontFamily: "monospace",
-          }}
-        >
-          {isHighCorruption ? "COMPROMISED" : metric.label}
-        </span>
+        {/* Label span removed per product ask: "the value name is
+            getting repeated just keep yellow one and remove the
+            repeated". metric.displayValue already carries the unit
+            (e.g. "0.1 JIF") or a prefix ("p=1.0000"), so rendering
+            metric.label above it painted the name twice — once as
+            gray "JIF" / "P-VALUE" and again inside the yellow value.
+            Only the yellow value stays. COMPROMISED corruption
+            state moves down here as a top-line before the value so
+            the danger cue still surfaces. */}
+        {isHighCorruption && (
+          <span
+            className="text-[9px] font-medium uppercase tracking-widest"
+            style={{ color: "#ef4444", fontFamily: "monospace" }}
+          >
+            COMPROMISED
+          </span>
+        )}
         <motion.span
           key={metric.displayValue}
           initial={{ scale: 1.1, opacity: 0.7 }}

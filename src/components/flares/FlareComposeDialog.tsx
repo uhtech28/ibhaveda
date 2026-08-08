@@ -295,32 +295,30 @@ export function FlareComposeDialog({
             </div>
           </div>
 
-          {/* Industries + Skills — pre-filled but editable */}
+          {/* Industries + Skills — pre-filled but editable. Headings
+              are now the placeholder text INSIDE the dropdown buttons
+              (per product ask: "write industry impact and the other
+              tag heading inside the box remove the heading from
+              outside"), so the outer <label> elements are dropped and
+              the trigger reads the field label until the user has
+              picked something. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-white/50">
-                Industries impacted
-              </label>
-              <IndustriesMultiSelect
-                selectedIndustries={industries}
-                onChange={(next) => {
-                  setTouched((t) => ({ ...t, industries: true }));
-                  setIndustries(next);
-                }}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-white/50">
-                Skills needed
-              </label>
-              <SkillsMultiSelect
-                selectedSkills={skills}
-                onChange={(next) => {
-                  setTouched((t) => ({ ...t, skills: true }));
-                  setSkills(next);
-                }}
-              />
-            </div>
+            <IndustriesMultiSelect
+              selectedIndustries={industries}
+              onChange={(next) => {
+                setTouched((t) => ({ ...t, industries: true }));
+                setIndustries(next);
+              }}
+              placeholder="Industries impacted"
+            />
+            <SkillsMultiSelect
+              selectedSkills={skills}
+              onChange={(next) => {
+                setTouched((t) => ({ ...t, skills: true }));
+                setSkills(next);
+              }}
+              placeholder="Skills needed"
+            />
           </div>
 
           {error && (

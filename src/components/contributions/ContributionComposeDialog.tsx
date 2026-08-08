@@ -3,29 +3,29 @@
 /**
  * @file ContributionComposeDialog.tsx
  * @description Compose dialog for the CONTRIBUTIONS tile in the
- *   Adventurer's Menu. Product mechanism (verbatim ask):
- *     1) persona creates a project (existing venture creation flow)
- *     2) inside the project, clicking CONTRIBUTIONS opens this
- *        dialog where they fill Title + Description. Tags are
- *        already present (inherited from the parent project) and
- *        can just be posted
- *     3) title is auto-prefixed with the project name — e.g. if the
- *        project is "Project" and the contribution title is
- *        "progress", the posted idea title becomes "Project:progress"
+ *   Adventurer's Menu.
+ *
+ *   Post-review polish rev — visible label headings ("Title",
+ *   "Description", "Tags (inherited from project)") and the header
+ *   project-name chip + Cancel button are all removed. Tags are now
+ *   EDITABLE via SkillsMultiSelect + IndustriesMultiSelect, seeded
+ *   with the parent project's existing tags so the common case is
+ *   still "just post" but users can tweak per contribution.
+ *
+ *   Title mechanism unchanged — the input renders the parent
+ *   project's title as a locked prefix so the posted idea becomes
+ *   `${projectName}:${userTypedSuffix}` (visible in the /feed).
  *
  *   Wraps the shadcn `Dialog` primitive so the surrounding scrim +
- *   subtle blur match FlareComposeDialog exactly. Product ask:
- *   "make contribution background like flare" — Flare uses the same
- *   shadcn wrapper, so switching primitives is the one-line change
- *   that lands us the same look (dim map, top navbar still visible
- *   above the scrim because the shadcn overlay respects z-index).
+ *   subtle blur match FlareComposeDialog exactly.
  *
  *   Under the hood this calls the same `api.ideas.createIdea`
- *   mutation the /feed post form uses, so contribution posts show
- *   up in the feed exactly like a normal idea post.
+ *   mutation the /feed post form uses, with `parentId` set to the
+ *   project's idea so contributions show up as child nodes in the
+ *   Idea Hierarchy flowchart.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -41,6 +41,8 @@ import {
   useKeyboardInsets,
   keyboardSafeStyle,
 } from "@/lib/hooks/useKeyboardInsets";
+import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
+import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 
 interface Props {
   open: boolean;
@@ -53,9 +55,11 @@ interface Props {
    *  the `by_parent` index). Without this the contribution posts as
    *  a root idea and never joins the project's tree. */
   parentIdeaId: Id<"ideas">;
-  /** Skills tags (already parsed from the parent idea's `category`). */
+  /** Skills tags on the parent project — used as the initial value
+   *  for the editable Skills picker. */
   inheritedSkills: readonly string[];
-  /** Industries tags (already parsed from the parent idea's `industries`). */
+  /** Industries tags on the parent project — used as the initial
+   *  value for the editable Industries picker. */
   inheritedIndustries: readonly string[];
   /** Optional callback fired after a successful post. */
   onPosted?: (newIdeaId: Id<"ideas">) => void;
@@ -75,37 +79,29 @@ export function ContributionComposeDialog({
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
+  // Tags start seeded from the parent project (matches the "tags will
+  // be already there" behavior from the earlier rev) but are now
+  // fully editable via the same MultiSelect components used in
+  // profile-setup and IdeaWizard.
+  const [skills, setSkills] = useState<string[]>([]);
+  const [industries, setIndustries] = useState<string[]>([]);
 
   const createIdea = useMutation(api.ideas.createIdea);
-  // Track on-screen keyboard height so the dialog shrinks + the
-  // scrollable body reserves bottom padding equal to the keyboard's
-  // occlusion. Without this the Post Contribution button lands
-  // behind the keyboard on iOS Safari + Android Chrome (see product
-  // ask: "while typing the mobile layout mess fix it for android
-  // ios and all types of mobiles").
   const kb = useKeyboardInsets();
 
-  // Clear the form whenever the dialog opens fresh so a previous
-  // draft (from a cancelled post) doesn't leak into the next one.
+  // Reset every field to the parent's defaults whenever the dialog
+  // opens fresh so a previous draft (from a cancelled post) doesn't
+  // leak into the next one.
   useEffect(() => {
     if (open) {
       setTitle("");
       setDescription("");
       setVisibility("public");
       setError("");
+      setSkills(Array.from(inheritedSkills));
+      setIndustries(Array.from(inheritedIndustries));
     }
-  }, [open]);
-
-  const tags = useMemo(
-    () => [
-      ...inheritedSkills.map((s) => ({ label: s, kind: "skill" as const })),
-      ...inheritedIndustries.map((s) => ({
-        label: s,
-        kind: "industry" as const,
-      })),
-    ],
-    [inheritedSkills, inheritedIndustries],
-  );
+  }, [open, inheritedSkills, inheritedIndustries]);
 
   const trimmedTitle = title.trim();
   const trimmedDescription = description.trim();
@@ -128,20 +124,10 @@ export function ContributionComposeDialog({
       const res = await createIdea({
         title: composedTitle,
         description: trimmedDescription,
-        category:
-          inheritedSkills.length > 0 ? JSON.stringify(inheritedSkills) : "",
+        category: skills.length > 0 ? JSON.stringify(skills) : "",
         industries:
-          inheritedIndustries.length > 0
-            ? JSON.stringify(inheritedIndustries)
-            : undefined,
+          industries.length > 0 ? JSON.stringify(industries) : undefined,
         visibility,
-        // Link the contribution to the parent project so it appears
-        // as a child node in the Idea Hierarchy flowchart. Product
-        // ask: "make sure the contribution also comes in hierarchy
-        // flow chart". convex/ideas.ts:createIdea validates that the
-        // caller is either the parent's author OR has an accepted
-        // contribution request — both conditions match the flow that
-        // reaches this dialog (author-owner OR accepted contributor).
         parentId: parentIdeaId,
       });
       const newIdeaId = (res as { ideaId: Id<"ideas"> }).ideaId;
@@ -159,24 +145,18 @@ export function ContributionComposeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        // Matches FlareComposeDialog.tsx line 199 dims + palette so the
-        // two compose surfaces feel like siblings.
-        // `style` overrides the max-h with a visualViewport-derived
-        // value so the dialog physically shrinks when the mobile
-        // keyboard opens (see useKeyboardInsets docstring for the
-        // per-browser rationale).
         className="w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[90dvh]"
         style={keyboardSafeStyle(kb, { reserveVh: 0.92 })}
       >
+        {/* Header — just the "Post Contribution" title, no project-
+            name chip on the right. Product ask: "remove new builder
+            wants to push... line". The project name still appears
+            in-context as the locked prefix inside the title input
+            below, so no information is lost. */}
         <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
-          <div className="flex items-center gap-2">
-            <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
-              Post Contribution
-              <span className="rounded-md bg-indigo-500/15 border border-indigo-400/25 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-200">
-                {projectName || "Project"}
-              </span>
-            </DialogTitle>
-          </div>
+          <DialogTitle className="text-lg font-semibold text-white">
+            Post Contribution
+          </DialogTitle>
         </DialogHeader>
 
         <form
@@ -185,39 +165,30 @@ export function ContributionComposeDialog({
         >
           <div
             className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0"
-            // Reserve just enough bottom padding so the focused
-            // input never lands right on top of the sticky footer
-            // when the keyboard scroll-into-view happens. The
-            // container itself is already max-height-clamped above.
             style={kb.isKeyboardOpen ? { scrollPaddingBottom: 96 } : undefined}
           >
-            {/* Title with locked project prefix */}
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/60 mb-1">
-                Title
-              </label>
-              <div className="flex items-stretch rounded-[10px] border border-white/5 bg-[#0D1117] focus-within:border-transparent focus-within:ring-2 focus-within:ring-[#6366F1]">
-                <span className="flex items-center pl-3 pr-1 text-sm font-semibold text-indigo-300 select-none">
-                  {projectName || "Project"}:
-                </span>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="progress"
-                  maxLength={100}
-                  autoFocus
-                  className="flex-1 bg-transparent border-0 outline-none px-1 py-2.5 text-sm text-white placeholder:text-[#6B7280]"
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </div>
+            {/* Title — no label heading per product ask "remove the
+                written headings title description tags". The locked
+                project prefix + the placeholder ("progress") make
+                the intent obvious. */}
+            <div className="flex items-stretch rounded-[10px] border border-white/5 bg-[#0D1117] focus-within:border-transparent focus-within:ring-2 focus-within:ring-[#6366F1]">
+              <span className="flex items-center pl-3 pr-1 text-sm font-semibold text-indigo-300 select-none max-w-[55%] truncate">
+                {projectName || "Project"}:
+              </span>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="progress"
+                maxLength={100}
+                autoFocus
+                className="flex-1 bg-transparent border-0 outline-none px-1 py-2.5 text-sm text-white placeholder:text-[#6B7280]"
+                onKeyDown={(e) => e.stopPropagation()}
+              />
             </div>
 
-            {/* Description */}
+            {/* Description — no label heading either. */}
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/60 mb-1">
-                Description
-              </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -232,34 +203,23 @@ export function ContributionComposeDialog({
               </div>
             </div>
 
-            {/* Inherited tags — read-only chips (product spec: "tags
-                will be already there which are used for the project"). */}
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/60 mb-1">
-                Tags (inherited from project)
-              </label>
-              {tags.length === 0 ? (
-                <p className="text-xs text-white/40 italic">
-                  No tags on this project yet — the contribution will post
-                  without tags.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map((t) => (
-                    <span
-                      key={`${t.kind}:${t.label}`}
-                      className={cn(
-                        "rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                        t.kind === "skill"
-                          ? "border-purple-400/25 bg-purple-500/10 text-purple-200"
-                          : "border-teal-400/25 bg-teal-500/10 text-teal-200",
-                      )}
-                    >
-                      #{t.label}
-                    </span>
-                  ))}
-                </div>
-              )}
+            {/* Tags — editable dropdowns, seeded from parent project.
+                Product ask: "tags should be shown that are there for
+                project but it should be editable so add the drop
+                down for selecting tags". Same MultiSelect components
+                used in profile-setup + IdeaWizard so vocabulary
+                stays consistent across the app. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <IndustriesMultiSelect
+                selectedIndustries={industries}
+                onChange={setIndustries}
+                placeholder="Industries…"
+              />
+              <SkillsMultiSelect
+                selectedSkills={skills}
+                onChange={setSkills}
+                placeholder="Skills…"
+              />
             </div>
 
             {/* Visibility */}
@@ -299,14 +259,11 @@ export function ContributionComposeDialog({
             )}
           </div>
 
+          {/* Footer — Post Contribution only. Cancel button removed
+              per product ask ("remove cancel button"). The dialog's
+              default × close and the shadcn overlay click-out are
+              still available for dismissal. */}
           <div className="flex items-center justify-end gap-3 border-t border-white/5 px-5 pt-3 pb-4 bg-[#0D1117] shrink-0">
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="rounded-[10px] px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.05] hover:text-white transition"
-            >
-              Cancel
-            </button>
             <button
               type="submit"
               disabled={!isValid}
