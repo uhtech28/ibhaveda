@@ -567,8 +567,13 @@ export function Step2TemplatePick() {
   // top even if the share dialog is momentarily still fading out.
   if (shareOpen && dialogue !== "contributors") return null;
 
-  // Contributors beat owns the whole screen — render just the dialog,
-  // no mascot on top. Sparky's speech content lives inside the modal.
+  // Contributors beat — render the invite dialog AND Sparky beside
+  // it (previously Sparky was suppressed here and the tutorial "just
+  // to map" step happened silently). Product ask (verbatim): "bring
+  // it back and use sparky there with conversation 'Write a quick
+  // message saying why you'd be a great fit, then send your
+  // request!'". The dialog itself still enforces "at least one
+  // invite" before Continue unlocks; Sparky just narrates the moment.
   if (dialogue === "contributors") {
     if (!latestIdeaId) {
       // Query still loading — brief blank frame; auto-transitions
@@ -576,10 +581,25 @@ export function Step2TemplatePick() {
       return null;
     }
     return (
-      <SuggestedContributorsDialog
-        ideaId={latestIdeaId}
-        onContinue={() => setDialogue("to_map")}
-      />
+      <>
+        <SuggestedContributorsDialog
+          ideaId={latestIdeaId}
+          onContinue={() => setDialogue("to_map")}
+        />
+        <TutorialMascot
+          visible
+          text="Write a quick message saying why you'd be a great fit, then send your request!"
+          mood="pointing"
+          // Bottom-left so Sparky sits BESIDE the centered contributor
+          // modal (max-w-560px) instead of overlapping its Send
+          // buttons on the right. `nearSelector={null}` keeps him at
+          // the fallback anchor; no need to follow a specific card
+          // inside the modal.
+          anchor="bottom-left"
+          nearSelector={null}
+          noScrim
+        />
+      </>
     );
   }
 

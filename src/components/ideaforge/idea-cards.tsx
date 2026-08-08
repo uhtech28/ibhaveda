@@ -125,6 +125,15 @@ function ProjectScoreChip({
 }) {
   const cfg = getTemplateConfig(templateId);
   const value = formatProjectScoreChip(templateId, cumulativeScores);
+  // Product ask (repeated): "the value name is getting repeated just
+  // keep yellow one and remove the repeated". `formatProjectScoreChip`
+  // already bakes the unit into the value string:
+  //   academic → "0.1 JIF"     (had a gray "JIF" label on the left)
+  //   lab      → "p = 1.0000"  (had a gray "P-VALUE" label on the left)
+  //   venture  → "$1,250,000"
+  //   creative → "235,000 fans"
+  // So the label was always a duplicate of the unit already inside
+  // the value. Kept the tooltip so hover still names the metric.
   return (
     <span
       className={cn(
@@ -133,9 +142,6 @@ function ProjectScoreChip({
       )}
       title={`Project ${cfg.displayLabel} — Ibhaveda Project Score`}
     >
-      <span className="mr-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/55">
-        {cfg.displayLabel}
-      </span>
       {value}
     </span>
   );

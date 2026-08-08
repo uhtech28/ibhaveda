@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
@@ -180,9 +180,25 @@ export const createIdea = mutation({
         throw new Error("Cannot create sub-idea under a deleted idea");
       }
 
-      // Check authorization: user must be author of parent OR have accepted contribution request
-      const isAuthor = parentIdea.authorId === user._id;
-      if (!isAuthor) {
+      // Check authorization: user must be author of parent OR the
+      // owner of the venture wrapping that idea (map/CONTRIBUTIONS
+      // tile — the venture owner is always the parent-idea author
+      // in the happy path, but `resolveOrProvisionUser` mints a
+      // fresh `users` row if the Clerk sub → users lookup misses,
+      // which leaves the venture pointing at the OLD users._id
+      // while `user._id` here is the NEW row. Falling back to a
+      // venture-owner check unwedges that case) OR have an
+      // accepted contribution request.
+      const isParentAuthor = parentIdea.authorId === user._id;
+      let isVentureOwner = false;
+      if (!isParentAuthor) {
+        const ventureRow = await ctx.db
+          .query("ventures")
+          .withIndex("by_idea", (q) => q.eq("ideaId", args.parentId!))
+          .first();
+        isVentureOwner = !!ventureRow && ventureRow.userId === user._id;
+      }
+      if (!isParentAuthor && !isVentureOwner) {
         // Check for accepted contribution request
         const acceptedRequests = await ctx.db
           .query("contributionRequests")
@@ -195,7 +211,13 @@ export const createIdea = mutation({
         const validRequest = acceptedRequests.find(request => request.ideaId === args.parentId);
 
         if (!validRequest) {
-          throw new Error("You are not authorized to add ideas under this parent. You must be the author or have an accepted contribution request.");
+          // ConvexError (not plain Error) so the message surfaces on
+          // the client — previously the user just saw an opaque
+          // "Server Error - Called by client" pill because
+          // `new Error(...)` messages are stripped in prod builds.
+          throw new ConvexError(
+            "You are not authorized to add ideas under this parent. You must be the author or have an accepted contribution request.",
+          );
         }
       }
     }

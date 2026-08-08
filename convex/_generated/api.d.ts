@@ -50,6 +50,7 @@ import type * as miniGameConstants from "../miniGameConstants.js";
 import type * as miniGameTypes from "../miniGameTypes.js";
 import type * as miniGames from "../miniGames.js";
 import type * as notifications from "../notifications.js";
+import type * as projectScoreSpec from "../projectScoreSpec.js";
 import type * as resend from "../resend.js";
 import type * as search from "../search.js";
 import type * as skillBadges from "../skillBadges.js";
@@ -122,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   miniGameTypes: typeof miniGameTypes;
   miniGames: typeof miniGames;
   notifications: typeof notifications;
+  projectScoreSpec: typeof projectScoreSpec;
   resend: typeof resend;
   search: typeof search;
   skillBadges: typeof skillBadges;

@@ -455,16 +455,27 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
         keyboardMgr.enabled = !inputFocused;
       }
 
-      // `sleeping` is a runtime field on Phaser's TimeStep but the
-      // typed surface doesn't expose it.
-      const phaserLoop = game.loop as Phaser.Core.TimeStep & { sleeping?: boolean };
+      // Previously guarded on a phantom `sleeping` field cast onto
+      // Phaser's TimeStep — that field doesn't exist (verified in
+      // phaser@3.90.0 src/core/TimeStep.js). The guard read
+      // `undefined`, meaning `sleep()` fired on the first pause but
+      // the `wake()` branch was NEVER reached because `sleeping`
+      // stayed permanently undefined ⇒ falsy. Once the loop stopped
+      // (running=false, RAF cancelled) it never restarted until a
+      // full page reload — that's the "open any tool → character
+      // freezes forever" bug the user reported.
+      //
+      // The real field is `running`. Sleep/wake are internally
+      // idempotent so the guard is just there to avoid redundant
+      // work when nothing changed.
+      const phaserLoop = game.loop;
       // SLEEP if a text input has focus — keyboard INP drops from
       // ~1,700ms to ~40ms. This is the dominant lag the user feels.
       if (manualPause || fullModalOpen || inputFocused) {
-        if (!phaserLoop.sleeping) phaserLoop.sleep();
+        if (phaserLoop.running) phaserLoop.sleep();
         return;
       }
-      if (phaserLoop.sleeping) phaserLoop.wake();
+      if (!phaserLoop.running) phaserLoop.wake();
 
       // Set FPS based on overlay + lite-mode state. Lite-mode kicks in
       // automatically for advanced ventures (6+ completed checkpoints
