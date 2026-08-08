@@ -562,7 +562,22 @@ export function IdeaWizard({
       }
 
       close();
-      router.push(`/map/world?ventureId=${ventureId}`);
+      // In tutorial mode, DO NOT jump straight to /map/world.
+      // Step 5 of the tutorial (SuggestedContributorsDialog — the
+      // "invite people for contribution" beat) lives on /feed and
+      // only mounts when the compose wizard has closed AND the user
+      // is still on /feed. If we router.push here, Step2TemplatePick
+      // unmounts before it can flip `dialogue` from "posting" →
+      // "contributors" and the invite step is skipped entirely.
+      // The `to_map` step's own Continue button (Step2TemplatePick
+      // line ~541) handles the map nav once the user finishes
+      // inviting collaborators.
+      //
+      // Non-tutorial callers still get the direct nav — nothing
+      // gates them from going straight to the map.
+      if (!tutorialMode) {
+        router.push(`/map/world?ventureId=${ventureId}`);
+      }
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : "Failed to post idea.",
