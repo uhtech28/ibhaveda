@@ -16,7 +16,7 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useCombatRound, type CombatPhase } from "@/lib/hooks/useCombatRound";
-import { CombatQuestionCard } from "./CombatQuestionCard";
+import { CombatQuestionCard, deriveBiomeMap } from "./CombatQuestionCard";
 import { CombatResultPanel } from "./CombatResultPanel";
 import { AntiCheatWarning } from "./AntiCheatWarning";
 import type { KeystrokeTelemetry } from "@/lib/combat/types";
@@ -26,6 +26,7 @@ import {
   type VillageBossInfo,
 } from "@/config/village-bosses";
 import { getPersona, isValidPersonaId } from "@/config/personas";
+import { useKeyboardInsets } from "@/lib/hooks/useKeyboardInsets";
 
 interface Props {
   roundId: Id<"combatRounds">;
@@ -59,6 +60,12 @@ export function CombatPanel({
     roundId,
     checkpointId,
   );
+  // Keyboard-aware sizing — the Attack button + textarea sit at the
+  // bottom of the panel. Without this the on-screen keyboard covers
+  // both on iOS Safari + Android Chrome. Applied via inline style to
+  // the scroll container below so max-h shrinks to the visible
+  // visualViewport when the keyboard opens.
+  const kb = useKeyboardInsets();
 
   // Persona portrait — the founder sprite shown facing the boss.
   // Uses the user's picked persona (all 8 personas now have real
@@ -258,14 +265,18 @@ export function CombatPanel({
       data-tutorial="combat-panel"
       className="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden"
     >
-      {/* Biome-themed background — Village painted map dimmed with a
-          corruption vignette in the boss's family color. The map image
-          reads through at ~40% brightness so users know they're still
-          "in the village" while fighting. */}
+      {/* Biome-themed background — routed through deriveBiomeMap so
+          Arena fights show the Arena, Forest fights show the Forest,
+          Harbor fights show the Harbor, etc. Previous rev hardcoded
+          the Village painted map here, which meant EVERY combat
+          across all stages was silhouetted against Village art
+          (product report: "i opend arcade but still got village").
+          Dimmed to 40% brightness so the terrain doesn't overpower
+          the combat UI. */}
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage: "url(/assets/maps-v2/village-painted/village-map.png)",
+          backgroundImage: `url(${deriveBiomeMap(boss?.idleAsset ?? null)})`,
           filter: "brightness(0.4) saturate(0.85)",
         }}
       />
@@ -369,8 +380,13 @@ export function CombatPanel({
         <div
           className={
             displayPhase.kind === "settled"
-              ? "relative max-h-[92vh] overflow-y-auto overscroll-contain no-scrollbar"
-              : "relative max-h-[92vh] overflow-y-auto overscroll-contain no-scrollbar border-2 border-white bg-black p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+              ? "relative max-h-[92dvh] overflow-y-auto overscroll-contain no-scrollbar"
+              : "relative max-h-[92dvh] overflow-y-auto overscroll-contain no-scrollbar border-2 border-white bg-black p-3 shadow-[0_20px_60px_rgba(0,0,0,0.7)] sm:p-6"
+          }
+          style={
+            kb.isKeyboardOpen && kb.viewportHeight > 0
+              ? { maxHeight: `${Math.floor(kb.viewportHeight * 0.92)}px` }
+              : undefined
           }
           onWheelCapture={(e) => e.stopPropagation()}
         >
@@ -462,6 +478,32 @@ function PhaseSwitch({
   founderAsset = null,
   ideaTitle = null,
 }: PhaseSwitchProps) {
+  // Track the previous playerHp so we can pick the correct transition
+  // line between questions. Product spec (verbatim): use one of
+  //   "Your attack was effective."
+  //   "Your attack was ineffective. You've been hurt!"
+  // depending on whether the last answer landed. The old fallback of
+  // "Your answer struck home" was off-brand and always positive even
+  // when the player got smacked — a bug per the screenshot review.
+  const prevPlayerHpRef = useRef<number | null>(null);
+  const prevBossHpRef = useRef<number | null>(null);
+  if (phase.kind === "active" && phase.view.currentQuestion) {
+    // Steady state — remember these HPs so the next transition window
+    // can compare against them.
+    prevPlayerHpRef.current = phase.view.playerHpCurrent;
+    prevBossHpRef.current = phase.view.bossHpCurrent;
+  }
+  const transitionPrompt = (() => {
+    if (phase.kind !== "active") return "";
+    if (phase.view.currentQuestionIndex === 0) {
+      return `* ${boss?.name ?? "The foe"} is preparing its first challenge…`;
+    }
+    const prevPlayer = prevPlayerHpRef.current;
+    if (prevPlayer !== null && phase.view.playerHpCurrent < prevPlayer) {
+      return "* Your attack was ineffective. You've been hurt!";
+    }
+    return "* Your attack was effective.";
+  })();
   switch (phase.kind) {
     case "loading":
       return <LoadingState />;
@@ -473,10 +515,7 @@ function PhaseSwitch({
           question={phase.view.currentQuestion ?? {
             _id: "transition" as never,
             order: phase.view.currentQuestionIndex + 1,
-            prompt:
-              phase.view.currentQuestionIndex === 0
-                ? `* ${boss?.name ?? "The foe"} is preparing its first challenge…`
-                : "* Your answer struck home. Bracing for the next question…",
+            prompt: transitionPrompt,
             persona: "villain",
             complexityTier: "medium",
             durationMs: 90_000,

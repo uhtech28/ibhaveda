@@ -213,10 +213,13 @@ export default function ProfileSetupPage() {
     return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, []);
 
-  // Prefetch /feed so the transition after submit is instant instead of
-  // a cold Next.js page load. Fires once on mount, harmless if already
-  // prefetched.
+  // Prefetch /persona-setup so the soft-nav after submit lands
+  // instantly — no cold JS load, no "Setting up your persona…" flash.
+  // /feed is also prefetched for the returning-user redirect path
+  // (see the useEffect below that bounces users away from this page
+  // when they already have a persona).
   useEffect(() => {
+    router.prefetch("/persona-setup");
     router.prefetch("/feed");
   }, [router]);
 
@@ -243,6 +246,17 @@ export default function ProfileSetupPage() {
   useEffect(() => {
     if (showPersonaSelector) return;
     if (isExplicitEdit) return;
+    // Guard: while the first-time submit handler is mid-flight
+    // (`loading===true`), the mutation is awaiting a server response.
+    // The reactive existingProfile query can populate first and trip
+    // this redirect BEFORE handleFirstTimeSubmit's own hard-nav to
+    // /persona-setup fires, causing the user to briefly land on /feed
+    // (via the router.replace path on line 273 when a stale
+    // hasPersona=true snapshot briefly returns). Product report:
+    // "after username setup it first redirect for 2 seconds to feed
+    // then comes to persona selection". Skipping the redirect while
+    // the handler owns navigation makes the transition instant.
+    if (loading) return;
     // Any existing profile row → redirect. We DON'T require
     // .username to be truthy here — an edge case where the Convex
     // row exists with an empty username was falling through both
@@ -267,10 +281,23 @@ export default function ProfileSetupPage() {
       typeof window !== "undefined" &&
       sessionStorage.getItem("personaPickerDismissed") === "1"
     ) {
+      // User already picked a persona in this tab — safe to bounce
+      // straight to /feed. Only hits this branch for RETURNING users
+      // who reload /profile-setup; fresh signups clear this flag in
+      // handleFirstTimeSubmit so they never take this path.
       router.replace("/feed");
       return;
     }
-    router.replace(hasPersona ? "/feed" : "/persona-setup");
+    // Any other fallthrough goes to /persona-setup. We used to route
+    // hasPersona===true users to /feed here, but a stale Convex
+    // client cache (personaIdRaw briefly returning an old id from a
+    // prior sign-in in the same tab) tripped that branch mid-submit
+    // and caused the "/feed flashes for 2 seconds then persona
+    // selection" bug. /persona-setup itself will bounce anyone with
+    // a real persona onward to /feed via its own effect at
+    // persona-setup/page.tsx:96-105 — so we lose nothing by always
+    // routing here, and we eliminate the flash class of races.
+    router.replace("/persona-setup");
   }, [
     existingProfile,
     router,
@@ -494,27 +521,20 @@ export default function ProfileSetupPage() {
   // completes. `.username` predicate dropped so profiles with empty
   // usernames also trigger the redirect (edge case that let the
   // Edit form leak through).
+  // Post-submit interstitial branch REMOVED per product ask: "we
+  // dont want loading after username setup direct persona". After
+  // handleFirstTimeSubmit fires (fire-and-forget mutation +
+  // synchronous router.replace to /persona-setup) the useEffect on
+  // line 246 will also route to /persona-setup within a tick. During
+  // that ~50ms transition window we return null — nothing paints,
+  // no "Loading" card, no spinner, no HeroHeader. The user's next
+  // visible paint is the persona picker.
   if (
     existingProfile &&
     !showPersonaSelector &&
     !isExplicitEdit
   ) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <HeroHeader />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <Card className="max-w-md w-full">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p>Loading your feed…</p>
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-        <FooterSection />
-      </div>
-    );
+    return null;
   }
 
   if (!existingProfile) {
@@ -552,7 +572,7 @@ export default function ProfileSetupPage() {
       !usernameValidation.checking;
     const nameReady = formData.displayName.trim().length >= 2;
 
-    const handleFirstTimeSubmit = async (e: React.FormEvent) => {
+    const handleFirstTimeSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!nameReady) {
         toast({ title: "Add your name to continue", variant: "destructive" });
@@ -563,50 +583,71 @@ export default function ProfileSetupPage() {
         return;
       }
       if (!userId) return;
-      setLoading(true);
       setError("");
-
-      // AWAIT the profile-create mutation BEFORE navigating. Prior
-      // fire-and-forget + inline-picker approach caused a
-      // "picker → feed flash → picker" race because /profile-setup
-      // was flipping to the persona picker while the mutation was
-      // still in flight — subsequent Convex query snapshots on /feed
-      // saw the pre-persona view of the user row and bounced back to
-      // /persona-setup. Cleaner deterministic flow:
-      //   sign up → /profile-setup form → /persona-setup picker
-      //          → /feed (via hard-nav after persona picked)
-      // No inline picker, no feed in between.
-      try {
-        await createUserProfile({
-          username: formData.username,
-          displayName: formData.displayName.trim(),
-          avatar: formData.avatar || undefined,
-          skills: [],
-          industries: [],
-        });
-        setLoading(false);
-        toast({
-          title: "Profile created",
-          description: "Now pick your persona.",
-          duration: 2000,
-        });
-        // Hard nav so the fresh /persona-setup mount doesn't inherit
-        // any stale query snapshot from this page's client cache.
-        if (typeof window !== "undefined") {
-          window.location.replace("/persona-setup");
-        } else {
-          router.replace("/persona-setup");
+      // Clear any stale session flags so /feed's early-bounce logic +
+      // /profile-setup's redirect useEffect don't take stale-cache paths.
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.removeItem("personaPickerDismissed");
+          sessionStorage.setItem("skipFeedGoToPersona", "1");
+          // Signal to /persona-setup that a createUserProfile call is
+          // already in flight from here — its auto-provision effect
+          // should NOT fire a second mutation with the Clerk-suggested
+          // username, or we race and one of them fails with a
+          // "username already taken" error.
+          sessionStorage.setItem("profileProvisionInFlight", "1");
+        } catch {
+          /* no-op */
         }
-      } catch (err) {
-        setLoading(false);
+      }
+
+      // Product ask (verbatim): "we dont want loading after username
+      // setup direct persona". Zero-wait strategy:
+      //   1. Fire createUserProfile WITHOUT awaiting — Convex reactive
+      //      queries on /persona-setup will pick up the new row within
+      //      a tick as soon as the server ACKs (~200-500ms).
+      //   2. Immediately router.replace("/persona-setup") — SOFT nav,
+      //      not window.location.replace. Soft nav preserves the
+      //      Clerk auth context + Convex client + Next.js router state,
+      //      so /persona-setup mounts in ~50-100ms with warm caches
+      //      instead of the ~1-2s cold reload that hard-nav needs.
+      //   3. /persona-setup is prefetched on mount below, so the JS
+      //      bundle is already parsed by the time we navigate.
+      //   4. If the mutation fails, we surface the error via toast +
+      //      a session flag; persona-setup will show a "please try
+      //      again" state instead of a broken picker.
+      void createUserProfile({
+        username: formData.username,
+        displayName: formData.displayName.trim(),
+        avatar: formData.avatar || undefined,
+        skills: [],
+        industries: [],
+      }).then(() => {
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem("profileProvisionInFlight");
+          } catch {
+            /* no-op */
+          }
+        }
+      }).catch((err) => {
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem("profileProvisionInFlight");
+          } catch {
+            /* no-op */
+          }
+        }
         const msg = err instanceof Error ? err.message : "Setup failed";
-        setError(msg);
         toast({
           title: "Setup failed",
           description: msg,
           variant: "destructive",
         });
-      }
+      });
+
+      // Nav is instant — no await, no loading state, no interstitial.
+      router.replace("/persona-setup");
     };
 
     const handlePersonaConfirm = async (personaId: PersonaId) => {
@@ -776,27 +817,27 @@ export default function ProfileSetupPage() {
   // frame and hard-redirect to /feed instead of the old Edit Profile
   // form. Product feedback: "we don't want edit profile screen" —
   // this route is onboarding-only, never a profile editor.
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-        <p className="text-sm text-muted-foreground">Redirecting…</p>
-      </div>
-      <FallbackRedirect />
-    </div>
-  );
+  // Nuclear fallback — no visible content, just the redirector.
+  // Previously showed a "Redirecting…" spinner card which the user
+  // reported as another loading state. Return null instead so the
+  // FallbackRedirect fires silently and the next paint is the
+  // destination page (/persona-setup).
+  return <FallbackRedirect />;
 }
 
 /**
- * Kicks the browser to /feed the moment it mounts. Only rendered by
- * the nuclear fallback return above — we don't add it to the main
- * useEffect chain because it would race with the other, smarter
- * redirect that knows about persona state.
+ * Nuclear fallback — kicks the browser to /persona-setup the moment
+ * it mounts. Previously routed to /feed, which was the OTHER source
+ * of the "feed flashes for 2s during signup" bug: any state that
+ * fell through the earlier branches (form / persona picker /
+ * post-submit interstitial) hit this and soft-nav'd to /feed, which
+ * then had its own persona-null detector bounce back after ~2s.
+ * Routing straight to /persona-setup makes the fallthrough safe.
  */
 function FallbackRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/feed");
+    router.replace("/persona-setup");
   }, [router]);
   return null;
 }

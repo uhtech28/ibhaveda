@@ -165,7 +165,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     // so the OLD 2.2 scale ended up rendering the boss ~200px tall and
     // clipping the top off the visible camera. 1.5 gives ~140px on screen,
     // which fits and reads clean.
-    scale: 1.5,
+    scale: 1.9,
     // Sprite origin (0.5, 1) puts the frame's bottom-edge at yOffset.
     // Trimmed from +80 → +62 per product ask ("monster just half cm
     // upward") — half a centimetre on a typical monitor is ~18px, so
@@ -213,7 +213,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     victoryFrameCount: 9,
     // Match Fog's tuned scale/yOffset — Pixellab bosses fill more of
     // their 92-frame than the old single-image bosses did.
-    scale: 1.5,
+    scale: 1.9,
     yOffset: 62, // Unified with CP1 — sprite feet on the CP disc.
     offsetX: 0, // ON the CP marker — persona sits at CP top-left (unified with CP1).
 
@@ -244,7 +244,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     defeatFrameCount: 9,
     victoryKey: "boss-automaton-victory",
     victoryFrameCount: 9,
-    scale: 1.5,
+    scale: 1.9,
     yOffset: 62, // Unified with CP1 — sprite feet on the CP disc.
     offsetX: 0, // ON the CP marker — persona sits at CP top-left (unified with CP1).
 
@@ -274,7 +274,7 @@ const VILLAGE_MINI_BOSSES: readonly VillageBossDef[] = [
     defeatFrameCount: 9,
     victoryKey: "boss-wraith-victory",
     victoryFrameCount: 9,
-    scale: 1.5,
+    scale: 1.9,
     yOffset: 62, // Unified with CP1 — sprite feet on the CP disc.
     offsetX: 0, // ON the CP marker — persona sits at CP top-left (unified with CP1).
 
@@ -316,7 +316,7 @@ const MAP_HEIGHT = 1024;
 // Scale factor for the 32×48 pixel-art sprite. At 2.4x the character
 // shows as ~77×115 world pixels — visible on both mobile (0.7x zoom
 // gives ~54px on screen) and desktop (1.4x zoom = 107px on screen).
-const CHAR_SCALE = 2.4;
+const CHAR_SCALE = 2.05;
 // Character stands ON the checkpoint marker — origin is bottom-center
 // Character spawns at the TOP-LEFT of the checkpoint marker on
 // every map. Product spec ("make sure where i have placed the
@@ -1170,18 +1170,14 @@ export class VillageMapScene extends Phaser.Scene {
       // not as a UFO hovering above it. Label sits just above the ring.
       const ring = this.add.circle(0, 0, 28, 0xfde047, 0);
       ring.setStrokeStyle(2.5, 0xfde047, 0.95);
-      const label = this.add
-        .text(0, -42, "PRESS  E", {
-          fontFamily: "monospace",
-          fontSize: "10px",
-          color: "#fde047",
-          fontStyle: "bold",
-        })
-        .setOrigin(0.5);
+      // "PRESS E" label removed per product ask ("remove press E
+      // written"). The pulsing amber ring alone communicates "this
+      // CP is interactable" — the E key still works, we just no
+      // longer paint the hint text over the boss sprite.
       // Container anchored ON the CP marker (cp.x, cp.y), not floating
       // above it. Previously used cp.y - 40 which lifted the whole
       // hint way above the marker and read as unrelated to it.
-      const container = this.add.container(cp.x, cp.y, [ring, label]);
+      const container = this.add.container(cp.x, cp.y, [ring]);
       container.setDepth(150);
       this.tweens.add({
         targets: ring,
@@ -1620,7 +1616,16 @@ export class VillageMapScene extends Phaser.Scene {
    * can call it on task open, checkpoint arrival, etc.
    */
   private maybeShowActiveBossTaunt(): void {
+    // Boss taunt bubbles ("Your idea has no edges…", etc.) DISABLED
+    // per product ask ("REMOVE TEXT" — screenshot showed the taunt
+    // hovering over the Fog boss on the map). Kept the method as a
+    // no-op so the two call sites (delayedCall + advance handler)
+    // continue to work without touching them. Re-enable by uncommenting
+    // the original block below.
     const idx = this.currentIndex;
+    this.miniBossTauntFired[idx] = true;
+    return;
+    /*
     const sprite = this.miniBossSprites[idx];
     const def = VILLAGE_MINI_BOSSES[idx];
     if (!sprite || !sprite.visible || !def) return;
@@ -1629,6 +1634,7 @@ export class VillageMapScene extends Phaser.Scene {
     const line = def.taunts[Math.floor(Math.random() * def.taunts.length)];
     showBossTaunt(this, sprite, line, 3600);
     this.miniBossTauntFired[idx] = true;
+    */
   }
 
   /**

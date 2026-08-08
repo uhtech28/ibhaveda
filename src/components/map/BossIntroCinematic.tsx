@@ -35,6 +35,16 @@ type Phase =
 
 const MAIN_BOSS_ART = "/assets/bosses/village/unraveller/idle.png";
 
+// Actual Venture stage function names (from convex/ventureConstants.ts
+// VENTURE_STAGES). Kept as a local mirror so this client component
+// doesn't have to import from the Convex module. Index i = stage i+1.
+const VENTURE_STAGE_FUNCTION_NAMES = [
+  "Ideation",
+  "Research",
+  "Validation",
+  "Offer Design",
+];
+
 // Speech that plays during the `main-speech` phase — Unraveller intro
 // lines BEFORE the minions are revealed. Kept intentionally short so
 // the pacing stays cinematic.
@@ -213,9 +223,11 @@ export function BossIntroCinematic({ onDone }: Props) {
         >
 
           {/* Red pulse behind the boss — scaled down on mobile so it
-              doesn't wash the whole screen red on small viewports. */}
+              doesn't wash the whole screen red on small viewports.
+              Follows the same top-[42%] mobile position as the boss
+              sprite so the glow stays centered on it. */}
           <motion.div
-            className="pointer-events-none absolute left-1/2 top-[32%] -translate-x-1/2 -translate-y-1/2 h-[420px] w-[420px] sm:top-[42%] sm:h-[720px] sm:w-[720px]"
+            className="pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 h-[420px] w-[420px] sm:top-[42%] sm:h-[720px] sm:w-[720px]"
             initial={{ opacity: 0, scale: 0.5 }}
             animate={
               phase === "curtain"
@@ -234,9 +246,12 @@ export function BossIntroCinematic({ onDone }: Props) {
               so we fake motion with an outer breathing bob (Y + scale)
               and an inner glow pulse. Feels alive without needing a
               spritesheet. Sprite scales down on mobile so the boss +
-              header + minions can all coexist in portrait viewports. */}
+              header + minions can all coexist in portrait viewports.
+              Positioned at top-[42%] on mobile to sit centered between
+              the pushed-down speech bubble (top-[22%]) and the mobile
+              stage strip (bottom-[26%]). */}
           <motion.div
-            className="pointer-events-none absolute left-1/2 top-[35%] -translate-x-1/2 -translate-y-1/2 sm:top-[45%]"
+            className="pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 sm:top-[45%]"
             initial={{ opacity: 0, y: 60, scale: 0.9 }}
             animate={
               phase === "curtain"
@@ -279,11 +294,16 @@ export function BossIntroCinematic({ onDone }: Props) {
             </motion.div>
           </motion.div>
 
-          {/* Boss name callout — tighter tracking + smaller font on
-              mobile so "The Unraveller" fits on a single line and the
-              header doesn't blow through the boss sprite. */}
+          {/* Boss name callout — the "STAGE 1 OVERSEER" eyebrow was
+              removed per product ask (was overlapping the tutorial
+              progress bar + reading as redundant next to the
+              per-stage cards below). Only "The Unraveller" title
+              renders here now. */}
           <motion.div
-            className="pointer-events-none absolute left-1/2 top-[10%] -translate-x-1/2 px-4 text-center sm:top-[18%]"
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 px-4 text-center sm:top-[18%]"
+            style={{
+              top: "calc(64px + env(safe-area-inset-top, 0px))",
+            }}
             initial={{ opacity: 0, y: -10 }}
             animate={
               phase === "curtain"
@@ -292,15 +312,9 @@ export function BossIntroCinematic({ onDone }: Props) {
             }
             transition={{ duration: 0.9, delay: 0.6, ease: "easeOut" }}
           >
-            {/* Header re-palette per product ask ("color combo similar
-                to the platform"). The pink → wine-red gradient was
-                replaced with the platform's cool violet/indigo
-                treatment: #9CA3AF muted eyebrow + white heading with
-                soft #6366F1 halo. Reads as part of the same product
-                surface as the feed / checkpoint panels. */}
-            <div className="text-[9px] font-bold uppercase tracking-[0.34em] text-[#9CA3AF] sm:text-[10px] sm:tracking-[0.5em]">
-              Stage 1 Overseer
-            </div>
+            {/* Eyebrow ("STAGE 1 OVERSEER") removed per product ask
+                ("remove the top writeen stage 1 over seer"). Only the
+                bold title renders now. */}
             <div
               className="mt-1 whitespace-nowrap text-[26px] font-black leading-none tracking-tight text-white sm:text-[42px]"
               style={{
@@ -332,9 +346,11 @@ export function BossIntroCinematic({ onDone }: Props) {
                 transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 // Mobile: sits BELOW the header and ABOVE the boss
                 // sprite as a full-width bubble (tail points DOWN to
-                // the boss). Desktop/tablet: floats upper-LEFT with a
-                // tail pointing down-right toward the boss.
-                className="pointer-events-none absolute inset-x-3 top-[19%] mx-auto w-auto max-w-[420px] sm:inset-x-auto sm:left-[6%] sm:top-[24%] sm:w-[min(88vw,380px)] md:left-[8%]"
+                // the boss). Pushed down slightly so there's a real
+                // gap between it and the boss art below. Desktop/
+                // tablet: floats upper-LEFT with a tail pointing
+                // down-right toward the boss.
+                className="pointer-events-none absolute inset-x-3 top-[22%] mx-auto w-auto max-w-[420px] sm:inset-x-auto sm:left-[6%] sm:top-[24%] sm:w-[min(88vw,380px)] md:left-[8%]"
               >
                 {/* Villain bubble — dark #0F1726 surface + white/8
                     border, matching every other card on the platform.
@@ -428,10 +444,12 @@ export function BossIntroCinematic({ onDone }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut" }}
-                // Mobile: tighter gap, lifted higher (bottom-[24%]) so
-                // it never crowds Sparky's bottom-right slot. Desktop
-                // keeps original spacing.
-                className="pointer-events-none absolute bottom-[24%] left-1/2 flex w-[calc(100vw-16px)] max-w-full -translate-x-1/2 justify-center gap-1.5 px-2 sm:bottom-[16%] sm:w-auto sm:gap-4 sm:px-0"
+                // Mobile: sits mid-lower area (bottom-[26%]) with
+                // slightly bigger cards + gap so multi-word stage
+                // labels like "Forest of Perfectionism" don't have to
+                // squeeze into a 74px card. Desktop keeps roomy
+                // spacing.
+                className="pointer-events-none absolute bottom-[26%] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[16%] sm:w-auto sm:gap-4 sm:px-0"
               >
                 {VILLAGE_BOSSES.map((boss, i) => {
                   const revealed = i <= minionIdx || phase === "finale";
@@ -444,10 +462,12 @@ export function BossIntroCinematic({ onDone }: Props) {
                           : { opacity: 0, scale: 0.7, y: 40 }
                       }
                       transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                      // Mobile card ~72px wide so all four fit in a
-                      // 360px viewport with small gaps; desktop keeps
-                      // the roomy 148px layout.
-                      className="flex w-[74px] flex-col items-center gap-1 sm:w-[148px] sm:gap-2"
+                      // Mobile card ~82px wide (was 74px) so labels
+                      // like "Forest of Perfectionism" have room to
+                      // break onto 2 lines cleanly instead of getting
+                      // squeezed. Four cards × 82 + 3 × 8 gap = 352px,
+                      // still fits inside a 360px viewport.
+                      className="flex w-[82px] flex-col items-center gap-1 sm:w-[148px] sm:gap-2"
                     >
                       {/* Minion card — repalatted from rose-tinted to
                           the platform's #0F1726 surface + white/8
@@ -534,12 +554,19 @@ export function BossIntroCinematic({ onDone }: Props) {
                           "The Artisan's Quarter") reads as a roadmap
                           preview rather than "here are four bosses
                           named X, Y, Z, W". */}
+                      {/* Card label — actual stage FUNCTION name
+                          (Ideation / Research / Validation / Offer
+                          Design) on top, and the boss name below.
+                          Previous rev used the biome name ("The
+                          Village") on top; product ask: use the
+                          real stage name up top and the boss name
+                          on the bottom. */}
                       <div className="text-center">
                         <div className="text-[7px] font-bold uppercase tracking-wider text-[#9CA3AF] sm:text-[9px] sm:tracking-widest">
-                          Stage {i + 1}
+                          {VENTURE_STAGE_FUNCTION_NAMES[i] ?? `Stage ${i + 1}`}
                         </div>
                         <div className="mt-0.5 text-[9px] font-bold leading-tight text-white/95 sm:text-[12px]">
-                          {STAGES[i]?.name ?? boss.name}
+                          {boss.name}
                         </div>
                       </div>
                     </motion.div>

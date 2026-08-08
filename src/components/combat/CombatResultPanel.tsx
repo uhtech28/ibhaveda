@@ -78,89 +78,223 @@ export function CombatResultPanel({
   const tutorialMode =
     tutorial.active && tutorial.step >= 7 && tutorial.step <= 9;
 
-  return (
-    <div
-      className="relative overflow-hidden rounded-lg border"
-      style={{
-        // Platform-aligned flat navy surface. No radial glow, no
-        // outer shadow — 90s CRT-shell feel per product ask.
-        background: "#0F1726",
-        borderColor: isWin
-          ? "rgba(99,102,241,0.55)"
-          : "rgba(239,68,68,0.55)",
-        // 2px hard drop lip only. No blur, no colour glow.
-        boxShadow: "0 4px 0 rgba(0,0,0,0.4)",
-      }}
-    >
-      {/* Corner bracket ornaments (indigo) — kept but flattened, no
-          drop-shadow glow. */}
-      <CornerOrnament corner="tl" isWin={isWin} />
-      <CornerOrnament corner="tr" isWin={isWin} />
-      <CornerOrnament corner="bl" isWin={isWin} />
-      <CornerOrnament corner="br" isWin={isWin} />
+  // ── WIN variant — use the ornate reference PNG as the frame ────────
+  // The image already contains the border, corner ornaments, sword-
+  // with-wings crest, "VICTORY!" title, gold rule and CONTINUE button.
+  // We just position our dynamic data (boss subtitle, Q1/Q2 replay,
+  // XP badge) inside the empty navy field, and drop a transparent
+  // clickable button on top of the baked CONTINUE.
+  //
+  // Percentages below are measured against the source image
+  // (1370×1148 → aspect 1.193). Kept in one place so future tweaks
+  // are trivial.
+  if (isWin) {
+    return (
+      <div
+        className="relative w-full mx-auto"
+        style={{
+          maxWidth: 720,
+          aspectRatio: "1370 / 1148",
+          backgroundImage: "url(/assets/ui/victory-frame.png)",
+          backgroundSize: "100% 100%",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+          imageRendering: "pixelated",
+        }}
+      >
+        {/* Boss subtitle — sits directly under the gold rule
+            (~26% down from the top of the frame). */}
+        <div
+          className="absolute left-0 right-0 flex justify-center"
+          style={{ top: "26%" }}
+        >
+          <BossSubtitle bossName={bossName} isWin={true} />
+        </div>
 
-      {/* Loss vignette — retained but dimmer, no glow. */}
-      {!isWin && (
-        <motion.div
-          key="defeat-vignette"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.35, 0.25] }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
-          className="pointer-events-none absolute inset-0 z-10"
-          style={{
-            background:
-              "linear-gradient(180deg, transparent 40%, rgba(239,68,68,0.28) 100%)",
-          }}
-        />
-      )}
-
-      {/* Winged VICTORY / DEFEAT banner header — compact top padding
-          so the whole panel fits on one screen without scrolling. */}
-      <div className="relative z-20 flex flex-col items-center px-4 pb-2 pt-4 sm:px-6 sm:pt-5">
-        <VictoryBanner isWin={isWin} />
-        <OutcomeRibbon isWin={isWin} bossName={bossName} />
-      </div>
-
-      {/* Round replay — ornate golden bordered panel like reference REWARDS box */}
-      <div className="relative z-20 px-4 pb-2 sm:px-6">
-        <PanelBox label="ROUND REPLAY" isWin={isWin} disabled={tutorialMode}>
+        {/* Round replay — spans ~34%–58% of the frame, inside the
+            navy inner field. */}
+        <div
+          className="absolute left-[6%] right-[6%]"
+          style={{ top: "32%" }}
+        >
           <HpReplay
             timeline={result.hpTimeline}
             bossHpInitial={bossHpInitial}
             playerHpInitial={playerHpInitial}
             finalScores={result.perQuestionScores}
             showStats={showStats}
-            isWin={isWin}
+            isWin={true}
+            bossAsset={bossAsset}
+            founderAsset={founderAsset}
+          />
+        </div>
+
+        {/* Individual XP — bottom of the content field, above the
+            baked CONTINUE button. */}
+        <div
+          className="absolute left-[6%] right-[6%] flex items-center justify-center"
+          style={{ top: "66%", height: "18%" }}
+        >
+          <XpBadgeReveal
+            points={result.individualPointsAwarded}
+            isWin={true}
+          />
+        </div>
+
+        {/* STATS button removed per product ask ("remove the stats
+            option"). Users advance via CONTINUE only. */}
+
+        {/* Transparent clickable overlay on the baked-in CONTINUE
+            button. The image's own CONTINUE artwork serves as the
+            visible button; our overlay makes the region clickable
+            and handles the tutorial-mode focus ring. */}
+        <BakedContinueOverlay
+          onClick={onAdvance}
+          highlight={tutorialMode}
+        />
+      </div>
+    );
+  }
+
+  // ── LOSS variant — code-drawn frame (no red-frame image supplied) ──
+  return (
+    <div
+      className="relative overflow-hidden"
+      style={{
+        background: "#0d1a3d",
+        border: "3px solid #b04b3a",
+        boxShadow:
+          "0 0 0 3px #050912, 0 6px 0 rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.55)",
+        borderRadius: 6,
+      }}
+    >
+      <CornerOrnament corner="tl" isWin={false} />
+      <CornerOrnament corner="tr" isWin={false} />
+      <CornerOrnament corner="bl" isWin={false} />
+      <CornerOrnament corner="br" isWin={false} />
+
+      <motion.div
+        key="defeat-vignette"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.35, 0.25] }}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+        className="pointer-events-none absolute inset-0 z-10"
+        style={{
+          background:
+            "linear-gradient(180deg, transparent 40%, rgba(239,68,68,0.28) 100%)",
+        }}
+      />
+
+      <div className="relative z-20 flex flex-col items-center px-4 pb-2 pt-4 sm:px-6 sm:pt-5">
+        <VictoryBanner isWin={false} />
+        <OutcomeRibbon isWin={false} bossName={bossName} />
+      </div>
+      <div className="relative z-20 px-4 pb-2 sm:px-6">
+        <PanelBox label="ROUND REPLAY" isWin={false} disabled={tutorialMode}>
+          <HpReplay
+            timeline={result.hpTimeline}
+            bossHpInitial={bossHpInitial}
+            playerHpInitial={playerHpInitial}
+            finalScores={result.perQuestionScores}
+            showStats={showStats}
+            isWin={false}
             bossAsset={bossAsset}
             founderAsset={founderAsset}
           />
         </PanelBox>
       </div>
-
-      {/* XP badge reveal — ornate golden bordered panel like reference SCORE SUMMARY box */}
       <div className="relative z-20 px-4 pb-2 sm:px-6">
-        <PanelBox label="INDIVIDUAL XP" isWin={isWin} disabled={tutorialMode}>
-          <XpBadgeReveal points={result.individualPointsAwarded} isWin={isWin} />
+        <PanelBox label="INDIVIDUAL XP" isWin={false} disabled={tutorialMode}>
+          <XpBadgeReveal points={result.individualPointsAwarded} isWin={false} />
         </PanelBox>
       </div>
-
-      {/* Actions — STATS toggle + ADVANCE / RETRY. In tutorial mode
-          STATS is disabled + dimmed and CONTINUE gets a pulsing
-          highlight so the only thing the user can (or wants to) do
-          is press it. */}
       <div className="relative z-20 flex flex-wrap items-center justify-center gap-3 px-4 pb-4 pt-1 sm:px-6 sm:pb-6">
-        <StatsButton
-          expanded={showStats}
-          onClick={() => setShowStats((v) => !v)}
-          disabled={tutorialMode}
-        />
-        {isWin ? (
-          <AdvanceButton onClick={onAdvance} highlight={tutorialMode} />
-        ) : (
-          <RetryButton onClick={onRetryCombat} highlight={tutorialMode} />
-        )}
+        {/* STATS button removed per product ask; users advance via
+            Retry only on loss screens. */}
+        <RetryButton onClick={onRetryCombat} highlight={tutorialMode} />
       </div>
     </div>
+  );
+}
+
+/** Boss subtitle used inside the image-backed WIN frame. Pixel-gold
+ *  text matching the reference's typography. Extracted so we can
+ *  render it without the outer OutcomeRibbon wrapper (which adds
+ *  its own margins). */
+function BossSubtitle({
+  bossName,
+  isWin,
+}: {
+  bossName: string | null;
+  isWin: boolean;
+}) {
+  const color = isWin ? "#e6b34b" : "#e07a6a";
+  const shade = isWin ? "#7a4a0a" : "#5a1a0a";
+  const displayName = (bossName && bossName.trim().length > 0
+    ? bossName
+    : "Boss"
+  ).toUpperCase();
+  const label = isWin
+    ? `${displayName} RETREATED`
+    : `${displayName} STRUCK YOU DOWN`;
+  return (
+    <span
+      className="text-[10px] font-bold uppercase tracking-[0.36em] sm:text-[12px]"
+      style={{
+        fontFamily: "var(--font-pixel-display), monospace",
+        color,
+        textShadow: `0 1px 0 ${shade}, 0 2px 3px rgba(0,0,0,0.5)`,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** Transparent overlay sized + positioned to sit exactly on top of the
+ *  CONTINUE button baked into victory-frame.png. Coordinates are the
+ *  same percentages used by the surrounding content blocks so the
+ *  hit-area matches what the user sees. Renders a subtle pulsing ring
+ *  when the tutorial is guiding the user toward Continue. */
+function BakedContinueOverlay({
+  onClick,
+  highlight,
+}: {
+  onClick: () => void;
+  highlight: boolean;
+}) {
+  return (
+    <>
+      {highlight && (
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute rounded-md"
+          style={{
+            left: "36%",
+            right: "36%",
+            top: "88%",
+            height: "8%",
+            boxShadow:
+              "0 0 0 3px #e6b34b, 0 0 24px 6px rgba(230,179,75,0.55)",
+          }}
+          initial={{ opacity: 0.55, scale: 1 }}
+          animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.04, 1] }}
+          transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label="Continue"
+        className="absolute cursor-pointer rounded-md bg-transparent transition-transform hover:scale-[1.02] active:scale-[0.98]"
+        style={{
+          left: "36%",
+          right: "36%",
+          top: "88%",
+          height: "8%",
+        }}
+      />
+    </>
   );
 }
 
@@ -194,22 +328,33 @@ function CornerOrnament({
         : corner === "bl"
           ? "bottom-2 left-2"
           : "bottom-2 right-2";
-  const color = isWin ? "#6366F1" : "#f87171";
+  const gold = isWin ? "#e6b34b" : "#c85a4a";
+  const goldDeep = isWin ? "#8a5a0f" : "#5a1a0a";
   return (
     <svg
-      className={`pointer-events-none absolute z-30 h-5 w-5 ${positionClass}`}
-      viewBox="0 0 24 24"
-      style={{ transform: rotate }}
+      className={`pointer-events-none absolute z-30 h-8 w-8 sm:h-10 sm:w-10 ${positionClass}`}
+      viewBox="0 0 32 32"
+      style={{ transform: rotate, imageRendering: "pixelated" }}
       aria-hidden
     >
-      {/* Flat L-shape bracket — no glow, 90s style. */}
-      <path
-        d="M2 2 L14 2 M2 2 L2 14"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="square"
-        fill="none"
-      />
+      {/* Greek-key / meander-style ornate corner bracket — chunky
+          pixel-art gold, matching the reference image's corners.
+          Built from a few rectangles so it stays crisp. */}
+      <g fill={gold}>
+        {/* Outer L */}
+        <rect x="2" y="2" width="16" height="2" />
+        <rect x="2" y="2" width="2" height="16" />
+        {/* Inner meander hook */}
+        <rect x="6" y="6" width="10" height="2" />
+        <rect x="6" y="6" width="2" height="10" />
+        <rect x="10" y="10" width="6" height="2" />
+        <rect x="10" y="10" width="2" height="6" />
+      </g>
+      {/* Deep-gold shadow layer for a pixel-bevel look */}
+      <g fill={goldDeep} opacity="0.6">
+        <rect x="4" y="4" width="14" height="1" />
+        <rect x="4" y="4" width="1" height="14" />
+      </g>
     </svg>
   );
 }
@@ -263,35 +408,103 @@ function StarField() {
 // ─────────────────────────────────────────────────────────────────────
 
 function VictoryBanner({ isWin }: { isWin: boolean }) {
-  // Flat 90s-style banner — no glows, no beveled text shadow, no
-  // sword-with-wings ornament. Pixel-display font, single-tone
-  // indigo (platform accent) for wins / dim red for losses.
+  // Reference-matched ornate banner: sword-with-wings crest above,
+  // chunky pixel-gold title with cross flourishes on each side, gold
+  // divider with center diamond stud below.
   const label = isWin ? "VICTORY!" : "DEFEAT!";
-  const primary = isWin ? "#C7D2FE" : "#fecaca";
-  const accent = isWin ? "#6366F1" : "#ef4444";
+  const gold = isWin ? "#e6b34b" : "#e07a6a";
+  const goldHi = isWin ? "#ffdd7a" : "#ffb0a0";
+  const goldDeep = isWin ? "#7a4a0a" : "#5a1a0a";
+  const outline = isWin ? "#1a0a00" : "#2a0a05";
 
   return (
     <div className="relative flex flex-col items-center gap-1">
-      <span
-        className="block leading-none"
-        style={{
-          fontFamily: "var(--font-pixel-display), monospace",
-          fontSize: "clamp(28px, 5vw, 48px)",
-          fontWeight: 700,
-          letterSpacing: "0.14em",
-          color: primary,
-          imageRendering: "pixelated",
-        }}
-      >
-        {label}
-      </span>
+      {/* Sword-with-wings crest */}
+      <SwordWithWings gold={gold} goldDeep={goldDeep} />
 
-      {/* Flat 2px accent underline — no gradient fade, no glow. */}
-      <div
-        className="mt-1 h-[2px] w-full max-w-[280px]"
-        style={{ background: accent }}
-      />
+      {/* Title row: cross flourish – TITLE – cross flourish */}
+      <div className="flex items-center gap-3 sm:gap-4">
+        <CrossFlourish gold={gold} goldDeep={goldDeep} />
+        <span
+          className="block leading-none"
+          style={{
+            fontFamily: "var(--font-pixel-display), monospace",
+            fontSize: "clamp(32px, 6vw, 56px)",
+            fontWeight: 900,
+            letterSpacing: "0.06em",
+            color: gold,
+            // Layered pixel bevel: hard drop shadows in deep gold +
+            // black outline, plus a bright top-highlight so the glyphs
+            // read as chiseled gold blocks like the reference art.
+            textShadow: [
+              `1px 0 0 ${goldHi}`,
+              `-1px 0 0 ${goldHi}`,
+              `0 -1px 0 ${goldHi}`,
+              `0 2px 0 ${goldDeep}`,
+              `0 3px 0 ${goldDeep}`,
+              `0 4px 0 ${outline}`,
+              `0 5px 0 ${outline}`,
+              `0 6px 8px rgba(0,0,0,0.6)`,
+            ].join(", "),
+            imageRendering: "pixelated",
+          }}
+        >
+          {label}
+        </span>
+        <CrossFlourish gold={gold} goldDeep={goldDeep} />
+      </div>
+
+      {/* Gold rule with center diamond stud */}
+      <div className="mt-2 flex w-full items-center justify-center">
+        <div
+          className="h-[2px] flex-1"
+          style={{ background: gold, maxWidth: 200, boxShadow: `0 1px 0 ${goldDeep}` }}
+        />
+        <span
+          aria-hidden
+          className="mx-2"
+          style={{
+            width: 8,
+            height: 8,
+            transform: "rotate(45deg)",
+            background: gold,
+            boxShadow: `inset -1px -1px 0 ${goldDeep}`,
+            display: "inline-block",
+          }}
+        />
+        <div
+          className="h-[2px] flex-1"
+          style={{ background: gold, maxWidth: 200, boxShadow: `0 1px 0 ${goldDeep}` }}
+        />
+      </div>
     </div>
+  );
+}
+
+/** Small cross flourish rendered on either side of the title
+ *  ("+ VICTORY! +" per the reference). Two thin gold bars flanking
+ *  a tiny diamond stud. */
+function CrossFlourish({
+  gold,
+  goldDeep,
+}: {
+  gold: string;
+  goldDeep: string;
+}) {
+  return (
+    <svg
+      aria-hidden
+      width={54}
+      height={16}
+      viewBox="0 0 54 16"
+      style={{ imageRendering: "pixelated", flexShrink: 0 }}
+    >
+      <rect x="0" y="7" width="20" height="2" fill={gold} />
+      <rect x="0" y="9" width="20" height="1" fill={goldDeep} />
+      <rect x="22" y="6" width="4" height="4" fill={gold} transform="rotate(45 24 8)" />
+      <rect x="34" y="7" width="20" height="2" fill={gold} />
+      <rect x="34" y="9" width="20" height="1" fill={goldDeep} />
+    </svg>
   );
 }
 
@@ -306,39 +519,94 @@ function SwordWithWings({
   gold: string;
   goldDeep: string;
 }) {
+  // Ornate crest matching the reference: chunky pixel-art sword
+  // pointing down with a blue gem in the crossguard, flanked by two
+  // three-tier feathered wings. Rendered pixel-crisp via rectangular
+  // primitives + polygons.
   return (
     <svg
       aria-hidden
-      width={106}
-      height={32}
-      viewBox="0 0 140 42"
-      style={{ filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.5))` }}
+      width={140}
+      height={44}
+      viewBox="0 0 140 44"
+      style={{ imageRendering: "pixelated" }}
     >
-      {/* Central sword — vertical blade + crossguard + pommel */}
-      <polygon points="70,2 73,8 73,30 67,30 67,8" fill="#e5e7eb" />
-      <polygon points="70,2 71,8 71,30 70,30" fill="#f9fafb" />
-      <rect x="60" y="28" width="20" height="4" fill={gold} />
-      <rect x="60" y="28" width="20" height="1" fill="#fff8e1" opacity="0.6" />
-      <rect x="60" y="31" width="20" height="1" fill={goldDeep} />
-      <rect x="68" y="32" width="4" height="6" fill={goldDeep} />
-      <circle cx="70" cy="40" r="2.5" fill={gold} />
-
-      {/* Left wing */}
-      <path
-        d="M60 22 C 45 12, 25 10, 10 18 C 18 20, 35 24, 50 30 C 55 32, 58 28, 60 22 Z"
-        fill={gold}
-        stroke={goldDeep}
-        strokeWidth="1"
-      />
-      {/* Right wing (mirror) */}
-      <g transform="translate(140 0) scale(-1 1)">
-        <path
-          d="M60 22 C 45 12, 25 10, 10 18 C 18 20, 35 24, 50 30 C 55 32, 58 28, 60 22 Z"
+      {/* ── Left wing — three tiers of feathers ─────────────────── */}
+      <g>
+        {/* Upper feather */}
+        <polygon
+          points="24,8 44,10 60,18 46,18 30,14"
           fill={gold}
           stroke={goldDeep}
-          strokeWidth="1"
+          strokeWidth="0.5"
         />
+        {/* Middle feather */}
+        <polygon
+          points="14,14 40,16 58,22 44,22 24,20"
+          fill={gold}
+          stroke={goldDeep}
+          strokeWidth="0.5"
+        />
+        {/* Lower feather */}
+        <polygon
+          points="10,20 38,22 56,26 42,26 22,26"
+          fill={gold}
+          stroke={goldDeep}
+          strokeWidth="0.5"
+        />
+        {/* Feather midlines for texture */}
+        <line x1="30" y1="12" x2="52" y2="17" stroke={goldDeep} strokeWidth="0.6" opacity="0.6" />
+        <line x1="22" y1="18" x2="50" y2="21" stroke={goldDeep} strokeWidth="0.6" opacity="0.6" />
+        <line x1="18" y1="23" x2="46" y2="25" stroke={goldDeep} strokeWidth="0.6" opacity="0.6" />
       </g>
+
+      {/* ── Right wing (mirror) ─────────────────────────────────── */}
+      <g transform="translate(140 0) scale(-1 1)">
+        <polygon
+          points="24,8 44,10 60,18 46,18 30,14"
+          fill={gold}
+          stroke={goldDeep}
+          strokeWidth="0.5"
+        />
+        <polygon
+          points="14,14 40,16 58,22 44,22 24,20"
+          fill={gold}
+          stroke={goldDeep}
+          strokeWidth="0.5"
+        />
+        <polygon
+          points="10,20 38,22 56,26 42,26 22,26"
+          fill={gold}
+          stroke={goldDeep}
+          strokeWidth="0.5"
+        />
+        <line x1="30" y1="12" x2="52" y2="17" stroke={goldDeep} strokeWidth="0.6" opacity="0.6" />
+        <line x1="22" y1="18" x2="50" y2="21" stroke={goldDeep} strokeWidth="0.6" opacity="0.6" />
+        <line x1="18" y1="23" x2="46" y2="25" stroke={goldDeep} strokeWidth="0.6" opacity="0.6" />
+      </g>
+
+      {/* ── Central sword pointing down ─────────────────────────── */}
+      {/* Silver blade (down-pointing triangle body) */}
+      <polygon points="66,18 74,18 74,38 70,42 66,38" fill="#e5e7eb" stroke="#4a4a52" strokeWidth="0.5" />
+      {/* Blade highlight (left edge) */}
+      <polygon points="66,18 68,18 68,38 67,40 66,38" fill="#f9fafb" />
+      {/* Crossguard — gold horizontal bar */}
+      <rect x="56" y="14" width="28" height="4" fill={gold} />
+      <rect x="56" y="14" width="28" height="1" fill="#fff2a8" />
+      <rect x="56" y="17" width="28" height="1" fill={goldDeep} />
+      {/* Guard end caps (little cross-tips) */}
+      <rect x="54" y="15" width="2" height="2" fill={gold} />
+      <rect x="84" y="15" width="2" height="2" fill={gold} />
+      {/* Handle grip */}
+      <rect x="68" y="6" width="4" height="8" fill="#4a2a10" />
+      <rect x="68" y="6" width="1" height="8" fill="#7a4a20" />
+      {/* Blue gem in the crossguard center */}
+      <rect x="68" y="15" width="4" height="2" fill="#5aa0ff" />
+      <rect x="69" y="15" width="2" height="1" fill="#a8d0ff" />
+      {/* Pommel (round cap on top) */}
+      <rect x="66" y="2" width="8" height="4" fill={gold} />
+      <rect x="66" y="2" width="8" height="1" fill="#fff2a8" />
+      <rect x="66" y="5" width="8" height="1" fill={goldDeep} />
     </svg>
   );
 }
@@ -358,9 +626,9 @@ function OutcomeRibbon({
   isWin: boolean;
   bossName: string | null;
 }) {
-  // Flat pixel subtitle — muted platform grey so the eye lands on
-  // VICTORY!, not on the name of the boss. No stroke, no shadow.
-  const color = isWin ? "#9CA3AF" : "#fca5a5";
+  // Pixel-gold subtitle matching the reference "BOSS DEFEATED" ribbon.
+  const color = isWin ? "#e6b34b" : "#e07a6a";
+  const shade = isWin ? "#7a4a0a" : "#5a1a0a";
   const displayName = (bossName && bossName.trim().length > 0
     ? bossName
     : "Boss"
@@ -369,12 +637,13 @@ function OutcomeRibbon({
     ? `${displayName} RETREATED`
     : `${displayName} STRUCK YOU DOWN`;
   return (
-    <div className="mt-2 flex items-center justify-center">
+    <div className="mt-1 flex items-center justify-center">
       <span
-        className="text-[10px] uppercase tracking-[0.36em] sm:text-[11px]"
+        className="text-[11px] font-bold uppercase tracking-[0.32em] sm:text-[12px]"
         style={{
           fontFamily: "var(--font-pixel-display), monospace",
           color,
+          textShadow: `0 1px 0 ${shade}, 0 2px 3px rgba(0,0,0,0.5)`,
         }}
       >
         {label}
@@ -407,32 +676,59 @@ function PanelBox({
   /** Tutorial-mode: dim the content so the eye is drawn to CONTINUE. */
   disabled?: boolean;
 }) {
-  // Flat 90s panel — single-pixel indigo border, matte navy fill.
-  // No gradients, no glows, no backdrop-filter blur, no corner studs.
-  const accent = isWin ? "#6366F1" : "#f87171";
+  // Ornate gold-bordered container matching the reference frame.
+  // 2px gold border with a subtle inner shadow that hints at pixel
+  // bevel; the header label sits over the top border on a solid navy
+  // chip flanked by tiny gold diamond studs.
+  const gold = isWin ? "#e6b34b" : "#c85a4a";
+  const goldDeep = isWin ? "#7a4a0a" : "#5a1a0a";
   return (
-    <div className="relative mt-2">
+    <div className="relative mt-3">
       <div
         className="relative rounded-md px-3 pb-3 pt-4 sm:px-4 sm:pt-5"
         style={{
-          border: `1px solid ${accent}`,
-          background: "#0B1220",
+          border: `2px solid ${gold}`,
+          background: "rgba(9,18,50,0.6)",
+          boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.55)`,
         }}
       >
-        {/* Flat header label — no ribbon, no notched banner. Sits
-            over the top border on a solid navy chip so the border
-            reads cleanly behind it. */}
-        <div className="pointer-events-none absolute -top-[9px] left-1/2 z-10 -translate-x-1/2 select-none">
+        {/* Header label ribbon — pixel-gold text on a solid navy chip
+            with a tiny diamond stud on each side (matches reference
+            "◆ ROUND REPLAY ◆" style badge). */}
+        <div className="pointer-events-none absolute -top-[10px] left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 select-none">
           <span
-            className="inline-block px-2 text-[10px] uppercase tracking-[0.36em] sm:text-[11px]"
+            aria-hidden
+            style={{
+              width: 6,
+              height: 6,
+              transform: "rotate(45deg)",
+              background: gold,
+              display: "inline-block",
+              boxShadow: `inset -1px -1px 0 ${goldDeep}`,
+            }}
+          />
+          <span
+            className="inline-block px-2 text-[11px] font-bold uppercase tracking-[0.36em] sm:text-[12px]"
             style={{
               fontFamily: "var(--font-pixel-display), monospace",
-              color: accent,
-              background: "#0F1726",
+              color: gold,
+              background: "#0d1a3d",
+              textShadow: `0 1px 0 ${goldDeep}`,
             }}
           >
             {label}
           </span>
+          <span
+            aria-hidden
+            style={{
+              width: 6,
+              height: 6,
+              transform: "rotate(45deg)",
+              background: gold,
+              display: "inline-block",
+              boxShadow: `inset -1px -1px 0 ${goldDeep}`,
+            }}
+          />
         </div>
 
 
@@ -595,26 +891,28 @@ function ReplayCard({
       ? Math.max(0, step.playerHpAfter / playerHpInitial)
       : 0;
   const borderColor = isWin
-    ? "rgba(99,102,241,0.35)"
+    ? "rgba(230,179,75,0.35)"
     : "rgba(239,68,68,0.35)";
 
   return (
     <div
-      className="relative rounded border p-3"
+      className="relative rounded-md border p-3"
       style={{
         borderColor,
-        background: "#0F1726",
+        background: "rgba(9,18,50,0.7)",
+        boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4)",
       }}
     >
-      {/* Q label centered up top — flat platform-indigo pill. */}
+      {/* Q label centered up top — ornate gold-outlined pill. */}
       <div className="mb-2 flex items-center justify-center">
         <span
-          className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-widest"
+          className="rounded-full border-2 px-3 py-0.5 text-[11px] font-bold uppercase tracking-widest"
           style={{
             fontFamily: "var(--font-pixel-display), monospace",
-            color: "#C7D2FE",
-            borderColor: "rgba(99,102,241,0.4)",
-            background: "rgba(99,102,241,0.08)",
+            color: "#e6b34b",
+            borderColor: "rgba(230,179,75,0.6)",
+            background: "rgba(230,179,75,0.08)",
+            textShadow: "0 1px 0 rgba(122,74,10,0.7)",
           }}
         >
           Q{qIndex + 1}
@@ -892,64 +1190,95 @@ function XpBadgeReveal({
       setDisplay(points);
       return;
     }
-    // Linear 1-by-1 increment per product request ("start from 1-2-3-4-5
-    // increasing till the amount"). Previously used a 16%-of-remaining
-    // ease-out that jumped 0→10→18→25→…, which is what the user saw as
-    // "not counting up properly". Now: +1 per tick.
+    // Slot-machine-style count-up. Uses requestAnimationFrame for
+    // frame-perfect timing with an ease-out cubic curve so the
+    // number starts fast and decelerates into the target — feels
+    // way more celebratory than a linear rise, and gives the user
+    // enough visible seconds to watch the score climb.
     //
-    // Tick timing is target-aware so the whole animation completes in
-    // roughly the same visible window regardless of magnitude:
-    //   - Small awards (≤120 xp) → 12ms per tick (60 xp = 720ms).
-    //   - Larger awards → cap total duration around 1500ms by
-    //     stepping in chunks (still visually smooth).
+    // Timing:
+    //   START_DELAY_MS — panel is fully in view before counting begins
+    //   TOTAL_DURATION_MS — how long the count itself takes
+    // Duration scales gently with magnitude so huge awards don't
+    // spend forever crawling from 0 → 300, but small ones still get
+    // the full drama.
+    const START_DELAY_MS = 350;
+    const TOTAL_DURATION_MS = Math.max(
+      1600,
+      Math.min(3500, 1200 + target * 22),
+    );
     setDisplay(0);
     setBurst(false);
-    // Chunk size: 1 for normal awards, bigger for huge ones so we
-    // don't sit at "23... 24... 25..." for six seconds.
-    const stepJump = target > 200 ? Math.max(1, Math.ceil(target / 150)) : 1;
-    const stepMs = Math.max(12, Math.min(28, Math.floor(1500 / (target / stepJump))));
-    let current = 0;
-    const id = window.setInterval(() => {
-      current = Math.min(target, current + stepJump);
-      setDisplay(current);
-      if (current >= target) {
-        window.clearInterval(id);
-        // Spark burst on the exact reveal frame — matches "then at 60
-        // a spark like professional games have" from the product spec.
+    let rafId = 0;
+    let startTs = 0;
+    let cancelled = false;
+    // Ease-out cubic: 1 - (1-t)^3
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+    const tick = (ts: number) => {
+      if (cancelled) return;
+      if (!startTs) startTs = ts;
+      const elapsed = ts - startTs;
+      const raw = Math.min(1, elapsed / TOTAL_DURATION_MS);
+      const eased = easeOut(raw);
+      const shown = Math.min(target, Math.round(eased * target));
+      setDisplay(shown);
+      if (raw < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        // Spark burst on the exact reveal frame.
         setBurst(true);
         window.setTimeout(() => setBurst(false), 900);
       }
-    }, stepMs);
-    return () => window.clearInterval(id);
+    };
+    const startTimer = window.setTimeout(() => {
+      rafId = requestAnimationFrame(tick);
+    }, START_DELAY_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [points, target, isPositive]);
 
-  // Platform indigo accent for wins, red for losses. Sparkles + glow
-  // removed — flat 90s hex badge, single-tone.
-  const accent = isPositive ? "#6366F1" : "#f87171";
+  // Gold accent for wins, red for losses. Ornate hex XP badge with
+  // gold outline + inner glow matching the reference's stat pill style.
+  const accent = isPositive ? "#e6b34b" : "#f87171";
+  const accentDeep = isPositive ? "#7a4a0a" : "#7f1d1d";
 
   return (
     <div className="relative flex items-center justify-center gap-4 py-2">
-      {/* Flat hex XP badge — solid navy fill, indigo outline, no glow. */}
+      {/* Ornate hex XP badge — gold outline, dark navy fill, gold XP label. */}
       <div
         className="relative flex items-center justify-center"
-        style={{ width: 60, height: 68 }}
+        style={{ width: 64, height: 72 }}
       >
-        <svg viewBox="0 0 64 72" width={60} height={68} aria-hidden>
+        <svg viewBox="0 0 64 72" width={64} height={72} aria-hidden>
+          {/* Outer hex */}
           <polygon
             points="32,2 60,18 60,54 32,70 4,54 4,18"
-            fill="#0B1220"
+            fill="#0d1a3d"
             stroke={accent}
-            strokeWidth="2"
+            strokeWidth="2.5"
           />
+          {/* Inner bevel line */}
+          <polygon
+            points="32,7 55,20 55,52 32,65 9,52 9,20"
+            fill="none"
+            stroke={accent}
+            strokeOpacity="0.4"
+            strokeWidth="1"
+          />
+          {/* XP text */}
           <text
             x="32"
-            y="42"
+            y="44"
             textAnchor="middle"
-            fontSize="14"
+            fontSize="18"
+            fontWeight="900"
             fill={accent}
             style={{
               fontFamily: "var(--font-pixel-display), monospace",
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
             }}
           >
             XP
@@ -957,25 +1286,41 @@ function XpBadgeReveal({
         </svg>
       </div>
 
-      {/* Counter with burst */}
+      {/* Counter with burst. Uses `key={display}` on the inner span
+          so framer-motion mounts a fresh instance every tick — that
+          gives us a tiny 1.02→1 scale pulse per number change even
+          while the count is still climbing (looks alive during the
+          rapid opening ticks). The outer `key={points}` still resets
+          the whole component when a fresh round result comes in. */}
       <div className="relative">
         <motion.span
-          key={`xp-num-${points}`}
-          className="inline-block text-3xl tabular-nums sm:text-4xl"
+          key={`xp-outer-${points}`}
+          className="relative inline-block text-3xl font-black tabular-nums sm:text-4xl"
           style={{
             fontFamily: "var(--font-pixel-display), monospace",
-            color: isPositive ? "#C7D2FE" : "#fca5a5",
+            color: isPositive ? "#e6b34b" : "#fca5a5",
+            textShadow: isPositive
+              ? "0 2px 0 #7a4a0a, 0 3px 6px rgba(0,0,0,0.55)"
+              : "0 2px 0 #7f1d1d, 0 3px 6px rgba(0,0,0,0.55)",
           }}
           animate={
             burst
               ? {
-                  scale: [1, 1.35, 1],
+                  scale: [1, 1.45, 1],
                 }
               : { scale: 1 }
           }
-          transition={{ duration: 0.55, ease: "easeOut" }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          {isPositive ? `+${display}` : `${display}`}
+          <motion.span
+            key={`xp-tick-${display}`}
+            initial={{ scale: 1.05, opacity: 0.85 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.09, ease: "easeOut" }}
+            style={{ display: "inline-block" }}
+          >
+            {isPositive ? `+${display}` : `${display}`}
+          </motion.span>
         </motion.span>
         <AnimatePresence>
           {burst && (
@@ -1035,15 +1380,17 @@ function StatsButton({
       aria-pressed={expanded}
       aria-disabled={disabled}
       disabled={disabled}
-      className="inline-flex items-center gap-2 rounded px-5 py-2.5 uppercase transition-colors hover:brightness-110"
+      className="inline-flex items-center gap-2 rounded-md px-5 py-2.5 uppercase transition-all hover:brightness-110"
       style={{
         fontFamily: "var(--font-pixel-display), monospace",
         fontSize: "11px",
-        letterSpacing: "0.22em",
-        color: "#C7D2FE",
-        background: "#0B1220",
-        border: "1px solid rgba(255,255,255,0.12)",
-        boxShadow: "0 2px 0 rgba(0,0,0,0.35)",
+        fontWeight: 700,
+        letterSpacing: "0.24em",
+        color: "#e6b34b",
+        background: "#0d1a3d",
+        border: "2px solid rgba(230,179,75,0.55)",
+        boxShadow: "0 3px 0 rgba(0,0,0,0.45)",
+        textShadow: "0 1px 0 rgba(122,74,10,0.7)",
         opacity: disabled ? 0.35 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
       }}
@@ -1055,9 +1402,9 @@ function StatsButton({
         viewBox="0 0 14 14"
         style={{ imageRendering: "pixelated" }}
       >
-        <rect x="1" y="8" width="3" height="5" fill="#C7D2FE" />
-        <rect x="5.5" y="5" width="3" height="8" fill="#C7D2FE" />
-        <rect x="10" y="2" width="3" height="11" fill="#C7D2FE" />
+        <rect x="1" y="8" width="3" height="5" fill="#e6b34b" />
+        <rect x="5.5" y="5" width="3" height="8" fill="#e6b34b" />
+        <rect x="10" y="2" width="3" height="11" fill="#e6b34b" />
       </svg>
       Stats
     </button>
@@ -1073,54 +1420,90 @@ function AdvanceButton({
    *  miss the only enabled control on the panel. */
   highlight?: boolean;
 }) {
-  // Flat 90s CONTINUE button — solid indigo fill, single-pixel outline,
-  // pixel-display text. No gradients, no glows, no arrow flourishes.
-  const accent = "#6366F1";
+  // Ornate CONTINUE button matching the reference — gold-outlined
+  // navy pill with pixel-gold "CONTINUE" text, flanked by chunky
+  // right-pointing pixel arrow flourishes on each side.
+  const gold = "#e6b34b";
+  const goldDeep = "#7a4a0a";
+  const outline = "#1a0a00";
   return (
     <div className="relative flex items-center gap-2">
       {highlight && (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded"
-          style={{ boxShadow: `0 0 0 2px ${accent}` }}
-          initial={{ opacity: 0.5 }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute inset-0 rounded-md"
+          style={{
+            boxShadow: `0 0 0 3px ${gold}, 0 0 22px 4px rgba(230,179,75,0.55)`,
+          }}
+          initial={{ opacity: 0.55, scale: 1 }}
+          animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.05, 1] }}
+          transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
         />
       )}
+      <PixelArrowFlourish direction="left" color={gold} />
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex items-center gap-2 rounded px-6 py-2.5 uppercase transition-colors hover:brightness-110"
+        className="inline-flex items-center gap-3 rounded-md px-7 py-2.5 uppercase transition-all hover:brightness-110"
         style={{
           fontFamily: "var(--font-pixel-display), monospace",
-          fontSize: "12px",
-          letterSpacing: "0.24em",
-          color: "#F9FAFB",
-          background: accent,
-          border: `1px solid ${accent}`,
-          boxShadow: "0 2px 0 rgba(0,0,0,0.35)",
+          fontSize: "14px",
+          fontWeight: 900,
+          letterSpacing: "0.28em",
+          color: gold,
+          background: "#0d1a3d",
+          border: `2px solid ${gold}`,
+          boxShadow: `0 4px 0 rgba(0,0,0,0.5), inset 0 0 0 1px ${outline}`,
+          textShadow: `0 2px 0 ${goldDeep}, 0 3px 3px rgba(0,0,0,0.5)`,
         }}
       >
         Continue
         <svg
           aria-hidden
-          width={10}
-          height={10}
+          width={12}
+          height={12}
           viewBox="0 0 12 12"
           style={{ imageRendering: "pixelated" }}
         >
-          <polygon points="2,1 11,6 2,11" fill="#F9FAFB" />
+          <polygon points="2,1 11,6 2,11" fill={gold} />
         </svg>
       </button>
+      <PixelArrowFlourish direction="right" color={gold} />
     </div>
   );
 }
 
-// PixelArrowFlourish kept as a stub (dead code) in case a future ask
-// re-introduces the ornate crest. Not called from the flat AdvanceButton.
-function PixelArrowFlourish(_: { direction: "left" | "right"; color: string }) {
-  return null;
+// Chunky pixel arrow flourish flanking the CONTINUE button per the
+// reference art. Two stacked chevrons + a small trailing bar.
+function PixelArrowFlourish({
+  direction,
+  color,
+}: {
+  direction: "left" | "right";
+  color: string;
+}) {
+  return (
+    <svg
+      aria-hidden
+      width={26}
+      height={16}
+      viewBox="0 0 26 16"
+      style={{
+        transform: direction === "right" ? undefined : "scaleX(-1)",
+        imageRendering: "pixelated",
+      }}
+    >
+      {/* Two right-pointing chevrons */}
+      <polygon points="0,8 8,0 12,0 4,8 12,16 8,16" fill={color} />
+      <polygon
+        points="10,8 18,0 22,0 14,8 22,16 18,16"
+        fill={color}
+        opacity={0.75}
+      />
+      {/* Trailing bar to give the flourish a "sword tip" tail */}
+      <rect x="22" y="7" width="4" height="2" fill={color} />
+    </svg>
+  );
 }
 
 function RetryButton({

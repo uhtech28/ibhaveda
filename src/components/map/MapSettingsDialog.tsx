@@ -21,7 +21,6 @@ import {
   Linkedin,
   Facebook,
   Loader2,
-  Volume2,
   User as UserIcon,
   Share2,
 } from "lucide-react";
@@ -58,7 +57,11 @@ const PLATFORMS: ReadonlyArray<{
   { id: "instagram", label: "Instagram", icon: <Instagram className="h-4 w-4" />, accent: "text-pink-300" },
 ];
 
-type Tab = "persona" | "social" | "audio";
+// Audio tab removed per product ask ("remove audio section"). The
+// AudioTab component + audioManager wiring stay in this file so we
+// can restore it later without a hunt — only the tab button + router
+// are dropped from the tab bar.
+type Tab = "persona" | "social";
 
 interface Props {
   open: boolean;
@@ -107,14 +110,12 @@ export function UserSettingsBody({
       <div className="flex gap-1 border-b border-white/10 pb-2 mb-3">
         <TabButton active={tab === "persona"} onClick={() => setTab("persona")} icon={<UserIcon className="h-4 w-4" />} label="Persona" />
         <TabButton active={tab === "social"} onClick={() => setTab("social")} icon={<Share2 className="h-4 w-4" />} label="Social" />
-        <TabButton active={tab === "audio"} onClick={() => setTab("audio")} icon={<Volume2 className="h-4 w-4" />} label="Audio" />
       </div>
 
       {tab === "persona" && (
         <PersonaTab onClose={() => onCloseParent?.()} />
       )}
       {tab === "social" && <SocialTab />}
-      {tab === "audio" && <AudioTab />}
     </div>
   );
 }

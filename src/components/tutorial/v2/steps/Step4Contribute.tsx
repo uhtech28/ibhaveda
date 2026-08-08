@@ -248,7 +248,7 @@ export function Step4Contribute() {
         // coming back on subsequent visits (hard refresh included).
         return {
           text:
-            "Tutorial complete! Start building, explore other projects, and remember, Sparky's here whenever you need help.",
+            "Tutorial complete! Start building, explore other projects, and remember, I am here whenever you need help.",
           mood: "celebrating",
           near: null,
           highlight: null,

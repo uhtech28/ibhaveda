@@ -600,6 +600,10 @@ export function Step2TemplatePick() {
         selector={view.highlight ?? null}
         padding={2}
         rx={12}
+        // Suppress the amber ring on the write-outline step per
+        // product ask ("remove golden hilight only from this part
+        // of the tutorial"). Every other step keeps its ring.
+        noRing={dialogue === "write_outline"}
       />
       <TutorialMascot
         visible={sparkyVisible}

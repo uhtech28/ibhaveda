@@ -522,8 +522,46 @@ export function Step3MapGuide() {
       tutorial.step < 9
     ) {
       void tutorial.goTo(9);
+      // Defensive local flag: if the Convex mutation ACK is slow and
+      // the user hard-refreshes in the ~500ms window, `tutorial.step`
+      // might still read 8 on next mount and the combat tutorial
+      // would replay. This flag is checked on mount below and forces
+      // an immediate re-advance so the AI-combat tutorial never
+      // re-triggers after victory. Product ask: "if i used ai combat
+      // in tutorial and came till victory board i should never get
+      // back the tutorial of ai combat".
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("tutorial-combat-done", "1");
+          localStorage.setItem("tutorial-combat-done", "1");
+        } catch {
+          /* no-op */
+        }
+      }
     }
   }, [stage, active, tutorial, bossIntroSeen]);
+
+  // Mount-time reconciliation — if the persisted tutorial.step lags
+  // behind our local "combat done" markers (hard-refresh during the
+  // mutation ack window), force-advance to step 9 immediately so the
+  // combat tutorial doesn't replay from stage-1 defaults.
+  useEffect(() => {
+    if (!active) return;
+    if (tutorial.step >= 9) return;
+    if (typeof window === "undefined") return;
+    let done = false;
+    try {
+      done =
+        sessionStorage.getItem("tutorial-combat-done") === "1" ||
+        localStorage.getItem("tutorial-combat-done") === "1";
+    } catch {
+      /* no-op */
+    }
+    if (done) {
+      void tutorial.goTo(9);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   // Auto-navigate to /feed on done. Runs once per active session.
   // Uses a fire-and-forget setTimeout OUTSIDE the effect's cleanup
@@ -658,7 +696,12 @@ export function Step3MapGuide() {
           // the user understands why the map still shows the boss.
           text: `Congratulations, ${TUTORIAL_MONSTER_NAME} retreated! You'll fully defeat it once every task under this checkpoint is done. Just two more things and you'll have everything you need.`,
           mood: "celebrating",
-          near: null,
+          // Anchor Sparky next to the Victory panel per product ask
+          // ("move that conversation of sparky next to victory box").
+          // Previously `near: null` floated the bubble in the fallback
+          // top-right corner far from the panel, so users had to
+          // eyeball across the screen to link cause + celebration.
+          near: '[data-tutorial="combat-panel"], [aria-label="AI Combat"], [data-combat-panel]',
           highlight: null,
           primary: {
             label: "Continue",
@@ -745,7 +788,14 @@ export function Step3MapGuide() {
         padding={4}
       />
       <TutorialMascot
-        visible
+        // Hide Sparky entirely during the boss-intro cinematic — the
+        // villain owns the whole stage. Previously Sparky rendered
+        // with an empty text bubble for the 500-800ms curtain/main-
+        // reveal window before bossSpeaking flipped true, which looked
+        // like a flashing empty box (product report: "before the
+        // unraveller starts speaking sparky conversation box is there
+        // for 1-2 seconds then it gets remove").
+        visible={stage !== "boss_intro"}
         text={view.text}
         mood={view.mood}
         primaryAction={view.primary}
@@ -764,9 +814,18 @@ export function Step3MapGuide() {
         // let users wander off the guided path. TutorialScrim punches
         // a hole around the highlighted target so the Flare tile
         // itself stays fully interactive.
+        // "victory" was previously in this list, which disabled the
+        // click-blocking scrim and let users tap the Victory panel's
+        // own Continue button independent of Sparky. Product ask:
+        // "block the continue button in victory box". Removing
+        // "victory" here re-enables the transparent full-viewport
+        // scrim (see TutorialMascot.tsx:559-568) so the ONLY way to
+        // advance is Sparky's Continue button. The scrim is
+        // transparent — the Victory panel stays fully visible
+        // underneath, its Continue just isn't clickable until Sparky
+        // is done.
         noScrim={
           stage === "boss_intro" ||
-          stage === "victory" ||
           stage === "done" ||
           stage === "flare_opened"
         }

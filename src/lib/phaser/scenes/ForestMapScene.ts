@@ -20,15 +20,11 @@
 
 import * as Phaser from "phaser";
 import { eventBridge } from "../utils/event-bridge";
-import { addBossHpBar, type BossHpBar } from "../animations/bossAnimator";
+import { type BossHpBar } from "../animations/bossAnimator";
 import { getStageMiniBosses, getStageSuperBoss } from "@/config/stage-bosses";
 import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day";
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
 import { playCpClearBurst } from "../utils/cp-clear-burst";
-// Corruption overlay disabled — only the type import remains for
-// the `_corruption: CorruptionOverlay | null` field. Pattern
-// helpers (ensureCorruptionPattern / motifForStage / OverlayCheckpoint)
-// were used by the now-removed `new CorruptionOverlay(...)` block.
 import { CorruptionOverlay } from "@/lib/phaser/systems/corruptionOverlay";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
@@ -36,8 +32,23 @@ import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
 import {
   getCurrentPersonaId,
   loadPersonaSprites,
-  personaSpriteKey,
+  registerPersonaAnimations,
 } from "@/lib/phaser/persona-assets";
+import {
+  loadBossAssets,
+  registerBossAnimations,
+  spawnMovingBoss,
+  retreatBossTo,
+  dissolveBoss,
+  spawnPersonaCharacter,
+  walkPersonaTo,
+  revealSuperBoss as revealSuperBossHelper,
+  playBossState,
+  playPersonaState,
+  playPersonaVictoryPose,
+  type MovingBossHandle,
+  type PersonaHandle,
+} from "@/lib/phaser/animations/stageMapAnimations";
 
 const MAP_ASSET = "/assets/maps-v2/forest/forest-map.png";
 // Sized to the actual painted area of the new LDtk delivery (was
@@ -49,8 +60,9 @@ const MAP_HEIGHT = 1156;
 /** Persona sprite reused from Village so it stays visually consistent. */
 const CHAR_IDLE_ASSET = "/assets/fan-tasy/Character_Idle.webp";
 const CHAR_WALK_ASSET = "/assets/fan-tasy/Character_Walk.webp";
-const CHAR_SCALE = 2.2;
-const CHAR_Y_OFFSET = 18;
+// Village-parity persona spawn offset (top-left of CP disc).
+const CHAR_X_OFFSET = -60;
+const CHAR_Y_OFFSET = -45;
 
 /**
  * Forest checkpoint layout — 4 nodes hand-picked on the 2304×1440 map.
@@ -199,29 +211,18 @@ function pointInAnyBlockedZone(x: number, y: number): boolean {
   return false;
 }
 
-/** Boss lateral offset per CP — alternates east/west so the boss doesn't
- *  overlap the character standing on the marker. Stage 2 has 4 mini bosses
- *  spread across CPs 0-3; CP4 (East Exit) is boss-free and triggers the
- *  super-boss reveal instead. */
-const BOSS_OFFSETS: readonly { x: number; y: number; scale: number }[] = [
-  { x: 105, y: -30, scale: 1.5 },
-  { x: -110, y: -30, scale: 1.5 },
-  { x: 105, y: -30, scale: 1.5 },
-  { x: -105, y: -30, scale: 1.6 },
-  { x: 0, y: 0, scale: 1 }, // CP4 — no mini-boss here
-];
-
 const WALK_DURATION_MS = 1800;
 
 export class ForestMapScene extends Phaser.Scene {
   private currentIndex = 0;
-  private character: Phaser.GameObjects.Sprite | null = null;
-  private characterShadow: Phaser.GameObjects.Ellipse | null = null;
+  private personaHandle: PersonaHandle | null = null;
   private isAnimating = false;
   private checkpointNodes: Phaser.GameObjects.Arc[] = [];
-  private miniBossSprites: (Phaser.GameObjects.Sprite | null)[] = [];
-  private miniBossHpBars: (BossHpBar | null)[] = [];
-  private superBossSprite: Phaser.GameObjects.Sprite | null = null;
+  /** Village-parity: ONE moving boss walks the whole map, retreating
+   *  between CPs. Its identity swaps to the roster entry for the CP it
+   *  currently guards so combat name/family/taunt lookups stay correct. */
+  private movingBoss: MovingBossHandle | null = null;
+  private superBoss: MovingBossHandle | null = null;
   private superBossHpBar: BossHpBar | null = null;
   private superBossRevealed = false;
   private todController: TimeOfDayController | null = null;
@@ -254,21 +255,12 @@ export class ForestMapScene extends Phaser.Scene {
         frameHeight: 48,
       });
     }
-    // Load Stage 2 mini-boss idle sprites
-    for (const boss of getStageMiniBosses(2)) {
-      const key = `forest-boss-${boss.checkpointIndex}`;
-      this.load.image(key, boss.idleAsset);
-    }
-    // Load Stage 2 super boss (Forest Colossus) — idle + back rotation for
-    // the cinematic reveal (spawns facing away, turns to face the founder).
+    // Village-parity: pull every available anim clip for each Stage 2
+    // boss via the shared helper. Missing clips fall back through
+    // hurt→idle / attack→idle at play time.
+    for (const boss of getStageMiniBosses(2)) loadBossAssets(this, 2, boss);
     const superBoss = getStageSuperBoss(2);
-    if (superBoss) {
-      this.load.image("forest-super-boss", superBoss.idleAsset);
-      this.load.image(
-        "forest-super-boss-back",
-        "/assets/bosses/stage2/forest-colossus/rotations/north.png",
-      );
-    }
+    if (superBoss) loadBossAssets(this, 2, superBoss);
   }
 
   create(): void {
@@ -429,12 +421,17 @@ export class ForestMapScene extends Phaser.Scene {
       force: true,
     });
 
-    // 6. Character + shadow
+    // 6. Register persona + boss anims (must be AFTER loader completes).
+    registerPersonaAnimations(this, getCurrentPersonaId());
+    for (const b of getStageMiniBosses(2)) registerBossAnimations(this, 2, b);
+    const sb = getStageSuperBoss(2);
+    if (sb) registerBossAnimations(this, 2, sb);
+
+    // 7. Character + shadow
     this.spawnCharacter();
 
-    // 7. Bosses (spawn all 4, only show active-CP)
-    this.spawnMiniBosses();
-    this.refreshMiniBossVisibility();
+    // 8. ONE moving boss (Village-parity moving-boss model)
+    this.spawnMovingBoss();
 
     // 8. Time-of-day cycle — atmospheric tint that shifts dawn/noon/dusk/night
     this.todController = attachTimeOfDay(this, "forest", {
@@ -453,76 +450,29 @@ export class ForestMapScene extends Phaser.Scene {
     eventBridge.dispatchToReact({ type: "PHASER_READY" });
   }
 
-  private spawnMiniBosses(): void {
+  /**
+   * Village-parity: ONE moving boss on the map. Its `boss` identity
+   * swaps to the roster entry for whichever CP it currently guards, so
+   * combat lookups always see the correct name/family/taunt copy.
+   */
+  private spawnMovingBoss(): void {
     const bosses = getStageMiniBosses(2);
-    for (const boss of bosses) {
-      const cp = CHECKPOINTS[boss.checkpointIndex];
-      const offset = BOSS_OFFSETS[boss.checkpointIndex];
-      const key = `forest-boss-${boss.checkpointIndex}`;
-      if (!cp || !offset || !this.textures.exists(key)) {
-        this.miniBossSprites.push(null);
-        this.miniBossHpBars.push(null);
-        continue;
-      }
-      const sprite = this.add.sprite(cp.x + offset.x, cp.y + offset.y, key);
-      sprite.setOrigin(0.5, 1);
-      sprite.setScale(offset.scale);
-      sprite.setDepth(60);
-      sprite.setFlipX(offset.x > 0);
-      this.tweens.add({
-        targets: sprite,
-        y: sprite.y - 6,
-        duration: 1400 + boss.checkpointIndex * 120,
-        ease: "Sine.easeInOut",
-        yoyo: true,
-        repeat: -1,
-      });
-      const hpBar = addBossHpBar(this, sprite, 1, boss.name);
-      this.miniBossSprites.push(sprite);
-      this.miniBossHpBars.push(hpBar);
-    }
-  }
-
-  private refreshMiniBossVisibility(): void {
-    for (let i = 0; i < this.miniBossSprites.length; i++) {
-      const sprite = this.miniBossSprites[i];
-      const hpBar = this.miniBossHpBars[i];
-      const isActive = i === this.currentIndex;
-      if (sprite) {
-        const wasVisible = sprite.visible;
-        sprite.setVisible(isActive);
-        // Turn-to-face "startle" — when a mini-boss becomes active (player
-        // just arrived at their CP), the boss visibly reacts. Simulates
-        // "the boss notices you" without swapping rotation textures.
-        if (isActive && !wasVisible) {
-          const originalScale = sprite.scale;
-          this.tweens.add({
-            targets: sprite,
-            scaleX: originalScale * 0.75,
-            scaleY: originalScale * 1.15,
-            duration: 130,
-            ease: "Sine.easeIn",
-            yoyo: true,
-            repeat: 1,
-            onComplete: () => {
-              sprite.setScale(originalScale);
-            },
-          });
-        }
-      }
-      if (hpBar) hpBar.setVisible(isActive);
-    }
+    if (bosses.length === 0) return;
+    const first = bosses[Math.min(this.currentIndex, bosses.length - 1)];
+    const cp = CHECKPOINTS[this.currentIndex];
+    if (!cp) return;
+    this.movingBoss = spawnMovingBoss(this, 2, first, cp, { showHpBar: true });
+    this.movingBoss.cpIndex = this.currentIndex;
+    this.movingBoss.sprite.setFlipX(true); // face the persona (left of boss)
   }
 
   /** Public — React calls this on task submit to drop the active boss HP. */
   public weakenActiveBoss(tasksDone: number, total: number = 3): void {
-    const hpBar = this.miniBossHpBars[this.currentIndex];
-    if (hpBar) {
-      const pct = Math.max(0, 1 - tasksDone / total);
-      hpBar.setHp(pct);
+    if (this.movingBoss?.hpBar) {
+      this.movingBoss.hpBar.setHp(Math.max(0, 1 - tasksDone / total));
     }
-    // Update the corruption overlay for THIS CP's segment. 2/3 → 10%
-    // opacity + weakened monster; 3/3 → 0% + shatter burst.
+    if (this.movingBoss) playBossState(this, this.movingBoss, "hurt");
+    if (this.personaHandle) playPersonaState(this, this.personaHandle, "attack");
     this._corruption?.updateSegment(this.currentIndex, tasksDone);
   }
 
@@ -538,76 +488,18 @@ export class ForestMapScene extends Phaser.Scene {
 
   private spawnCharacter(): void {
     const active = CHECKPOINTS[this.currentIndex];
-    const personaId = getCurrentPersonaId();
-    const personaIdleTex = personaSpriteKey(personaId, "idle");
-    const personaWalkTex = personaSpriteKey(personaId, "walk");
-    const idleTexKey = this.textures.exists(personaIdleTex)
-      ? personaIdleTex
-      : "village-persona-idle";
-    const walkTexKey = this.textures.exists(personaWalkTex)
-      ? personaWalkTex
-      : "village-persona-walk";
-    if (!this.textures.exists(idleTexKey)) return;
-
-    // If a previous scene registered these anims against the OLD texture,
-    // drop them so we rebind to the picked persona's sheet.
-    if (this.anims.exists("persona-idle")) this.anims.remove("persona-idle");
-    if (this.anims.exists("persona-walk")) this.anims.remove("persona-walk");
-
-    // Character animations — reuse same keys as Village so no clash
-    const idleFrames = this.textures.get(idleTexKey).frameTotal;
-    this.anims.create({
-      key: "persona-idle",
-      frames: this.anims.generateFrameNumbers(idleTexKey, {
-        start: 0,
-        end: Math.max(0, Math.min(idleFrames - 1, 3)),
-      }),
-      frameRate: 4,
-      repeat: -1,
+    this.personaHandle = spawnPersonaCharacter(this, active, {
+      legacyIdleKey: "village-persona-idle",
+      legacyWalkKey: "village-persona-walk",
+      xOffset: CHAR_X_OFFSET,
+      yOffset: CHAR_Y_OFFSET,
     });
+  }
 
-    const walkFrames = this.textures.get(walkTexKey).frameTotal;
-    // For legacy Village sheet, useful walk frames are 10..14. For extended
-    // personas, walk frames start at 0. Pick range based on which sheet.
-    const walkStart = walkTexKey === "village-persona-walk" ? 10 : 0;
-    const walkEnd = walkTexKey === "village-persona-walk"
-      ? Math.min(walkFrames - 1, 14)
-      : Math.min(walkFrames - 1, 5);
-    this.anims.create({
-      key: "persona-walk",
-      frames: this.anims.generateFrameNumbers(walkTexKey, {
-        start: walkStart,
-        end: walkEnd,
-      }),
-      frameRate: 10,
-      repeat: -1,
-    });
-
-    // Shadow (planted on ground, doesn't bob)
-    const groundY = active.y + CHAR_Y_OFFSET + 4;
-    this.characterShadow = this.add
-      .ellipse(active.x, groundY, 54, 14, 0x000000, 0.42)
-      .setDepth(95);
-
-    this.character = this.add.sprite(
-      active.x,
-      active.y + CHAR_Y_OFFSET,
-      idleTexKey,
-    );
-    this.character.setOrigin(0.5, 1);
-    this.character.setScale(CHAR_SCALE);
-    this.character.setDepth(100);
-    this.character.play("persona-idle");
-
-    // Shadow tracks X only
-    this.time.addEvent({
-      delay: 60,
-      loop: true,
-      callback: () => {
-        if (!this.character || !this.characterShadow) return;
-        this.characterShadow.setPosition(this.character.x, groundY);
-      },
-    });
+  /** Back-compat: some external systems (attachEditorTestWalk) grab
+   *  `this.character` directly. Alias to the persona handle's sprite. */
+  private get character(): Phaser.GameObjects.Sprite | null {
+    return this.personaHandle?.sprite ?? null;
   }
 
   private onCheckpointClicked(cp: Checkpoint): void {
@@ -625,23 +517,45 @@ export class ForestMapScene extends Phaser.Scene {
   public advanceToNextCheckpoint(): void {
     if (this.isAnimating) return;
     if (this.currentIndex >= CHECKPOINTS.length - 1) {
-      // Stage 2 fully cleared at the CP level → reveal the SUPER boss
-      // (Forest Colossus) instead of firing STAGE_COMPLETE. React opens
-      // CombatPanel against the super boss; on victory React fires
-      // STAGE_COMPLETE which advances to Stage 3.
+      // Village-parity: dissolve the moving boss (dies at final CP)
+      // then reveal the stage super-boss (Forest Colossus).
       if (!this.superBossRevealed) {
-        this.revealSuperBoss();
+        if (this.movingBoss) {
+          dissolveBoss(this, this.movingBoss, {
+            onComplete: () => this.revealSuperBoss(),
+          });
+        } else {
+          this.revealSuperBoss();
+        }
       }
       return;
     }
     this.isAnimating = true;
-    // Fire the "CP cleared" burst on the CP we just finished before walking
     const clearedCp = CHECKPOINTS[this.currentIndex];
     if (clearedCp) playCpClearBurst(this, clearedCp.x, clearedCp.y, "standard");
     this.currentIndex += 1;
-    this.refreshMiniBossVisibility();
     const to = CHECKPOINTS[this.currentIndex];
-    if (this.character) this.walkCharacterTo(to.x, to.y + CHAR_Y_OFFSET);
+
+    // Move both the boss and the persona to the next CP in parallel.
+    if (this.movingBoss) {
+      if (this.movingBoss.hpBar) this.movingBoss.hpBar.setHp(1);
+      const bosses = getStageMiniBosses(2);
+      const nextBossDef = bosses[this.currentIndex] ?? bosses[bosses.length - 1];
+      if (nextBossDef) this.movingBoss.boss = nextBossDef;
+      retreatBossTo(this, this.movingBoss, to, {
+        durationMs: WALK_DURATION_MS,
+        faceX: to.x + CHAR_X_OFFSET,
+      });
+      this.movingBoss.cpIndex = this.currentIndex;
+    }
+    if (this.personaHandle) {
+      walkPersonaTo(
+        this,
+        this.personaHandle,
+        { x: to.x + CHAR_X_OFFSET, y: to.y + CHAR_Y_OFFSET },
+        { durationMs: WALK_DURATION_MS },
+      );
+    }
     this.cameras.main.pan(to.x, to.y, WALK_DURATION_MS, "Sine.easeInOut");
     this.time.delayedCall(WALK_DURATION_MS + 100, () => {
       this.isAnimating = false;
@@ -649,87 +563,33 @@ export class ForestMapScene extends Phaser.Scene {
   }
 
   /**
-   * Dramatic super-boss reveal — spawns the Forest Colossus east of CP4
-   * in a big, slow rise, pans the camera to it, and after ~2s notifies
-   * React (SUPER_BOSS_ENCOUNTER) so CombatPanel opens.
-   */
-  /**
-   * Dramatic super-boss reveal — spawns the Forest Colossus east of CP4
-   * in a big, slow rise, pans the camera to it, and after ~2s notifies
-   * React (SUPER_BOSS_ENCOUNTER) so CombatPanel opens.
+   * Reveal the Forest Colossus super-boss via the shared helper (pan +
+   * scale-in + HP bar) + persona victory pose. Fires
+   * SUPER_BOSS_ENCOUNTER for React to open the combat panel.
    */
   private revealSuperBoss(): void {
     if (this.superBossRevealed) return;
     this.superBossRevealed = true;
+    const superBoss = getStageSuperBoss(2);
+    if (!superBoss) return;
     const cp4 = CHECKPOINTS[CHECKPOINTS.length - 1];
     const superX = cp4.x + 240;
     const superY = cp4.y - 40;
 
-    this.cameras.main.pan(superX, superY, 1400, "Sine.easeInOut");
-
-    if (this.textures.exists("forest-super-boss")) {
-      const startTexture = this.textures.exists("forest-super-boss-back")
-        ? "forest-super-boss-back"
-        : "forest-super-boss";
-      const sprite = this.add.sprite(superX, superY + 260, startTexture);
-      sprite.setOrigin(0.5, 1);
-      sprite.setScale(0);
-      sprite.setDepth(70);
-      sprite.setAlpha(0);
-      this.superBossSprite = sprite;
-
-      this.tweens.add({
-        targets: sprite,
-        y: superY,
-        alpha: 1,
-        scale: 2.4,
-        duration: 1600,
-        delay: 400,
-        ease: "Sine.easeOut",
-      });
-
-      this.time.delayedCall(1900, () => {
-        if (!this.textures.exists("forest-super-boss")) return;
-        this.tweens.add({
-          targets: sprite,
-          scaleX: 2.4 * 0.15,
-          duration: 90,
-          ease: "Sine.easeIn",
-          onComplete: () => {
-            sprite.setTexture("forest-super-boss");
-            this.tweens.add({
-              targets: sprite,
-              scaleX: 2.4,
-              duration: 140,
-              ease: "Back.easeOut",
-            });
-          },
-        });
-      });
-
-      this.time.delayedCall(2500, () => {
-        this.tweens.add({
-          targets: sprite,
-          y: superY - 10,
-          duration: 1800,
-          ease: "Sine.easeInOut",
-          yoyo: true,
-          repeat: -1,
-        });
-      });
-
-      const superBoss = getStageSuperBoss(2);
-      if (superBoss) {
-        this.superBossHpBar = addBossHpBar(this, sprite, 1, superBoss.name);
-      }
+    if (this.personaHandle) {
+      playPersonaVictoryPose(this, this.personaHandle, superX);
     }
 
+    this.superBoss = revealSuperBossHelper(this, 2, superBoss, { x: superX, y: superY }, {
+      panDurationMs: 1400,
+    });
+    this.superBossHpBar = this.superBoss.hpBar;
+
     this.time.delayedCall(2200, () => {
-      const superBoss = getStageSuperBoss(2);
       eventBridge.dispatchToReact({
         type: "SUPER_BOSS_ENCOUNTER",
         stage: 2,
-        bossSlug: superBoss?.name,
+        bossSlug: superBoss.name,
       });
     });
   }
@@ -744,42 +604,23 @@ export class ForestMapScene extends Phaser.Scene {
       });
       return;
     }
-    if (this.superBossHpBar) this.superBossHpBar.setHp(0);
-    if (this.superBossSprite) {
-      this.tweens.add({
-        targets: this.superBossSprite,
-        alpha: 0,
-        scale: 2.6,
-        y: this.superBossSprite.y + 30,
-        duration: 900,
-        ease: "Sine.easeIn",
+    if (this.superBoss) {
+      dissolveBoss(this, this.superBoss, {
+        onComplete: () => {
+          eventBridge.dispatchToReact({
+            type: "STAGE_COMPLETE",
+            stage: 2,
+            nextStage: 3,
+          });
+        },
       });
-    }
-    this.time.delayedCall(1200, () => {
+    } else {
       eventBridge.dispatchToReact({
         type: "STAGE_COMPLETE",
         stage: 2,
         nextStage: 3,
       });
-    });
-  }
-
-  private walkCharacterTo(x: number, y: number): void {
-    const char = this.character;
-    if (!char) return;
-    char.setFlipX(x < char.x);
-    char.play("persona-walk");
-    this.tweens.add({
-      targets: char,
-      x,
-      y,
-      duration: WALK_DURATION_MS,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        char.setFlipX(false);
-        char.play("persona-idle");
-      },
-    });
+    }
   }
 
   public getCurrentIndex(): number {
@@ -790,8 +631,18 @@ export class ForestMapScene extends Phaser.Scene {
     this.currentIndex = Phaser.Math.Clamp(i, 0, CHECKPOINTS.length - 1);
     const cp = CHECKPOINTS[this.currentIndex];
     this.cameras.main.centerOn(cp.x, cp.y);
-    if (this.character) {
-      this.character.setPosition(cp.x, cp.y + CHAR_Y_OFFSET);
+    if (this.personaHandle) {
+      this.personaHandle.sprite.setPosition(
+        cp.x + CHAR_X_OFFSET,
+        cp.y + CHAR_Y_OFFSET,
+      );
+      this.personaHandle.groundY = cp.y + CHAR_Y_OFFSET + 4;
+    }
+    if (this.movingBoss) {
+      const xOff = this.movingBoss.boss.spriteXOffset ?? 0;
+      const yOff = this.movingBoss.boss.spriteYOffset ?? 62;
+      this.movingBoss.sprite.setPosition(cp.x + xOff, cp.y + yOff);
+      this.movingBoss.cpIndex = this.currentIndex;
     }
   }
 

@@ -81,19 +81,54 @@ export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
       ) : flares.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {flares
-            .filter((flare) => flare.status !== "closed")
-            .map((flare) => (
-            <FlareCard
-              key={flare._id}
-              flare={flare as typeof flare & { status: "open" | "resolved" }}
-              isOwn={
-                currentUserId !== null && flare.owner._id === currentUserId
-              }
-              onClick={() => setOpenFlareId(flare._id)}
-            />
-          ))}
+        // Fixed-height scroll window — shows ~1.5 flare cards so the
+        // section stops growing endlessly and the rest of the feed
+        // stays visible without a page-length scroll. Product ask:
+        // "dont make them keep on adding, make the space of 1.5 flare
+        // where people can scroll flares at the top". Cards render in
+        // the same 2-col grid as before; only the outer wrapper is
+        // clipped + scrolls.
+        //
+        // 360px picks up one full card row (~240px) plus ~120px of
+        // the next row, giving a clear "there's more below" hint.
+        // `pr-1` reserves space so the scrollbar doesn't overlap the
+        // right-hand card border. `flare-scroll` is a local class
+        // (styles below) that gives a subtle amber-tinted scrollbar
+        // instead of the browser default chunky grey one.
+        <div className="flare-scroll max-h-[360px] overflow-y-auto pr-1">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {flares
+              .filter((flare) => flare.status !== "closed")
+              .map((flare) => (
+              <FlareCard
+                key={flare._id}
+                flare={flare as typeof flare & { status: "open" | "resolved" }}
+                isOwn={
+                  currentUserId !== null && flare.owner._id === currentUserId
+                }
+                onClick={() => setOpenFlareId(flare._id)}
+              />
+            ))}
+          </div>
+          <style jsx>{`
+            .flare-scroll {
+              scrollbar-width: thin;
+              scrollbar-color: rgba(251, 191, 36, 0.35) transparent;
+            }
+            .flare-scroll::-webkit-scrollbar {
+              width: 6px;
+            }
+            .flare-scroll::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .flare-scroll::-webkit-scrollbar-thumb {
+              background: rgba(251, 191, 36, 0.35);
+              border-radius: 3px;
+            }
+            .flare-scroll::-webkit-scrollbar-thumb:hover {
+              background: rgba(251, 191, 36, 0.55);
+            }
+          `}</style>
         </div>
       )}
 

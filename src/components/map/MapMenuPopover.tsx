@@ -188,9 +188,12 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
                   onClick={(e) => e.stopPropagation()}
                   // max-h + scroll guard so the modal never grows past
                   // the viewport (with 9 tiles in a 3x3 the previous
-                  // aspect-square tiles pushed the last row past the
-                  // screen edge on typical laptops).
-                  className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0A0D12]/95 p-6 shadow-2xl sm:p-8"
+                  // aspect-square tiles pushed the last row off-screen
+                  // on typical laptops). On mobile the modal is
+                  // capped tighter (75dvh) and given tighter padding
+                  // so the tutorial's Sparky bubble docked at the top
+                  // of the viewport doesn't overlap the top tiles.
+                  className="relative w-full max-w-2xl max-h-[75dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0A0D12]/95 p-4 shadow-2xl sm:max-h-[90vh] sm:p-8"
                 >
                   {/* Saddlebag/Settings button next to × removed per
                       product request — the Adventurer's Menu now
@@ -222,23 +225,25 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
                     </svg>
                   </button>
 
-                  <header className="mb-5 pr-10">
+                  <header className="mb-3 pr-10 sm:mb-5">
                     <p
-                      className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-amber-400/80"
+                      className="font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-amber-400/80 sm:text-[10px]"
                       style={{
                         fontFamily: "var(--font-pixel-display), monospace",
                       }}
                     >
                       Adventurer's Menu
                     </p>
-                    <h2 className="mt-1 text-xl font-semibold text-white sm:text-2xl">
+                    <h2 className="mt-0.5 text-base font-semibold text-white sm:mt-1 sm:text-2xl">
                       Choose your path
                     </h2>
                   </header>
 
                   {/* 3x3 grid on desktop — 9 tiles fit exactly. Mobile
-                      stays 2-column so the tiles don't get too small. */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                      stays 2-column so the tiles don't get too small.
+                      Tighter gap on mobile so more tiles fit per row of
+                      vertical space. */}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4">
                     {MENU_ITEMS.map((item) => (
                       <button
                         key={item.id}
@@ -255,36 +260,38 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
                         }}
                         onMouseEnter={() => audioManager.playUI("hover")}
                         className={cn(
-                          // Fixed compact tile size — was `aspect-square`
-                          // which produced ~200px×200px tiles at the 3-col
-                          // grid width, pushing the last row off-screen.
-                          // Now a fixed 128px min-height so the whole
-                          // menu (title + 3x3) fits inside a laptop
-                          // viewport without scrolling.
-                          "flex min-h-[128px] flex-col items-center justify-center gap-2 rounded-xl border bg-white/[0.02] px-3 py-4 transition-all hover:-translate-y-0.5",
+                          // Compact tile sizing — mobile uses a
+                          // shorter 92px minimum so all 9 tiles
+                          // (5 rows on a 2-col mobile grid) fit
+                          // inside the tighter 75dvh modal without
+                          // being crowded by Sparky's tutorial bubble
+                          // docked at the top of the viewport. Desktop
+                          // keeps the roomier 128px so the 3-col grid
+                          // still reads as clickable cards, not chips.
+                          "flex min-h-[92px] flex-col items-center justify-center gap-1.5 rounded-xl border bg-white/[0.02] px-2 py-3 transition-all hover:-translate-y-0.5 sm:min-h-[128px] sm:gap-2 sm:px-3 sm:py-4",
                           item.accent,
                         )}
                       >
                         {item.pixelIcon ? (
-                          // Icon size bumped 44 → 72 per product
-                          // request ("increase their size"). The
-                          // user's custom PNGs read much better at
-                          // the larger scale — the built-in pixel
-                          // icons still look sharp because they're
-                          // 128px source.
+                          // Icon size 56 — a middle ground between the
+                          // previous 72 (too tall for mobile 92px
+                          // tiles) and 44 (too small on desktop 128px
+                          // tiles). Reads well at both breakpoints and
+                          // keeps PixelIcon's inline width/height
+                          // simple (no className size override needed).
                           <PixelIcon
                             name={item.pixelIcon}
-                            size={72}
+                            size={56}
                             alt={item.label}
                           />
                         ) : item.lucideIcon ? (
                           <item.lucideIcon
-                            className="h-16 w-16 text-yellow-300/90"
+                            className="h-10 w-10 text-yellow-300/90 sm:h-14 sm:w-14"
                             strokeWidth={1.5}
                             aria-label={item.label}
                           />
                         ) : null}
-                        <span className="text-center text-[11px] font-semibold uppercase tracking-wider text-white/85 sm:text-xs">
+                        <span className="text-center text-[10px] font-semibold uppercase tracking-wider text-white/85 sm:text-xs">
                           {item.label}
                         </span>
                       </button>

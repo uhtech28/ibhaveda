@@ -22,6 +22,34 @@ import { useTutorialOptional } from "@/components/tutorial/v2/useTutorial";
 export function FeedClient() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+
+  // SYNCHRONOUS early bounce — profile-setup drops a
+  // `skipFeedGoToPersona=1` session flag right before its hard-nav to
+  // /persona-setup. If the browser somehow commits /feed first (soft
+  // router race, extension-injected nav, service-worker replay), we
+  // detect the flag inside a useLayoutEffect that runs synchronously
+  // after DOM mutations but BEFORE the browser paints, so the user
+  // never sees /feed. Product ask (verbatim): "there is still that
+  // glitch after username set up feed loads for 2 seconds then
+  // persona selection come remove that feed redirect".
+  const [earlyBounce, setEarlyBounce] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (sessionStorage.getItem("skipFeedGoToPersona") === "1") {
+        sessionStorage.removeItem("skipFeedGoToPersona");
+        setEarlyBounce(true);
+        // Immediate hard-nav — replace (not assign) so the /feed URL
+        // is not left in the browser back-stack.
+        window.location.replace("/persona-setup");
+      }
+    } catch {
+      /* SSR / private mode — safe to skip */
+    }
+    // Mount-only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { isComplete: isProfileComplete, isLoading: isProfileLoading } = useProfileCompletion();
   const currentUser = useQuery(api.users.getCurrentUser);
 
@@ -165,19 +193,16 @@ export function FeedClient() {
       // User already saw the picker in this tab — don't loop them back.
       return;
     }
-    // DEBOUNCE the redirect. The pre-fix "picker → feed → picker"
-    // flicker was caused by /feed firing this redirect the moment its
-    // personaIdRaw query resolved to null, even though an
-    // updatePersonaId mutation was IN FLIGHT and about to land in the
-    // very next tick. Delaying the redirect by ~1.2s lets any recent
-    // mutation propagate through the Convex reactive query cache —
-    // if it lands, `personaIdRaw` becomes a string, the guard at
-    // the top of the effect returns early on the retry render, and
-    // the timeout is cancelled by the cleanup below.
+    // IMMEDIATE redirect. Previously a 1200ms debounce was used to
+    // ride out a mutation-in-flight race, but the current flow
+    // uses hard-nav from /profile-setup → /persona-setup, so by the
+    // time /feed sees personaIdRaw=null the user has never picked a
+    // persona and doesn't need any debounce. Product report:
+    // "after username setup it first redirect for 2 seconds to feed
+    // then comes to persona selection". Kept a 50ms micro-defer so
+    // React can finish the current render before the nav, avoiding
+    // a "setState during render" warning.
     const t = window.setTimeout(() => {
-      // Re-check the session flag right before nav — the
-      // profile-setup hard-reload path may have written it after
-      // the current effect closure captured the old value.
       if (
         typeof window !== "undefined" &&
         sessionStorage.getItem("personaPickerDismissed") === "1"
@@ -185,7 +210,7 @@ export function FeedClient() {
         return;
       }
       router.replace("/persona-setup");
-    }, 1200);
+    }, 50);
     return () => window.clearTimeout(t);
   }, [
     isLoaded,
@@ -297,6 +322,16 @@ export function FeedClient() {
       typeof window !== "undefined" &&
       sessionStorage.getItem("personaPickerDismissed") === "1"
     );
+  // Early-bounce path — we detected the `skipFeedGoToPersona` flag
+  // in the useEffect above and fired window.location.replace. Render
+  // an inert black screen (NO feed markup, NO Sparky, NO Convex
+  // queries continuing to load ideas) while the browser tears down.
+  // Without this the user would see a 1-frame flash of the feed
+  // content before the hard-nav commits.
+  if (earlyBounce) {
+    return <div className="fixed inset-0 z-[9999] bg-black" />;
+  }
+
   if (showPersonaBlockingLoader) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">

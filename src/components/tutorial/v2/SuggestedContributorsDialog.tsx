@@ -44,9 +44,16 @@ const SPARKY_PROMPT =
 export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
   const currentUser = useQuery(api.users.getCurrentUser);
   const allUsers = useQuery(api.users.getAllUsers, {});
-  const createRequest = useMutation(
-    api.contributionRequests.createContributionRequest,
-  );
+  // This tutorial step is the AUTHOR inviting people to their own
+  // just-created idea. It used to call `createContributionRequest`
+  // which is the OPPOSITE direction (a would-be contributor asking
+  // an author for permission). That mutation's server-side check
+  // "You cannot request contribution to your own idea" fired every
+  // single time because the requester and the idea author were the
+  // same user, breaking the tutorial. `sendInvitation` is the
+  // correct primitive: only the idea author can call it, and it
+  // targets an invitee by username.
+  const sendInvitation = useMutation(api.invitations.sendInvitation);
 
   const suggestions = useMemo(() => {
     if (!allUsers || !currentUser) return [];
@@ -115,13 +122,23 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
       // gate elsewhere in the app. A one-word "hi" isn't a real pitch.
       if (message.length < 10) return;
       if (sentSet.has(userId) || sendingSet.has(userId)) return;
+      // Resolve the invitee's username from the suggestions list
+      // (allUsers already has it). sendInvitation takes a username
+      // string, not an id.
+      const invitee = (allUsers ?? []).find((u) => u._id === userId);
+      const inviteeUsername = invitee?.username;
+      if (!inviteeUsername) return;
       setSendingSet((prev) => {
         const next = new Set(prev);
         next.add(userId);
         return next;
       });
       try {
-        await createRequest({ ideaId, message });
+        await sendInvitation({
+          ideaId,
+          username: inviteeUsername,
+          message,
+        });
         setSentSet((prev) => {
           const next = new Set(prev);
           next.add(userId);
@@ -138,7 +155,7 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
         });
       }
     },
-    [createRequest, ideaId, drafts, sentSet, sendingSet],
+    [sendInvitation, ideaId, drafts, sentSet, sendingSet, allUsers],
   );
 
   return (

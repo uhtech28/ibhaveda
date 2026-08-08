@@ -96,6 +96,30 @@ export function CombatQuestionCard({
   const damageNumberTimerRef = useRef<NodeJS.Timeout | null>(null);
   const playerDamageNumberTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ── Attack-flow state machine ──────────────────────────────────────────
+  // Per product spec: when the user clicks Attack, the question card
+  // (dialogue + textarea + attack button) DISAPPEARS while the battle
+  // scene plays the swing/hurt animation. Once the animation completes,
+  // if the round hasn't ended, a transition message shows until the
+  // next question loads. Round-ending outcomes skip the message and
+  // go straight to the result panel via CombatPanel's existing
+  // CINEMATIC_HOLD_MS handoff.
+  //
+  //   idle      → question + textarea + attack button visible
+  //   swinging  → question card hidden, battle scene playing the swing;
+  //               entered on Attack click, exits when server HP delta
+  //               lands (or on safety timer)
+  //   message   → question card hidden, transition banner shown; enters
+  //               after `swinging` when round continues (bossDelta or
+  //               playerDelta > 0 but nobody died); exits when the next
+  //               question._id arrives
+  type AttackPhase = "idle" | "swinging" | "message";
+  const [attackPhase, setAttackPhase] = useState<AttackPhase>("idle");
+  const [transitionMessage, setTransitionMessage] = useState<string | null>(
+    null,
+  );
+  const attackPhaseTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     const prevBoss = lastBossHpRef.current;
     const prevPlayer = lastPlayerHpRef.current;
@@ -198,10 +222,35 @@ export function CombatQuestionCard({
       );
     }
 
+    // Attack-flow state machine advancement (see AttackPhase decl above).
+    // When we're mid-swing and the server has just responded (any HP
+    // delta OR a question advance), transition into the "message" beat
+    // and pick the outcome-specific line. Round-ending is detected
+    // externally via CINEMATIC_HOLD_MS / isLocked; here we just show
+    // the mid-round message which will get unmounted when the parent
+    // swaps in the result panel anyway.
+    if (attackPhase === "swinging") {
+      const advanced = question._id !== lastQuestionIdRef.current;
+      if (bossDelta > 0 || playerDelta > 0 || advanced) {
+        // Two-line binary per product ask ("we dont want that your
+        // attack struck home use any of these lines as per answer").
+        // Player took HP → ineffective / hurt. Otherwise → effective
+        // (covers real damage AND the neutral block case, since a
+        // successful block still means the answer landed enough to
+        // stop the boss's counter).
+        const msg =
+          playerDelta > 0
+            ? "Your attack was ineffective. You've been hurt!"
+            : "Your attack was effective.";
+        setTransitionMessage(msg);
+        setAttackPhase("message");
+      }
+    }
+
     lastBossHpRef.current = bossHpCurrent;
     lastPlayerHpRef.current = playerHpCurrent;
     lastQuestionIdRef.current = question._id;
-  }, [bossHpCurrent, playerHpCurrent, bossHpInitial, question._id]);
+  }, [bossHpCurrent, playerHpCurrent, bossHpInitial, question._id, attackPhase]);
 
   useEffect(() => {
     return () => {
@@ -212,6 +261,8 @@ export function CombatQuestionCard({
         clearTimeout(playerDamageNumberTimerRef.current);
       if (pendingAttackTimerRef.current)
         clearTimeout(pendingAttackTimerRef.current);
+      if (attackPhaseTimerRef.current)
+        clearTimeout(attackPhaseTimerRef.current);
     };
   }, []);
 
@@ -220,10 +271,30 @@ export function CombatQuestionCard({
   }, [value]);
 
   useEffect(() => {
+    // Guard: `_id === "transition"` is CombatPanel's placeholder
+    // question that gets synthesized while the server is between real
+    // questions. It's NOT a new question — treating it as one would
+    // reset attackPhase back to "idle" and remount the dialogue +
+    // textarea + attack button on top of the between-questions
+    // message overlay (product report: "instead of next question
+    // line we have to use these lines according to the answer").
+    // Skip the reset entirely for transition IDs; the phase stays on
+    // "swinging" / "message" until a real Q._id arrives.
+    if ((question._id as unknown as string) === "transition") return;
+
     reset();
     setValue("");
     valueRef.current = "";
     setDialogueDone(false); // hold the timer until this new question's typewriter finishes
+    // A REAL new question drops us back to the idle attack phase so
+    // the dialogue + textarea + attack button reappear. Also clear
+    // the transition message so it doesn't linger over the new prompt.
+    setAttackPhase("idle");
+    setTransitionMessage(null);
+    if (attackPhaseTimerRef.current) {
+      clearTimeout(attackPhaseTimerRef.current);
+      attackPhaseTimerRef.current = null;
+    }
   }, [question._id, reset]);
 
   // Whether the AI dialogue typewriter has finished — controls when
@@ -263,6 +334,18 @@ export function CombatQuestionCard({
     // clears pendingAttack. 4s balances that requirement against
     // holding the arena-zoom overlay too long on real timeouts.
     setPendingAttack(true);
+    // Enter the "swinging" phase — hides the question dialogue,
+    // textarea, and attack button; keeps the battle scene visible so
+    // the sprite animation reads uninterrupted. The transition to
+    // "message" or the round-end result panel happens via the HP-diff
+    // effect above (or via CombatPanel's CINEMATIC_HOLD_MS for
+    // round-ending outcomes, which unmounts this whole card).
+    setAttackPhase("swinging");
+    setTransitionMessage(null);
+    if (attackPhaseTimerRef.current) {
+      clearTimeout(attackPhaseTimerRef.current);
+      attackPhaseTimerRef.current = null;
+    }
     if (pendingAttackTimerRef.current) clearTimeout(pendingAttackTimerRef.current);
     pendingAttackTimerRef.current = setTimeout(
       () => setPendingAttack(false),
@@ -310,32 +393,41 @@ export function CombatQuestionCard({
           bar which sits at top-16 above the panel. Circular timer
           sits inline on the right per product request "timer at top". */}
       <div
-        className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 bg-black px-4 py-1"
+        // Two-column layout: title takes the full LEFT width, timer
+        // sits on the right. Removes the old centered layout that
+        // wasted a spacer column and pushed the title into the
+        // middle. Product ask: "START HEADING FROM MORE LEFT".
+        className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2 bg-black px-2 py-1 sm:gap-3 sm:px-4"
         style={{ marginTop: "1.5rem" }}
       >
-        {/* Left spacer — keeps the title visually centered while the
-            timer takes up the right cell. */}
-        <div />
-        <div className="flex min-w-0 items-center justify-center gap-2">
-          <span className="text-base text-emerald-400">📍</span>
+        <div className="flex min-w-0 items-center justify-start">
           {/*
-            Title now names the ACTUAL boss (e.g. "Fog of Vagueness
-            Challenge") instead of the generic "BOSS CHALLENGE". Falls
-            back to the venture title, then to "Boss Challenge" if
-            nothing is known — belt & suspenders so the header always
-            renders something meaningful.
+            📍 pin emoji removed per product ask ("REMOVE THE EMOTE
+            BEFORE THE CHALLENGE HEADING"). Title left-aligned so
+            it starts flush with the panel's left padding instead of
+            being centered — matches the "start from more left" ask.
+            Format: "PROJECT NAME : BOSS NAME CHALLENGE". Responsive
+            sizing: text-sm on narrow phones so the full title fits,
+            text-lg on ≥sm, text-xl on ≥md.
           */}
           <span
-            className="min-w-0 truncate font-mono text-sm font-black uppercase tracking-widest text-emerald-300"
+            // Sizes stepped down one notch per product ask ("LITTLE BIT
+            // LOWER THE SIZE OF CHALLENGE HEADING"). Previously
+            // text-sm / sm:text-lg / md:text-xl; now text-xs /
+            // sm:text-base / md:text-lg — reads calmer without
+            // losing legibility on any breakpoint.
+            className="min-w-0 truncate font-mono text-xs font-black uppercase tracking-wider text-emerald-300 sm:text-base sm:tracking-widest md:text-lg"
             style={{ fontFamily: "var(--font-pixel-display), monospace" }}
-            title={boss?.name ?? ideaTitle ?? undefined}
+            title={`${ideaTitle ?? ""} : ${boss?.name ?? "Boss"} Challenge`}
           >
-            {boss?.name && boss.name.trim().length > 0
-              ? boss.name
-              : ideaTitle && ideaTitle.trim().length > 0
-                ? ideaTitle
-                : "Boss"}
-            &nbsp;&nbsp;Challenge
+            {ideaTitle && ideaTitle.trim().length > 0 ? (
+              <>
+                {ideaTitle}
+                <span className="mx-1 text-emerald-500/80">:</span>
+              </>
+            ) : null}
+            {boss?.name && boss.name.trim().length > 0 ? boss.name : "Boss"}
+            <span className="hidden sm:inline">&nbsp;&nbsp;Challenge</span>
           </span>
         </div>
         {/* Timer cell — right-aligned so the ring sits at the top of
@@ -381,73 +473,111 @@ export function CombatQuestionCard({
           bossName={boss?.name ?? "Doubt Imp"}
         />
 
-        {/* Dialogue box */}
-        <ReactiveDialogueShell
-          bossReaction={bossReaction}
-          bossDamage={bossDamage}
-          playerDamage={playerDamage}
-        >
-          <DialoguePanel
-            persona={question.persona}
-            prompt={question.prompt}
-            // Pass the current boss's idle-frame path so the portrait
-            // shows the actual monster face (Fog of Vagueness, Wraith,
-            // Unraveller, etc.) instead of the generic red SVG villain.
-            bossAsset={boss?.idleAsset ?? null}
-            // Also pass the boss's display name — DialoguePanel prefers
-            // the hand-picked face portrait from src/lib/bosses/bossFaces
-            // when we have one for this boss, and only falls back to
-            // clipping the idle spritesheet when we don't.
-            bossName={boss?.name ?? null}
-            onDone={() => setDialogueDone(true)}
-          />
-        </ReactiveDialogueShell>
+        {/* Question card body — dialogue + textarea + attack button.
+            Hidden during the attack animation and the between-question
+            transition beat per product spec ("the question screen
+            disappears"). Also hidden when the parent has swapped in
+            the "transition" placeholder question (CombatPanel does
+            this when the server is between real questions) — those
+            renders should show the outcome message, not a dialogue
+            with hardcoded placeholder prompt text. */}
+        {attackPhase === "idle" &&
+          (question._id as unknown as string) !== "transition" && (
+          <>
+            {/* Dialogue box */}
+            <ReactiveDialogueShell
+              bossReaction={bossReaction}
+              bossDamage={bossDamage}
+              playerDamage={playerDamage}
+            >
+              <DialoguePanel
+                persona={question.persona}
+                prompt={question.prompt}
+                // Pass the current boss's idle-frame path so the portrait
+                // shows the actual monster face (Fog of Vagueness, Wraith,
+                // Unraveller, etc.) instead of the generic red SVG villain.
+                bossAsset={boss?.idleAsset ?? null}
+                // Also pass the boss's display name — DialoguePanel prefers
+                // the hand-picked face portrait from src/lib/bosses/bossFaces
+                // when we have one for this boss, and only falls back to
+                // clipping the idle spritesheet when we don't.
+                bossName={boss?.name ?? null}
+                onDone={() => setDialogueDone(true)}
+              />
+            </ReactiveDialogueShell>
 
-        {/* Answer textarea */}
-        {/* Copy / paste / cut / right-click BLOCKED per product
-            request — see earlier task. */}
-        <textarea
-          ref={textareaRef}
-          aria-label="Your answer"
-          className="min-h-[72px] w-full resize-y bg-black p-2 font-mono text-sm leading-relaxed text-white outline-none disabled:opacity-60"
-          placeholder="Type your answer to defeat the boss…"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onPaste={(e) => {
-            e.preventDefault();
-            handlers.onPaste(e);
-          }}
-          onCopy={(e) => e.preventDefault()}
-          onCut={(e) => e.preventDefault()}
-          onContextMenu={(e) => e.preventDefault()}
-          onDrop={(e) => e.preventDefault()}
-          onKeyDown={onKeyDownComposite}
-          // Belt-and-suspenders: some browsers dispatch KEYUP/KEYPRESS
-          // events to Phaser via document listeners even when KEYDOWN
-          // is stopped at the React root. Stop them here too so WASD/E
-          // never reach the map scene while the answer box is focused.
-          onKeyUp={(e) => e.stopPropagation()}
-          onKeyPress={(e) => e.stopPropagation()}
-          disabled={isLocked}
-          spellCheck={false}
-          autoComplete="off"
-          autoCorrect="off"
-        />
+            {/* Answer textarea */}
+            {/* Copy / paste / cut / right-click BLOCKED per product
+                request — see earlier task. */}
+            <textarea
+              ref={textareaRef}
+              aria-label="Your answer"
+              className="min-h-[72px] w-full resize-y bg-black p-2 font-mono text-sm leading-relaxed text-white outline-none disabled:opacity-60"
+              placeholder="Type your answer to defeat the boss…"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onPaste={(e) => {
+                e.preventDefault();
+                handlers.onPaste(e);
+              }}
+              onCopy={(e) => e.preventDefault()}
+              onCut={(e) => e.preventDefault()}
+              onContextMenu={(e) => e.preventDefault()}
+              onDrop={(e) => e.preventDefault()}
+              onKeyDown={onKeyDownComposite}
+              // Belt-and-suspenders: some browsers dispatch KEYUP/KEYPRESS
+              // events to Phaser via document listeners even when KEYDOWN
+              // is stopped at the React root. Stop them here too so WASD/E
+              // never reach the map scene while the answer box is focused.
+              onKeyUp={(e) => e.stopPropagation()}
+              onKeyPress={(e) => e.stopPropagation()}
+              disabled={isLocked}
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+            />
 
-        <div className="flex items-center justify-end text-xs">
-          {/* "Cmd/Ctrl + Enter to attack" hint removed per product
-              request — plain Enter now submits, Attack button is
-              self-explanatory. */}
-          <button
-            type="button"
-            onClick={handleSubmitClick}
-            disabled={isLocked}
-            className="border-2 border-white bg-black px-5 py-1.5 font-mono text-xs uppercase tracking-wider text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+            <div className="flex items-center justify-end text-xs">
+              {/* "Cmd/Ctrl + Enter to attack" hint removed per product
+                  request — plain Enter now submits, Attack button is
+                  self-explanatory. */}
+              <button
+                type="button"
+                onClick={handleSubmitClick}
+                disabled={isLocked}
+                className="border-2 border-white bg-black px-5 py-1.5 font-mono text-xs uppercase tracking-wider text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ fontFamily: "var(--font-pixel-display), monospace" }}
+              >
+                Attack
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Transition-message banner — shown between questions and
+            during the swing beat. Text is one of the three spec
+            lines picked from the last HP delta (set by the HP-diff
+            effect above); if the swing/transition state was entered
+            without a known outcome yet, default to "struck home" so
+            the banner never renders empty. */}
+        {(attackPhase !== "idle" ||
+          (question._id as unknown as string) === "transition") && (
+          <div
+            className="flex min-h-[96px] items-center justify-center border-2 border-white bg-black px-6 py-5 text-center"
+            role="status"
+            aria-live="polite"
           >
-            Attack
-          </button>
-        </div>
+            <span
+              className="text-sm font-mono uppercase tracking-[0.14em] text-white sm:text-base"
+              style={{
+                fontFamily: "var(--font-pixel-display), monospace",
+                textShadow: "0 1px 6px rgba(0,0,0,0.7)",
+              }}
+            >
+              {transitionMessage ?? "Your attack was effective."}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -879,17 +1009,22 @@ function DialoguePanel({
     }
     wasTypingRef.current = isTyping;
   }, [isTyping, onDone]);
-  // Prefer the hand-picked face-portrait for this boss when we have
-  // one — those are cropped as clean head-shots, so they fill the
-  // red 64×64 cell without the aggressive spritesheet-clipping math
-  // BossFacePortrait needs. Falls through to spritesheet clipping,
-  // then to the procedural SVG.
-  const bossFaceUrl = persona === "villain" ? getBossFaceUrl(bossName) : null;
+  // Always prefer the hand-picked boss head-shot for this boss when
+  // we have one — the whole combat round is against ONE boss, so
+  // every question (whether the underlying prompt was authored in a
+  // "villain" or "mentor" voice) should show the boss's face in the
+  // portrait cell. Previous rev gated on persona==="villain", so
+  // every alternating "mentor" question in a round rendered the
+  // generic purple wizard SVG. Product feedback: "makee sure every
+  // ai combat screen uses boss head png".
+  // Fallback chain (only if no hand-picked face exists):
+  //   bossFaceUrl → clipped spritesheet frame → procedural SVG.
+  const bossFaceUrl = getBossFaceUrl(bossName);
   return (
     <div className="flex items-start gap-4 bg-black p-4">
       {bossFaceUrl ? (
         <BossFaceImagePortrait src={bossFaceUrl} bossName={bossName ?? ""} />
-      ) : bossAsset && persona === "villain" ? (
+      ) : bossAsset ? (
         <BossFacePortrait bossAsset={bossAsset} />
       ) : (
         <Portrait persona={persona} talking={isTyping} />
@@ -1226,7 +1361,7 @@ function PersonaChip({ persona }: { persona: "villain" | "mentor" }) {
  * → artisans-map.  Falls back to the neutral arena backdrop when the
  * boss path is missing or unfamiliar.
  */
-function deriveBiomeMap(bossAsset: string | null | undefined): string {
+export function deriveBiomeMap(bossAsset: string | null | undefined): string {
   const fallback = "/assets/maps-v2/arena/arena-background.png";
   if (!bossAsset) return fallback;
   if (bossAsset.includes("/bosses/village/")) {
@@ -1237,11 +1372,30 @@ function deriveBiomeMap(bossAsset: string | null | undefined): string {
   if (bossAsset.includes("/bosses/stage2/")) {
     return "/assets/maps-v2/forest/forest-map.png";
   }
+  // Arena bosses live under /bosses/arena/ (Judge, Advocate, Masked
+  // Challenger, Oracle). Route them to the actual Arena painted map
+  // instead of falling through to the village backdrop.
+  if (bossAsset.includes("/bosses/arena/")) {
+    return "/assets/maps-v2/arena/arena-map.png";
+  }
   if (bossAsset.includes("/bosses/stage3/")) {
     return "/assets/maps-v2/golden-harbor/harbor-map.png";
   }
   if (bossAsset.includes("/bosses/stage4/")) {
     return "/assets/maps-v2/artisans/artisans-map.png";
+  }
+  // Stage 5 (Mine) — Ironhold biome. Falls back to arena bg only if
+  // the mine map hasn't been authored yet.
+  if (bossAsset.includes("/bosses/stage5/") || bossAsset.includes("/bosses/mine/")) {
+    return "/assets/maps-v2/mine/mine-map.png";
+  }
+  // Stage 7 (Crossroads Town) — Iteration biome. Same fallback rule
+  // if the map isn't shipped.
+  if (
+    bossAsset.includes("/bosses/stage7/") ||
+    bossAsset.includes("/bosses/crossroads/")
+  ) {
+    return "/assets/maps-v2/crossroads-town/crossroads-map.png";
   }
   return fallback;
 }
@@ -1646,12 +1800,11 @@ function BattleScene({
           200px wide against a 120px sprite, so the character sat pushed
           to the left edge instead of dead-center. */}
       <div
-        className="pointer-events-none absolute bottom-2 left-8 z-10 sm:bottom-3 sm:left-16"
-        style={{ width: 120 }}
+        className="pointer-events-none absolute bottom-2 left-2 z-10 w-[30%] max-w-[120px] sm:bottom-3 sm:left-16"
       >
-        <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-widest text-white/85">
-          <span>You</span>
-          <span className="tabular-nums text-white/60">
+        <div className="flex items-center justify-between gap-1 font-mono text-[8px] uppercase tracking-widest text-white/85 sm:text-[9px]">
+          <span className="truncate">You</span>
+          <span className="tabular-nums text-white/60 shrink-0">
             {Math.max(0, Math.round(playerHpCurrent))}/{playerHpInitial}
           </span>
         </div>
@@ -1677,12 +1830,11 @@ function BattleScene({
           its HP bar instead of floating it toward the right edge like
           the previous 200px bar did. */}
       <div
-        className="pointer-events-none absolute bottom-2 right-8 z-10 sm:bottom-3 sm:right-16"
-        style={{ width: 300 }}
+        className="pointer-events-none absolute bottom-2 right-2 z-10 w-[55%] max-w-[300px] sm:bottom-3 sm:right-16"
       >
-        <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-widest text-white/85">
-          <span className="truncate pr-2">{bossName}</span>
-          <span className="tabular-nums text-white/60">
+        <div className="flex items-center justify-between gap-1 font-mono text-[8px] uppercase tracking-widest text-white/85 sm:text-[9px]">
+          <span className="truncate">{bossName}</span>
+          <span className="tabular-nums text-white/60 shrink-0">
             {Math.max(0, Math.round(bossHpCurrent))}/{bossHpInitial}
           </span>
         </div>
@@ -1733,37 +1885,49 @@ function BattleScene({
           bottom: "-40px",
           // CINEMATIC LAYOUT
           // - retreat stage (WIN only): boss slides ~180px to the RIGHT
-          //   + fades to 40% + shrinks slightly, so it visually
-          //   RETREATS off the arena rather than just standing there
-          //   waiting for the defeat clip. Product ask: "at end when
-          //   boss is defeated a retreated animation should be played
-          //   for boss".
-          // - defeat stage: both sprites stay, loser plays its defeat
-          //   clip in place.
-          // - cheer stage: loser (opacity 0) is gone, winner moved to
-          //   center.
-          //   won → boss is the loser; lost → boss is the winner.
+          //   + fades + shrinks so it visually RETREATS off the arena.
+          //   Product ask: "at end when boss is defeated a retreated
+          //   animation should be played for boss".
+          // - defeat / cheer (WIN): PRESERVE the retreated transform so
+          //   the boss stays off-screen instead of CSS-easing back to
+          //   origin. Previous rev cleared the transform on `defeat`
+          //   which caused a visible bounce ("boss goes back, comes
+          //   back, then retreats") — the transition prop would ease
+          //   translateX(180px) → identity over 700ms, so the boss
+          //   walked back into frame before playing its defeat clip.
+          //   Now retreat → defeat → cheer is one clean slide-off.
+          // - lost path is unchanged: no retreat beat, boss stays in
+          //   place through defeat, then glides to center for VICTORY.
           opacity:
-            cinematicStage === "cheer" && outcome === "won"
-              ? 0
-              : cinematicStage === "retreat" && outcome === "won"
-                ? 0.45
-                : 1,
+            outcome === "won"
+              ? cinematicStage === "cheer"
+                ? 0
+                : cinematicStage === "retreat" || cinematicStage === "defeat"
+                  ? 0.35
+                  : 1
+              : 1,
           transform:
             cinematicStage === "cheer" && outcome === "lost"
               ? "translateX(calc(-50vw + 50%)) scale(1.15)"
-              : cinematicStage === "retreat" && outcome === "won"
+              : outcome === "won" &&
+                  (cinematicStage === "retreat" ||
+                    cinematicStage === "defeat" ||
+                    cinematicStage === "cheer")
                 ? "translateX(180px) scale(0.85)"
                 : undefined,
           filter:
-            cinematicStage === "retreat" && outcome === "won"
+            outcome === "won" &&
+            (cinematicStage === "retreat" || cinematicStage === "defeat")
               ? "blur(1px) saturate(0.6)"
               : undefined,
           // Slower ease during retreat so the flee reads as deliberate
           // and cinematic — the boss backing away in defeat, not just
           // sliding out.
           transition:
-            cinematicStage === "retreat" && outcome === "won"
+            outcome === "won" &&
+            (cinematicStage === "retreat" ||
+              cinematicStage === "defeat" ||
+              cinematicStage === "cheer")
               ? "opacity 900ms ease-in, transform 1400ms cubic-bezier(0.22, 1, 0.36, 1), filter 900ms ease-in"
               : "opacity 500ms ease-out, transform 700ms cubic-bezier(0.4, 0, 0.2, 1)",
           pointerEvents:
@@ -1792,18 +1956,18 @@ function BattleScene({
             //   Optimistic pending-attack → boss shows HURT too.
             //   BLOCK / idle → idle breathing loop.
             state={
-              // Cinematic staging with the new RETREAT beat:
-              // - won → RETREAT: hold idle so the banner reads over a
-              //         still boss (feels like the boss is FROZEN
-              //         mid-thought before fleeing). DEFEAT + CHEER:
-              //         play defeat clip once, then hold last frame
-              //         while the boss fades out during CHEER.
+              // Cinematic staging:
+              // - won → HOLD "idle" through every WIN stage. The
+              //   retreat is a pure transform-slide off-screen, no
+              //   defeat clip in place. Bug fix: previously swapped to
+              //   "defeat" on the defeat stage, which combined with
+              //   the transform-clearing bug made the boss "walk back
+              //   into frame" and die on the spot. Now retreat → fade
+              //   off cleanly with no per-frame animation change.
               // - lost → boss WINS → wait through defeat stage in
               //          idle, then VICTORY loop when at center.
               outcome === "won"
-                ? cinematicStage === "retreat"
-                  ? "idle"
-                  : "defeat"
+                ? "idle"
                 : outcome === "lost"
                   ? cinematicStage === "cheer"
                     ? "victory"

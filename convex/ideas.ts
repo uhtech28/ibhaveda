@@ -224,8 +224,12 @@ export const createIdea = mutation({
 
     const ideaId = await ctx.db.insert("ideas", ideaData);
 
-    // Create notifications based on idea visibility
-    if (args.visibility === 'public') {
+    // Create notifications based on idea visibility. Root ideas only —
+    // sub-nodes (contributions posted via the map's CONTRIBUTIONS
+    // tile) are treated as project internals per the "tasks
+    // contribution flare don't count to created ideas" rule and
+    // should NOT broadcast "X shared a new idea" to every user.
+    if (args.visibility === 'public' && !args.parentId) {
       // For public ideas, notify all users except the creator
       const allUsers = await ctx.db.query("users").collect();
 
@@ -247,8 +251,9 @@ export const createIdea = mutation({
       // Wait for all notifications to be created
       await Promise.all(notificationPromises);
     } else {
-      // For private ideas, only notify the author (which is already excluded above)
-      // Private ideas don't generate public notifications to maintain privacy
+      // For private ideas OR sub-nodes (parentId set), no platform-
+      // wide notifications. Private ideas stay private; contributions
+      // surface inside the parent project's hierarchy instead.
     }
 
 
@@ -257,24 +262,35 @@ export const createIdea = mutation({
       await ctx.scheduler.runAfter(0, internal.socialProof.scheduleForNewIdea, { ideaId });
     }
 
-    // Gamification: Award XP and Coins for creating an idea
-    await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
-      userId: user._id,
-      amount: 50,
-      action: "create_idea",
-    });
+    // Gamification: Award XP + Coins + trigger badge checks ONLY for
+    // top-level (root) ideas. Sub-nodes — contributions posted via
+    // the Adventurer's Menu, or any future child ideas — pass a
+    // `parentId` and should NOT bump the "Created Ideas" counter,
+    // the XP tier, or the create-idea badge chain, because they are
+    // parts of an existing project rather than independent ideas.
+    // Product ask (verbatim): "make sure tasks contribution flare
+    // dont count to created ideas they are just part of idea/project".
+    // (Tasks + Flares live in separate tables so they never hit this
+    // mutation at all — the gate below covers the contributions case.)
+    if (!args.parentId) {
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+        userId: user._id,
+        amount: 50,
+        action: "create_idea",
+      });
 
-    await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
-      userId: user._id,
-      amount: 50,
-      type: "create_idea",
-      description: "Created a new idea"
-    });
+      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
+        userId: user._id,
+        amount: 50,
+        type: "create_idea",
+        description: "Created a new idea"
+      });
 
-    await ctx.scheduler.runAfter(0, internal.badges.checkBadges, {
-      userId: user._id,
-      trigger: "create_idea",
-    });
+      await ctx.scheduler.runAfter(0, internal.badges.checkBadges, {
+        userId: user._id,
+        trigger: "create_idea",
+      });
+    }
 
     // Auto-cross-post to any connected socials (LinkedIn / X / FB /
     // IG) the user has toggled on. Fire-and-forget action — a

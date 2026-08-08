@@ -21,6 +21,10 @@ import Link from "next/link";
 // the app. Caps selection at 5 so authors' incoming-request lists
 // don't get spammed with a laundry list of every skill.
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
+import {
+  useKeyboardInsets,
+  keyboardSafeStyle,
+} from "@/lib/hooks/useKeyboardInsets";
 
 interface ContributionRequestModalProps {
   ideaId: Id<"ideas">;
@@ -54,7 +58,15 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
 }) => {
   const createRequestMutation = useMutation(api.contributionRequests.createContributionRequest);
   const userRequests = useQuery(api.contributionRequests.getMyRequests);
-  
+
+  // Keyboard-aware sizing — this component is rendered inside
+  // multiple wrappers (map dialog, feed dialog, tutorial dialog),
+  // most of which don't set a keyboard-safe max-height on their
+  // DialogContent. By clamping the FORM itself we cover every
+  // call-site without touching each host. Fires the shared
+  // useKeyboardInsets hook (visualViewport-based).
+  const kb = useKeyboardInsets();
+
   const [message, setMessage] = useState("");
   // Skill tags the contributor is offering — capped at 5 by the
   // SkillsMultiSelect component itself. Server also dedupes + caps
@@ -216,7 +228,19 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-6 overflow-hidden">
+    <form
+      onSubmit={handleSubmit}
+      className="w-full min-w-0 space-y-6 overflow-y-auto"
+      // Clamp to the visible viewport when the on-screen keyboard is
+      // open (visualViewport-derived). Prevents the textarea + Send
+      // Request button from disappearing behind the keyboard on iOS
+      // Safari + Android Chrome per screenshot report.
+      style={
+        kb.isKeyboardOpen
+          ? { ...keyboardSafeStyle(kb, { reserveVh: 0.82 }), scrollPaddingBottom: 96 }
+          : undefined
+      }
+    >
       <div className="flex flex-col gap-1.5 text-left">
         <h2 className="text-lg leading-none font-semibold">
           Request to Contribute

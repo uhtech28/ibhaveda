@@ -24,6 +24,7 @@ export type SparkyMood = "idle" | "talking" | "pointing" | "celebrating";
  * are swallowed — the sound is nice-to-have, never blocking.
  */
 let __tutorialContinueAudio: HTMLAudioElement | null = null;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function playContinueSound(): void {
   if (typeof window === "undefined") return;
   try {
@@ -655,7 +656,7 @@ export function TutorialMascot({
   const [suppressedByOverlay, setSuppressedByOverlay] = useState(() => {
     if (typeof document === "undefined") return false;
     return !!document.querySelector(
-      '[data-tutorial="combat-panel"], [data-tutorial-hide="true"]',
+      '[data-tutorial="combat-panel"], [data-tutorial-hide="true"], [data-boss-intro="active"]',
     );
   });
   // useLayoutEffect (not useEffect) so the observer subscription
@@ -667,7 +668,7 @@ export function TutorialMascot({
     const check = () => {
       setSuppressedByOverlay(
         !!document.querySelector(
-          '[data-tutorial="combat-panel"], [data-tutorial-hide="true"]',
+          '[data-tutorial="combat-panel"], [data-tutorial-hide="true"], [data-boss-intro="active"]',
         ),
       );
     };
@@ -677,7 +678,11 @@ export function TutorialMascot({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-tutorial", "data-tutorial-hide"],
+      attributeFilter: [
+        "data-tutorial",
+        "data-tutorial-hide",
+        "data-boss-intro",
+      ],
     });
     return () => observer.disconnect();
   }, []);
@@ -760,7 +765,10 @@ export function TutorialMascot({
         label: primaryAction.label,
         onClick: () => {
           setCheerTick((n) => n + 1);
-          playContinueSound();
+          // Continue-chime disabled per product ask ("remove the music
+          // that is in continue button in tutorial"). The
+          // playContinueSound helper stays defined above so it can be
+          // re-enabled with one line if we want it back.
           primaryAction.onClick();
         },
       }

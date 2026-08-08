@@ -38,6 +38,10 @@ import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { cn } from "@/lib/utils";
 import { displayFontClass } from "@/components/ideaforge/shared";
+import {
+  useKeyboardInsets,
+  keyboardSafeStyle,
+} from "@/lib/hooks/useKeyboardInsets";
 
 const MIN_DESCRIPTION_CHARS = 20;
 const MAX_DESCRIPTION_CHARS = 600;
@@ -76,6 +80,12 @@ export function FlareComposeDialog({
   ventureId,
   checkpointId,
 }: Props) {
+  // Mobile keyboard-aware sizing — collapses the dialog max-height
+  // to the visible visualViewport so the Fire Flare button stays on
+  // screen when the keyboard opens. Fixes the screenshot report:
+  // "while typing the mobile layout mess". Cross-browser rationale
+  // in useKeyboardInsets.ts docstring.
+  const kb = useKeyboardInsets();
   // ── Fetch venture -> idea so we can pre-fill title + tags ────────────────
   const venture = useQuery(
     api.ventures.getVenture,
@@ -197,6 +207,7 @@ export function FlareComposeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[90dvh]"
+        style={keyboardSafeStyle(kb, { reserveVh: 0.92 })}
         data-tutorial="flare-compose"
       >
         <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
@@ -217,7 +228,10 @@ export function FlareComposeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0">
+        <div
+          className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0"
+          style={kb.isKeyboardOpen ? { scrollPaddingBottom: 96 } : undefined}
+        >
           {/* Title — pre-filled from the linked idea */}
           <div>
             <Input

@@ -23,6 +23,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import {
+  useKeyboardInsets,
+  keyboardSafeStyle,
+} from "@/lib/hooks/useKeyboardInsets";
+import {
   Sparkles,
   ArrowLeft,
   ArrowRight,
@@ -139,6 +143,14 @@ export function IdeaWizard({
   const createVenture = useMutation(api.ventures.createVenture);
   const generateUploadUrl = useMutation(api.ideas.generateUploadUrl);
   const attachFileToIdea = useMutation(api.ideas.attachFileToIdea);
+
+  // Mobile keyboard-aware sizing — the wizard has two long forms
+  // ("Describe Your Idea" outline step + "Your Idea" preview step)
+  // that both suffered from keyboard overlap on iOS + Android per
+  // screenshot report. Applying to the DialogContent style shrinks
+  // the whole modal to the visible visualViewport so the Create /
+  // Post Idea CTA stays reachable.
+  const kb = useKeyboardInsets();
 
   // ── Step & template state ──
   const [step, setStep] = useState<Step>("template");
@@ -614,6 +626,7 @@ export function IdeaWizard({
         className={cn(
           "w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[85dvh] sm:max-h-[90vh]",
         )}
+        style={keyboardSafeStyle(kb, { reserveVh: 0.9 })}
         onEscapeKeyDown={(e) => tutorialMode && e.preventDefault()}
         onPointerDownOutside={(e) => tutorialMode && e.preventDefault()}
         onInteractOutside={(e) => tutorialMode && e.preventDefault()}
@@ -737,7 +750,10 @@ export function IdeaWizard({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 flex flex-col px-5 py-4 min-h-0">
+            <div
+              className="flex-1 flex flex-col px-5 py-4 min-h-0 overflow-y-auto"
+              style={kb.isKeyboardOpen ? { scrollPaddingBottom: 120 } : undefined}
+            >
               <div className="relative flex-1">
                 {/* Amber "Describe your idea" tutorial callout REMOVED
                     per product request. Same treatment as the amber
@@ -893,7 +909,10 @@ export function IdeaWizard({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0">
+            <div
+              className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0"
+              style={kb.isKeyboardOpen ? { scrollPaddingBottom: 120 } : undefined}
+            >
               <div>
                 <Input
                   id="wiz-title"

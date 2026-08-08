@@ -34,6 +34,12 @@ interface TutorialHighlightProps {
   passthroughCutout?: boolean;
   /** Optional click handler on the dimmed area. */
   onDimClick?: () => void;
+  /**
+   * When true, the dim overlay still spotlights the target BUT the
+   * pulsing amber ring is suppressed. Used on the write-outline step
+   * where the ring reads as noise on the textarea.
+   */
+  noRing?: boolean;
 }
 
 interface Rect {
@@ -52,6 +58,7 @@ export function TutorialHighlight({
   rx = 10,
   passthroughCutout = true,
   onDimClick,
+  noRing = false,
 }: TutorialHighlightProps) {
   const [rect, setRect] = useState<Rect>(EMPTY_RECT);
   // Auto-detected border-radius of the target element — updated each measure
@@ -231,12 +238,29 @@ export function TutorialHighlight({
             />
           </svg>
 
-          {/* Amber ring around the target REMOVED per product ask
-              ("remove golden outline from these 2 boxes completely").
-              The dim-overlay cutout above still spotlights the
-              target — it just no longer has a golden rim. If we
-              want a subtle highlight back in the future, restore
-              the div below with a lower-opacity boxShadow. */}
+          {/* Amber/gold highlight ring around the target — matches
+              the flare menu-tile's amber palette so the tutorial
+              highlight reads consistent with the flare tile that
+              Sparky guides users to open later. Product ask: "use
+              golden hilight like other tutroial like flare have". */}
+          {hasTarget && !noRing && (
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute"
+              style={{
+                left: rect.x,
+                top: rect.y,
+                width: rect.width,
+                height: rect.height,
+                borderRadius: effectiveRx,
+                boxShadow:
+                  "0 0 0 2px #fbbf24, 0 0 0 5px rgba(251,191,36,0.35), 0 0 24px rgba(251,191,36,0.55)",
+              }}
+              initial={{ opacity: 0.55 }}
+              animate={{ opacity: [0.55, 1, 0.55] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
         </motion.div>
       )}
     </AnimatePresence>

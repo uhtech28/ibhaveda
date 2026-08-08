@@ -48,12 +48,9 @@ export function PersonaSelector({
         <header className="persona-header">
           {/* "Step 2 of 2 — pick your builder" eyebrow removed per
               product request — the header now leads with the title. */}
-          <h1 className="persona-title">Choose your persona</h1>
-          <p className="persona-sub">
-            The archetype you pick shapes how the world sees you and
-            what your character looks like on the venture map. You can
-            change this later from your profile.
-          </p>
+          <h1 className="persona-title">Choose your Persona</h1>
+          {/* Product ask: "remove line The archetype you pick..." —
+              header now leads straight into the grid, no subline. */}
         </header>
 
         <div
@@ -251,12 +248,16 @@ export function PersonaSelector({
           animation: personaFadeIn 0.35s ease-out;
         }
         .persona-wrap {
-          max-width: 1080px;
+          /* Wrap max-width scales with the viewport so big MacBook /
+             external monitors don't get boxed into a tiny 1080px
+             column with empty margins. Product feedback: "on device
+             like macbook big laptop it showed small layout". */
+          max-width: min(1600px, 92vw);
           margin: 0 auto;
-          padding: 28px 24px 28px;
+          padding: clamp(24px, 2.5vw, 44px) clamp(20px, 2vw, 32px);
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: clamp(20px, 2vw, 34px);
         }
         .persona-header {
           text-align: center;
@@ -264,23 +265,20 @@ export function PersonaSelector({
         .persona-title {
           font-family: var(--font-display, "Space Grotesk", "Inter", sans-serif);
           font-weight: 700;
-          font-size: clamp(24px, 3.5vw, 34px);
+          /* Upper cap bumped from 34px → 48px so the title scales
+             into the extra width big screens now get. */
+          font-size: clamp(24px, 3.4vw, 48px);
           line-height: 1.15;
           letter-spacing: -0.4px;
           color: #ffffff;
           margin-bottom: 8px;
         }
-        .persona-sub {
-          color: #9ca3af;
-          font-size: 13px;
-          line-height: 1.5;
-          max-width: 540px;
-          margin: 0 auto;
-        }
         .persona-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 14px;
+          /* Gap grows with the viewport too so cards breathe on
+             bigger screens instead of feeling glued together. */
+          gap: clamp(14px, 1.4vw, 24px);
         }
         /* Tablet — 3 columns so the grid stays legible under 900px
            and doesn't jump straight to 2. */
@@ -301,17 +299,17 @@ export function PersonaSelector({
         .persona-card {
           /* Fixed min-height + justify-content:space-between so every
              card in the grid has the same footprint regardless of
-             tagline word-count — otherwise "The tinker of odd
-             combinations" stretches its cell taller than "Oracle / The
-             visionary seer" and the row loses its baseline. */
+             tagline word-count. Dimensions clamp so big screens
+             get proportionally bigger cards. */
           position: relative;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          gap: 14px;
-          padding: 20px 14px 22px;
-          min-height: 232px;
+          gap: clamp(12px, 1vw, 18px);
+          padding: clamp(18px, 1.6vw, 28px) clamp(12px, 1.2vw, 20px)
+            clamp(20px, 1.8vw, 30px);
+          min-height: clamp(232px, 22vw, 320px);
           border-radius: 18px;
           /* Card fill + border bumped from 3.5% / 8% white so each
              card actually reads as a card on the dark purple bg
@@ -339,8 +337,11 @@ export function PersonaSelector({
         }
         .persona-portrait-wrap {
           position: relative;
-          width: 96px;
-          height: 96px;
+          /* Portrait tile scales with the viewport so big screens
+             get bigger, more legible art instead of a small 96px
+             stamp lost in a wide card. */
+          width: clamp(96px, 8vw, 140px);
+          height: clamp(96px, 8vw, 140px);
           border-radius: 14px;
           overflow: hidden;
           background: rgba(0, 0, 0, 0.35);
@@ -372,14 +373,14 @@ export function PersonaSelector({
           text-align: center;
         }
         .persona-name {
-          font-size: 15px;
+          font-size: clamp(15px, 1.2vw, 20px);
           font-weight: 700;
           color: #f6f4fa;
-          margin-bottom: 3px;
+          margin-bottom: 4px;
           letter-spacing: 0.2px;
         }
         .persona-tag {
-          font-size: 11.5px;
+          font-size: clamp(11.5px, 0.95vw, 15px);
           color: #a49bc0;
           line-height: 1.4;
           min-height: 32px;

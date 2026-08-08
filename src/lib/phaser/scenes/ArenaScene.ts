@@ -18,7 +18,7 @@
 
 import * as Phaser from "phaser";
 import { eventBridge } from "../utils/event-bridge";
-import { addBossHpBar, type BossHpBar } from "../animations/bossAnimator";
+import { type BossHpBar } from "../animations/bossAnimator";
 import { getStageMiniBosses, getStageSuperBoss } from "@/config/stage-bosses";
 import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day";
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
@@ -34,8 +34,23 @@ import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
 import {
   getCurrentPersonaId,
   loadPersonaSprites,
-  personaSpriteKey,
+  registerPersonaAnimations,
 } from "@/lib/phaser/persona-assets";
+import {
+  loadBossAssets,
+  registerBossAnimations,
+  spawnMovingBoss,
+  retreatBossTo,
+  dissolveBoss,
+  spawnPersonaCharacter,
+  walkPersonaTo,
+  revealSuperBoss as revealSuperBossHelper,
+  playBossState,
+  playPersonaState,
+  playPersonaVictoryPose,
+  type MovingBossHandle,
+  type PersonaHandle,
+} from "@/lib/phaser/animations/stageMapAnimations";
 
 const MAP_ASSET = "/assets/maps-v2/arena/arena-map.png";
 const MAP_WIDTH = 2624;
@@ -61,8 +76,11 @@ function pointInAnyBlockedZone(x: number, y: number): boolean {
 
 const CHAR_IDLE_ASSET = "/assets/fan-tasy/Character_Idle.webp";
 const CHAR_WALK_ASSET = "/assets/fan-tasy/Character_Walk.webp";
-const CHAR_SCALE = 2.2;
-const CHAR_Y_OFFSET = 18;
+// Village-parity: persona spawns TOP-LEFT of the CP marker so it doesn't
+// overlap the boss (which sits at spriteXOffset=0 on the disc). See
+// VillageMapScene.ts:330-331 for the origin of these values.
+const CHAR_X_OFFSET = -60;
+const CHAR_Y_OFFSET = -45;
 
 /**
  * The Arena has 4 CPs per venture spec (Validation stage).
@@ -90,24 +108,25 @@ const CHECKPOINTS: readonly Checkpoint[] = [
   { index: 3, x: 2280, y: 1150, label: "The Verdict Pillar" },  // bottom-right mystical portal
 ];
 
-const BOSS_OFFSETS: readonly { x: number; y: number; scale: number }[] = [
+// BOSS_OFFSETS retained for backwards-reference; the moving-boss model
+// uses per-boss spriteScale/spriteXOffset/spriteYOffset from
+// stage-bosses.ts instead of this table.
+const _BOSS_OFFSETS_LEGACY: readonly { x: number; y: number; scale: number }[] = [
   { x: 105, y: -30, scale: 1.5 },
-  { x: -110, y: -30, scale: 1.5 },
-  { x: 105, y: -30, scale: 1.6 },
-  { x: -105, y: -30, scale: 1.7 },
 ];
+void _BOSS_OFFSETS_LEGACY;
 
 const WALK_DURATION_MS = 1800;
 
 export class ArenaScene extends Phaser.Scene {
   private currentIndex = 0;
-  private character: Phaser.GameObjects.Sprite | null = null;
-  private characterShadow: Phaser.GameObjects.Ellipse | null = null;
+  private personaHandle: PersonaHandle | null = null;
   private isAnimating = false;
   private checkpointNodes: Phaser.GameObjects.Arc[] = [];
-  private miniBossSprites: (Phaser.GameObjects.Sprite | null)[] = [];
-  private miniBossHpBars: (BossHpBar | null)[] = [];
-  private superBossSprite: Phaser.GameObjects.Sprite | null = null;
+  /** Village-parity: ONE moving boss walks the whole map, retreating
+   *  east/west on advance until it dies at the final CP. */
+  private movingBoss: MovingBossHandle | null = null;
+  private superBoss: MovingBossHandle | null = null;
   private superBossHpBar: BossHpBar | null = null;
   private superBossRevealed = false;
   private todController: TimeOfDayController | null = null;
@@ -140,17 +159,15 @@ export class ArenaScene extends Phaser.Scene {
         frameHeight: 48,
       });
     }
-    // Boss art for Stage 3 (Advocate of Comfortable Lies + minis) is
-    // still pending — getStageMiniBosses(3) currently returns [], so no
-    // additional preloads run.  Once the boss roster lands in
-    // stage-bosses.ts, this loop starts pulling their idle sprites.
+    // Village-parity: pull EVERY available clip (idle/attack/hurt/
+    // defeat/victory) for each Stage-3 boss via the shared helper.
+    // Missing clips are silently skipped and the state machine falls
+    // back through hurt→idle / attack→idle at play time.
     for (const boss of getStageMiniBosses(3)) {
-      this.load.image(`arena-boss-${boss.checkpointIndex}`, boss.idleAsset);
+      loadBossAssets(this, 3, boss);
     }
     const superBoss = getStageSuperBoss(3);
-    if (superBoss) {
-      this.load.image("arena-super-boss", superBoss.idleAsset);
-    }
+    if (superBoss) loadBossAssets(this, 3, superBoss);
   }
 
   create(): void {
@@ -257,9 +274,15 @@ export class ArenaScene extends Phaser.Scene {
     // `this._corruption?.…` callsite silently no-ops.
     this._corruption = null;
 
+    // Register persona + boss animations (must happen AFTER loader
+    // finishes, i.e. in create(), not preload()). Idempotent.
+    registerPersonaAnimations(this, getCurrentPersonaId());
+    for (const b of getStageMiniBosses(3)) registerBossAnimations(this, 3, b);
+    const sb = getStageSuperBoss(3);
+    if (sb) registerBossAnimations(this, 3, sb);
+
     this.spawnCharacter();
-    this.spawnMiniBosses();
-    this.refreshMiniBossVisibility();
+    this.spawnMovingBoss();
     // Arena biome doesn't have its own TOD/VFX palette entry yet.  Use
     // the artisan palette temporarily since it reads warm-lit against
     // sandy floors and torch-lined walls.  Swap to a dedicated "arena"
@@ -319,68 +342,42 @@ export class ArenaScene extends Phaser.Scene {
     eventBridge.dispatchToReact({ type: "PHASER_READY" });
   }
 
-  private spawnMiniBosses(): void {
-    for (const boss of getStageMiniBosses(3)) {
-      const cp = CHECKPOINTS[boss.checkpointIndex];
-      const offset = BOSS_OFFSETS[boss.checkpointIndex];
-      const key = `arena-boss-${boss.checkpointIndex}`;
-      if (!cp || !offset || !this.textures.exists(key)) {
-        this.miniBossSprites.push(null);
-        this.miniBossHpBars.push(null);
-        continue;
-      }
-      const sprite = this.add.sprite(cp.x + offset.x, cp.y + offset.y, key);
-      sprite.setOrigin(0.5, 1);
-      sprite.setScale(offset.scale);
-      sprite.setDepth(60);
-      sprite.setFlipX(offset.x > 0);
-      this.tweens.add({
-        targets: sprite,
-        y: sprite.y - 6,
-        duration: 1400 + boss.checkpointIndex * 120,
-        ease: "Sine.easeInOut",
-        yoyo: true,
-        repeat: -1,
-      });
-      const hpBar = addBossHpBar(this, sprite, 1, boss.name);
-      this.miniBossSprites.push(sprite);
-      this.miniBossHpBars.push(hpBar);
-    }
-  }
-
-  private refreshMiniBossVisibility(): void {
-    for (let i = 0; i < this.miniBossSprites.length; i++) {
-      const sprite = this.miniBossSprites[i];
-      const hpBar = this.miniBossHpBars[i];
-      const isActive = i === this.currentIndex;
-      if (sprite) {
-        const wasVisible = sprite.visible;
-        sprite.setVisible(isActive);
-        if (isActive && !wasVisible) {
-          const originalScale = sprite.scale;
-          this.tweens.add({
-            targets: sprite,
-            scaleX: originalScale * 0.75,
-            scaleY: originalScale * 1.15,
-            duration: 130,
-            ease: "Sine.easeIn",
-            yoyo: true,
-            repeat: 1,
-            onComplete: () => sprite.setScale(originalScale),
-          });
-        }
-      }
-      if (hpBar) hpBar.setVisible(isActive);
-    }
+  /**
+   * Village-parity spawn: ONE moving boss lives on the map. The FIRST
+   * roster entry is the "walking boss" that retreats between CPs; the
+   * remaining roster entries provide names + intro lines for combat
+   * lookups but no sprite. When we `advanceToNextCheckpoint`, we
+   * `retreatBossTo` the next CP AND swap the moving boss's identity to
+   * the next roster entry (so name/intro/family line up with the CP the
+   * player is now fighting at).
+   */
+  private spawnMovingBoss(): void {
+    const bosses = getStageMiniBosses(3);
+    if (bosses.length === 0) return;
+    const first = bosses[0];
+    const cp = CHECKPOINTS[this.currentIndex];
+    if (!cp) return;
+    this.movingBoss = spawnMovingBoss(this, 3, first, cp, {
+      showHpBar: true,
+    });
+    this.movingBoss.cpIndex = this.currentIndex;
+    // Face the character (persona spawns at CP top-left → left of boss)
+    this.movingBoss.sprite.setFlipX(true);
   }
 
   public weakenActiveBoss(tasksDone: number, total: number = 3): void {
-    const hpBar = this.miniBossHpBars[this.currentIndex];
-    if (hpBar) {
-      hpBar.setHp(Math.max(0, 1 - tasksDone / total));
+    if (this.movingBoss?.hpBar) {
+      this.movingBoss.hpBar.setHp(Math.max(0, 1 - tasksDone / total));
     }
-    // Update the corruption overlay for THIS CP's segment. 2/3 → 10%
-    // opacity + weakened monster; 3/3 → 0% + shatter burst.
+    // Play a "hurt" flash on the boss + "attack" on the persona to sell
+    // the task completion as a combat hit. Idempotent — helper guards
+    // busy state so rapid-fire clicks don't stomp on the animation.
+    if (this.movingBoss) {
+      playBossState(this, this.movingBoss, "hurt");
+    }
+    if (this.personaHandle) {
+      playPersonaState(this, this.personaHandle, "attack");
+    }
     this._corruption?.updateSegment(this.currentIndex, tasksDone);
   }
 
@@ -396,73 +393,21 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnCharacter(): void {
     const active = CHECKPOINTS[this.currentIndex];
-    const personaId = getCurrentPersonaId();
-    const personaIdleTex = personaSpriteKey(personaId, "idle");
-    const personaWalkTex = personaSpriteKey(personaId, "walk");
-    const idleTexKey = this.textures.exists(personaIdleTex)
-      ? personaIdleTex
-      : "village-persona-idle";
-    const walkTexKey = this.textures.exists(personaWalkTex)
-      ? personaWalkTex
-      : "village-persona-walk";
-    if (!this.textures.exists(idleTexKey)) return;
-
-    // If a previous scene registered these anims against the OLD texture,
-    // drop them so we rebind to the picked persona's sheet.
-    if (this.anims.exists("persona-idle")) this.anims.remove("persona-idle");
-    if (this.anims.exists("persona-walk")) this.anims.remove("persona-walk");
-
-    const idleFrames = this.textures.get(idleTexKey).frameTotal;
-    this.anims.create({
-      key: "persona-idle",
-      frames: this.anims.generateFrameNumbers(idleTexKey, {
-        start: 0,
-        end: Math.max(0, Math.min(idleFrames - 1, 3)),
-      }),
-      frameRate: 4,
-      repeat: -1,
+    // Village-parity spawn via shared helper — respects extended
+    // Pixellab personas + falls back to the legacy fantasy sheet for
+    // any persona that hasn't been re-generated yet.
+    this.personaHandle = spawnPersonaCharacter(this, active, {
+      legacyIdleKey: "village-persona-idle",
+      legacyWalkKey: "village-persona-walk",
+      xOffset: CHAR_X_OFFSET,
+      yOffset: CHAR_Y_OFFSET,
     });
+  }
 
-    const walkFrames = this.textures.get(walkTexKey).frameTotal;
-    // For legacy Village sheet, useful walk frames are 10..14. For extended
-    // personas, walk frames start at 0. Pick range based on which sheet.
-    const walkStart = walkTexKey === "village-persona-walk" ? 10 : 0;
-    const walkEnd = walkTexKey === "village-persona-walk"
-      ? Math.min(walkFrames - 1, 14)
-      : Math.min(walkFrames - 1, 5);
-    this.anims.create({
-      key: "persona-walk",
-      frames: this.anims.generateFrameNumbers(walkTexKey, {
-        start: walkStart,
-        end: walkEnd,
-      }),
-      frameRate: 10,
-      repeat: -1,
-    });
-
-    const groundY = active.y + CHAR_Y_OFFSET + 4;
-    this.characterShadow = this.add
-      .ellipse(active.x, groundY, 54, 14, 0x000000, 0.42)
-      .setDepth(95);
-
-    this.character = this.add.sprite(
-      active.x,
-      active.y + CHAR_Y_OFFSET,
-      idleTexKey,
-    );
-    this.character.setOrigin(0.5, 1);
-    this.character.setScale(CHAR_SCALE);
-    this.character.setDepth(100);
-    this.character.play("persona-idle");
-
-    this.time.addEvent({
-      delay: 60,
-      loop: true,
-      callback: () => {
-        if (!this.character || !this.characterShadow) return;
-        this.characterShadow.setPosition(this.character.x, groundY);
-      },
-    });
+  /** Compat accessor for other systems (e.g. attachEditorTestWalk) that
+   *  still expect a `character` sprite reference. */
+  private get character(): Phaser.GameObjects.Sprite | null {
+    return this.personaHandle?.sprite ?? null;
   }
 
   private onCheckpointClicked(cp: Checkpoint): void {
@@ -477,15 +422,19 @@ export class ArenaScene extends Phaser.Scene {
   public advanceToNextCheckpoint(): void {
     if (this.isAnimating) return;
     if (this.currentIndex >= CHECKPOINTS.length - 1) {
-      // Stage 3 (Arena · Validation) fully cleared → advance to Stage
-      // 4 (Artisan's Quarter · Offer Design).  When super-boss art
-      // (Advocate of Comfortable Lies) arrives, this branch will
-      // instead call revealSuperBoss() and STAGE_COMPLETE gets fired
-      // from defeatSuperBoss() after the fight.
+      // Village-parity: on the final CP, DISSOLVE the moving boss
+      // (it "dies" at the last checkpoint per product spec), then
+      // reveal the super boss so combat can begin.
       if (!this.superBossRevealed) {
         const superBoss = getStageSuperBoss(3);
         if (superBoss) {
-          this.revealSuperBoss();
+          if (this.movingBoss) {
+            dissolveBoss(this, this.movingBoss, {
+              onComplete: () => this.revealSuperBoss(),
+            });
+          } else {
+            this.revealSuperBoss();
+          }
           return;
         }
       }
@@ -500,9 +449,35 @@ export class ArenaScene extends Phaser.Scene {
     const clearedCp = CHECKPOINTS[this.currentIndex];
     if (clearedCp) playCpClearBurst(this, clearedCp.x, clearedCp.y, "standard");
     this.currentIndex += 1;
-    this.refreshMiniBossVisibility();
     const to = CHECKPOINTS[this.currentIndex];
-    if (this.character) this.walkCharacterTo(to.x, to.y + CHAR_Y_OFFSET);
+
+    // Village-parity: retreat the moving boss to the next CP first,
+    // then walk the character behind it. Both animations run in
+    // parallel so the map feels alive rather than sequential.
+    if (this.movingBoss) {
+      // Refresh HP bar for the new "encounter" (next boss's fight)
+      if (this.movingBoss.hpBar) this.movingBoss.hpBar.setHp(1);
+      // Swap the boss identity to the roster entry for the new CP so
+      // combat lookups pull the correct name/family/taunt copy.
+      const bosses = getStageMiniBosses(3);
+      const nextBossDef = bosses[this.currentIndex] ?? bosses[bosses.length - 1];
+      if (nextBossDef) {
+        this.movingBoss.boss = nextBossDef;
+      }
+      retreatBossTo(this, this.movingBoss, to, {
+        durationMs: WALK_DURATION_MS,
+        faceX: to.x + CHAR_X_OFFSET,
+      });
+      this.movingBoss.cpIndex = this.currentIndex;
+    }
+    if (this.personaHandle) {
+      walkPersonaTo(
+        this,
+        this.personaHandle,
+        { x: to.x + CHAR_X_OFFSET, y: to.y + CHAR_Y_OFFSET },
+        { durationMs: WALK_DURATION_MS },
+      );
+    }
     this.cameras.main.pan(to.x, to.y, WALK_DURATION_MS, "Sine.easeInOut");
     this.time.delayedCall(WALK_DURATION_MS + 100, () => {
       this.isAnimating = false;
@@ -510,47 +485,34 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /**
-   * Reveal the Advocate of Comfortable Lies super boss.  Fires
-   * SUPER_BOSS_ENCOUNTER with the real Advocate sprite (arena/advocate/
-   * idle.png).  Choreography matches Forest/Harbor/Artisans: rise +
-   * head-snap + idle.
+   * Reveal the stage-3 super boss (Advocate of Comfortable Lies).
+   * Delegates to the shared helper which does the rise/scale/pan
+   * choreography AND the persona victory pose that Village uses.
    */
   private revealSuperBoss(): void {
     if (this.superBossRevealed) return;
     this.superBossRevealed = true;
+    const superBoss = getStageSuperBoss(3);
+    if (!superBoss) return;
     const cp4 = CHECKPOINTS[CHECKPOINTS.length - 1];
-    const superX = cp4.x + 150;
-    const superY = cp4.y - 30;
-    this.cameras.main.pan(superX, superY, 1400, "Sine.easeInOut");
+    const superX = cp4.x + 180;
+    const superY = cp4.y - 40;
 
-    if (this.textures.exists("arena-super-boss")) {
-      const sprite = this.add.sprite(superX, superY + 260, "arena-super-boss");
-      sprite.setOrigin(0.5, 1);
-      sprite.setScale(0);
-      sprite.setDepth(70);
-      sprite.setAlpha(0);
-      this.superBossSprite = sprite;
-      this.tweens.add({
-        targets: sprite,
-        y: superY,
-        alpha: 1,
-        scale: 2.6,
-        duration: 1600,
-        delay: 400,
-        ease: "Sine.easeOut",
-      });
-      const superBoss = getStageSuperBoss(3);
-      if (superBoss) {
-        this.superBossHpBar = addBossHpBar(this, sprite, 1, superBoss.name);
-      }
+    // Persona reacts (gold aura + hop + victory pose) — Village parity
+    if (this.personaHandle) {
+      playPersonaVictoryPose(this, this.personaHandle, superX);
     }
 
+    this.superBoss = revealSuperBossHelper(this, 3, superBoss, { x: superX, y: superY }, {
+      panDurationMs: 1400,
+    });
+    this.superBossHpBar = this.superBoss.hpBar;
+
     this.time.delayedCall(2200, () => {
-      const superBoss = getStageSuperBoss(3);
       eventBridge.dispatchToReact({
         type: "SUPER_BOSS_ENCOUNTER",
         stage: 3,
-        bossSlug: superBoss?.name,
+        bossSlug: superBoss.name,
       });
     });
   }
@@ -565,42 +527,23 @@ export class ArenaScene extends Phaser.Scene {
       });
       return;
     }
-    if (this.superBossHpBar) this.superBossHpBar.setHp(0);
-    if (this.superBossSprite) {
-      this.tweens.add({
-        targets: this.superBossSprite,
-        alpha: 0,
-        scale: 2.8,
-        y: this.superBossSprite.y + 30,
-        duration: 900,
-        ease: "Sine.easeIn",
+    if (this.superBoss) {
+      dissolveBoss(this, this.superBoss, {
+        onComplete: () => {
+          eventBridge.dispatchToReact({
+            type: "STAGE_COMPLETE",
+            stage: 3,
+            nextStage: 4,
+          });
+        },
       });
-    }
-    this.time.delayedCall(1200, () => {
+    } else {
       eventBridge.dispatchToReact({
         type: "STAGE_COMPLETE",
         stage: 3,
         nextStage: 4,
       });
-    });
-  }
-
-  private walkCharacterTo(x: number, y: number): void {
-    const char = this.character;
-    if (!char) return;
-    char.setFlipX(x < char.x);
-    char.play("persona-walk");
-    this.tweens.add({
-      targets: char,
-      x,
-      y,
-      duration: WALK_DURATION_MS,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        char.setFlipX(false);
-        char.play("persona-idle");
-      },
-    });
+    }
   }
 
   public getCurrentIndex(): number {
@@ -611,7 +554,16 @@ export class ArenaScene extends Phaser.Scene {
     this.currentIndex = Phaser.Math.Clamp(i, 0, CHECKPOINTS.length - 1);
     const cp = CHECKPOINTS[this.currentIndex];
     this.cameras.main.centerOn(cp.x, cp.y);
-    if (this.character) this.character.setPosition(cp.x, cp.y + CHAR_Y_OFFSET);
+    if (this.personaHandle) {
+      this.personaHandle.sprite.setPosition(cp.x + CHAR_X_OFFSET, cp.y + CHAR_Y_OFFSET);
+      this.personaHandle.groundY = cp.y + CHAR_Y_OFFSET + 4;
+    }
+    if (this.movingBoss) {
+      const xOff = this.movingBoss.boss.spriteXOffset ?? 0;
+      const yOff = this.movingBoss.boss.spriteYOffset ?? 62;
+      this.movingBoss.sprite.setPosition(cp.x + xOff, cp.y + yOff);
+      this.movingBoss.cpIndex = this.currentIndex;
+    }
   }
 
   shutdown(): void {

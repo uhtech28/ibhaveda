@@ -209,19 +209,19 @@ export function MapNavbar() {
 
                 <div className="h-4 sm:h-5 w-px bg-white/10 shrink-0" />
 
-                {/* Quality Metric */}
+                {/* Quality Metric — label span removed because
+                    `templateMetric.displayValue` already includes the
+                    unit (e.g. "0.1 JIF"), so rendering the small
+                    "JIF" label above the value showed "JIF" twice.
+                    Product report: "jif is mentioned 2 times remove
+                    left one". Icon + value alone reads cleanly. */}
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                   <span className="text-white shrink-0">
                     <PremiumIcon name={templateMetric.icon} className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" strokeWidth={1.5} />
                   </span>
-                  <div className="flex flex-col text-left">
-                    <span className="text-[7px] sm:text-[8px] font-medium uppercase tracking-widest leading-none text-white/50">
-                      {templateMetric.label}
-                    </span>
-                    <span className="text-[9px] sm:text-[10px] md:text-[11px] font-bold leading-tight" style={{ color: colors.primary }}>
-                      {templateMetric.displayValue}
-                    </span>
-                  </div>
+                  <span className="text-[9px] sm:text-[10px] md:text-[11px] font-bold leading-tight" style={{ color: colors.primary }}>
+                    {templateMetric.displayValue}
+                  </span>
                 </div>
 
                 {/* Corruption Meter if > 0 */}

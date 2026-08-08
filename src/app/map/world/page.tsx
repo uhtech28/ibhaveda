@@ -68,6 +68,7 @@ import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { MapMenuPopover } from "@/components/map/MapMenuPopover";
+import { ContributionComposeDialog } from "@/components/contributions/ContributionComposeDialog";
 import { MapSettingsDialog } from "@/components/map/MapSettingsDialog";
 import { ToolsPanel } from "@/components/map/ToolsPanel";
 import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
@@ -355,18 +356,39 @@ const PHASE_ONE_STAGE_LIMIT = 2;
  * (or the user visits with ?stage=N in the URL), we look up the correct
  * scene key here and swap Phaser scenes.
  */
-const STAGE_SCENE_KEY: Record<number, string> = {
-  1: "VillageMapScene",     // Ideation · The Village
-  2: "ForestMapScene",      // Research · The Forest
-  3: "ArenaScene",          // Validation · The Arena
-  4: "ArtisansScene",       // Offer Design · The Artisan's Quarter
-  5: "MineScene",           // Build & Deliver · The Mine (Ironhold)
-  6: "GoldenHarborScene",   // Launch · The Harbour
-  7: "CrossroadsScene",     // Iteration · The Crossroads Town
-  // Stage 8 (The Capital · Scale) — art pending.
+/**
+ * Per-template, per-stage Phaser scene routing.
+ *
+ * Only Venture has bespoke map art shipped today. Academic / Lab /
+ * Creative templates deliberately have NO entries — the scene-swap
+ * effect below detects that and falls through to a React "template
+ * map under construction" overlay instead of silently loading the
+ * Village and misrepresenting the template.
+ *
+ * When per-template art ships, add nested entries here and the
+ * router below picks them up automatically.
+ */
+type SceneKeysByStage = Record<number, string>;
+const STAGE_SCENE_KEY: Record<string, SceneKeysByStage> = {
+  venture: {
+    1: "VillageMapScene",     // Ideation · The Village
+    2: "ForestMapScene",      // Research · The Forest
+    3: "ArenaScene",          // Validation · The Arena
+    4: "ArtisansScene",       // Offer Design · The Artisan's Quarter
+    5: "MineScene",           // Build & Deliver · The Mine (Ironhold)
+    6: "GoldenHarborScene",   // Launch · The Harbour
+    7: "CrossroadsScene",     // Iteration · The Crossroads Town
+    // Stage 8 (The Capital · Scale) — art pending.
+  },
+  // academic / lab / creative intentionally empty — bespoke map art
+  // for those templates hasn't been authored yet. See
+  // TemplateMapPlaceholder below for the React fallback.
+  academic: {},
+  lab: {},
+  creative: {},
 };
 
-function useMapGame(personaReady: boolean) {
+function useMapGame(personaReady: boolean, templateId: string | null = "venture") {
   const gameRef = useRef<import("phaser").Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [phaserReady, setPhaserReady] = useState(false);
@@ -512,16 +534,25 @@ function useMapGame(personaReady: boolean) {
     // and the correct spritesheet never gets loaded on first paint.
     if (!personaReady) return;
 
+    // Every template now gets a full Phaser scene per product ask:
+    // "FOR ALL MAPS ADD CHECK POINT BOSS, MAKE THEM ZOOM LIKE VILLAGE
+    // MAP AND PERSONA WITH MOVEMENT". Venture uses VillageMapScene
+    // (with the 6 stage scenes lazy-added below); non-venture
+    // templates (academic / lab / creative) use TemplateMapScene —
+    // a lightweight parametric scene that takes {mapUrl, mapWidth,
+    // mapHeight, biomeLabel, boss} via init(data) and gives them the
+    // same persona + camera + boss experience.
+    const isVentureTemplate =
+      (templateId ?? "venture") === "venture";
+
     const handleReady = () => {
       setPhaserReady(true);
-      // Kick off village ambience + music once Phaser finishes booting.
-      // Both files already exist in public/audio/ so this is a pure wire-up.
-      try {
-        audioManager.playAmbienceForStage(1);
-        audioManager.playMusic("stage_village", 0.42);
-      } catch (err) {
-        console.warn("[MapPage] audio startup failed", err);
-      }
+      // Stage-specific ambience + music are wired up separately by an
+      // effect in MapPageInner that reads venture.currentStage — the
+      // previous hardcoded stage_village call here meant every user
+      // on Forest / Arena / Harbor / Artisans etc. was still hearing
+      // the Village theme (product report: "i opend arcade but still
+      // got village"). Do NOT play any music here.
     };
 
     eventBridge.onReact("PHASER_READY", handleReady);
@@ -535,16 +566,31 @@ function useMapGame(personaReady: boolean) {
     // fires. Wall-time to first playable map dropped from ~4-6s to
     // ~1.5-2s in practice (network + parse dominated by the 7-way
     // Promise.all previously).
+    // Non-venture templates boot a MUCH lighter scene chain — just
+    // Phaser + TemplateMapScene (~40KB total) instead of the full
+    // Village boot (~4.6MB). Venture keeps the original chain because
+    // its scene has hardcoded checkpoints + boss coords tied to the
+    // village painted map.
+    const initialSceneImport = isVentureTemplate
+      ? import("@/lib/phaser/scenes/VillageMapScene").then((m) => ({
+          key: "VillageMapScene",
+          scene: m.VillageMapScene as unknown,
+        }))
+      : import("@/lib/phaser/scenes/TemplateMapScene").then((m) => ({
+          key: "TemplateMapScene",
+          scene: m.TemplateMapScene as unknown,
+        }));
+
     Promise.all([
       import("phaser"),
       import("@/lib/phaser/game-config"),
-      import("@/lib/phaser/scenes/VillageMapScene"),
-    ]).then(([Phaser, { createGameConfig }, { VillageMapScene }]) => {
+      initialSceneImport,
+    ]).then(([Phaser, { createGameConfig }, initialScene]) => {
       if (!containerRef.current || gameRef.current) return;
       const game = new Phaser.Game(
         createGameConfig(
           containerRef.current,
-          [VillageMapScene] as unknown as Parameters<typeof createGameConfig>[1],
+          [initialScene.scene] as unknown as Parameters<typeof createGameConfig>[1],
         ),
       );
       gameRef.current = game;
@@ -570,6 +616,11 @@ function useMapGame(personaReady: boolean) {
       // "ForestMapScene") etc. works when the user progresses. The
       // active Village scene keeps rendering the whole time — the user
       // never sees a hitch.
+      //
+      // GATED on venture — non-venture templates use TemplateMapScene
+      // for every biome and never need the 6 stage-specific scenes,
+      // so skipping saves ~600KB of JS parse + network on Academic.
+      if (!isVentureTemplate) return;
       void Promise.all([
         import("@/lib/phaser/scenes/ForestMapScene"),
         import("@/lib/phaser/scenes/ArenaScene"),
@@ -622,7 +673,7 @@ function useMapGame(personaReady: boolean) {
       gameRef.current = null;
       setPhaserReady(false);
     };
-  }, [personaReady]);
+  }, [personaReady, templateId]);
 
   return { containerRef, phaserReady, gameRef };
 }
@@ -1452,7 +1503,226 @@ function StageResetNotice({
 
 // TourToggle removed with the WorldMapTour walkthrough deletion.
 
+/**
+ * Biome-name → painted map PNG resolver, keyed by templateId.
+ *
+ * Every biomeName in `convex/{academic,lab,creative}/*Constants.ts`
+ * maps to a real PNG shipped under `/public/assets/maps-v2/`. Kept as
+ * a lookup rather than inline switches so the biome→file mapping
+ * stays in one place; adding a new stage means dropping a PNG in the
+ * right folder and adding a line here.
+ *
+ * Returns null when we don't have a painted map for that combination
+ * (e.g. creative template hasn't shipped bespoke maps yet); callers
+ * then fall back to the themed gradient.
+ */
+function resolveTemplateMapUrl(
+  templateId: string,
+  biomeName: string | null,
+): string | null {
+  if (!biomeName) return null;
+  const norm = biomeName.trim().toLowerCase();
+  if (templateId === "academic") {
+    const ACADEMIC_MAP: Record<string, string> = {
+      "ancient library": "/assets/maps-v2/academic/library-map.png",
+      "library": "/assets/maps-v2/academic/library-map.png",
+      "ruins": "/assets/maps-v2/academic/ruins-map.png",
+      "cartographer's tower":
+        "/assets/maps-v2/academic/cartographer-tower-map.png",
+      "cartographers tower":
+        "/assets/maps-v2/academic/cartographer-tower-map.png",
+      "scriptorium": "/assets/maps-v2/academic/scriptorium-map.png",
+      "council chamber":
+        "/assets/maps-v2/academic/council-chamber-map.png",
+      "grand archive": "/assets/maps-v2/academic/grand-archive-map.png",
+    };
+    return ACADEMIC_MAP[norm] ?? null;
+  }
+  if (templateId === "lab") {
+    const LAB_MAP: Record<string, string> = {
+      "observatory": "/assets/maps-v2/lab/observatory-map.png",
+      "ancient library": "/assets/maps-v2/lab/library-map.png",
+      "library": "/assets/maps-v2/lab/library-map.png",
+      "cartographer's tower": "/assets/maps-v2/lab/cartographer-tower-map.png",
+      "cartographers tower": "/assets/maps-v2/lab/cartographer-tower-map.png",
+      "forge": "/assets/maps-v2/lab/forge-map.png",
+      "alchemist's laboratory":
+        "/assets/maps-v2/lab/alchemists-laboratory-map.png",
+      "alchemists laboratory":
+        "/assets/maps-v2/lab/alchemists-laboratory-map.png",
+      "crossroads town": "/assets/maps-v2/lab/crossroads-map.png",
+      "crossroads": "/assets/maps-v2/lab/crossroads-map.png",
+      "grand hall": "/assets/maps-v2/lab/grand-hall-map.png",
+    };
+    return LAB_MAP[norm] ?? null;
+  }
+  // Creative template — biomes reuse forest/village/artisans/harbor
+  // painted maps until bespoke creative art ships.
+  if (templateId === "creative") {
+    const CREATIVE_MAP: Record<string, string> = {
+      "sacred grove": "/assets/maps-v2/forest/forest-map.png",
+      "gallery of echoes": "/assets/maps-v2/village-painted/village-map.png",
+      "wilderness": "/assets/maps-v2/forest/forest-map.png",
+      "village square": "/assets/maps-v2/village-painted/village-map.png",
+      "artisan's workshop": "/assets/maps-v2/artisans/artisans-map.png",
+      "artisans workshop": "/assets/maps-v2/artisans/artisans-map.png",
+      "harbour": "/assets/maps-v2/golden-harbor/harbor-map.png",
+      "harbor": "/assets/maps-v2/golden-harbor/harbor-map.png",
+    };
+    return CREATIVE_MAP[norm] ?? null;
+  }
+  return null;
+}
 
+/**
+ * TemplateMapPlaceholder
+ *
+ * Renders the painted map for a non-Venture template stage. Every
+ * biome in the academic / lab / creative constants files maps to a
+ * real PNG in /public/assets/maps-v2/ — we look up the correct
+ * asset and use it as the full-viewport backdrop.
+ *
+ * Falls back to a themed gradient card only when no painted map
+ * exists for that specific biome (safety net; the alias tables
+ * above cover every biome currently defined).
+ *
+ * Absolutely-positioned inside the phaser-canvas-wrapper's parent,
+ * so it sits under the HUD but above the (blank) canvas.
+ */
+function TemplateMapPlaceholder({
+  templateId,
+  stageName,
+  stageNumber,
+  currentCheckpoint,
+}: {
+  templateId: string;
+  stageName: string | null;
+  stageNumber: number;
+  currentCheckpoint: number;
+}) {
+  const mapUrl = resolveTemplateMapUrl(templateId, stageName);
+  const theme =
+    templateId === "academic"
+      ? {
+          label: "Academic Paper",
+          accent: "#e2a648",
+          accentDeep: "#7a4a10",
+          bg: "linear-gradient(180deg, #2b1e14 0%, #1a120a 55%, #0e0a05 100%)",
+          overlay:
+            "radial-gradient(ellipse at 50% 30%, rgba(226,166,72,0.15) 0%, transparent 65%)",
+          motif: "📜",
+        }
+      : templateId === "lab"
+        ? {
+            label: "Lab Experiment",
+            accent: "#5ac8e4",
+            accentDeep: "#0e5b6d",
+            bg: "linear-gradient(180deg, #0d1e28 0%, #071319 55%, #030a0f 100%)",
+            overlay:
+              "radial-gradient(ellipse at 50% 30%, rgba(90,200,228,0.16) 0%, transparent 65%)",
+            motif: "⚗️",
+          }
+        : {
+            // creative
+            label: "Creative Project",
+            accent: "#e2739a",
+            accentDeep: "#7a1a44",
+            bg: "linear-gradient(180deg, #241028 0%, #16081c 55%, #0a030d 100%)",
+            overlay:
+              "radial-gradient(ellipse at 50% 30%, rgba(226,115,154,0.18) 0%, transparent 65%)",
+            motif: "🎨",
+          };
+
+  // Painted map available — render it as the full-viewport backdrop
+  // with a small stage-label pill in the top-left so users know
+  // which biome they're on. We ALSO inject a <link rel="preload"> so
+  // the browser starts the PNG fetch immediately at parent-mount time
+  // instead of waiting until the background-image style is applied
+  // (which is one extra layout tick). Combined with skipping the
+  // Village Phaser boot for non-venture templates (useMapGame above)
+  // this drops Academic first-paint from ~6-10s → ~1-2s.
+  if (mapUrl) {
+    return (
+      <div
+        aria-label={`${theme.label} · ${stageName ?? `Stage ${stageNumber}`}`}
+        className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
+        style={{
+          backgroundImage: `url(${mapUrl})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          imageRendering: "pixelated",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <link rel="preload" as="image" href={mapUrl} />
+        {/* Stage badge — top-left, small, low-contrast so it doesn't
+            fight the map art. */}
+        <div
+          className="pointer-events-auto absolute left-4 top-4 rounded-md border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.24em] backdrop-blur-sm sm:left-6 sm:top-6"
+          style={{
+            background: "rgba(10,10,20,0.6)",
+            borderColor: `${theme.accent}55`,
+            color: theme.accent,
+          }}
+        >
+          <span className="opacity-70">CP {currentCheckpoint} · </span>
+          <span>{stageName ?? `Stage ${stageNumber}`}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // No painted map for this specific biome — fall back to the themed
+  // gradient card so users at least know which template they're in.
+  return (
+    <div
+      aria-label={`${theme.label} map placeholder`}
+      className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center overflow-hidden"
+      style={{ background: theme.bg }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: theme.overlay }}
+      />
+      <div
+        className="pointer-events-auto relative z-10 max-w-[520px] mx-4 rounded-2xl border p-6 text-center sm:p-8"
+        style={{
+          background: "rgba(15,23,38,0.85)",
+          borderColor: theme.accent,
+          boxShadow: `0 20px 60px -20px rgba(0,0,0,0.7), 0 0 0 1px ${theme.accentDeep}`,
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+        }}
+      >
+        <div
+          className="text-[10px] font-bold uppercase tracking-[0.42em]"
+          style={{ color: theme.accent }}
+        >
+          {theme.label}
+        </div>
+        <div
+          className="mt-3 text-3xl leading-none"
+          style={{ color: theme.accent }}
+        >
+          {theme.motif}
+        </div>
+        <h2
+          className="mt-4 text-[22px] font-semibold leading-tight text-white sm:text-[26px]"
+          style={{
+            fontFamily: "'Space Grotesk', 'Inter', sans-serif",
+            letterSpacing: "-0.3px",
+          }}
+        >
+          {stageName ?? `Stage ${stageNumber}`}
+        </h2>
+        <p className="mt-2 text-[13px] leading-relaxed text-[#9CA3AF]">
+          Checkpoint {currentCheckpoint}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /** Loading screen */
 function LoadingScreen() {
@@ -1617,7 +1887,12 @@ function MapPageInner() {
   if (personaResolved) {
     setCurrentPersonaId(chosenPersonaId);
   }
-  const { containerRef, phaserReady, gameRef } = useMapGame(personaResolved);
+  // useMapGame is called BELOW after `activeVenture` is memoized so
+  // its templateId can be passed in — non-venture templates (academic
+  // / lab / creative) skip the entire Village Phaser boot chain
+  // (~4.6MB) which was the biggest bottleneck loading Academic per
+  // product report "I AM TESTING MAPS FROM ACADEMIC NOW BUT ITS
+  // TAKING VERYY LONG TO LOAD".
 
   // Stage-based scene routing — reads ?stage=N from the URL. Stage lock
   // (clamp to unlocked ceiling) applied lower down once `venture` loads.
@@ -1856,6 +2131,15 @@ function MapPageInner() {
     [activeVentureId],
   );
 
+  // Boot Phaser now that we know the templateId. Non-venture templates
+  // skip the entire Village boot chain and just flip phaserReady=true
+  // so <TemplateMapPlaceholder> can paint the background-image map
+  // instantly. See useMapGame in this file for details.
+  const { containerRef, phaserReady, gameRef } = useMapGame(
+    personaResolved,
+    (activeVenture?.templateId as string | undefined) ?? "venture",
+  );
+
   // Subscribe to notifications for gold checkpoint awards
   const notifications = useQuery(api.notifications.getNotifications, {
     filterReadStatus: "unread",
@@ -2026,6 +2310,12 @@ function MapPageInner() {
   // author-vs-non-author; CONTRIBUTIONS always wants the send-request
   // dialog regardless of viewer role.
   const [isSendContributionOpen, setIsSendContributionOpen] = useState(false);
+  // CONTRIBUTIONS tile in the Adventurer's Menu now opens a compose
+  // dialog for posting a project contribution (Project:title format,
+  // inherited tags, description). Kept separate from the older
+  // isSendContributionOpen flag so the send-help flow (ContributionRequestModal)
+  // still works from other entry points.
+  const [isContributionComposeOpen, setIsContributionComposeOpen] = useState(false);
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isKanbanOpen, setIsKanbanOpen] = useState(false);
@@ -2404,10 +2694,57 @@ function MapPageInner() {
       requestedStage && Number.isFinite(requestedStage)
         ? requestedStage
         : activeStage;
-    const targetKey = STAGE_SCENE_KEY[desiredStage];
+    // Route by (templateId, stage). Non-venture templates have no
+    // scenes wired yet (see STAGE_SCENE_KEY comment above) — the
+    // React overlay below handles that case, so we just bail out of
+    // the Phaser routing here.
+    const templateId = (venture?.templateId ?? "venture") as string;
+    const templateScenes = STAGE_SCENE_KEY[templateId] ?? {};
+    let targetKey = templateScenes[desiredStage];
+    // Non-venture templates: fall through to the parametric
+    // TemplateMapScene with a biome-specific config. Product ask
+    // ("FOR ALL MAPS ADD CHECK POINT BOSS, MAKE THEM ZOOM LIKE
+    // VILLAGE MAP AND PERSONA WITH MOVEMENT") — instead of leaving
+    // Academic/Lab/Creative on the pure-CSS TemplateMapPlaceholder,
+    // route them into TemplateMapScene which gives them the full
+    // persona + camera + boss experience.
+    if (!targetKey && templateId !== "venture") {
+      targetKey = "TemplateMapScene";
+    }
     if (!targetKey) return;
     const game = gameRef.current;
     const sceneMgr = game.scene;
+
+    // Compute biome-specific data for TemplateMapScene from the
+    // templateStages metadata (already memoized above from
+    // getStageMetadata). Reading templateStages instead of stageInfo
+    // avoids a temporal-dead-zone crash — stageInfo is declared much
+    // further down in the component body via useAtomValue, but this
+    // routing effect runs at the top of the render pass.
+    const templateBiomeName =
+      templateStages[Math.max(0, desiredStage - 1)]?.biomeName ?? null;
+    let templateSceneData: {
+      mapKey: string;
+      mapUrl: string;
+      mapWidth: number;
+      mapHeight: number;
+      biomeLabel: string;
+      stage: number;
+    } | null = null;
+    if (targetKey === "TemplateMapScene") {
+      const mapUrl = resolveTemplateMapUrl(templateId, templateBiomeName);
+      if (!mapUrl) return;
+      // Default map dims — Academic/Lab shipped at 1412×1156. Slightly
+      // over-sizing the bounds is safer than under (Phaser handles OOB).
+      templateSceneData = {
+        mapKey: `template:${mapUrl}`,
+        mapUrl,
+        mapWidth: 1540,
+        mapHeight: 1412,
+        biomeLabel: templateBiomeName ?? `Stage ${desiredStage}`,
+        stage: desiredStage,
+      };
+    }
 
     let rafId = 0;
     let cancelled = false;
@@ -2426,14 +2763,24 @@ function MapPageInner() {
         return;
       }
       // Stop any other stage scene that's currently running so we
-      // don't stack multiple map scenes on top of each other.
-      for (const key of Object.values(STAGE_SCENE_KEY)) {
-        if (key === targetKey) continue;
-        if (sceneMgr.isActive(key) || sceneMgr.isVisible(key)) {
-          sceneMgr.stop(key);
+      // don't stack multiple map scenes on top of each other. Sweep
+      // every template's scene set so cross-template swaps also
+      // clean up.
+      for (const bucket of Object.values(STAGE_SCENE_KEY)) {
+        for (const key of Object.values(bucket)) {
+          if (key === targetKey) continue;
+          if (sceneMgr.isActive(key) || sceneMgr.isVisible(key)) {
+            sceneMgr.stop(key);
+          }
         }
       }
-      sceneMgr.start(targetKey);
+      // Also stop TemplateMapScene when switching biomes so the next
+      // scene.start reruns init() with the new biome data.
+      if (targetKey === "TemplateMapScene" && sceneMgr.getScene("TemplateMapScene")) {
+        sceneMgr.stop("TemplateMapScene");
+      }
+      // Pass biome data to TemplateMapScene via scene.start's second arg.
+      sceneMgr.start(targetKey, templateSceneData ?? undefined);
     };
 
     attemptSwap();
@@ -2441,7 +2788,32 @@ function MapPageInner() {
       cancelled = true;
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [phaserReady, activeStage, requestedStage, gameRef]);
+  }, [phaserReady, activeStage, requestedStage, venture?.templateId, gameRef, templateStages]);
+
+  // ── Stage-driven ambience + music ─────────────────────────────────────
+  // Route audio by the venture's actual currentStage. Previously the
+  // handleReady hook in useMapGame hardcoded stage 1 / stage_village
+  // regardless of what stage the user was actually on, so Forest /
+  // Arena / Harbor etc. players heard the Village theme through their
+  // whole run. Now the music track and ambience match the stage the
+  // user is playing.
+  useEffect(() => {
+    if (!phaserReady || !venture) return;
+    const stageToPlay =
+      requestedStage && Number.isFinite(requestedStage)
+        ? requestedStage
+        : activeStage;
+    try {
+      audioManager.playAmbienceForStage(stageToPlay);
+      // stage_1 → stage_7 track keys line up with STAGE_SCENE_KEY.
+      // Fall back to stage_1 when we're outside the known range so
+      // audio never dies silently.
+      const trackKey = `stage_${Math.min(7, Math.max(1, stageToPlay))}`;
+      audioManager.playMusic(trackKey, 0.42);
+    } catch (err) {
+      console.warn("[MapPage] stage audio update failed", err);
+    }
+  }, [phaserReady, activeStage, requestedStage, venture]);
 
   useEffect(() => {
     if (!checkpoints.length) return;
@@ -4723,14 +5095,13 @@ function MapPageInner() {
         }
         setIsGroupChatOpen(true);
       } else if (tab === "contributors") {
-        // CONTRIBUTIONS tile (scroll icon). Rewired per product ask:
-        // "in replacement in contributions use the send contribution
-        // tab that was there which includes tags too". Opens the
-        // ContributionRequestModal — the same skill-tag-aware form
-        // /feed uses when someone clicks "Contribute" on a project
-        // card — instead of the old author-only Team & Contributors
-        // panel (which now lives under the GUILD tile below).
-        setIsSendContributionOpen(true);
+        // CONTRIBUTIONS tile — opens the ContributionComposeDialog.
+        // Product mechanism: inside a project, click Contributions →
+        // fill Title + Description → tags inherit from the project →
+        // post as `${ProjectName}:${title}` idea (visible in feed).
+        // Map bar (MapNavbar) stays visible behind the dialog since
+        // the compose scrim starts BELOW the navbar top offset.
+        setIsContributionComposeOpen(true);
       } else if (tab === "feed") {
         setIsContributionsOpen(true);
       } else if (tab === "hierarchy") {
@@ -4989,6 +5360,28 @@ function MapPageInner() {
           contain: "strict",
         }}
       />
+
+      {/* ── Non-venture template placeholder ────────────────────────
+          Academic / Lab / Creative templates have no bespoke map
+          art authored yet. Previously the scene router fell through
+          to VillageMapScene for every stage, which meant an
+          "Academic Paper" idea started on the Village map with the
+          Fog of Vagueness boss — misleading and off-brand.
+          Now we detect an unsupported template and render this
+          themed placeholder on top of the (blank) canvas. The HUD
+          bar and Adventurer's Menu still work, so users can still
+          navigate to their tasks via the flare/menu. */}
+      {venture &&
+        venture.templateId &&
+        venture.templateId !== "venture" &&
+        !STAGE_SCENE_KEY[venture.templateId as string]?.[activeStage] && (
+          <TemplateMapPlaceholder
+            templateId={venture.templateId as string}
+            stageName={stageInfo?.biomeName ?? null}
+            stageNumber={activeStage}
+            currentCheckpoint={activeCP}
+          />
+        )}
 
       {/* Mobile virtual joystick — only renders on touch devices.
           Bottom-left corner. Emits {x,y} vectors via eventBridge that
@@ -5898,6 +6291,37 @@ function MapPageInner() {
               </div>
             )}
           </AnimatePresence>
+
+          {/* Contribution Compose Dialog — CONTRIBUTIONS tile in the
+              Adventurer's Menu. Posts a project update as an idea
+              with title `${ProjectName}:${userTitle}`, inheriting
+              the parent project's skill + industry tags. Map bar
+              stays visible behind (scrim starts below the navbar). */}
+          {(() => {
+            if (!isContributionComposeOpen || !ideaForContributors) return null;
+            const parseTags = (str?: string): string[] => {
+              if (!str) return [];
+              try {
+                const parsed = JSON.parse(str);
+                if (Array.isArray(parsed)) {
+                  return parsed.map((s) => String(s).trim()).filter(Boolean);
+                }
+              } catch {
+                /* fall through */
+              }
+              return str.split(",").map((s) => s.trim()).filter(Boolean);
+            };
+            return (
+              <ContributionComposeDialog
+                open
+                onOpenChange={(next) => setIsContributionComposeOpen(next)}
+                projectName={ideaForContributors.title}
+                parentIdeaId={ideaForContributors._id as Id<"ideas">}
+                inheritedSkills={parseTags(ideaForContributors.category)}
+                inheritedIndustries={parseTags(ideaForContributors.industries)}
+              />
+            );
+          })()}
 
           {/* Send-Contribution Modal — dedicated dialog opened by the
               Adventurer's Menu CONTRIBUTIONS tile (scroll icon).

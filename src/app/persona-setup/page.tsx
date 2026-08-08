@@ -71,6 +71,18 @@ export default function PersonaSetupPage() {
     if (!isLoaded || !userId || !user) return;
     if (existingProfile === undefined) return; // still loading
     if (existingProfile) return; // row already exists — nothing to do
+    // If /profile-setup just fired its own createUserProfile without
+    // awaiting (the fire-and-forget path added to eliminate the
+    // post-submit loading flash), skip auto-provision so we don't
+    // race with the in-flight mutation and hit "username already
+    // taken". profileProvisionInFlight is cleared by profile-setup
+    // once its own mutation resolves.
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("profileProvisionInFlight") === "1"
+    ) {
+      return;
+    }
     provisionedRef.current = true;
     const suggestedUsername = (user.username || user.firstName || "user")
       .toLowerCase()
