@@ -69,6 +69,7 @@ import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPo
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { MapMenuPopover } from "@/components/map/MapMenuPopover";
 import { ContributionComposeDialog } from "@/components/contributions/ContributionComposeDialog";
+import { AssetWarmer } from "@/components/perf/AssetWarmer";
 import { MapSettingsDialog } from "@/components/map/MapSettingsDialog";
 import { ToolsPanel } from "@/components/map/ToolsPanel";
 import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
@@ -6869,27 +6870,38 @@ function MapFeedComposer({
 
 export default function MapPage() {
   return (
-    <Suspense
-      fallback={
-        <div
-          // data-tutorial-hide keeps Sparky suppressed during this
-          // Suspense fallback (see LoadingScreen comment above).
-          data-tutorial-hide="true"
-          className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
-          style={{ background: "#050810", fontFamily: "var(--font-sans)" }}
-        >
+    <>
+      {/* Warm every asset that gates first-perceived-smoothness on
+          the map + tutorial surfaces (Sparky sprite frames, menu tile
+          icons, Fog boss anim frames). Mounts OUTSIDE the Suspense
+          boundary so the browser starts fetching them immediately —
+          in parallel with hydration + Convex queries — instead of
+          waiting for a consuming component to render. Fixes the
+          "icons/animations/victory board/sparky sometimes takes time
+          to load, feels glitchy" report. */}
+      <AssetWarmer />
+      <Suspense
+        fallback={
           <div
-            className="text-xs tracking-[0.3em] uppercase font-black"
-            style={{ color: "#6366f1" }}
+            // data-tutorial-hide keeps Sparky suppressed during this
+            // Suspense fallback (see LoadingScreen comment above).
+            data-tutorial-hide="true"
+            className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
+            style={{ background: "#050810", fontFamily: "var(--font-sans)" }}
           >
-            Entering the World…
+            <div
+              className="text-xs tracking-[0.3em] uppercase font-black"
+              style={{ color: "#6366f1" }}
+            >
+              Entering the World…
+            </div>
           </div>
-        </div>
-      }
-    >
-      <MapPageInner />
-      <MapTourMount />
-    </Suspense>
+        }
+      >
+        <MapPageInner />
+        <MapTourMount />
+      </Suspense>
+    </>
   );
 }
 

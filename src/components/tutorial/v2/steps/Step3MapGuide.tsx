@@ -696,12 +696,15 @@ export function Step3MapGuide() {
           // the user understands why the map still shows the boss.
           text: `Congratulations, ${TUTORIAL_MONSTER_NAME} retreated! You'll fully defeat it once every task under this checkpoint is done. Just two more things and you'll have everything you need.`,
           mood: "celebrating",
-          // Anchor Sparky next to the Victory panel per product ask
-          // ("move that conversation of sparky next to victory box").
-          // Previously `near: null` floated the bubble in the fallback
-          // top-right corner far from the panel, so users had to
-          // eyeball across the screen to link cause + celebration.
-          near: '[data-tutorial="combat-panel"], [aria-label="AI Combat"], [data-combat-panel]',
+          // Anchor Sparky next to the Victory PANEL specifically —
+          // combat-victory-panel is a ~720px centered card, small
+          // enough for TutorialMascot's beside-placement to compute
+          // a real coordinate. Falls back to the outer combat-panel
+          // wrapper (full-screen) only if the victory sub-panel
+          // isn't mounted yet, at which point Sparky lands in the
+          // bottom-right fallback for a beat until the victory
+          // panel renders and the follow-target loop re-anchors.
+          near: '[data-tutorial="combat-victory-panel"], [data-tutorial="combat-panel"], [aria-label="AI Combat"], [data-combat-panel]',
           highlight: null,
           primary: {
             label: "Continue",

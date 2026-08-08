@@ -92,6 +92,16 @@ export function CombatResultPanel({
     return (
       <div
         className="relative w-full mx-auto"
+        // data-tutorial marker lets Step3MapGuide's "victory" stage
+        // anchor Sparky's "Congratulations, X retreated!" bubble
+        // NEXT TO this panel (product ask: "move that conversation
+        // of sparky next to victory box"). Previously the outer
+        // combat-panel wrapper was the only marker and it's a
+        // fixed-inset-0 full-screen div — TutorialMascot bails on
+        // targets larger than 75%×60% of the viewport and falls
+        // back to bottom-right, which is why the bubble appeared in
+        // the corner instead of beside the Victory panel.
+        data-tutorial="combat-victory-panel"
         style={{
           maxWidth: 720,
           aspectRatio: "1370 / 1148",
@@ -147,9 +157,14 @@ export function CombatResultPanel({
         {/* Transparent clickable overlay on the baked-in CONTINUE
             button. The image's own CONTINUE artwork serves as the
             visible button; our overlay makes the region clickable
-            and handles the tutorial-mode focus ring. */}
+            and handles the tutorial-mode focus ring. During
+            tutorialMode the overlay's onClick is a no-op — the user
+            MUST advance via Sparky's own Continue button (which
+            calls onAdvance programmatically). Product ask: "block
+            the continue button in victory box" during the tutorial
+            so the user can't skip Sparky's narration. */}
         <BakedContinueOverlay
-          onClick={onAdvance}
+          onClick={tutorialMode ? () => {} : onAdvance}
           highlight={tutorialMode}
         />
       </div>

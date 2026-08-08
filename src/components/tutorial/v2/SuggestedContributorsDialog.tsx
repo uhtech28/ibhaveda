@@ -72,6 +72,10 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
   const [sentSet, setSentSet] = useState<Set<string>>(new Set());
   // Users mid-send (button spinner state).
   const [sendingSet, setSendingSet] = useState<Set<string>>(new Set());
+  // Surface send errors inline instead of swallowing them silently —
+  // if the server rejects (e.g. duplicate invitation, no matching
+  // username), the user sees the reason under the affected row.
+  const [errors, setErrors] = useState<Record<string, string>>({});
   // Per-user textarea refs. iOS Safari ignores React's `autoFocus`
   // prop because it fires in a post-mount effect (after the
   // AnimatePresence height-expand animation), by which point the
@@ -82,7 +86,15 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
   // either way.
   const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
-  const canContinue = sentSet.size >= 1;
+  // Continue unlocks after at least one successful send OR when the
+  // suggestions list is empty (fresh community with no other users)
+  // OR when the users query loaded but returned zero suggestions.
+  // Without the empty-community fallback the tutorial dead-ends for
+  // the very first users on a new deployment, who have no one to
+  // invite and can't proceed past this step.
+  const communityIsEmpty =
+    allUsers !== undefined && currentUser !== undefined && suggestions.length === 0;
+  const canContinue = sentSet.size >= 1 || communityIsEmpty;
 
   const handleExpand = useCallback((userId: string) => {
     setExpandedUserId((prev) => {
@@ -122,15 +134,23 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
       // gate elsewhere in the app. A one-word "hi" isn't a real pitch.
       if (message.length < 10) return;
       if (sentSet.has(userId) || sendingSet.has(userId)) return;
-      // Resolve the invitee's username from the suggestions list
-      // (allUsers already has it). sendInvitation takes a username
-      // string, not an id.
       const invitee = (allUsers ?? []).find((u) => u._id === userId);
       const inviteeUsername = invitee?.username;
-      if (!inviteeUsername) return;
+      if (!inviteeUsername) {
+        setErrors((prev) => ({
+          ...prev,
+          [userId]: "Missing username — try another suggestion.",
+        }));
+        return;
+      }
       setSendingSet((prev) => {
         const next = new Set(prev);
         next.add(userId);
+        return next;
+      });
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[userId];
         return next;
       });
       try {
@@ -145,8 +165,16 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
           return next;
         });
         setExpandedUserId(null);
-      } catch {
-        /* silent — the tutorial flow shouldn't dead-end on a hiccup */
+      } catch (err) {
+        // Surface the server-side rejection reason (was silently
+        // swallowed, which left the user stuck at 0/3 sent with no
+        // idea why). Common reasons: duplicate invitation exists,
+        // invitee doesn't accept invitations, etc.
+        const msg =
+          err instanceof Error
+            ? err.message.replace(/^\[.*?\]\s*/, "")
+            : "Send failed — try another builder.";
+        setErrors((prev) => ({ ...prev, [userId]: msg }));
       } finally {
         setSendingSet((prev) => {
           const next = new Set(prev);
@@ -365,6 +393,11 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                                 {sending ? "Sending…" : "Send"}
                               </button>
                             </div>
+                            {errors[u._id] && (
+                              <p className="mt-1.5 text-[11px] leading-snug text-[#f87171]">
+                                {errors[u._id]}
+                              </p>
+                            )}
                           </div>
                         </motion.div>
                       )}

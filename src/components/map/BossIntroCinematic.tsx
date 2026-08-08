@@ -251,7 +251,13 @@ export function BossIntroCinematic({ onDone }: Props) {
               the pushed-down speech bubble (top-[22%]) and the mobile
               stage strip (bottom-[26%]). */}
           <motion.div
-            className="pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 sm:top-[45%]"
+            // Boss sprite pulled UP further per product ask
+            // ("shift everything little upward so it look
+            // centralised for all pc"). Desktop 38%→30% and mobile
+            // 32%→28% so the boss + surrounding stack (title / bubble
+            // above, minions + CTA below) reads as a vertically
+            // centered composition instead of sitting mid-lower.
+            className="pointer-events-none absolute left-1/2 top-[28%] -translate-x-1/2 -translate-y-1/2 sm:top-[30%]"
             initial={{ opacity: 0, y: 60, scale: 0.9 }}
             animate={
               phase === "curtain"
@@ -300,7 +306,15 @@ export function BossIntroCinematic({ onDone }: Props) {
               per-stage cards below). Only "The Unraveller" title
               renders here now. */}
           <motion.div
-            className="pointer-events-none absolute left-1/2 -translate-x-1/2 px-4 text-center sm:top-[18%]"
+            // Title HIDDEN on mobile (< sm) per product ask:
+            // "FIX THE MOBILE VIEW THE CONVERSATION BOX IS OVERLAPPING
+            // BOSS FACE". The giant "The Unraveller" heading was
+            // colliding with the speech bubble below it. The bubble
+            // already labels the speaker ("THE UNRAVELLER" chip), so
+            // the redundant title only served the desktop hero
+            // layout — where there's room to spare. `hidden sm:block`
+            // keeps the desktop treatment intact.
+            className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 px-4 text-center sm:block sm:top-[10%]"
             style={{
               top: "calc(64px + env(safe-area-inset-top, 0px))",
             }}
@@ -312,9 +326,6 @@ export function BossIntroCinematic({ onDone }: Props) {
             }
             transition={{ duration: 0.9, delay: 0.6, ease: "easeOut" }}
           >
-            {/* Eyebrow ("STAGE 1 OVERSEER") removed per product ask
-                ("remove the top writeen stage 1 over seer"). Only the
-                bold title renders now. */}
             <div
               className="mt-1 whitespace-nowrap text-[26px] font-black leading-none tracking-tight text-white sm:text-[42px]"
               style={{
@@ -350,7 +361,12 @@ export function BossIntroCinematic({ onDone }: Props) {
                 // gap between it and the boss art below. Desktop/
                 // tablet: floats upper-LEFT with a tail pointing
                 // down-right toward the boss.
-                className="pointer-events-none absolute inset-x-3 top-[22%] mx-auto w-auto max-w-[420px] sm:inset-x-auto sm:left-[6%] sm:top-[24%] sm:w-[min(88vw,380px)] md:left-[8%]"
+                // Bubble top offset dropped from top-[22%] → top-[10%]
+                // on mobile now that the "The Unraveller" title above
+                // is hidden. Gives the bubble the top slot cleanly
+                // and puts more space between the bubble tail and
+                // the boss sprite below (which sits ~mid-viewport).
+                className="pointer-events-none absolute inset-x-3 top-[10%] mx-auto w-auto max-w-[420px] sm:inset-x-auto sm:left-[6%] sm:top-[24%] sm:w-[min(88vw,380px)] md:left-[8%]"
               >
                 {/* Villain bubble — dark #0F1726 surface + white/8
                     border, matching every other card on the platform.
@@ -444,12 +460,22 @@ export function BossIntroCinematic({ onDone }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut" }}
-                // Mobile: sits mid-lower area (bottom-[26%]) with
-                // slightly bigger cards + gap so multi-word stage
-                // labels like "Forest of Perfectionism" don't have to
-                // squeeze into a 74px card. Desktop keeps roomy
-                // spacing.
-                className="pointer-events-none absolute bottom-[26%] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[16%] sm:w-auto sm:gap-4 sm:px-0"
+                // Minion strip repositioned to sit ABOVE the Face
+                // them button on mobile (~100px from bottom leaves
+                // room for the 48px CTA + margin), and lifted a bit
+                // on desktop so the whole composition centers rather
+                // than crowding the bottom edge.
+                // Mobile: mini-boss strip lifted from bottom-[110px]
+                // → bottom-[130px] so there's a real gap between the
+                // minion cards and the Face them CTA (which sits at
+                // bottom-6 = 24px). Prevents the CTA from crowding
+                // the minion labels.
+                // Desktop: dropped from sm:bottom-[22%] → sm:bottom-[28%]
+                // to lift the whole composition off the baseline and
+                // pack title/boss/minions/CTA into a centered stack
+                // (product ask: "shift everything little upward so it
+                // look centralised for all pc").
+                className="pointer-events-none absolute bottom-[130px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
               >
                 {VILLAGE_BOSSES.map((boss, i) => {
                   const revealed = i <= minionIdx || phase === "finale";
@@ -589,7 +615,19 @@ export function BossIntroCinematic({ onDone }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ delay: 0.6, duration: 0.6, ease: "easeOut" }}
-                className="absolute inset-x-0 bottom-[260px] z-[210] flex flex-col items-center gap-3 sm:bottom-6"
+                // Face them CTA now sits BELOW the minion strip on
+                // mobile (`bottom-6`, same as desktop) per product
+                // ask: "for mobile view of this screen keep face
+                // them button below the mini bosses". The old
+                // `bottom-[260px]` placement landed the button in the
+                // middle of the boss art / above the minions.
+                // Mobile: bottom-6 (24px) — sits comfortably below
+                // the minion strip (which is at bottom-[130px]).
+                // Desktop: bumped from sm:bottom-10 → sm:bottom-[12%]
+                // so it lifts off the very bottom of the viewport and
+                // stays inside the centered stack alongside the
+                // minions (which moved to sm:bottom-[28%]).
+                className="absolute inset-x-0 bottom-6 z-[210] flex flex-col items-center gap-3 sm:bottom-[12%]"
               >
                 {/* CTA re-styled to match the platform's primary
                     indigo action (same treatment as Post Idea,
