@@ -34,6 +34,8 @@ import {
   getCurrentPersonaId,
   loadPersonaSprites,
   registerPersonaAnimations,
+  personaAnimKey,
+  directionalWalkAnimKey,
 } from "@/lib/phaser/persona-assets";
 import {
   loadBossAssets,
@@ -90,21 +92,25 @@ export function generateCheckpointLayout(
   labelPrefix: string = "CP",
 ): Array<{ x: number; y: number; label: string }> {
   if (count <= 0) return [];
-  const marginX = mapWidth * 0.12;
-  const marginY = mapHeight * 0.18;
+  // Use MOST of the map area — old version had 12% X / 18% Y margins
+  // which pinned everything to the middle-bottom band on tall biomes.
+  // 8% margins let the serpentine cover top-to-bottom of the map.
+  const marginX = mapWidth * 0.08;
+  const marginY = mapHeight * 0.08;
   const usableW = mapWidth - marginX * 2;
   const usableH = mapHeight - marginY * 2;
   const out: Array<{ x: number; y: number; label: string }> = [];
   for (let i = 0; i < count; i++) {
-    // Linear progress left → right
+    // Linear progress left → right.
     const t = count === 1 ? 0.5 : i / (count - 1);
     const x = marginX + usableW * t;
-    // Serpentine sine wave — amplitude scales with map height so the
-    // path arcs through more of the visible area on tall biomes.
+    // Serpentine sine wave — 1.5 full cycles across the map so the
+    // path visibly weaves top→bottom→top instead of clustering low.
+    // Amplitude 0.48 (was 0.35) uses ~96% of the vertical usable area.
     const y =
       marginY +
       usableH *
-        (0.5 + 0.35 * Math.sin((i / Math.max(1, count - 1)) * Math.PI * 1.5));
+        (0.5 + 0.48 * Math.sin(t * Math.PI * 2.4));
     out.push({
       x: Math.round(x),
       y: Math.round(y),
@@ -237,6 +243,12 @@ export class TemplateMapScene extends Phaser.Scene {
     // "make sure all map zoom is like village map").
     const cam = this.cameras.main;
     cam.setBounds(0, 0, mapWidth, mapHeight);
+    // Paint the camera background BLACK so any area outside the map
+    // bounds (e.g. when the map is smaller than the viewport at low
+    // mobile zoom, or when the follow-camera hits a bound with the
+    // deadzone) shows a clean matte instead of a torn/streaked GPU
+    // artifact from the WebGL clear color leaking through.
+    cam.setBackgroundColor(0x0a0a10);
     cam.setZoom(getResponsiveZoom());
 
     // Use the provided checkpoint list if any; else fall back to a
@@ -250,20 +262,22 @@ export class TemplateMapScene extends Phaser.Scene {
     const hub = this.checkpoints[0];
     cam.centerOn(hub.x, hub.y);
 
-    // Paint gold-disc markers for every CP — matches Village's look
-    // exactly (26px radius, gold fill + brown ring, index number).
+    // Paint gold-disc markers for every CP. Sized smaller (14px vs 26)
+    // so they read as pips at the wider mobile zoom brackets instead
+    // of hero-sized medallions dominating the map. Fill + ring + number
+    // still match Village's palette.
     this.checkpointNodes = [];
     for (let i = 0; i < this.checkpoints.length; i++) {
       const cp = this.checkpoints[i];
       const disc = this.add
-        .circle(cp.x, cp.y, 26, 0xd4af37, 0.95)
-        .setStrokeStyle(3, 0x7a4a10, 1)
+        .circle(cp.x, cp.y, 14, 0xd4af37, 0.95)
+        .setStrokeStyle(2, 0x7a4a10, 1)
         .setDepth(50)
         .setInteractive({ useHandCursor: true });
       this.add
         .text(cp.x, cp.y, String(i + 1), {
           fontFamily: "monospace",
-          fontSize: "22px",
+          fontSize: "12px",
           color: "#3a2010",
           fontStyle: "bold",
         } as unknown as Phaser.Types.GameObjects.Text.TextStyle)
@@ -341,13 +355,25 @@ export class TemplateMapScene extends Phaser.Scene {
       cam.setDeadzone(120, 100);
     }
 
-    // Free-roam WASD — force:true so it drives the persona without editor mode.
+    // Free-roam WASD — force:true so it drives the persona without
+    // editor mode. Personas use namespaced anim keys like
+    // `persona-anim:<id>:idle` and `persona-anim:<id>:walk-<dir>` — the
+    // default `"persona-walk"` / `"persona-idle"` fallbacks in the
+    // driver don't exist as registered anims, so previously WASD moved
+    // the sprite through the map but never triggered any walk frames
+    // and left the char stuck on its idle first-frame. Pass the correct
+    // keys + directional resolver so we get 4-way walk cycles + a
+    // proper idle-return on key release.
+    const pid = getCurrentPersonaId();
     attachEditorTestWalk(this, {
       getCharacter: () => this.personaHandle?.sprite ?? null,
       isBlocked: () => false, // no per-map blockers yet on template scenes
       mapWidth,
       mapHeight,
       force: true,
+      idleAnimKey: personaAnimKey(pid, "idle"),
+      walkAnimKey: personaAnimKey(pid, "walk-east"),
+      resolveWalkAnimKey: (dx, dy) => directionalWalkAnimKey(pid, dx, dy),
     });
 
     // Let React know the scene is up.

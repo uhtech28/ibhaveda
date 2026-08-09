@@ -37,6 +37,17 @@ export interface EditorTestWalkOptions {
   feetOffsetY?: number;
   /** Anim key to play while moving. Default `"persona-walk"`. */
   walkAnimKey?: string;
+  /**
+   * Optional resolver for direction-specific walk anims. When
+   * provided, called every frame with the normalized (dx, dy) input
+   * vector and expected to return the correct anim key for that
+   * direction (e.g. `persona-anim:<id>:walk-east`). If it returns
+   * a key that doesn't exist in the scene, we fall through to
+   * `walkAnimKey`. Personas with 4-directional walk sheets should
+   * always pass this — the single `walkAnimKey` string can only
+   * play one direction.
+   */
+  resolveWalkAnimKey?: (dx: number, dy: number) => string | null;
   /** Anim key to play when idle. Default `"persona-idle"`. */
   idleAnimKey?: string;
   /**
@@ -82,6 +93,7 @@ export function attachEditorTestWalk(
   // Track which anim we last requested so we only call .play() on state
   // change (Phaser restarts the clip every call — spamming freezes it).
   let isWalking = false;
+  let currentWalkKey: string | null = null;
 
   const step = (_time: number, delta: number) => {
     const char = opts.getCharacter();
@@ -104,6 +116,7 @@ export function attachEditorTestWalk(
       if (isWalking) {
         if (scene.anims.exists(idleAnimKey)) char.play(idleAnimKey, true);
         isWalking = false;
+        currentWalkKey = null;
       }
       return;
     }
@@ -130,14 +143,31 @@ export function attachEditorTestWalk(
     if (!opts.isBlocked(char.x, clampedY + feetOffsetY)) char.y = clampedY;
 
     // Face the movement direction using flipX if the sprite defaults to
-    // facing right. Skip if we're just going up/down.
+    // facing right. Skip if we're just going up/down. Extended personas
+    // that have separate east/west walk sheets don't need flipX — they
+    // encode facing in the anim itself — but flipX is harmless when the
+    // resolver picks the same anim for both horizontal directions.
     if (Math.abs(nx) > 0.05) char.setFlipX(nx < 0);
 
-    // Swap to walk anim exactly once per idle→walk transition.
-    if (!isWalking) {
-      if (scene.anims.exists(walkAnimKey)) char.play(walkAnimKey, true);
-      isWalking = true;
+    // Resolve which walk anim to play THIS frame. Extended personas use
+    // 4-directional sheets so we ask the resolver each tick; legacy
+    // 2-anim personas fall through to the single walkAnimKey. We only
+    // call .play() when the desired key actually changes — spamming
+    // .play() every frame restarts the clip and freezes the sprite on
+    // its first frame.
+    let desiredKey: string | null = null;
+    if (opts.resolveWalkAnimKey) {
+      const dyn = opts.resolveWalkAnimKey(nx, ny);
+      if (dyn && scene.anims.exists(dyn)) desiredKey = dyn;
     }
+    if (!desiredKey && scene.anims.exists(walkAnimKey)) {
+      desiredKey = walkAnimKey;
+    }
+    if (desiredKey && (currentWalkKey !== desiredKey || !isWalking)) {
+      char.play(desiredKey, true);
+      currentWalkKey = desiredKey;
+    }
+    isWalking = true;
 
     // Camera follow — center on character each tick.
     scene.cameras.main.centerOn(char.x, char.y);
