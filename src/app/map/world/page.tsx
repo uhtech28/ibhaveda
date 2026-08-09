@@ -2784,7 +2784,41 @@ function MapPageInner() {
         rafId = requestAnimationFrame(attemptSwap);
         return;
       }
-      // Already active — nothing to do.
+      // ── TemplateMapScene special case ──────────────────────────────
+      // Phaser auto-starts the first-registered scene on Game boot
+      // with NO data (an empty {} config). TemplateMapScene guards
+      // create() with an empty-config early return in that case — so
+      // it ends up in an "active" but blank state. The old code below
+      // then saw `isActive(targetKey) === true` and bailed WITHOUT
+      // ever calling `scene.start(templateSceneData)`, so the real
+      // biome data (mapKey, checkpoints, boss, stage) never reached
+      // Phaser. Result on prod: the React CSS placeholder painted the
+      // biome background, but no CPs / persona / boss / zoom.
+      //
+      // Fix: for TemplateMapScene, always stop-and-restart with the
+      // fresh biome data. `sceneMgr.start` re-runs init() → preload()
+      // → create() with the second-arg data payload. Cheap because
+      // Phaser's texture cache holds the already-loaded map image
+      // between restarts, so there's no re-download.
+      if (targetKey === "TemplateMapScene") {
+        // First, clear any other stage scene that might be rendering
+        // (mirrors the sweep below for parity).
+        for (const bucket of Object.values(STAGE_SCENE_KEY)) {
+          for (const key of Object.values(bucket)) {
+            if (key === targetKey) continue;
+            if (sceneMgr.isActive(key) || sceneMgr.isVisible(key)) {
+              sceneMgr.stop(key);
+            }
+          }
+        }
+        if (sceneMgr.getScene("TemplateMapScene")) {
+          sceneMgr.stop("TemplateMapScene");
+        }
+        sceneMgr.start("TemplateMapScene", templateSceneData ?? undefined);
+        return;
+      }
+      // Already active — nothing to do (only applies to venture-stage
+      // scenes; TemplateMapScene handled above).
       if (sceneMgr.isActive(targetKey) || sceneMgr.isVisible(targetKey)) {
         return;
       }
@@ -2800,12 +2834,12 @@ function MapPageInner() {
           }
         }
       }
-      // Also stop TemplateMapScene when switching biomes so the next
-      // scene.start reruns init() with the new biome data.
-      if (targetKey === "TemplateMapScene" && sceneMgr.getScene("TemplateMapScene")) {
+      // Also stop TemplateMapScene when switching FROM template to a
+      // venture scene, so leftover boss/persona sprites don't linger.
+      if (sceneMgr.getScene("TemplateMapScene") &&
+          (sceneMgr.isActive("TemplateMapScene") || sceneMgr.isVisible("TemplateMapScene"))) {
         sceneMgr.stop("TemplateMapScene");
       }
-      // Pass biome data to TemplateMapScene via scene.start's second arg.
       sceneMgr.start(targetKey, templateSceneData ?? undefined);
     };
 
@@ -5414,17 +5448,22 @@ function MapPageInner() {
         }}
       />
 
-      {/* ── Non-venture template placeholder ────────────────────────
-          Academic / Lab / Creative templates have no bespoke map
-          art authored yet. Previously the scene router fell through
-          to VillageMapScene for every stage, which meant an
-          "Academic Paper" idea started on the Village map with the
-          Fog of Vagueness boss — misleading and off-brand.
-          Now we detect an unsupported template and render this
-          themed placeholder on top of the (blank) canvas. The HUD
-          bar and Adventurer's Menu still work, so users can still
-          navigate to their tasks via the flare/menu. */}
-      {venture &&
+      {/* ── Non-venture template placeholder (RETIRED) ─────────────
+          Academic / Lab / Creative now route through TemplateMapScene
+          in the Phaser routing effect above, which paints the biome
+          background inside Phaser AND spawns checkpoints, persona,
+          boss + Village-parity zoom. The old CSS placeholder used to
+          sit on TOP of the Phaser canvas — which meant even after we
+          wired TemplateMapScene, the placeholder still occluded the
+          CPs/persona/boss the scene had rendered. Removing the
+          overlay lets Phaser show through.
+          If a future template genuinely has no scene AND no biome art
+          available, the router will simply not run scene.start() and
+          the black Phaser canvas stays visible — the HUD still works.
+          `TemplateMapPlaceholder` is intentionally kept in the file
+          in case we need to fall back for a specific edge case, but
+          it is no longer rendered by default. */}
+      {false && venture &&
         venture.templateId &&
         venture.templateId !== "venture" &&
         !STAGE_SCENE_KEY[venture.templateId as string]?.[activeStage] && (
