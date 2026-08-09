@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Eye, EyeOff } from "lucide-react";
 
 /**
  * Shared visual pieces for the custom auth modal. These deliberately mimic
@@ -33,6 +33,27 @@ export function PrimaryButton({
           <ChevronRight className="h-3.5 w-3.5" />
         </>
       )}
+    </button>
+  );
+}
+
+/** Show/hide password toggle using Clerk's standard outline eye icon. */
+export function PasswordToggle({
+  show,
+  onToggle,
+}: {
+  show: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9394a1] transition hover:text-[#31313a]"
+      aria-label={show ? "Hide password" : "Show password"}
+      tabIndex={-1}
+    >
+      {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
     </button>
   );
 }

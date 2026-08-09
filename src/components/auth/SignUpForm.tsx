@@ -13,6 +13,7 @@ import {
   AuthHeaderLogo,
   SecuredByClerk,
   FieldMessage,
+  PasswordToggle,
   clerkErrorMessage,
 } from "./auth-ui";
 
@@ -60,11 +61,22 @@ export function SignUpForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !signUp) return;
+    if (!canSubmit || !signUp || !setActive) return;
     setFormError(null);
     setSubmitting(true);
     try {
-      await signUp.create({ emailAddress: emailTrim, password });
+      const res = await signUp.create({ emailAddress: emailTrim, password });
+      // Some Clerk instances don't gate sign-up behind email-code verification,
+      // so create() returns "complete" straight away. In that case there is no
+      // pending sign-up attempt to prepare — calling prepareEmailAddressVerification
+      // would throw client_state_invalid ("No sign up attempt was found"). Activate
+      // the session and route on instead.
+      if (res.status === "complete") {
+        await setActive({ session: res.createdSessionId });
+        onClose();
+        router.push("/profile-setup");
+        return;
+      }
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setStep("verify");
     } catch (err) {
@@ -190,15 +202,7 @@ export function SignUpForm({
               onFocus={() => setPwFocused(true)}
               placeholder="Enter your password"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((s) => !s)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9394a1] hover:text-[#31313a]"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              tabIndex={-1}
-            >
-              {showPassword ? "🙈" : "👁"}
-            </button>
+            <PasswordToggle show={showPassword} onToggle={() => setShowPassword((s) => !s)} />
           </div>
           {showPwMsg &&
             (password.length < 8 ? (

@@ -13,6 +13,7 @@ import {
   AuthHeaderLogo,
   SecuredByClerk,
   FieldMessage,
+  PasswordToggle,
   clerkErrorMessage,
 } from "./auth-ui";
 
@@ -120,15 +121,7 @@ export function SignInForm({
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((s) => !s)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9394a1] hover:text-[#31313a]"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              tabIndex={-1}
-            >
-              {showPassword ? "🙈" : "👁"}
-            </button>
+            <PasswordToggle show={showPassword} onToggle={() => setShowPassword((s) => !s)} />
           </div>
         </div>
 
