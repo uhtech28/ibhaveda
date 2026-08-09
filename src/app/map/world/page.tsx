@@ -381,7 +381,13 @@ const STAGE_SCENE_KEY: Record<string, SceneKeysByStage> = {
     5: "MineScene",           // Build & Deliver · The Mine (Ironhold)
     6: "GoldenHarborScene",   // Launch · The Harbour
     7: "CrossroadsScene",     // Iteration · The Crossroads Town
-    // Stage 8 (The Capital · Scale) — art pending.
+    // Stage 8 (The Capital · Scale): bespoke art still pending, but
+    // rather than leave Stage-8 players on a blank canvas we route
+    // them into VillageMapScene so they at least get a playable map
+    // with CPs, persona and boss. Swap to a dedicated CapitalScene
+    // (or route through TemplateMapScene with a capital-map.png) when
+    // the painted art ships.
+    8: "VillageMapScene",
   },
   // academic / lab / creative intentionally empty — bespoke map art
   // for those templates hasn't been authored yet. See
@@ -1535,14 +1541,26 @@ function resolveTemplateMapUrl(
   biomeName: string | null,
 ): string | null {
   if (!biomeName) return null;
-  const norm = biomeName.trim().toLowerCase();
+  // Normalise:
+  //  - lowercase, trim
+  //  - strip a leading "the " so "The Ruins" matches the "ruins" key
+  //  - strip apostrophes so "Cartographer's Tower" matches
+  //    "cartographers tower"
+  // Prod audit turned up 7 biomes across academic/lab/creative that
+  // failed to resolve for exactly these two reasons — user saw a dark
+  // Phaser canvas with no biome art because the mapUrl returned null.
+  const rawNorm = biomeName.trim().toLowerCase();
+  const norm = rawNorm
+    .replace(/^the\s+/, "")
+    .replace(/['’]/g, "");
+  // NOTE — all keys below are AFTER normalisation (stripped "the ",
+  // stripped apostrophes, lowercased). E.g. "The Ruins" arrives here
+  // as "ruins" and "Cartographer's Tower" as "cartographers tower".
   if (templateId === "academic") {
     const ACADEMIC_MAP: Record<string, string> = {
       "ancient library": "/assets/maps-v2/academic/library-map.png",
       "library": "/assets/maps-v2/academic/library-map.png",
       "ruins": "/assets/maps-v2/academic/ruins-map.png",
-      "cartographer's tower":
-        "/assets/maps-v2/academic/cartographer-tower-map.png",
       "cartographers tower":
         "/assets/maps-v2/academic/cartographer-tower-map.png",
       "scriptorium": "/assets/maps-v2/academic/scriptorium-map.png",
@@ -1557,11 +1575,8 @@ function resolveTemplateMapUrl(
       "observatory": "/assets/maps-v2/lab/observatory-map.png",
       "ancient library": "/assets/maps-v2/lab/library-map.png",
       "library": "/assets/maps-v2/lab/library-map.png",
-      "cartographer's tower": "/assets/maps-v2/lab/cartographer-tower-map.png",
       "cartographers tower": "/assets/maps-v2/lab/cartographer-tower-map.png",
       "forge": "/assets/maps-v2/lab/forge-map.png",
-      "alchemist's laboratory":
-        "/assets/maps-v2/lab/alchemists-laboratory-map.png",
       "alchemists laboratory":
         "/assets/maps-v2/lab/alchemists-laboratory-map.png",
       "crossroads town": "/assets/maps-v2/lab/crossroads-map.png",
@@ -1578,7 +1593,6 @@ function resolveTemplateMapUrl(
       "gallery of echoes": "/assets/maps-v2/village-painted/village-map.png",
       "wilderness": "/assets/maps-v2/forest/forest-map.png",
       "village square": "/assets/maps-v2/village-painted/village-map.png",
-      "artisan's workshop": "/assets/maps-v2/artisans/artisans-map.png",
       "artisans workshop": "/assets/maps-v2/artisans/artisans-map.png",
       "harbour": "/assets/maps-v2/golden-harbor/harbor-map.png",
       "harbor": "/assets/maps-v2/golden-harbor/harbor-map.png",
