@@ -29,19 +29,28 @@
 import { useEffect, useRef, useState } from "react";
 
 interface Props {
-  /** Max time to keep splash mounted if the video never fires
-   *  `ended` (network stall, codec fail). Defaults to 30 s — comfy
-   *  headroom above the 10 s clip length. */
+  /** LEGACY: pre-video splash timed out after ~2.5s. The prop is
+   *  kept only for backwards-compat with any lingering callers —
+   *  IGNORED intentionally. Splash now dismisses ONLY on user click
+   *  after video ends (or on video error). */
   durationMs?: number;
   onDone: () => void;
 }
 
 const VIDEO_SRC = "/assets/videos/welcome-intro.mp4";
 
-export function WelcomeSplash({ durationMs = 30_000, onDone }: Props) {
+/** Hard upper bound — only kicks in if the video never loads AND
+ *  never fires `onError` (offline dev, blocked domain, whatever).
+ *  Cleared the moment the video's `onPlay` event fires, so once
+ *  playback starts the user gets the full clip no matter how long. */
+const NEVER_LOADED_TIMEOUT_MS = 15_000;
+
+export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
+  void _unused; // silence unused-var lint without changing the API
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [ended, setEnded] = useState(false);
   const doneRef = useRef(false);
+  const safetyTimerRef = useRef<number | null>(null);
 
   // Wrap onDone in a fire-once guard so a rapid keyboard-and-click
   // combo can't fire twice (would cause a double router.replace on
@@ -52,16 +61,29 @@ export function WelcomeSplash({ durationMs = 30_000, onDone }: Props) {
     onDone();
   };
 
-  // Safety-valve auto-dismiss — if the video never ends (broken
-  // mp4, dropped connection, autoplay blocked and user never
-  // interacts) we still advance after durationMs so signup doesn't
-  // dead-end. Cleared on unmount so a normal end→click path can't
-  // fire this after we've already navigated.
+  // Clear the safety-valve timer. Called once playback actually
+  // starts (onPlay) — from that point on we trust `onEnded` and the
+  // click handler to advance, never a wall-clock timer.
+  const clearSafetyTimer = () => {
+    if (safetyTimerRef.current !== null) {
+      window.clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+  };
+
+  // Safety-valve auto-dismiss — ONLY fires if the video never even
+  // starts playing (broken mp4, dropped connection, autoplay blocked
+  // AND user never interacts). Cleared the moment `onPlay` fires.
+  // Once cleared, the splash sits on the last frame forever waiting
+  // for the user to tap Continue — which is the product spec.
   useEffect(() => {
-    const t = window.setTimeout(fireDone, durationMs);
-    return () => window.clearTimeout(t);
+    safetyTimerRef.current = window.setTimeout(
+      fireDone,
+      NEVER_LOADED_TIMEOUT_MS,
+    );
+    return clearSafetyTimer;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [durationMs]);
+  }, []);
 
   // Kick playback on mount. iOS Safari sometimes needs an explicit
   // .play() call even with autoPlay attribute, and Chrome's
@@ -113,6 +135,11 @@ export function WelcomeSplash({ durationMs = 30_000, onDone }: Props) {
         muted
         playsInline
         // No `loop` — spec says play once + pause at end.
+        // Playback started for real — kill the never-loaded safety
+        // valve so it can't dismiss the splash mid-video.
+        onPlay={clearSafetyTimer}
+        onPlaying={clearSafetyTimer}
+        onLoadedData={clearSafetyTimer}
         onEnded={() => {
           // Pause explicitly so the last frame stays painted even
           // on browsers that snap the poster back on ended events
