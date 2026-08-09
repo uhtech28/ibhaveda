@@ -55,6 +55,8 @@ import { getVillageBoss } from "@/config/village-bosses";
 import { getStageBoss, getStageSuperBoss } from "@/config/stage-bosses";
 import type { StageBoss } from "@/config/stage-bosses";
 import { getTemplate, type TemplateId } from "@/config/templates";
+import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
+import { generateCheckpointLayout } from "@/lib/phaser/scenes/TemplateMapScene";
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
   checkpointBossKey,
@@ -2742,19 +2744,31 @@ function MapPageInner() {
       mapHeight: number;
       biomeLabel: string;
       stage: number;
+      checkpoints?: Array<{ x: number; y: number; label: string }>;
     } | null = null;
     if (targetKey === "TemplateMapScene") {
       const mapUrl = resolveTemplateMapUrl(templateId, templateBiomeName);
       if (!mapUrl) return;
       // Default map dims — Academic/Lab shipped at 1412×1156. Slightly
       // over-sizing the bounds is safer than under (Phaser handles OOB).
+      const mapW = 1540;
+      const mapH = 1412;
+      // CP count comes from the template's stage config
+      // (templateStages was resolved above from getStageMetadata).
+      // Fall back to 3 CPs for any stage that somehow doesn't have
+      // a checkpoints field — matches every non-venture template
+      // spec (all have ≥ 3 CPs per stage).
+      const cpCount =
+        templateStages[Math.max(0, desiredStage - 1)]?.checkpoints ?? 3;
+      const cpLayout = generateCheckpointLayout(mapW, mapH, cpCount);
       templateSceneData = {
         mapKey: `template:${mapUrl}`,
         mapUrl,
-        mapWidth: 1540,
-        mapHeight: 1412,
+        mapWidth: mapW,
+        mapHeight: mapH,
         biomeLabel: templateBiomeName ?? `Stage ${desiredStage}`,
         stage: desiredStage,
+        checkpoints: cpLayout,
       };
     }
 
@@ -3976,6 +3990,33 @@ function MapPageInner() {
       corruptionLevel,
     });
   }, [phaserReady, venture?._id, corruptionLevel]);
+
+  // ── Assigned pool super-boss → VillageMapScene reveal ─────────────────────
+  // Venture creation writes a random pool boss id (1..12) to
+  // `venture.assignedBosses[0]` (see convex/ventures.ts:createVentureForUser).
+  // That id maps 1:1 to SUPER_BOSS_POOL index (id - 1). Once phaser is
+  // ready + the venture query has landed, look up the entry and push
+  // it into VillageMapScene via setAssignedPoolBoss so the super-boss
+  // silhouette + reveal-time taunt use the CORRECT boss instead of
+  // the hardcoded Unraveller. Runs whenever the assignment changes
+  // (rare — set once at venture create — but safe to re-run).
+  useEffect(() => {
+    if (!phaserReady) return;
+    const bossIdRaw = venture?.assignedBosses?.[0];
+    const bossId = typeof bossIdRaw === "number" ? bossIdRaw : Number(bossIdRaw);
+    if (!Number.isFinite(bossId) || bossId < 1 || bossId > SUPER_BOSS_POOL.length) return;
+    const entry = SUPER_BOSS_POOL[bossId - 1];
+    if (!entry) return;
+    try {
+      const sceneMgr = gameRef.current?.scene;
+      const scene = sceneMgr?.getScene("VillageMapScene");
+      if (scene && typeof (scene as { setAssignedPoolBoss?: (e: SuperBossPoolEntry) => void }).setAssignedPoolBoss === "function") {
+        (scene as { setAssignedPoolBoss: (e: SuperBossPoolEntry) => void }).setAssignedPoolBoss(entry);
+      }
+    } catch (err) {
+      console.warn("[MapPage] setAssignedPoolBoss failed", err);
+    }
+  }, [phaserReady, venture?._id, venture?.assignedBosses]);
 
   // ── Sync checkpoint progress → Phaser (deduped by signature) ───────────────
   useEffect(() => {

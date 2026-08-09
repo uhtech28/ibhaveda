@@ -55,6 +55,7 @@ import {
   directionalWalkAnimKey,
 } from "../persona-assets";
 import { getPersona } from "@/config/personas";
+import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
 import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
 // Corruption overlay + pattern helpers imports kept for the TYPE
 // (`CorruptionOverlay | null` on the private field below) but the
@@ -550,11 +551,20 @@ export class VillageMapScene extends Phaser.Scene {
     defeat: string | null;
     victory: string | null;
   } | null> = [];
-  // Super boss (The Unraveller).
+  // Super boss silhouette + reveal state. Defaults to the Unraveller
+  // per the original demo, but `assignedPoolBoss` overrides at runtime
+  // once the venture's random pool assignment is known — see
+  // `setAssignedPoolBoss` + `fullRevealSuperBoss` below.
   private superBossSprite: Phaser.GameObjects.Sprite | null = null;
   private superBossBobTween: Phaser.Tweens.Tween | null = null;
   private superBossTendrilStopper: (() => void) | null = null;
   private superBossRevealed = false;
+  /** Which of the 12 pool bosses the current venture drew. Set by the
+   *  React map page from `venture.assignedBosses[0]` (Convex — the
+   *  boss id in that array maps 1..12 → SUPER_BOSS_POOL index). Null
+   *  when the query hasn't resolved yet — reveal falls back to
+   *  Unraveller (the default silhouette + taunt). */
+  private assignedPoolBoss: SuperBossPoolEntry | null = null;
 
   // Village ambient VFX emitter handles (for shutdown cleanup)
   private ambientEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
@@ -633,6 +643,48 @@ export class VillageMapScene extends Phaser.Scene {
     });
     // The Unraveller — static rotation (no anim frames available yet).
     this.load.image("boss-unraveller-idle", UNRAVELLER_IDLE_ASSET);
+    // Preload every pool super-boss's idle + all animation clips so
+    // we can swap the super-boss sprite texture AND play the full
+    // state machine on reveal based on the current venture's random
+    // assignment (venture.assignedBosses[0] maps 1..12 →
+    // SUPER_BOSS_POOL[id-1]). Two texture keys per boss:
+    //   `pool-boss-idle:<id>` = static idle for the pre-reveal
+    //      silhouette swap (setAssignedPoolBoss / fullRevealSuperBoss)
+    //   `pool-boss-anim:<id>:<state>` = spritesheet for the state
+    //      machine (loaded ONLY if the entry ships a matching
+    //      idleClip / attackClip / hurtClip / defeatClip / victoryClip)
+    // Total cold-cost across all 12: ~1-2 MB (mostly the Tide Caller
+    // 164×164 sheets). Preloading upfront avoids a network stall
+    // between the reveal cinematic and the anim first play.
+    for (const entry of SUPER_BOSS_POOL) {
+      // 1) Static idle for the silhouette
+      const staticPath = entry.idleAsset ?? entry.idleClip?.asset;
+      if (staticPath) {
+        const key = `pool-boss-idle:${entry.id}`;
+        if (!this.textures.exists(key)) this.load.image(key, staticPath);
+      }
+      // 2) Anim clips — every state with a clip block
+      const clips: Array<[string, typeof entry.idleClip]> = [
+        ["idle", entry.idleClip],
+        ["attack", entry.attackClip],
+        ["hurt", entry.hurtClip],
+        ["defeat", entry.defeatClip],
+        ["victory", entry.victoryClip],
+      ];
+      for (const [state, clip] of clips) {
+        if (!clip) continue;
+        const animKey = `pool-boss-anim:${entry.id}:${state}`;
+        if (this.textures.exists(animKey)) continue;
+        if (clip.frameCount > 1 && clip.frameWidth && clip.frameHeight) {
+          this.load.spritesheet(animKey, clip.asset, {
+            frameWidth: clip.frameWidth,
+            frameHeight: clip.frameHeight,
+          });
+        } else {
+          this.load.image(animKey, clip.asset);
+        }
+      }
+    }
     // Everyone Chimera (CP2) — Pixellab pipeline: idle + attack + hurt.
     // Missing victory / defeat — config falls back to hurt for defeat.
     this.load.spritesheet("boss-chimera-idle", CHIMERA_IDLE_ASSET, {
@@ -676,6 +728,37 @@ export class VillageMapScene extends Phaser.Scene {
   create(): void {
     // 1. Painted village background
     this.add.image(0, 0, "village-composite").setOrigin(0, 0).setDepth(0);
+
+    // Register pool boss animations for every SUPER_BOSS_POOL entry
+    // whose clips loaded in preload(). Anim keys mirror the texture
+    // keys from preload: `pool-boss-anim:<id>:<state>`. Idempotent —
+    // Phaser skips if the key already exists. Attack/hurt/defeat/
+    // victory play once; idle loops.
+    for (const entry of SUPER_BOSS_POOL) {
+      const clips: Array<[string, typeof entry.idleClip, number]> = [
+        ["idle",    entry.idleClip,    -1],
+        ["attack",  entry.attackClip,   0],
+        ["hurt",    entry.hurtClip,     0],
+        ["defeat",  entry.defeatClip,   0],
+        ["victory", entry.victoryClip,  0],
+      ];
+      for (const [state, clip, repeat] of clips) {
+        if (!clip || clip.frameCount <= 1) continue;
+        const texKey = `pool-boss-anim:${entry.id}:${state}`;
+        const animKey = `pool-boss-anim-key:${entry.id}:${state}`;
+        if (!this.textures.exists(texKey)) continue;
+        if (this.anims.exists(animKey)) continue;
+        this.anims.create({
+          key: animKey,
+          frames: this.anims.generateFrameNumbers(texKey, {
+            start: 0,
+            end: Math.max(0, clip.frameCount - 1),
+          }),
+          frameRate: clip.fps ?? (state === "idle" ? 6 : 10),
+          repeat,
+        });
+      }
+    }
 
     // 2. Camera — centered on first checkpoint, drag-to-pan.
     // Adaptive zoom by viewport width so mobile shows more of the map.
@@ -1643,6 +1726,37 @@ export class VillageMapScene extends Phaser.Scene {
    * Also updates the HP bar AND lights up the corresponding task-fill
    * star on the checkpoint marker.
    */
+  /**
+   * Called by the React map page as soon as it knows which of the 12
+   * pool super bosses this venture drew (from Convex
+   * `venture.assignedBosses[0]` → SUPER_BOSS_POOL index). The scene
+   * stores the entry and swaps the super-boss silhouette texture +
+   * taunt copy at reveal time (see `fullRevealSuperBoss`). Safe to
+   * call multiple times — the reveal path re-reads this field on each
+   * invocation, and it's a no-op if the reveal already happened.
+   */
+  public setAssignedPoolBoss(entry: SuperBossPoolEntry | null): void {
+    this.assignedPoolBoss = entry;
+    // If the reveal hasn't fired yet and the sprite is already
+    // placed (silhouette phase, alpha 0.12), pre-swap the texture
+    // so users see the correct silhouette while still faded.
+    // Swapping AFTER reveal is a no-op — reveal already applied
+    // the assigned texture in fullRevealSuperBoss.
+    if (this.superBossRevealed) return;
+    if (!this.superBossSprite || !entry) return;
+    // Prefer the idle animation if it's registered (breathing loop),
+    // else fall back to the static texture. The reveal call will
+    // re-issue the same swap under the same rules so this
+    // pre-swap is purely a "correct silhouette while faded" nicety.
+    const idleAnimKey = `pool-boss-anim-key:${entry.id}:idle`;
+    const staticKey = `pool-boss-idle:${entry.id}`;
+    if (this.anims.exists(idleAnimKey)) {
+      this.superBossSprite.play(idleAnimKey);
+    } else if (this.textures.exists(staticKey)) {
+      this.superBossSprite.setTexture(staticKey);
+    }
+  }
+
   public weakenActiveBoss(tasksDone: number, tasksTotal: number = 3): void {
     const idx = this.currentIndex;
     const sprite = this.miniBossSprites[idx];
@@ -1831,8 +1945,12 @@ export class VillageMapScene extends Phaser.Scene {
   }
 
   /**
-   * P0 #3 — fully reveal The Unraveller and shake the world. Called when
-   * the last checkpoint is cleared.
+   * P0 #3 — fully reveal the venture's assigned super boss and shake
+   * the world. Called when the last checkpoint is cleared. If the
+   * venture has an assigned pool boss (React page called
+   * setAssignedPoolBoss before this fires), the silhouette texture
+   * + taunt copy swap to that boss's identity. Falls back to The
+   * Unraveller (original hardcoded reveal) when no assignment.
    */
   private async fullRevealSuperBoss(): Promise<void> {
     const sprite = this.superBossSprite;
@@ -1840,26 +1958,55 @@ export class VillageMapScene extends Phaser.Scene {
     this.superBossRevealed = true;
     if (this.superBossBobTween) this.superBossBobTween.stop();
 
+    // Swap the silhouette texture to the assigned pool boss if we
+    // have one AND its idle texture actually preloaded. Otherwise
+    // keep the default Unraveller silhouette.
+    //
+    // If the assigned boss ships an animated idle sheet (registered
+    // in create() as `pool-boss-anim-key:<id>:idle`), we swap to
+    // THAT animation on reveal so the boss breathes/loops instead
+    // of holding a single static frame. Static-only bosses fall
+    // back to the plain texture swap. Both paths preserve the
+    // family tint so bossAnimator VFX stay coherent.
+    const assigned = this.assignedPoolBoss;
+    if (assigned) {
+      const idleAnimKey = `pool-boss-anim-key:${assigned.id}:idle`;
+      const staticKey = `pool-boss-idle:${assigned.id}`;
+      if (this.anims.exists(idleAnimKey)) {
+        // Play the breathing/idle loop — Phaser handles the texture
+        // swap internally via the animation frames.
+        sprite.play(idleAnimKey);
+      } else if (this.textures.exists(staticKey)) {
+        sprite.setTexture(staticKey);
+      }
+      tagBossFamily(sprite, "serpent");
+    }
+
     // Ensure sprite is at least somewhat visible before the pan starts
     sprite.setAlpha(Math.max(sprite.alpha, 0.4));
     // Swap to the Unraveller's own music track for the reveal moment.
     // stage_village fades under boss_unraveller so the pan/shake lands
-    // with a new sonic identity.
+    // with a new sonic identity. Kept for every pool boss — pool
+    // bosses inherit the Unraveller theme until per-boss tracks ship.
     try {
       audioManager.playMusic("boss_unraveller", 0.55);
     } catch { /* audio not critical */ }
 
     // Fire the persona's heroic victory pose in parallel with the reveal.
     // Delayed slightly (~200ms) so the pan is already underway when the
-    // character reacts to the Unraveller — cinematic beat.
+    // character reacts to the boss — cinematic beat.
     this.time.delayedCall(200, () => this.playPersonaVictoryPose());
 
     await revealBoss(this, sprite, {
       panDurationMs: 900,
       shakeIntensity: 0.011,
     });
-    // Ominous line
-    showBossTaunt(this, sprite, "So you've unraveled the vagueness. Come find me.", 4000);
+    // Ominous line — per-boss taunt when we have one, else the classic
+    // Unraveller vagueness line.
+    const tauntLine = assigned
+      ? `The ${assigned.name} watches. ${assigned.represents}. Come find me.`
+      : "So you've unraveled the vagueness. Come find me.";
+    showBossTaunt(this, sprite, tauntLine, 4000);
     // Resume bob at new state
     this.superBossBobTween = this.tweens.add({
       targets: sprite,

@@ -1,0 +1,36 @@
+{
+  "group_id": "ab819cea-b16f-4416-8f6e-2c2f52fb1c05",
+  "states": [
+    {
+      "character": {
+        "id": "c192d7c5-90d6-40a8-9168-9b7e7bf40689",
+        "name": "Idle",
+        "prompt": "idle",
+        "size": {
+          "width": 256,
+          "height": 256
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-08T11:28:06.820050+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-08T11:35:42.758632"
+}

@@ -49,6 +49,7 @@ import {
   type MovingBossHandle,
   type PersonaHandle,
 } from "@/lib/phaser/animations/stageMapAnimations";
+import { getResponsiveZoom } from "@/lib/phaser/utils/responsive-zoom";
 
 const MAP_ASSET = "/assets/maps-v2/forest/forest-map.png";
 // Sized to the actual painted area of the new LDtk delivery (was
@@ -270,13 +271,7 @@ export class ForestMapScene extends Phaser.Scene {
     // 2. Camera
     const cam = this.cameras.main;
     cam.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    const vw = typeof window !== "undefined" ? window.innerWidth : 1920;
-    let zoom: number;
-    if (vw < 480) zoom = 0.5;
-    else if (vw < 768) zoom = 0.65;
-    else if (vw < 1024) zoom = 0.85;
-    else zoom = 1.0;
-    cam.setZoom(zoom);
+    cam.setZoom(getResponsiveZoom());
     const start = CHECKPOINTS[this.currentIndex];
     cam.centerOn(start.x, start.y);
 
@@ -364,11 +359,6 @@ export class ForestMapScene extends Phaser.Scene {
     // full opacity, fade to ~10% when their owning CP hits 2/3 tasks,
     // and to 0% + shatter burst at 3/3. `applyCorruptionState` is
     // called from React whenever the CP data changes.
-    const forestPattern = ensureCorruptionPattern(this, motifForStage(2));
-    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
-      x: cp.x,
-      y: cp.y,
-    }));
     // Corruption overlay DISABLED per product ask ("remove the
     // corruption mechanism for now WHATEVER U HAVE ADDED"). The
     // CorruptionOverlay class stays on disk; we just don't

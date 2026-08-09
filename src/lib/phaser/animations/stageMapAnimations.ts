@@ -309,6 +309,16 @@ export function playBossState(
  * target CP, flip to face the travel direction, then face the
  * character again on complete. Fires a callback when the tween ends
  * so the scene can chain into `walkCharacterTo`.
+ *
+ * Product rule (verbatim from user): "if any animation is missing
+ * for a boss use can use defeat animation also in retreat and
+ * attack animation for victory". So during the retreat tween we
+ * play the boss's defeat animation if it exists — the resolveState
+ * chain (defeat → hurt → idle) then picks the best available clip,
+ * meaning bosses without any defeat/hurt anim just keep their idle
+ * during retreat instead of freezing on a single frame. Once the
+ * tween completes we bounce back to idle so the boss reads as
+ * "settled" at the new CP.
  */
 export function retreatBossTo(
   scene: Phaser.Scene,
@@ -329,6 +339,11 @@ export function retreatBossTo(
   // away, not sliding backwards).
   handle.sprite.setFlipX(targetX < startX);
 
+  // Play the "retreating" animation — defeat by product rule, with
+  // resolveState fallback through hurt → idle. Force=true so we
+  // preempt whatever state was playing before the retreat began.
+  playBossState(scene, handle, "defeat", { force: true });
+
   scene.tweens.add({
     targets: handle.sprite,
     x: targetX,
@@ -341,6 +356,9 @@ export function retreatBossTo(
       // VillageMapScene's CHAR_X_OFFSET convention).
       const faceX = opts.faceX ?? target.x - 60;
       handle.sprite.setFlipX(faceX < handle.sprite.x);
+      // Settle back to idle so the boss reads as alive/breathing at
+      // the new CP instead of holding the last defeat frame.
+      playBossState(scene, handle, "idle", { force: true });
       opts.onComplete?.();
     },
   });
@@ -738,5 +756,135 @@ export function onCombatVictory(
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Pool super-boss support (project-scoped villains from
+// SUPER_BOSS_POOL in venture.config.ts). Same clip shape as a
+// StageBoss, so we adapt the entry into a StageBoss-compatible
+// object and reuse the existing load/register/spawn/play helpers.
+// Per user ask: "wire all of them with code and if any animation
+// is missing for a boss use can use defeat animation also in
+// retreat and attack animation for victory. do everything
+// professionally." — the resolveState fallback chain already covers
+// victory→attack→idle and defeat→hurt→idle, so pool bosses inherit
+// those graceful fallbacks automatically.
+// ─────────────────────────────────────────────────────────────────────
+
+import type { SuperBossPoolEntry } from "@/config/templates/venture.config";
+import type { VillageBossFamily } from "@/config/village-bosses";
+
+/** Turn a SuperBossPoolEntry into a StageBoss-compatible object so
+ *  every helper below (load / register / spawn / play / retreat /
+ *  dissolve) can accept it without a second code path. */
+function poolAsStageBoss(entry: SuperBossPoolEntry): StageBoss {
+  // Pool bosses default to "serpent" family palette (matches the
+  // Unraveller / Ashen Drake / Tide Caller flavor) — used only for
+  // aura tint by bossAnimator. Individual entries can override by
+  // extending SuperBossPoolEntry with a `family` field later.
+  const family: VillageBossFamily = "serpent";
+  return {
+    checkpointIndex: -1,
+    isSuper: true,
+    name: entry.name,
+    family,
+    idleAsset: entry.idleAsset ?? "",
+    introLine: `* ${entry.name} rises. ${entry.represents}.`,
+    idleClip: entry.idleClip,
+    attackClip: entry.attackClip,
+    hurtClip: entry.hurtClip,
+    defeatClip: entry.defeatClip,
+    victoryClip: entry.victoryClip,
+    spriteScale: entry.spriteScale ?? 2.4,
+    spriteYOffset: entry.spriteYOffset ?? 40,
+    spriteXOffset: entry.spriteXOffset ?? 0,
+  };
+}
+
+/** Preload every clip a pool boss ships (idle/attack/hurt/defeat/
+ *  victory + optional rotations). Call from a scene's preload().
+ *  Skips clips that don't exist on disk cleanly — the state machine
+ *  falls back through resolveState() at play time. */
+export function loadPoolBossAssets(
+  scene: Phaser.Scene,
+  entry: SuperBossPoolEntry,
+): void {
+  const boss = poolAsStageBoss(entry);
+  // Pool bosses go under stage=0 in the texture-key namespace so they
+  // never collide with stage-1..7 mini/super bosses.
+  loadBossAssets(scene, 0, boss);
+  // Optional directional rotations — load each as a plain image so
+  // the map's walk code can `setTexture()` on facing change.
+  if (entry.rotations) {
+    for (const [dir, path] of Object.entries(entry.rotations)) {
+      if (!path) continue;
+      const key = `pool-rot:${slugify(entry.name)}:${dir}`;
+      if (scene.textures.exists(key)) continue;
+      scene.load.image(key, path);
+    }
+  }
+}
+
+/** Register anims for every pool-boss clip that loaded. */
+export function registerPoolBossAnimations(
+  scene: Phaser.Scene,
+  entry: SuperBossPoolEntry,
+): void {
+  const boss = poolAsStageBoss(entry);
+  registerBossAnimations(scene, 0, boss);
+}
+
+/** Spawn a pool boss as a MovingBossHandle at a specific map point.
+ *  Returns a handle scenes can pass to playBossState / retreatBossTo /
+ *  dissolveBoss just like a stage boss. */
+export function spawnPoolBoss(
+  scene: Phaser.Scene,
+  entry: SuperBossPoolEntry,
+  pos: { x: number; y: number },
+  opts: { showHpBar?: boolean; depth?: number } = {},
+): MovingBossHandle {
+  const boss = poolAsStageBoss(entry);
+  const handle = spawnMovingBoss(scene, 0, boss, pos, opts);
+  return handle;
+}
+
+/** Reveal a pool super boss with the full cinematic (pan + rise +
+ *  scale-in + HP bar). Same choreography as revealSuperBoss for
+ *  stage-final bosses. */
+export function revealPoolSuperBoss(
+  scene: Phaser.Scene,
+  entry: SuperBossPoolEntry,
+  pos: { x: number; y: number },
+  opts: { panDurationMs?: number; onArrived?: () => void } = {},
+): MovingBossHandle {
+  const boss = poolAsStageBoss(entry);
+  return revealSuperBoss(scene, 0, boss, pos, opts);
+}
+
+/** Swap a pool boss's on-screen facing to the direction closest to a
+ *  given vector, using the 8 rotation images if the entry ships them.
+ *  No-op when the entry has no rotations block — the current sprite
+ *  frame stays. */
+export function setPoolBossFacing(
+  scene: Phaser.Scene,
+  handle: MovingBossHandle,
+  entry: SuperBossPoolEntry,
+  dx: number,
+  dy: number,
+): void {
+  if (!entry.rotations) return;
+  // 8-direction picker — atan2 → nearest 45° bucket.
+  const angle = Math.atan2(dy, dx); // -PI..PI, 0 = east
+  const octant = Math.round(((angle + Math.PI) / (Math.PI / 4))) % 8;
+  const dirs: Array<keyof NonNullable<SuperBossPoolEntry["rotations"]>> = [
+    "west", "south-west", "south", "south-east",
+    "east", "north-east", "north", "north-west",
+  ];
+  const dir = dirs[octant];
+  const key = `pool-rot:${slugify(entry.name)}:${dir}`;
+  if (scene.textures.exists(key)) {
+    handle.sprite.setTexture(key);
+  }
+}
+
 // Re-exports for scene convenience
 export type { BossState, StageBoss };
+export type { SuperBossPoolEntry };

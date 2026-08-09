@@ -181,25 +181,348 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
 // venture creation (see createTemplatedVenture). These are project-
 // scoped villains, NOT per-stage. Sourced from Ibhaveda_boss_corruption_
 // table Sheet 1 "Super Boss Pool - 12 Bosses".
-export const SUPER_BOSS_POOL: readonly {
+//
+// Every entry now carries optional per-state Pixellab spritesheet
+// paths. The animation state-machine helper (stageMapAnimations.ts)
+// reads these when a super boss is instantiated as a MovingBossHandle
+// and plays each clip if present. Missing clips fall through per the
+// resolveState() chain:
+//   defeat  → hurt → idle
+//   victory → attack → idle
+// so a boss shipped with only idle+attack still plays a "victory"
+// pose (by re-using its attack sheet) and a "defeat" (by re-using
+// hurt if present, else static idle).
+//
+// Frame descriptor defaults: Pixellab exports at this template are
+// 92×92 with 9 frames per state. Overrides per-clip are supported
+// via BossClipMeta.frameWidth/frameHeight/frameCount.
+export interface SuperBossClip {
+  asset: string;
+  frameCount: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  fps?: number;
+}
+export interface SuperBossPoolEntry {
   id: string;
   name: string;
   represents: string;
-  /** Idle sprite path (south-facing). Optional — populated as art lands. */
+  /** Static south-facing idle image. Kept for backwards-compat + as
+   *  the "when nothing else loads" fallback path. */
   idleAsset?: string;
-}[] = [
-  { id: "super_unraveller",     name: "The Unraveller",     represents: "Doubt and loss of direction",       idleAsset: "/assets/bosses/village/unraveller/idle.png" },
-  { id: "super_pale_architect", name: "The Pale Architect", represents: "Perfectionism and paralysis" },
-  { id: "super_hollow_king",    name: "The Hollow King",    represents: "Loss of purpose" },
-  { id: "super_thornwarden",    name: "The Thornwarden",    represents: "Bureaucracy and friction" },
-  { id: "super_mirror_witch",   name: "The Mirror Witch",   represents: "Self-deception" },
-  { id: "super_ashen_drake",    name: "The Ashen Drake",    represents: "Abandonment and inertia" },
-  { id: "super_tide_caller",    name: "The Tide Caller",    represents: "Distraction and scope creep",       idleAsset: "/assets/bosses/super-pool/tide-caller/idle.png" },
-  { id: "super_gravemind",      name: "The Gravemind",      represents: "Fear of failure" },
-  { id: "super_rusted_oracle",  name: "The Rusted Oracle",  represents: "Imposter syndrome",                 idleAsset: "/assets/bosses/super-pool/rusted-oracle/idle.png" },
-  { id: "super_wraith_council", name: "The Wraith Council", represents: "Decision paralysis",                idleAsset: "/assets/bosses/super-pool/wraith-council/idle.png" },
-  { id: "super_stonecaller",    name: "The Stonecaller",    represents: "Overwhelm",                         idleAsset: "/assets/bosses/super-pool/stonecaller/idle.png" },
-  { id: "super_veilwalker",     name: "The Veilwalker",     represents: "Isolation and fear of irrelevance", idleAsset: "/assets/bosses/super-pool/veilwalker/idle.png" },
+  /** Per-state animation clips. `idle` overrides idleAsset when both
+   *  are present. All fields optional — helper falls back through
+   *  defeat→hurt→idle and victory→attack→idle. */
+  idleClip?: SuperBossClip;
+  attackClip?: SuperBossClip;
+  hurtClip?: SuperBossClip;
+  defeatClip?: SuperBossClip;
+  victoryClip?: SuperBossClip;
+  /** 8-direction idle rotations. If present, the map's persona-walk
+   *  code can pick the right facing frame instead of always showing
+   *  south. Same 8 keys as Pixellab exports. */
+  rotations?: Partial<Record<
+    "north" | "north-east" | "east" | "south-east" | "south" | "south-west" | "west" | "north-west",
+    string
+  >>;
+  /** Boss size scale on the map — pool bosses default to 2.4 (final
+   *  boss reveal, bigger than stage minis at 1.9). */
+  spriteScale?: number;
+  /** Y offset from CP marker — pool bosses default to 40 (higher
+   *  than mini bosses so the sword-with-wings crest reads clearly). */
+  spriteYOffset?: number;
+  spriteXOffset?: number;
+}
+
+// Pixellab helper — most sheets are 92×92×9. Some pool bosses ship at
+// different dims (Tide Caller = 164×164, Stonecaller idle rotations
+// = 256×256). Per-clip overrides handle those.
+const P92 = { frameCount: 9, frameWidth: 92, frameHeight: 92 } as const;
+const T164 = { frameCount: 9, frameWidth: 164, frameHeight: 164 } as const;
+
+export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
+  {
+    id: "super_unraveller",
+    name: "The Unraveller",
+    represents: "Doubt and loss of direction",
+    // Village-stage idle (kept as the low-alpha silhouette on the map
+    // before reveal) + newly-extracted anim strips from the user's
+    // GIF uploads at 96×96 (four_purple_serpentine idle 9f + strike
+    // attack 9f). Rotations at 92×92 from A_colossal_serpent zip.
+    // Frame-size differs between rotations (92) and anims (96) —
+    // per-clip dims respect that.
+    idleAsset: "/assets/bosses/village/unraveller/idle.png",
+    idleClip:   { asset: "/assets/bosses/super-pool/unraveller/idle.png",   frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 6 },
+    attackClip: { asset: "/assets/bosses/super-pool/unraveller/attack.png", frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 10 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/unraveller/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/unraveller/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/unraveller/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/unraveller/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/unraveller/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/unraveller/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/unraveller/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/unraveller/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40, spriteXOffset: 0,
+  },
+  {
+    id: "super_pale_architect",
+    name: "The Pale Architect",
+    represents: "Perfectionism and paralysis",
+    // Rotations at 88×88 from A_towering_undead_titan_boss.zip +
+    // newly-extracted anim strips at 92×92 from the user's GIF
+    // uploads (armored_skeleton stands firmly 9f = idle, armored_
+    // skeleton lunges forward 11f = attack). Per-clip frame dims
+    // handle the 88/92 split.
+    idleAsset: "/assets/bosses/super-pool/pale-architect/idle.png",
+    idleClip:   { asset: "/assets/bosses/super-pool/pale-architect/idle.png",   frameCount: 9,  frameWidth: 92, frameHeight: 92, fps: 6 },
+    attackClip: { asset: "/assets/bosses/super-pool/pale-architect/attack.png", frameCount: 11, frameWidth: 92, frameHeight: 92, fps: 10 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/pale-architect/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/pale-architect/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/pale-architect/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/pale-architect/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/pale-architect/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/pale-architect/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/pale-architect/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/pale-architect/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_hollow_king",
+    name: "The Hollow King",
+    represents: "Loss of purpose",
+    // Rotations at 92×92 from A_grand_spectral_king_boss.zip + FULL
+    // 5-clip anim set from the user's GIF uploads (Tall_armored_king_
+    // in_tarnished breathing-idle 4f + custom king-slumps defeat 9f +
+    // custom taking-damage hurt 9f + grand-spectral-king dark-figure-
+    // raises-staff attack 9f + grand-spectral-king armored-king-plants
+    // 9f as victory). Frame sizes: idle/hurt/defeat = 92×92 native
+    // (from Tall_armored_king pack); attack/victory = 88×88 native
+    // (from A_grand_spectral_king pack). Per-clip dims respect that.
+    idleAsset: "/assets/bosses/super-pool/hollow-king/idle.png",
+    idleClip:    { asset: "/assets/bosses/super-pool/hollow-king/idle.png",    frameCount: 4, frameWidth: 92, frameHeight: 92, fps: 4 },
+    attackClip:  { asset: "/assets/bosses/super-pool/hollow-king/attack.png",  frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10 },
+    hurtClip:    { asset: "/assets/bosses/super-pool/hollow-king/hurt.png",    frameCount: 9, frameWidth: 92, frameHeight: 92, fps: 10 },
+    defeatClip:  { asset: "/assets/bosses/super-pool/hollow-king/defeat.png",  frameCount: 9, frameWidth: 92, frameHeight: 92, fps: 8 },
+    victoryClip: { asset: "/assets/bosses/super-pool/hollow-king/victory.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 8 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/hollow-king/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/hollow-king/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/hollow-king/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/hollow-king/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/hollow-king/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/hollow-king/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/hollow-king/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/hollow-king/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_thornwarden",
+    name: "The Thornwarden",
+    represents: "Bureaucracy and friction",
+    // Extracted from `Massive_humanoid_tree-giant_trunk-body_covered (1).zip`
+    // — 8-dir rotations at 96×96 + 3 stitched frame sequences:
+    //   idle.png = Breathing_Idle 4-frame loop
+    //   attack.png = tree-creature-draws-itself-up 9 frames
+    //   hurt.png = creature-recoils-sharply 9 frames
+    // No defeat/victory anims shipped → fallback chain uses hurt/attack.
+    idleAsset: "/assets/bosses/super-pool/thornwarden/idle.png",
+    idleClip:   { asset: "/assets/bosses/super-pool/thornwarden/idle.png",   frameCount: 4, frameWidth: 96, frameHeight: 96, fps: 4 },
+    attackClip: { asset: "/assets/bosses/super-pool/thornwarden/attack.png", frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 10 },
+    hurtClip:   { asset: "/assets/bosses/super-pool/thornwarden/hurt.png",   frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 10 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/thornwarden/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/thornwarden/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/thornwarden/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/thornwarden/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/thornwarden/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/thornwarden/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/thornwarden/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/thornwarden/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_mirror_witch",
+    name: "The Mirror Witch",
+    represents: "Self-deception",
+    // 8-dir rotations at 92×92 from A_tall_elegant_sorceress_boss.zip
+    // + anim strips at 92×92 from the user's GIF uploads (sorceress
+    // stands-tall 9f idle + sorceress raises-her-arms 9f attack).
+    idleAsset: "/assets/bosses/super-pool/mirror-witch/idle.png",
+    idleClip:   { asset: "/assets/bosses/super-pool/mirror-witch/idle.png",   frameCount: 9, frameWidth: 92, frameHeight: 92, fps: 6 },
+    attackClip: { asset: "/assets/bosses/super-pool/mirror-witch/attack.png", frameCount: 9, frameWidth: 92, frameHeight: 92, fps: 10 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/mirror-witch/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/mirror-witch/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/mirror-witch/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/mirror-witch/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/mirror-witch/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/mirror-witch/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/mirror-witch/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/mirror-witch/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_ashen_drake",
+    name: "The Ashen Drake",
+    represents: "Abandonment and inertia",
+    // 8-dir rotations at 92×92 from A_large_dragon_boss_with.zip +
+    // 3 anim strips from the user's GIF uploads:
+    //   idle = dragon-stands-its-ground 9f 96×96
+    //   attack = dragon-rears-back 9f 96×96
+    //   defeat = small-dragon-slowly-slumps 9f 92×92
+    // Per-clip dims cover the 96/92 mix.
+    idleAsset: "/assets/bosses/super-pool/ashen-drake/idle.png",
+    idleClip:   { asset: "/assets/bosses/super-pool/ashen-drake/idle.png",   frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 6 },
+    attackClip: { asset: "/assets/bosses/super-pool/ashen-drake/attack.png", frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 10 },
+    defeatClip: { asset: "/assets/bosses/super-pool/ashen-drake/defeat.png", frameCount: 9, frameWidth: 92, frameHeight: 92, fps: 8 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/ashen-drake/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/ashen-drake/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/ashen-drake/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/ashen-drake/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/ashen-drake/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/ashen-drake/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/ashen-drake/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/ashen-drake/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_tide_caller",
+    name: "The Tide Caller",
+    represents: "Distraction and scope creep",
+    idleAsset: "/assets/bosses/super-pool/tide-caller/idle.png",
+    // Full 5-clip Pixellab set on disk at 164×164×9 + newly-extracted
+    // 8-dir rotations from `Tide caller.zip` (53 PNGs including anim
+    // sequences under anims/).
+    idleClip:    { asset: "/assets/bosses/super-pool/tide-caller/idle.png",    ...T164, fps: 6 },
+    attackClip:  { asset: "/assets/bosses/super-pool/tide-caller/attack.png",  ...T164, fps: 10 },
+    hurtClip:    { asset: "/assets/bosses/super-pool/tide-caller/hurt.png",    ...T164, fps: 10 },
+    defeatClip:  { asset: "/assets/bosses/super-pool/tide-caller/defeat.png",  ...T164, fps: 8 },
+    victoryClip: { asset: "/assets/bosses/super-pool/tide-caller/victory.png", ...T164, fps: 8 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/tide-caller/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/tide-caller/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/tide-caller/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/tide-caller/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/tide-caller/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/tide-caller/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/tide-caller/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/tide-caller/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_gravemind",
+    name: "The Gravemind",
+    represents: "Fear of failure",
+    // Only pool boss with ZERO art. Pending user delivery.
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_rusted_oracle",
+    name: "The Rusted Oracle",
+    represents: "Imposter syndrome",
+    idleAsset: "/assets/bosses/super-pool/rusted-oracle/idle.png",
+    // Full 5-clip Pixellab set on disk at 92×92×9 plus 8-dir rotations
+    // extracted from the new `the_rusted_oracle.zip` pack (39 PNGs
+    // total including animation frame sequences under anims/).
+    idleClip:    { asset: "/assets/bosses/super-pool/rusted-oracle/idle.png",    ...P92, fps: 6 },
+    attackClip:  { asset: "/assets/bosses/super-pool/rusted-oracle/attack.png",  ...P92, fps: 10 },
+    hurtClip:    { asset: "/assets/bosses/super-pool/rusted-oracle/hurt.png",    ...P92, fps: 10 },
+    defeatClip:  { asset: "/assets/bosses/super-pool/rusted-oracle/defeat.png",  ...P92, fps: 8 },
+    victoryClip: { asset: "/assets/bosses/super-pool/rusted-oracle/victory.png", ...P92, fps: 8 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/rusted-oracle/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/rusted-oracle/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/rusted-oracle/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/rusted-oracle/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/rusted-oracle/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/rusted-oracle/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/rusted-oracle/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/rusted-oracle/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_wraith_council",
+    name: "The Wraith Council",
+    represents: "Decision paralysis",
+    // Rebuilt from `the_wraith_council.zip` — 88×88 sheets stitched
+    // from Pixellab anim frames (idle 4f + attack 9f + hurt 9f). No
+    // defeat/victory anims → fallback chain uses hurt/attack.
+    // Legacy 92×92 defeat.png sheet exists on disk from an earlier
+    // pack but the newer anims are 88×88; if we wired defeatClip
+    // pointing at the legacy 92×92 file Phaser would slice wrong.
+    // Skipped to keep the frame-size consistent.
+    idleAsset: "/assets/bosses/super-pool/wraith-council/idle.png",
+    idleClip:    { asset: "/assets/bosses/super-pool/wraith-council/idle.png",   frameCount: 4, frameWidth: 88, frameHeight: 88, fps: 4 },
+    attackClip:  { asset: "/assets/bosses/super-pool/wraith-council/attack.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10 },
+    hurtClip:    { asset: "/assets/bosses/super-pool/wraith-council/hurt.png",   frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10 },
+    // Existing 88×88×9 defeat sheet was already on disk from an
+    // earlier legacy pack (verified: 792×88 = 9 frames × 88px), so
+    // we wire it here to complete the state machine even though
+    // the new Pixellab pack didn't ship a defeat anim.
+    defeatClip:  { asset: "/assets/bosses/super-pool/wraith-council/defeat.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 8 },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_stonecaller",
+    name: "The Stonecaller",
+    represents: "Overwhelm",
+    // Rebuilt from `the_stonecaller (1).zip` — 92×92 stitched anims
+    // (attack 9f + hurt 9f from stone-golem shifts/hunches) + legacy
+    // victory sheet + 256×256 8-direction rotations from the
+    // idle_stonecaller.zip pack.
+    idleAsset: "/assets/bosses/super-pool/stonecaller/idle.png",
+    idleClip:    { asset: "/assets/bosses/super-pool/stonecaller/idle.png",    ...P92, fps: 6 },
+    attackClip:  { asset: "/assets/bosses/super-pool/stonecaller/attack.png",  ...P92, fps: 10 },
+    hurtClip:    { asset: "/assets/bosses/super-pool/stonecaller/hurt.png",    ...P92, fps: 10 },
+    victoryClip: { asset: "/assets/bosses/super-pool/stonecaller/victory.png", ...P92, fps: 8 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/stonecaller/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/stonecaller/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/stonecaller/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/stonecaller/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/stonecaller/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/stonecaller/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/stonecaller/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/stonecaller/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
+  {
+    id: "super_veilwalker",
+    name: "The Veilwalker",
+    represents: "Isolation and fear of irrelevance",
+    // Rebuilt from `the_veilwalker.zip` + `v_eilwalker_hurt.zip` —
+    // 88×88 stitched sheets (idle Breathing 4f + attack cloaked-lunges
+    // 9f + defeat hooded-slumps 9f) + 8-dir rotations at 256×256
+    // (idle + hurt-state facings). No standalone hurt anim yet →
+    // fallback uses idle.
+    idleAsset: "/assets/bosses/super-pool/veilwalker/idle.png",
+    idleClip:    { asset: "/assets/bosses/super-pool/veilwalker/idle.png",   frameCount: 4, frameWidth: 88, frameHeight: 88, fps: 4 },
+    attackClip:  { asset: "/assets/bosses/super-pool/veilwalker/attack.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10 },
+    defeatClip:  { asset: "/assets/bosses/super-pool/veilwalker/defeat.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 8 },
+    rotations: {
+      north:        "/assets/bosses/super-pool/veilwalker/rotations/north.png",
+      "north-east": "/assets/bosses/super-pool/veilwalker/rotations/north-east.png",
+      east:         "/assets/bosses/super-pool/veilwalker/rotations/east.png",
+      "south-east": "/assets/bosses/super-pool/veilwalker/rotations/south-east.png",
+      south:        "/assets/bosses/super-pool/veilwalker/rotations/south.png",
+      "south-west": "/assets/bosses/super-pool/veilwalker/rotations/south-west.png",
+      west:         "/assets/bosses/super-pool/veilwalker/rotations/west.png",
+      "north-west": "/assets/bosses/super-pool/veilwalker/rotations/north-west.png",
+    },
+    spriteScale: 2.4, spriteYOffset: 40,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

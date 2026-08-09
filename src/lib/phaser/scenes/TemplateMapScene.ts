@@ -29,6 +29,7 @@
 import * as Phaser from "phaser";
 import { eventBridge } from "../utils/event-bridge";
 import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
+import { getResponsiveZoom } from "@/lib/phaser/utils/responsive-zoom";
 import {
   getCurrentPersonaId,
   loadPersonaSprites,
@@ -61,6 +62,56 @@ export interface TemplateMapSceneInit {
   stage?: number;
   /** Optional pre-built boss config. Falls back to a shared Fog stand-in. */
   boss?: StageBoss;
+  /**
+   * Ordered checkpoint list for this biome. Each entry gets a gold
+   * disc + number badge painted on the map, and `advanceToNextCheckpoint`
+   * walks the persona + retreats the boss along this path. When
+   * omitted (older callers), the scene falls back to the old single-
+   * hub layout for backwards compat.
+   * Coordinates are in map-image pixels.
+   */
+  checkpoints?: ReadonlyArray<{ x: number; y: number; label: string }>;
+}
+
+/**
+ * Generate a default checkpoint layout for a biome that hasn't been
+ * hand-tuned yet. Positions N checkpoints in a gentle serpentine
+ * curve from top-left to bottom-right of the painted area, leaving
+ * a healthy margin so gold discs never sit against the map edge.
+ *
+ * Used by the React layer to fabricate a positions array when only
+ * the CP COUNT is known (from the Convex template stage config) —
+ * artist can later replace with hand-picked coordinates per biome.
+ */
+export function generateCheckpointLayout(
+  mapWidth: number,
+  mapHeight: number,
+  count: number,
+  labelPrefix: string = "CP",
+): Array<{ x: number; y: number; label: string }> {
+  if (count <= 0) return [];
+  const marginX = mapWidth * 0.12;
+  const marginY = mapHeight * 0.18;
+  const usableW = mapWidth - marginX * 2;
+  const usableH = mapHeight - marginY * 2;
+  const out: Array<{ x: number; y: number; label: string }> = [];
+  for (let i = 0; i < count; i++) {
+    // Linear progress left → right
+    const t = count === 1 ? 0.5 : i / (count - 1);
+    const x = marginX + usableW * t;
+    // Serpentine sine wave — amplitude scales with map height so the
+    // path arcs through more of the visible area on tall biomes.
+    const y =
+      marginY +
+      usableH *
+        (0.5 + 0.35 * Math.sin((i / Math.max(1, count - 1)) * Math.PI * 1.5));
+    out.push({
+      x: Math.round(x),
+      y: Math.round(y),
+      label: `${labelPrefix} ${i + 1}`,
+    });
+  }
+  return out;
 }
 
 // Village-parity persona spawn offset (top-left of CP disc).
@@ -128,6 +179,12 @@ export class TemplateMapScene extends Phaser.Scene {
   private personaHandle: PersonaHandle | null = null;
   private movingBoss: MovingBossHandle | null = null;
   private isAnimating = false;
+  /** Checkpoint state — mirrors VillageMapScene's model so React
+   *  handlers advanceToNextCheckpoint / weakenActiveBoss / etc. can
+   *  drive progression exactly the same way regardless of scene. */
+  private checkpoints: ReadonlyArray<{ x: number; y: number; label: string }> = [];
+  private currentIndex = 0;
+  private checkpointNodes: Phaser.GameObjects.Arc[] = [];
 
   constructor() {
     super({ key: "TemplateMapScene" });
@@ -175,13 +232,53 @@ export class TemplateMapScene extends Phaser.Scene {
     this.add.image(0, 0, mapKey).setOrigin(0, 0).setDepth(0);
 
     // Camera — mirrors Village: responsive zoom, bounds set to map size.
+    // Zoom brackets pulled from the shared helper so every template
+    // biome renders at the exact same scale as Village (product ask:
+    // "make sure all map zoom is like village map").
     const cam = this.cameras.main;
     cam.setBounds(0, 0, mapWidth, mapHeight);
-    const vw = typeof window !== "undefined" ? window.innerWidth : 1920;
-    const zoom = vw < 480 ? 0.5 : vw < 768 ? 0.7 : vw < 1024 ? 0.9 : 1.0;
-    cam.setZoom(zoom);
-    const hub = hubCheckpoint(mapWidth, mapHeight);
+    cam.setZoom(getResponsiveZoom());
+
+    // Use the provided checkpoint list if any; else fall back to a
+    // single hub anchor so the old single-CP behavior still works
+    // for callers who haven't migrated yet.
+    this.checkpoints =
+      this.cfg.checkpoints && this.cfg.checkpoints.length > 0
+        ? this.cfg.checkpoints
+        : [{ ...hubCheckpoint(mapWidth, mapHeight), label: "Hub" }];
+    this.currentIndex = 0;
+    const hub = this.checkpoints[0];
     cam.centerOn(hub.x, hub.y);
+
+    // Paint gold-disc markers for every CP — matches Village's look
+    // exactly (26px radius, gold fill + brown ring, index number).
+    this.checkpointNodes = [];
+    for (let i = 0; i < this.checkpoints.length; i++) {
+      const cp = this.checkpoints[i];
+      const disc = this.add
+        .circle(cp.x, cp.y, 26, 0xd4af37, 0.95)
+        .setStrokeStyle(3, 0x7a4a10, 1)
+        .setDepth(50)
+        .setInteractive({ useHandCursor: true });
+      this.add
+        .text(cp.x, cp.y, String(i + 1), {
+          fontFamily: "monospace",
+          fontSize: "22px",
+          color: "#3a2010",
+          fontStyle: "bold",
+        } as unknown as Phaser.Types.GameObjects.Text.TextStyle)
+        .setOrigin(0.5)
+        .setDepth(51);
+      disc.on("pointerdown", () => {
+        eventBridge.dispatchToReact({
+          type: "CHECKPOINT_CLICKED",
+          checkpointId: `template-cp-${i}`,
+          stage: this.cfg?.stage ?? 0,
+          checkpoint: i + 1,
+        });
+      });
+      this.checkpointNodes.push(disc);
+    }
 
     // Drag-to-pan (mouse) — same UX as other stages.
     let dragging = false;
@@ -221,16 +318,19 @@ export class TemplateMapScene extends Phaser.Scene {
     const boss = this.cfg.boss ?? FALLBACK_BOSS;
     registerBossAnimations(this, this.cfg.stage ?? 0, boss);
 
-    // Persona spawn — at the hub
+    // Persona spawn — at the FIRST checkpoint (top-left convention
+    // matches Village and every other stage scene).
     this.personaHandle = spawnPersonaCharacter(this, hub, {
       xOffset: CHAR_X_OFFSET,
       yOffset: CHAR_Y_OFFSET,
     });
 
-    // Boss spawn — slightly east + one CP-height down from the hub so
-    // the boss reads as "guarding the path" and doesn't overlap the persona.
+    // Boss spawn — at the FIRST checkpoint too, with the same
+    // moving-boss model Village uses (one sprite walks the whole
+    // path, retreating between CPs on advance). Boss sits ON the
+    // CP disc so the persona at top-left doesn't overlap it.
     this.movingBoss = spawnMovingBoss(this, this.cfg.stage ?? 0, boss, {
-      x: hub.x + 140,
+      x: hub.x,
       y: hub.y,
     }, { showHpBar: true });
     this.movingBoss.sprite.setFlipX(true); // face the persona (which is to its left)
@@ -275,26 +375,54 @@ export class TemplateMapScene extends Phaser.Scene {
 
   public advanceToNextCheckpoint(): void {
     if (this.isAnimating || !this.cfg) return;
+    // Village-parity: on final CP → dissolve the moving boss and
+    // fire STAGE_COMPLETE so React advances to the next stage.
+    if (this.currentIndex >= this.checkpoints.length - 1) {
+      if (this.movingBoss) {
+        dissolveBoss(this, this.movingBoss, {
+          onComplete: () => {
+            eventBridge.dispatchToReact({
+              type: "STAGE_COMPLETE",
+              stage: this.cfg?.stage ?? 0,
+              nextStage: (this.cfg?.stage ?? 0) + 1,
+            });
+          },
+        });
+      } else {
+        eventBridge.dispatchToReact({
+          type: "STAGE_COMPLETE",
+          stage: this.cfg?.stage ?? 0,
+          nextStage: (this.cfg?.stage ?? 0) + 1,
+        });
+      }
+      return;
+    }
     this.isAnimating = true;
-    // Template maps only have one hub — the "advance" beat here just
-    // retreats the boss slightly east + walks the persona forward as
-    // a visual celebration, then resets busy. React drives the actual
-    // stage progression via STAGE_COMPLETE for these templates.
-    const hub = hubCheckpoint(this.cfg.mapWidth, this.cfg.mapHeight);
-    const nextX = hub.x + 240;
+    this.currentIndex += 1;
+    const to = this.checkpoints[this.currentIndex];
+
+    // Retreat the boss to the next CP + walk persona in parallel.
     if (this.movingBoss) {
-      retreatBossTo(this, this.movingBoss, { x: nextX, y: hub.y }, {
-        durationMs: WALK_DURATION_MS,
-      });
+      if (this.movingBoss.hpBar) this.movingBoss.hpBar.setHp(1);
+      retreatBossTo(
+        this,
+        this.movingBoss,
+        { x: to.x, y: to.y },
+        {
+          durationMs: WALK_DURATION_MS,
+          faceX: to.x + CHAR_X_OFFSET,
+        },
+      );
     }
     if (this.personaHandle) {
       walkPersonaTo(
         this,
         this.personaHandle,
-        { x: hub.x + 40, y: hub.y + CHAR_Y_OFFSET },
+        { x: to.x + CHAR_X_OFFSET, y: to.y + CHAR_Y_OFFSET },
         { durationMs: WALK_DURATION_MS },
       );
     }
+    this.cameras.main.pan(to.x, to.y, WALK_DURATION_MS, "Sine.easeInOut");
     this.time.delayedCall(WALK_DURATION_MS + 100, () => {
       this.isAnimating = false;
     });

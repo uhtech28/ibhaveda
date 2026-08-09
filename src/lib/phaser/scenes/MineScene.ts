@@ -50,6 +50,7 @@ import {
   type MovingBossHandle,
   type PersonaHandle,
 } from "@/lib/phaser/animations/stageMapAnimations";
+import { getResponsiveZoom } from "@/lib/phaser/utils/responsive-zoom";
 
 const MAP_ASSET = "/assets/maps-v2/mine/mine-map.png";
 // The mine-map.png painted region is 1536×1024. LDtk simplified export
@@ -203,13 +204,7 @@ export class MineScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    const vw = typeof window !== "undefined" ? window.innerWidth : 1920;
-    let zoom: number;
-    if (vw < 480) zoom = 0.45;
-    else if (vw < 768) zoom = 0.6;
-    else if (vw < 1024) zoom = 0.8;
-    else zoom = 0.95;
-    cam.setZoom(zoom);
+    cam.setZoom(getResponsiveZoom());
     const start = CHECKPOINTS[this.currentIndex];
     cam.centerOn(start.x, start.y);
 
@@ -288,12 +283,6 @@ export class MineScene extends Phaser.Scene {
       this.checkpointNodes.push(disc);
     }
 
-    // Corruption overlay — one tile-strip per CP-to-CP segment.
-    const minePattern = ensureCorruptionPattern(this, motifForStage(5));
-    const overlayCps: OverlayCheckpoint[] = CHECKPOINTS.map((cp) => ({
-      x: cp.x,
-      y: cp.y,
-    }));
     // Corruption overlay DISABLED per product ask ("remove the
     // corruption mechanism for now WHATEVER U HAVE ADDED"). The
     // CorruptionOverlay class stays on disk; we just don't
