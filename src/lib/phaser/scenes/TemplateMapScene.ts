@@ -232,32 +232,87 @@ export class TemplateMapScene extends Phaser.Scene {
       eventBridge.dispatchToReact({ type: "PHASER_READY" });
       return;
     }
-    const { mapKey, mapWidth, mapHeight, biomeLabel } = this.cfg;
+    const { mapKey, biomeLabel } = this.cfg;
 
-    // Backdrop
+    // Prefer the LOADED texture's actual dimensions over the config's
+    // best-guess mapWidth/mapHeight. Every academic/lab/creative PNG
+    // ships a slightly different aspect (1540×1156, 1412×1156, 1156×1412
+    // for portrait, etc.) — but the caller passes a one-size default of
+    // 1540×1412. That mismatch was the root cause of the green-stripe
+    // torn-map bug on prod: camera bounds went 256px BELOW the actual
+    // image, WebGL sampled the last texel row into the empty area, and
+    // the GPU smeared it into vertical stripes. Reading from the
+    // texture guarantees bounds exactly match painted pixels.
+    let actualW = this.cfg.mapWidth;
+    let actualH = this.cfg.mapHeight;
+    if (this.textures.exists(mapKey)) {
+      const src = this.textures.get(mapKey).getSourceImage() as
+        | HTMLImageElement
+        | { width: number; height: number };
+      if (src && src.width > 0 && src.height > 0) {
+        actualW = src.width;
+        actualH = src.height;
+      }
+    }
+    const mapWidth = actualW;
+    const mapHeight = actualH;
+
+    // Belt-and-suspenders backdrop: a large dark filled rectangle that
+    // extends well past the map's own bounds. Even if the camera
+    // somehow overshoots (rounding at fractional zoom, sub-pixel scroll
+    // during a pan tween), the viewer sees a clean dark matte instead
+    // of any GPU sampling garbage. Rendered at depth -10 so the map
+    // and every other sprite paint on top.
+    this.add
+      .rectangle(
+        mapWidth / 2,
+        mapHeight / 2,
+        mapWidth * 3,
+        mapHeight * 3,
+        0x0a0a10,
+        1,
+      )
+      .setDepth(-10);
+
+    // Map backdrop — pinned to (0,0) with origin top-left.
     this.add.image(0, 0, mapKey).setOrigin(0, 0).setDepth(0);
 
-    // Camera — mirrors Village: responsive zoom, bounds set to map size.
-    // Zoom brackets pulled from the shared helper so every template
-    // biome renders at the exact same scale as Village (product ask:
-    // "make sure all map zoom is like village map").
+    // Camera — mirrors Village: responsive zoom, bounds set to ACTUAL
+    // painted map size so follow-cam can't scroll past the image edge.
     const cam = this.cameras.main;
     cam.setBounds(0, 0, mapWidth, mapHeight);
-    // Paint the camera background BLACK so any area outside the map
-    // bounds (e.g. when the map is smaller than the viewport at low
-    // mobile zoom, or when the follow-camera hits a bound with the
-    // deadzone) shows a clean matte instead of a torn/streaked GPU
-    // artifact from the WebGL clear color leaking through.
+    // Also paint the camera clear color — belt on top of the suspenders
+    // above. If the map dims ever fail to read, this at least keeps
+    // the void a solid dark matte instead of a torn GPU strip.
     cam.setBackgroundColor(0x0a0a10);
     cam.setZoom(getResponsiveZoom());
 
-    // Use the provided checkpoint list if any; else fall back to a
-    // single hub anchor so the old single-CP behavior still works
-    // for callers who haven't migrated yet.
-    this.checkpoints =
+    // Recompute CP positions against the ACTUAL painted map dims. The
+    // caller may have passed positions computed for a default 1540×1412
+    // bound, but the real image can be 1540×1156 (landscape) or
+    // 1156×1412 (portrait). Using the caller's positions verbatim would
+    // paint CPs beyond the visible map on landscape variants. Keep the
+    // caller's CP COUNT + labels (the count reflects the template's
+    // per-stage checkpoint spec), just re-derive the coordinates.
+    const desiredCount =
       this.cfg.checkpoints && this.cfg.checkpoints.length > 0
-        ? this.cfg.checkpoints
-        : [{ ...hubCheckpoint(mapWidth, mapHeight), label: "Hub" }];
+        ? this.cfg.checkpoints.length
+        : 0;
+    if (desiredCount > 0) {
+      const regen = generateCheckpointLayout(mapWidth, mapHeight, desiredCount);
+      // Preserve any custom labels from the caller (e.g. "Boss Arena")
+      // by copying label index-for-index; positions are always the
+      // freshly-computed serpentine.
+      this.checkpoints = regen.map((cp, i) => ({
+        x: cp.x,
+        y: cp.y,
+        label: this.cfg?.checkpoints?.[i]?.label ?? cp.label,
+      }));
+    } else {
+      this.checkpoints = [
+        { ...hubCheckpoint(mapWidth, mapHeight), label: "Hub" },
+      ];
+    }
     this.currentIndex = 0;
     const hub = this.checkpoints[0];
     cam.centerOn(hub.x, hub.y);

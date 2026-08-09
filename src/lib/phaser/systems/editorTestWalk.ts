@@ -142,13 +142,6 @@ export function attachEditorTestWalk(
     if (!opts.isBlocked(clampedX, char.y + feetOffsetY)) char.x = clampedX;
     if (!opts.isBlocked(char.x, clampedY + feetOffsetY)) char.y = clampedY;
 
-    // Face the movement direction using flipX if the sprite defaults to
-    // facing right. Skip if we're just going up/down. Extended personas
-    // that have separate east/west walk sheets don't need flipX — they
-    // encode facing in the anim itself — but flipX is harmless when the
-    // resolver picks the same anim for both horizontal directions.
-    if (Math.abs(nx) > 0.05) char.setFlipX(nx < 0);
-
     // Resolve which walk anim to play THIS frame. Extended personas use
     // 4-directional sheets so we ask the resolver each tick; legacy
     // 2-anim personas fall through to the single walkAnimKey. We only
@@ -156,9 +149,13 @@ export function attachEditorTestWalk(
     // .play() every frame restarts the clip and freezes the sprite on
     // its first frame.
     let desiredKey: string | null = null;
+    let resolvedDirectional = false;
     if (opts.resolveWalkAnimKey) {
       const dyn = opts.resolveWalkAnimKey(nx, ny);
-      if (dyn && scene.anims.exists(dyn)) desiredKey = dyn;
+      if (dyn && scene.anims.exists(dyn)) {
+        desiredKey = dyn;
+        resolvedDirectional = true;
+      }
     }
     if (!desiredKey && scene.anims.exists(walkAnimKey)) {
       desiredKey = walkAnimKey;
@@ -168,6 +165,20 @@ export function attachEditorTestWalk(
       currentWalkKey = desiredKey;
     }
     isWalking = true;
+
+    // Facing:
+    //  - Directional persona (walk-east / walk-west exist as distinct
+    //    sheets): the frames already point the right way, so applying
+    //    flipX would MIRROR them back to the opposite facing — the
+    //    exact bug that caused "left-walk plays right-walk animation"
+    //    on production. Clear any stale flip and leave the anim alone.
+    //  - Legacy 2-anim persona (single "walk" sheet, always east): use
+    //    flipX to face west when moving left, as before.
+    if (resolvedDirectional) {
+      if (char.flipX) char.setFlipX(false);
+    } else if (Math.abs(nx) > 0.05) {
+      char.setFlipX(nx < 0);
+    }
 
     // Camera follow — center on character each tick.
     scene.cameras.main.centerOn(char.x, char.y);
