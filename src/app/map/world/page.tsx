@@ -2735,8 +2735,13 @@ function MapPageInner() {
     // avoids a temporal-dead-zone crash — stageInfo is declared much
     // further down in the component body via useAtomValue, but this
     // routing effect runs at the top of the render pass.
+    // NOTE: getStageMetadata() renames the template config's
+    // `biomeName` → `biome` on its returned Stage objects. Reading
+    // `.biomeName` here would be `undefined`, which cascaded into
+    // resolveTemplateMapUrl → null → bail-out → Phaser boots with no
+    // config → blank map. Read the correct field.
     const templateBiomeName =
-      templateStages[Math.max(0, desiredStage - 1)]?.biomeName ?? null;
+      templateStages[Math.max(0, desiredStage - 1)]?.biome ?? null;
     let templateSceneData: {
       mapKey: string;
       mapUrl: string;
