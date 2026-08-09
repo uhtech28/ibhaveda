@@ -81,21 +81,31 @@ export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
       ) : flares.length === 0 ? (
         <EmptyState />
       ) : (
-        // Fixed-height scroll window — shows ~1.5 flare cards so the
-        // section stops growing endlessly and the rest of the feed
-        // stays visible without a page-length scroll. Product ask:
-        // "dont make them keep on adding, make the space of 1.5 flare
-        // where people can scroll flares at the top". Cards render in
-        // the same 2-col grid as before; only the outer wrapper is
-        // clipped + scrolls.
+        // Fixed-height scroll window — reserves the visual space of
+        // ONE flare card + a small peek so the section always occupies
+        // the same amount of viewport regardless of how many flares
+        // exist. Product spec: "keep space for 1 flare visible, make
+        // sure its all constant for all pc devices all android ios
+        // mobile".
         //
-        // 360px picks up one full card row (~240px) plus ~120px of
-        // the next row, giving a clear "there's more below" hint.
+        // Why a single fixed pixel value across every breakpoint:
+        //  - Desktop grid-cols-2 lays out two cards per row (~230px
+        //    tall including padding + gap), so 260px shows exactly one
+        //    row plus ~30px peek of the next — enough to signal "there
+        //    is more below" without stealing more of the feed.
+        //  - Mobile single-column: one card ≈ 200px tall, 260px shows
+        //    ~1.3 cards — same "one full flare + peek" behaviour.
+        //  - Using a single px height (not svh/dvh/vh) keeps the
+        //    layout identical whether the mobile browser's URL bar is
+        //    expanded or collapsed and immune to iOS Safari's
+        //    100vh-includes-toolbar quirk that shifts the whole feed.
+        //
         // `pr-1` reserves space so the scrollbar doesn't overlap the
-        // right-hand card border. `flare-scroll` is a local class
-        // (styles below) that gives a subtle amber-tinted scrollbar
-        // instead of the browser default chunky grey one.
-        <div className="flare-scroll max-h-[360px] overflow-y-auto pr-1">
+        // right-hand card border. `flare-scroll` (styles below) gives
+        // a subtle amber-tinted scrollbar instead of the browser
+        // default chunky grey one — same rendering on WebKit / Blink /
+        // Gecko.
+        <div className="flare-scroll max-h-[260px] overflow-y-auto pr-1">
           <div className="grid gap-3 sm:grid-cols-2">
             {flares
               .filter((flare) => flare.status !== "closed")
@@ -112,8 +122,18 @@ export function FlareFeedSection({ limit = 20, currentUserId = null }: Props) {
           </div>
           <style jsx>{`
             .flare-scroll {
+              /* Same amber-tinted thin scrollbar on Firefox + WebKit
+                 so the visual is identical on desktop & mobile. */
               scrollbar-width: thin;
               scrollbar-color: rgba(251, 191, 36, 0.35) transparent;
+              /* Prevent overscroll from bubbling up to the page —
+                 without this, flick-scrolling past the last flare on
+                 iOS/Android rubber-bands the WHOLE feed and can even
+                 dismiss the mobile browser toolbar (pushes chrome
+                 up/down mid-scroll), which was jarring. */
+              overscroll-behavior: contain;
+              /* Momentum scrolling on iOS. Chrome ignores harmlessly. */
+              -webkit-overflow-scrolling: touch;
             }
             .flare-scroll::-webkit-scrollbar {
               width: 6px;
