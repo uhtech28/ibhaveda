@@ -1,0 +1,84 @@
+{
+  "group_id": "600ac1f0-0ec3-4f20-a303-b570810c678f",
+  "states": [
+    {
+      "character": {
+        "id": "1bdbb339-341f-4d89-9a64-940aedba340b",
+        "name": "Idle",
+        "prompt": "A floating circular telescope-like creature made of polished brass rings and a large central \nglass lens that shows a swirling distorted rainbow-colored illusion within it, small mechanical \nbrass arm-like appendages extending from its sides, faint glowing prismatic light leaking from \nthe edges of the lens, an observatory-instrument-turned-creature aesthetic",
+        "size": {
+          "width": 84,
+          "height": 84
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-09T23:13:09.637074+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "The_small_robotic_creature_flinches_sharply_its_me": {
+            "south": [
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_000.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_001.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_002.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_003.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_004.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_005.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_006.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_007.png",
+              "Idle/animations/The_small_robotic_creature_flinches_sharply_its_me/south/frame_008.png"
+            ]
+          },
+          "The_robot_shudders_violently_as_its_central_swirli": {
+            "south": [
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_000.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_001.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_002.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_003.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_004.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_005.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_006.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_007.png",
+              "Idle/animations/The_robot_shudders_violently_as_its_central_swirli/south/frame_008.png"
+            ]
+          },
+          "The_robot_flinches_its_brass_body_jerking_backward": {
+            "south": [
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_000.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_001.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_002.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_003.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_004.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_005.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_006.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_007.png",
+              "Idle/animations/The_robot_flinches_its_brass_body_jerking_backward/south/frame_008.png"
+            ]
+          },
+          "Breathing_Idle": {
+            "south": [
+              "Idle/animations/Breathing_Idle/south/frame_000.png",
+              "Idle/animations/Breathing_Idle/south/frame_001.png",
+              "Idle/animations/Breathing_Idle/south/frame_002.png",
+              "Idle/animations/Breathing_Idle/south/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-09T23:27:07.008828"
+}

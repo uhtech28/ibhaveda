@@ -1,0 +1,84 @@
+{
+  "group_id": "5a282c1c-a935-404e-8b33-e9b8aa15054f",
+  "states": [
+    {
+      "character": {
+        "id": "8e44aba7-854a-463f-a252-282460e364de",
+        "name": "Idle",
+        "prompt": "A wiry humanoid figure wearing a deep brown leather coat covered in pockets full of \nmeasuring tools, oversized brass goggles with crooked misaligned lenses pushed up on a \nbalding head, holding a large unrolled map with visibly skewed crooked lines, ink-stained \nfingers, an eccentric mad-mapmaker aesthetic.",
+        "size": {
+          "width": 92,
+          "height": 92
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-09T22:42:08.379433+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Breathing_Idle": {
+            "south": [
+              "Idle/animations/Breathing_Idle/south/frame_000.png",
+              "Idle/animations/Breathing_Idle/south/frame_001.png",
+              "Idle/animations/Breathing_Idle/south/frame_002.png",
+              "Idle/animations/Breathing_Idle/south/frame_003.png"
+            ]
+          },
+          "The_character_pauses_their_study_of_the_map_quickl": {
+            "south": [
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_000.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_001.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_002.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_003.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_004.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_005.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_006.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_007.png",
+              "Idle/animations/The_character_pauses_their_study_of_the_map_quickl/south/frame_008.png"
+            ]
+          },
+          "The_explorer_looks_down_at_his_map_with_a_focused": {
+            "south": [
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_000.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_001.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_002.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_003.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_004.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_005.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_006.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_007.png",
+              "Idle/animations/The_explorer_looks_down_at_his_map_with_a_focused/south/frame_008.png"
+            ]
+          },
+          "The_explorer_stumbles_backward_his_posture_collaps": {
+            "south": [
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_000.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_001.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_002.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_003.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_004.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_005.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_006.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_007.png",
+              "Idle/animations/The_explorer_stumbles_backward_his_posture_collaps/south/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-09T22:54:42.117225"
+}

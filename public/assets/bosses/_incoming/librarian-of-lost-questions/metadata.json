@@ -1,0 +1,58 @@
+{
+  "group_id": "d0569350-2ed1-447b-9da7-d229046320f6",
+  "states": [
+    {
+      "character": {
+        "id": "3f4f4290-95f3-434a-96ac-3a0f173ea893",
+        "name": "Idle",
+        "prompt": "A spectral scholarly figure in tattered dark brown librarian robes, translucent grey-blue skin, \nwearing small round glasses on a gaunt elderly face, surrounded by floating misfiled books \nand scrolls drifting in the air around it, long thin fingers holding an open ledger, an ancient \narchive-dwelling ghost aesthetic. Single image containing a 1x4 sprite sheet grid (one row, \nfour equal-sized cells, evenly spaced, no overlapping, consistent character scale and \nproportions across all four cells, same baseline/ground line in each cell, neutral idle standing \npose in every cell). Cell 1: FRONT view (facing camera/viewer). Cell 2: LEFT view (facing left, \nfull side profile). Cell 3: BACK view (facing away from camera). Cell 4: RIGHT view (facing \nright, full side profile). No background scenery, no UI elements, no text, no labels. Art style: \n16-bit pixel art, retro SNES-style RPG sprite, clean black outline, flat cel-shaded coloring, \ntransparent background, soft ambient lighting, crisp pixel edges (no anti-aliasing blur), vibrant \nsaturated color palette, 8K resolution upscale of pixel art",
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-09T22:30:17.157950+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "The_hooded_wizard_stands_tall_clutching_an_open_bo": {
+            "south": [
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_000.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_001.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_002.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_003.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_004.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_005.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_006.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_007.png",
+              "Idle/animations/The_hooded_wizard_stands_tall_clutching_an_open_bo/south/frame_008.png"
+            ]
+          },
+          "Breathing_Idle": {
+            "south": [
+              "Idle/animations/Breathing_Idle/south/frame_000.png",
+              "Idle/animations/Breathing_Idle/south/frame_001.png",
+              "Idle/animations/Breathing_Idle/south/frame_002.png",
+              "Idle/animations/Breathing_Idle/south/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-09T22:43:07.920479"
+}

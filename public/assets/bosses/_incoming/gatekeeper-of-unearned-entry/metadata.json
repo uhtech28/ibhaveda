@@ -1,0 +1,84 @@
+{
+  "group_id": "69cebad2-ab38-4fbf-af39-96d9ae942548",
+  "states": [
+    {
+      "character": {
+        "id": "e5e8d4c0-e794-488e-beb4-8e3163f91602",
+        "name": "Idle",
+        "prompt": "A towering stone-armored guardian figure wearing heavy ornate grey and gold ceremonial \nplate armor resembling an archive door, a large rectangular shield embossed with a wax-seal \nsymbol, a stern carved-stone face visible through an open helmet visor, standing in a rigid \nblocking stance, an imposing gatekeeper-of-knowledge aesthetic.",
+        "size": {
+          "width": 92,
+          "height": 92
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-09T23:11:55.472522+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "The_armored_knight_slowly_collapses_to_their_knees": {
+            "south": [
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_000.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_001.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_002.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_003.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_004.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_005.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_006.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_007.png",
+              "Idle/animations/The_armored_knight_slowly_collapses_to_their_knees/south/frame_008.png"
+            ]
+          },
+          "Breathing_Idle": {
+            "south": [
+              "Idle/animations/Breathing_Idle/south/frame_000.png",
+              "Idle/animations/Breathing_Idle/south/frame_001.png",
+              "Idle/animations/Breathing_Idle/south/frame_002.png",
+              "Idle/animations/Breathing_Idle/south/frame_003.png"
+            ]
+          },
+          "The_knight_stands_firm_then_raises_their_shield_sl": {
+            "south": [
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_000.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_001.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_002.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_003.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_004.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_005.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_006.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_007.png",
+              "Idle/animations/The_knight_stands_firm_then_raises_their_shield_sl/south/frame_008.png"
+            ]
+          },
+          "The_armored_knight_bracingly_steps_forward_and_swi": {
+            "south": [
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_000.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_001.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_002.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_003.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_004.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_005.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_006.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_007.png",
+              "Idle/animations/The_armored_knight_bracingly_steps_forward_and_swi/south/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-09T23:23:56.906468"
+}

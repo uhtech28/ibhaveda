@@ -1,0 +1,76 @@
+{
+  "group_id": "ca33bb5f-0f88-42b0-a4f7-35903ac65793",
+  "states": [
+    {
+      "character": {
+        "id": "76cb9bc7-30a5-42da-a599-90a13fb3c947",
+        "name": "Idle",
+        "prompt": "A small wiry humanoid creature made of living dark-grey shadow with glowing molten-orange \ncracks across its limbs, sharp clawed fingers stained with soot, two narrow glowing orange \neyes, a hunched sneaky posture as if hiding among machinery, faint floating sparks and small \ngear fragments around its body, a mischievous forge-saboteur aesthetic",
+        "size": {
+          "width": 88,
+          "height": 88
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-09T23:25:27.367764+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "The_creature_winces_and_hunches_its_shoulders_its": {
+            "south": [
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_000.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_001.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_002.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_003.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_004.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_005.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_006.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_007.png",
+              "Idle/animations/The_creature_winces_and_hunches_its_shoulders_its/south/frame_008.png"
+            ]
+          },
+          "The_creature_shudders_as_the_fiery_embers_coursing": {
+            "south": [
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_000.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_001.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_002.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_003.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_004.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_005.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_006.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_007.png",
+              "Idle/animations/The_creature_shudders_as_the_fiery_embers_coursing/south/frame_008.png"
+            ]
+          },
+          "The_creature_lunges_forward_hunching_its_shoulders": {
+            "south": [
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_000.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_001.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_002.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_003.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_004.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_005.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_006.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_007.png",
+              "Idle/animations/The_creature_lunges_forward_hunching_its_shoulders/south/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-09T23:34:51.695975"
+}

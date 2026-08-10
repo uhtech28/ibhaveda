@@ -1,0 +1,71 @@
+{
+  "group_id": "1d9ca9aa-a9af-4d61-bddf-58155fb4bd5b",
+  "states": [
+    {
+      "character": {
+        "id": "040de12c-8874-48d5-81fd-653bcaa721d9",
+        "name": "Idle",
+        "prompt": "An ancient mummified archivist figure wrapped in faded brittle beige bandages and torn \nparchment scraps, hollow dark eye sockets, holding a stack of torn half-burned documents \nagainst its chest, surrounded by floating fragments of paper, a dusty ruined-archive aesthetic \nwith cracked stone textures implied in its wrappings. Single image containing a 1x4 sprite \nsheet grid (one row, four equal-sized cells, evenly spaced, no overlapping, consistent \ncharacter scale and proportions across all four cells, same baseline/ground line in each cell, \nneutral idle standing pose in every cell). Cell 1: FRONT view (facing camera/viewer). Cell 2: \nLEFT view (facing left, full side profile). Cell 3: BACK view (facing away from camera). Cell 4: \nRIGHT view (facing right, full side profile). No background scenery, no UI elements, no text, \nno labels. Art style: 16-bit pixel art, retro SNES-style RPG sprite, clean black outline, flat cel\u0002shaded coloring, transparent background, soft ambient lighting, crisp pixel edges (no anti\u0002aliasing blur), vibrant saturated color palette, 8K resolution upscale of pixel art",
+        "size": {
+          "width": 88,
+          "height": 88
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-09T22:31:06.705982+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "The_character_stands_firmly_and_lifts_both_hands_u": {
+            "south": [
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_000.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_001.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_002.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_003.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_004.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_005.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_006.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_007.png",
+              "Idle/animations/The_character_stands_firmly_and_lifts_both_hands_u/south/frame_008.png"
+            ]
+          },
+          "Breathing_Idle": {
+            "south": [
+              "Idle/animations/Breathing_Idle/south/frame_000.png",
+              "Idle/animations/Breathing_Idle/south/frame_001.png",
+              "Idle/animations/Breathing_Idle/south/frame_002.png",
+              "Idle/animations/Breathing_Idle/south/frame_003.png"
+            ]
+          },
+          "The_character_staggers_backward_clutching_their_ch": {
+            "south": [
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_000.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_001.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_002.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_003.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_004.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_005.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_006.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_007.png",
+              "Idle/animations/The_character_staggers_backward_clutching_their_ch/south/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-09T22:43:18.642299"
+}

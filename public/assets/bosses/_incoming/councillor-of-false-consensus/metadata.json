@@ -1,0 +1,84 @@
+{
+  "group_id": "bfd00e27-5ce1-49da-a74e-129f7e0105c2",
+  "states": [
+    {
+      "character": {
+        "id": "e0790ac2-4fe9-4b00-9d46-c7ad03ee4289",
+        "name": "Idle",
+        "prompt": "A smooth well-dressed humanoid figure in an elegant deep navy-blue formal suit with a crisp \nwhite collar, a polished smiling face with overly perfect symmetrical features, slicked-back \ndark hair, hands clasped together in a placating gesture, an unsettlingly agreeable and \nsmooth political aesthetic.",
+        "size": {
+          "width": 92,
+          "height": 92
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-09T22:50:34.016661+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Breathing_Idle": {
+            "south": [
+              "Idle/animations/Breathing_Idle/south/frame_000.png",
+              "Idle/animations/Breathing_Idle/south/frame_001.png",
+              "Idle/animations/Breathing_Idle/south/frame_002.png",
+              "Idle/animations/Breathing_Idle/south/frame_003.png"
+            ]
+          },
+          "The_man_in_the_suit_abruptly_lunges_forward_thrust": {
+            "south": [
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_000.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_001.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_002.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_003.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_004.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_005.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_006.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_007.png",
+              "Idle/animations/The_man_in_the_suit_abruptly_lunges_forward_thrust/south/frame_008.png"
+            ]
+          },
+          "The_man_winces_in_pain_his_eyes_narrowing_and_his": {
+            "south": [
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_000.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_001.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_002.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_003.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_004.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_005.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_006.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_007.png",
+              "Idle/animations/The_man_winces_in_pain_his_eyes_narrowing_and_his/south/frame_008.png"
+            ]
+          },
+          "The_figure_stands_tall_and_confident_then_shifts_h": {
+            "south": [
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_000.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_001.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_002.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_003.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_004.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_005.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_006.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_007.png",
+              "Idle/animations/The_figure_stands_tall_and_confident_then_shifts_h/south/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-09T23:05:49.184055"
+}
