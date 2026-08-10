@@ -10,6 +10,7 @@ import ChatWidget from "@/components/chat/ChatWidget";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { AuthModalProvider } from "@/components/auth/auth-modal";
+import { TutorialProvider } from "@/components/tutorial/v2/TutorialProvider";
 import "./globals.css";
 
 const displayFont = Sora({
@@ -155,12 +156,12 @@ export default function RootLayout({
               
               <ThemeProvider>
                 <AuthModalProvider>
-                  <ChatProvider>
+                  <TutorialProvider><ChatProvider>
                     {children}
                     <MobileBottomNav />
                     <Toaster />
                     <ChatWidget />
-                  </ChatProvider>
+                  </ChatProvider></TutorialProvider>
                 </AuthModalProvider>
               </ThemeProvider>
             
