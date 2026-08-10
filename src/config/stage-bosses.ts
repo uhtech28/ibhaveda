@@ -414,10 +414,24 @@ const STAGE_4_ARTISANS: StageRoster = {
   stageName: "Artisans District",
   bosses: [
     {
-      checkpointIndex: 0, name: "The Armored Perfectionist", family: "machine",
-      idleAsset: "/assets/bosses/stage4/armor-golem/idle.png",
-      introLine: "* Its armor is flawless. Its progress is zero.",
-      spriteScale: 1.9, spriteYOffset: 62, spriteXOffset: 0,
+      // Was "The Armored Perfectionist" (single-frame placeholder).
+      // Swapped to the Unfinished Golem art pack (idle 4f + attack 9f
+      // Pixellab) — the lore matches ("half-built stone giant" per
+      // Pixellab prompt fits Offer Design perfectly: your offer is
+      // never quite finished either). Frame size 88×88.
+      checkpointIndex: 0, name: "The Unfinished Golem", family: "machine",
+      idleAsset: "/assets/bosses/venture/unfinished-golem/idle.png",
+      introLine:
+        "* The Unfinished Golem stands half-built. Its armor is flawless where finished; the rest is scaffolding.",
+      idleClip: {
+        asset: "/assets/bosses/venture/unfinished-golem/idle.png",
+        frameCount: 4, frameWidth: 88, frameHeight: 88, fps: 6,
+      },
+      attackClip: {
+        asset: "/assets/bosses/venture/unfinished-golem/attack.png",
+        frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10,
+      },
+      spriteScale: 2.0, spriteYOffset: 60, spriteXOffset: 0,
     },
     {
       checkpointIndex: 1, name: "Automaton of Delegated Dreams", family: "machine",

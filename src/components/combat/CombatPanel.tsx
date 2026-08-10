@@ -16,7 +16,11 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useCombatRound, type CombatPhase } from "@/lib/hooks/useCombatRound";
-import { CombatQuestionCard, deriveBiomeMap } from "./CombatQuestionCard";
+import {
+  CombatQuestionCard,
+  deriveBiomeMap,
+  focusForCheckpoint,
+} from "./CombatQuestionCard";
 import { CombatResultPanel } from "./CombatResultPanel";
 import { AntiCheatWarning } from "./AntiCheatWarning";
 import type { KeystrokeTelemetry } from "@/lib/combat/types";
@@ -45,6 +49,14 @@ interface Props {
   /** The user's actual venture / idea title (e.g. "Retlify AI").  Rendered
    *  in the combat header instead of the demo's hardcoded slug. */
   ideaTitle?: string | null;
+  /** 1-based checkpoint number the boss is guarding (1..N). Used to
+   *  focus the OUTER combat scrim on the specific area of the map
+   *  where the encounter is happening — "take map area near
+   *  checkpoint as ai combat background". Village keeps its bespoke
+   *  painted backdrop; every other biome falls back to a CP-zoomed
+   *  crop of the painted world map. Optional so legacy callers still
+   *  work (a null / undefined value → whole-map centered scrim). */
+  checkpointIndex?: number | null;
 }
 
 export function CombatPanel({
@@ -55,6 +67,7 @@ export function CombatPanel({
   onRetryStarted,
   boss = null,
   ideaTitle = null,
+  checkpointIndex = null,
 }: Props) {
   const { phase, submitAnswer, retryCombat, abandon } = useCombatRound(
     roundId,
@@ -265,20 +278,49 @@ export function CombatPanel({
       data-tutorial="combat-panel"
       className="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden"
     >
-      {/* Biome-themed background — routed through deriveBiomeMap so
-          Arena fights show the Arena, Forest fights show the Forest,
-          Harbor fights show the Harbor, etc. Previous rev hardcoded
-          the Village painted map here, which meant EVERY combat
-          across all stages was silhouetted against Village art
-          (product report: "i opend arcade but still got village").
-          Dimmed to 40% brightness so the terrain doesn't overpower
-          the combat UI. */}
+      {/* ── Biome-themed background ────────────────────────────────
+          Village: uses its dedicated painted combat backdrop (art
+          already attached), rendered `cover` so nothing is cropped.
+          Every other biome: shows the biome's painted world map
+          ZOOMED IN on the specific checkpoint the boss guards — per
+          product ask "take map area near checkpoint as ai combat
+          background for all map except village". `focusForCheckpoint`
+          returns background-size 180% + a CP-percentage position so
+          the scrim reads as "this exact spot on the map" instead of a
+          generic biome shot. When a CP index isn't available (legacy
+          call sites) the helper falls back to a centered cover crop.
+          40% brightness + 85% saturation keeps the terrain readable
+          without overpowering the combat UI on top. */}
       <div
-        className="pointer-events-none absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: `url(${deriveBiomeMap(boss?.idleAsset ?? null)})`,
-          filter: "brightness(0.4) saturate(0.85)",
-        }}
+        className="pointer-events-none absolute inset-0"
+        style={(() => {
+          const bossAsset = boss?.idleAsset ?? null;
+          const isVillage = !!bossAsset?.includes("/bosses/village/");
+          if (isVillage) {
+            return {
+              backgroundImage: `url(${deriveBiomeMap(bossAsset)})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              filter: "brightness(0.4) saturate(0.85)",
+            };
+          }
+          const focus = focusForCheckpoint(
+            bossAsset,
+            // focusForCheckpoint uses 0-based indexing internally
+            // (CP1 → index 0) — match that convention.
+            typeof checkpointIndex === "number"
+              ? checkpointIndex - 1
+              : null,
+          );
+          return {
+            backgroundImage: `url(${deriveBiomeMap(bossAsset)})`,
+            backgroundSize: focus.size,
+            backgroundPosition: `${focus.positionX} ${focus.positionY}`,
+            backgroundRepeat: "no-repeat",
+            filter: "brightness(0.4) saturate(0.85)",
+          };
+        })()}
       />
       {/* Dark base overlay so the terrain doesn't overpower the combat UI */}
       <div className="pointer-events-none absolute inset-0 bg-black/55 backdrop-blur-[2px]" />

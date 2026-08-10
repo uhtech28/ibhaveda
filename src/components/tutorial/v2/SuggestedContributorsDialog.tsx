@@ -5,27 +5,31 @@
  * tutorial. Shown right after the user's first idea is posted, before
  * they navigate to the map.
  *
- * Design constraints (from product):
- *   1. Must render identically on mobile AND desktop. Previously only
- *      surfaced reliably on mobile because the wizard's share panel
- *      auto-navigated to /map/world before the tutorial could catch
- *      the closed-wizard state. Wizard onDone now no-ops for
- *      tutorialMode; this dialog owns the navigation to /map/world.
- *   2. UI matches the platform palette — navy #0F1726 bg, border
- *      white/8, #6366F1 accent, gold #F5C542 highlights. NO pink/
- *      orange gradients (previous rev was inconsistent with the rest
- *      of the app).
- *   3. Compulsory — user must send at least one contribution request
- *      before the Continue button unlocks. There is no "ask later"
- *      escape hatch on this step.
- *   4. Sending is a real write: clicking "Send request" expands an
- *      inline textarea + Send button so the user composes an actual
- *      pitch. Sparky's bubble appears above the write row with the
- *      copy "Write a quick message saying why you'd be a great fit,
- *      then send your request!"
+ * Product spec (updated):
+ *   1. NO subtitle blurb.
+ *   2. NO "0 of 3 sent · at least 1 required" progress dots.
+ *   3. NO "Continue to your map" button + no gate copy underneath.
+ *   4. Clicking "Send request" auto-composes a friendly template
+ *      pitch ("Hi, I'm {username}, I want to contribute to your
+ *      project '{ideaTitle}'.") and sends it in the same tap — no
+ *      textarea, no character-count gate. The moment the send
+ *      resolves we fire onContinue() so the user is taken straight
+ *      to their map without needing a second confirmation from
+ *      Sparky.
+ *   5. Cancel / expand row + Sparky prompt bubble are gone (there's
+ *      nothing left to write, so no guidance needed).
+ *
+ * Design constraints unchanged:
+ *   - Same platform palette (navy #0F1726, gold accent, indigo CTA).
+ *   - Mobile + desktop parity.
+ *   - Author-side mutation is `sendInvitation` (author invites
+ *     invitee by username). We are NOT calling the reverse-direction
+ *     `createContributionRequest` — that would hit the "cannot
+ *     request contribution to your own idea" auth check and fail
+ *     every time.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -34,25 +38,19 @@ import type { Id } from "@convex/_generated/dataModel";
 interface Props {
   /** ID of the idea just posted. Used as the request target. */
   ideaId: Id<"ideas">;
-  /** Called when the user clicks Continue (advance to map). */
+  /** Called after the FIRST successful auto-send so the parent can
+   *  navigate the user to /map/world. Also called if the user
+   *  dismisses / no suggestions exist so the tutorial isn't stuck. */
   onContinue: () => void;
 }
-
-const SPARKY_PROMPT =
-  "Write a quick message saying why you'd be a great fit, then send your request!";
 
 export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
   const currentUser = useQuery(api.users.getCurrentUser);
   const allUsers = useQuery(api.users.getAllUsers, {});
-  // This tutorial step is the AUTHOR inviting people to their own
-  // just-created idea. It used to call `createContributionRequest`
-  // which is the OPPOSITE direction (a would-be contributor asking
-  // an author for permission). That mutation's server-side check
-  // "You cannot request contribution to your own idea" fired every
-  // single time because the requester and the idea author were the
-  // same user, breaking the tutorial. `sendInvitation` is the
-  // correct primitive: only the idea author can call it, and it
-  // targets an invitee by username.
+  // Fetch the idea so we can bake its title into the auto-composed
+  // pitch ("...contribute to your project 'Foo'."). Cheap read —
+  // Convex will already have this cached from the wizard step.
+  const idea = useQuery(api.ideas.getIdeaById, { ideaId });
   const sendInvitation = useMutation(api.invitations.sendInvitation);
 
   const suggestions = useMemo(() => {
@@ -62,77 +60,42 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
       .slice(0, 3);
   }, [allUsers, currentUser]);
 
-  // Which user's write-row is expanded. Only one can be open at a
-  // time — keeps Sparky's bubble anchored to one target.
-  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
-  // Per-user message drafts. Persist across expand/collapse so the
-  // user doesn't lose text if they collapse and reopen.
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
   // Users we've successfully sent to.
   const [sentSet, setSentSet] = useState<Set<string>>(new Set());
-  // Users mid-send (button spinner state).
+  // Users mid-send (per-row spinner state).
   const [sendingSet, setSendingSet] = useState<Set<string>>(new Set());
   // Surface send errors inline instead of swallowing them silently —
-  // if the server rejects (e.g. duplicate invitation, no matching
-  // username), the user sees the reason under the affected row.
+  // if the server rejects (e.g. duplicate invitation), the user sees
+  // the reason under the affected row.
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // Per-user textarea refs. iOS Safari ignores React's `autoFocus`
-  // prop because it fires in a post-mount effect (after the
-  // AnimatePresence height-expand animation), by which point the
-  // user-gesture context is lost and iOS refuses to open the
-  // keyboard. Instead we imperatively call .focus() *synchronously*
-  // inside the tap handler — that preserves the gesture and iOS
-  // opens the keyboard as expected. Android/desktop keep working
-  // either way.
-  const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  // Guard so the auto-advance to /map/world can only fire once —
+  // a second tap on another Send request row shouldn't stack
+  // router.push calls on top of a navigation already in flight.
+  const [advancedRef, setAdvancedRef] = useState(false);
 
-  // Continue unlocks after at least one successful send OR when the
-  // suggestions list is empty (fresh community with no other users)
-  // OR when the users query loaded but returned zero suggestions.
-  // Without the empty-community fallback the tutorial dead-ends for
-  // the very first users on a new deployment, who have no one to
-  // invite and can't proceed past this step.
+  // If the community truly is empty (no other users to invite),
+  // don't dead-end the tutorial — auto-advance the moment we've
+  // confirmed the query resolved with zero suggestions.
   const communityIsEmpty =
-    allUsers !== undefined && currentUser !== undefined && suggestions.length === 0;
-  const canContinue = sentSet.size >= 1 || communityIsEmpty;
+    allUsers !== undefined &&
+    currentUser !== undefined &&
+    suggestions.length === 0;
 
-  const handleExpand = useCallback((userId: string) => {
-    setExpandedUserId((prev) => {
-      const next = prev === userId ? null : userId;
-      // Kick focus() synchronously so iOS honours it. The textarea
-      // may not exist yet (it mounts on the next frame after
-      // setState + AnimatePresence expand), so we retry across a
-      // couple of rAFs until the ref lands.
-      if (next === userId && typeof window !== "undefined") {
-        let attempts = 0;
-        const tryFocus = () => {
-          const el = textareaRefs.current[userId];
-          if (el) {
-            el.focus();
-            // Some iOS versions need a nudge to raise the keyboard
-            // even after focus — dispatching a click on the element
-            // inside the same task keeps the gesture chain intact.
-            try {
-              el.click();
-            } catch {
-              /* no-op */
-            }
-            return;
-          }
-          if (++attempts < 8) requestAnimationFrame(tryFocus);
-        };
-        requestAnimationFrame(tryFocus);
-      }
-      return next;
-    });
-  }, []);
+  const buildTemplateMessage = useCallback(() => {
+    // Prefer the display name — falls back to the @handle so we never
+    // send "Hi, I'm undefined, ...".
+    const meName =
+      currentUser?.displayName ||
+      currentUser?.username ||
+      "a fellow builder";
+    // Idea title comes from Convex; fall back to a generic phrase so
+    // the pitch still reads well if the read hasn't landed yet.
+    const projectName = idea?.title?.trim() || "your project";
+    return `Hi, I'm ${meName}. I'd love to contribute to your project "${projectName}".`;
+  }, [currentUser, idea]);
 
-  const handleSend = useCallback(
+  const handleAutoSend = useCallback(
     async (userId: string) => {
-      const message = (drafts[userId] || "").trim();
-      // Guard: minimum 10 characters — matches ContributionRequestModal's
-      // gate elsewhere in the app. A one-word "hi" isn't a real pitch.
-      if (message.length < 10) return;
       if (sentSet.has(userId) || sendingSet.has(userId)) return;
       const invitee = (allUsers ?? []).find((u) => u._id === userId);
       const inviteeUsername = invitee?.username;
@@ -157,19 +120,25 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
         await sendInvitation({
           ideaId,
           username: inviteeUsername,
-          message,
+          message: buildTemplateMessage(),
         });
         setSentSet((prev) => {
           const next = new Set(prev);
           next.add(userId);
           return next;
         });
-        setExpandedUserId(null);
+        // Auto-advance to map on the FIRST successful send. Guard
+        // against duplicate navigation if the user manages to tap
+        // two rows in the same tick.
+        if (!advancedRef) {
+          setAdvancedRef(true);
+          // Slight delay so the user sees the row's ✓ Sent flash
+          // before the dialog unmounts (feels less abrupt).
+          window.setTimeout(() => {
+            onContinue();
+          }, 350);
+        }
       } catch (err) {
-        // Surface the server-side rejection reason (was silently
-        // swallowed, which left the user stuck at 0/3 sent with no
-        // idea why). Common reasons: duplicate invitation exists,
-        // invitee doesn't accept invitations, etc.
         const msg =
           err instanceof Error
             ? err.message.replace(/^\[.*?\]\s*/, "")
@@ -183,8 +152,28 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
         });
       }
     },
-    [sendInvitation, ideaId, drafts, sentSet, sendingSet, allUsers],
+    [
+      sendInvitation,
+      ideaId,
+      sentSet,
+      sendingSet,
+      allUsers,
+      buildTemplateMessage,
+      advancedRef,
+      onContinue,
+    ],
   );
+
+  // Empty-community fallback — the moment we know there's nobody to
+  // invite, punt to the map so the tutorial doesn't dead-end.
+  // Runs in an effect (never during render) so we don't infinite-loop
+  // by setting state as a side-effect of rendering.
+  useEffect(() => {
+    if (!communityIsEmpty || advancedRef) return;
+    setAdvancedRef(true);
+    const t = window.setTimeout(() => onContinue(), 0);
+    return () => window.clearTimeout(t);
+  }, [communityIsEmpty, advancedRef, onContinue]);
 
   return (
     <AnimatePresence>
@@ -196,19 +185,10 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
         transition={{ duration: 0.3 }}
         className="fixed inset-0 z-[400] flex items-center justify-center overflow-y-auto p-4 sm:p-6"
         style={{
-          // Platform-consistent scrim — deep navy with a soft indigo
-          // radial. Matches the persona-picker / feed backdrop.
           background:
             "radial-gradient(ellipse 900px 600px at 50% -5%, rgba(99,102,241,0.14), transparent 60%), rgba(5,8,20,0.88)",
           backdropFilter: "blur(6px)",
-          // iOS Safari (all versions) still needs the -webkit- prefix
-          // for the backdrop-filter to actually paint. Without it the
-          // scrim renders flat and the blur-behind effect that Android
-          // gets silently drops on iPhone/iPad.
           WebkitBackdropFilter: "blur(6px)",
-          // Kill the gray-flash tap highlight iOS paints on any
-          // <button>/<a>/<textarea> tapped inside the dialog. Cascades
-          // down through descendants so we don't have to repeat it.
           WebkitTapHighlightColor: "transparent",
           fontFamily: "'Inter', system-ui, sans-serif",
           color: "#F9FAFB",
@@ -220,7 +200,6 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
           transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           className="w-full max-w-[560px] rounded-2xl border border-white/8 shadow-2xl"
           style={{
-            // Platform card surface — same as cardSurface used in feed.
             background:
               "linear-gradient(180deg, #111827 0%, #0F1726 60%, #0B1220 100%)",
             boxShadow:
@@ -228,7 +207,7 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
           }}
         >
           <div className="p-6 sm:p-7">
-            {/* Header — no eyebrow tag, keep the surface calm */}
+            {/* Header — subtitle intentionally removed per spec. */}
             <h2
               className="text-[22px] leading-tight font-semibold sm:text-[26px]"
               style={{
@@ -237,37 +216,27 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                 letterSpacing: "-0.3px",
               }}
             >
-              These are people we think can help you
+              Potential Contributors
             </h2>
-            <p className="mt-2 text-[13.5px] leading-relaxed text-[#9CA3AF]">
-              Send a contribution request to at least one collaborator to
-              continue. Pick who might be the best fit and pitch them in
-              your own words.
-            </p>
 
             <div className="mt-5 flex flex-col gap-2.5">
               {suggestions.length === 0 && (
                 <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-6 text-center text-[13px] text-[#6B7280]">
                   {allUsers === undefined
                     ? "Finding builders you might want to invite…"
-                    : "No suggestions yet — try again after the community grows."}
+                    : "No suggestions yet — taking you to your map."}
                 </div>
               )}
               {suggestions.map((u) => {
                 const sent = sentSet.has(u._id);
                 const sending = sendingSet.has(u._id);
-                const expanded = expandedUserId === u._id;
-                const draft = drafts[u._id] || "";
-                const canSend = draft.trim().length >= 10 && !sending;
                 return (
                   <div
                     key={u._id}
                     className={`rounded-xl border transition-colors ${
                       sent
                         ? "border-[#22c55e]/40 bg-[#22c55e]/[0.06]"
-                        : expanded
-                          ? "border-[#6366F1]/50 bg-[#6366F1]/[0.05]"
-                          : "border-white/8 bg-white/[0.02] hover:border-white/15"
+                        : "border-white/8 bg-white/[0.02] hover:border-white/15"
                     }`}
                   >
                     <div className="flex items-center gap-3 px-4 py-3">
@@ -301,208 +270,36 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                       </div>
                       <button
                         type="button"
-                        onClick={() =>
-                          sent ? undefined : handleExpand(u._id)
-                        }
-                        disabled={sent}
+                        onClick={() => (sent ? undefined : void handleAutoSend(u._id))}
+                        disabled={sent || sending}
                         className={`shrink-0 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-wider transition ${
                           sent
                             ? "cursor-default bg-[#22c55e]/15 text-[#4ade80]"
-                            : expanded
-                              ? "bg-white/8 text-[#C7D2FE] hover:bg-white/12"
+                            : sending
+                              ? "cursor-wait bg-white/8 text-[#C7D2FE]"
                               : "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white hover:brightness-110 active:scale-95"
                         }`}
                       >
-                        {sent
-                          ? "✓ Sent"
-                          : expanded
-                            ? "Cancel"
-                            : "Send request"}
+                        {sent ? "✓ Sent" : sending ? "Sending…" : "Send request"}
                       </button>
                     </div>
-
-                    {/* ── Inline write-message row ─────────────────
-                        Expands beneath the user row when "Send request"
-                        is tapped. Sparky's bubble sits above the row
-                        with the requested copy. */}
-                    <AnimatePresence initial={false}>
-                      {expanded && !sent && (
-                        <motion.div
-                          key="write-row"
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.22, ease: "easeOut" }}
-                          className="overflow-hidden"
-                        >
-                          <div className="px-4 pb-4 pt-1">
-                            {/* Sparky guidance bubble — matches the
-                                platform's tutorial bubble style
-                                (white card, pointer arrow, gold accent
-                                left border) but inlined into the
-                                dialog so no portal is needed. */}
-                            <SparkyGuidanceBubble />
-
-                            <textarea
-                              ref={(el) => {
-                                textareaRefs.current[u._id] = el;
-                              }}
-                              value={draft}
-                              onChange={(e) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [u._id]: e.target.value,
-                                }))
-                              }
-                              placeholder="Hey — I'm building something you might be a great fit for. Here's why…"
-                              maxLength={500}
-                              rows={3}
-                              // NOTE: no `autoFocus` — handled imperatively
-                              // inside handleExpand for iOS compatibility.
-                              // Reset iOS-default rounded/padded chrome so
-                              // the field matches the platform's dark
-                              // inputs on both platforms.
-                              style={{
-                                WebkitAppearance: "none",
-                                WebkitTapHighlightColor: "transparent",
-                              }}
-                              className="mt-3 w-full resize-none rounded-xl border border-white/12 bg-[#0B1220] px-3 py-2.5 text-[13.5px] leading-relaxed text-[#F9FAFB] placeholder:text-[#4B5563] focus:border-[#6366F1] focus:outline-none focus:ring-1 focus:ring-[#6366F1]/50"
-                            />
-                            <div className="mt-2 flex items-center justify-between">
-                              <span
-                                className={`text-[11px] ${
-                                  draft.trim().length < 10
-                                    ? "text-[#6B7280]"
-                                    : "text-[#4ade80]"
-                                }`}
-                              >
-                                {draft.trim().length < 10
-                                  ? `${10 - draft.trim().length} more character${10 - draft.trim().length === 1 ? "" : "s"} to send`
-                                  : `${draft.length} / 500`}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => void handleSend(u._id)}
-                                disabled={!canSend}
-                                className={`rounded-full px-5 py-2 text-[12px] font-semibold uppercase tracking-wider transition ${
-                                  canSend
-                                    ? "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white hover:brightness-110 active:scale-95"
-                                    : "cursor-not-allowed bg-white/5 text-[#4B5563]"
-                                }`}
-                              >
-                                {sending ? "Sending…" : "Send"}
-                              </button>
-                            </div>
-                            {errors[u._id] && (
-                              <p className="mt-1.5 text-[11px] leading-snug text-[#f87171]">
-                                {errors[u._id]}
-                              </p>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {errors[u._id] && (
+                      <p className="px-4 pb-3 text-[11px] leading-snug text-[#f87171]">
+                        {errors[u._id]}
+                      </p>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* ── Progress + Continue ────────────────────────────── */}
-            <div className="mt-6 space-y-3">
-              <div className="flex items-center justify-center gap-1.5">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className={`h-1.5 w-8 rounded-full transition-colors ${
-                      i < sentSet.size ? "bg-[#22c55e]" : "bg-white/8"
-                    }`}
-                  />
-                ))}
-                <span className="ml-2 text-[11px] text-[#6B7280]">
-                  {sentSet.size} of 3 sent
-                  {sentSet.size === 0 && (
-                    <span className="ml-1 text-[#F5C542]">
-                      · at least 1 required
-                    </span>
-                  )}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={canContinue ? onContinue : undefined}
-                disabled={!canContinue}
-                className={`w-full rounded-xl px-6 py-3.5 text-[13.5px] font-semibold uppercase tracking-[0.14em] transition ${
-                  canContinue
-                    ? "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-lg shadow-[#6366F1]/25 hover:brightness-110 active:scale-[0.99]"
-                    : "cursor-not-allowed bg-white/5 text-[#4B5563]"
-                }`}
-              >
-                Continue to your map
-              </button>
-              {!canContinue && (
-                <p className="text-center text-[11px] text-[#6B7280]">
-                  Send at least one request to unlock Continue.
-                </p>
-              )}
-            </div>
+            {/* Progress + Continue button + gate copy all removed per
+                spec — a single tap on any Send request row auto-sends
+                a template pitch and takes the user straight to their
+                map. */}
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
-  );
-}
-
-/**
- * Inline Sparky guidance bubble — white card with the requested
- * onboarding copy and a small gold-outlined puppy avatar on the left.
- * Kept inside this file so the dialog is self-contained (no reliance
- * on the portal-mounted TutorialMascot which is already suppressed
- * during the contributors beat by Step2TemplatePick).
- */
-function SparkyGuidanceBubble() {
-  return (
-    <div className="flex items-start gap-2.5">
-      {/* Small Sparky sprite — solid gold puppy silhouette so it
-          reads as "our mascot" without importing the full animated
-          sprite component (this is a static one-line guidance moment). */}
-      <div
-        className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full border border-[#F5C542]/40"
-        style={{
-          background:
-            "radial-gradient(circle at 35% 35%, #fde68a 0%, #f5c542 55%, #b8790a 100%)",
-          boxShadow: "0 0 12px rgba(245,197,66,0.25)",
-        }}
-        aria-hidden
-      >
-        {/* Simple pup emoji-style glyph — SVG so it renders crisply */}
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-          <path
-            d="M6 10c0-3.5 2.7-6 6-6s6 2.5 6 6c0 1-.4 2-1 2.7l1 2.3-2.2-.6c-1 .7-2.3 1-3.8 1s-2.8-.3-3.8-1L6 15l1-2.3c-.6-.7-1-1.7-1-2.7Z"
-            fill="#3a2412"
-          />
-          <circle cx="10" cy="10" r="1" fill="#fff2c8" />
-          <circle cx="14" cy="10" r="1" fill="#fff2c8" />
-          <circle cx="10" cy="10" r="0.5" fill="#3a2412" />
-          <circle cx="14" cy="10" r="0.5" fill="#3a2412" />
-          <path
-            d="M11 12.5c.5.4 1.5.4 2 0"
-            stroke="#3a2412"
-            strokeWidth="0.6"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
-      <div
-        className="relative flex-1 rounded-xl border-l-[3px] border-[#F5C542] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#111827] shadow-sm"
-        style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
-      >
-        {SPARKY_PROMPT}
-        {/* Tail pointing left toward the Sparky avatar */}
-        <span
-          className="absolute -left-[6px] top-3 h-3 w-3 rotate-45 border-b border-l border-[#F5C542] bg-white"
-          aria-hidden
-        />
-      </div>
-    </div>
   );
 }

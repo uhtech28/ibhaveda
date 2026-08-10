@@ -588,7 +588,7 @@ export function Step2TemplatePick() {
         />
         <TutorialMascot
           visible
-          text="Write a quick message saying why you'd be a great fit, then send your request!"
+          text="Pick a builder and tap Send request — I'll auto-write the pitch and take you straight to your map."
           mood="pointing"
           // Bottom-left so Sparky sits BESIDE the centered contributor
           // modal (max-w-560px) instead of overlapping its Send

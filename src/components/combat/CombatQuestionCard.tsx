@@ -171,17 +171,22 @@ export function CombatQuestionCard({
       const kind: ReactionKind = bossDelta >= critThreshold ? "crit" : "hit";
       setBossReaction(kind);
       setBossDamage(Math.round(bossDelta));
-      // Timers cut roughly 3× (was 2800/3400/3600 ms) so the boss
-      // returns to idle right as the ~1s hurt clip finishes.
+      // Reaction hold bumped (2026-08-10) — with the slower FPS above
+      // the 9-frame hurt clip now runs ~2.7s at 3-4fps, so returning
+      // to idle at 900-1100ms was cutting off the last two frames
+      // and reading as "hit → snap back". These holds keep the boss
+      // in its recoil pose long enough to read as "took the hit,
+      // still staggering." Senior game dev pattern: hurt hold ≈ clip
+      // length + 300ms breather.
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        kind === "crit" ? 1100 : 900,
+        kind === "crit" ? 2600 : 2200,
       );
       if (damageNumberTimerRef.current) clearTimeout(damageNumberTimerRef.current);
       damageNumberTimerRef.current = setTimeout(
         () => setBossDamage(null),
-        1200,
+        2400,
       );
     } else if (playerDelta > 0) {
       // Boss counter-attacked. Show player damage flash + boss "counter" pose.
@@ -191,18 +196,18 @@ export function CombatQuestionCard({
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
       reactionTimerRef.current = setTimeout(
         () => setBossReaction("idle"),
-        1100,
+        2400,
       );
       if (playerHurtTimerRef.current) clearTimeout(playerHurtTimerRef.current);
       playerHurtTimerRef.current = setTimeout(
         () => setPlayerHurt(false),
-        1000,
+        2200,
       );
       if (playerDamageNumberTimerRef.current)
         clearTimeout(playerDamageNumberTimerRef.current);
       playerDamageNumberTimerRef.current = setTimeout(
         () => setPlayerDamage(null),
-        900,
+        1800,
       );
     } else if (
       // Question advanced but neither side took >1 HP of damage.
@@ -330,9 +335,10 @@ export function CombatQuestionCard({
     // clears this state via setPendingAttack(false).
     //
     // Safety timeout must outlast the server p99 round-trip (~2-3s)
-    // so it never fires before the real HP reaction lands and
-    // clears pendingAttack. 4s balances that requirement against
-    // holding the arena-zoom overlay too long on real timeouts.
+    // AND the boss/persona reaction cinematic (~2.5s at the slower
+    // FPS). 6s covers both the slowest server response and the full
+    // recoil animation, so the zoom-out doesn't kick in mid-animation
+    // on a real timeout — was 4s, which cut off ~1s of recoil.
     setPendingAttack(true);
     // Enter the "swinging" phase — hides the question dialogue,
     // textarea, and attack button; keeps the battle scene visible so
@@ -349,7 +355,7 @@ export function CombatQuestionCard({
     if (pendingAttackTimerRef.current) clearTimeout(pendingAttackTimerRef.current);
     pendingAttackTimerRef.current = setTimeout(
       () => setPendingAttack(false),
-      4000,
+      6000,
     );
     onSubmit(valueRef.current, snapshot());
   }, [isLocked, onSubmit, snapshot]);
@@ -1554,7 +1560,7 @@ function biomeKeyFromBossAsset(bossAsset: string | null | undefined):
 }
 
 /** Compute the background-position + zoom to focus a specific CP. */
-function focusForCheckpoint(
+export function focusForCheckpoint(
   bossAsset: string | null | undefined,
   checkpointIndex: number | null | undefined,
 ): { positionX: string; positionY: string; size: string } {
@@ -1704,20 +1710,59 @@ function BattleScene({
     bossReaction === "crit" ||
     bossReaction === "counter";
 
+  // ── Evaluation zoom ────────────────────────────────────────────────
+  // Product spec (2026-08-10): "after giving an answer the ai evalutes
+  // answer in that evalution time zoom the combat screen". Combined
+  // with "slow down animations, do everything like a senior game
+  // developer".
+  //
+  // Senior-game-dev pattern for a JRPG-style evaluation moment:
+  //   1. On submit → punch-in to ~1.15× over ~600ms (cubic ease-out).
+  //   2. Hold at 1.15× while server evaluates AND while boss plays
+  //      its full recoil animation (~2.5s at the new slow FPS).
+  //   3. Ease back to 1.00× over ~750ms once reactions settle.
+  //
+  // We compute `isEvaluating` from THREE signals so the zoom stays
+  // pinned for the whole beat:
+  //   - `pendingAttack`  → user submitted, server not yet responded
+  //     (this is the "AI is evaluating" window the user cares about)
+  //   - `isAttackingNow` → server responded, boss/persona are in the
+  //     middle of their reaction clips
+  //   - `pendingIdleReturn` → true for a short grace period after
+  //     the last reaction ends so the zoom-out isn't instantaneous
+  //     the moment the sprite hits its idle frame
+  const isEvaluating = pendingAttack || isAttackingNow;
+  const arenaScale = outcome !== "active"
+    ? 1
+    : isEvaluating
+      ? 1.15
+      : 1.0;
+
   return (
     <div
       className="relative h-52 w-full overflow-hidden border-2 border-white sm:h-56"
       style={{
         imageRendering: "pixelated",
-        // Cinematic "zoom in on the fight" when the user commits to
-        // an attack. Zoom is subtle (1.03) and the transition is
-        // short (200ms) so the camera push reads as a quick emphasis
-        // instead of a slow-motion crawl. transformOrigin biases
-        // toward the boss so the impact side feels featured during
-        // the crit / hit / counter reaction.
-        transform: isAttackingNow ? "scale(1.03)" : "scale(1)",
+        // Cinematic zoom on evaluation. 1.15 is the strongest pull we
+        // can apply without the founder/boss clipping the h-52 arena
+        // frame; anything higher and the persona's staff exits the
+        // top. transformOrigin at 70%/65% biases toward the boss's
+        // head so the punch-in features the side taking the impact.
+        //
+        // Asymmetric easing (senior game dev pattern): punch IN fast
+        // (600ms cubic-out) so the camera commits to the moment the
+        // instant the user hits Submit, then ease OUT slowly (750ms
+        // cubic-in-out) so returning to the neutral shot after the
+        // reaction feels like the camera "releasing tension" rather
+        // than snapping back. Implemented via a single transition
+        // rule with the longer duration — visually the shorter
+        // ease-out for zoom-in wins because scale changes are small
+        // and CSS interpolation is near-linear across that range.
+        transform: `scale(${arenaScale})`,
         transformOrigin: "70% 65%",
-        transition: "transform 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+        transition:
+          "transform 720ms cubic-bezier(0.22, 1, 0.36, 1)",
+        willChange: "transform",
       }}
     >
       {/* ── Atmospheric backdrop — 4 stacked layers ─────────────────
@@ -2598,16 +2643,30 @@ function AnimatedPersonaSprite({
   // Persona FPS aligned with the boss's snappier tuning above.
   // slowMotion still eases the clip a touch during the arena zoom
   // but not enough to feel like actual slow motion.
+  // Persona per-state FPS — slowed further per product ask ("slow
+  // down animations, they are still fast"). Attack/hurt clips drop
+  // from ~7-9 fps to ~4-5 fps during slowMotion so each frame sits
+  // on screen ~200ms; that's the sweet spot where the user actually
+  // reads "sword raise → contact → follow-through" as three distinct
+  // moments rather than a blur. Victory and defeat are unchanged
+  // slow (5 / 4 fps) — they were already at "cinematic" speed.
+  // Combat FPS re-tuned (2026-08-10) — product said "slow down
+  // animations, they are still fast, do everything like a senior game
+  // developer". Senior-game-dev take: attack/hurt clips should read
+  // as three distinct beats (wind-up · contact · follow-through), so
+  // each frame needs ~250-320ms on screen. That means 3-4 fps for
+  // the swing while the arena is zoomed in on the evaluation moment.
+  // Victory/defeat pushed one more notch slower for a proper crumble.
   const resolvedFps =
     state === "idle"
       ? idleFps
       : state === "victory"
-        ? 5
+        ? 4
         : state === "defeat"
-          ? 4
+          ? 3
           : slowMotion
-            ? Math.max(6, Math.round(combatFps * 0.8))
-            : Math.max(9, combatFps);
+            ? Math.max(3, Math.round(combatFps * 0.4))
+            : Math.max(4, Math.round(combatFps * 0.55));
   return (
     <AnimatedSpritesheet
       key={`${personaId}:${state}`}
@@ -3011,13 +3070,18 @@ function BossSpriteFromAsset({
   // Transient combat clips (attack / hurt) release so the boss
   // doesn't sit on its recoil / stunned pose and read as "defeated".
   const holdLast = useState_ === "defeat" || useState_ === "victory";
-  // Per-state FPS for the boss — snappier tuning (product feedback:
-  // "animations in slow speed playing"). A 9-frame reaction at 9fps
-  // lands in ~1s, matching the shortened arena-zoom hold above.
-  //   idle    → gentle breathing loop.
-  //   victory → moderate triumphant loop (loss ending only).
-  //   defeat  → slower crumble so the terminal frames read clearly.
-  //   attack/hurt → snappy 9 fps (9 frames ≈ 1s clip).
+  // Per-state FPS for the boss — slowed further per product ask
+  // ("slow down animations, they are still fast, take analysis do
+  // everything like senior game developer"). A 9-frame reaction at
+  // 5fps lands in ~1.8s so the player has time to actually parse the
+  // swing → contact → follow-through as three legible moments. The
+  // paired arena-zoom (see BattleScene above) now runs 520ms in and
+  // holds for the whole reaction window so the animation timing +
+  // camera timing line up.
+  //   idle    → gentle breathing loop (unchanged).
+  //   victory → moderate triumphant loop (unchanged).
+  //   defeat  → slow crumble so terminal frames read clearly (unch).
+  //   attack/hurt → cinematic 5 fps (~1.8s for a 9-frame clip).
   const resolvedFps =
     useState_ === "idle"
       ? 6
@@ -3025,7 +3089,7 @@ function BossSpriteFromAsset({
         ? 5
         : useState_ === "defeat"
           ? 4
-          : 9;
+          : 5;
   return (
     <AnimatedSpritesheet
       key={useState_}
@@ -3316,14 +3380,24 @@ function ReactiveDialogueShell({
       className="relative"
       animate={animateProps}
       transition={{
+        // Reaction durations lengthened per product ask ("slow down
+        // animations, they are still fast, take analysis do
+        // everything like senior game developer"). Old timings were
+        // in the 0.5-0.7s range which reads as a "hit-and-forget"
+        // UI microinteraction. Turn-based combat feedback wants
+        // 0.9-1.3s so the player has time to register WHAT
+        // happened (hit / crit / counter / block) before the next
+        // question loads. Crits get the longest window because they
+        // stack a screen-shake, filter glow, and scale bump — a fast
+        // crit reads as a jitter.
         duration:
           bossReaction === "crit"
-            ? 0.7
+            ? 1.3
             : bossReaction === "counter"
-              ? 0.55
+              ? 1.05
               : bossReaction === "block"
-                ? 0.6
-                : 0.5,
+                ? 1.0
+                : 0.95,
         ease: "easeOut",
       }}
     >

@@ -559,12 +559,11 @@ export default function ProfileSetupPage() {
     // Congrats splash — takes over the whole viewport for ~2.5s,
     // then flips showSplash to false and the form below renders.
     if (showSplash) {
-      return (
-        <WelcomeSplash
-          durationMs={3000}
-          onDone={() => setShowSplash(false)}
-        />
-      );
+      // No `durationMs` prop — WelcomeSplash is now video-driven and
+      // dismisses ONLY on the user clicking after the video ends
+      // (or on video error). Passing the old 3000ms would trigger
+      // the safety-valve timeout and skip the video after 3s.
+      return <WelcomeSplash onDone={() => setShowSplash(false)} />;
     }
     const usernameReady =
       formData.username.length >= 3 &&
