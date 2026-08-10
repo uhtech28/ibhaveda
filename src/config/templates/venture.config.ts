@@ -1,4 +1,4 @@
-﻿/**
+/**
  * venture.config.ts
  *
  * Venture template configuration.
