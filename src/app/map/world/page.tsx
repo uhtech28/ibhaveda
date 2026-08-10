@@ -57,6 +57,44 @@ import type { StageBoss } from "@/config/stage-bosses";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
 import { generateCheckpointLayout } from "@/lib/phaser/scenes/TemplateMapScene";
+import { getTemplateStageBoss } from "@/config/template-stage-bosses";
+import type { StageBoss } from "@/config/stage-bosses";
+
+/**
+ * Unified boss lookup that routes by templateId. For Venture (stages
+ * 1-8 with bespoke per-CP rosters) delegates to getStageBoss from
+ * stage-bosses.ts. For Academic / Lab / Creative it hits the
+ * per-template roster which returns the SAME biome-specific boss for
+ * every CP on that stage (templates have one monster per stage today).
+ *
+ * Returning the biome boss for every CP on a template map means the
+ * user actually fights their template's antagonist at each checkpoint
+ * instead of the previous behaviour where getStageBoss returned null
+ * and the combat panel auto-skipped the fight.
+ */
+function resolveBossForCombat(
+  templateId: string | undefined,
+  stage: number,
+  cpIndex: number,
+): StageBoss | null {
+  const tid = templateId ?? "venture";
+  if (tid === "venture") {
+    // Venture uses village-boss lookup for stage 1 (called by caller
+    // separately) or getStageBoss for stages 2-8.
+    return getStageBoss(stage, cpIndex);
+  }
+  // Templates return the biome boss for any CP on that stage.
+  return getTemplateStageBoss(tid, stage);
+}
+
+function resolveSuperBossForCombat(
+  templateId: string | undefined,
+  stage: number,
+): StageBoss | null {
+  const tid = templateId ?? "venture";
+  if (tid === "venture") return getStageSuperBoss(stage);
+  return getTemplateStageBoss(tid, stage);
+}
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
   checkpointBossKey,
@@ -2764,6 +2802,13 @@ function MapPageInner() {
       biomeLabel: string;
       stage: number;
       checkpoints?: Array<{ x: number; y: number; label: string }>;
+      // Per-template boss config. When present, TemplateMapScene
+      // uses it instead of the generic Fog Guardian fallback so the
+      // on-map boss is the biome-specific antagonist (Librarian /
+      // Cartographer / etc.) with real Pixellab clips. Null-safe:
+      // undefined leaves the scene on its FALLBACK_BOSS.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      boss?: any;
     } | null = null;
     if (targetKey === "TemplateMapScene") {
       const mapUrl = resolveTemplateMapUrl(templateId, templateBiomeName);
@@ -2780,6 +2825,13 @@ function MapPageInner() {
       const cpCount =
         templateStages[Math.max(0, desiredStage - 1)]?.checkpoints ?? 3;
       const cpLayout = generateCheckpointLayout(mapW, mapH, cpCount);
+      // Resolve the biome-specific boss (Academic Librarian, Lab
+      // Alchemist, etc.) from the per-template roster. Returns null
+      // for stages whose art hasn't shipped yet (Creative Stage 2
+      // and 5 at time of writing) — in that case the scene falls
+      // back to its internal FALLBACK_BOSS so the map still has a
+      // moving boss at CP1.
+      const stageBoss = getTemplateStageBoss(templateId, desiredStage);
       templateSceneData = {
         mapKey: `template:${mapUrl}`,
         mapUrl,
@@ -2788,6 +2840,7 @@ function MapPageInner() {
         biomeLabel: templateBiomeName ?? `Stage ${desiredStage}`,
         stage: desiredStage,
         checkpoints: cpLayout,
+        boss: stageBoss ?? undefined,
       };
     }
 
@@ -2925,10 +2978,14 @@ function MapPageInner() {
       // fallback, which rendered the user's OWN persona sprite as the
       // "boss" over a village backdrop labelled "Doubt Imp" — visibly
       // broken. Now: mark the CP boss as defeated and advance.
+      // Route boss lookup by template. Venture keeps its per-CP roster;
+      // Academic/Lab/Creative return their biome boss for every CP on
+      // the stage (one monster per template stage today).
+      const currentTemplateId = (venture?.templateId ?? "venture") as string;
       const bossForCp =
-        cp.stage === 1
+        currentTemplateId === "venture" && cp.stage === 1
           ? getVillageBoss(cp.checkpoint - 1)
-          : getStageBoss(cp.stage, cp.checkpoint - 1);
+          : resolveBossForCombat(currentTemplateId, cp.stage, cp.checkpoint - 1);
       if (!bossForCp) {
         const key = checkpointBossKey(cp.stage, cp.checkpoint);
         setBossDefeatedAtCheckpoint((prev) => {
@@ -3902,7 +3959,11 @@ function MapPageInner() {
 
   useEffect(() => {
     const handleEncounter = (e: { stage: number; bossSlug?: string }) => {
-      const boss = getStageSuperBoss(e.stage);
+      // Route super-boss lookup by template so Academic/Lab/Creative
+      // super encounters use their biome boss (Grand-Archive Gatekeeper,
+      // etc.) instead of the Venture roster.
+      const tid = (venture?.templateId ?? "venture") as string;
+      const boss = resolveSuperBossForCombat(tid, e.stage);
       setSuperBossEncounter({ open: true, stage: e.stage, boss });
       // Layer a dramatic boss theme over the stage ambience for the
       // encounter's duration. Pick track by boss family so each stage's
@@ -5431,9 +5492,16 @@ function MapPageInner() {
                 // stage-bosses.ts (currently stages 5, 7, 8 — art
                 // pending). Returns undefined only if truly nothing
                 // is defined for the stage/CP combination.
-                (activeStage === 1
+                // Now template-aware: for Academic/Lab/Creative the
+                // HUD boss name pulls from the per-template roster so
+                // users on the Academic map see "Librarian of Lost
+                // Questions" etc. on the bottom bar instead of a
+                // Venture roster name.
+                (((venture?.templateId ?? "venture") as string) === "venture" &&
+                activeStage === 1
                   ? getVillageBoss(Math.max(0, (activeCP ?? 1) - 1))?.name
-                  : getStageBoss(
+                  : resolveBossForCombat(
+                      (venture?.templateId ?? "venture") as string,
                       activeStage,
                       Math.max(0, (activeCP ?? 1) - 1),
                     )?.name) ?? undefined
@@ -5732,14 +5800,19 @@ function MapPageInner() {
               key={activeCombatRoundId}
               roundId={activeCombatRoundId as Id<"combatRounds">}
               checkpointId={bossCombatTarget.checkpointId as Id<"ventureCheckpoints">}
-              // Stage-aware boss identity — pulls from the shared
-              // stage-bosses config which covers stages 1-4 with real
-              // sprites + names + intro lines. Falls back to Village
-              // config for stage 1 (both paths return same data).
+              // Template-aware boss identity. Venture uses the
+              // stage-bosses.ts per-CP roster (village lookup for
+              // stage 1). Academic/Lab/Creative use the per-template
+              // roster in template-stage-bosses.ts which returns the
+              // biome boss for every CP on that stage — so users on
+              // Academic fight the Librarian at Ancient Library CPs,
+              // Cartographer at Cartographer's Tower CPs, etc.
               boss={
+                ((venture?.templateId ?? "venture") as string) === "venture" &&
                 bossCombatTarget.stage === 1
                   ? getVillageBoss(bossCombatTarget.checkpoint - 1)
-                  : getStageBoss(
+                  : resolveBossForCombat(
+                      (venture?.templateId ?? "venture") as string,
                       bossCombatTarget.stage,
                       bossCombatTarget.checkpoint - 1,
                     )
@@ -5748,6 +5821,11 @@ function MapPageInner() {
               // hardcoded "RETLIFY: BOSS CHALLENGE" placeholder in the
               // combat header with the user's real idea name.
               ideaTitle={ideaTitle}
+              // Which CP the boss guards — drives the outer combat
+              // scrim to crop the biome map at that exact location
+              // (non-Village maps). Village uses its dedicated
+              // painted backdrop and ignores this hint.
+              checkpointIndex={bossCombatTarget.checkpoint}
               onRetryStarted={(newRoundId) => {
                 // Direct swap to the new round. The key prop above
                 // forces a clean CombatPanel remount when activeCombatRoundId changes.
