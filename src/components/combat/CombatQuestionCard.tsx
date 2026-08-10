@@ -1668,6 +1668,23 @@ function BattleScene({
         ? "lost"
         : "active";
 
+  // ── Responsive boss sprite sizing ──────────────────────────────────
+  // Product ask (mobile screenshot review): "reduce the size of boss
+  // for mobile view" — at 300px the Fog sprite crowded the whole arena
+  // and covered the persona standing at the left. On phones (< 640px)
+  // we use 180px so the boss reads as a boss-scale figure without
+  // dominating the frame; desktop keeps the cinematic 300px.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 639px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  const bossDisplayWidth = isMobile ? 180 : 300;
+
   // ── Three-stage cinematic ──────────────────────────────────────────
   // Stage 0 (win only) RETREAT (0 - 1600ms): a gamified banner reads
   //   "<Boss Name> is retreating!" over the still arena. Boss holds
@@ -1954,7 +1971,13 @@ function BattleScene({
           the framer overlay outlived the sprite clip, which read as a
           second "phantom" animation replaying the old motion. */}
       <div
-        className="absolute right-8 sm:right-16"
+        // Right-anchored so the boss reads as the "far right" combatant
+        // on every viewport width. On mobile the anchor is tighter
+        // (right-2) so the smaller 180px sprite sits fully within the
+        // frame instead of getting clipped by the right border, and
+        // the persona at left-2 has clear horizontal space to be
+        // visible against the smaller opponent.
+        className="absolute right-2 sm:right-16"
         style={{
           bottom: "-40px",
           // CINEMATIC LAYOUT
@@ -2019,6 +2042,7 @@ function BattleScene({
         {bossAsset ? (
           <BossSpriteFromAsset
             bossAsset={bossAsset}
+            displayWidth={bossDisplayWidth}
             // Endgame-first: on WIN, boss's opacity has already gone
             // to 0 above so this state doesn't matter (boss faded out
             // — but we still send "defeat" for parity in case of
@@ -2070,7 +2094,11 @@ function BattleScene({
          - cheer stage: loser fades to opacity 0; winner slides to center
                         and loops VICTORY */}
       <div
-        className="absolute left-8 sm:left-16"
+        // Persona left anchor: left-2 on mobile mirrors the boss's
+        // right-2 so both combatants sit inside the arena frame with
+        // matching gutters. Desktop keeps left-16 for the cinematic
+        // stage-blocking.
+        className="absolute left-2 sm:left-16"
         style={{
           // Ground-plane tuning:
           //   bottom-8 / bottom-12  → floated 32–48px above the path
@@ -2548,10 +2576,21 @@ function AnimatedSpritesheet({
   // -(N-1)*frameW as the endpoint, each step becomes (N-1)/N of a
   // frame and the sheet visibly slides between frames instead of
   // snapping — the "sliding left to right" bug.
+  //
+  // ALSO IMPORTANT — animate the FULL `background-position` (x + y)
+  // instead of `background-position-x`. Screenshots from production
+  // showed both persona and boss sprites stuck on frame 0; the root
+  // cause was that a chunk of mobile browsers (iOS Safari < 16.4 +
+  // several Android WebView builds) don't animate the split
+  // `background-position-x` sub-property reliably when the base
+  // `background-position` shorthand has been set separately on the
+  // element. Animating the full shorthand from "0px 50%" to
+  // "<endX>px 50%" avoids the sub-property mismatch and works on
+  // every browser we support.
   const endX = -(frameCount * frameWidth * scale);
   const keyframes = `@keyframes ${animId} {
-    from { background-position-x: 0px; }
-    to   { background-position-x: ${endX}px; }
+    from { background-position: 0px 50%; }
+    to   { background-position: ${endX}px 50%; }
   }`;
 
   // `holdLast`: for TERMINAL one-shots (defeat / victory) we want the
@@ -2586,6 +2625,16 @@ function AnimatedSpritesheet({
       />
     );
   }
+  // Use the `animation` shorthand rather than the five split
+  // properties: React's inline-style parser occasionally drops one of
+  // the split props on hot-reload / hydration, resulting in a sprite
+  // that renders frame 0 forever with no keyframe playing. The
+  // shorthand is parsed as a single declaration and is stable across
+  // every browser we ship for.
+  const iterCount = loop ? "infinite" : "1";
+  const fillMode = holdLast ? "forwards" : "none";
+  const animationShorthand =
+    `${animId} ${durationMs}ms steps(${frameCount}) ${iterCount} ${fillMode}`;
   return (
     <>
       <style>{keyframes}</style>
@@ -2602,11 +2651,15 @@ function AnimatedSpritesheet({
           backgroundRepeat: "no-repeat",
           backgroundSize: `${sheetTotalW * scale}px ${displayHeight}px`,
           backgroundPosition: "0 50%",
-          animationName: animId,
-          animationDuration: `${durationMs}ms`,
-          animationTimingFunction: `steps(${frameCount})`,
-          animationIterationCount: loop ? "infinite" : 1,
-          animationFillMode: holdLast ? "forwards" : "none",
+          // Shorthand + prefix for older iOS Safari (<= 15) that still
+          // gates non-prefixed shorthand parsing on some property
+          // combinations. Explicit will-change hint promotes the
+          // element to its own compositor layer so the keyframes run
+          // on the GPU thread instead of the main thread (visible
+          // stutter on low-end Android otherwise).
+          animation: animationShorthand,
+          WebkitAnimation: animationShorthand,
+          willChange: "background-position",
         }}
       />
     </>
@@ -2645,9 +2698,24 @@ function AnimatedPersonaSprite({
   const ext = persona.extended;
   const frameWidth = ext?.frameWidth ?? 88;
   const frameHeight = ext?.frameHeight ?? 88;
-  const frameCount = ext?.idleFrames ?? 9;
   const idleFps = ext?.idleFps ?? 6;
   const combatFps = ext?.combatFps ?? 8;
+  // Per-STATE frame count. The old code hardcoded frameCount to
+  // ext.idleFrames for every state, so playing the 9-frame attack
+  // sheet with frameCount=4 only cycled through the first 4 frames
+  // and the rest of the swing was invisible. State-aware lookup
+  // matches each sheet to its actual frame count with a defensive
+  // fallback.
+  const stateFrames = (() => {
+    switch (state) {
+      case "attack":  return ext?.attackFrames ?? 9;
+      case "hurt":    return ext?.hurtFrames ?? 9;
+      case "defeat":  return ext?.defeatFrames ?? 9;
+      case "victory": return ext?.victoryFrames ?? 9;
+      default:        return ext?.idleFrames ?? 9;
+    }
+  })();
+  const frameCount = stateFrames;
   // If the persona is missing this clip (Oracle etc.), fall back to
   // idle so we never load a 404 sheet.
   const resolvedState: PersonaAnimState = ext?.missingClips?.includes(state as never)
@@ -2727,10 +2795,15 @@ function BossSpriteFromAsset({
   bossAsset,
   state = "idle",
   onStateComplete,
+  displayWidth = 300,
 }: {
   bossAsset: string;
   state?: BossAnimState;
   onStateComplete?: () => void;
+  /** CSS px width for the rendered sprite. Defaults to the desktop
+   *  cinematic 300; mobile callers pass ~180 so the boss doesn't
+   *  crowd the whole arena on phones. */
+  displayWidth?: number;
 }) {
   // Per-CLIP frame counts because most bosses have short 4-frame idle
   // loops but longer 9-frame combat clips (attack / hurt / defeat /
@@ -3245,7 +3318,7 @@ function BossSpriteFromAsset({
       frameCount={spec.frames}
       frameWidth={spec.frameWidth}
       frameHeight={spec.frameHeight}
-      displayWidth={300}
+      displayWidth={displayWidth}
       fps={resolvedFps}
       loop={isLoop}
       holdLast={holdLast}
