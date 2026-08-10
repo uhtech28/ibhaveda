@@ -956,6 +956,31 @@ export function TutorialMascot({
               // bottom (target is above us) Sparky sits at the TOP of
               // the bubble; if docked at top, Sparky sits at the BOTTOM.
               const sparkyOnTop = !dockTop;
+              // ── Keyboard-aware bottom offset ──────────────────────
+              // On mobile, `position: fixed` bottom-anchored elements
+              // stick to the LAYOUT viewport bottom, NOT the visual
+              // viewport bottom. When the on-screen keyboard opens,
+              // `visualViewport.height` shrinks by the keyboard height
+              // but a fixed `bottom: 20px` still glues Sparky's bubble
+              // to below the keyboard — user sees the bubble jump
+              // and then get covered. Reported as: "when we open
+              // keyboard in tutorial sparky shifts like bug".
+              //
+              // Fix: compute the keyboard offset from the visualViewport
+              // and add it to the `bottom` inset. When there's no
+              // keyboard, offset is 0 → same layout as before.
+              // Transitioning bottom with a 220ms cubic-out ease makes
+              // the shift read as a smooth glide (Apple / Google
+              // standard sizing) instead of a snap.
+              const keyboardOffsetPx =
+                typeof window !== "undefined" && window.visualViewport
+                  ? Math.max(
+                      0,
+                      window.innerHeight -
+                        window.visualViewport.height -
+                        window.visualViewport.offsetTop,
+                    )
+                  : 0;
               return (
                 <div
                   className="pointer-events-none fixed inset-x-0 z-[10010] flex justify-center"
@@ -963,10 +988,18 @@ export function TutorialMascot({
                     top: dockTop ? BUBBLE_BOTTOM_INSET_MOBILE : undefined,
                     bottom: dockTop
                       ? undefined
-                      : `calc(${BUBBLE_BOTTOM_INSET_MOBILE}px + env(safe-area-inset-bottom, 0px))`,
+                      : `calc(${BUBBLE_BOTTOM_INSET_MOBILE}px + env(safe-area-inset-bottom, 0px) + ${keyboardOffsetPx}px)`,
                     // Extra top padding when docked-top so the peeking-
                     // out Sparky doesn't collide with the notch/status bar.
                     paddingTop: dockTop ? SPARKY_SIZE_MOBILE - 8 : 0,
+                    // Smooth transition when the keyboard opens/closes.
+                    // 220ms matches iOS's own keyboard slide-in curve
+                    // and Android's Material easing, so Sparky reads
+                    // as part of the same motion instead of a
+                    // separate delayed jump.
+                    transition:
+                      "bottom 220ms cubic-bezier(0.22, 1, 0.36, 1), top 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    willChange: "bottom, top",
                   }}
                 >
                   <motion.div
