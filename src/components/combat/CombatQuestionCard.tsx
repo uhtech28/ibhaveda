@@ -1403,6 +1403,26 @@ export function deriveBiomeMap(bossAsset: string | null | undefined): string {
   ) {
     return "/assets/maps-v2/crossroads-town/crossroads-map.png";
   }
+  // ── Template boss backdrops ────────────────────────────────────────
+  // Templates share art with venture maps (their maps live under
+  // /assets/maps-v2/academic|lab|creative/) so combat renders the
+  // biome-specific painting behind the fight for the template's own
+  // stage. Wildcard on the boss slug isn't reliable here (Librarian
+  // is Stage 1 in Academic but Stage 2 in Lab), so we fall back to a
+  // generic per-template arena crop when the exact biome map isn't
+  // straightforward to derive.
+  if (bossAsset.includes("/bosses/academic/")) {
+    return "/assets/maps-v2/academic/library-map.png";
+  }
+  if (bossAsset.includes("/bosses/lab/")) {
+    return "/assets/maps-v2/lab/observatory-map.png";
+  }
+  if (bossAsset.includes("/bosses/creative/")) {
+    return "/assets/maps-v2/forest/forest-map.png";
+  }
+  if (bossAsset.includes("/bosses/venture/unfinished-golem/")) {
+    return "/assets/maps-v2/artisans/artisans-map.png";
+  }
   return fallback;
 }
 
@@ -1478,6 +1498,15 @@ function biomePaletteFromBoss(bossAsset: string | null | undefined): BiomePalett
   if (bossAsset.includes("/bosses/stage2/")) return BIOME_PALETTES.stage2;
   if (bossAsset.includes("/bosses/stage3/")) return BIOME_PALETTES.stage3;
   if (bossAsset.includes("/bosses/stage4/")) return BIOME_PALETTES.stage4;
+  // Template palettes — reuse the closest thematic Venture palette so
+  // the combat arena reads coherently instead of the generic muddy
+  // fallback tint. Academic (parchment/library) leans on the warm
+  // village dusk; Lab (observatory/forge) leans on stage4's amber
+  // forge; Creative (grove) leans on stage2's moonlit forest.
+  if (bossAsset.includes("/bosses/academic/")) return BIOME_PALETTES.village;
+  if (bossAsset.includes("/bosses/lab/")) return BIOME_PALETTES.stage4;
+  if (bossAsset.includes("/bosses/creative/")) return BIOME_PALETTES.stage2;
+  if (bossAsset.includes("/bosses/venture/")) return BIOME_PALETTES.stage4;
   return BIOME_PALETTES.fallback;
 }
 
@@ -3024,6 +3053,125 @@ function BossSpriteFromAsset({
         idle: { frames: 1, frameWidth: 88, frameHeight: 88 },
       },
     },
+    // ── Template bosses (2026-08-10) ──────────────────────────────
+    // Wired via getTemplateStageBoss. Per-clip frame counts + sizes
+    // pulled from the on-disk stitcher manifest. Without these
+    // entries the boss rendered as static frame 0 during combat
+    // because the sheet detector fell through to the plain <img>
+    // branch. Fallback chain (hurt→attack→idle etc.) handles the
+    // states each boss didn't ship art for.
+    // ── Venture (Stage 4 super) ───────────────────────────────────
+    {
+      match: "/bosses/venture/unfinished-golem/idle.png",
+      folder: "/assets/bosses/venture/unfinished-golem",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    // ── Academic (6 bosses) ───────────────────────────────────────
+    {
+      match: "/bosses/academic/librarian-of-lost-questions/idle.png",
+      folder: "/assets/bosses/academic/librarian-of-lost-questions",
+      clips: {
+        idle:   { frames: 4, frameWidth: 96, frameHeight: 96 },
+        attack: { frames: 9, frameWidth: 96, frameHeight: 96 },
+      },
+    },
+    {
+      match: "/bosses/academic/keeper-of-incomplete-records/idle.png",
+      folder: "/assets/bosses/academic/keeper-of-incomplete-records",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/academic/cartographer-of-crooked-maps/idle.png",
+      folder: "/assets/bosses/academic/cartographer-of-crooked-maps",
+      clips: {
+        idle:   { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:   { frames: 9, frameWidth: 92, frameHeight: 92 },
+        defeat: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/academic/blank-page-wraith/idle.png",
+      folder: "/assets/bosses/academic/blank-page-wraith",
+      clips: {
+        idle:   { frames: 4, frameWidth: 76, frameHeight: 76 },
+        attack: { frames: 9, frameWidth: 76, frameHeight: 76 },
+        hurt:   { frames: 9, frameWidth: 76, frameHeight: 76 },
+      },
+    },
+    {
+      match: "/bosses/academic/councillor-of-false-consensus/idle.png",
+      folder: "/assets/bosses/academic/councillor-of-false-consensus",
+      clips: {
+        idle:   { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+        hurt:   { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/academic/gatekeeper-of-unearned-entry/idle.png",
+      folder: "/assets/bosses/academic/gatekeeper-of-unearned-entry",
+      clips: {
+        idle:   { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+        defeat: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    // ── Lab (4 unique bosses; Librarian + Cartographer are shared
+    //   with Academic above via idleAsset path so no re-registration
+    //   is needed for those two slots). ─────────────────────────────
+    {
+      match: "/bosses/lab/mirage-lens/idle.png",
+      folder: "/assets/bosses/lab/mirage-lens",
+      clips: {
+        idle: { frames: 4, frameWidth: 84, frameHeight: 84 },
+        hurt: { frames: 9, frameWidth: 84, frameHeight: 84 },
+      },
+    },
+    {
+      match: "/bosses/lab/saboteur-of-the-forge/idle.png",
+      folder: "/assets/bosses/lab/saboteur-of-the-forge",
+      clips: {
+        // Saboteur ships a single south-rotation idle (no Breathing
+        // loop was exported), so idle is 1 frame + treated as still.
+        idle:   { frames: 1, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/lab/alchemist-of-wishful-results/idle.png",
+      folder: "/assets/bosses/lab/alchemist-of-wishful-results",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/lab/silencer-of-findings/idle.png",
+      folder: "/assets/bosses/lab/silencer-of-findings",
+      clips: {
+        idle:   { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+        defeat: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    // Existing /incoming/ super-pool bosses ARE already animated
+    // through their own super-pool entries earlier in this list, so no
+    // Creative entries needed for the alias-reuse slots (Silence That
+    // Smothers → silencer, Beast of Unfinished → golem, Crowd of
+    // False Validation → councillor, Harbourmaster / Babel Merchant
+    // already have super-pool entries). Creative Stage 2 + 5 pending
+    // art fall through to the FALLBACK_BOSS (village fog) which is
+    // already registered above.
   ];
   const sheetDef = SPRITESHEET_BOSSES.find((s) => bossAsset.includes(s.match));
   if (!sheetDef) {
