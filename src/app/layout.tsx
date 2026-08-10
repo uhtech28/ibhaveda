@@ -9,8 +9,6 @@ import { Toaster } from '@/components/ui/toaster';
 import ChatWidget from "@/components/chat/ChatWidget";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
-import { ClarityScript } from "@/components/analytics/ClarityScript";
 import { AuthModalProvider } from "@/components/auth/auth-modal";
 import "./globals.css";
 
@@ -153,8 +151,8 @@ export default function RootLayout({
           className="font-sans antialiased"
         >
           <ConvexClientProvider>
-            <AnalyticsProvider>
-              <ClarityScript />
+            
+              
               <ThemeProvider>
                 <AuthModalProvider>
                   <ChatProvider>
@@ -165,7 +163,7 @@ export default function RootLayout({
                   </ChatProvider>
                 </AuthModalProvider>
               </ThemeProvider>
-            </AnalyticsProvider>
+            
           </ConvexClientProvider>
         </body>
       </html>
