@@ -332,6 +332,46 @@ export function FeedClient() {
     return <div className="fixed inset-0 z-[9999] bg-black" />;
   }
 
+  // ── Tutorial-intro flash guard ─────────────────────────────────────
+  // Product report (2026-08-10): "after persona selection it redirects
+  // to feed then black screen sparky comes take deep analysis, after
+  // persona selection redirect direct to black screen sparky after
+  // that to feed for tutorial".
+  //
+  // Root cause: persona-setup hard-reloads to /feed. /feed renders its
+  // full markup (idea cards, HUD, hero panel) in the same frame the
+  // TutorialProvider's Step2TemplatePick mounts. Sparky's own black
+  // scrim then covers the feed a paint or two later, so the user sees
+  // ~150-300ms of feed content flash before the tutorial intro.
+  //
+  // Fix: while the tutorial is active AND the user is on the intro
+  // step (step 2), render only a solid black backdrop from this route.
+  // Sparky's scrim + speech overlay mount on top → user sees a clean
+  // seamless black → intro appears → user clicks Continue → tutorial
+  // advances to step > 2 → this guard falls through and the real feed
+  // paints for the first time.
+  //
+  // The guard fires in two situations:
+  //   (a) sessionStorage flag `gateFeedForTutorialIntro` is set by
+  //       persona-setup on hard-reload. That handles the CRITICAL
+  //       frames: mount → tutorial context resolves (async, ~200ms) →
+  //       Step2 mounts its scrim. Without the flag, feed content is
+  //       painted during that window and the user sees the flash.
+  //   (b) After the flag times out, we fall back to the tutorial
+  //       context: hide feed while active && step === 2 (intro).
+  // Persona-setup clears the flag on a 5s timer as an absolute safety
+  // net; Step2's Let's Go handler also clears it explicitly. Once
+  // either signal releases, feed paints for the first time.
+  const introFlagSet =
+    typeof window !== "undefined" &&
+    sessionStorage.getItem("gateFeedForTutorialIntro") === "1";
+  const inTutorialIntro =
+    introFlagSet ||
+    (!!tutorial && tutorial.active === true && tutorial.step === 2);
+  if (inTutorialIntro) {
+    return <div className="fixed inset-0 z-[80] bg-black" />;
+  }
+
   if (showPersonaBlockingLoader) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">

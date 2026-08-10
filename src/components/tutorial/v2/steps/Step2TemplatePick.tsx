@@ -469,6 +469,17 @@ export function Step2TemplatePick() {
           primary: {
             label: "Let's go",
             onClick: () => {
+              // Clear the feed-intro flash guard so FeedClient starts
+              // rendering its real markup as of THIS tick — otherwise
+              // it would keep painting the black backdrop until the
+              // sessionStorage 5s safety timer fires.
+              if (typeof window !== "undefined") {
+                try {
+                  sessionStorage.removeItem("gateFeedForTutorialIntro");
+                } catch {
+                  /* no-op */
+                }
+              }
               // Advance internal step to 3 (click_plus). Bar was hidden
               // at 0/8 during the intro pitch; now moves to 1/8.
               if (tutorial.step < 3) {

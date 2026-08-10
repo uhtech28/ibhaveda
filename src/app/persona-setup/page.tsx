@@ -124,6 +124,22 @@ export default function PersonaSetupPage() {
         await updatePersonaId({ personaId: id });
         if (typeof window !== "undefined") {
           sessionStorage.setItem("personaPickerDismissed", "1");
+          // Tutorial-intro flash guard. FeedClient reads this flag on
+          // its first render and, when set, paints a solid black
+          // backdrop instead of the full feed markup — so the user
+          // sees a seamless black → Sparky intro instead of
+          // feed-content-flash → black scrim. Cleared by Step2's
+          // "Let's go" button handler (which advances the tutorial
+          // past the intro dialogue). Also has a 5s safety self-clear
+          // below in case the tutorial state never resolves.
+          sessionStorage.setItem("gateFeedForTutorialIntro", "1");
+          window.setTimeout(() => {
+            try {
+              sessionStorage.removeItem("gateFeedForTutorialIntro");
+            } catch {
+              /* no-op */
+            }
+          }, 5000);
         }
         // Hard reload into /feed rather than router.replace so the
         // whole client re-mounts with the fresh persona ID baked in.
