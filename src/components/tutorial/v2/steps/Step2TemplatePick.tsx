@@ -217,7 +217,15 @@ export function Step2TemplatePick() {
   // Start on `intro` for a fresh tutorial. Sparky introduces himself,
   // waits for the user to click Continue, then transitions into the
   // guided post-creation flow.
-  const [dialogue, setDialogue] = useState<DialogueState>("intro");
+  // EXCEPT: when the user arrived from /persona-setup's Sparky-intro
+  // overlay (which already fired goTo(3) before hard-navigating here),
+  // the tutorial step is already at 3+ — in that case jump STRAIGHT to
+  // "click_plus" so /feed doesn't re-play the intro pitch. This is
+  // what prevents the second Sparky bubble users used to see on /feed
+  // after the persona-setup intro.
+  const [dialogue, setDialogue] = useState<DialogueState>(() =>
+    tutorial.step >= 3 ? "click_plus" : "intro",
+  );
   // Poll for the post-publish share dialog. When it opens, we hide the
   // tutorial (Sparky + scrim + highlight) so the user can interact with the
   // dialog's "GO TO MY WORLD MAP" button without interference. Step3 takes
