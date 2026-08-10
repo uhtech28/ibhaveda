@@ -40,23 +40,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
   const activeConversationId = conversationId || directConversationId || resolvedGroupConversationId;
 
-  // Guard against `virtual:` placeholder IDs — ChannelList generates
-  // these for channels the user hasn't opened yet, so no real Convex
-  // row exists behind them. Firing getConversationMessages with a
-  // virtual ID would throw ArgumentValidationError because the
-  // validator expects a real `v.id("conversations")`. When we detect
-  // a virtual ID we skip the query and let the parent flow create the
-  // conversation (ChannelList swaps the virtual ID for a real one on
-  // click, which re-renders this component with a valid ID).
-  const isVirtualId =
-    typeof activeConversationId === "string" &&
-    activeConversationId.startsWith("virtual:");
-  const messages = useQuery(
-    api.chat.getConversationMessages,
-    isAuthenticated && activeConversationId && !isVirtualId
-      ? { conversationId: activeConversationId }
-      : "skip",
-  );
+  const messages = useQuery(api.chat.getConversationMessages, isAuthenticated && activeConversationId ? { conversationId: activeConversationId } : "skip");
   const displayedMessages = messages !== undefined
     ? messages
     : (ideaId && groupChannels && groupChannels.length === 0)
@@ -83,12 +67,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
   // visible Members pill in the header rather than just a settings cog.
   const groupMembers = useQuery(
     api.chat.getGroupMembers,
-    // Same `virtual:` guard as getConversationMessages above —
-    // getGroupMembers takes a real `v.id("conversations")` too, so
-    // passing a placeholder would throw ArgumentValidationError.
-    isAuthenticated && ideaId && activeConversationId && !isVirtualId
-      ? { conversationId: activeConversationId }
-      : "skip",
+    isAuthenticated && ideaId && activeConversationId ? { conversationId: activeConversationId } : "skip"
   );
 
   useEffect(() => {
@@ -209,7 +188,7 @@ const ChatThread: React.FC<ChatThreadProps> = memo(({ conversationId, onBack, on
 
   return (
     <div className="flex flex-col h-full bg-[#0B101B] max-w-full overflow-hidden">
-      <div className="relative flex h-16 shrink-0 items-center border-b border-white/10 bg-[#0B101B] px-4 py-0">
+      <div className="relative flex h-16 shrink-0 items-center border-b border-white/10 bg-[#0B101B] px-4 py-0 max-sm:h-14">
         <div className="absolute inset-y-0 left-4 flex items-center">
           <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 hover:bg-white/[0.08] shrink-0">
             <ArrowLeft className="w-4 h-4" />

@@ -15,10 +15,6 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { getTemplateSafe, type TemplateId } from "@/config/templates";
 import {
-  formatProjectScore,
-  getTemplateConfig,
-} from "@/lib/scoring/projectScore";
-import {
   cardSurface,
   codeFontClass,
   ComposerDraft,
@@ -63,32 +59,10 @@ function getProgressPercentage(summary: VentureSummary) {
   return Math.min(100, Math.round((summary.completedCheckpoints / summary.totalCheckpoints) * 100));
 }
 
-/**
- * Format the per-template Project Score chip shown at the top of
- * every idea/venture feed card. Display side of the Ibhaveda Project
- * Score spec (see convex/projectScoreSpec.ts):
- *
- *   Venture  → USD, rounded to nearest $10,000
- *   Academic → JIF, 1 decimal
- *   Lab      → p-value, 4 decimals, floored at 0.05
- *   Creative → Fans, rounded to nearest 1,000
- *
- * `projectScoreRaw` is computed server-side by walking every real
- * per-task submission event, applying stage-scaled Gold ceilings +
- * per-tier weights + quality multipliers per spec §2 — see
- * `getVentureCumulativeHUDScores` in convex/aiScoring.ts. Client
- * only formats.
- */
-function formatProjectScoreChip(
-  templateId: string | null | undefined,
-  cumulativeScores:
-    | {
-        projectScoreRaw?: number;
-      }
-    | null
-    | undefined,
-): string {
-  return formatProjectScore(templateId, cumulativeScores?.projectScoreRaw);
+function formatDollarValue(value?: number) {
+  const baseIdeaValue = 100_000;
+  const earnedValue = Math.max(0, Math.round(value ?? 0));
+  return `$${(baseIdeaValue + earnedValue).toLocaleString("en-US")}`;
 }
 
 function getStageSummary(summary: VentureSummary) {
@@ -102,49 +76,6 @@ function getStageSummary(summary: VentureSummary) {
     totalStages,
     label: stage?.biomeName ?? stage?.name ?? `Stage ${currentStage}`,
   };
-}
-
-/**
- * Small pill-style chip that renders a project's current Project
- * Score in its template's native unit ($ / JIF / p-value / fans).
- * Replaces the old hardcoded "$100,000" plate on every card so
- * Academic/Lab/Creative projects stop lying about their scoring
- * unit.
- */
-function ProjectScoreChip({
-  templateId,
-  cumulativeScores,
-}: {
-  templateId: string | null | undefined;
-  cumulativeScores:
-    | {
-        projectScoreRaw?: number;
-      }
-    | null
-    | undefined;
-}) {
-  const cfg = getTemplateConfig(templateId);
-  const value = formatProjectScoreChip(templateId, cumulativeScores);
-  // Product ask (repeated): "the value name is getting repeated just
-  // keep yellow one and remove the repeated". `formatProjectScoreChip`
-  // already bakes the unit into the value string:
-  //   academic → "0.1 JIF"     (had a gray "JIF" label on the left)
-  //   lab      → "p = 1.0000"  (had a gray "P-VALUE" label on the left)
-  //   venture  → "$1,250,000"
-  //   creative → "235,000 fans"
-  // So the label was always a duplicate of the unit already inside
-  // the value. Kept the tooltip so hover still names the metric.
-  return (
-    <span
-      className={cn(
-        displayFontClass,
-        "shrink-0 rounded-full border border-white/8 bg-black/25 px-2.5 py-1 text-right text-[13px] font-semibold leading-tight text-orange-300",
-      )}
-      title={`Project ${cfg.displayLabel} — Ibhaveda Project Score`}
-    >
-      {value}
-    </span>
-  );
 }
 
 function MeshBanner({ title }: { title: string }) {
@@ -334,7 +265,7 @@ function StoryAction({
       title={label}
       className={cn(
         transitionBase,
-        "flex flex-1 min-w-0 items-center justify-center gap-1.5 rounded-[10px] px-2 py-2 text-xs sm:text-sm",
+        "flex w-full min-w-0 items-center justify-center gap-1.5 rounded-[10px] px-2 py-2 text-xs sm:text-sm",
         active ? tone.active : tone.base
       )}
     >
@@ -408,72 +339,6 @@ function ContributorsAction({
   );
 }
 
-/**
- * Minimal HUD strip shown on milestone posts when the full venture
- * summary can't be resolved (parentId missing, private venture, older
- * post, etc.). Renders author + a "milestone cleared" pip so the card
- * still has the same visual footprint as a full venture card — no
- * empty gap between title and description.
- *
- * CLICKABLE: navigates to /map/world so viewers can jump into their
- * own map (the fallback path — we don't know the parent venture id).
- * If a `ventureIdeaId` is passed, opens that specific venture instead.
- */
-function MilestoneFallbackBar({
-  author,
-  ventureIdeaId,
-}: {
-  author?: IdeaAuthor | null;
-  ventureIdeaId?: string;
-}) {
-  const router = useRouter();
-  const authorName = getDisplayName(author);
-  const target = ventureIdeaId ? `/map?ideaId=${ventureIdeaId}` : `/map/world`;
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        router.push(target);
-      }}
-      className={cn(
-        transitionBase,
-        "mt-3 flex w-full items-center gap-3 overflow-hidden rounded-xl border border-white/8 px-3 py-2 text-left hover:border-[#6366F1]/40 hover:shadow-[0_0_24px_rgba(99,102,241,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1]/50",
-      )}
-      style={{
-        background:
-          "linear-gradient(135deg, rgba(6,14,35,0.95) 0%, rgba(10,10,20,0.98) 50%, rgba(35,6,10,0.95) 100%)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
-      }}
-      aria-label="Open venture map"
-      title="Open venture map"
-    >
-      <Avatar className="h-5 w-5 shrink-0 border border-violet-300/30">
-        <AvatarImage src={author?.avatar} alt={authorName} />
-        <AvatarFallback className="bg-[#241A3C] text-[8px] font-bold text-violet-100">
-          {getInitials(authorName)}
-        </AvatarFallback>
-      </Avatar>
-      <span className="min-w-0 flex-1 truncate text-[10px] font-black uppercase tracking-wider text-violet-100 drop-shadow-[0_0_8px_rgba(167,139,250,0.45)]">
-        {authorName}
-      </span>
-      {/* No progress bar here — the parent venture summary didn't
-          resolve, so any percentage would be a lie. Just show a
-          "milestone" chip so the user still recognises this is a
-          venture-scoped post they can click into. */}
-      <span className="shrink-0 rounded-md border border-violet-400/25 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-200/90">
-        Milestone
-      </span>
-      <span
-        aria-hidden
-        className="shrink-0 text-[10px] text-violet-300/70"
-      >
-        ›
-      </span>
-    </button>
-  );
-}
-
 function IdeaVentureProgressBar({
   ideaId,
   title,
@@ -493,14 +358,7 @@ function IdeaVentureProgressBar({
   const stageSummary = getStageSummary(summary);
   const authorName = getDisplayName(author);
   const authorHref = author?.username ? `/profile/${author.username}` : null;
-  // Prefer canonical definition name, then whatever server sent.
-  // Falls back to null so the boss chip is hidden entirely rather
-  // than showing a literal placeholder like "Boss".
-  const bossName =
-    summary.superBoss?.definition?.name ??
-    summary.superBoss?.bossName ??
-    null;
-  const hasBoss = bossName != null && summary.superBoss != null;
+  const bossName = summary.superBoss?.definition?.name ?? summary.superBoss?.bossName ?? "Boss";
   const bossHp = summary.superBoss?.currentHp ?? 100;
   const bossBaseHp = summary.superBoss?.baseHp ?? 100;
   const bossPercentage = bossBaseHp > 0 ? Math.min(100, Math.round((bossHp / bossBaseHp) * 100)) : 0;
@@ -583,58 +441,51 @@ function IdeaVentureProgressBar({
           </div>
         </div>
 
-        {/* VS pill + boss column — only shown when a real super-boss
-            with a resolvable name exists. Otherwise the progress side
-            takes the full width instead of showing "VS · BOSS · 100%". */}
-        {hasBoss && (
-          <>
-            <div className="relative z-10 flex shrink-0 flex-col items-center justify-center px-2 py-2">
-              <div
-                className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2"
-                style={{ background: "linear-gradient(to bottom, transparent, rgba(245,158,11,0.3), rgba(245,158,11,0.65), rgba(245,158,11,0.3), transparent)" }}
-              />
-              <motion.div
-                className="relative z-10 grid h-5 w-5 place-items-center rounded-full bg-[#FACC15] text-[#0A0D12] shadow-[0_0_8px_rgba(250,204,21,0.45)]"
-                animate={{ scale: [1, 1.04, 1] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <span className="select-none text-[7px] font-black leading-none">
-                  VS
-                </span>
-              </motion.div>
-            </div>
+        <div className="relative z-10 flex shrink-0 flex-col items-center justify-center px-2 py-2">
+          <div
+            className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2"
+            style={{ background: "linear-gradient(to bottom, transparent, rgba(245,158,11,0.3), rgba(245,158,11,0.65), rgba(245,158,11,0.3), transparent)" }}
+          />
+          <motion.div
+            className="relative z-10 grid h-5 w-5 place-items-center rounded-full bg-[#FACC15] text-[#0A0D12] shadow-[0_0_8px_rgba(250,204,21,0.45)]"
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <span className="select-none text-[7px] font-black leading-none">
+              VS
+            </span>
+          </motion.div>
+        </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
-              <div className="flex flex-row-reverse items-center gap-1.5">
-                <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}>
-                  <Skull className="h-3 w-3 shrink-0 text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
-                </motion.div>
-                <span className="truncate text-right text-[9.5px] font-black uppercase leading-none tracking-wider text-rose-200 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]">
-                  {bossName}
-                </span>
-              </div>
-              <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
-                <motion.div
-                  className="h-full origin-left rounded-full bg-gradient-to-r from-rose-700 via-red-500 to-rose-300"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${bossPercentage}%` }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                />
-                <motion.div
-                  className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                  animate={{ x: ["-100%", "350%"] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                />
-              </div>
-              <div className="flex items-baseline justify-end gap-1">
-                <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-500">HP:</span>
-                <span className="font-mono text-[10.5px] font-black leading-none text-rose-400">
-                  {bossPercentage}%
-                </span>
-              </div>
-            </div>
-          </>
-        )}
+        <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-3 py-2">
+          <div className="flex flex-row-reverse items-center gap-1.5">
+            <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}>
+              <Skull className="h-3 w-3 shrink-0 text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+            </motion.div>
+            <span className="truncate text-right text-[9.5px] font-black uppercase leading-none tracking-wider text-rose-200 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]">
+              {bossName}
+            </span>
+          </div>
+          <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-black/70 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
+            <motion.div
+              className="h-full origin-left rounded-full bg-gradient-to-r from-rose-700 via-red-500 to-rose-300"
+              initial={{ width: 0 }}
+              animate={{ width: `${bossPercentage}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+            <motion.div
+              className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              animate={{ x: ["-100%", "350%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            />
+          </div>
+          <div className="flex items-baseline justify-end gap-1">
+            <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-500">HP:</span>
+            <span className="font-mono text-[10.5px] font-black leading-none text-rose-400">
+              {bossPercentage}%
+            </span>
+          </div>
+        </div>
       </div>
     </button>
   );
@@ -723,30 +574,9 @@ export function IdeaStoryCard({
     return () => observer.disconnect();
   }, [isVisible]);
 
-  // For milestone posts (auto-created after task completion), look up
-  // the venture summary via the parent idea (the actual venture) so
-  // the progress bar renders with THE VILLAGE 1/8 + boss HP just like
-  // the original venture post.
-  //
-  // Detection is intentionally BROAD: category==="milestone" catches
-  // every auto-created milestone regardless of whether the older
-  // parentId backfill happened. The title-prefix check ("✅ Completed:")
-  // is belt-and-braces for even older posts where the category field
-  // might be missing.
-  const isMilestonePost =
-    idea.category === "milestone" ||
-    (typeof idea.title === "string" && idea.title.startsWith("✅ Completed:"));
-  // Prefer parentId (the venture idea) when available. Otherwise fall
-  // back to the milestone's own id — getVentureSummaryByIdea will
-  // return null for it, but MilestoneFallbackBar downstream still
-  // renders a HUD strip so the card never has an empty gap.
-  const ideaIdForVentureLookup =
-    isMilestonePost && idea.parentId
-      ? (idea.parentId as Id<"ideas">)
-      : (idea._id as Id<"ideas">);
   const ventureSummary = useQuery(
     api.ventures.getVentureSummaryByIdea,
-    isVisible ? { ideaId: ideaIdForVentureLookup } : "skip",
+    isVisible ? { ideaId: idea._id as Id<"ideas"> } : "skip",
   );
   const cumulativeScores = useQuery(
     api.aiScoring.getVentureCumulativeHUDScores,
@@ -809,23 +639,24 @@ export function IdeaStoryCard({
       className={cn(
         cardSurface,
         transitionBase,
-        "cursor-pointer overflow-hidden p-5 hover:border-[#6366F1]/50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]"
+        "cursor-pointer overflow-hidden p-5 hover:border-[#6366F1]/50 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]",
+        showFullContent && "mobile-post-detail-card max-sm:mx-auto max-sm:w-[calc(100vw-2rem)] max-sm:text-center"
       )}
     >
       <div>
-        <div className="flex items-start justify-between gap-3">
-          <button type="button" onClick={() => !disableCardOpen && onOpenIdea(idea._id)} className="min-w-0 flex-1 text-left">
-            <h2 className={cn(displayFontClass, "text-[18px] font-semibold leading-tight text-[#F9FAFB] hover:text-[#C7D2FE]")}>{idea.title}</h2>
+        <div className={cn("flex items-start justify-between gap-3", showFullContent && "max-sm:flex-col max-sm:items-center max-sm:text-center")}>
+          <button
+            type="button"
+            onClick={() => !disableCardOpen && onOpenIdea(idea._id)}
+            className={cn("min-w-0 flex-1 text-left", showFullContent && "max-sm:w-full max-sm:text-center")}
+          >
+            <h2 className={cn(displayFontClass, "text-[18px] font-semibold leading-tight text-[#F9FAFB] hover:text-[#C7D2FE]", showFullContent && "max-sm:text-center")}>{idea.title}</h2>
           </button>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className={cn("flex shrink-0 items-center gap-2", showFullContent && "max-sm:justify-center")}>
             {ventureSummary && (
-              <ProjectScoreChip
-                templateId={
-                  ventureSummary.templateId ??
-                  (cumulativeScores?.templateId as TemplateId | undefined)
-                }
-                cumulativeScores={cumulativeScores}
-              />
+              <span className={cn(displayFontClass, "shrink-0 text-[18px] font-semibold leading-tight text-orange-300")}>
+                {formatDollarValue(cumulativeScores?.valuationScore)}
+              </span>
             )}
             {ownerAction && (
               <div className="flex items-center gap-2">
@@ -834,30 +665,9 @@ export function IdeaStoryCard({
             )}
           </div>
         </div>
-        {/* Milestone posts (auto-created after task completion) use the
-            parent venture's ideaId so clicking the bar takes users to
-            the venture's map — not the standalone milestone post.
-            Falls back to a minimal placeholder bar when the venture
-            summary isn't available (older milestones without parentId,
-            private ventures the viewer can't access, etc.) so every
-            task post still shows a map-strip like a regular idea card. */}
-        {ventureSummary ? (
-          <IdeaVentureProgressBar
-            ideaId={ideaIdForVentureLookup}
-            title={isMilestonePost ? (ventureSummary?.name ?? idea.title) : idea.title}
-            author={idea.author}
-            summary={ventureSummary}
-          />
-        ) : isMilestonePost ? (
-          <MilestoneFallbackBar
-            author={idea.author}
-            ventureIdeaId={
-              idea.parentId ? (idea.parentId as unknown as string) : undefined
-            }
-          />
-        ) : null}
+        <IdeaVentureProgressBar ideaId={idea._id} title={idea.title} author={idea.author} summary={ventureSummary} />
         <div className="mt-3 text-[15px] leading-7 text-[#D1D5DB]">
-          <p className={cn(!showFullContent && !expanded && shouldClamp && "line-clamp-3")}>{description}</p>
+          <p className={cn(!showFullContent && !expanded && shouldClamp && "line-clamp-3", showFullContent && "max-sm:text-center")}>{description}</p>
           {!showFullContent && shouldClamp && (
             <button
               type="button"
@@ -893,7 +703,7 @@ export function IdeaStoryCard({
       <div className="mt-5 flex flex-col gap-2 text-xs text-[#9CA3AF]">
         {/* Industries — own row */}
         {industryTags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={cn("flex flex-wrap items-center gap-2", showFullContent && "max-sm:justify-center")}>
             {visibleIndustries.map((tag) => (
               <button
                 key={`ind-${tag}`}
@@ -951,7 +761,7 @@ export function IdeaStoryCard({
 
         {/* Skills — own row */}
         {skillTags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={cn("flex flex-wrap items-center gap-2", showFullContent && "max-sm:justify-center")}>
             {visibleSkills.map((tag) => (
               <button
                 key={`skl-${tag}`}
@@ -1009,7 +819,7 @@ export function IdeaStoryCard({
       </div>
 
       <div className="mt-5 border-t border-white/8 pt-3">
-        <div className="flex flex-nowrap items-center gap-1">
+        <div className="grid grid-cols-3 items-center gap-1">
           <StoryAction
             icon={Sparkles}
             label="Spark"
@@ -1028,7 +838,7 @@ export function IdeaStoryCard({
             onClick={() => onComment(idea._id)}
             iconOnly
           />
-          <span data-tutorial="contribute" className="inline-flex">
+          <span data-tutorial="contribute" className="min-w-0">
             <ContributorsAction
               ideaId={idea._id}
               onClick={() => {
@@ -1060,6 +870,7 @@ export function IdeaStoryCard({
       {/* PRD §8 — engagement popups for this story card */}
       <SparkersDialog
         ideaId={sparkersOpen ? (idea._id as Id<"ideas">) : null}
+        sparkCount={optimisticSpark.count}
         onOpenChange={(open) => setSparkersOpen(open)}
       />
       <ContributorsDialog

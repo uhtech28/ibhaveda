@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Award, Filter, ArrowLeft, ArrowUpDown, Star, EyeOff } from "lucide-react";
+import { Search, Award, Filter, ArrowLeft, ArrowUpDown, Star, EyeOff, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -566,30 +566,34 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
               />
             </div>
 
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 max-sm:grid max-sm:w-full max-sm:min-w-0 max-sm:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
               {/* Sort selector dropdown */}
-              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans">
-                <ArrowUpDown className="w-3.5 h-3.5" />
-                <span className="font-extrabold uppercase tracking-wide text-[10px] text-slate-500">Sort:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e: any) => setSortBy(e.target.value)}
-                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans"
-                >
-                  <option value="recent" className="bg-slate-950 text-white font-sans">Recently Earned</option>
-                  <option value="prestige" className="bg-slate-950 text-white font-sans">Highest Rarity</option>
-                  <option value="name" className="bg-slate-950 text-white font-sans">Alphabetical (A-Z)</option>
-                </select>
+              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans max-sm:min-w-0 max-sm:gap-1 max-sm:px-2">
+                <ArrowUpDown className="w-3.5 h-3.5 shrink-0 max-sm:w-3 max-sm:h-3" />
+                <span className="shrink-0 font-extrabold uppercase tracking-wide text-[10px] text-slate-500 max-sm:text-[8px]">Sort:</span>
+                <div className="relative min-w-0 flex-1">
+                  <select
+                    value={sortBy}
+                    onChange={(e: any) => setSortBy(e.target.value)}
+                    className="mobile-badge-select min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:!text-[8px]"
+                  >
+                    <option value="recent" className="bg-slate-950 text-white font-sans">Recently Earned</option>
+                    <option value="prestige" className="bg-slate-950 text-white font-sans">Highest Rarity</option>
+                    <option value="name" className="bg-slate-950 text-white font-sans">Alphabetical (A-Z)</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-0 top-1/2 hidden h-2.5 w-2.5 -translate-y-1/2 text-white max-sm:block" />
+                </div>
               </div>
 
               {/* Rarity filter dropdown */}
-              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans">
-                <Filter className="w-3.5 h-3.5" />
-                <span className="font-extrabold uppercase tracking-wide text-[10px] text-slate-500">Rarity:</span>
+              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-white/5 rounded-xl px-3 h-10 text-xs text-slate-400 font-sans max-sm:min-w-0 max-sm:gap-1 max-sm:px-2">
+                <Filter className="w-3.5 h-3.5 shrink-0 max-sm:w-3 max-sm:h-3" />
+                <span className="shrink-0 font-extrabold uppercase tracking-wide text-[10px] text-slate-500 max-sm:text-[8px]">Rarity:</span>
+                <div className="relative min-w-0 flex-1">
                 <select
                   value={activeRarity}
                   onChange={(e: any) => setActiveRarity(e.target.value)}
-                  className="bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans"
+                  className="mobile-badge-select min-w-0 bg-transparent border-none text-white focus:outline-none font-bold text-xs cursor-pointer pr-1 font-sans max-sm:w-full max-sm:appearance-none max-sm:truncate max-sm:pr-3 max-sm:!text-[8px]"
                 >
                   <option value="all" className="bg-slate-950 text-white font-sans">All Rarities</option>
                   <option value="common" className="bg-slate-950 text-white font-sans">🥉 Bronze</option>
@@ -599,6 +603,8 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
                   <option value="legendary" className="bg-slate-950 text-white font-sans">👑 Legendary</option>
                   <option value="mythic" className="bg-slate-950 text-white font-sans">🔥 Mythic</option>
                 </select>
+                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 hidden h-2.5 w-2.5 -translate-y-1/2 text-white max-sm:block" />
+                </div>
               </div>
             </div>
           </div>

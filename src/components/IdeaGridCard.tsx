@@ -251,10 +251,10 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
           </span>
 
           {/* Bottom Right: Actions (Icons & Numbers separated) */}
-          <div className="flex items-center gap-4">
+          <div className="grid w-40 grid-cols-3 items-center gap-2">
 
             {/* Sparks */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-center gap-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -279,7 +279,7 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
             </div>
 
             {/* Comments */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-center gap-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -302,7 +302,7 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
             </div>
 
             {/* Contributors — use UserPlus icon to match the feed/idea page */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-center gap-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -332,6 +332,7 @@ export const IdeaGridCard = React.memo<IdeaGridCardProps>(({
       {/* PRD §8 — engagement popups */}
       <SparkersDialog
         ideaId={sparkersOpen ? (idea._id as Id<"ideas">) : null}
+        sparkCount={idea.sparkCount || 0}
         onOpenChange={(open) => setSparkersOpen(open)}
       />
       <ContributorsDialog

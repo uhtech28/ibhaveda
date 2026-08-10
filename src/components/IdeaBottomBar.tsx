@@ -75,7 +75,7 @@ export function IdeaBottomBar({
 
   const containerClasses = variant === "floating"
     ? "fixed bottom-6 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur-md border border-border/50 rounded-full shadow-2xl px-2 py-2 flex items-center gap-2 z-50 ring-1 ring-black/5"
-    : "flex items-center justify-center gap-2 py-4 border-t border-border/50 bg-transparent";
+    : "grid grid-cols-3 items-center gap-2 py-4 border-t border-border/50 bg-transparent";
 
   return (
     <div className={containerClasses}>
@@ -86,7 +86,7 @@ export function IdeaBottomBar({
         onSuccess={handleSpark}
         disabled={!userId || isSparking}
         className={`
-          rounded-full px-4 h-10 transition-all duration-300
+          w-full rounded-full px-4 h-10 transition-all duration-300
           ${currentHasSparked
             ? 'bg-[#111827] text-orange-300 hover:bg-[#172033] hover:text-orange-200'
             : 'bg-transparent text-orange-300 hover:bg-[#111827] hover:text-orange-200'
@@ -103,20 +103,16 @@ export function IdeaBottomBar({
         )}
       </ParticleButton>
 
-      <div className="w-px h-6 bg-border/40 mx-1" />
-
       {/* Comment Button */}
       <Button
         variant="ghost"
         size="sm"
         onClick={onOpenComments}
-        className="rounded-full px-4 h-10 gap-2 bg-[#111827] text-blue-300 hover:bg-[#172033] hover:text-blue-200 transition-colors"
+        className="w-full rounded-full px-4 h-10 gap-2 bg-[#111827] text-blue-300 hover:bg-[#172033] hover:text-blue-200 transition-colors"
       >
         <MessageCircle className={`w-4 h-4 text-blue-300 ${commentCount > 0 ? "fill-current" : ""}`} />
         <span className="font-semibold text-sm">{commentCount}</span>
       </Button>
-
-      <div className="w-px h-6 bg-border/40 mx-1" />
 
       {/* Contribute / Requests Button — same Users icon as the feed card,
        * regardless of whether the viewer is the author. The red dot in the
@@ -127,7 +123,7 @@ export function IdeaBottomBar({
         onClick={onOpenRequests}
         aria-label={isAuthor ? "View contribution requests" : "Contributors"}
         title={isAuthor ? "Contribution requests" : "Contributors"}
-        className="rounded-full px-4 h-10 gap-2 bg-transparent text-violet-300 hover:bg-[#111827] hover:text-violet-200 transition-colors relative"
+        className="relative w-full rounded-full px-4 h-10 gap-2 bg-transparent text-violet-300 hover:bg-[#111827] hover:text-violet-200 transition-colors"
       >
         <UserPlus className={`w-4 h-4 text-violet-300 ${hasRequestedOrAccepted ? "fill-current" : ""}`} />
         <span className="font-semibold text-sm">{contributorCount}</span>

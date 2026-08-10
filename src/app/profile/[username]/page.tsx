@@ -5,11 +5,6 @@ import { useParams } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "../../../../convex/_generated/api"
 import { CompactProfileView } from "@/components/user/CompactProfileView"
-// MyFlaresSection import removed — the "My Flares" panel was pulled
-// off the profile page per product request. Flare history / status is
-// still accessible from the map's checkpoint panel + notifications;
-// having it on the profile duplicated that surface.
-// import { MyFlaresSection } from "@/components/flares/MyFlaresSection"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { HeroHeader } from "@/components/header"
@@ -80,18 +75,13 @@ export default function ProfilePage() {
     <div className="min-h-screen flex flex-col bg-background">
       <HeroHeader />
 
-      <main className="flex-1 container mx-auto px-4 py-12 pt-32">
+      <main className="flex-1 container mx-auto px-4 pb-12 pt-20 sm:py-12 sm:pt-32">
         <CompactProfileView
           profile={profileData}
           isOwner={isCurrentUser}
           myRequests={myRequests}
           incomingRequests={incomingRequests}
         />
-
-        {/* My Flares section removed from the profile page per
-            product request — flare history + status lives in the map
-            CheckpointPanel and notifications, so surfacing it on the
-            profile was redundant. */}
       </main>
 
       <FooterSection />

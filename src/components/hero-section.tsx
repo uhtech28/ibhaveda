@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { SignUpButton, useClerk, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { GraduationCap, TrendingUp, Rocket, Building2 } from "lucide-react";
+import { useAuthModal } from "@/components/auth/auth-modal";
 
 const SELECTED_ROLE_KEY = "ii.selectedRole";
 
@@ -87,7 +88,7 @@ function PixelField() {
 
 export default function HeroSection() {
   const { isSignedIn } = useUser();
-  const { openSignIn } = useClerk();
+  const { openSignIn, openSignUp } = useAuthModal();
   const router = useRouter();
 
   const handleSelect = (role: string) => {
@@ -124,11 +125,11 @@ export default function HeroSection() {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes lp-card-cta-glow {
-          0%, 18%, 100% {
+          0%, 25%, 100% {
             border-color: rgba(255,255,255,0.10);
             box-shadow: 0 0 0 rgba(255,255,255,0), 0 8px 32px rgba(0,0,0,0.40);
           }
-          8% {
+          12.5% {
             border-color: var(--role-color);
             box-shadow: 0 0 20px var(--role-glow-strong), 0 0 44px var(--role-glow), 0 8px 32px rgba(0,0,0,0.55);
           }
@@ -144,33 +145,20 @@ export default function HeroSection() {
         <div className="relative z-10 w-full max-w-5xl flex flex-col items-center">
 
 
-          {/* ── Already a member ──
-              Hide entirely when the user is already signed in — Clerk
-              throws a dev-only "cannot_render_single_session_enabled"
-              warning if openSignIn() fires with an active session.
-              Signed-in visitors landing here should just go straight
-              to /feed instead. */}
-          {!isSignedIn && (
-            <div
-              className="mb-4"
-              style={{ animation: "lp-reveal-simple 600ms ease both" }}
+          {/* ── Already a member ── */}
+          <div
+            className="mb-4"
+            style={{ animation: "lp-reveal-simple 600ms ease both" }}
+          >
+            <button
+              type="button"
+              onClick={() => openSignIn()}
+              className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
             >
-              <button
-                type="button"
-                onClick={() => {
-                  if (isSignedIn) {
-                    router.push("/feed");
-                    return;
-                  }
-                  openSignIn({ afterSignInUrl: "/feed", fallbackRedirectUrl: "/feed" });
-                }}
-                className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
-              >
-                Already a member?{" "}
-                <span className="text-[#F7D66D] font-semibold hover:underline">Log in</span>
-              </button>
-            </div>
-          )}
+              Already a member?{" "}
+              <span className="text-[#F7D66D] font-semibold hover:underline">Log in</span>
+            </button>
+          </div>
 
           {/* ── Hero copy ── */}
           <div
@@ -189,11 +177,11 @@ export default function HeroSection() {
             </p>
 
             <h1 className="text-[1.85rem] sm:text-5xl lg:text-[3.25rem] font-black text-white leading-[1.07] tracking-tight max-w-3xl font-display">
-              Stop Thinking. Start Building.
+              Nobody's Building With You. Yet.
             </h1>
 
             <p className="mt-3 text-sm sm:text-base text-slate-300 max-w-xl leading-6">
-              Join projects, recruit teammates and start creating.
+              Co-founders. Builders. Investors. Zero gatekeeping.
             </p>
           </div>
 
@@ -219,13 +207,13 @@ export default function HeroSection() {
                       style={{ background: role.glow }}
                     />
                     <div className="relative z-10 h-full">
-                      <div
-                        className="absolute left-0 top-0 grid h-10 w-10 place-items-center rounded-xl border border-white/10"
-                        style={{ background: `${role.color}18` }}
-                      >
-                        <Icon className="h-5 w-5" style={{ color: role.color }} />
-                      </div>
                       <div className="flex h-full flex-col items-center justify-center text-center">
+                        <div
+                          className="mb-6 grid h-10 w-10 place-items-center rounded-xl border border-white/10"
+                          style={{ background: `${role.color}18` }}
+                        >
+                          <Icon className="h-5 w-5" style={{ color: role.color }} />
+                        </div>
                         <p
                           className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1"
                           style={{ color: role.color }}
@@ -245,7 +233,7 @@ export default function HeroSection() {
                   "relative aspect-square overflow-hidden rounded-[20px] border border-white/10 bg-[#0B111A] p-4 transition-transform duration-200 hover:scale-[1.025] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 cursor-pointer text-left";
 
                 const style = {
-                  animation: `lp-card-in 450ms ${index * 80}ms ease both, lp-card-cta-glow 5200ms ${900 + index * 650}ms ease-in-out infinite`,
+                  animation: `lp-card-in 450ms ${index * 80}ms ease both, lp-card-cta-glow 10400ms ${900 + index * 2600}ms ease-in-out infinite`,
                   "--role-color": role.color,
                   "--role-glow": role.glow,
                   "--role-glow-strong": `${role.color}66`,
@@ -270,17 +258,19 @@ export default function HeroSection() {
                 }
 
                 return (
-                  <SignUpButton key={role.key} mode="modal" forceRedirectUrl="/profile-setup">
-                    <button
-                      type="button"
-                      onClick={() => handleSelect(role.key)}
-                      className={cardClass}
-                      style={style}
-                      aria-label={`Sign up as ${role.label}`}
-                    >
-                      {inner}
-                    </button>
-                  </SignUpButton>
+                  <button
+                    key={role.key}
+                    type="button"
+                    onClick={() => {
+                      handleSelect(role.key);
+                      openSignUp();
+                    }}
+                    className={cardClass}
+                    style={style}
+                    aria-label={`Sign up as ${role.label}`}
+                  >
+                    {inner}
+                  </button>
                 );
               })}
             </div>

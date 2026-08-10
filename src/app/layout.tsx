@@ -9,7 +9,9 @@ import { Toaster } from '@/components/ui/toaster';
 import ChatWidget from "@/components/chat/ChatWidget";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { TutorialProvider } from "@/components/tutorial/v2";
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { ClarityScript } from "@/components/analytics/ClarityScript";
+import { AuthModalProvider } from "@/components/auth/auth-modal";
 import "./globals.css";
 
 const displayFont = Sora({
@@ -114,57 +116,56 @@ export const viewport = {
   interactiveWidget: 'resizes-content',
 };
 
-// ClerkProvider is ALWAYS rendered so downstream `useAuth()` /
-// `useUser()` calls don't throw "clerk not provided". If the real
-// publishable key is missing (e.g. Preview deployment without full
-// env), we pass a syntactically valid stub key. Clerk mounts, hooks
-// return "signed out" state, and the app LOADS. Actual auth calls
-// will fail but that's fine for a visual demo -- they're not invoked
-// without user interaction.
-const CLERK_PUBLISHABLE_KEY =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-  "pk_test_ZGVtby1zdHViLmNsZXJrLmFjY291bnRzLmRldiQ"; // demo-stub.clerk.accounts.dev$
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <ClerkProvider
+      localization={{
+        unstable__errors: {
+          // Clerk has a built-in (non-configurable) rule that rejects a password
+          // identical/too similar to the account's email. When that fires, Clerk
+          // renders its "character requirements" sentence with an EMPTY list, so
+          // users saw a broken "Your password must contain ." message.
+          // Rewriting the prefix into a complete standalone sentence makes the
+          // empty-list case read clearly. (All character-class rules are off in
+          // the Clerk dashboard, so this prefix effectively only shows here.)
+          passwordComplexity: {
+            // NOTE: the built-in password==email rejection renders through this
+            // SAME sentence with an EMPTY requirement list, and it fires on
+            // submit regardless of the zxcvbn strength setting. So the prefix
+            // MUST be a complete, self-contained sentence — if it merely leads
+            // into the (here empty) list, the email error breaks to
+            // "Your password must be ." A length-only hint that also keeps the
+            // email error readable is impossible here; that split needs a
+            // custom form. Keeping one clear self-contained sentence for both.
+            sentencePrefix:
+              "Your password must be at least 8 characters and can't be the same as your email address",
+            minimumLength: "",
+          },
+        },
+      }}
+    >
       <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
-        <head>
-          {/* One-shot cache nuke. next.config.ts previously served
-              /assets/* with `max-age=31536000, immutable` which froze
-              old files on returning visitors' devices for a full year.
-              This script runs on every page load, checks a version
-              stamp in localStorage, and if it doesn't match: unregisters
-              any service worker, clears all CacheStorage entries, then
-              does a single reload. After that the version is bumped and
-              the script skips itself on subsequent loads. Bump
-              CACHE_BUST_VERSION whenever you need to force a global
-              cache-flush again. */}
-          <script
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{
-              __html: `(function(){try{var K='__ibhaveda_cache_bust_v';var V='2026-07-10a';if(typeof window==='undefined')return;if(window.localStorage.getItem(K)===V)return;window.localStorage.setItem(K,V);var ops=[];if('serviceWorker' in navigator){ops.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}));}if('caches' in window){ops.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}));}Promise.all(ops).finally(function(){window.location.reload();});}catch(e){}})();`,
-            }}
-          />
-        </head>
         <body
           className="font-sans antialiased"
         >
           <ConvexClientProvider>
-            <ThemeProvider>
-              <ChatProvider>
-                <TutorialProvider>
-                  {children}
-                  <MobileBottomNav />
-                  <Toaster />
-                  <ChatWidget />
-                </TutorialProvider>
-              </ChatProvider>
-            </ThemeProvider>
+            <AnalyticsProvider>
+              <ClarityScript />
+              <ThemeProvider>
+                <AuthModalProvider>
+                  <ChatProvider>
+                    {children}
+                    <MobileBottomNav />
+                    <Toaster />
+                    <ChatWidget />
+                  </ChatProvider>
+                </AuthModalProvider>
+              </ThemeProvider>
+            </AnalyticsProvider>
           </ConvexClientProvider>
         </body>
       </html>

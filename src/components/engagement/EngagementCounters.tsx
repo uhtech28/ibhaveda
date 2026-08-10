@@ -71,6 +71,7 @@ export function EngagementCounters({
 
       <SparkersDialog
         ideaId={sparkersOpen ? ideaId : null}
+        sparkCount={sparkCount}
         onOpenChange={(next) => {
           if (!next) setSparkersOpen(false);
         }}

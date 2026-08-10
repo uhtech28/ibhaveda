@@ -24,6 +24,8 @@ interface Props {
   description?: React.ReactNode;
   children: React.ReactNode;
   contentClassName?: string;
+  descriptionClassName?: string;
+  mobilePresentation?: "sheet" | "modal";
 }
 
 export function ResponsivePopup({
@@ -33,11 +35,24 @@ export function ResponsivePopup({
   description,
   children,
   contentClassName,
+  descriptionClassName,
+  mobilePresentation = "sheet",
 }: Props) {
+  const mobileIsModal = mobilePresentation === "modal";
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenChange(false);
+          }}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
           className={cn(
             "fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -45,15 +60,28 @@ export function ResponsivePopup({
           )}
         />
         <DialogPrimitive.Content
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDownOutside={(event) => {
+            event.preventDefault();
+            onOpenChange(false);
+          }}
           className={cn(
             // base — always
             "fixed z-[10000] border border-white/10 bg-[#111827] shadow-2xl",
             "focus:outline-none",
-            // mobile: bottom-sheet
-            "inset-x-0 bottom-0 left-0 right-0 max-h-[85vh] w-full",
-            "rounded-t-2xl rounded-b-none p-4 pt-3",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
+            mobileIsModal
+              ? [
+                  "top-1/2 left-1/2 right-auto bottom-auto w-[calc(100vw-1.5rem)] max-w-[31rem] max-h-[76dvh]",
+                  "-translate-x-1/2 -translate-y-1/2 rounded-2xl p-4",
+                  "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
+                ]
+              : [
+                  "inset-x-0 bottom-0 left-0 right-0 max-h-[85vh] w-full",
+                  "rounded-t-2xl rounded-b-none p-4 pt-3",
+                  "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
+                ],
             // desktop (sm+): centered modal
             "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:right-auto sm:bottom-auto",
             "sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2",
@@ -64,7 +92,9 @@ export function ResponsivePopup({
           )}
         >
           {/* Mobile drag handle (cosmetic — not functional) */}
-          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" />
+          {!mobileIsModal && (
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" />
+          )}
 
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -72,7 +102,9 @@ export function ResponsivePopup({
                 {title}
               </DialogPrimitive.Title>
               {description && (
-                <DialogPrimitive.Description className="mt-1 text-xs text-white/55 sm:text-sm">
+                <DialogPrimitive.Description
+                  className={cn("mt-1 text-xs text-white/55 sm:text-sm", descriptionClassName)}
+                >
                   {description}
                 </DialogPrimitive.Description>
               )}

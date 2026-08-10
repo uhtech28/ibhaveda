@@ -281,8 +281,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <div
           ref={suggestionsRef}
           className={cn(
-            "fixed left-2 right-2 lg:absolute lg:left-0 lg:right-0 z-40 bg-background border rounded-md shadow-xl lg:shadow-lg max-h-[70vh] lg:max-h-96 overflow-y-auto",
-            "top-[80px] lg:top-full lg:border-t-0 lg:rounded-t-none lg:rounded-b-md",
+            "fixed left-2 right-2 z-[70] bg-background border rounded-md shadow-xl max-h-[70vh] overflow-y-auto lg:absolute lg:left-0 lg:right-0 lg:z-40 lg:max-h-96 lg:shadow-lg",
+            "top-16 lg:top-full lg:border-t-0 lg:rounded-t-none lg:rounded-b-md",
             !showSearchResults && "hidden lg:block"
           )}
           role="listbox"

@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
-import { SignedIn, SignedOut, useAuth, useClerk } from '@clerk/nextjs'
+import { SignedIn, SignedOut, useClerk } from '@clerk/nextjs'
+import { useAuthModal } from '@/components/auth/auth-modal'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -29,10 +30,6 @@ const menuItems = [
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'My Ideas', href: '/my-ideas', icon: IdeaBulb },
     { name: 'Community', href: '/community', icon: Users },
-    // Leaderboard entry removed per product ask — the trophy icon sat
-    // between Community and Notifications, and the /leaderboard content
-    // now lives inside /community as a tab, so the standalone nav item
-    // was redundant.
 ]
 
 export const HeroHeader = ({
@@ -45,23 +42,8 @@ export const HeroHeader = ({
     onOpenTodos?: () => void
     onOpenCalendar?: () => void
 }) => {
-    const { signOut, openSignIn: clerkOpenSignIn, openSignUp: clerkOpenSignUp } = useClerk()
-    // Belt-and-braces guard — <SignedOut> already hides the login/signup
-    // buttons for authed users, but during Clerk's hydration window the
-    // buttons briefly render and a rapid click fires openSignIn/openSignUp
-    // against an already-active session. Clerk logs a dev-only
-    // `cannot_render_single_session_enabled` notice in that case.
-    // Wrapping the calls in a signed-in check makes them a no-op when
-    // there's no work to do.
-    const { isSignedIn } = useAuth()
-    const openSignIn: typeof clerkOpenSignIn = (opts) => {
-        if (isSignedIn) return
-        return clerkOpenSignIn(opts)
-    }
-    const openSignUp: typeof clerkOpenSignUp = (opts) => {
-        if (isSignedIn) return
-        return clerkOpenSignUp(opts)
-    }
+    const { signOut } = useClerk()
+    const { openSignIn, openSignUp } = useAuthModal()
     const currentUser = useQuery(api.users.getCurrentUser)
     const pathname = usePathname()
     const router = useRouter()
@@ -135,39 +117,41 @@ export const HeroHeader = ({
                             </button>
                             <SignedOut>
                                 <div className="flex shrink-0 gap-1">
-                                    <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn({ afterSignInUrl: "/feed" })}>Login</Button>
-                                    <Button size="sm" onClick={() => openSignUp({ afterSignUpUrl: "/profile-setup" })}>Sign Up</Button>
+                                    <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn()}>Login</Button>
+                                    <Button size="sm" onClick={() => openSignUp()}>Sign Up</Button>
                                 </div>
                             </SignedOut>
                             <SignedIn>
-                                <button type="button" aria-label="Post idea" onClick={() => setShowIdeaWizard(true)} className={cn(transitionBase, "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
-                                    <Plus className="h-5 w-5" />
-                                </button>
-                                <div className="shrink-0 [&_button]:h-9 [&_button]:w-9 [&_button]:text-[#D1D5DB] [&_button:hover]:bg-white/[0.06] [&_button:hover]:text-white">
-                                    <NotificationBell />
+                                <div className="grid shrink-0 grid-cols-3 items-center gap-1">
+                                    <button type="button" aria-label="Post idea" onClick={() => setShowIdeaWizard(true)} className={cn(transitionBase, "grid h-9 w-9 place-items-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
+                                        <Plus className="h-5 w-5" />
+                                    </button>
+                                    <div className="grid h-9 w-9 place-items-center [&_button]:grid [&_button]:h-9 [&_button]:w-9 [&_button]:place-items-center [&_button]:p-0 [&_button]:text-[#D1D5DB] [&_button:hover]:bg-white/[0.06] [&_button:hover]:text-white">
+                                        <NotificationBell />
+                                    </div>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <button type="button" className="grid h-9 w-9 place-items-center rounded-full" aria-label="Open profile menu">
+                                                <Avatar className="h-7 w-7">
+                                                    <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
+                                                    <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{initials}</AvatarFallback>
+                                                </Avatar>
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56" align="end" forceMount>
+                                            <div className="grid gap-2">
+                                                <Link href={`/profile/${currentUser?.username}`} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors">
+                                                    {currentUser?.displayName}
+                                                    <p className="text-xs text-muted-foreground font-normal truncate">@{currentUser?.username}</p>
+                                                </Link>
+                                                <Button variant="ghost" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => signOut()}>
+                                                    <LogOut className="h-4 w-4" />
+                                                    <span>Sign Out</span>
+                                                </Button>
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <button type="button" className="shrink-0 rounded-full" aria-label="Open profile menu">
-                                            <Avatar className="h-7 w-7">
-                                                <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
-                                                <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{initials}</AvatarFallback>
-                                            </Avatar>
-                                        </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-56" align="end" forceMount>
-                                        <div className="grid gap-2">
-                                            <Link href={`/profile/${currentUser?.username}`} className="font-medium truncate p-2 -mx-2 rounded-md hover:bg-muted transition-colors">
-                                                {currentUser?.displayName}
-                                                <p className="text-xs text-muted-foreground font-normal truncate">@{currentUser?.username}</p>
-                                            </Link>
-                                            <Button variant="ghost" className="justify-start gap-2 px-2 w-full text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => signOut()}>
-                                                <LogOut className="h-4 w-4" />
-                                                <span>Sign Out</span>
-                                            </Button>
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
                             </SignedIn>
                         </>
                     )}
@@ -210,11 +194,11 @@ export const HeroHeader = ({
                         })}
                     </nav>
 
-                    <div className="ml-auto flex items-center gap-3">
+                    <div className="ml-1 flex items-center gap-2">
                         <SignedOut>
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn({ afterSignInUrl: "/feed" })}>Login</Button>
-                                <Button size="sm" onClick={() => openSignUp({ afterSignUpUrl: "/profile-setup" })}>Sign Up</Button>
+                                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" onClick={() => openSignIn()}>Login</Button>
+                                <Button size="sm" onClick={() => openSignUp()}>Sign Up</Button>
                             </div>
                         </SignedOut>
                         <SignedIn>

@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * "Who's on this team" popup. Triggered from the contributor counter
- * on an idea card or venture page. Shows the author first, then every
- * accepted contributor in acceptance order.
+ * Contributors popup. Triggered from the contributor counter on an idea
+ * card or venture page. Shows the author first, then every accepted
+ * contributor in acceptance order.
  *
- * Wired to the `getIdeaContributors` query. Renders as a bottom sheet
- * on mobile and a centered modal on desktop (PRD §8 AC5) via
- * `ResponsivePopup`.
+ * Wired to the `getIdeaContributors` query. Renders as a centered
+ * modal on mobile and desktop via `ResponsivePopup`.
  */
 
 import React from "react";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -29,15 +28,7 @@ export function ContributorsDialog({ ideaId, onOpenChange }: Props) {
     api.engagement.getIdeaContributors,
     ideaId ? { ideaId } : "skip",
   );
-
-  const headerSubtext =
-    team === undefined
-      ? "Loading…"
-      : team.length === 0
-        ? "No one on this team yet."
-        : team.length === 1
-          ? "Solo idea — author only"
-          : `${team.length} on the team`;
+  const contributorCount = team?.length ?? 0;
 
   return (
     <ResponsivePopup
@@ -45,11 +36,11 @@ export function ContributorsDialog({ ideaId, onOpenChange }: Props) {
       onOpenChange={onOpenChange}
       title={
         <span className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-emerald-300" />
-          On this idea
+          <UserPlus className="h-5 w-5 text-fuchsia-300" />
+          {contributorCount} Contributors
         </span>
       }
-      description={headerSubtext}
+      mobilePresentation="modal"
     >
       {team === undefined ? (
         <LoadingState />
@@ -61,11 +52,14 @@ export function ContributorsDialog({ ideaId, onOpenChange }: Props) {
             <li key={entry.user._id} className="py-1">
               <UserListItem
                 user={entry.user}
-                badge={entry.role === "author" ? "Author" : undefined}
                 subtext={
-                  entry.role === "author"
-                    ? "Started this idea"
-                    : `Joined ${formatDistanceToNow(entry.joinedAt, { addSuffix: true })}`
+                  entry.role === "author" ? (
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white/60">
+                      Ideator
+                    </span>
+                  ) : (
+                    `Joined ${formatDistanceToNow(entry.joinedAt, { addSuffix: true })}`
+                  )
                 }
               />
             </li>
@@ -80,7 +74,7 @@ function LoadingState() {
   return (
     <div className="flex items-center gap-2 px-2 py-6 text-sm text-white/40">
       <Loader2 className="h-4 w-4 animate-spin" />
-      Loading team…
+      Loading team...
     </div>
   );
 }
@@ -88,7 +82,7 @@ function LoadingState() {
 function EmptyState() {
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.015] p-6 text-center">
-      <Users className="mx-auto h-5 w-5 text-white/30" />
+      <UserPlus className="mx-auto h-5 w-5 text-white/30" />
       <p className="mt-2 text-sm text-white/60">No one on this team yet.</p>
     </div>
   );

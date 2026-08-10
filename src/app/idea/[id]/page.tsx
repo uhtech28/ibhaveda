@@ -37,6 +37,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { MobilePopup } from "@/components/ui/mobile-popup";
 import {
   TreeProvider,
   TreeView,
@@ -66,6 +67,7 @@ import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { IdeaBreadcrumb, IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
 import { IdeaStoryCard } from "@/components/ideaforge/idea-cards";
 import { IdeaForgeIdea } from "@/components/ideaforge/shared";
+import { useMobilePopupMode, useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 
 type ConvexIdea = {
   _id: string;
@@ -172,6 +174,9 @@ function IdeaDetailVideo({ src, mimeType }: { src: string; mimeType?: string }) 
 }
 
 export default function IdeaDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  useMobileVisualViewport();
+  const isMobilePopup = useMobilePopupMode();
+
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const resolvedParams = React.use(params);
@@ -195,6 +200,8 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
   const [showComments, setShowComments] = useState(false);
   const [showCreateSubIdea, setShowCreateSubIdea] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [commentsKeyboardOpen, setCommentsKeyboardOpen] = useState(false);
+  const [contributionKeyboardOpen, setContributionKeyboardOpen] = useState(false);
 
   React.useEffect(() => {
     if (isLoaded && !userId) router.push("/");
@@ -240,8 +247,8 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
         onOpenCalendar={() => setShowCalendar(true)}
       />
 
-      <main className="flex-1 w-full py-12 pt-24">
-        <div className="mx-auto w-full max-w-[900px] px-4 sm:px-6 lg:px-8 relative">
+      <main className="flex-1 w-full pb-12 pt-24 max-sm:flex max-sm:min-h-[100dvh] max-sm:justify-center lg:grid lg:place-items-center lg:py-16">
+        <div className="mx-auto flex w-full max-w-[900px] flex-col items-center px-4 sm:px-6 lg:px-8 relative">
           {/* Breadcrumb — always shows Feed > root > ... > current so
               the user never loses context. */}
           <IdeaBreadcrumb ideaId={id as Id<"ideas">} className="mb-4 justify-center" />
@@ -306,7 +313,7 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           ) : (
             <>
-              <div className="pb-8">
+              <div className="w-full pb-8 max-sm:flex max-sm:justify-center">
                 <IdeaStoryCard
                   idea={ideaQuery as IdeaForgeIdea}
                   saved={false}
@@ -341,8 +348,90 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={showRequests} onOpenChange={setShowRequests}>
-                <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto w-full">
+              {isMobilePopup && showRequests && (
+                <MobilePopup
+                  onClose={() => {
+                    setShowRequests(false);
+                    setContributionKeyboardOpen(false);
+                  }}
+                  className="overflow-y-auto border-white/10 bg-[#111827] p-6 text-white"
+                  style={{ maxHeight: contributionKeyboardOpen ? 'var(--app-vv-contribution-keyboard-height, min(82dvh, 27rem))' : 'var(--app-vv-contribution-height, min(78dvh, 34rem))' }}
+                >
+                  <div
+                    onFocus={(event) => {
+                      if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(true);
+                    }}
+                    onBlur={(event) => {
+                      if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(false);
+                    }}
+                  >
+                    <DialogHeader>
+                      <DialogTitle>Contribution Requests</DialogTitle>
+                    </DialogHeader>
+                    {(ideaQuery as ConvexIdea).isAuthor ? (
+                      <Tabs defaultValue="incoming" className="w-full mt-2">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="incoming">Incoming Requests</TabsTrigger>
+                          <TabsTrigger value="invite">Invite Contributors</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="incoming" className="mt-4">
+                          <ContributionDashboard
+                            ideaId={ideaQuery._id as Id<"ideas">}
+                            ideaTitle={(ideaQuery as ConvexIdea).title}
+                            authorId={(ideaQuery as ConvexIdea).authorId}
+                            authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
+                            isAuthor
+                            onClose={() => {
+                              setShowRequests(false);
+                              setContributionKeyboardOpen(false);
+                            }}
+                            embedded
+                          />
+                        </TabsContent>
+                        <TabsContent value="invite" className="mt-4">
+                          <InvitationSection
+                            idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: true }}
+                            embedded
+                          />
+                        </TabsContent>
+                      </Tabs>
+                    ) : (
+                      <>
+                        <ContributionDashboard
+                          ideaId={ideaQuery._id as Id<"ideas">}
+                          ideaTitle={(ideaQuery as ConvexIdea).title}
+                          authorId={(ideaQuery as ConvexIdea).authorId}
+                          authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
+                          isAuthor={false}
+                          onClose={() => {
+                            setShowRequests(false);
+                            setContributionKeyboardOpen(false);
+                          }}
+                        />
+                        <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: false }} />
+                      </>
+                    )}
+                  </div>
+                </MobilePopup>
+              )}
+
+              {!isMobilePopup && (
+              <Dialog
+                open={showRequests}
+                onOpenChange={(open) => {
+                  setShowRequests(open);
+                  if (!open) setContributionKeyboardOpen(false);
+                }}
+              >
+                <DialogContent
+                  onFocus={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(true);
+                  }}
+                  onBlur={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setContributionKeyboardOpen(false);
+                  }}
+                  className={`mobile-contribution-request-dialog ${contributionKeyboardOpen ? "mobile-contribution-request-dialog--keyboard" : ""} max-w-3xl max-h-[85vh] overflow-y-auto w-full`}
+                >
                   <DialogHeader>
                     <DialogTitle>Contribution Requests</DialogTitle>
                   </DialogHeader>
@@ -359,7 +448,10 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                           authorId={(ideaQuery as ConvexIdea).authorId}
                           authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
                           isAuthor
-                          onClose={() => setShowRequests(false)}
+                          onClose={() => {
+                            setShowRequests(false);
+                            setContributionKeyboardOpen(false);
+                          }}
                           embedded
                         />
                       </TabsContent>
@@ -378,13 +470,17 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                         authorId={(ideaQuery as ConvexIdea).authorId}
                         authorName={(ideaQuery as ConvexIdea).author?.name || (ideaQuery as ConvexIdea).author?.username}
                         isAuthor={false}
-                        onClose={() => setShowRequests(false)}
+                        onClose={() => {
+                          setShowRequests(false);
+                          setContributionKeyboardOpen(false);
+                        }}
                       />
                       <InvitationSection idea={{ _id: ideaQuery._id as Id<"ideas">, isAuthor: false }} />
                     </>
                   )}
                 </DialogContent>
               </Dialog>
+              )}
 
               <Dialog open={showTodos} onOpenChange={setShowTodos}>
                 <DialogContent className="w-[calc(100vw-1rem)] max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col bg-background/95 backdrop-blur-xl">
@@ -413,28 +509,94 @@ export default function IdeaDetailPage({ params }: { params: Promise<{ id: strin
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={showComments} onOpenChange={setShowComments}>
+              {isMobilePopup && showComments && (
+                <MobilePopup
+                  onClose={() => {
+                    setShowComments(false);
+                    setCommentsKeyboardOpen(false);
+                  }}
+                  className="grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden bg-[#0A0D12] p-0 text-white"
+                  style={{ height: commentsKeyboardOpen ? 'var(--app-vv-comments-keyboard-height, min(82dvh, 28rem))' : 'var(--app-vv-comments-height, min(76dvh, 43rem))' }}
+                >
+                  <header className="flex min-w-0 items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-4 py-0 h-14">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
+                      <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
+                    </div>
+                    <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
+                      <Link href={`/idea/${ideaQuery._id}`} className="block max-w-full truncate transition-colors hover:text-[#C7D2FE]">
+                        {ideaQuery.title}
+                      </Link>
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowComments(false);
+                        setCommentsKeyboardOpen(false);
+                      }}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/65 transition hover:bg-white/10 hover:text-white"
+                      aria-label="Close comments"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </header>
+                  <div
+                    className="min-h-0 min-w-0 overflow-hidden px-4 py-3"
+                    onFocus={(event) => {
+                      if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(true);
+                    }}
+                    onBlur={(event) => {
+                      if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(false);
+                    }}
+                  >
+                    <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
+                  </div>
+                </MobilePopup>
+              )}
+
+              {!isMobilePopup && (
+              <Dialog
+                open={showComments}
+                onOpenChange={(open) => {
+                  setShowComments(open);
+                  if (!open) setCommentsKeyboardOpen(false);
+                }}
+              >
                 <DialogContent
-                  className="
-                    grid grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
-                    w-full max-w-[640px]
+                  showCloseButton={false}
+                  onFocus={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(true);
+                  }}
+                  onBlur={(event) => {
+                    if (event.target instanceof HTMLTextAreaElement) setCommentsKeyboardOpen(false);
+                  }}
+                  className={`
+                    mobile-comments-dialog
+                    ${commentsKeyboardOpen ? "mobile-comments-dialog--keyboard" : ""}
+                    grid min-w-0 grid-rows-[auto_1fr] gap-0 overflow-hidden border-white/10 bg-[#0A0D12] p-0 text-white shadow-[0_24px_80px_rgba(3,7,18,0.65)]
+                    w-full max-w-[640px] sm:w-[min(calc(100vw-2rem),640px)]
                     h-[100dvh] max-h-[100dvh] rounded-none
                     sm:h-[min(85dvh,720px)] sm:max-h-[85dvh] sm:rounded-2xl
-                  "
+                  `}
                 >
-                  <header className="flex items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30">
+                  <header className="flex min-w-0 items-center gap-3 border-b border-white/8 bg-gradient-to-b from-[#141B2D] to-[#0F1524] px-5 py-4 max-sm:h-14 max-sm:px-4 max-sm:py-0">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#6366F1]/25 to-[#8B5CF6]/15 ring-1 ring-[#6366F1]/30 max-sm:h-9 max-sm:w-9">
                       <MessageCircle className="h-5 w-5 text-[#C7D2FE]" />
                     </div>
                     <DialogTitle className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-white">
-                      {ideaQuery.title}
+                      <Link href={`/idea/${ideaQuery._id}`} className="block max-w-full truncate transition-colors hover:text-[#C7D2FE]">
+                        {ideaQuery.title}
+                      </Link>
                     </DialogTitle>
+                    <DialogClose className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/65 transition hover:bg-white/10 hover:text-white" aria-label="Close comments">
+                      <X className="h-4 w-4" />
+                    </DialogClose>
                   </header>
-                  <div className="min-h-0 px-5 py-4 overflow-hidden">
+                  <div className="min-h-0 min-w-0 overflow-hidden px-5 py-4 max-sm:px-4 max-sm:py-3">
                     <CommentsSection ideaId={ideaQuery._id as Id<"ideas">} commentCount={(ideaQuery as ConvexIdea).commentCount} />
                   </div>
                 </DialogContent>
               </Dialog>
+              )}
 
               <CreateSubIdeaDialog
                 isOpen={showCreateSubIdea}

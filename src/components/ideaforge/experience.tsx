@@ -38,7 +38,6 @@ import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { IdeaForgeRightRail } from "@/components/ideaforge/right-rail";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { IdeaWizard } from "@/components/ideas/IdeaWizard";
-import { FlareFeedSection } from "@/components/flares/FlareFeedSection";
 import {
   cardSurface,
   ComposerDraft,
@@ -235,25 +234,6 @@ export function IdeaForgeExperience({
     setShowIdeaWizard(true);
   };
 
-  // After profile-setup the user is routed to /feed?openCompose=1.
-  // Auto-open the compose wizard on that landing so the new user
-  // doesn't get stuck on the feed wondering what to do next.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("openCompose") === "1") {
-      setWizardDraft(undefined);
-      setWizardTutorialMode(true);
-      setShowIdeaWizard(true);
-      // Strip the param from the URL so a refresh doesn't re-open.
-      params.delete("openCompose");
-      const next =
-        window.location.pathname +
-        (params.toString() ? `?${params.toString()}` : "");
-      window.history.replaceState(null, "", next);
-    }
-  }, []);
-
   const openComposerWithDraft = (draft?: Partial<ComposerDraft>) => {
     setWizardDraft(draft);
     setShowIdeaWizard(true);
@@ -293,10 +273,6 @@ export function IdeaForgeExperience({
                       </div>
                     </section>
                   )}
-                  {/* Community Flares — shows all open help requests +
-                      "Flare" button. Rendered above the idea feed so
-                      users see requests for help first. */}
-                  <FlareFeedSection currentUserId={currentUser?._id ?? null} />
                   <FilterTabs tabs={feedTabs} activeKey={feedTab} onChange={setFeedTab} />
                 </>
               ) : (
@@ -413,15 +389,13 @@ export function IdeaForgeExperience({
                   </div>
                 );
               })()}
-              {/* Infinite scroll — sentinel triggers next page; spinner shows while loading */}
+              {/* Infinite scroll — sentinel triggers next page; spinner always visible at bottom */}
               {mode === "feed" && (
                 <>
                   <div ref={sentinelRef} className="h-4" />
-                  {hasMore && (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-[#6366F1]" />
-                    </div>
-                  )}
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#6366F1]" />
+                  </div>
                 </>
               )}
             </div>

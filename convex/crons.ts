@@ -39,14 +39,6 @@ crons.daily(
   api.crons.dailyBossCorruption,
 );
 
-// Schedule: Daily flare expiry sweep — marks any open flare past its
-// 7-day window as status="expired" so the community feed stays fresh.
-crons.daily(
-  "Expire Old Flares",
-  { hourUTC: 4, minuteUTC: 0 },
-  api.flares.expireOldFlares,
-);
-
 // Schedule: Weekly Badge Evaluation
 crons.weekly(
   "Weekly Badge Evaluation",
@@ -66,6 +58,13 @@ crons.daily(
     "Daily Re-engagement Emails",
     { hourUTC: 3, minuteUTC: 30 },
     api.emailReengagement.sendReengagementEmails
+);
+
+// Schedule: Daily retention snapshot at midnight IST (18:30 UTC)
+crons.daily(
+  "daily-retention-snapshot",
+  { hourUTC: 18, minuteUTC: 30 },
+  api.retentionCron.takeRetentionSnapshot
 );
 
 // Schedule: Social Proof Engine — daily spark evaluator at 00:05 UTC

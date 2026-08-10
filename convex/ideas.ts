@@ -1,4 +1,4 @@
-import { v, ConvexError } from "convex/values";
+import { v } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
@@ -11,67 +11,6 @@ async function getIdeaSparkCount(ctx: any, ideaId: Id<"ideas">) {
     .collect();
 
   return sparks.length;
-}
-
-/**
- * Look up the user by Clerk ID. If they don't have a Convex `users`
- * row yet (e.g. skipped /profile-setup), create a minimal one on the
- * fly derived from Clerk identity claims. Guarantees a non-null user
- * so downstream code can safely reference `user._id`, `user.displayName`,
- * etc. Throws only if the insert itself fails (schema mismatch, etc.).
- */
-async function resolveOrProvisionUser(
-  ctx: any,
-  clerkSubject: string,
-  ident: { email?: string; name?: string; givenName?: string; nickname?: string },
-) {
-  const existing = await ctx.db
-    .query("users")
-    .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", clerkSubject))
-    .unique();
-  if (existing) return existing;
-
-  const rawEmail = ident.email ?? null;
-  const rawName =
-    ident.name ||
-    ident.givenName ||
-    ident.nickname ||
-    (rawEmail ? rawEmail.split("@")[0] : "");
-  const base =
-    (rawEmail
-      ? rawEmail.split("@")[0]
-      : `user_${clerkSubject.slice(-6)}`
-    )
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "")
-      .slice(0, 20) || `user_${clerkSubject.slice(-6)}`;
-
-  let candidate = base;
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const clash = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q: any) => q.eq("username", candidate))
-      .first();
-    if (!clash) break;
-    candidate = `${base}${Math.floor(Math.random() * 10000)}`;
-  }
-
-  const now = Date.now();
-  const newId = await ctx.db.insert("users", {
-    clerkId: clerkSubject,
-    username: candidate,
-    displayName: rawName || candidate,
-    skills: [],
-    industries: [],
-    completedOnboarding: false,
-    createdAt: now,
-    updatedAt: now,
-  });
-  const fresh = await ctx.db.get(newId);
-  if (!fresh) {
-    throw new Error("Failed to auto-provision user");
-  }
-  return fresh;
 }
 
 async function getCurrentUserFromAuth(ctx: any) {
@@ -151,22 +90,15 @@ export const createIdea = mutation({
       throw new Error("Invalid visibility setting");
     }
 
-    // Find user by Clerk ID, auto-provisioning a minimal row if
-    // this is the first time we see them. The /profile-setup
-    // redirect is disabled per product request (task #145) so a
-    // freshly-signed-up user can reach /feed and try to post before
-    // ever completing the name/username form. Bootstrapping here
-    // means the post always succeeds; profile polish is optional.
-    const user = await resolveOrProvisionUser(
-      ctx,
-      identity.subject,
-      identity as unknown as {
-        email?: string;
-        name?: string;
-        givenName?: string;
-        nickname?: string;
-      },
-    );
+    // Find user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
 
     // If parentId is provided, validate it and check authorization
     if (args.parentId) {
@@ -180,25 +112,9 @@ export const createIdea = mutation({
         throw new Error("Cannot create sub-idea under a deleted idea");
       }
 
-      // Check authorization: user must be author of parent OR the
-      // owner of the venture wrapping that idea (map/CONTRIBUTIONS
-      // tile — the venture owner is always the parent-idea author
-      // in the happy path, but `resolveOrProvisionUser` mints a
-      // fresh `users` row if the Clerk sub → users lookup misses,
-      // which leaves the venture pointing at the OLD users._id
-      // while `user._id` here is the NEW row. Falling back to a
-      // venture-owner check unwedges that case) OR have an
-      // accepted contribution request.
-      const isParentAuthor = parentIdea.authorId === user._id;
-      let isVentureOwner = false;
-      if (!isParentAuthor) {
-        const ventureRow = await ctx.db
-          .query("ventures")
-          .withIndex("by_idea", (q) => q.eq("ideaId", args.parentId!))
-          .first();
-        isVentureOwner = !!ventureRow && ventureRow.userId === user._id;
-      }
-      if (!isParentAuthor && !isVentureOwner) {
+      // Check authorization: user must be author of parent OR have accepted contribution request
+      const isAuthor = parentIdea.authorId === user._id;
+      if (!isAuthor) {
         // Check for accepted contribution request
         const acceptedRequests = await ctx.db
           .query("contributionRequests")
@@ -211,13 +127,7 @@ export const createIdea = mutation({
         const validRequest = acceptedRequests.find(request => request.ideaId === args.parentId);
 
         if (!validRequest) {
-          // ConvexError (not plain Error) so the message surfaces on
-          // the client — previously the user just saw an opaque
-          // "Server Error - Called by client" pill because
-          // `new Error(...)` messages are stripped in prod builds.
-          throw new ConvexError(
-            "You are not authorized to add ideas under this parent. You must be the author or have an accepted contribution request.",
-          );
+          throw new Error("You are not authorized to add ideas under this parent. You must be the author or have an accepted contribution request.");
         }
       }
     }
@@ -246,37 +156,6 @@ export const createIdea = mutation({
 
     const ideaId = await ctx.db.insert("ideas", ideaData);
 
-    // Create notifications based on idea visibility. Root ideas only —
-    // sub-nodes (contributions posted via the map's CONTRIBUTIONS
-    // tile) are treated as project internals per the "tasks
-    // contribution flare don't count to created ideas" rule and
-    // should NOT broadcast "X shared a new idea" to every user.
-    if (args.visibility === 'public' && !args.parentId) {
-      // For public ideas, notify all users except the creator
-      const allUsers = await ctx.db.query("users").collect();
-
-      // Filter out the creator and create notifications
-      const notificationPromises = allUsers
-        .filter(u => u._id !== user._id) // Exclude the creator
-        .map(recipient =>
-          ctx.db.insert("notifications", {
-            recipientId: recipient._id,
-            senderId: user._id,
-            type: "new_idea",
-            message: `${user.displayName} shared a new idea: "${args.title.trim()}"`,
-            relatedId: ideaId,
-            isRead: false,
-            createdAt: now,
-          })
-        );
-
-      // Wait for all notifications to be created
-      await Promise.all(notificationPromises);
-    } else {
-      // For private ideas OR sub-nodes (parentId set), no platform-
-      // wide notifications. Private ideas stay private; contributions
-      // surface inside the parent project's hierarchy instead.
-    }
 
 
     // Social proof engine: schedule seeded sparks for new public root ideas
@@ -284,61 +163,24 @@ export const createIdea = mutation({
       await ctx.scheduler.runAfter(0, internal.socialProof.scheduleForNewIdea, { ideaId });
     }
 
-    // Gamification: Award XP + Coins + trigger badge checks ONLY for
-    // top-level (root) ideas. Sub-nodes — contributions posted via
-    // the Adventurer's Menu, or any future child ideas — pass a
-    // `parentId` and should NOT bump the "Created Ideas" counter,
-    // the XP tier, or the create-idea badge chain, because they are
-    // parts of an existing project rather than independent ideas.
-    // Product ask (verbatim): "make sure tasks contribution flare
-    // dont count to created ideas they are just part of idea/project".
-    // (Tasks + Flares live in separate tables so they never hit this
-    // mutation at all — the gate below covers the contributions case.)
-    if (!args.parentId) {
-      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
-        userId: user._id,
-        amount: 50,
-        action: "create_idea",
-      });
+    // Gamification: Award XP and Coins for creating an idea
+    await ctx.scheduler.runAfter(0, internal.gamification.internalAwardXP, {
+      userId: user._id,
+      amount: 50,
+      action: "create_idea",
+    });
 
-      await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
-        userId: user._id,
-        amount: 50,
-        type: "create_idea",
-        description: "Created a new idea"
-      });
+    await ctx.scheduler.runAfter(0, internal.gamification.internalAwardPoints, {
+      userId: user._id,
+      amount: 50,
+      type: "create_idea",
+      description: "Created a new idea"
+    });
 
-      await ctx.scheduler.runAfter(0, internal.badges.checkBadges, {
-        userId: user._id,
-        trigger: "create_idea",
-      });
-    }
-
-    // Auto-cross-post to any connected socials (LinkedIn / X / FB /
-    // IG) the user has toggled on. Fire-and-forget action — a
-    // provider failure never blocks idea creation, and users with no
-    // connected accounts silently skip.
-    //
-    // The `siteUrl` env var lets us hand each provider a canonical URL
-    // to link back to. Falls back to a placeholder if unset (dev).
-    if (args.visibility === "public") {
-      const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ??
-        process.env.SITE_URL ??
-        "https://uhtech.in";
-      const ideaUrl = `${siteUrl.replace(/\/$/, "")}/idea/${ideaId}`;
-      await ctx.scheduler.runAfter(
-        500, // ~half-second delay so any post-insert triggers settle
-        internal.socialAutoPost.publishIdeaToConnectedSocials,
-        {
-          userId: user._id,
-          ideaId,
-          title: args.title.trim(),
-          description: (args.description ?? "").trim(),
-          ideaUrl,
-        },
-      );
-    }
+    await ctx.scheduler.runAfter(0, internal.badges.checkBadges, {
+      userId: user._id,
+      trigger: "create_idea",
+    });
 
     return { ideaId, message: "Idea created successfully" };
   },
@@ -1712,28 +1554,6 @@ export const addSubIdea = mutation({
       updatedAt: now,
     });
 
-    // Create notifications for all users except the creator (only for public sub-ideas)
-    if (args.visibility === 'public') {
-      const allUsers = await ctx.db.query("users").collect();
-
-      // Filter out the creator and create notifications
-      const notificationPromises = allUsers
-        .filter(u => u._id !== user._id) // Exclude the creator
-        .map(recipient =>
-          ctx.db.insert("notifications", {
-            recipientId: recipient._id,
-            senderId: user._id,
-            type: "new_idea",
-            message: `${user.displayName} added a new idea branch: "${args.title.trim()}"`,
-            relatedId: subIdeaId,
-            isRead: false,
-            createdAt: now,
-          })
-        );
-
-      // Wait for all notifications to be created
-      await Promise.all(notificationPromises);
-    }
 
     return { subIdeaId, message: "Sub-idea added successfully" };
   },

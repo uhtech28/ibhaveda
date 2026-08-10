@@ -19,7 +19,6 @@ import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
-import { EditProfileModal } from "@/components/user/EditProfileModal";
 
 export interface UserProfile {
   _id: Id<"users">;
@@ -94,11 +93,6 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"created" | "sparked" | "contributed">("created");
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
-  // Edit Profile modal — opened by the pencil button. Replaces the
-  // previous /profile-setup?edit=1 route (that page is onboarding-only
-  // now). Modal renders inline at the bottom of this component so it
-  // portals into the same subtree we already own.
-  const [editOpen, setEditOpen] = useState(false);
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
   const equippedBadgeIds = profile.equippedBadges || [];
@@ -161,9 +155,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   }, [earnedBadges, equippedBadgeIds]);
 
   const handleEditProfile = () => {
-    // Opens the modal-based Edit Profile UI (basic fields + Persona /
-    // Social / Audio settings). /profile-setup stays onboarding-only.
-    setEditOpen(true);
+    router.push("/profile-setup");
   };
 
   const openDialog = (type: "created" | "sparked" | "contributed") => {
@@ -247,17 +239,16 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                       <Edit2 className="w-4 h-4" />
                     </Button>
                   ) : (
-                    <div className="flex gap-1.5">
-                      <Button
-                        variant="default"
-                        size="icon"
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
                         onClick={handleSendMessage}
-                        className="h-8 w-8 rounded-full flex-shrink-0"
+                        className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         title="Message"
+                        aria-label="Message"
                       >
-                        <MessageCircle className="w-4 h-4 text-white" />
-                        <span className="sr-only">Message</span>
-                      </Button>
+                        <MessageCircle className="h-5 w-5" />
+                      </button>
                       <InvitationButton
                         targetUser={{
                           _id: profile._id,
@@ -265,6 +256,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
                           displayName: profile.displayName,
                         }}
                         iconOnly
+                        iconOnlyClassName="inline-flex h-10 w-10 items-center justify-center rounded-full p-0 leading-none [&_svg]:block"
                       />
                     </div>
                   )}
@@ -353,20 +345,20 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         </Card>
 
         {/* 2. Stats Column (Span 1) */}
-        <div className="md:col-span-1 grid grid-cols-3 md:grid-cols-1 md:grid-rows-3 gap-3">
+        <div className="md:col-span-1 grid grid-cols-3 md:grid-cols-1 md:grid-rows-3 gap-2.5 md:gap-3">
           <Card
             className="shadow-sm border-border/40 hover:bg-muted/30 transition-all cursor-pointer group active:scale-[0.98]"
             onClick={() => openDialog("created")}
           >
-            <CardContent className="flex h-full min-h-[92px] flex-col items-center justify-center gap-2 p-3 text-center md:min-h-0 md:flex-row md:justify-between md:p-4 md:text-left">
-              <div className="flex flex-col items-center gap-2 md:flex-row md:gap-3">
-                <div className="p-2 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors">
-                  <Lightbulb className="w-4 h-4 text-primary" />
+            <CardContent className="flex h-full min-h-[74px] flex-col items-center justify-center gap-1.5 p-2 text-center sm:min-h-[92px] sm:gap-2 sm:p-3 md:min-h-0 md:flex-row md:justify-between md:p-4 md:text-left">
+              <div className="flex flex-col items-center gap-1.5 sm:gap-2 md:flex-row md:gap-3">
+                <div className="p-1.5 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors sm:p-2">
+                  <Lightbulb className="w-3.5 h-3.5 text-primary sm:h-4 sm:w-4" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors sm:text-sm">Created</span>
+                <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors sm:text-sm">Created</span>
               </div>
               <div className="flex items-center gap-1 md:gap-2">
-                <span className="text-lg font-bold text-foreground md:text-xl">{metrics.ideasCreated}</span>
+                <span className="text-base font-bold text-foreground sm:text-lg md:text-xl">{metrics.ideasCreated}</span>
                 <ChevronRight className="hidden w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors md:block" />
               </div>
             </CardContent>
@@ -376,15 +368,15 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
             className="shadow-sm border-border/40 hover:bg-muted/30 transition-all cursor-pointer group active:scale-[0.98]"
             onClick={() => openDialog("sparked")}
           >
-            <CardContent className="flex h-full min-h-[92px] flex-col items-center justify-center gap-2 p-3 text-center md:min-h-0 md:flex-row md:justify-between md:p-4 md:text-left">
-              <div className="flex flex-col items-center gap-2 md:flex-row md:gap-3">
-                <div className="p-2 bg-orange-500/10 rounded-full group-hover:bg-orange-500/20 transition-colors">
-                  <Sparkles className="w-4 h-4 text-orange-500" />
+            <CardContent className="flex h-full min-h-[74px] flex-col items-center justify-center gap-1.5 p-2 text-center sm:min-h-[92px] sm:gap-2 sm:p-3 md:min-h-0 md:flex-row md:justify-between md:p-4 md:text-left">
+              <div className="flex flex-col items-center gap-1.5 sm:gap-2 md:flex-row md:gap-3">
+                <div className="p-1.5 bg-orange-500/10 rounded-full group-hover:bg-orange-500/20 transition-colors sm:p-2">
+                  <Sparkles className="w-3.5 h-3.5 text-orange-500 sm:h-4 sm:w-4" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors sm:text-sm">Sparked</span>
+                <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors sm:text-sm">Sparked</span>
               </div>
               <div className="flex items-center gap-1 md:gap-2">
-                <span className="text-lg font-bold text-foreground md:text-xl">{metrics.ideasSparked}</span>
+                <span className="text-base font-bold text-foreground sm:text-lg md:text-xl">{metrics.ideasSparked}</span>
                 <ChevronRight className="hidden w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors md:block" />
               </div>
             </CardContent>
@@ -394,15 +386,15 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
             className="shadow-sm border-border/40 hover:bg-muted/30 transition-all cursor-pointer group active:scale-[0.98]"
             onClick={() => openDialog("contributed")}
           >
-            <CardContent className="flex h-full min-h-[92px] flex-col items-center justify-center gap-2 p-3 text-center md:min-h-0 md:flex-row md:justify-between md:p-4 md:text-left">
-              <div className="flex flex-col items-center gap-2 md:flex-row md:gap-3">
-                <div className="p-2 bg-violet-500/10 rounded-full group-hover:bg-violet-500/20 transition-colors">
-                  <UserPlus className="w-4 h-4 text-violet-500" />
+            <CardContent className="flex h-full min-h-[74px] flex-col items-center justify-center gap-1.5 p-2 text-center sm:min-h-[92px] sm:gap-2 sm:p-3 md:min-h-0 md:flex-row md:justify-between md:p-4 md:text-left">
+              <div className="flex flex-col items-center gap-1.5 sm:gap-2 md:flex-row md:gap-3">
+                <div className="p-1.5 bg-violet-500/10 rounded-full group-hover:bg-violet-500/20 transition-colors sm:p-2">
+                  <UserPlus className="w-3.5 h-3.5 text-violet-500 sm:h-4 sm:w-4" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors sm:text-sm">Contributed</span>
+                <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors sm:text-sm">Contributed</span>
               </div>
               <div className="flex items-center gap-1 md:gap-2">
-                <span className="text-lg font-bold text-foreground md:text-xl">{metrics.ideasContributed}</span>
+                <span className="text-base font-bold text-foreground sm:text-lg md:text-xl">{metrics.ideasContributed}</span>
                 <ChevronRight className="hidden w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors md:block" />
               </div>
             </CardContent>
@@ -412,8 +404,8 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
       </div>
 
       {/* Buttons & Actions (Badges and Awards + Contribution Requests) */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:mt-6 md:grid-cols-3 md:gap-4">
+        <div className={`md:col-span-2 grid gap-3 md:gap-4 ${isOwner ? "grid-cols-2 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2"}`}>
         {/* Badges and Awards button (Visible to everyone) */}
         <Link
           href={`/profile/${profile.username}/badges`}
@@ -423,15 +415,15 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
           <Button
             type="button"
             variant="outline"
-            className="h-14 w-full justify-between gap-3 rounded-xl px-4"
+            className="h-12 w-full justify-center gap-2 rounded-xl px-2 sm:h-14 sm:justify-between sm:gap-3 sm:px-4"
           >
-            <span className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/10 text-yellow-500">
-                <Trophy className="h-4 w-4" />
+            <span className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-yellow-500/10 text-yellow-500 sm:h-8 sm:w-8">
+                <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <span className="text-sm font-semibold">Award Showcase</span>
+              <span className="truncate text-xs font-semibold sm:text-sm">Award Showcase</span>
             </span>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronRight className="hidden h-4 w-4 text-muted-foreground sm:block" />
           </Button>
         </Link>
 
@@ -445,15 +437,18 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
             <Button
               type="button"
               variant="outline"
-              className="h-14 w-full justify-between gap-3 rounded-xl px-4"
+              className="h-12 w-full justify-center gap-2 rounded-xl px-2 sm:h-14 sm:justify-between sm:gap-3 sm:px-4"
             >
-              <span className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
-                  <UserPlus className="h-4 w-4" />
+              <span className="flex min-w-0 items-center gap-2 sm:gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-500 sm:h-8 sm:w-8">
+                  <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
-                <span className="text-sm font-semibold">Manage Contribution Requests</span>
+                <span className="truncate text-xs font-semibold sm:text-sm">
+                  <span className="sm:hidden">Contributions</span>
+                  <span className="hidden sm:inline">Manage Contribution Requests</span>
+                </span>
               </span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="hidden h-4 w-4 text-muted-foreground sm:block" />
             </Button>
           </Link>
         )}
@@ -476,11 +471,6 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         canEquipMore={equippedBadgeIds.length < 3}
         onEquipToggle={selectedBadge ? () => handleEquipToggle(selectedBadge.id) : undefined}
       />
-
-      {/* Owner-only Edit Profile modal — pencil button toggles this */}
-      {isOwner && (
-        <EditProfileModal open={editOpen} onOpenChange={setEditOpen} />
-      )}
     </div>
   );
 }

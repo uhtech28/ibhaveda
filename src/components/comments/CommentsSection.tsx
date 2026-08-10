@@ -130,12 +130,11 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
   const { roots, replies } = groupByParent(comments || []);
 
   return (
-    <div className="grid h-full min-h-0 min-w-0 grid-rows-[1fr_auto] w-full overflow-hidden">
-      {/* Scrollable comment list — overflow-x-hidden so long comment
-          text can never push the container wider than the dialog. */}
+    <div className="grid h-full min-h-0 w-full min-w-0 grid-rows-[1fr_auto] overflow-hidden">
+      {/* Scrollable comment list */}
       <div
         ref={scrollRef}
-        className="min-w-0 overflow-x-hidden overflow-y-auto pr-1 -mr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-track]:bg-transparent"
+        className="overflow-y-auto pr-1 -mr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {comments === undefined ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-[#6B7280]">
@@ -169,9 +168,9 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
       {/* Input — pinned bottom row of the grid */}
       <div className="pt-3 border-t border-white/8">
         {userId ? (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="min-w-0">
             <div
-              className={`relative rounded-[22px] border bg-[#0A0D12] transition-colors focus-within:bg-[#111827] ${
+              className={`relative w-full max-w-full overflow-hidden rounded-[22px] border bg-[#0A0D12] transition-colors focus-within:bg-[#111827] ${
                 isOverCommentLimit
                   ? "border-rose-500/80 focus-within:border-rose-400"
                   : "border-white/10 focus-within:border-[#6366F1]/45"
@@ -182,7 +181,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
                 placeholder="Share your thoughts…"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="block max-h-[84px] min-h-[44px] w-full resize-none rounded-[22px] bg-transparent py-3 pl-4 pr-14 text-sm leading-5 text-white placeholder:text-[#6B7280] outline-none focus:ring-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent"
+                className="block max-h-[84px] min-h-[44px] w-full min-w-0 resize-none rounded-[22px] bg-transparent py-3 pl-4 pr-14 text-sm leading-5 text-white placeholder:text-[#6B7280] outline-none focus:ring-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent"
                 disabled={isSubmitting}
                 rows={1}
                 onKeyDown={(e) => {
@@ -196,7 +195,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ ideaId }) => {
                 type="submit"
                 size="icon"
                 disabled={!content.trim() || isSubmitting || isOverCommentLimit}
-                className="absolute bottom-1.5 right-1.5 h-8 w-8 rounded-full bg-[#6366F1] text-white hover:bg-[#8B5CF6] disabled:opacity-40 disabled:hover:bg-[#6366F1]"
+                className="absolute bottom-1.5 right-1.5 grid h-8 w-8 place-items-center rounded-full bg-[#6366F1] p-0 text-white hover:bg-[#8B5CF6] disabled:opacity-40 disabled:hover:bg-[#6366F1]"
                 title="Post comment (⌘ + Enter)"
               >
                 {isSubmitting ? <Spinner size={14} /> : <Send className="h-4 w-4" />}
@@ -302,8 +301,8 @@ const CommentItem: React.FC<{
   };
 
   return (
-    <div className={`group min-w-0 ${level > 0 ? "ml-9" : ""}`}>
-      <div className="flex min-w-0 gap-3">
+    <div className={`group ${level > 0 ? "ml-9" : ""}`}>
+      <div className="flex gap-3">
         <Link
           href={comment.author?.username ? `/profile/${comment.author.username}` : "#"}
           className="shrink-0"
@@ -317,7 +316,7 @@ const CommentItem: React.FC<{
         </Link>
 
         <div className="min-w-0 flex-1">
-          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-2.5 transition-colors hover:border-white/12">
+          <div className="max-w-full rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-2.5 transition-colors hover:border-white/12">
             <div className="mb-1 flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <Link
@@ -389,21 +388,9 @@ const CommentItem: React.FC<{
                 placeholder="Write a reply…"
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
-                // text-base on mobile prevents iOS Safari's zoom-in
-                // on focus (triggered by any input with font-size < 16px,
-                // and Safari refuses to zoom back out).
-                className="min-h-[56px] flex-1 resize-none rounded-xl border border-white/8 bg-[#0A0D12] px-3 py-2 text-base text-white placeholder:text-[#6B7280] focus:border-[#6366F1]/45 focus:outline-none sm:text-sm"
+                className="min-h-[56px] flex-1 resize-none rounded-xl border border-white/8 bg-[#0A0D12] px-3 py-2 text-sm text-white placeholder:text-[#6B7280] focus:border-[#6366F1]/45 focus:outline-none"
                 maxLength={500}
-                // Imperative focus for iOS (autoFocus is ignored
-                // post-mount — gesture context is lost). The ref
-                // callback fires synchronously during the same tick as
-                // the Reply-toggle click, so iOS raises the keyboard.
-                ref={(el) => {
-                  if (el && typeof window !== "undefined" && !el.dataset.autofocused) {
-                    el.dataset.autofocused = "1";
-                    requestAnimationFrame(() => el.focus());
-                  }
-                }}
+                autoFocus
               />
               <Button
                 type="submit"

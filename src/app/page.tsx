@@ -1,12 +1,12 @@
 import HeroSection from "@/components/hero-section";
 import FooterSection from "@/components/footer";
-import LandingIntro from "@/components/landing-intro";
+// import LandingIntro from "@/components/landing-intro";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#070A0F]">
       {/* First-visit cinematic intro overlay */}
-      <LandingIntro />
+      {/* <LandingIntro /> */}
 
       {/* Hero + role cards — everything above the fold */}
       <HeroSection />

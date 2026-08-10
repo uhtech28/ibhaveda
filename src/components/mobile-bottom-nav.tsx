@@ -46,7 +46,7 @@ function MobileBottomNavContent() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 lg:hidden pb-safe">
-      <nav className="grid h-16 grid-cols-4 items-center px-2">
+      <nav className="grid h-16 grid-cols-4 items-center justify-items-center px-2">
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -58,14 +58,16 @@ function MobileBottomNavContent() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200",
+                "grid h-full w-full place-items-center content-center gap-1 transition-colors duration-200",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Icon className={cn("w-6 h-6", isActive && "fill-current")} />
-              <span className="text-[10px] font-medium">{item.name}</span>
+              <span className="grid h-6 w-6 place-items-center">
+                <Icon className={cn("h-5 w-5", isActive && "fill-current")} />
+              </span>
+              <span className="text-center text-[10px] font-medium leading-none">{item.name}</span>
             </Link>
           );
         })}

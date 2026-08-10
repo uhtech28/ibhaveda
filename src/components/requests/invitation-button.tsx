@@ -185,7 +185,15 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
             type="button"
             aria-label="Close invitation overlay"
             className="fixed inset-0 z-[10090] hidden bg-black/55 backdrop-blur-sm max-sm:block"
-            onClick={() => setIsPopoverOpen(false)}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsPopoverOpen(false);
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
           />
         )}
 
@@ -195,7 +203,7 @@ export const InvitationButton: React.FC<InvitationButtonProps> = ({ targetUser, 
           sideOffset={12}
           collisionPadding={16}
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className="relative w-[min(92vw,384px)] max-h-[80vh] overflow-y-auto pr-3 pt-3 max-sm:fixed max-sm:left-1/2 max-sm:top-1/2 max-sm:z-[10100] max-sm:w-[calc(100vw-2rem)] max-sm:max-w-[384px] max-sm:max-h-[min(72dvh,560px)] max-sm:-translate-x-1/2 max-sm:-translate-y-1/2 max-sm:overflow-hidden max-sm:rounded-2xl max-sm:border-white/10 max-sm:bg-[#111827] max-sm:p-3 max-sm:shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+          className="mobile-invitation-popover relative w-[min(92vw,384px)] max-h-[80vh] overflow-y-auto pr-3 pt-3 max-sm:z-[10100] max-sm:w-[calc(100vw-2rem)] max-sm:max-w-[384px] max-sm:max-h-[min(72dvh,560px)] max-sm:overflow-hidden max-sm:rounded-2xl max-sm:border-white/10 max-sm:bg-[#111827] max-sm:p-3 max-sm:shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
         >
           <button
             type="button"

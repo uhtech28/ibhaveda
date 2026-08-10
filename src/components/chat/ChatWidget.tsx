@@ -114,11 +114,23 @@ const ChatWidget: React.FC = () => {
       <button
         type="button"
         aria-label="Close chat"
-        onClick={handleClose}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          handleClose();
+        }}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
         className={BACKDROP_CLASS}
       />
 
-      <div className={positionClass}>
+      <div
+        className={positionClass}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
         <Card className={CARD_CLASS}>
           <Suspense fallback={<div className="p-4 text-center">Loading...</div>}>
             {selectedConversationId || selectedReceiverId ? (

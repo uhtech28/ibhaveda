@@ -65,7 +65,7 @@ export function IdeaForgeRightRail({
             type: classifyActiveTag(label, "industries"),
           })),
         ])
-        .filter((tag) => tag.label)
+        .filter((tag) => tag.label && tag.label.toLowerCase() !== "milestone")
         .reduce((tags, tag) => {
           const key = tag.label.toLowerCase();
           if (!tags.has(key)) tags.set(key, tag);
@@ -134,7 +134,7 @@ export function IdeaForgeRightRail({
                     onClick={() => onTagSelect(tag.label)}
                     className={cn(
                       transitionBase,
-                      "inline-flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[11px] font-medium",
+                      "inline-flex items-center justify-start gap-1.5 rounded-[8px] border px-3 py-1.5 text-left text-[11px] font-medium",
                       isSkill
                         ? "border-sky-500/35 bg-sky-500/10 text-sky-300 hover:bg-sky-500/16"
                         : "border-fuchsia-500/35 bg-fuchsia-500/12 text-fuchsia-300 hover:bg-fuchsia-500/18"

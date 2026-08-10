@@ -1,8 +1,9 @@
 "use client";
 
-import { SignUpButton, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { GraduationCap, TrendingUp, Rocket, Building2, ArrowRight } from "lucide-react";
+import { useAuthModal } from "@/components/auth/auth-modal";
 
 export const SELECTED_ROLE_KEY = "ii.selectedRole";
 
@@ -47,6 +48,7 @@ const ROLES = [
 
 export default function RoleSelector() {
   const { isSignedIn } = useUser();
+  const { openSignUp } = useAuthModal();
   const router = useRouter();
 
   const handleSelect = (role: string) => {
@@ -134,16 +136,18 @@ export default function RoleSelector() {
           }
 
           return (
-            <SignUpButton key={role.key} mode="modal" forceRedirectUrl="/profile-setup">
-              <button
-                type="button"
-                onClick={() => handleSelect(role.key)}
-                className={cardClass}
-                aria-label={`Sign up as ${role.label}`}
-              >
-                {inner}
-              </button>
-            </SignUpButton>
+            <button
+              key={role.key}
+              type="button"
+              onClick={() => {
+                handleSelect(role.key);
+                openSignUp();
+              }}
+              className={cardClass}
+              aria-label={`Sign up as ${role.label}`}
+            >
+              {inner}
+            </button>
           );
         })}
       </div>

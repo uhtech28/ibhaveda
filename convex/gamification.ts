@@ -432,6 +432,17 @@ export const internalAwardPoints = internalMutation({
             createdAt: Date.now(),
         });
 
+        await db.insert("analytics_events", {
+            userId: args.userId,
+            sessionId: "server",
+            eventName: "xp_awarded",
+            eventCategory: "engagement",
+            properties: { amount: args.amount, type: args.type, description: args.description },
+            timestamp: Date.now(),
+            serverTimestamp: Date.now(),
+            sequenceNumber: 0,
+        });
+
         // Mirror the award into the userLevels.titlePoints/totalPoints so the
         // Level progress bar in the profile UI actually moves. This unifies the
         // two parallel reward systems (wallet + userLevels) so creating ideas,

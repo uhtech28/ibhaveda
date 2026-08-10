@@ -8,7 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, AlertCircle, Lightbulb, Sparkles, Send, Trophy, UserPlus } from "lucide-react";
+import { Users, AlertCircle, Lightbulb, Sparkles, MessageCircle, Trophy, UserPlus } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { HeroHeader } from "@/components/header";
 import { Spinner } from "@/components/ui/spinner";
@@ -138,11 +138,11 @@ export default function CommunityPage() {
           </div>
 
           <LeaderboardErrorBoundary>
-            <WeeklyPodiumTabs />
+            <WeeklyLeaderboard />
           </LeaderboardErrorBoundary>
 
           {/* Users Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredUsers.filter(user => user.clerkId !== clerkUser?.id).map((user: UserProfile) => (
               <UserCard
                 key={user._id}
@@ -274,59 +274,6 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
   );
 };
 
-/**
- * WeeklyPodiumTabs — switchable podium: Top Contributors (people) vs
- * Top Projects (ideas). Product asked for a Top Projects section next
- * to Top Contributors — implemented as an in-place tab so they share
- * the same podium layout instead of adding a second full section that
- * pushes the user grid off-screen. State-only, no URL sync (the whole
- * page already reads/writes `?q=` for search — keeping this local
- * avoids an unrelated URL churn).
- */
-const WeeklyPodiumTabs = () => {
-  const [tab, setTab] = React.useState<"contributors" | "projects">(
-    "contributors",
-  );
-
-  return (
-    <div className="mb-16">
-      {/* Tab switcher — same visual weight for both tabs so neither
-          feels "primary". Uses the same yellow-gold accent as the
-          Trophy header for consistency. */}
-      <div className="flex items-center justify-center gap-2 mb-6">
-        <button
-          type="button"
-          onClick={() => setTab("contributors")}
-          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold transition-all ${
-            tab === "contributors"
-              ? "border-yellow-500/60 bg-yellow-500/10 text-yellow-300"
-              : "border-border/60 text-muted-foreground hover:border-yellow-500/30 hover:text-foreground"
-          }`}
-          aria-pressed={tab === "contributors"}
-        >
-          <Trophy className="w-4 h-4" />
-          Top Contributors
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("projects")}
-          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold transition-all ${
-            tab === "projects"
-              ? "border-yellow-500/60 bg-yellow-500/10 text-yellow-300"
-              : "border-border/60 text-muted-foreground hover:border-yellow-500/30 hover:text-foreground"
-          }`}
-          aria-pressed={tab === "projects"}
-        >
-          <Lightbulb className="w-4 h-4" />
-          Top Projects
-        </button>
-      </div>
-
-      {tab === "contributors" ? <WeeklyLeaderboard /> : <WeeklyTopProjects />}
-    </div>
-  );
-};
-
 const WeeklyLeaderboard = () => {
   const topUsers = useQuery(api.leaderboard.getWeeklyLeaderboard, { limit: 3 });
 
@@ -340,7 +287,7 @@ const WeeklyLeaderboard = () => {
   const third = topUsers[2];
 
   return (
-    <div>
+    <div className="mb-16">
       <div className="flex items-center justify-center gap-3 mb-8">
         <Trophy className="w-8 h-8 text-yellow-500" />
         <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
@@ -370,172 +317,6 @@ const WeeklyLeaderboard = () => {
         </div>
       </div>
     </div>
-  );
-};
-
-/**
- * WeeklyTopProjects — Top-3 ideas podium. Ranks by spark count with
- * contribution count as tiebreaker and creation recency as final
- * tiebreaker, matching the "Trending Ideas" logic already used in
- * `IdeaRightRail` (single source of truth for what "trending" means
- * on this app). Reads from the same `getPublicIdeasFast` query the
- * feed uses so we don't add a second server-side query for ranking.
- */
-const WeeklyTopProjects = () => {
-  const publicIdeas = useQuery(api.ideas.getPublicIdeasFast);
-
-  const ranked = React.useMemo(() => {
-    if (!publicIdeas) return [] as typeof publicIdeas;
-    return [...publicIdeas]
-      .sort(
-        (a, b) =>
-          (b.sparkCount || 0) - (a.sparkCount || 0) ||
-          (b.contributionCount || 0) - (a.contributionCount || 0) ||
-          (b.createdAt || 0) - (a.createdAt || 0),
-      )
-      .slice(0, 3);
-  }, [publicIdeas]);
-
-  if (publicIdeas === undefined) return null; // loading — fail silently
-  if (ranked.length === 0) return null;
-
-  const [first, second, third] = ranked;
-
-  return (
-    <div>
-      <div className="flex items-center justify-center gap-3 mb-8">
-        <Lightbulb className="w-8 h-8 text-yellow-500" />
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
-          Weekly Top Projects
-        </h2>
-        <Lightbulb className="w-8 h-8 text-yellow-500" />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
-        <div className="md:order-2">
-          {first && <ProjectPodiumCard idea={first} rank={1} />}
-        </div>
-        <div className="md:order-1">
-          {second ? (
-            <ProjectPodiumCard idea={second} rank={2} />
-          ) : (
-            <div className="hidden md:block" />
-          )}
-        </div>
-        <div className="md:order-3">
-          {third ? (
-            <ProjectPodiumCard idea={third} rank={3} />
-          ) : (
-            <div className="hidden md:block" />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/**
- * Podium card for an idea/project. Mirrors PodiumCard's layout so the
- * two tabs feel like the same widget. Metric shown is spark count
- * (the driver of the ranking) so the number the user sees explains
- * why the project placed where it did.
- *
- * `ProjectPodiumItem` is a structural subset of what `getPublicIdeasFast`
- * returns — declared inline (rather than piped through the Convex type
- * pipeline) so the file stays self-contained and doesn't couple its
- * types to `useQuery`'s complex generic.
- */
-interface ProjectPodiumItem {
-  _id: string;
-  title: string;
-  sparkCount?: number;
-  contributionCount?: number;
-  createdAt?: number;
-  author?: { username?: string | null } | null;
-}
-
-const ProjectPodiumCard: React.FC<{ idea: ProjectPodiumItem; rank: 1 | 2 | 3 }> = ({
-  idea,
-  rank,
-}) => {
-  const styles = RANK_STYLES[rank];
-  const isFirst = rank === 1;
-  const heightClass =
-    rank === 1
-      ? "md:min-h-[300px]"
-      : rank === 2
-        ? "md:min-h-[240px]"
-        : "md:min-h-[210px]";
-  const sparks = idea.sparkCount ?? 0;
-
-  return (
-    <Card
-      className={`relative overflow-hidden border-2 ${styles.border} ${styles.bg} ${heightClass} shadow-lg flex flex-col items-center justify-center text-center transition-transform duration-300 hover:scale-[1.03] ${
-        isFirst ? "p-6 md:p-8" : "p-4 md:p-5"
-      }`}
-    >
-      <div
-        className={`absolute top-0 left-0 w-full ${isFirst ? "h-1.5" : "h-1"} ${styles.accent}`}
-      />
-
-      <div
-        className={`flex items-center justify-center rounded-full text-white font-bold shadow-md ${styles.accent} ${
-          isFirst ? "w-12 h-12 text-lg -mt-2 mb-3" : "w-9 h-9 text-sm -mt-1 mb-2"
-        }`}
-        aria-label={`Rank ${rank}`}
-      >
-        #{rank}
-      </div>
-
-      <Link
-        href={`/idea/${idea._id}`}
-        className="w-full flex flex-col items-center"
-      >
-        {/* Reuse the avatar slot for the idea's Lightbulb icon so the
-            card silhouette matches the user PodiumCard exactly. */}
-        <div
-          className={`shadow-md border-4 ${styles.avatarRing} rounded-full bg-background flex items-center justify-center ${
-            isFirst ? "w-24 h-24 mb-4" : "w-16 h-16 mb-3"
-          }`}
-        >
-          <Lightbulb
-            className={`text-yellow-400 ${isFirst ? "w-10 h-10" : "w-7 h-7"}`}
-          />
-        </div>
-
-        <h3
-          className={`font-bold text-foreground truncate w-full hover:text-primary transition-colors ${
-            isFirst ? "text-xl" : "text-base"
-          }`}
-        >
-          {idea.title}
-        </h3>
-        <p
-          className={`text-muted-foreground ${
-            isFirst ? "text-xs mb-4" : "text-[11px] mb-3"
-          }`}
-        >
-          @{idea.author?.username ?? "anonymous"}
-        </p>
-
-        <div
-          className={`bg-background rounded-full border border-border/50 flex items-center gap-1.5 ${
-            isFirst ? "px-4 py-1.5" : "px-3 py-1"
-          }`}
-        >
-          <span
-            className={`font-bold font-mono ${styles.pointsText} ${isFirst ? "text-base" : "text-sm"}`}
-          >
-            {sparks}
-          </span>
-          <span
-            className={`text-muted-foreground font-medium uppercase tracking-wider ${isFirst ? "text-xs" : "text-[10px]"}`}
-          >
-            Sparks
-          </span>
-        </div>
-      </Link>
-    </Card>
   );
 };
 
@@ -579,9 +360,18 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
   const showcaseBadgeColors = ["#10B981", "#F97316", "#06B6D4"];
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 relative flex h-[220px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+    <Card className="group relative flex h-[232px] flex-col overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:shadow-lg">
       {!isCurrentUser && currentUserId && (
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute right-5 top-10 z-10 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary p-0 text-white shadow-xs transition-all hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            onClick={handleMessageClick}
+            title="Message"
+            aria-label={`Message ${user.displayName}`}
+          >
+            <MessageCircle className="h-3 w-3" />
+          </button>
           <InvitationButton
             targetUser={{
               _id: user._id,
@@ -589,24 +379,14 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
               displayName: user.displayName,
             }}
             iconOnly
-            iconOnlyClassName="h-7 w-7 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
+            iconOnlyClassName="inline-flex h-6 w-6 items-center justify-center rounded-full border-border/60 p-0 leading-none transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary [&_svg]:block [&_svg]:h-3 [&_svg]:w-3"
           />
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0 rounded-md border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all"
-            onClick={handleMessageClick}
-            title="Message"
-            aria-label={`Message ${user.displayName}`}
-          >
-            <Send className="w-3 h-3" />
-          </Button>
         </div>
       )}
-      <div className="grid shrink-0 grid-rows-[42px_22px_24px_24px_42px] px-4 pb-0.5 pt-2">
+      <div className="flex h-full flex-col px-5 pb-5 pt-5">
         <Link href={profileHref} className="block">
           {/* Header: Avatar & Name */}
-          <div className="flex items-center gap-3 pr-20">
+          <div className="flex items-center gap-3 pr-16">
             <Avatar className="w-8 h-8 border-2 border-background shadow-sm shrink-0">
               <AvatarImage src={user.avatar} alt={user.displayName} className="object-cover" />
               <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
@@ -644,48 +424,64 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
 
         </Link>
 
-        <Link href={profileHref} className="block min-w-0">
+        <Link href={profileHref} className="mt-4 block min-w-0">
           <p className="line-clamp-1 text-[10px] leading-5 text-muted-foreground">
             {bio || emptyProfileText}
           </p>
         </Link>
 
-        <div className="flex min-w-0 flex-wrap items-start gap-1 overflow-hidden py-0.5">
-          {visibleIndustries.map((ind, i) => (
-            <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
-              {ind}
+        <div className="mt-3 flex min-h-6 min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          {visibleIndustries.length > 0 ? (
+            <>
+              {visibleIndustries.map((ind, i) => (
+                <span key={`ind-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(ind); }} className="cursor-pointer truncate max-w-[150px] rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
+                  {ind}
+                </span>
+              ))}
+              {hiddenIndustryCount > 0 && (
+                <Link
+                  href={profileHref}
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0 rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
+                >
+                  +{hiddenIndustryCount}
+                </Link>
+              )}
+            </>
+          ) : (
+            <span className="truncate text-[10px] font-medium text-muted-foreground">
+              No industry listed
             </span>
-          ))}
-          {hiddenIndustryCount > 0 && (
-            <Link
-              href={profileHref}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
-            >
-              +{hiddenIndustryCount} more
-            </Link>
           )}
-        </div>
+          </div>
 
-        <div className="flex min-w-0 flex-wrap items-start gap-1 overflow-hidden py-0.5">
-          {visibleSkills.map((skill, i) => (
-            <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
-              {skill}
+        <div className="mt-1 flex min-h-6 min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          {visibleSkills.length > 0 ? (
+            <>
+              {visibleSkills.map((skill, i) => (
+                <span key={`skill-${i}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTagClick?.(skill); }} className="cursor-pointer truncate max-w-[112px] rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                  {skill}
+                </span>
+              ))}
+              {hiddenSkillCount > 0 && (
+                <Link
+                  href={profileHref}
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0 rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
+                >
+                  +{hiddenSkillCount}
+                </Link>
+              )}
+            </>
+          ) : (
+            <span className="truncate text-[10px] font-medium text-muted-foreground">
+              No skills listed
             </span>
-          ))}
-          {hiddenSkillCount > 0 && (
-            <Link
-              href={profileHref}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
-            >
-              +{hiddenSkillCount} more
-            </Link>
           )}
-        </div>
+          </div>
 
           {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-1 border-b border-t border-border/40 py-1">
+          <div className="mb-5 mt-auto grid grid-cols-3 gap-1 border-b border-t border-border/40 py-2">
             <button
               type="button"
               onClick={() => openStatsDialog("created")}
