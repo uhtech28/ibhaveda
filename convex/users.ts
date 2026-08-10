@@ -1,8 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalAction, internalQuery } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { Id, Doc } from "./_generated/dataModel";
 import { ConvexError } from "convex/values";
-import { internal } from "./_generated/api";
 
 export type UserProfile = Doc<"users"> & {
   skills: string[];
@@ -969,69 +968,161 @@ export const getPersonaGender = query({
   },
 });
 
-// Called from the Clerk webhook when user.created fires — stores email on the
-// Convex user row once onboarding completes and the row exists.
-export const storeEmailFromWebhook = internalMutation({
-  args: { clerkId: v.string(), email: v.string() },
-  handler: async (ctx, { clerkId, email }) => {
-    const user = await ctx.db
+// ─────────────────────────────────────────────────────────────────────
+// PRD §3.1 — 10-persona picker (currently 8 supported in the UI).
+// Writes to users.personaId. Schema keeps all 10 literals for
+// backward compat (see convex/schema.ts) — this mutation validates
+// the 8 personas we actually have art for.
+// ─────────────────────────────────────────────────────────────────────
+
+const SUPPORTED_PERSONA_IDS = [
+  "arcanist",
+  "alchemist",
+  "artisan",
+  "drifter",
+  "oracle",
+  "engineer",
+  "healer",
+  "pathfinder",
+] as const;
+
+export const updatePersonaId = mutation({
+  args: {
+    personaId: v.union(
+      v.literal("arcanist"),
+      v.literal("alchemist"),
+      v.literal("artisan"),
+      v.literal("drifter"),
+      v.literal("oracle"),
+      v.literal("engineer"),
+      v.literal("healer"),
+      v.literal("pathfinder"),
+    ),
+  },
+  handler: async ({ db, auth }, args) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const profile = await db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
       .first();
-    if (!user) return; // row not yet created — webhook fired before onboarding
-    if (user.email) return; // already stored, skip
-    await ctx.db.patch(user._id, { email });
-  },
-});
+    if (!profile) throw new Error("User profile not found");
 
-// Internal helper — patches a single user's email. Called by the backfill action.
-export const patchUserEmail = internalMutation({
-  args: { userId: v.id("users"), email: v.string() },
-  handler: async (ctx, { userId, email }) => {
-    await ctx.db.patch(userId, { email });
-  },
-});
-
-// One-time backfill action: reads all users missing email, fetches from Clerk,
-// and patches each one. Run once from the Convex dashboard after deploying to prod.
-export const backfillUserEmails = internalAction({
-  args: {},
-  handler: async (ctx) => {
-    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-    if (!clerkSecretKey) throw new Error("CLERK_SECRET_KEY not set");
-
-    const users = await ctx.runQuery(internal.users.getUsersMissingEmail);
-
-    for (const user of users) {
-      try {
-        const res = await fetch(
-          `https://api.clerk.com/v1/users/${user.clerkId}`,
-          { headers: { Authorization: `Bearer ${clerkSecretKey}` } }
-        );
-        if (!res.ok) continue;
-        const data = (await res.json()) as {
-          email_addresses?: Array<{ email_address: string }>;
-        };
-        const email = data.email_addresses?.[0]?.email_address;
-        if (email) {
-          await ctx.runMutation(internal.users.patchUserEmail, {
-            userId: user._id,
-            email,
-          });
-        }
-      } catch {
-        // skip individual failures, continue backfill
-      }
+    // Extra runtime guard — schema allows 10 literals but only 8 are
+    // shipped. Bail loudly if a rogue client sends ranger/sage.
+    if (!SUPPORTED_PERSONA_IDS.includes(args.personaId)) {
+      throw new Error(
+        `Persona "${args.personaId}" is not shipped yet — pick one of ${SUPPORTED_PERSONA_IDS.join(", ")}`,
+      );
     }
+
+    await db.patch(profile._id, {
+      personaId: args.personaId,
+      updatedAt: Date.now(),
+    });
+    return { success: true, personaId: args.personaId };
   },
 });
 
-export const getUsersMissingEmail = internalQuery({
+// Read helper — Phaser scenes use this to render the correct sprite.
+export const getMyPersonaId = query({
   args: {},
-  handler: async (ctx) => {
-    return await ctx.db
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
       .query("users")
-      .filter((q) => q.eq(q.field("email"), undefined))
-      .collect();
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    return profile?.personaId ?? null;
+  },
+});
+
+// Read another user's persona so the viewer-mode map (visiting someone
+// else's venture) can render the venture owner's character instead of
+// the viewer's. Returns null if the user hasn't picked one — the caller
+// falls back to the default persona in that case.
+export const getPersonaIdForUser = query({
+  args: { userId: v.id("users") },
+  handler: async ({ db }, args) => {
+    const profile = await db.get(args.userId);
+    return profile?.personaId ?? null;
+  },
+});
+
+// ── First-time boss intro cinematic ──────────────────────────────────
+// A one-shot cinematic plays on the user's first visit to /map/world.
+// The Unraveller (main boss) rises up and challenges them, then the
+// four checkpoint bosses reveal one by one. After it plays we mark
+// this flag true so it never plays again for this user.
+
+export const getMyBossIntroSeen = query({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    // Missing field is treated as unseen — first-time users trigger
+    // the cinematic on their first map visit.
+    return profile?.hasSeenBossIntro === true;
+  },
+});
+
+export const markBossIntroSeen = mutation({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!profile) return null;
+    if (profile.hasSeenBossIntro === true) return { alreadySeen: true };
+    await db.patch(profile._id, {
+      hasSeenBossIntro: true,
+      updatedAt: Date.now(),
+    });
+    return { alreadySeen: false };
+  },
+});
+
+// ── Gate of Ibhaveda onboarding intro ────────────────────────────────
+// Plays once, immediately after signup, before username/persona pick.
+// See ibhaveda-onboarding-intro-doc.pdf for the full creative brief.
+
+export const getMyGateIntroSeen = query({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    return profile?.hasSeenGateIntro === true;
+  },
+});
+
+export const markGateIntroSeen = mutation({
+  args: {},
+  handler: async ({ db, auth }) => {
+    const identity = await auth.getUserIdentity();
+    if (!identity) return null;
+    const profile = await db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!profile) return null;
+    if (profile.hasSeenGateIntro === true) return { alreadySeen: true };
+    await db.patch(profile._id, {
+      hasSeenGateIntro: true,
+      updatedAt: Date.now(),
+    });
+    return { alreadySeen: false };
   },
 });

@@ -1,12 +1,12 @@
-/**
+﻿/**
  * venture.config.ts
  *
  * Venture template configuration.
  * Wraps the existing VENTURE_STAGES / CHECKPOINT_DEFINITIONS from ventureConstants.ts
- * as a ProjectTemplate config — no existing constants are modified.
+ * as a ProjectTemplate config â€” no existing constants are modified.
  *
- * Theme: Dark Tech Platform — Indigo / Purple / Cyan
- * Quality Metric: Valuation Score (₹, higher is better)
+ * Theme: Dark Tech Platform â€” Indigo / Purple / Cyan
+ * Quality Metric: Valuation Score (â‚¹, higher is better)
  */
 
 import type {
@@ -16,12 +16,12 @@ import type {
   BiomeThemeConfig,
 } from "./templateTypes";
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // BIOME THEMES (per stage)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
-  { // Stage 1 — Ideation Hub (Village)
+  { // Stage 1 â€” Ideation Hub (Village)
     primaryColor: 0x6366f1,
     secondaryColor: 0x818cf8,
     particleStyle: "circuit_nodes",
@@ -30,7 +30,7 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
     weatherEffect: "none",
     bgColor: "#0f0f1a",
   },
-  { // Stage 2 — Research Lab (Forest)
+  { // Stage 2 â€” Research Lab (Forest)
     primaryColor: 0x8b5cf6,
     secondaryColor: 0xa78bfa,
     particleStyle: "circuit_nodes",
@@ -39,7 +39,7 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
     weatherEffect: "none",
     bgColor: "#0f0f1a",
   },
-  { // Stage 3 — Validation Center (Arena)
+  { // Stage 3 â€” Validation Center (Arena)
     primaryColor: 0x06b6d4,
     secondaryColor: 0x22d3ee,
     particleStyle: "circuit_nodes",
@@ -48,7 +48,7 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
     weatherEffect: "none",
     bgColor: "#0a0a14",
   },
-  { // Stage 4 — Offer Design Studio (Artisan)
+  { // Stage 4 â€” Offer Design Studio (Artisan)
     primaryColor: 0xf59e0b,
     secondaryColor: 0xfbbf24,
     particleStyle: "circuit_nodes",
@@ -57,7 +57,7 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
     weatherEffect: "none",
     bgColor: "#0f0a00",
   },
-  { // Stage 5 — Build & Deliver Zone (Mine)
+  { // Stage 5 â€” Build & Deliver Zone (Mine)
     primaryColor: 0x3b82f6,
     secondaryColor: 0x60a5fa,
     particleStyle: "circuit_nodes",
@@ -66,7 +66,7 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
     weatherEffect: "none",
     bgColor: "#070714",
   },
-  { // Stage 6 — Launch Pad (Harbour)
+  { // Stage 6 â€” Launch Pad (Harbour)
     primaryColor: 0xef4444,
     secondaryColor: 0xf87171,
     particleStyle: "circuit_nodes",
@@ -75,7 +75,7 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
     weatherEffect: "none",
     bgColor: "#140a0a",
   },
-  { // Stage 7 — Iteration Engine (Crossroads)
+  { // Stage 7 â€” Iteration Engine (Crossroads)
     primaryColor: 0x10b981,
     secondaryColor: 0x34d399,
     particleStyle: "circuit_nodes",
@@ -84,7 +84,7 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
     weatherEffect: "none",
     bgColor: "#001a0f",
   },
-  { // Stage 8 — Scale Summit (Capital)
+  { // Stage 8 â€” Scale Summit (Capital)
     primaryColor: 0xfbbf24,
     secondaryColor: 0xfde68a,
     particleStyle: "circuit_nodes",
@@ -95,13 +95,13 @@ const VENTURE_BIOME_THEMES: BiomeThemeConfig[] = [
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MONSTERS (one per stage — PRD §4.1)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// MONSTERS (one per stage â€” PRD Â§4.1)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Per Ibhaveda_boss_corruption_table Stage Monsters sheet: each Venture
 // stage has ONE local stage-monster. The 12-boss Super Boss Pool is a
-// separate project-scoped random assignment — see SUPER_BOSS_POOL below.
+// separate project-scoped random assignment â€” see SUPER_BOSS_POOL below.
 const VENTURE_MONSTERS: MonsterConfig[] = [
   {
     id: "venture_fog_of_vagueness",
@@ -109,7 +109,7 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
     stageId: 1,
     lore: "Pale blue-grey mist that swallows every noticeboard until the founder names the problem exactly.",
     represents: "Vague problem-framing",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
   {
@@ -118,16 +118,16 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
     stageId: 2,
     lore: "A tangled forest spectre that hoards every side-path until the founder commits to one route.",
     represents: "Endless research without direction",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
   {
     id: "venture_advocate_of_lies",
     name: "The Advocate of Comfortable Lies",
     stageId: 3,
-    lore: "A slick barrister who reframes assumptions as facts — falls silent only when real evidence lands.",
+    lore: "A slick barrister who reframes assumptions as facts â€” falls silent only when real evidence lands.",
     represents: "Untested assumptions",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
   {
@@ -136,7 +136,7 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
     stageId: 4,
     lore: "A half-forged stone giant that crumbles the moment the founder ships one buyable offer instead of ten drafts.",
     represents: "Perpetual polishing without release",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
   {
@@ -145,7 +145,7 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
     stageId: 5,
     lore: "A dark-grey rubble-shrouded wraith that dispels the moment the founder ships the smallest working version.",
     represents: "Fear of the first shipped build",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
   {
@@ -154,7 +154,7 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
     stageId: 6,
     lore: "A bureaucrat wreathed in blue-grey storm-fog that clears the moment the founder names the launch date out loud.",
     represents: "Hesitation at the launch window",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
   {
@@ -163,7 +163,7 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
     stageId: 7,
     lore: "A shrouded figure of black-and-white static who dissipates the moment the founder commits to one message.",
     represents: "Message dilution across iterations",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
   {
@@ -172,12 +172,12 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
     stageId: 8,
     lore: "An armored chain-wrapped figure that shatters the moment the founder names one system to automate this quarter.",
     represents: "Scale-time process paralysis",
-    role: "stage_monster",
+    role: "mini_boss",
     spriteKey: "procedural",
   },
 ];
 
-// 12-boss Super Boss Pool — one is RANDOMLY assigned per project at
+// 12-boss Super Boss Pool â€” one is RANDOMLY assigned per project at
 // venture creation (see createTemplatedVenture). These are project-
 // scoped villains, NOT per-stage. Sourced from Ibhaveda_boss_corruption_
 // table Sheet 1 "Super Boss Pool - 12 Bosses".
@@ -187,14 +187,14 @@ const VENTURE_MONSTERS: MonsterConfig[] = [
 // reads these when a super boss is instantiated as a MovingBossHandle
 // and plays each clip if present. Missing clips fall through per the
 // resolveState() chain:
-//   defeat  → hurt → idle
-//   victory → attack → idle
+//   defeat  â†’ hurt â†’ idle
+//   victory â†’ attack â†’ idle
 // so a boss shipped with only idle+attack still plays a "victory"
 // pose (by re-using its attack sheet) and a "defeat" (by re-using
 // hurt if present, else static idle).
 //
 // Frame descriptor defaults: Pixellab exports at this template are
-// 92×92 with 9 frames per state. Overrides per-clip are supported
+// 92Ã—92 with 9 frames per state. Overrides per-clip are supported
 // via BossClipMeta.frameWidth/frameHeight/frameCount.
 export interface SuperBossClip {
   asset: string;
@@ -211,8 +211,8 @@ export interface SuperBossPoolEntry {
    *  the "when nothing else loads" fallback path. */
   idleAsset?: string;
   /** Per-state animation clips. `idle` overrides idleAsset when both
-   *  are present. All fields optional — helper falls back through
-   *  defeat→hurt→idle and victory→attack→idle. */
+   *  are present. All fields optional â€” helper falls back through
+   *  defeatâ†’hurtâ†’idle and victoryâ†’attackâ†’idle. */
   idleClip?: SuperBossClip;
   attackClip?: SuperBossClip;
   hurtClip?: SuperBossClip;
@@ -225,18 +225,18 @@ export interface SuperBossPoolEntry {
     "north" | "north-east" | "east" | "south-east" | "south" | "south-west" | "west" | "north-west",
     string
   >>;
-  /** Boss size scale on the map — pool bosses default to 2.4 (final
+  /** Boss size scale on the map â€” pool bosses default to 2.4 (final
    *  boss reveal, bigger than stage minis at 1.9). */
   spriteScale?: number;
-  /** Y offset from CP marker — pool bosses default to 40 (higher
+  /** Y offset from CP marker â€” pool bosses default to 40 (higher
    *  than mini bosses so the sword-with-wings crest reads clearly). */
   spriteYOffset?: number;
   spriteXOffset?: number;
 }
 
-// Pixellab helper — most sheets are 92×92×9. Some pool bosses ship at
-// different dims (Tide Caller = 164×164, Stonecaller idle rotations
-// = 256×256). Per-clip overrides handle those.
+// Pixellab helper â€” most sheets are 92Ã—92Ã—9. Some pool bosses ship at
+// different dims (Tide Caller = 164Ã—164, Stonecaller idle rotations
+// = 256Ã—256). Per-clip overrides handle those.
 const P92 = { frameCount: 9, frameWidth: 92, frameHeight: 92 } as const;
 const T164 = { frameCount: 9, frameWidth: 164, frameHeight: 164 } as const;
 
@@ -247,9 +247,9 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     represents: "Doubt and loss of direction",
     // Village-stage idle (kept as the low-alpha silhouette on the map
     // before reveal) + newly-extracted anim strips from the user's
-    // GIF uploads at 96×96 (four_purple_serpentine idle 9f + strike
-    // attack 9f). Rotations at 92×92 from A_colossal_serpent zip.
-    // Frame-size differs between rotations (92) and anims (96) —
+    // GIF uploads at 96Ã—96 (four_purple_serpentine idle 9f + strike
+    // attack 9f). Rotations at 92Ã—92 from A_colossal_serpent zip.
+    // Frame-size differs between rotations (92) and anims (96) â€”
     // per-clip dims respect that.
     idleAsset: "/assets/bosses/village/unraveller/idle.png",
     idleClip:   { asset: "/assets/bosses/super-pool/unraveller/idle.png",   frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 6 },
@@ -270,8 +270,8 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_pale_architect",
     name: "The Pale Architect",
     represents: "Perfectionism and paralysis",
-    // Rotations at 88×88 from A_towering_undead_titan_boss.zip +
-    // newly-extracted anim strips at 92×92 from the user's GIF
+    // Rotations at 88Ã—88 from A_towering_undead_titan_boss.zip +
+    // newly-extracted anim strips at 92Ã—92 from the user's GIF
     // uploads (armored_skeleton stands firmly 9f = idle, armored_
     // skeleton lunges forward 11f = attack). Per-clip frame dims
     // handle the 88/92 split.
@@ -294,13 +294,13 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_hollow_king",
     name: "The Hollow King",
     represents: "Loss of purpose",
-    // Rotations at 92×92 from A_grand_spectral_king_boss.zip + FULL
+    // Rotations at 92Ã—92 from A_grand_spectral_king_boss.zip + FULL
     // 5-clip anim set from the user's GIF uploads (Tall_armored_king_
     // in_tarnished breathing-idle 4f + custom king-slumps defeat 9f +
     // custom taking-damage hurt 9f + grand-spectral-king dark-figure-
     // raises-staff attack 9f + grand-spectral-king armored-king-plants
-    // 9f as victory). Frame sizes: idle/hurt/defeat = 92×92 native
-    // (from Tall_armored_king pack); attack/victory = 88×88 native
+    // 9f as victory). Frame sizes: idle/hurt/defeat = 92Ã—92 native
+    // (from Tall_armored_king pack); attack/victory = 88Ã—88 native
     // (from A_grand_spectral_king pack). Per-clip dims respect that.
     idleAsset: "/assets/bosses/super-pool/hollow-king/idle.png",
     idleClip:    { asset: "/assets/bosses/super-pool/hollow-king/idle.png",    frameCount: 4, frameWidth: 92, frameHeight: 92, fps: 4 },
@@ -325,11 +325,11 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     name: "The Thornwarden",
     represents: "Bureaucracy and friction",
     // Extracted from `Massive_humanoid_tree-giant_trunk-body_covered (1).zip`
-    // — 8-dir rotations at 96×96 + 3 stitched frame sequences:
+    // â€” 8-dir rotations at 96Ã—96 + 3 stitched frame sequences:
     //   idle.png = Breathing_Idle 4-frame loop
     //   attack.png = tree-creature-draws-itself-up 9 frames
     //   hurt.png = creature-recoils-sharply 9 frames
-    // No defeat/victory anims shipped → fallback chain uses hurt/attack.
+    // No defeat/victory anims shipped â†’ fallback chain uses hurt/attack.
     idleAsset: "/assets/bosses/super-pool/thornwarden/idle.png",
     idleClip:   { asset: "/assets/bosses/super-pool/thornwarden/idle.png",   frameCount: 4, frameWidth: 96, frameHeight: 96, fps: 4 },
     attackClip: { asset: "/assets/bosses/super-pool/thornwarden/attack.png", frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 10 },
@@ -350,8 +350,8 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_mirror_witch",
     name: "The Mirror Witch",
     represents: "Self-deception",
-    // 8-dir rotations at 92×92 from A_tall_elegant_sorceress_boss.zip
-    // + anim strips at 92×92 from the user's GIF uploads (sorceress
+    // 8-dir rotations at 92Ã—92 from A_tall_elegant_sorceress_boss.zip
+    // + anim strips at 92Ã—92 from the user's GIF uploads (sorceress
     // stands-tall 9f idle + sorceress raises-her-arms 9f attack).
     idleAsset: "/assets/bosses/super-pool/mirror-witch/idle.png",
     idleClip:   { asset: "/assets/bosses/super-pool/mirror-witch/idle.png",   frameCount: 9, frameWidth: 92, frameHeight: 92, fps: 6 },
@@ -372,11 +372,11 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_ashen_drake",
     name: "The Ashen Drake",
     represents: "Abandonment and inertia",
-    // 8-dir rotations at 92×92 from A_large_dragon_boss_with.zip +
+    // 8-dir rotations at 92Ã—92 from A_large_dragon_boss_with.zip +
     // 3 anim strips from the user's GIF uploads:
-    //   idle = dragon-stands-its-ground 9f 96×96
-    //   attack = dragon-rears-back 9f 96×96
-    //   defeat = small-dragon-slowly-slumps 9f 92×92
+    //   idle = dragon-stands-its-ground 9f 96Ã—96
+    //   attack = dragon-rears-back 9f 96Ã—96
+    //   defeat = small-dragon-slowly-slumps 9f 92Ã—92
     // Per-clip dims cover the 96/92 mix.
     idleAsset: "/assets/bosses/super-pool/ashen-drake/idle.png",
     idleClip:   { asset: "/assets/bosses/super-pool/ashen-drake/idle.png",   frameCount: 9, frameWidth: 96, frameHeight: 96, fps: 6 },
@@ -399,7 +399,7 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     name: "The Tide Caller",
     represents: "Distraction and scope creep",
     idleAsset: "/assets/bosses/super-pool/tide-caller/idle.png",
-    // Full 5-clip Pixellab set on disk at 164×164×9 + newly-extracted
+    // Full 5-clip Pixellab set on disk at 164Ã—164Ã—9 + newly-extracted
     // 8-dir rotations from `Tide caller.zip` (53 PNGs including anim
     // sequences under anims/).
     idleClip:    { asset: "/assets/bosses/super-pool/tide-caller/idle.png",    ...T164, fps: 6 },
@@ -431,7 +431,7 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     name: "The Rusted Oracle",
     represents: "Imposter syndrome",
     idleAsset: "/assets/bosses/super-pool/rusted-oracle/idle.png",
-    // Full 5-clip Pixellab set on disk at 92×92×9 plus 8-dir rotations
+    // Full 5-clip Pixellab set on disk at 92Ã—92Ã—9 plus 8-dir rotations
     // extracted from the new `the_rusted_oracle.zip` pack (39 PNGs
     // total including animation frame sequences under anims/).
     idleClip:    { asset: "/assets/bosses/super-pool/rusted-oracle/idle.png",    ...P92, fps: 6 },
@@ -455,19 +455,19 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_wraith_council",
     name: "The Wraith Council",
     represents: "Decision paralysis",
-    // Rebuilt from `the_wraith_council.zip` — 88×88 sheets stitched
+    // Rebuilt from `the_wraith_council.zip` â€” 88Ã—88 sheets stitched
     // from Pixellab anim frames (idle 4f + attack 9f + hurt 9f). No
-    // defeat/victory anims → fallback chain uses hurt/attack.
-    // Legacy 92×92 defeat.png sheet exists on disk from an earlier
-    // pack but the newer anims are 88×88; if we wired defeatClip
-    // pointing at the legacy 92×92 file Phaser would slice wrong.
+    // defeat/victory anims â†’ fallback chain uses hurt/attack.
+    // Legacy 92Ã—92 defeat.png sheet exists on disk from an earlier
+    // pack but the newer anims are 88Ã—88; if we wired defeatClip
+    // pointing at the legacy 92Ã—92 file Phaser would slice wrong.
     // Skipped to keep the frame-size consistent.
     idleAsset: "/assets/bosses/super-pool/wraith-council/idle.png",
     idleClip:    { asset: "/assets/bosses/super-pool/wraith-council/idle.png",   frameCount: 4, frameWidth: 88, frameHeight: 88, fps: 4 },
     attackClip:  { asset: "/assets/bosses/super-pool/wraith-council/attack.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10 },
     hurtClip:    { asset: "/assets/bosses/super-pool/wraith-council/hurt.png",   frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10 },
-    // Existing 88×88×9 defeat sheet was already on disk from an
-    // earlier legacy pack (verified: 792×88 = 9 frames × 88px), so
+    // Existing 88Ã—88Ã—9 defeat sheet was already on disk from an
+    // earlier legacy pack (verified: 792Ã—88 = 9 frames Ã— 88px), so
     // we wire it here to complete the state machine even though
     // the new Pixellab pack didn't ship a defeat anim.
     defeatClip:  { asset: "/assets/bosses/super-pool/wraith-council/defeat.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 8 },
@@ -477,9 +477,9 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_stonecaller",
     name: "The Stonecaller",
     represents: "Overwhelm",
-    // Rebuilt from `the_stonecaller (1).zip` — 92×92 stitched anims
+    // Rebuilt from `the_stonecaller (1).zip` â€” 92Ã—92 stitched anims
     // (attack 9f + hurt 9f from stone-golem shifts/hunches) + legacy
-    // victory sheet + 256×256 8-direction rotations from the
+    // victory sheet + 256Ã—256 8-direction rotations from the
     // idle_stonecaller.zip pack.
     idleAsset: "/assets/bosses/super-pool/stonecaller/idle.png",
     idleClip:    { asset: "/assets/bosses/super-pool/stonecaller/idle.png",    ...P92, fps: 6 },
@@ -502,10 +502,10 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_veilwalker",
     name: "The Veilwalker",
     represents: "Isolation and fear of irrelevance",
-    // Rebuilt from `the_veilwalker.zip` + `v_eilwalker_hurt.zip` —
-    // 88×88 stitched sheets (idle Breathing 4f + attack cloaked-lunges
-    // 9f + defeat hooded-slumps 9f) + 8-dir rotations at 256×256
-    // (idle + hurt-state facings). No standalone hurt anim yet →
+    // Rebuilt from `the_veilwalker.zip` + `v_eilwalker_hurt.zip` â€”
+    // 88Ã—88 stitched sheets (idle Breathing 4f + attack cloaked-lunges
+    // 9f + defeat hooded-slumps 9f) + 8-dir rotations at 256Ã—256
+    // (idle + hurt-state facings). No standalone hurt anim yet â†’
     // fallback uses idle.
     idleAsset: "/assets/bosses/super-pool/veilwalker/idle.png",
     idleClip:    { asset: "/assets/bosses/super-pool/veilwalker/idle.png",   frameCount: 4, frameWidth: 88, frameHeight: 88, fps: 4 },
@@ -525,19 +525,19 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // STAGE CONFIGS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const VENTURE_STAGES: StageConfig[] = [
   {
     id: 1,
     name: "Ideation",
     biomeName: "The Village",
-    subtitle: "Stage 1 · Birth of Ideas",
+    subtitle: "Stage 1 Â· Birth of Ideas",
     checkpoints: 4,
     monster: VENTURE_MONSTERS[0],
-    icon: "💡",
+    icon: "ðŸ’¡",
     biomeTheme: VENTURE_BIOME_THEMES[0],
     worldX: 0,
     worldWidth: 1400,
@@ -546,10 +546,10 @@ const VENTURE_STAGES: StageConfig[] = [
     id: 2,
     name: "Research",
     biomeName: "The Forest",
-    subtitle: "Stage 2 · Climb to Knowledge",
+    subtitle: "Stage 2 Â· Climb to Knowledge",
     checkpoints: 5,
     monster: VENTURE_MONSTERS[1],
-    icon: "🔍",
+    icon: "ðŸ”",
     biomeTheme: VENTURE_BIOME_THEMES[1],
     worldX: 1400,
     worldWidth: 1600,
@@ -558,10 +558,10 @@ const VENTURE_STAGES: StageConfig[] = [
     id: 3,
     name: "Validation",
     biomeName: "Validation Center",
-    subtitle: "Stage 3 · Test What's Real",
+    subtitle: "Stage 3 Â· Test What's Real",
     checkpoints: 4,
     monster: VENTURE_MONSTERS[2],
-    icon: "✅",
+    icon: "âœ…",
     biomeTheme: VENTURE_BIOME_THEMES[2],
     worldX: 3000,
     worldWidth: 1400,
@@ -570,10 +570,10 @@ const VENTURE_STAGES: StageConfig[] = [
     id: 4,
     name: "Offer Design",
     biomeName: "Offer Design Studio",
-    subtitle: "Stage 4 · Shape the Product",
+    subtitle: "Stage 4 Â· Shape the Product",
     checkpoints: 5,
     monster: VENTURE_MONSTERS[3],
-    icon: "🎨",
+    icon: "ðŸŽ¨",
     biomeTheme: VENTURE_BIOME_THEMES[3],
     worldX: 4400,
     worldWidth: 1600,
@@ -582,10 +582,10 @@ const VENTURE_STAGES: StageConfig[] = [
     id: 5,
     name: "Build & Deliver",
     biomeName: "Build & Deliver Zone",
-    subtitle: "Stage 5 · Make It Real",
+    subtitle: "Stage 5 Â· Make It Real",
     checkpoints: 6,
     monster: VENTURE_MONSTERS[4],
-    icon: "⚙️",
+    icon: "âš™ï¸",
     biomeTheme: VENTURE_BIOME_THEMES[4],
     worldX: 6000,
     worldWidth: 1800,
@@ -594,10 +594,10 @@ const VENTURE_STAGES: StageConfig[] = [
     id: 6,
     name: "Launch",
     biomeName: "Launch Pad",
-    subtitle: "Stage 6 · Go Public",
+    subtitle: "Stage 6 Â· Go Public",
     checkpoints: 3,
     monster: VENTURE_MONSTERS[5],
-    icon: "🚀",
+    icon: "ðŸš€",
     biomeTheme: VENTURE_BIOME_THEMES[5],
     worldX: 7800,
     worldWidth: 1200,
@@ -606,10 +606,10 @@ const VENTURE_STAGES: StageConfig[] = [
     id: 7,
     name: "Iteration",
     biomeName: "Iteration Engine",
-    subtitle: "Stage 7 · Refine & Improve",
+    subtitle: "Stage 7 Â· Refine & Improve",
     checkpoints: 4,
     monster: VENTURE_MONSTERS[6],
-    icon: "🔄",
+    icon: "ðŸ”„",
     biomeTheme: VENTURE_BIOME_THEMES[6],
     worldX: 9000,
     worldWidth: 1400,
@@ -618,19 +618,19 @@ const VENTURE_STAGES: StageConfig[] = [
     id: 8,
     name: "Scale",
     biomeName: "Scale Summit",
-    subtitle: "Stage 8 · Reach New Heights",
+    subtitle: "Stage 8 Â· Reach New Heights",
     checkpoints: 5,
     monster: VENTURE_MONSTERS[7],
-    icon: "📈",
+    icon: "ðŸ“ˆ",
     biomeTheme: VENTURE_BIOME_THEMES[7],
     worldX: 10400,
     worldWidth: 1600,
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // VENTURE TEMPLATE EXPORT
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const VENTURE_TEMPLATE: ProjectTemplate = {
   id: "venture",
@@ -642,7 +642,7 @@ export const VENTURE_TEMPLATE: ProjectTemplate = {
   qualityMetric: {
     id: "valuation_score",
     label: "Valuation Score",
-    unit: "₹",
+    unit: "â‚¹",
     direction: "higher_is_better",
     startValue: 0,
     displayFormat: "currency",
@@ -651,13 +651,13 @@ export const VENTURE_TEMPLATE: ProjectTemplate = {
       standard: 500_000,
       high: 2_000_000,
     },
-    icon: "💰",
+    icon: "ðŸ’°",
   },
 
   worldTheme: {
     hudColorScheme: "venture",
     hudPrimaryColor: "#6366f1",
-    hudMetricIcon: "💰",
+    hudMetricIcon: "ðŸ’°",
     mapBackgroundKey: "bg_venture",
     loreFont: "Inter",
     accentFont: "Courier New",
@@ -719,3 +719,4 @@ export const VENTURE_TEMPLATE: ProjectTemplate = {
 
   totalCheckpoints: 36, // 4+5+4+5+6+3+4+5
 };
+

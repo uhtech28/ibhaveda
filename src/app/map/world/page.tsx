@@ -1,12 +1,12 @@
-"use client";
+﻿"use client";
 
 /**
  * src/app/map/page.tsx
  *
- * Ibhaveda — Venture World Map
+ * Ibhaveda â€” Venture World Map
  * React overlay layer + Phaser canvas integration
  *
- * Stack: Next.js 15 · React 19 · Framer Motion 12 · Tailwind CSS 4 · Convex · Clerk
+ * Stack: Next.js 15 Â· React 19 Â· Framer Motion 12 Â· Tailwind CSS 4 Â· Convex Â· Clerk
  */
 
 import {
@@ -43,7 +43,7 @@ import {
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { MessageSquare, X, Users, Send, Share2, ExternalLink, Check, Copy, Lock, ChevronLeft, ChevronRight, Swords, Zap } from "lucide-react";
 import { PixelIcon } from "@/components/ui/PixelIcon";
-// Shared saddlebag + × close cluster rendered in the top-right of
+// Shared saddlebag + Ã— close cluster rendered in the top-right of
 // every tool panel. Clicking the saddlebag closes the panel AND
 // reopens the Adventurer's Menu via a window event that
 // MapMenuPopover listens for.
@@ -58,7 +58,6 @@ import { getTemplate, type TemplateId } from "@/config/templates";
 import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
 import { generateCheckpointLayout } from "@/lib/phaser/scenes/TemplateMapScene";
 import { getTemplateStageBoss } from "@/config/template-stage-bosses";
-import type { StageBoss } from "@/config/stage-bosses";
 
 /**
  * Unified boss lookup that routes by templateId. For Venture (stages
@@ -119,7 +118,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { InvitationSection } from "@/components/requests/invitation-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
-// ListTodo dropped — the icon-only "Tasks" button that used to sit
+// ListTodo dropped â€” the icon-only "Tasks" button that used to sit
 // beside the biome label in the HUD was removed as decorative.
 import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon } from "lucide-react";
 import { CalendarTool } from "@/components/tools/calendar-tool";
@@ -145,7 +144,7 @@ const StageClearedToast = dynamic(
   () => import("@/components/village/StageClearedToast"),
   { ssr: false },
 );
-// DailyChallengesCard dynamic import removed — the top-right card
+// DailyChallengesCard dynamic import removed â€” the top-right card
 // was pulled from /map/world (see the deleted render block below).
 // Component file still exists in @/components/gamification/ if we
 // bring it back on another surface.
@@ -158,9 +157,9 @@ const FlareTriggerButton = dynamic(
   { ssr: false },
 );
 // FlareComposeDialog mounted at the page level so the Adventurer's
-// Menu can open it via the new "flare" panel-id (menu → onOpenPanel
-// → setIsFlareComposeOpen). The FlareTriggerButton inside the
-// CheckpointPanel still spins up its OWN copy — this instance is
+// Menu can open it via the new "flare" panel-id (menu â†’ onOpenPanel
+// â†’ setIsFlareComposeOpen). The FlareTriggerButton inside the
+// CheckpointPanel still spins up its OWN copy â€” this instance is
 // only for the menu-triggered path.
 const FlareComposeDialog = dynamic(
   () => import("@/components/flares/FlareComposeDialog").then(mod => mod.FlareComposeDialog),
@@ -179,7 +178,7 @@ const BossIntroCinematic = dynamic(
 );
 const TaskSubmissionModal = dynamic(() => import("@/components/map/TaskSubmissionModal").then(mod => mod.TaskSubmissionModal), { ssr: false });
 const StageClearModal = dynamic(() => import("@/components/map/StageClearModal").then(mod => mod.StageClearModal), { ssr: false });
-// WorldMapTour removed — replaced entirely by the v2 tutorial (Sparky).
+// WorldMapTour removed â€” replaced entirely by the v2 tutorial (Sparky).
 const ChatThread = dynamic(() => import("@/components/chat/ChatThread"), { ssr: false });
 const GroupList = dynamic(() => import("@/components/chat/GroupList"), { ssr: false });
 const ChannelList = dynamic(() => import("@/components/chat/ChannelList"), { ssr: false });
@@ -206,9 +205,9 @@ import {
 } from "@/components/minigames";
 import { MINIGAME_SPAWNS } from "@convex/miniGameConstants";
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TYPES
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type CheckpointStatus = "locked" | "active" | "partial" | "completed" | "gold";
 
@@ -247,11 +246,11 @@ interface Stage {
   icon: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// All 8 stages — visual metadata mapped from the canonical VENTURE_STAGES constant.
+// All 8 stages â€” visual metadata mapped from the canonical VENTURE_STAGES constant.
 // checkpoints count must match ventureConstants.ts.
 const STAGES: Stage[] = [
   {
@@ -261,7 +260,7 @@ const STAGES: Stage[] = [
     mini: "Fog of Vagueness",
     glow: "#818cf8", // Indigo 400
     checkpoints: 4,
-    icon: "💡",
+    icon: "ðŸ’¡",
   },
   {
     id: 2,
@@ -270,7 +269,7 @@ const STAGES: Stage[] = [
     mini: "Pathwarden Wraith",
     glow: "#a78bfa", // Violet 400
     checkpoints: 5,
-    icon: "🔬",
+    icon: "ðŸ”¬",
   },
   {
     id: 3,
@@ -279,7 +278,7 @@ const STAGES: Stage[] = [
     mini: "Advocate of Comfortable Lies",
     glow: "#f472b6", // Pink 400
     checkpoints: 4,
-    icon: "✅",
+    icon: "âœ…",
   },
   {
     id: 4,
@@ -288,7 +287,7 @@ const STAGES: Stage[] = [
     mini: "Unfinished Golem",
     glow: "#34d399", // Emerald 400
     checkpoints: 5,
-    icon: "🎨",
+    icon: "ðŸŽ¨",
   },
   {
     id: 5,
@@ -297,7 +296,7 @@ const STAGES: Stage[] = [
     mini: "Collapse Specter",
     glow: "#fb923c", // Orange 400
     checkpoints: 6,
-    icon: "⚙️",
+    icon: "âš™ï¸",
   },
   {
     id: 6,
@@ -306,7 +305,7 @@ const STAGES: Stage[] = [
     mini: "Harbourmaster of Hesitation",
     glow: "#38bdf8", // Cyan 400
     checkpoints: 3,
-    icon: "🚀",
+    icon: "ðŸš€",
   },
   {
     id: 7,
@@ -315,7 +314,7 @@ const STAGES: Stage[] = [
     mini: "Babel Merchant",
     glow: "#facc15", // Yellow 400
     checkpoints: 4,
-    icon: "🔄",
+    icon: "ðŸ”„",
   },
   {
     id: 8,
@@ -324,7 +323,7 @@ const STAGES: Stage[] = [
     mini: "Iron Bureaucrat",
     glow: "#c084fc", // Purple 400
     checkpoints: 5,
-    icon: "📈",
+    icon: "ðŸ“ˆ",
   },
 ];
 
@@ -382,18 +381,18 @@ const STAGE_ANIMATION: Record<number, string> = {
   4: "Bridge Repair",
   5: "Compass Calibration",
   6: "Ward Placement",
-  7: "Compass Calibration", // Stage 7 (Iteration) uses Compass Calibration per PRD §5
+  7: "Compass Calibration", // Stage 7 (Iteration) uses Compass Calibration per PRD Â§5
   8: "Seal Break",
 };
 
 const PHASE_ONE_STAGE_LIMIT = 2;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HOOK — Phaser game lifecycle
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// HOOK â€” Phaser game lifecycle
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
- * Stage → scene key mapping. When the venture's currentStage changes
+ * Stage â†’ scene key mapping. When the venture's currentStage changes
  * (or the user visits with ?stage=N in the URL), we look up the correct
  * scene key here and swap Phaser scenes.
  */
@@ -401,7 +400,7 @@ const PHASE_ONE_STAGE_LIMIT = 2;
  * Per-template, per-stage Phaser scene routing.
  *
  * Only Venture has bespoke map art shipped today. Academic / Lab /
- * Creative templates deliberately have NO entries — the scene-swap
+ * Creative templates deliberately have NO entries â€” the scene-swap
  * effect below detects that and falls through to a React "template
  * map under construction" overlay instead of silently loading the
  * Village and misrepresenting the template.
@@ -412,14 +411,14 @@ const PHASE_ONE_STAGE_LIMIT = 2;
 type SceneKeysByStage = Record<number, string>;
 const STAGE_SCENE_KEY: Record<string, SceneKeysByStage> = {
   venture: {
-    1: "VillageMapScene",     // Ideation · The Village
-    2: "ForestMapScene",      // Research · The Forest
-    3: "ArenaScene",          // Validation · The Arena
-    4: "ArtisansScene",       // Offer Design · The Artisan's Quarter
-    5: "MineScene",           // Build & Deliver · The Mine (Ironhold)
-    6: "GoldenHarborScene",   // Launch · The Harbour
-    7: "CrossroadsScene",     // Iteration · The Crossroads Town
-    // Stage 8 (The Capital · Scale): bespoke art still pending, but
+    1: "VillageMapScene",     // Ideation Â· The Village
+    2: "ForestMapScene",      // Research Â· The Forest
+    3: "ArenaScene",          // Validation Â· The Arena
+    4: "ArtisansScene",       // Offer Design Â· The Artisan's Quarter
+    5: "MineScene",           // Build & Deliver Â· The Mine (Ironhold)
+    6: "GoldenHarborScene",   // Launch Â· The Harbour
+    7: "CrossroadsScene",     // Iteration Â· The Crossroads Town
+    // Stage 8 (The Capital Â· Scale): bespoke art still pending, but
     // rather than leave Stage-8 players on a blank canvas we route
     // them into VillageMapScene so they at least get a playable map
     // with CPs, persona and boss. Swap to a dedicated CapitalScene
@@ -427,7 +426,7 @@ const STAGE_SCENE_KEY: Record<string, SceneKeysByStage> = {
     // the painted art ships.
     8: "VillageMapScene",
   },
-  // academic / lab / creative intentionally empty — bespoke map art
+  // academic / lab / creative intentionally empty â€” bespoke map art
   // for those templates hasn't been authored yet. See
   // TemplateMapPlaceholder below for the React fallback.
   academic: {},
@@ -441,7 +440,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
   const [phaserReady, setPhaserReady] = useState(false);
 
   // Pause Phaser when any overlay panel is open. Trace showed INP of
-  // 2 seconds with only 189ms of JS work — the remaining 1.8s was
+  // 2 seconds with only 189ms of JS work â€” the remaining 1.8s was
   // "presentation delay" caused by the Phaser game loop hogging the
   // main thread every 16ms. When an overlay covers the canvas there's
   // no visual reason to keep rendering, and freeing the main thread
@@ -502,20 +501,20 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
       }
 
       // Previously guarded on a phantom `sleeping` field cast onto
-      // Phaser's TimeStep — that field doesn't exist (verified in
+      // Phaser's TimeStep â€” that field doesn't exist (verified in
       // phaser@3.90.0 src/core/TimeStep.js). The guard read
       // `undefined`, meaning `sleep()` fired on the first pause but
       // the `wake()` branch was NEVER reached because `sleeping`
-      // stayed permanently undefined ⇒ falsy. Once the loop stopped
+      // stayed permanently undefined â‡’ falsy. Once the loop stopped
       // (running=false, RAF cancelled) it never restarted until a
-      // full page reload — that's the "open any tool → character
+      // full page reload â€” that's the "open any tool â†’ character
       // freezes forever" bug the user reported.
       //
       // The real field is `running`. Sleep/wake are internally
       // idempotent so the guard is just there to avoid redundant
       // work when nothing changed.
       const phaserLoop = game.loop;
-      // SLEEP if a text input has focus — keyboard INP drops from
+      // SLEEP if a text input has focus â€” keyboard INP drops from
       // ~1,700ms to ~40ms. This is the dominant lag the user feels.
       if (manualPause || fullModalOpen || inputFocused) {
         if (phaserLoop.running) phaserLoop.sleep();
@@ -525,7 +524,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
 
       // Set FPS based on overlay + lite-mode state. Lite-mode kicks in
       // automatically for advanced ventures (6+ completed checkpoints
-      // — see WorldMapScene.setVentureAdvanced) and we drop the steady
+      // â€” see WorldMapScene.setVentureAdvanced) and we drop the steady
       // FPS to 30. With smoothStep on, pixel-art world maps look fine
       // at 30fps and the main thread has roughly half the per-frame
       // cost, which is the dominant remaining lag source for veterans.
@@ -536,7 +535,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
       if (typeof loop.setFpsLimit === "function") {
         loop.setFpsLimit(targetFps);
       } else {
-        // Older Phaser versions — set the field directly.
+        // Older Phaser versions â€” set the field directly.
         (loop as unknown as { targetFps: number }).targetFps = targetFps;
       }
     };
@@ -587,7 +586,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
-    // Wait for the persona query to resolve before booting Phaser —
+    // Wait for the persona query to resolve before booting Phaser â€”
     // otherwise VillageMapScene.preload runs with the default persona
     // and the correct spritesheet never gets loaded on first paint.
     if (!personaReady) return;
@@ -596,7 +595,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
     // "FOR ALL MAPS ADD CHECK POINT BOSS, MAKE THEM ZOOM LIKE VILLAGE
     // MAP AND PERSONA WITH MOVEMENT". Venture uses VillageMapScene
     // (with the 6 stage scenes lazy-added below); non-venture
-    // templates (academic / lab / creative) use TemplateMapScene —
+    // templates (academic / lab / creative) use TemplateMapScene â€”
     // a lightweight parametric scene that takes {mapUrl, mapWidth,
     // mapHeight, biomeLabel, boss} via init(data) and gives them the
     // same persona + camera + boss experience.
@@ -606,7 +605,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
     const handleReady = () => {
       setPhaserReady(true);
       // Stage-specific ambience + music are wired up separately by an
-      // effect in MapPageInner that reads venture.currentStage — the
+      // effect in MapPageInner that reads venture.currentStage â€” the
       // previous hardcoded stage_village call here meant every user
       // on Forest / Arena / Harbor / Artisans etc. was still hearing
       // the Village theme (product report: "i opend arcade but still
@@ -624,7 +623,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
     // fires. Wall-time to first playable map dropped from ~4-6s to
     // ~1.5-2s in practice (network + parse dominated by the 7-way
     // Promise.all previously).
-    // Non-venture templates boot a MUCH lighter scene chain — just
+    // Non-venture templates boot a MUCH lighter scene chain â€” just
     // Phaser + TemplateMapScene (~40KB total) instead of the full
     // Village boot (~4.6MB). Venture keeps the original chain because
     // its scene has hardcoded checkpoints + boss coords tied to the
@@ -672,10 +671,10 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
       // Fire-and-forget lazy load of the other 6 stage scenes. They
       // register themselves with Phaser as they arrive so scene.start(
       // "ForestMapScene") etc. works when the user progresses. The
-      // active Village scene keeps rendering the whole time — the user
+      // active Village scene keeps rendering the whole time â€” the user
       // never sees a hitch.
       //
-      // GATED on venture — non-venture templates use TemplateMapScene
+      // GATED on venture â€” non-venture templates use TemplateMapScene
       // for every biome and never need the 6 stage-specific scenes,
       // so skipping saves ~600KB of JS parse + network on Academic.
       if (!isVentureTemplate) return;
@@ -736,9 +735,9 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
   return { containerRef, phaserReady, gameRef };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS — derive checkpoint status from Convex row
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// HELPERS â€” derive checkpoint status from Convex row
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function deriveCheckpointStatus(
   cp: {
@@ -773,9 +772,9 @@ function deriveCheckpointStatus(
   return "locked";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // SUB-COMPONENTS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Stage pill navigation strip */
 function StageStrip({
@@ -864,7 +863,7 @@ function StageStrip({
                   animate={{ scale: 1 }}
                   className="absolute inset-0 flex items-center justify-center text-white text-[8px]"
                 >
-                  ✓
+                  âœ“
                 </motion.div>
               )}
             </motion.div>
@@ -942,7 +941,7 @@ function CheckpointPanelSkeleton() {
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 12, opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 32 }}
-      // Centered — matches the real CheckpointPanel wrapper style
+      // Centered â€” matches the real CheckpointPanel wrapper style
       // so the skeleton lands in the same spot as its replacement
       // and there's no "jump from right to center" when the real
       // panel takes over.
@@ -1044,7 +1043,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
       // Centered rather than right-anchored per product ask ("the
       // tasks have to be in the centre"). Uses a fixed inset + flex
       // centering so the panel lands dead-center of the viewport at
-      // its intrinsic width — feels like a modal without stealing
+      // its intrinsic width â€” feels like a modal without stealing
       // the modal treatment (no dim scrim, map behind still
       // interactive). z-[75] keeps it above the Phaser canvas but
       // below the Adventurer's Menu (z-[200]) and tool modals.
@@ -1054,11 +1053,11 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
       <div
         // Aligned with the platform's post-card visual language
         // (see IdeaCard in components/ideaforge/idea-cards.tsx):
-        //   - rounded-[18px] instead of rounded-3xl → same corner
+        //   - rounded-[18px] instead of rounded-3xl â†’ same corner
         //     radius the feed cards, tabs, and search bar all use.
-        //   - border-white/8 (was white/10) → matches every card /
+        //   - border-white/8 (was white/10) â†’ matches every card /
         //     input on /feed.
-        //   - bg-[#0F1726]/85 backdrop-blur-xl → identical stack to
+        //   - bg-[#0F1726]/85 backdrop-blur-xl â†’ identical stack to
         //     the sticky filter bar + all feed surfaces.
         //   - font-sans on the whole panel forces platform body
         //     font instead of Phaser fantasy defaults.
@@ -1068,8 +1067,8 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
           contain: "layout style",
         }}
       >
-          {/* Close cluster — [saddlebag → reopen Adventurer's Menu]
-              + [×]. Matches the pattern the other tool panels
+          {/* Close cluster â€” [saddlebag â†’ reopen Adventurer's Menu]
+              + [Ã—]. Matches the pattern the other tool panels
               (Journal, Chats, Calendar, Idea Hierarchy, Team &
               Contributors) already use, so users always have a
               one-click way to jump between panels. */}
@@ -1083,7 +1082,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
           </div>
 
           <div className="flex flex-col gap-3.5 px-5 py-5 sm:p-5 sm:pt-6 flex-1 overflow-y-auto no-scrollbar">
-            {/* Checkpoint Title + inline outcome — sized so single-line
+            {/* Checkpoint Title + inline outcome â€” sized so single-line
                 CP names ("Pierce the Fog of Vagueness", "Chart the
                 Forest", etc.) fit on a single row inside the mobile
                 panel width, with just enough right padding to clear
@@ -1091,8 +1090,8 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                 colour the feed cards use for secondary copy, so
                 headings + subheadings read consistently across the
                 platform. */}
-            {/* Right padding widened from pr-10 → pr-20 to clear the
-                new saddlebag + × cluster (two 32px buttons + gap ≈
+            {/* Right padding widened from pr-10 â†’ pr-20 to clear the
+                new saddlebag + Ã— cluster (two 32px buttons + gap â‰ˆ
                 72px). Prevents the title crashing into the cluster
                 on narrow panel widths. */}
             <div className="pr-20 sm:pr-20">
@@ -1148,7 +1147,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
 
           </div>
 
-          {/* Advance + boss counter — shown on every unlocked checkpoint */}
+          {/* Advance + boss counter â€” shown on every unlocked checkpoint */}
           {!isLocked && (
               <div className="p-2.5 sm:p-3 pt-0 flex flex-col gap-2">
                 {!isGold && canAdvance && (
@@ -1217,9 +1216,9 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                       {isAdvancing
                         ? "Processing..."
                         : isGold
-                          ? "Proceed →"
+                          ? "Proceed â†’"
                           : canAdvance
-                            ? "Advance →"
+                            ? "Advance â†’"
                             : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
                     </span>
                     {!isCurrentMapCheckpoint && doneTasks >= 2 && !isAdvancing && (
@@ -1241,8 +1240,8 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                 </motion.button>
 
                 {/* Flare button removed from the checkpoint task panel
-                    per product request — the Flare tile in the
-                    Adventurer's Menu (bottom-HUD saddlebag → Flare)
+                    per product request â€” the Flare tile in the
+                    Adventurer's Menu (bottom-HUD saddlebag â†’ Flare)
                     still fires a flare with the correct venture +
                     checkpoint context via the same FlareComposeDialog,
                     so this in-panel duplicate was redundant. */}
@@ -1353,7 +1352,7 @@ const TaskCard = memo(function TaskCardInner({
         }}
       />
 
-      {/* Quest-scroll icon REMOVED per product request — the coloured
+      {/* Quest-scroll icon REMOVED per product request â€” the coloured
           left status stripe already communicates open / done / locked
           state, so the scroll pixel-art was visual noise next to the
           uppercase task title. Locked rows still show a small lock
@@ -1378,18 +1377,18 @@ const TaskCard = memo(function TaskCardInner({
       <div className="flex-1 min-w-0 relative z-10">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            {/* Task TITLE only — the fuller description was moved into
+            {/* Task TITLE only â€” the fuller description was moved into
                 the TaskSubmissionModal so the checkpoint panel stays
                 scannable. Falls back to the description head-fragment
                 for legacy tasks with no separate title.
                 Sentence-case per product request ("only keep first
-                letter capital") — was ALL-CAPS quest-log style, now
+                letter capital") â€” was ALL-CAPS quest-log style, now
                 just capitalise the first letter and lowercase the
                 rest so titles read like a normal sentence
                 ("Speak its name" instead of "SPEAK ITS NAME"). */}
             {/* Task title uses the same weight + colour as the
                 platform's primary body text (see feed idea-card
-                titles) — the `tracking-wide` from the old quest-log
+                titles) â€” the `tracking-wide` from the old quest-log
                 style is gone since the sentence-case titles read
                 cleaner at normal letter-spacing. */}
             <p className="text-[13px] sm:text-sm font-semibold leading-snug text-white">
@@ -1427,7 +1426,7 @@ const TaskCard = memo(function TaskCardInner({
               }}
               title="Redo Task"
             >
-              ↺
+              â†º
             </motion.button>
           )}
         </div>
@@ -1436,7 +1435,7 @@ const TaskCard = memo(function TaskCardInner({
             AI evaluating...
           </p>
         )}
-        {/* Score badge (STANDARD · 8/12) hidden per user preference —
+        {/* Score badge (STANDARD Â· 8/12) hidden per user preference â€”
             keep evaluation data in state for combat logic but do not show
             the tier/score label on task cards. */}
       </div>
@@ -1486,7 +1485,7 @@ function PhaseLaunchBanner({
           onMouseEnter={() => audioManager.playUI("hover")}
           className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] text-slate-400 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white z-10 shadow-sm"
         >
-          ✕
+          âœ•
         </motion.button>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1541,7 +1540,7 @@ function StageResetNotice({
           onMouseEnter={() => audioManager.playUI("hover")}
           className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] text-slate-400 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white z-10 shadow-sm"
         >
-          ✕
+          âœ•
         </motion.button>
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">
           New Stage Unlocked
@@ -1551,7 +1550,7 @@ function StageResetNotice({
           <span className="font-black text-indigo-300">
             {baseBrightness.toFixed(2)}%
           </span>
-          . The extra stage glow builds back up as you complete this stage’s
+          . The extra stage glow builds back up as you complete this stageâ€™s
           tasks.
         </p>
       </div>
@@ -1562,11 +1561,11 @@ function StageResetNotice({
 // TourToggle removed with the WorldMapTour walkthrough deletion.
 
 /**
- * Biome-name → painted map PNG resolver, keyed by templateId.
+ * Biome-name â†’ painted map PNG resolver, keyed by templateId.
  *
  * Every biomeName in `convex/{academic,lab,creative}/*Constants.ts`
  * maps to a real PNG shipped under `/public/assets/maps-v2/`. Kept as
- * a lookup rather than inline switches so the biome→file mapping
+ * a lookup rather than inline switches so the biomeâ†’file mapping
  * stays in one place; adding a new stage means dropping a PNG in the
  * right folder and adding a line here.
  *
@@ -1585,13 +1584,13 @@ function resolveTemplateMapUrl(
   //  - strip apostrophes so "Cartographer's Tower" matches
   //    "cartographers tower"
   // Prod audit turned up 7 biomes across academic/lab/creative that
-  // failed to resolve for exactly these two reasons — user saw a dark
+  // failed to resolve for exactly these two reasons â€” user saw a dark
   // Phaser canvas with no biome art because the mapUrl returned null.
   const rawNorm = biomeName.trim().toLowerCase();
   const norm = rawNorm
     .replace(/^the\s+/, "")
-    .replace(/['’]/g, "");
-  // NOTE — all keys below are AFTER normalisation (stripped "the ",
+    .replace(/['â€™]/g, "");
+  // NOTE â€” all keys below are AFTER normalisation (stripped "the ",
   // stripped apostrophes, lowercased). E.g. "The Ruins" arrives here
   // as "ruins" and "Cartographer's Tower" as "cartographers tower".
   if (templateId === "academic") {
@@ -1623,7 +1622,7 @@ function resolveTemplateMapUrl(
     };
     return LAB_MAP[norm] ?? null;
   }
-  // Creative template — biomes reuse forest/village/artisans/harbor
+  // Creative template â€” biomes reuse forest/village/artisans/harbor
   // painted maps until bespoke creative art ships.
   if (templateId === "creative") {
     const CREATIVE_MAP: Record<string, string> = {
@@ -1645,7 +1644,7 @@ function resolveTemplateMapUrl(
  *
  * Renders the painted map for a non-Venture template stage. Every
  * biome in the academic / lab / creative constants files maps to a
- * real PNG in /public/assets/maps-v2/ — we look up the correct
+ * real PNG in /public/assets/maps-v2/ â€” we look up the correct
  * asset and use it as the full-viewport backdrop.
  *
  * Falls back to a themed gradient card only when no painted map
@@ -1676,7 +1675,7 @@ function TemplateMapPlaceholder({
           bg: "linear-gradient(180deg, #2b1e14 0%, #1a120a 55%, #0e0a05 100%)",
           overlay:
             "radial-gradient(ellipse at 50% 30%, rgba(226,166,72,0.15) 0%, transparent 65%)",
-          motif: "📜",
+          motif: "ðŸ“œ",
         }
       : templateId === "lab"
         ? {
@@ -1686,7 +1685,7 @@ function TemplateMapPlaceholder({
             bg: "linear-gradient(180deg, #0d1e28 0%, #071319 55%, #030a0f 100%)",
             overlay:
               "radial-gradient(ellipse at 50% 30%, rgba(90,200,228,0.16) 0%, transparent 65%)",
-            motif: "⚗️",
+            motif: "âš—ï¸",
           }
         : {
             // creative
@@ -1696,21 +1695,21 @@ function TemplateMapPlaceholder({
             bg: "linear-gradient(180deg, #241028 0%, #16081c 55%, #0a030d 100%)",
             overlay:
               "radial-gradient(ellipse at 50% 30%, rgba(226,115,154,0.18) 0%, transparent 65%)",
-            motif: "🎨",
+            motif: "ðŸŽ¨",
           };
 
-  // Painted map available — render it as the full-viewport backdrop
+  // Painted map available â€” render it as the full-viewport backdrop
   // with a small stage-label pill in the top-left so users know
   // which biome they're on. We ALSO inject a <link rel="preload"> so
   // the browser starts the PNG fetch immediately at parent-mount time
   // instead of waiting until the background-image style is applied
   // (which is one extra layout tick). Combined with skipping the
   // Village Phaser boot for non-venture templates (useMapGame above)
-  // this drops Academic first-paint from ~6-10s → ~1-2s.
+  // this drops Academic first-paint from ~6-10s â†’ ~1-2s.
   if (mapUrl) {
     return (
       <div
-        aria-label={`${theme.label} · ${stageName ?? `Stage ${stageNumber}`}`}
+        aria-label={`${theme.label} Â· ${stageName ?? `Stage ${stageNumber}`}`}
         className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
         style={{
           backgroundImage: `url(${mapUrl})`,
@@ -1722,7 +1721,7 @@ function TemplateMapPlaceholder({
       >
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <link rel="preload" as="image" href={mapUrl} />
-        {/* Stage badge — top-left, small, low-contrast so it doesn't
+        {/* Stage badge â€” top-left, small, low-contrast so it doesn't
             fight the map art. */}
         <div
           className="pointer-events-auto absolute left-4 top-4 rounded-md border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.24em] backdrop-blur-sm sm:left-6 sm:top-6"
@@ -1732,14 +1731,14 @@ function TemplateMapPlaceholder({
             color: theme.accent,
           }}
         >
-          <span className="opacity-70">CP {currentCheckpoint} · </span>
+          <span className="opacity-70">CP {currentCheckpoint} Â· </span>
           <span>{stageName ?? `Stage ${stageNumber}`}</span>
         </div>
       </div>
     );
   }
 
-  // No painted map for this specific biome — fall back to the themed
+  // No painted map for this specific biome â€” fall back to the themed
   // gradient card so users at least know which template they're in.
   return (
     <div
@@ -1797,8 +1796,8 @@ function LoadingScreen() {
       // data-tutorial-hide tells TutorialMascot to suppress Sparky
       // while this overlay is on screen. Without it, Sparky was
       // painting his intro line for ~1-2s over the "Entering the
-      // World…" loader on every /map/world visit (product feedback:
-      // Sparky flash bug — screenshot 1).
+      // Worldâ€¦" loader on every /map/world visit (product feedback:
+      // Sparky flash bug â€” screenshot 1).
       data-tutorial-hide="true"
       className="absolute inset-0 z-[60] flex flex-col items-center justify-center"
       style={{ background: "#050810" }}
@@ -1807,7 +1806,7 @@ function LoadingScreen() {
         className="map-load-glitch"
         data-text="Entering the World..."
       >
-        Entering the World…
+        Entering the Worldâ€¦
       </div>
       <div
         className="mt-6 h-[3px] w-40 rounded-full overflow-hidden relative"
@@ -1880,15 +1879,15 @@ function LoadingScreen() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DATA HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MAIN PAGE
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Phase boundary checkpoint numbers (cumulative) — triggers phase-transition animation variant.
+// Phase boundary checkpoint numbers (cumulative) â€” triggers phase-transition animation variant.
 // Boundaries: Stage 1 ends at 4, Stage 2 at 9, Stage 3 at 13, Stage 4 at 18,
 // Stage 5 at 24, Stage 6 at 27, Stage 7 at 31, Stage 8 at 36.
 const PHASE_THRESHOLDS = new Set([4, 9, 13, 18, 24, 27, 31, 36]);
@@ -1915,13 +1914,13 @@ function MapPageInner() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ── First-time boss intro cinematic ───────────────────────────────
+  // â”€â”€ First-time boss intro cinematic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Plays once per user. `undefined` = query loading (don't render),
   // `false` = unseen (SHOW cinematic once Phaser is ready),
   // `true` = already seen (skip).
   //
   // Belt-and-braces gate: if the tutorial has already progressed past
-  // combat (step >= 8), the user has been on this map before — even
+  // combat (step >= 8), the user has been on this map before â€” even
   // if the Convex flag is delayed by network latency we do NOT want
   // the cinematic to re-play on the flare step return trip.
   const bossIntroSeen = useQuery(api.users.getMyBossIntroSeen, {});
@@ -1933,7 +1932,7 @@ function MapPageInner() {
   const shouldShowBossIntro =
     bossIntroSeen === false && !bossIntroDismissed && !tutorialPastCombat;
 
-  // ── Persona wiring ────────────────────────────────────────────────
+  // â”€â”€ Persona wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Fetch the user's chosen persona so Phaser boots with the correct
   // spritesheet. `undefined` = query loading; `null` = signed-out or
   // never set. In both loading-or-missing cases we treat the default
@@ -1941,8 +1940,8 @@ function MapPageInner() {
   const personaIdRaw = useQuery(api.users.getMyPersonaId, {});
   const personaResolved = personaIdRaw !== undefined;
   // All 8 personas now have full Pixellab extended spritesheets
-  // (arcanist/artisan/drifter/engineer/healer/oracle/pathfinder @92×92,
-  // alchemist @88×88). Use whichever the user picked; fall back to
+  // (arcanist/artisan/drifter/engineer/healer/oracle/pathfinder @92Ã—92,
+  // alchemist @88Ã—88). Use whichever the user picked; fall back to
   // alchemist if they somehow got here without one set.
   const chosenPersonaId: PersonaId = isValidPersonaId(personaIdRaw)
     ? personaIdRaw
@@ -1954,25 +1953,25 @@ function MapPageInner() {
     setCurrentPersonaId(chosenPersonaId);
   }
   // useMapGame is called BELOW after `activeVenture` is memoized so
-  // its templateId can be passed in — non-venture templates (academic
+  // its templateId can be passed in â€” non-venture templates (academic
   // / lab / creative) skip the entire Village Phaser boot chain
   // (~4.6MB) which was the biggest bottleneck loading Academic per
   // product report "I AM TESTING MAPS FROM ACADEMIC NOW BUT ITS
   // TAKING VERYY LONG TO LOAD".
 
-  // Stage-based scene routing — reads ?stage=N from the URL. Stage lock
+  // Stage-based scene routing â€” reads ?stage=N from the URL. Stage lock
   // (clamp to unlocked ceiling) applied lower down once `venture` loads.
   const paramStage = searchParams?.get("stage");
   const requestedStage = paramStage ? parseInt(paramStage, 10) : null;
 
   // NOTE: the actual scene-routing effect lives below, once `venture`
   // has been loaded so we can read `venture.currentStage` and drive
-  // the scene from the venture's real state — not just the URL param.
+  // the scene from the venture's real state â€” not just the URL param.
   // See the effect that depends on [phaserReady, activeStage,
   // requestedStage] later in this component.
   //
   // STAGE_COMPLETE listener is registered further down, after
-  // `activeVentureId` is defined — its handler needs a stable, current
+  // `activeVentureId` is defined â€” its handler needs a stable, current
   // reference to the venture id to persist stage advancement to Convex.
 
   const {
@@ -2049,7 +2048,7 @@ function MapPageInner() {
     [pathname, router],
   );
 
-  // ── Read gender + stage from localStorage (set by /map and /map/stages) ──
+  // â”€â”€ Read gender + stage from localStorage (set by /map and /map/stages) â”€â”€
   const [selectedGender, setSelectedGender] = useState<"male" | "female">(
     "male",
   );
@@ -2075,11 +2074,11 @@ function MapPageInner() {
     if (s) setSelectedStageId(parseInt(s, 10));
     const queryVentureId = searchParams.get("ventureId");
     if (queryVentureId) {
-      // URL param is the authoritative source — overwrite localStorage and use it
+      // URL param is the authoritative source â€” overwrite localStorage and use it
       localStorage.setItem("activeVentureId", queryVentureId);
       setPreferredVentureId(queryVentureId);
     } else {
-      // No URL param — use whatever was last cached (e.g. returning directly to /map/world)
+      // No URL param â€” use whatever was last cached (e.g. returning directly to /map/world)
       const storedVentureId = localStorage.getItem("activeVentureId");
       setPreferredVentureId(storedVentureId);
     }
@@ -2111,7 +2110,7 @@ function MapPageInner() {
     };
   }, [router]);
 
-  // ── Audio unlock on first interaction ─────────────────────────────────────
+  // â”€â”€ Audio unlock on first interaction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // audioManager already attaches window listeners for click/keydown/touchstart
   // but we also call unlock() explicitly once the map mounts to be safe.
   useEffect(() => {
@@ -2126,7 +2125,7 @@ function MapPageInner() {
     };
   }, []);
 
-  // ── Jotai atom setters (HUD store) ────────────────────────────────────────
+  // â”€â”€ Jotai atom setters (HUD store) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const setActiveVentureAtom = useSetAtom(activeVentureAtom);
   const setUserProgressAtom = useSetAtom(userProgressAtom);
   const setStageInfoAtom = useSetAtom(stageInfoAtom);
@@ -2138,7 +2137,7 @@ function MapPageInner() {
   const setTemplateMetricAtom = useSetAtom(templateMetricAtom);
   const [audioSettings, setAudioSettings] = useAtom(audioSettingsAtom);
 
-  // ── Initialize audio settings from audioManager on first load ──────────────
+  // â”€â”€ Initialize audio settings from audioManager on first load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     // Force reset to 100% volume if user has old localStorage values
     const VOLUME_VERSION = "v2"; // Increment this to force reset
@@ -2166,13 +2165,13 @@ function MapPageInner() {
     });
   }, []); // Run once on mount
 
-  // ── Convex queries ─────────────────────────────────────────────────────────
+  // â”€â”€ Convex queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ventures = useQuery(api.worldMap.getVenturesByUser);
 
   // Venture resolution priority:
-  // 1. URL ?ventureId=<id>  → use ONLY that venture (idea-specific map).
-  //    Never silently fall back to another — show "no venture" UI if not found.
-  // 2. No URL param         → resume the last cached venture (e.g. nav icon tap).
+  // 1. URL ?ventureId=<id>  â†’ use ONLY that venture (idea-specific map).
+  //    Never silently fall back to another â€” show "no venture" UI if not found.
+  // 2. No URL param         â†’ resume the last cached venture (e.g. nav icon tap).
   const hasUrlVentureParam = !!searchParams.get("ventureId");
   const ventureById = useQuery(
     api.worldMap.getVentureById,
@@ -2224,10 +2223,10 @@ function MapPageInner() {
   // currentUser needed for level + streak + badge lookups
   const currentUser = useQuery(api.users.getCurrentUser);
 
-  // ── Viewer mode ──────────────────────────────────────────────────────
+  // â”€â”€ Viewer mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // If the loaded venture belongs to someone else (spectating a friend's
   // map), we render THEIR persona and disable free-roam input + interact.
-  // Progress on the map still reflects the venture's checkpoints — that
+  // Progress on the map still reflects the venture's checkpoints â€” that
   // data is already scoped to `activeVentureId` in downstream queries.
   const isViewerMode =
     !!activeVenture && !!currentUser?._id && activeVenture.userId !== currentUser._id;
@@ -2262,10 +2261,10 @@ function MapPageInner() {
     currentUser?._id ? { userId: currentUser._id } : "skip",
   );
 
-  // getStreak uses the caller's auth identity — no args
+  // getStreak uses the caller's auth identity â€” no args
   const streakData = useQuery(api.gamification.getStreak);
 
-  // Live badge subscription — detects new awards and fires BadgeAwardSequence
+  // Live badge subscription â€” detects new awards and fires BadgeAwardSequence
   const myBadges = useQuery(api.badges.getMyBadges);
   const prevBadgeCountRef = useRef<number | null>(null);
 
@@ -2304,7 +2303,7 @@ function MapPageInner() {
     ventureArg,
   );
 
-  // ── Convex mutations ───────────────────────────────────────────────────────
+  // â”€â”€ Convex mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const advanceCheckpoint = useMutation(api.ventures.advanceCheckpoint);
   const advanceStage = useMutation(api.ventures.advanceStage);
   const ensureVentureStructure = useMutation(
@@ -2317,11 +2316,11 @@ function MapPageInner() {
   const savePersonaGender = useMutation(api.worldMap.savePersonaGender);
   const markNotificationRead = useMutation(api.notifications.markAsRead);
 
-  // ── Local UI state (non-persisted) ────────────────────────────────────────
+  // â”€â”€ Local UI state (non-persisted) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [selectedDetail, setSelectedDetail] = useState<CheckpointDetail | null>(
     null,
   );
-  // Deferred mount for CheckpointPanel — paint the skeleton on the
+  // Deferred mount for CheckpointPanel â€” paint the skeleton on the
   // same frame as the click (instant feedback), then mount the heavy
   // panel content on the next frame. Old maps were taking 4,500ms
   // pointer INP because clicking a checkpoint synchronously triggered
@@ -2363,12 +2362,12 @@ function MapPageInner() {
 
   // Group chat popup modal state
   const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
-  // PRD §2 v1.1 — sidebar-driven mini-games panel (replaced the
+  // PRD Â§2 v1.1 â€” sidebar-driven mini-games panel (replaced the
   // floating-dot easter-egg UX on the world map).
   const [isMiniGamesPanelOpen, setIsMiniGamesPanelOpen] = useState(false);
   const [isContributorsOpen, setIsContributorsOpen] = useState(false);
   const [isContributionsOpen, setIsContributionsOpen] = useState(false);
-  // Dedicated state for the "send contribution request" modal — the
+  // Dedicated state for the "send contribution request" modal â€” the
   // Adventurer's Menu CONTRIBUTIONS tile now opens this form directly
   // (with skill-tag picker), decoupled from the Team & Contributors
   // panel which moved to the GUILD tile. Keeping this separate from
@@ -2387,7 +2386,7 @@ function MapPageInner() {
   const [isKanbanOpen, setIsKanbanOpen] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  // Flare compose dialog — opened from the Adventurer's Menu "Flare"
+  // Flare compose dialog â€” opened from the Adventurer's Menu "Flare"
   // tile (map/world/page.tsx also renders one instance so users can
   // fire a flare without first navigating to a specific checkpoint).
   const [isFlareComposeOpen, setIsFlareComposeOpen] = useState(false);
@@ -2396,11 +2395,11 @@ function MapPageInner() {
   const redoTask = useMutation(api.worldMap.redoTask);
 
   // kanbanData query is active whenever EITHER the Kanban modal is
-  // open OR the Calendar modal is open — the calendar reads kanban
-  // cards to show tasks on their deadline dates (Kanban↔Calendar
+  // open OR the Calendar modal is open â€” the calendar reads kanban
+  // cards to show tasks on their deadline dates (Kanbanâ†”Calendar
   // sync). Previously this query only fired when `isKanbanOpen` was
   // true, so opening the calendar without first opening the kanban
-  // gave the calendar a null `kanbanData` and no cards showed —
+  // gave the calendar a null `kanbanData` and no cards showed â€”
   // that's the "kanban tasks not syncing to calendar" bug.
   const kanbanData = useQuery(
     api.worldMap.getToolData,
@@ -2427,7 +2426,7 @@ function MapPageInner() {
   );
 
   const handleToolSubmit = async (toolType: string, data: unknown) => {
-    // Always give the user visible feedback — closing the tool's own
+    // Always give the user visible feedback â€” closing the tool's own
     // modal on click IS the confirmation, regardless of whether the
     // save succeeded, failed, or was skipped in viewer mode. Without
     // this, Submit Board / Post Update felt "dead" because the panel
@@ -2446,14 +2445,14 @@ function MapPageInner() {
       closeTool();
       return;
     }
-    // Client-side owner gate — the mutation itself throws
+    // Client-side owner gate â€” the mutation itself throws
     // "Unauthorized" when a non-owner tries to save (see
     // convex/worldMap.ts saveToolData). Silently skip the call in
     // viewer mode so the console stays clean, but still close the
     // modal so the user sees their click was registered.
     if (isViewerMode) {
       console.info(
-        "[handleToolSubmit] viewer mode — skipping save (read-only venture)",
+        "[handleToolSubmit] viewer mode â€” skipping save (read-only venture)",
       );
       closeTool();
       return;
@@ -2467,14 +2466,14 @@ function MapPageInner() {
     } catch (err) {
       // Belt-and-suspenders: even for owners, network hiccups or
       // stale auth shouldn't take down the whole page. Log and
-      // continue — the modal still closes so the button feels alive.
+      // continue â€” the modal still closes so the button feels alive.
       console.warn("[handleToolSubmit] saveToolData failed:", err);
     } finally {
       closeTool();
     }
   };
 
-  // Badge queue — pop-and-show one at a time
+  // Badge queue â€” pop-and-show one at a time
   const [badgeQueue, setBadgeQueue] = useState<BadgePayload[]>([]);
   const [activeBadge, setActiveBadge] = useState<BadgePayload | null>(null);
   const badgeBufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -2565,7 +2564,7 @@ function MapPageInner() {
   }>({ show: false, stageNumber: 1, stageName: "", isGold: false });
 
   // Tour walkthrough state
-  // showTour removed with WorldMapTour deletion — v2 tutorial replaces it.
+  // showTour removed with WorldMapTour deletion â€” v2 tutorial replaces it.
   // New product-tour state. Used to suppress the legacy WorldMapTour
   // and to drive the first-checkpoint pulse for first-run users.
   const tourStateForPulse = useQuery(api.tutorial.getMyFeedTutorialState, {});
@@ -2574,7 +2573,7 @@ function MapPageInner() {
   const [interCheckpointQueue, setInterCheckpointQueue] = useState<Array<"henchman" | "treasure" | "shield" | "insight" | "clear">>([]);
   const [bypassInterCheckpoint, setBypassInterCheckpoint] = useState(false);
 
-  // ── Boss combat gate: one fight per checkpoint before advance ─────────────
+  // â”€â”€ Boss combat gate: one fight per checkpoint before advance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [bossDefeatedAtCheckpoint, setBossDefeatedAtCheckpoint] = useState<
     Set<string>
   >(() => new Set());
@@ -2652,7 +2651,7 @@ function MapPageInner() {
       : "skip"
   );
 
-  // Legacy WorldMapTour open/close effect removed — v2 Sparky is now the
+  // Legacy WorldMapTour open/close effect removed â€” v2 Sparky is now the
   // only walkthrough on /map/world.
 
   // Task submission state (now using Jotai atom for global access)
@@ -2669,7 +2668,7 @@ function MapPageInner() {
   const lastCheckpointPhaserSyncRef = useRef<string>("");
   const lastBrightnessPhaserSyncRef = useRef<number | null>(null);
 
-  // ── Derived values from Convex ─────────────────────────────────────────────
+  // â”€â”€ Derived values from Convex â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const venture = worldMapData?.venture ?? null;
   const ideaForContributors = useQuery(
     api.ideas.getIdeaById,
@@ -2687,7 +2686,7 @@ function MapPageInner() {
     () => templateStages.reduce((sum, stage) => sum + stage.checkpoints, 0),
     [templateStages],
   );
-  // Stable reference — avoids re-renders on every Convex tick
+  // Stable reference â€” avoids re-renders on every Convex tick
   const checkpoints = useMemo(
     () => worldMapData?.checkpoints ?? [],
     [worldMapData?.checkpoints],
@@ -2708,7 +2707,7 @@ function MapPageInner() {
   const activeStage = venture?.currentStage ?? 1;
   const activeCP = venture?.currentCheckpoint ?? 1;
 
-  // Stage lock — if the URL requests a stage the user hasn't unlocked yet,
+  // Stage lock â€” if the URL requests a stage the user hasn't unlocked yet,
   // rewrite it to their actual currentStage. Prevents skipping progression
   // via URL fiddling and keeps deep-linked bookmarks honest.
   //
@@ -2716,7 +2715,7 @@ function MapPageInner() {
   // so demo presenters can walk the next stage without playing through.
   // Real progression (task submits, boss defeats) still requires unlocking.
   useEffect(() => {
-    // Dev bypass — `?stagelock=off` or NODE_ENV=development + explicit
+    // Dev bypass â€” `?stagelock=off` or NODE_ENV=development + explicit
     // opt-in URL param lets you preview any painted stage without
     // needing to actually progress a Convex venture through it.  Kept
     // opt-in even in dev so we don't hide the lock's normal behaviour
@@ -2740,19 +2739,19 @@ function MapPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venture?.currentStage, requestedStage]);
 
-  // ── Scene routing — drive Phaser scene from venture.currentStage ─────
+  // â”€â”€ Scene routing â€” drive Phaser scene from venture.currentStage â”€â”€â”€â”€â”€
   // Bug fix: previously scene selection only fired when the URL had
-  // ?stage=N. Users landing on /map/world?ventureId=… with a venture
+  // ?stage=N. Users landing on /map/world?ventureId=â€¦ with a venture
   // whose currentStage was 3 saw the Village art despite the HUD bar
   // correctly reading "The Arena". Root cause: only one useEffect
   // hardcoded `stage = requestedStage` (URL param) and returned early
   // for stage 1 / null. Now the effect derives the target stage from
-  // (URL override → activeStage) and swaps whenever either changes.
+  // (URL override â†’ activeStage) and swaps whenever either changes.
   //
   // Lazy-registered scenes (Forest/Arena/etc. are loaded async by the
   // useMapGame hook) may not be present yet on first mount. When
   // getScene() returns null we schedule a retry on the next frame
-  // until the target scene registers, then fire the swap. Idempotent —
+  // until the target scene registers, then fire the swap. Idempotent â€”
   // returns immediately if the target scene is already active.
   useEffect(() => {
     if (!phaserReady || !gameRef.current) return;
@@ -2761,7 +2760,7 @@ function MapPageInner() {
         ? requestedStage
         : activeStage;
     // Route by (templateId, stage). Non-venture templates have no
-    // scenes wired yet (see STAGE_SCENE_KEY comment above) — the
+    // scenes wired yet (see STAGE_SCENE_KEY comment above) â€” the
     // React overlay below handles that case, so we just bail out of
     // the Phaser routing here.
     const templateId = (venture?.templateId ?? "venture") as string;
@@ -2770,7 +2769,7 @@ function MapPageInner() {
     // Non-venture templates: fall through to the parametric
     // TemplateMapScene with a biome-specific config. Product ask
     // ("FOR ALL MAPS ADD CHECK POINT BOSS, MAKE THEM ZOOM LIKE
-    // VILLAGE MAP AND PERSONA WITH MOVEMENT") — instead of leaving
+    // VILLAGE MAP AND PERSONA WITH MOVEMENT") â€” instead of leaving
     // Academic/Lab/Creative on the pure-CSS TemplateMapPlaceholder,
     // route them into TemplateMapScene which gives them the full
     // persona + camera + boss experience.
@@ -2784,14 +2783,14 @@ function MapPageInner() {
     // Compute biome-specific data for TemplateMapScene from the
     // templateStages metadata (already memoized above from
     // getStageMetadata). Reading templateStages instead of stageInfo
-    // avoids a temporal-dead-zone crash — stageInfo is declared much
+    // avoids a temporal-dead-zone crash â€” stageInfo is declared much
     // further down in the component body via useAtomValue, but this
     // routing effect runs at the top of the render pass.
     // NOTE: getStageMetadata() renames the template config's
-    // `biomeName` → `biome` on its returned Stage objects. Reading
+    // `biomeName` â†’ `biome` on its returned Stage objects. Reading
     // `.biomeName` here would be `undefined`, which cascaded into
-    // resolveTemplateMapUrl → null → bail-out → Phaser boots with no
-    // config → blank map. Read the correct field.
+    // resolveTemplateMapUrl â†’ null â†’ bail-out â†’ Phaser boots with no
+    // config â†’ blank map. Read the correct field.
     const templateBiomeName =
       templateStages[Math.max(0, desiredStage - 1)]?.biome ?? null;
     let templateSceneData: {
@@ -2813,22 +2812,22 @@ function MapPageInner() {
     if (targetKey === "TemplateMapScene") {
       const mapUrl = resolveTemplateMapUrl(templateId, templateBiomeName);
       if (!mapUrl) return;
-      // Default map dims — Academic/Lab shipped at 1412×1156. Slightly
+      // Default map dims â€” Academic/Lab shipped at 1412Ã—1156. Slightly
       // over-sizing the bounds is safer than under (Phaser handles OOB).
       const mapW = 1540;
       const mapH = 1412;
       // CP count comes from the template's stage config
       // (templateStages was resolved above from getStageMetadata).
       // Fall back to 3 CPs for any stage that somehow doesn't have
-      // a checkpoints field — matches every non-venture template
-      // spec (all have ≥ 3 CPs per stage).
+      // a checkpoints field â€” matches every non-venture template
+      // spec (all have â‰¥ 3 CPs per stage).
       const cpCount =
         templateStages[Math.max(0, desiredStage - 1)]?.checkpoints ?? 3;
       const cpLayout = generateCheckpointLayout(mapW, mapH, cpCount);
       // Resolve the biome-specific boss (Academic Librarian, Lab
       // Alchemist, etc.) from the per-template roster. Returns null
       // for stages whose art hasn't shipped yet (Creative Stage 2
-      // and 5 at time of writing) — in that case the scene falls
+      // and 5 at time of writing) â€” in that case the scene falls
       // back to its internal FALLBACK_BOSS so the map still has a
       // moving boss at CP1.
       const stageBoss = getTemplateStageBoss(templateId, desiredStage);
@@ -2856,10 +2855,10 @@ function MapPageInner() {
         rafId = requestAnimationFrame(attemptSwap);
         return;
       }
-      // ── TemplateMapScene special case ──────────────────────────────
+      // â”€â”€ TemplateMapScene special case â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       // Phaser auto-starts the first-registered scene on Game boot
       // with NO data (an empty {} config). TemplateMapScene guards
-      // create() with an empty-config early return in that case — so
+      // create() with an empty-config early return in that case â€” so
       // it ends up in an "active" but blank state. The old code below
       // then saw `isActive(targetKey) === true` and bailed WITHOUT
       // ever calling `scene.start(templateSceneData)`, so the real
@@ -2868,8 +2867,8 @@ function MapPageInner() {
       // biome background, but no CPs / persona / boss / zoom.
       //
       // Fix: for TemplateMapScene, always stop-and-restart with the
-      // fresh biome data. `sceneMgr.start` re-runs init() → preload()
-      // → create() with the second-arg data payload. Cheap because
+      // fresh biome data. `sceneMgr.start` re-runs init() â†’ preload()
+      // â†’ create() with the second-arg data payload. Cheap because
       // Phaser's texture cache holds the already-loaded map image
       // between restarts, so there's no re-download.
       if (targetKey === "TemplateMapScene") {
@@ -2889,7 +2888,7 @@ function MapPageInner() {
         sceneMgr.start("TemplateMapScene", templateSceneData ?? undefined);
         return;
       }
-      // Already active — nothing to do (only applies to venture-stage
+      // Already active â€” nothing to do (only applies to venture-stage
       // scenes; TemplateMapScene handled above).
       if (sceneMgr.isActive(targetKey) || sceneMgr.isVisible(targetKey)) {
         return;
@@ -2922,7 +2921,7 @@ function MapPageInner() {
     };
   }, [phaserReady, activeStage, requestedStage, venture?.templateId, gameRef, templateStages]);
 
-  // ── Stage-driven ambience + music ─────────────────────────────────────
+  // â”€â”€ Stage-driven ambience + music â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Route audio by the venture's actual currentStage. Previously the
   // handleReady hook in useMapGame hardcoded stage 1 / stage_village
   // regardless of what stage the user was actually on, so Forest /
@@ -2937,7 +2936,7 @@ function MapPageInner() {
         : activeStage;
     try {
       audioManager.playAmbienceForStage(stageToPlay);
-      // stage_1 → stage_7 track keys line up with STAGE_SCENE_KEY.
+      // stage_1 â†’ stage_7 track keys line up with STAGE_SCENE_KEY.
       // Fall back to stage_1 when we're outside the known range so
       // audio never dies silently.
       const trackKey = `stage_${Math.min(7, Math.max(1, stageToPlay))}`;
@@ -2971,12 +2970,12 @@ function MapPageInner() {
         cp.checkpoint,
       );
 
-      // Pre-flight boss lookup — skip combat entirely when this CP has
+      // Pre-flight boss lookup â€” skip combat entirely when this CP has
       // no configured boss (stages 5 Mine and 7 Crossroads currently
       // have empty rosters; Stage 3 Arena is short one at CP4). The
       // previous behaviour fell through to CombatPanel's null-boss
       // fallback, which rendered the user's OWN persona sprite as the
-      // "boss" over a village backdrop labelled "Doubt Imp" — visibly
+      // "boss" over a village backdrop labelled "Doubt Imp" â€” visibly
       // broken. Now: mark the CP boss as defeated and advance.
       // Route boss lookup by template. Venture keeps its per-CP roster;
       // Academic/Lab/Creative return their biome boss for every CP on
@@ -3054,7 +3053,7 @@ function MapPageInner() {
 
     // Fire the map persona's victory anim + the mini-boss's defeat anim
     // (Pixellab pipeline). Runs on whichever stage scene is currently
-    // active — all four expose the same onCombatVictory() contract.
+    // active â€” all four expose the same onCombatVictory() contract.
     try {
       const sceneMgr = gameRef.current?.scene;
       const STAGE_KEYS = [
@@ -3138,8 +3137,8 @@ function MapPageInner() {
     if (structureEnsuredForRef.current === activeVenture._id) return;
     // Skip when the viewer is not the venture owner. The mutation
     // requires assertVentureAccess, so for someone else's venture it
-    // throws "no access" → catch resets the guard → effect re-fires
-    // → infinite failing mutations, which is the dominant lag source
+    // throws "no access" â†’ catch resets the guard â†’ effect re-fires
+    // â†’ infinite failing mutations, which is the dominant lag source
     // on forked-venture views. Stamping the guard with the activeVenture
     // id below ALSO suppresses retry when we did skip.
     if (!currentUser?._id || activeVenture.userId !== currentUser._id) {
@@ -3161,8 +3160,8 @@ function MapPageInner() {
     });
   }, [activeVenture?._id, backfillPendingEvaluations]);
 
-  // ── Detect gold checkpoint notifications ──────────────────────────────────
-  // Bail BEFORE the work — previously the spread + sort over `checkpoints`
+  // â”€â”€ Detect gold checkpoint notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Bail BEFORE the work â€” previously the spread + sort over `checkpoints`
   // ran on every notifications poll even when there was nothing to show.
   // For advanced ventures `checkpoints` is 30+ items so that allocation
   // chain was paid constantly.
@@ -3170,7 +3169,7 @@ function MapPageInner() {
     if (!notifications || !venture) return;
 
     // Find unread gold checkpoint notification for this venture (only
-    // need the first one — find is O(N) once, not filter+spread+sort).
+    // need the first one â€” find is O(N) once, not filter+spread+sort).
     const latestNotif = notifications.find(
       (n) =>
         n.type === "gold_checkpoint" &&
@@ -3207,12 +3206,12 @@ function MapPageInner() {
         checkpoint: targetCP,
       });
 
-      // 🔊 Play gold coin SFX for the milestone reward
+      // ðŸ”Š Play gold coin SFX for the milestone reward
       audioManager.playGoldGain();
 
       // Mark notification as read so it doesn't re-trigger on next Convex poll
       markNotificationRead({ notificationId: latestNotif._id }).catch(() => {
-        // Non-critical — ignore if notification already read
+        // Non-critical â€” ignore if notification already read
       });
 
       // Auto-dismiss gold popup after 6 seconds
@@ -3301,7 +3300,7 @@ function MapPageInner() {
     [activeStage, activeCP, optimisticCompletedTaskIds],
   );
 
-  // Refresh selectedDetail when checkpoints tick — but read prev via the
+  // Refresh selectedDetail when checkpoints tick â€” but read prev via the
   // setter form so this effect doesn't depend on selectedDetail (which it
   // sets), preventing a self-perpetuating cascade.
   useEffect(() => {
@@ -3327,14 +3326,14 @@ function MapPageInner() {
     });
   }, [checkpoints, buildCheckpointDetail]);
 
-  // ── Sync URL Query Parameters to React state ───────────────────────────────
+  // â”€â”€ Sync URL Query Parameters to React state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Must include `checkpoints` in deps: if the URL loads with a
   // ?checkpointId=... before the checkpoints Convex query resolves,
   // the initial run of this effect sees an empty checkpoints array,
   // finds nothing, and sets selectedDetail = null. The refresh effect
   // above only reruns when `prev` is non-null, so without a rerun here
   // once checkpoints arrive, the panel never opens (user reported this
-  // — task column not visible on /map/world?checkpointId=... after
+  // â€” task column not visible on /map/world?checkpointId=... after
   // Step2's auto-navigate). Adding checkpoints + buildCheckpointDetail
   // to deps makes the sync try again when the query lands.
   useEffect(() => {
@@ -3344,7 +3343,7 @@ function MapPageInner() {
       if (cp) {
         setSelectedDetail(buildCheckpointDetail(cp));
       } else if (checkpoints.length > 0) {
-        // We have checkpoints loaded but the ID isn't among them — the URL
+        // We have checkpoints loaded but the ID isn't among them â€” the URL
         // param is stale. Clear it.
         setSelectedDetail(null);
       }
@@ -3365,7 +3364,7 @@ function MapPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramCheckpointId, paramPanel, paramTab, checkpoints, buildCheckpointDetail]);
 
-  // ── Auto-open current active checkpoint on mount if no param is set ────────
+  // â”€â”€ Auto-open current active checkpoint on mount if no param is set â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (checkpoints.length > 0 && activeStage && activeCP && !paramCheckpointId && !hasAutoOpenedRef.current) {
       const activeCheckpoint = checkpoints.find(
@@ -3393,7 +3392,7 @@ function MapPageInner() {
           selectedDetail.checkpointIndex === previousActive.checkpoint;
 
         if (wasFollowingPreviousActive) {
-          // Panel was open on the old active checkpoint — auto-advance it to
+          // Panel was open on the old active checkpoint â€” auto-advance it to
           // the new active checkpoint (same-stage or cross-stage).
           const nextActiveCheckpoint = checkpoints.find(
             (cp) => cp.stage === activeStage && cp.checkpoint === activeCP,
@@ -3434,8 +3433,8 @@ function MapPageInner() {
     phaserReady,
   ]);
 
-  // ── Persist gender to DB whenever venture + gender are known ─────────────
-  // Only writes when the viewer owns the venture — otherwise we'd
+  // â”€â”€ Persist gender to DB whenever venture + gender are known â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Only writes when the viewer owns the venture â€” otherwise we'd
   // silently overwrite the author's persona gender on every visit to
   // their map.
   useEffect(() => {
@@ -3454,7 +3453,7 @@ function MapPageInner() {
     if (flagsSeededRef.current) return;
     flagsSeededRef.current = true;
     seedFlags().catch(() => {
-      // Non-critical — silently ignore if already seeded
+      // Non-critical â€” silently ignore if already seeded
     });
   }, [seedFlags]);
 
@@ -3463,7 +3462,7 @@ function MapPageInner() {
   // grind tasks first.
   //
   // Previously this handler silently returned if `activeVenture` or
-  // the matching `cp` weren't ready — which frequently happened when
+  // the matching `cp` weren't ready â€” which frequently happened when
   // Step3MapGuide dispatched the event immediately after boss-intro
   // dismissal, before Convex had hydrated venture/checkpoints. Result:
   // combat never opened. Now the request is stashed in a ref and
@@ -3481,13 +3480,13 @@ function MapPageInner() {
       if (!forceCombatPendingRef.current) return;
       if (!activeVenture) return;
       if (!checkpoints || checkpoints.length === 0) return;
-      // Primary lookup — the currently-active checkpoint. Works for
+      // Primary lookup â€” the currently-active checkpoint. Works for
       // the common case where activeStage / activeCP have resolved
       // by the time the tutorial dispatches its force-combat event.
       let cp = checkpoints.find(
         (c) => c.stage === activeStage && c.checkpoint === activeCP,
       );
-      // FALLBACK — when activeStage/activeCP are still undefined
+      // FALLBACK â€” when activeStage/activeCP are still undefined
       // (Convex + URL-sync race on first map paint), use the first
       // NOT-completed checkpoint. That's the natural target the
       // tutorial wanted anyway, and it prevents the "stuck on map,
@@ -3508,7 +3507,7 @@ function MapPageInner() {
       forceCombatPendingRef.current = false;
       startBossCombat(cp, doneTasks);
     };
-    // Retry when any dep changes — covers the race where the event
+    // Retry when any dep changes â€” covers the race where the event
     // fires before Convex data lands.
     tryFireForceCombat();
     window.addEventListener("tutorial:force-combat", handler);
@@ -3573,7 +3572,7 @@ function MapPageInner() {
     );
   }, [allStageQualities, activeStage]);
 
-  // ── Detect new badges via Convex subscription ─────────────────────────────
+  // â”€â”€ Detect new badges via Convex subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // getMyBadges returns badges newest-first. When the count increases, the
   // badge at index 0 is the most recently awarded one.
   useEffect(() => {
@@ -3584,7 +3583,7 @@ function MapPageInner() {
       prevBadgeCountRef.current !== null &&
       count > prevBadgeCountRef.current
     ) {
-      // Skip if a local task submission just happened — the task badge from
+      // Skip if a local task submission just happened â€” the task badge from
       // handleTaskSubmissionSuccess already covers this animation.
       const msSinceSubmit = Date.now() - recentTaskSubmitRef.current;
       if (msSinceSubmit < 5000) {
@@ -3592,7 +3591,7 @@ function MapPageInner() {
         return;
       }
 
-      // Skip while the v2 tutorial is active — badges awarded during the
+      // Skip while the v2 tutorial is active â€” badges awarded during the
       // guided flow (e.g. First Spark from the auto-submitted post) show
       // up right when Sparky is teaching the first task and derail the
       // guided experience. The badge is still recorded server-side; the
@@ -3602,7 +3601,7 @@ function MapPageInner() {
         return;
       }
 
-      // New badge(s) awarded — enqueue them
+      // New badge(s) awarded â€” enqueue them
       const newCount = count - prevBadgeCountRef.current;
       const newBadges = myBadges.slice(0, newCount);
       const payloads: BadgePayload[] = newBadges.map((b) => ({
@@ -3613,7 +3612,7 @@ function MapPageInner() {
         rarity: b.rarity,
         awardedAt: b.awardedAt,
       }));
-      console.log(`[MapPage] 🎖️ New badge(s) detected: ${newCount}`, payloads);
+      console.log(`[MapPage] ðŸŽ–ï¸ New badge(s) detected: ${newCount}`, payloads);
       setBadgeQueue((q) => {
         const existingNames = new Set(q.map((b) => b.name));
         const unique = payloads.filter((p) => !existingNames.has(p.name) && !shownBadgesRef.current.has(p.name));
@@ -3624,7 +3623,7 @@ function MapPageInner() {
     prevBadgeCountRef.current = count;
   }, [myBadges, tutorialActive]);
 
-  // ── Detect new venture badges (62-badge system) ───────────────────────────
+  // â”€â”€ Detect new venture badges (62-badge system) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!ventureMyBadges) return;
     const count = ventureMyBadges.length;
@@ -3633,7 +3632,7 @@ function MapPageInner() {
       prevVentureBadgeCountRef.current !== null &&
       count > prevVentureBadgeCountRef.current
     ) {
-      // Skip if a local task submission just happened — the task badge from
+      // Skip if a local task submission just happened â€” the task badge from
       // handleTaskSubmissionSuccess already covers this animation.
       const msSinceSubmit = Date.now() - recentTaskSubmitRef.current;
       if (msSinceSubmit < 5000) {
@@ -3641,13 +3640,13 @@ function MapPageInner() {
         return;
       }
 
-      // Skip while the v2 tutorial is active — see the myBadges effect above.
+      // Skip while the v2 tutorial is active â€” see the myBadges effect above.
       if (tutorialActive) {
         prevVentureBadgeCountRef.current = count;
         return;
       }
 
-      // New venture badge(s) awarded — enqueue them
+      // New venture badge(s) awarded â€” enqueue them
       const newCount = count - prevVentureBadgeCountRef.current;
       // Sort by awardedAt descending to get newest first
       const sorted = [...ventureMyBadges].sort(
@@ -3678,7 +3677,7 @@ function MapPageInner() {
 
       if (payloads.length > 0) {
         console.log(
-          `[MapPage] 🏆 New venture badge(s) detected: ${newCount}`,
+          `[MapPage] ðŸ† New venture badge(s) detected: ${newCount}`,
           payloads,
         );
         setBadgeQueue((q) => {
@@ -3695,7 +3694,7 @@ function MapPageInner() {
     prevVentureBadgeCountRef.current = count;
   }, [ventureMyBadges, tutorialActive]);
 
-  // ── Play biome ambience + stage music whenever the DISPLAYED stage changes.
+  // â”€â”€ Play biome ambience + stage music whenever the DISPLAYED stage changes.
   //     Uses the URL-requested stage (?stage=N) when present so the user
   //     hears Forest music while walking the Forest map, even if Convex
   //     venture.currentStage hasn't caught up yet (demo path where CPs
@@ -3711,7 +3710,7 @@ function MapPageInner() {
     audioManager.playStageMusic(displayedStage);
   }, [activeStage, requestedStage, activeVenture?.templateId, phaserReady]);
 
-  // ── Detect level-up → trigger LevelUpSequence + fanfare ──────────────────
+  // â”€â”€ Detect level-up â†’ trigger LevelUpSequence + fanfare â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Handles multi-level progression (XP overflow) - shows all levels gained in one animation
   useEffect(() => {
     if (levelData === undefined) return;
@@ -3736,16 +3735,16 @@ function MapPageInner() {
       // Enhanced logging for multi-level gains
       if (isMultiLevel) {
         console.log(
-          `[MapPage] 🎉 MULTI-LEVEL UP! ${prevLevelRef.current} → ${level} (+${levelsGained} levels) - XP overflow handled`,
+          `[MapPage] ðŸŽ‰ MULTI-LEVEL UP! ${prevLevelRef.current} â†’ ${level} (+${levelsGained} levels) - XP overflow handled`,
         );
       } else {
-        console.log(`[MapPage] Level-up: ${prevLevelRef.current} → ${level}`);
+        console.log(`[MapPage] Level-up: ${prevLevelRef.current} â†’ ${level}`);
       }
     }
     prevLevelRef.current = level;
   }, [level, levelPhase, levelData]);
 
-  // ── Sync Convex data → Jotai HUD atoms ────────────────────────────────────
+  // â”€â”€ Sync Convex data â†’ Jotai HUD atoms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!venture) return;
 
@@ -3761,7 +3760,7 @@ function MapPageInner() {
 
     setStageInfoAtom({
       stageName: stageData?.name ?? "Ideation",
-      stageIcon: stageData?.icon ?? "💡",
+      stageIcon: stageData?.icon ?? "ðŸ’¡",
       biomeName: stageData?.biome ?? "The Village",
       stage: activeStage,
       currentCheckpoint: activeCP,
@@ -3875,26 +3874,26 @@ function MapPageInner() {
     setUserProgressAtom,
   ]);
 
-  // ── Sync template metric to HUD atom ──────────────────────────────────────────
+  // â”€â”€ Sync template metric to HUD atom â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (templateMetric) {
       setTemplateMetricAtom(templateMetric);
     }
   }, [templateMetric, setTemplateMetricAtom]);
 
-  // ── Sync template ID to HUD atom ──────────────────────────────────────────────
+  // â”€â”€ Sync template ID to HUD atom â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (venture?.templateId) {
       setTemplateIdAtom(venture.templateId);
     }
   }, [venture?.templateId, setTemplateIdAtom]);
 
-  // ── Also listen for BADGE_AWARDED events dispatched via the event bridge ──
+  // â”€â”€ Also listen for BADGE_AWARDED events dispatched via the event bridge â”€â”€
   // (Covers Phaser-side badge triggers in addition to the Convex subscription)
   useEffect(() => {
     const handleBadge = (event: BadgePayload) => {
       setBadgeQueue((q) => {
-        // Deduplicate — don't show same badge twice if subscription already caught it
+        // Deduplicate â€” don't show same badge twice if subscription already caught it
         if (q.some((b) => b.id === event.id)) return q;
         return [...q, event];
       });
@@ -3903,7 +3902,7 @@ function MapPageInner() {
     return () => eventBridge.off("BADGE_AWARDED", handleBadge);
   }, []);
 
-  // ── Village demo — final celebration on Unraveller reveal ────────────────
+  // â”€â”€ Village demo â€” final celebration on Unraveller reveal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // The Phaser scene fires VILLAGE_COMPLETE 4s after the boss taunt lands.
   // We render VillageCompleteCelebration as a full-screen overlay to close
   // the emotional arc of Stage 1.
@@ -3928,7 +3927,7 @@ function MapPageInner() {
     return () => eventBridge.off("VILLAGE_COMPLETE", handleVillageComplete);
   }, []);
 
-  // ── Venture-wide finale — fires when the final stage (Artisans / 4) is
+  // â”€â”€ Venture-wide finale â€” fires when the final stage (Artisans / 4) is
   //     cleared. The STAGE_COMPLETE event carries `nextStage > 4` in that
   //     case; we open the VentureCompleteCelebration overlay instead of
   //     navigating (there's no stage 5 art yet).
@@ -3937,7 +3936,7 @@ function MapPageInner() {
     stagesCleared: number;
   }>({ open: false, stagesCleared: 4 });
 
-  // ── Super-boss encounter overlay — opens when Forest/Harbor/Artisans
+  // â”€â”€ Super-boss encounter overlay â€” opens when Forest/Harbor/Artisans
   //     scenes fire SUPER_BOSS_ENCOUNTER after CP4 mini-boss clears.
   //     The player commits to a "final blow" CTA; on click we call the
   //     scene's defeatSuperBoss() which plays the defeat beat and then
@@ -3948,8 +3947,8 @@ function MapPageInner() {
     boss: StageBoss | null;
   }>({ open: false, stage: 0, boss: null });
 
-  // Brief toast between mid-arc stage transitions (Forest→Harbor and
-  // Harbor→Artisans). Village→Forest has the fuller celebration, and
+  // Brief toast between mid-arc stage transitions (Forestâ†’Harbor and
+  // Harborâ†’Artisans). Villageâ†’Forest has the fuller celebration, and
   // Stage 4 finish has the venture finale, so this only fires for
   // clearedStage of 2 or 3.
   const [stageCleared, setStageCleared] = useState<{ open: boolean; stage: number }>({
@@ -3957,7 +3956,7 @@ function MapPageInner() {
     stage: 0,
   });
 
-  // ── Per-stage super-boss intro cinematic ────────────────────────────
+  // â”€â”€ Per-stage super-boss intro cinematic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // The original BossIntroCinematic was hardwired to the Unraveller +
   // 4 Village bosses and only played once per user on their first
   // /map visit. Product ask (2026-08-10): "like we have overview for
@@ -3995,9 +3994,9 @@ function MapPageInner() {
       // Layer a dramatic boss theme over the stage ambience for the
       // encounter's duration. Pick track by boss family so each stage's
       // super boss has a distinct sonic identity.
-      //   plant → Pale Architect (Forest Colossus)
-      //   serpent → Gravemind (Leviathan / Forge Dragon)
-      //   default → Unraveller (Village fallback)
+      //   plant â†’ Pale Architect (Forest Colossus)
+      //   serpent â†’ Gravemind (Leviathan / Forge Dragon)
+      //   default â†’ Unraveller (Village fallback)
       try {
         let track = "boss_unraveller";
         if (boss?.family === "plant") track = "boss_pale_architect";
@@ -4010,8 +4009,8 @@ function MapPageInner() {
       // Decide whether to play the per-super intro cinematic first.
       // Village Stage 1 skips this because the FIRST-VISIT
       // BossIntroCinematic (mounted separately) already covers the
-      // Unraveller reveal. Every other stage — including all Academic
-      // /Lab/Creative super bosses — gets a fresh cinematic on
+      // Unraveller reveal. Every other stage â€” including all Academic
+      // /Lab/Creative super bosses â€” gets a fresh cinematic on
       // first-in-session encounter.
       const sessionKey = `superIntroSeen:${tid}:${e.stage}`;
       const alreadySeen =
@@ -4041,7 +4040,7 @@ function MapPageInner() {
             ? [{ name: tplBoss.name, idleAsset: tplBoss.idleAsset }]
             : [{ name: boss.name, idleAsset: boss.idleAsset }];
         })();
-        // Stage function names for the strip — Venture uses its
+        // Stage function names for the strip â€” Venture uses its
         // established list; templates use the current stage's short
         // name. Falls back gracefully.
         const stageName =
@@ -4054,7 +4053,7 @@ function MapPageInner() {
                  e.stage - 1, e.stage,
                )
             : [stageName];
-        // Speech lines — reuse boss.introLine if present, otherwise a
+        // Speech lines â€” reuse boss.introLine if present, otherwise a
         // family-flavoured generic call. Two lines maximum so the
         // cinematic keeps its pacing.
         const introLine = boss.introLine ?? `* ${boss.name} rises before you.`;
@@ -4084,7 +4083,7 @@ function MapPageInner() {
         return;
       }
 
-      // Skip cinematic → open the combat modal directly.
+      // Skip cinematic â†’ open the combat modal directly.
       setSuperBossEncounter({ open: true, stage: e.stage, boss });
     };
     eventBridge.onReact("SUPER_BOSS_ENCOUNTER", handleEncounter);
@@ -4092,7 +4091,7 @@ function MapPageInner() {
   }, [venture?.templateId, templateStages]);
 
   // Listen for STAGE_COMPLETE events from Forest/Harbor/Artisans scenes.
-  // Persists progression to Convex via advanceStage (idempotent — the
+  // Persists progression to Convex via advanceStage (idempotent â€” the
   // Convex-side tryAdvanceStage guards with a "all CPs of stage marked
   // completed" check, so this is safe to fire opportunistically).
   //
@@ -4100,7 +4099,7 @@ function MapPageInner() {
   // If nextStage > 4: we open the venture-wide finale overlay.
   useEffect(() => {
     const handleStageComplete = (e: { stage: number; nextStage: number }) => {
-      // Fire Convex persistence in the background — never block the UX on it.
+      // Fire Convex persistence in the background â€” never block the UX on it.
       if (activeVentureId) {
         advanceStage({ ventureId: activeVentureId as Id<"ventures"> }).catch(
           (err) => {
@@ -4118,8 +4117,8 @@ function MapPageInner() {
         setVentureComplete({ open: true, stagesCleared: 4 });
         return;
       }
-      // Mid-arc transitions (Forest→Artisans, Artisans→Harbor): brief
-      // cleared-toast for atmosphere.  Stage 1→2 uses the fuller
+      // Mid-arc transitions (Forestâ†’Artisans, Artisansâ†’Harbor): brief
+      // cleared-toast for atmosphere.  Stage 1â†’2 uses the fuller
       // VillageCompleteCelebration path elsewhere.
       if (e.stage === 2 || e.stage === 4) {
         setStageCleared({ open: true, stage: e.stage });
@@ -4133,7 +4132,7 @@ function MapPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVentureId]);
 
-  // ── Sync venture identity → Phaser (not on every task/checkpoint tick) ───────
+  // â”€â”€ Sync venture identity â†’ Phaser (not on every task/checkpoint tick) â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!phaserReady || !venture) return;
 
@@ -4203,7 +4202,7 @@ function MapPageInner() {
     currentUser?.username,
   ]);
 
-  // ── Live corruption meter → Phaser map visuals ─────────────────────────────
+  // â”€â”€ Live corruption meter â†’ Phaser map visuals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!phaserReady || !venture) return;
     eventBridge.dispatchToPhaser({
@@ -4212,7 +4211,7 @@ function MapPageInner() {
     });
   }, [phaserReady, venture?._id, corruptionLevel]);
 
-  // ── Assigned pool super-boss → VillageMapScene reveal ─────────────────────
+  // â”€â”€ Assigned pool super-boss â†’ VillageMapScene reveal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Venture creation writes a random pool boss id (1..12) to
   // `venture.assignedBosses[0]` (see convex/ventures.ts:createVentureForUser).
   // That id maps 1:1 to SUPER_BOSS_POOL index (id - 1). Once phaser is
@@ -4220,7 +4219,7 @@ function MapPageInner() {
   // it into VillageMapScene via setAssignedPoolBoss so the super-boss
   // silhouette + reveal-time taunt use the CORRECT boss instead of
   // the hardcoded Unraveller. Runs whenever the assignment changes
-  // (rare — set once at venture create — but safe to re-run).
+  // (rare â€” set once at venture create â€” but safe to re-run).
   useEffect(() => {
     if (!phaserReady) return;
     const bossIdRaw = venture?.assignedBosses?.[0];
@@ -4239,7 +4238,7 @@ function MapPageInner() {
     }
   }, [phaserReady, venture?._id, venture?.assignedBosses]);
 
-  // ── Sync checkpoint progress → Phaser (deduped by signature) ───────────────
+  // â”€â”€ Sync checkpoint progress â†’ Phaser (deduped by signature) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!phaserReady || !venture || checkpoints.length === 0) return;
 
@@ -4263,7 +4262,7 @@ function MapPageInner() {
       checkpoints: phaserStates,
     });
 
-    // Corruption overlay sync — filter to the ACTIVE stage's CPs and
+    // Corruption overlay sync â€” filter to the ACTIVE stage's CPs and
     // hand them to whichever stage scene is currently mounted. Every
     // stage scene implements `applyCorruptionState(states)`; we probe
     // and forward to the first live one.
@@ -4296,7 +4295,7 @@ function MapPageInner() {
     }
   }, [phaserReady, venture?._id, checkpoints, activeStage, activeCP]);
 
-  // ── PRD §2 — mini-game lifecycle hook + Phaser sync ───────────────────────
+  // â”€â”€ PRD Â§2 â€” mini-game lifecycle hook + Phaser sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const miniGameLifecycle = useMiniGameLifecycle(
     venture?._id as Id<"ventures"> | undefined,
   );
@@ -4316,7 +4315,7 @@ function MapPageInner() {
         window.focus();
         // If document.body still has overflow:hidden but no active
         // scroll-lock consumer (Radix Dialog, tutorial, celebration),
-        // stomp it clear. Defensive — never runs if a real overlay is open.
+        // stomp it clear. Defensive â€” never runs if a real overlay is open.
         const openDialogs = document.querySelectorAll("[role='dialog'][data-state='open']").length;
         if (openDialogs === 0 && document.body.style.overflow === "hidden") {
           document.body.style.overflow = "";
@@ -4346,7 +4345,7 @@ function MapPageInner() {
     });
   }, [phaserReady, miniGameCheckpointGate, miniGameCompletedSpawnIds]);
 
-  // Bridge: Phaser fires MINIGAME_SPAWN_ACTIVATED → hook opens the prompt.
+  // Bridge: Phaser fires MINIGAME_SPAWN_ACTIVATED â†’ hook opens the prompt.
   // Prefer the Convex-registered config (canonical difficulty/flavor), but
   // fall back to the event payload for demo/dev spawns that Phaser adds
   // ad-hoc without a matching Convex row (e.g. the visible near-CP1 tag).
@@ -4376,7 +4375,7 @@ function MapPageInner() {
     return () => eventBridge.off("MINIGAME_SPAWN_ACTIVATED", handler);
   }, [miniGameLifecycle]);
 
-  // ── Sync world brightness → Phaser ─────────────────────────────────────────
+  // â”€â”€ Sync world brightness â†’ Phaser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!phaserReady) return;
     const nextBrightness = brightness?.worldBrightness ?? 0;
@@ -4389,7 +4388,7 @@ function MapPageInner() {
     });
   }, [phaserReady, brightness?.worldBrightness]);
 
-  // ── Checkpoint click from Phaser ───────────────────────────────────────────
+  // â”€â”€ Checkpoint click from Phaser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const handleClick = (e: {
       checkpointId: string;
@@ -4482,14 +4481,14 @@ function MapPageInner() {
     updateUrlParams,
   ]);
 
-  // ── Task toggle → Convex mutation ─────────────────────────────────────────
+  // â”€â”€ Task toggle â†’ Convex mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleTaskToggle = useCallback(
     async (taskIdx: number) => {
       if (!selectedDetail) return;
       const task = selectedDetail.tasks[taskIdx];
       if (!task || task.done) return; // tasks can only be marked done, not undone
 
-      // Ownership gate — non-owners can VIEW a checkpoint on someone
+      // Ownership gate â€” non-owners can VIEW a checkpoint on someone
       // else's venture (via the map's sourceIdeaId flow) but they
       // can't submit tasks. Server enforces this too via
       // assertVentureAccess, but short-circuiting here avoids firing
@@ -4536,7 +4535,7 @@ function MapPageInner() {
     [selectedDetail, setSubmittingTask, activeVenture, currentUser?._id],
   );
 
-  // ── Task redo → Reset and reopen submission modal ────────────────────────
+  // â”€â”€ Task redo â†’ Reset and reopen submission modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleTaskRedo = useCallback(
     async (taskIdx: number) => {
       if (!selectedDetail) return;
@@ -4609,11 +4608,11 @@ function MapPageInner() {
       checkpointId: Id<"ventureCheckpoints">;
       taskLevel: "t1" | "t2" | "t3";
     }) => {
-      // ── 1. Close the modal immediately ─────────────────────────────────
+      // â”€â”€ 1. Close the modal immediately â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       setSubmittingTask(null);
 
       // Stamp the submission time so DB-driven badge detectors (myBadges /
-      // ventureMyBadges) skip re-showing a badge for the next 5 seconds —
+      // ventureMyBadges) skip re-showing a badge for the next 5 seconds â€”
       // the local task badge animation already covers this event.
       recentTaskSubmitRef.current = Date.now();
 
@@ -4622,10 +4621,10 @@ function MapPageInner() {
         [taskId]: true,
       }));
 
-      // ── 2. Task badge — rarity matches corruption, profile-style card ──
-      // Gold (legendary)  : corruption < 25  — pristine execution
-      // Silver (rare)     : corruption 25–49 — solid but slightly tarnished
-      // Bronze (uncommon) : corruption >= 50  — survived, with cost
+      // â”€â”€ 2. Task badge â€” rarity matches corruption, profile-style card â”€â”€
+      // Gold (legendary)  : corruption < 25  â€” pristine execution
+      // Silver (rare)     : corruption 25â€“49 â€” solid but slightly tarnished
+      // Bronze (uncommon) : corruption >= 50  â€” survived, with cost
       const taskBadgeRarity: BadgePayload["rarity"] =
         corruptionLevel < 25
           ? "legendary"
@@ -4649,19 +4648,19 @@ function MapPageInner() {
           t.includes("journal") ||
           t.includes("self_report")
         )
-          return "✍️";
+          return "âœï¸";
         if (t.includes("table") || t.includes("poll") || t.includes("chart"))
-          return "📊";
-        if (t.includes("map") || t.includes("roadmap")) return "🗺️";
-        if (t.includes("survey") || t.includes("checklist")) return "📋";
-        if (t.includes("link")) return "🔗";
-        if (t.includes("upload")) return "📤";
-        if (t.includes("kanban") || t.includes("board")) return "🗂️";
-        if (t.includes("calendar") || t.includes("date")) return "📅";
+          return "ðŸ“Š";
+        if (t.includes("map") || t.includes("roadmap")) return "ðŸ—ºï¸";
+        if (t.includes("survey") || t.includes("checklist")) return "ðŸ“‹";
+        if (t.includes("link")) return "ðŸ”—";
+        if (t.includes("upload")) return "ðŸ“¤";
+        if (t.includes("kanban") || t.includes("board")) return "ðŸ—‚ï¸";
+        if (t.includes("calendar") || t.includes("date")) return "ðŸ“…";
 
-        if (rarity === "legendary") return "🏆";
-        if (rarity === "rare") return "🥈";
-        return "🥉";
+        if (rarity === "legendary") return "ðŸ†";
+        if (rarity === "rare") return "ðŸ¥ˆ";
+        return "ðŸ¥‰";
       };
 
       const taskBadgeIcon = getToolEmoji(toolType, taskBadgeRarity);
@@ -4672,7 +4671,7 @@ function MapPageInner() {
           : corruptionLevel < 50
             ? "Silver"
             : "Bronze";
-      const taskBadgeLabel = `${cpTitle} (${levelName}) — ${statusText}`;
+      const taskBadgeLabel = `${cpTitle} (${levelName}) â€” ${statusText}`;
 
       const taskLevelName =
         taskLevel === "t1" ? "Easy" : taskLevel === "t2" ? "Medium" : "Stretch";
@@ -4728,7 +4727,7 @@ function MapPageInner() {
       }
 
       // Suppress the task-badge celebration while the v2 tutorial is
-      // running — it hijacks the guided flow with a full-screen
+      // running â€” it hijacks the guided flow with a full-screen
       // "CONGRATULATIONS!" modal right after Submit Response. Post-tutorial
       // task submissions still trigger the badge normally.
       if (!tutorialActive) {
@@ -4826,7 +4825,7 @@ function MapPageInner() {
         taskLevel,
       });
 
-      // Boss weakening — call scene.weakenActiveBoss(doneCount) on
+      // Boss weakening â€” call scene.weakenActiveBoss(doneCount) on
       // whichever stage scene is currently active. All four stage scenes
       // (Village / Forest / GoldenHarbor / Artisans) implement the same
       // weakenActiveBoss(tasksDone, total) contract, so we probe each in
@@ -4863,7 +4862,7 @@ function MapPageInner() {
         console.warn("[MapPage] weakenActiveBoss failed", err);
       }
 
-      // Reward feedback — floating "+N XP" popover.  Uses the REAL point
+      // Reward feedback â€” floating "+N XP" popover.  Uses the REAL point
       // value granted by the server (t1/t2 = 20 pts, t3 = 35 pts) so the
       // popover doesn't lie to the user.  Gamification audit surfaced
       // the previous hardcoded "+15 XP" as a UX credibility issue.
@@ -4873,7 +4872,7 @@ function MapPageInner() {
         eventBridge.dispatchToReact({
           type: "XP_AWARDED",
           amount: rewardAmount,
-          label: taskLevel === "t3" ? "Task · Deep" : "Task",
+          label: taskLevel === "t3" ? "Task Â· Deep" : "Task",
         });
       } catch (err) {
         console.warn("[MapPage] XP_AWARDED dispatch failed", err);
@@ -4882,12 +4881,12 @@ function MapPageInner() {
       // v2 tutorial: after the guided first task, auto-advance the
       // checkpoint so the user is taken straight into AI Combat instead
       // of having to hunt for the Advance button.
-      //   forceBypass=false → boss combat check RUNS (we want combat)
-      //   skipDoneTasksCheck=true → allow advance with just 1 completed
+      //   forceBypass=false â†’ boss combat check RUNS (we want combat)
+      //   skipDoneTasksCheck=true â†’ allow advance with just 1 completed
       //     task (the tutorial only submits one)
-      //   fromBossVictory=false → default
-      // handleAdvance then hits needsCheckpointBossCombat() → true →
-      // startBossCombat() → sets bossCombatTarget → CombatPanel mounts.
+      //   fromBossVictory=false â†’ default
+      // handleAdvance then hits needsCheckpointBossCombat() â†’ true â†’
+      // startBossCombat() â†’ sets bossCombatTarget â†’ CombatPanel mounts.
       if (tutorialActive) {
         window.setTimeout(() => {
           const fn = handleAdvanceRef.current;
@@ -4908,7 +4907,7 @@ function MapPageInner() {
     ],
   );
 
-  // ── Advance checkpoint → Convex mutation ──────────────────────────────────
+  // â”€â”€ Advance checkpoint â†’ Convex mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleAdvance = useCallback(async (
     forceBypass = false,
     skipDoneTasksCheck = false,
@@ -4947,7 +4946,7 @@ function MapPageInner() {
     const mapStage = venture.currentStage ?? 1;
     const mapCheckpoint = venture.currentCheckpoint ?? 1;
 
-    // ── Boss combat: required once per checkpoint before advance ────────────
+    // â”€â”€ Boss combat: required once per checkpoint before advance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (
       !forceBypass &&
       needsCheckpointBossCombat(
@@ -4963,7 +4962,7 @@ function MapPageInner() {
       return;
     }
 
-    // ── Inter-checkpoint passage events removed as requested (only Boss combat and Badge animations should exist)
+    // â”€â”€ Inter-checkpoint passage events removed as requested (only Boss combat and Badge animations should exist)
     const unresolvedEvents: any[] = [];
 
     const isGold = doneTasks >= 3;
@@ -5059,10 +5058,10 @@ function MapPageInner() {
       // Reset bypass flag AFTER successful advance
       setBypassInterCheckpoint(false);
 
-      // ── Level (checkpoint) badge — rarity based on corruption meter ────
-      // Gold (legendary)  : corruption < 25  — clean, visionary execution
-      // Silver (rare)     : corruption 25–49  — solid but slightly compromised
-      // Bronze (uncommon) : corruption >= 50  — survived but at a cost
+      // â”€â”€ Level (checkpoint) badge â€” rarity based on corruption meter â”€â”€â”€â”€
+      // Gold (legendary)  : corruption < 25  â€” clean, visionary execution
+      // Silver (rare)     : corruption 25â€“49  â€” solid but slightly compromised
+      // Bronze (uncommon) : corruption >= 50  â€” survived but at a cost
       const levelBadgeRarity: BadgePayload["rarity"] =
         corruptionLevel < 25
           ? "legendary"
@@ -5076,20 +5075,20 @@ function MapPageInner() {
           : corruptionLevel < 50
             ? "Silver"
             : "Bronze";
-      const levelBadgeLabel = `${cp.checkpointName} — ${statusTextCP}`;
+      const levelBadgeLabel = `${cp.checkpointName} â€” ${statusTextCP}`;
 
       // Dynamic Stage-based Checkpoint Icon
       const getStageEmoji = (stageNum: number, rarity: string) => {
-        if (stageNum === 1) return "💡"; // Ideation
-        if (stageNum === 2) return "🔬"; // Research
-        if (stageNum === 3) return "✅"; // Validation
-        if (stageNum === 4) return "🎨"; // Offer Design
-        if (stageNum === 5) return "⚙️"; // Build & Deliver
-        if (stageNum === 6) return "🚀"; // Launch
-        if (stageNum === 7) return "🔄"; // Iteration
-        if (stageNum === 8) return "👑"; // Scale
+        if (stageNum === 1) return "ðŸ’¡"; // Ideation
+        if (stageNum === 2) return "ðŸ”¬"; // Research
+        if (stageNum === 3) return "âœ…"; // Validation
+        if (stageNum === 4) return "ðŸŽ¨"; // Offer Design
+        if (stageNum === 5) return "âš™ï¸"; // Build & Deliver
+        if (stageNum === 6) return "ðŸš€"; // Launch
+        if (stageNum === 7) return "ðŸ”„"; // Iteration
+        if (stageNum === 8) return "ðŸ‘‘"; // Scale
 
-        return rarity === "legendary" ? "🏆" : rarity === "rare" ? "🥈" : "🥉";
+        return rarity === "legendary" ? "ðŸ†" : rarity === "rare" ? "ðŸ¥ˆ" : "ðŸ¥‰";
       };
 
       const levelBadgeIcon = getStageEmoji(cp.stage, levelBadgeRarity);
@@ -5098,7 +5097,7 @@ function MapPageInner() {
           ? `Checkpoint "${cp.checkpointName}" cleared with gold-standard purity!`
           : corruptionLevel < 50
             ? `Checkpoint "${cp.checkpointName}" cleared with silver integrity. Keep the corruption at bay!`
-            : `Checkpoint "${cp.checkpointName}" cleared — bronze earned. Watch the corruption meter!`;
+            : `Checkpoint "${cp.checkpointName}" cleared â€” bronze earned. Watch the corruption meter!`;
       const checkpointBadgePrimary =
         levelBadgeRarity === "legendary"
           ? "#FBBF24"
@@ -5175,9 +5174,9 @@ function MapPageInner() {
             : stageMedalTier === "silver"
               ? "Silver"
               : "Bronze";
-        const stageBadgeName = `Stage ${cp.stage}: ${stageNames[cp.stage - 1]} Clear — ${stageMedalText}`;
+        const stageBadgeName = `Stage ${cp.stage}: ${stageNames[cp.stage - 1]} Clear â€” ${stageMedalText}`;
         const stageBadgeIcon =
-          corruptionLevel <= 30 ? "🥇" : corruptionLevel <= 70 ? "🥈" : "🥉";
+          corruptionLevel <= 30 ? "ðŸ¥‡" : corruptionLevel <= 70 ? "ðŸ¥ˆ" : "ðŸ¥‰";
         const stageBadgeDesc = `Completed Stage ${cp.stage} with ${stageMedalText.toLowerCase()} prestige status!`;
         const stageBadgePrimary =
           stageBadgeRarity === "legendary"
@@ -5229,7 +5228,7 @@ function MapPageInner() {
           updateUrlParams({ checkpointId: null }, true);
         }
       } else if (nextCp) {
-        // Same-stage advance — open the next checkpoint panel immediately.
+        // Same-stage advance â€” open the next checkpoint panel immediately.
         setSelectedDetail(buildCheckpointDetail(nextCp));
         updateUrlParams({ checkpointId: nextCp._id }, true);
         if (phaserReady) {
@@ -5276,14 +5275,14 @@ function MapPageInner() {
   // Keep handleAdvanceRef always pointing at the latest handleAdvance
   handleAdvanceRef.current = handleAdvance;
 
-  // ── Destroy audio on unmount ──────────────────────────────────────────────
+  // â”€â”€ Destroy audio on unmount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     return () => {
       audioManager.destroy();
     };
   }, []);
 
-  // ── Stage strip select ─────────────────────────────────────────────────────
+  // â”€â”€ Stage strip select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [viewingStage, setViewingStage] = useState(1);
   const viewingStageSyncedRef = useRef(false);
 
@@ -5349,13 +5348,13 @@ function MapPageInner() {
     }
   }, [selectedStageId, checkpoints, phaserReady, handleStageSelect]);
 
-  // ── Read HUD atom values ───────────────────────────────────────────────────
+  // â”€â”€ Read HUD atom values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const stageInfo = useAtomValue(stageInfoAtom);
   const checkpointProgress = useAtomValue(checkpointProgressAtom);
   const userProgress = useAtomValue(userProgressAtom);
   const corruption = useAtomValue(corruptionStateAtom);
 
-  // Stable callback for LeftSidebar — inlined as a 25-line arrow before,
+  // Stable callback for LeftSidebar â€” inlined as a 25-line arrow before,
   // which re-created the closure every render and prevented LeftSidebar
   // from staying memoized.
   const handleSidebarOpenPanel = useCallback(
@@ -5369,9 +5368,9 @@ function MapPageInner() {
         }
         setIsGroupChatOpen(true);
       } else if (tab === "contributors") {
-        // CONTRIBUTIONS tile — opens the ContributionComposeDialog.
-        // Product mechanism: inside a project, click Contributions →
-        // fill Title + Description → tags inherit from the project →
+        // CONTRIBUTIONS tile â€” opens the ContributionComposeDialog.
+        // Product mechanism: inside a project, click Contributions â†’
+        // fill Title + Description â†’ tags inherit from the project â†’
         // post as `${ProjectName}:${title}` idea (visible in feed).
         // Map bar (MapNavbar) stays visible behind the dialog since
         // the compose scrim starts BELOW the navbar top offset.
@@ -5387,15 +5386,15 @@ function MapPageInner() {
       } else if (tab === "journal") {
         setIsJournalOpen(true);
       } else if (tab === "community") {
-        // GUILD tile (was "Community" — renamed per product ask
+        // GUILD tile (was "Community" â€” renamed per product ask
         // "name it as guid"). Opens the Team & Contributors panel
-        // (Incoming Requests + Invite Contributors tabs) — the panel
+        // (Incoming Requests + Invite Contributors tabs) â€” the panel
         // that used to open from CONTRIBUTIONS. The tile keeps its
         // internal id of "community" for backwards-compat with the
         // MapMenuPanelId union; only the label + destination changed.
         // The /community full-page surface (Weekly Top Contributors +
         // Top Projects leaderboard) is still reachable from the
-        // header nav — moving it off the map menu freed the slot for
+        // header nav â€” moving it off the map menu freed the slot for
         // the Guild panel.
         setIsContributorsOpen(true);
       } else if (tab === "minigames") {
@@ -5403,7 +5402,7 @@ function MapPageInner() {
         // technical id still "minigames" for backwards-compat).
         // Product ask: "quest should show the task". Open the
         // CheckpointPanel for the user's currently active
-        // checkpoint so the tasks list appears — this matches
+        // checkpoint so the tasks list appears â€” this matches
         // clicking the CP marker on the map. Fallback: open the
         // first checkpoint in the current stage. Very last fallback:
         // open the old minigames panel if we somehow can't find any
@@ -5425,7 +5424,7 @@ function MapPageInner() {
       } else if (tab === "settings") {
         setIsSettingsOpen(true);
       } else if (tab === "flare") {
-        // Menu "Flare" tile — opens the compose dialog with the
+        // Menu "Flare" tile â€” opens the compose dialog with the
         // current venture context so responders see which project
         // needs help. Checkpoint context stays optional (users
         // firing from the menu may not be viewing a specific CP).
@@ -5441,7 +5440,7 @@ function MapPageInner() {
       updateUrlParams,
       router,
       // Added when Quests tile was rewired to open the active
-      // CheckpointPanel — reads live checkpoint state to pick the
+      // CheckpointPanel â€” reads live checkpoint state to pick the
       // right one.
       checkpoints,
       activeStage,
@@ -5449,12 +5448,12 @@ function MapPageInner() {
     ],
   );
 
-  // ── Loading / no-venture guard ─────────────────────────────────────────────
+  // â”€â”€ Loading / no-venture guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // worldMapData is "skip"ped while intro is showing, so only check it after intro
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <div
@@ -5464,7 +5463,7 @@ function MapPageInner() {
       {/* Fonts + keyframes + Phaser canvas position lock.
           The Phaser RESIZE scale mode dynamically sets margin-left /
           margin-top on the inserted canvas to center it inside the
-          wrapper. Each margin change counts as a layout shift —
+          wrapper. Each margin change counts as a layout shift â€”
           field traces (PerformanceObserver) showed CLS 1.000 with
           the canvas as the largest source. Pinning the canvas to
           inset:0 with !important neutralises those margin writes
@@ -5508,15 +5507,15 @@ function MapPageInner() {
           id="bottom-hud-control"
           className="pointer-events-auto flex items-center gap-2 md:gap-2.5 rounded-xl border border-white/5 bg-[#0A0D12]/92 backdrop-blur-xl px-2 py-1.5 md:px-2.5 md:py-2 shadow-2xl min-h-[44px]"
         >
-          {/* Adventurer's Menu — replaces the standalone LeftSidebar
-              column. Clicking pops up a 2×4 grid of nav destinations
+          {/* Adventurer's Menu â€” replaces the standalone LeftSidebar
+              column. Clicking pops up a 2Ã—4 grid of nav destinations
               (feed / chat / contributors / hierarchy / calendar /
               kanban / journal / settings). All go through the same
               handleSidebarOpenPanel so existing routing works. */}
           <MapMenuPopover onOpenPanel={handleSidebarOpenPanel} />
 
           {/* Prev/Next stage buttons take ZERO layout space when
-              disabled — Stage 1 users don't see an empty amber
+              disabled â€” Stage 1 users don't see an empty amber
               placeholder on the left, and latest-stage users don't
               see an empty emerald placeholder either. Result: HUD
               bar starts at "THE VILLAGE" for a fresh player. */}
@@ -5542,7 +5541,7 @@ function MapPageInner() {
             </button>
           )}
 
-          {/* "Current Map" — conditionally mounted for compactness.
+          {/* "Current Map" â€” conditionally mounted for compactness.
               (Was previously visibility-toggled to avoid CLS, but the
               invisible slot ate ~130px of blank space next to the
               menu button. Compactness > CLS on this bar per product.) */}
@@ -5557,7 +5556,7 @@ function MapPageInner() {
             </button>
           )}
 
-          {/* Standalone StageInfo pill removed per product request —
+          {/* Standalone StageInfo pill removed per product request â€”
               the biome label ("THE VILLAGE" with its chest icon) used
               to sit here to the left of the XP bar, but the same
               biome name is now rendered inline as the SUBHEADING
@@ -5571,7 +5570,7 @@ function MapPageInner() {
               maxXP={userProgress.xpToNextLevel}
               compact={true}
               // Left side: the user's PROJECT / venture name (e.g.
-              // "testing") — NOT their username. Previously we passed
+              // "testing") â€” NOT their username. Previously we passed
               // currentUser.username here so the HUD showed "USER_PRO
               // (1/8)" instead of the actual project title. The user
               // asked for the venture title on the left so the map bar
@@ -5582,7 +5581,7 @@ function MapPageInner() {
                 activeVenture?.name ||
                 undefined
               }
-              // Stage/biome name ("The Village", "The Forest", …)
+              // Stage/biome name ("The Village", "The Forest", â€¦)
               // shown as the subheading under the project name
               // inside the XPBar. Replaces the standalone StageInfo
               // pill that used to sit to the left of the bar.
@@ -5596,7 +5595,7 @@ function MapPageInner() {
                 // getStageBoss with activeStage so the label matches
                 // what the map shows. Falls back to getVillageBoss on
                 // stages that don't yet have a roster in
-                // stage-bosses.ts (currently stages 5, 7, 8 — art
+                // stage-bosses.ts (currently stages 5, 7, 8 â€” art
                 // pending). Returns undefined only if truly nothing
                 // is defined for the stage/CP combination.
                 // Now template-aware: for Academic/Lab/Creative the
@@ -5622,7 +5621,7 @@ function MapPageInner() {
 
       {/* Phaser canvas - Fully responsive.
           `contain: strict` confines the entire Phaser subtree from
-          contributing to outer layout/paint shifts — when Phaser
+          contributing to outer layout/paint shifts â€” when Phaser
           inserts/resizes its canvas element after mount, none of
           those size recalcs can ripple into surrounding HUD/overlays.
           This was a measurable CLS contributor on advanced ventures
@@ -5642,18 +5641,18 @@ function MapPageInner() {
         }}
       />
 
-      {/* ── Non-venture template placeholder (RETIRED) ─────────────
+      {/* â”€â”€ Non-venture template placeholder (RETIRED) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Academic / Lab / Creative now route through TemplateMapScene
           in the Phaser routing effect above, which paints the biome
           background inside Phaser AND spawns checkpoints, persona,
           boss + Village-parity zoom. The old CSS placeholder used to
-          sit on TOP of the Phaser canvas — which meant even after we
+          sit on TOP of the Phaser canvas â€” which meant even after we
           wired TemplateMapScene, the placeholder still occluded the
           CPs/persona/boss the scene had rendered. Removing the
           overlay lets Phaser show through.
           If a future template genuinely has no scene AND no biome art
           available, the router will simply not run scene.start() and
-          the black Phaser canvas stays visible — the HUD still works.
+          the black Phaser canvas stays visible â€” the HUD still works.
           `TemplateMapPlaceholder` is intentionally kept in the file
           in case we need to fall back for a specific edge case, but
           it is no longer rendered by default. */}
@@ -5669,13 +5668,13 @@ function MapPageInner() {
           />
         )}
 
-      {/* Mobile virtual joystick — only renders on touch devices.
+      {/* Mobile virtual joystick â€” only renders on touch devices.
           Bottom-left corner. Emits {x,y} vectors via eventBridge that
           VillageMapScene (and every other stage scene) reads in update()
           to drive the character. */}
       {phaserReady && <MobileJoystick />}
 
-      {/* First-time boss intro cinematic — Unraveller looms out of the
+      {/* First-time boss intro cinematic â€” Unraveller looms out of the
           dark, delivers 3 lines of villain speech, then the 4
           checkpoint bosses reveal one by one. Ends with a "Face them"
           CTA. Never plays again for this user (Convex-backed flag). */}
@@ -5683,7 +5682,7 @@ function MapPageInner() {
         <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />
       )}
 
-      {/* Per-stage super-boss intro cinematic — plays once per browser
+      {/* Per-stage super-boss intro cinematic â€” plays once per browser
           session per (templateId, stage). Uses the same component as
           the Unraveller first-visit intro, parameterized with the
           super boss's own art + intro line + this stage's mini-boss
@@ -5714,7 +5713,7 @@ function MapPageInner() {
         />
       )}
 
-      {/* Loading screen — hide once Phaser canvas is ready; data can sync in background */}
+      {/* Loading screen â€” hide once Phaser canvas is ready; data can sync in background */}
       <AnimatePresence>
         {!phaserReady && (
           <motion.div
@@ -5732,7 +5731,7 @@ function MapPageInner() {
 
       {phaserReady && activeVenture && (
         <>
-          {/* Corruption colour wash removed — it dimmed the map with a transparent layer. */}
+          {/* Corruption colour wash removed â€” it dimmed the map with a transparent layer. */}
 
           {/* Critical-corruption alert ring. Using box-shadow inset
               instead of border-[10px] so the element never affects
@@ -5754,7 +5753,7 @@ function MapPageInner() {
 
           {/* Quest List removed per user request */}
 
-          {/* TEMPORARY: boss HP bar hidden for demo — restore by removing
+          {/* TEMPORARY: boss HP bar hidden for demo â€” restore by removing
               the `false &&` guard below. Original condition preserved for
               easy re-enable after client sign-off.  */}
           {false && (corruption.level >= 60 || bossCombatTarget) && (
@@ -5763,7 +5762,7 @@ function MapPageInner() {
 
           {/* Stage navigation strip removed */}
 
-          {/* WorldMapTour + TourToggle removed — v2 tutorial (Sparky) is
+          {/* WorldMapTour + TourToggle removed â€” v2 tutorial (Sparky) is
               the only guided walkthrough now. */}
 
           <CrossingFlash trigger={flashTrigger} />
@@ -5802,7 +5801,7 @@ function MapPageInner() {
           {/* Floating "+N XP" popovers on task submit / CP clear / boss defeat */}
           <XpFloatingPopover />
 
-          {/* Daily Challenges card removed per product request — was
+          {/* Daily Challenges card removed per product request â€” was
               taking up top-right screen real estate on load and the
               challenges themselves (fire a flare, submit N tasks) are
               already surfaced through Sparky's tutorial + the flare
@@ -5810,7 +5809,7 @@ function MapPageInner() {
               DailyChallengesCard component is still available for the
               profile page if we want to bring it back there. */}
 
-          {/* Village demo — Stage 1 Complete finale after Unraveller reveal.
+          {/* Village demo â€” Stage 1 Complete finale after Unraveller reveal.
               When the user dismisses this we also fire PREVIEW_NEXT_STAGE
               on the event bridge; the Phaser scene handles the camera pan
               east to the silhouetted Forest of Perfectionism. */}
@@ -5843,7 +5842,7 @@ function MapPageInner() {
             }}
           />
 
-          {/* Mid-arc stage-clear toast — Forest→Harbor + Harbor→Artisans.
+          {/* Mid-arc stage-clear toast â€” Forestâ†’Harbor + Harborâ†’Artisans.
               Fires briefly during the URL swap between stages. */}
           <StageClearedToast
             open={stageCleared.open}
@@ -5851,7 +5850,7 @@ function MapPageInner() {
             onDismiss={() => setStageCleared((s) => ({ ...s, open: false }))}
           />
 
-          {/* Super-boss encounter for stages 2-4 — sits between the CP4
+          {/* Super-boss encounter for stages 2-4 â€” sits between the CP4
               mini-boss clear and the STAGE_COMPLETE navigation. Strike
               CTA calls the scene's defeatSuperBoss method, which plays
               the defeat animation and then fires STAGE_COMPLETE. */}
@@ -5863,7 +5862,7 @@ function MapPageInner() {
               setSuperBossEncounter((s) => ({ ...s, open: false }));
               const game = gameRef.current;
               if (!game) return;
-              // Map super-boss stage → the Phaser scene that owns the
+              // Map super-boss stage â†’ the Phaser scene that owns the
               // defeatSuperBoss() choreography. Post-realignment this
               // was pointing stage 3 at GoldenHarborScene (silent URL
               // jump to Stage 7) and had no case for stages 5/6/7 at
@@ -5887,7 +5886,7 @@ function MapPageInner() {
             }}
             onDismiss={() => {
               setSuperBossEncounter((s) => ({ ...s, open: false }));
-              // Boss theme was layered on when encounter opened — swap
+              // Boss theme was layered on when encounter opened â€” swap
               // back to the stage's ambient music since we're staying on
               // this stage.
               try {
@@ -5898,7 +5897,7 @@ function MapPageInner() {
             }}
           />
 
-          {/* Venture-wide finale — fires when the final stage (4) clears.
+          {/* Venture-wide finale â€” fires when the final stage (4) clears.
               Nothing to preview beyond this yet; the CTA drops the user
               back on the World map at their current (final) stage. */}
           <VentureCompleteCelebration
@@ -5931,8 +5930,8 @@ function MapPageInner() {
             />
           )}
 
-          {/* ── HP-based Cross-Question Combat — replaces the old single-question
-                Doubt Imp overlay. Fires when player walks into a boss checkpoint. ── */}
+          {/* â”€â”€ HP-based Cross-Question Combat â€” replaces the old single-question
+                Doubt Imp overlay. Fires when player walks into a boss checkpoint. â”€â”€ */}
           {bossCombatTarget && activeVenture && activeCombatRoundId && (
             <CombatPanel
               key={activeCombatRoundId}
@@ -5942,7 +5941,7 @@ function MapPageInner() {
               // stage-bosses.ts per-CP roster (village lookup for
               // stage 1). Academic/Lab/Creative use the per-template
               // roster in template-stage-bosses.ts which returns the
-              // biome boss for every CP on that stage — so users on
+              // biome boss for every CP on that stage â€” so users on
               // Academic fight the Librarian at Ancient Library CPs,
               // Cartographer at Cartographer's Tower CPs, etc.
               boss={
@@ -5955,11 +5954,11 @@ function MapPageInner() {
                       bossCombatTarget.checkpoint - 1,
                     )
               }
-              // Founder's actual venture / idea title — replaces the
+              // Founder's actual venture / idea title â€” replaces the
               // hardcoded "RETLIFY: BOSS CHALLENGE" placeholder in the
               // combat header with the user's real idea name.
               ideaTitle={ideaTitle}
-              // Which CP the boss guards — drives the outer combat
+              // Which CP the boss guards â€” drives the outer combat
               // scrim to crop the biome map at that exact location
               // (non-Village maps). Village uses its dedicated
               // painted backdrop and ignores this hint.
@@ -5967,7 +5966,7 @@ function MapPageInner() {
               onRetryStarted={(newRoundId) => {
                 // Direct swap to the new round. The key prop above
                 // forces a clean CombatPanel remount when activeCombatRoundId changes.
-                console.log("[combat] retry: swapping roundId from", activeCombatRoundId, "→", newRoundId);
+                console.log("[combat] retry: swapping roundId from", activeCombatRoundId, "â†’", newRoundId);
                 setActiveCombatRoundId(newRoundId);
               }}
               onAdvanceCheckpoint={() => {
@@ -6012,7 +6011,7 @@ function MapPageInner() {
                 // flare beat can fire. Open the CheckpointPanel on the
                 // active CP so the flare button is on screen for Sparky
                 // to anchor to. The old behaviour pushed to /feed here
-                // — which meant the flare step never got a target and
+                // â€” which meant the flare step never got a target and
                 // the tutorial silently skipped it.
                 if (
                   tourStateForPulse?.state === "not_started" ||
@@ -6057,7 +6056,7 @@ function MapPageInner() {
                 ) : (
                   <>
                     <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-rose-400 border-t-transparent" />
-                    <p className="text-sm text-white/70">The boss is awakening…</p>
+                    <p className="text-sm text-white/70">The boss is awakeningâ€¦</p>
                   </>
                 )}
               </div>
@@ -6093,10 +6092,10 @@ function MapPageInner() {
             );
           })()}
 
-          {/* PRD §2 v1.1 — sidebar entry-point for mini-games (the
+          {/* PRD Â§2 v1.1 â€” sidebar entry-point for mini-games (the
            *  floating dot UX was replaced because it felt visually
            *  noisy alongside the snake-path checkpoints). Selecting a
-           *  game here calls `engageWithSpawn` → prompt → overlay →
+           *  game here calls `engageWithSpawn` â†’ prompt â†’ overlay â†’
            *  result, same downstream flow. */}
           <MiniGamesPanel
             open={isMiniGamesPanelOpen}
@@ -6108,7 +6107,7 @@ function MapPageInner() {
             }}
           />
 
-          {/* Lifecycle surfaces — same as before. Only mount the
+          {/* Lifecycle surfaces â€” same as before. Only mount the
               prompt dialog when the prompt phase is actually active,
               otherwise the Radix portal + state machine sits in the
               tree for nothing. */}
@@ -6152,7 +6151,7 @@ function MapPageInner() {
                 onPlayNext={(spawn) => {
                   miniGameLifecycle.closeResult();
                   // Tiny delay so the result panel finishes its exit
-                  // before the prompt opens — avoids two stacked
+                  // before the prompt opens â€” avoids two stacked
                   // modals in the same frame.
                   setTimeout(() => {
                     miniGameLifecycle.engageWithSpawn(spawn);
@@ -6170,11 +6169,11 @@ function MapPageInner() {
             className="absolute left-2 top-1/2 -translate-y-1/2 z-[60] sm:left-3 md:left-4 lg:left-5 flex items-center gap-3"
             style={{ contain: "layout" }}
           >
-            {/* LeftSidebar removed — the menu now lives as a popup
+            {/* LeftSidebar removed â€” the menu now lives as a popup
                 triggered by a backpack button on the left of the bottom
                 HUD bar (see MapMenuPopover mounted below). */}
 
-            {/* Settings modal — opened from the menu popover's Settings
+            {/* Settings modal â€” opened from the menu popover's Settings
                 item at the
                 bottom. Contains persona swap, social connect/disconnect,
                 and audio controls. Mounted here (not at page root) so it
@@ -6186,7 +6185,7 @@ function MapPageInner() {
 
             {/* Menu-triggered flare compose. Ventures the user is
                 currently viewing are passed as context so the flare
-                is properly attributed. Checkpoint stays undefined —
+                is properly attributed. Checkpoint stays undefined â€”
                 menu flares are venture-scoped, not CP-scoped. */}
             <FlareComposeDialog
               open={isFlareComposeOpen}
@@ -6216,13 +6215,13 @@ function MapPageInner() {
             />
           </div>
 
-          {/* Checkpoint detail panel — deferred mount.
+          {/* Checkpoint detail panel â€” deferred mount.
               `selectedDetail` flips synchronously on click (React
               commits the state). React then schedules the heavy
               CheckpointPanel render at lower priority via
               `useDeferredValue`, so the click event finishes paint
               before the panel mount work runs. User sees the slide-in
-              on the next frame (~16ms, imperceptible). No skeleton —
+              on the next frame (~16ms, imperceptible). No skeleton â€”
               an earlier skeleton attempt added CLS because its size
               didn't match the real panel content. */}
           <AnimatePresence>
@@ -6292,7 +6291,7 @@ function MapPageInner() {
             onSuccess={handleTaskSubmissionSuccess}
           />
 
-          {/* Stage Clear Modal — only mount while it should be visible
+          {/* Stage Clear Modal â€” only mount while it should be visible
               so its timers / dynamic import / framer hooks stay cold
               otherwise. */}
           {stageClearModal.show && (
@@ -6432,13 +6431,13 @@ function MapPageInner() {
                           bare
                         />
                       ) : venture?.ideaId ? (
-                        // Query in flight — show a spinner.
+                        // Query in flight â€” show a spinner.
                         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
                           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                           <span className="text-sm text-slate-400">Loading hierarchy...</span>
                         </div>
                       ) : (
-                        // No idea attached to this venture at all — surface
+                        // No idea attached to this venture at all â€” surface
                         // a clear message instead of a blank dialog.
                         <div className="flex flex-col items-center justify-center h-48 gap-2 text-center px-6">
                           <GitBranch className="h-6 w-6 text-slate-500" />
@@ -6486,8 +6485,8 @@ function MapPageInner() {
                         {/* Pixel-art hourglass matching the Calendar
                             tile in the Adventurer's Menu. */}
                         <PixelIcon name="menu-calendar-v2" size={22} alt="Calendar" />
-                        {/* Title trimmed from "Calendar & Syncs" →
-                            "Calendar" per product request — the
+                        {/* Title trimmed from "Calendar & Syncs" â†’
+                            "Calendar" per product request â€” the
                             "& Syncs" tail was redundant chrome. */}
                         Calendar
                       </h2>
@@ -6523,7 +6522,7 @@ function MapPageInner() {
                 />
                 {/* Panel height dropped from fixed `h-[700px]` to
                     `h-auto` so the modal collapses to its content
-                    height — the previous fixed height left a big
+                    height â€” the previous fixed height left a big
                     blank void below Submit Board when the board had
                     only a couple of cards. `max-h-[88dvh]` still caps
                     it for very tall boards, and inner content
@@ -6544,7 +6543,7 @@ function MapPageInner() {
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
                         {/* Header icon swapped to the pixel-art
                             rune-stone that matches the Kanban tile
-                            in the Adventurer's Menu — consistent
+                            in the Adventurer's Menu â€” consistent
                             visual identity across menu + panel. */}
                         <PixelIcon name="rune-stone" size={22} alt="Kanban" />
                         Kanban Board
@@ -6558,7 +6557,7 @@ function MapPageInner() {
                         prompt="Manage your venture tasks and workflow."
                         initialContent={kanbanData}
                         onSubmit={(data) => handleToolSubmit("kanban", data)}
-                        // Read-only when viewing someone else's venture —
+                        // Read-only when viewing someone else's venture â€”
                         // the server rejects saves anyway (see
                         // saveToolData Unauthorized check), so tell the
                         // user up-front and disable Submit rather than
@@ -6619,7 +6618,7 @@ function MapPageInner() {
             )}
           </AnimatePresence>
 
-          {/* Contribution Compose Dialog — CONTRIBUTIONS tile in the
+          {/* Contribution Compose Dialog â€” CONTRIBUTIONS tile in the
               Adventurer's Menu. Posts a project update as an idea
               with title `${ProjectName}:${userTitle}`, inheriting
               the parent project's skill + industry tags. Map bar
@@ -6650,7 +6649,7 @@ function MapPageInner() {
             );
           })()}
 
-          {/* Send-Contribution Modal — dedicated dialog opened by the
+          {/* Send-Contribution Modal â€” dedicated dialog opened by the
               Adventurer's Menu CONTRIBUTIONS tile (scroll icon).
               Renders the same skill-tag ContributionRequestModal that
               /feed uses for the "Contribute" button on project cards.
@@ -6664,8 +6663,8 @@ function MapPageInner() {
                 onOpenChange={(open) => !open && setIsSendContributionOpen(false)}
               >
                 <DialogContent className="w-[min(92vw,560px)] max-w-[560px] overflow-hidden border-white/10 bg-[#111827] text-white">
-                  {/* showSkillTags — this instance is the map's
-                      gamification path (Adventurer's Menu →
+                  {/* showSkillTags â€” this instance is the map's
+                      gamification path (Adventurer's Menu â†’
                       CONTRIBUTIONS), which product wants to keep the
                       richer skill-tag picker + char counter. The
                       /feed "Contribute" button omits this prop, so
@@ -6688,12 +6687,12 @@ function MapPageInner() {
             )}
           </AnimatePresence>
 
-          {/* Contributors Popup Modal — AUTHOR view uses the roomy
+          {/* Contributors Popup Modal â€” AUTHOR view uses the roomy
               Team & Contributors panel (tabs for incoming requests +
               invitations). NON-AUTHOR view mirrors the /feed compact
-              "Request to Contribute" dialog exactly — same width,
+              "Request to Contribute" dialog exactly â€” same width,
               same styling, same ContributionRequestModal component
-              inside a shadcn Dialog wrapper — so users get a
+              inside a shadcn Dialog wrapper â€” so users get a
               consistent experience whether they contribute from the
               feed or from the map. */}
           <AnimatePresence>
@@ -6742,7 +6741,7 @@ function MapPageInner() {
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
                         {/* Pixel-art guild crest matching the Guild
-                            tile in the Adventurer's Menu — this panel
+                            tile in the Adventurer's Menu â€” this panel
                             IS the Guild view (Incoming Requests +
                             Invite Contributors), so it shares the
                             same shield icon. */}
@@ -6853,10 +6852,10 @@ function MapPageInner() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MapFeedComposer — inline feed post composer for the Project Contributions popup
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// MapFeedComposer â€” inline feed post composer for the Project Contributions popup
 // Posts via api.ideas.addComment with auto-prepended project name + tags header
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MapFeedComposer({
   ideaId,
   ideaTitle,
@@ -6979,7 +6978,7 @@ function MapFeedComposer({
             exit={{ opacity: 0 }}
             className="text-xs text-emerald-400 mt-2 px-1 font-medium flex items-center gap-1"
           >
-            <span>✓</span> Post published successfully!
+            <span>âœ“</span> Post published successfully!
           </motion.p>
         )}
       </div>
@@ -7002,7 +7001,7 @@ function MapFeedComposer({
         {comments === undefined ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-zinc-500">
             <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-medium">Loading activity feed…</span>
+            <span className="text-xs font-medium">Loading activity feedâ€¦</span>
           </div>
         ) : comments.filter(c => !c.parentCommentId).length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-center border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
@@ -7128,7 +7127,7 @@ function MapFeedComposer({
                 rel="noreferrer"
                 className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-900 border border-white/10 hover:border-white/20 text-white font-semibold text-xs transition-colors"
               >
-                𝕏 Share on X
+                ð• Share on X
               </a>
               <a
                 href={shareUrls(sharingPost).linkedin}
@@ -7153,7 +7152,7 @@ function MapFeedComposer({
                 }}
                 className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-[#833AB4]/20 via-[#FD1D1D]/20 to-[#F56040]/20 border border-[#FD1D1D]/30 hover:opacity-90 text-white font-semibold text-xs transition-colors"
               >
-                📸 Instagram Info
+                ðŸ“¸ Instagram Info
               </button>
             </div>
 
@@ -7184,7 +7183,7 @@ function MapFeedComposer({
             </div>
             {copied && (
               <p className="text-[10px] text-center text-indigo-300 mt-3">
-                ✓ Ready to paste! Instagram will open so you can share your milestone.
+                âœ“ Ready to paste! Instagram will open so you can share your milestone.
               </p>
             )}
           </motion.div>
@@ -7200,8 +7199,8 @@ export default function MapPage() {
       {/* Warm every asset that gates first-perceived-smoothness on
           the map + tutorial surfaces (Sparky sprite frames, menu tile
           icons, Fog boss anim frames). Mounts OUTSIDE the Suspense
-          boundary so the browser starts fetching them immediately —
-          in parallel with hydration + Convex queries — instead of
+          boundary so the browser starts fetching them immediately â€”
+          in parallel with hydration + Convex queries â€” instead of
           waiting for a consuming component to render. Fixes the
           "icons/animations/victory board/sparky sometimes takes time
           to load, feels glitchy" report. */}
@@ -7219,7 +7218,7 @@ export default function MapPage() {
               className="text-xs tracking-[0.3em] uppercase font-black"
               style={{ color: "#6366f1" }}
             >
-              Entering the World…
+              Entering the Worldâ€¦
             </div>
           </div>
         }
@@ -7293,3 +7292,5 @@ function MapTourMount() {
     />
   );
 }
+
+
