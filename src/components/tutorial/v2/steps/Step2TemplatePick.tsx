@@ -595,7 +595,19 @@ export function Step2TemplatePick() {
       <>
         <SuggestedContributorsDialog
           ideaId={latestIdeaId}
-          onContinue={() => setDialogue("to_map")}
+          onContinue={() => {
+            // Product spec (2026-08-10): after Send Request in the
+            // tutorial contributors beat, go DIRECTLY to the map.
+            // No Sparky "Yay! Your idea is live. Go to map" bubble
+            // in between — that was one tap the user didn't need.
+            // Advance the tutorial past the map-nav gate (step 6 -> 7
+            // per the state machine; Step3MapGuide takes over from 7)
+            // and push the route in the same tick.
+            if (tutorial.step < 7) {
+              void tutorial.goTo(7);
+            }
+            router.push("/map/world");
+          }}
         />
         <TutorialMascot
           visible
