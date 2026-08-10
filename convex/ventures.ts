@@ -480,7 +480,19 @@ export const ensureVentureStructure = mutation({
     let insertedCheckpoints = 0;
     let insertedTasks = 0;
 
-    for (const cpDef of CHECKPOINT_DEFINITIONS) {
+    // CRITICAL — pull the CP definitions for THIS venture's template.
+    // The previous code iterated `CHECKPOINT_DEFINITIONS` (Venture only)
+    // unconditionally, so an Academic/Lab/Creative venture got Venture
+    // CPs + tasks seeded into its ventureCheckpoints / ventureTasks
+    // tables. That meant every non-Venture map rendered Venture CP
+    // labels ("Problem identified" etc.) with Venture task prompts
+    // ("Describe the problem you are solving…"), completely ignoring
+    // the template the user picked. `templateId` was patched onto
+    // `venture` earlier in this same handler — reading it here uses
+    // that value so the correct constants file drives the seed.
+    const seedTemplateId = (venture.templateId ?? "venture") as TemplateId;
+    const seedCheckpointDefs = getCheckpointDefinitions(seedTemplateId);
+    for (const cpDef of seedCheckpointDefs) {
       const key = `${cpDef.stage}-${cpDef.checkpoint}`;
       let checkpoint = checkpointByKey.get(key);
 
@@ -942,7 +954,11 @@ export const submitEvidence = mutation({
       const stageName =
         VENTURE_STAGES[checkpoint.stage - 1]?.name ||
         `Stage ${checkpoint.stage}`;
-      const checkpointDef = CHECKPOINT_DEFINITIONS.find(
+      // Template-aware CP-name lookup (was hardcoded Venture, which
+      // meant Academic/Lab/Creative feed posts announced Venture-only
+      // checkpoint names on their gold-CP celebrations).
+      const tidForCpName = (venture.templateId ?? "venture") as TemplateId;
+      const checkpointDef = getCheckpointDefinitions(tidForCpName).find(
         (cp) =>
           cp.stage === checkpoint.stage &&
           cp.checkpoint === checkpoint.checkpoint,
@@ -1088,8 +1104,13 @@ export const submitEvidence = mutation({
     });
 
     // ── Trigger AI quality scoring (async, non-blocking) ─────────────────────
-    // Resolve checkpoint def for the outcome text the scorer needs
-    const checkpointDef = CHECKPOINT_DEFINITIONS.find(
+    // Resolve checkpoint def for the outcome text the scorer needs.
+    // Template-aware: was hardcoded Venture CHECKPOINT_DEFINITIONS,
+    // meaning the AI scorer got a Venture outcome ("A specific, real
+    // pain point is clearly articulated…") when scoring an Academic
+    // literature-review task — nonsense rubric → nonsense score.
+    const tidForScoring = (venture.templateId ?? "venture") as TemplateId;
+    const checkpointDef = getCheckpointDefinitions(tidForScoring).find(
       (d) =>
         d.stage === checkpoint.stage && d.checkpoint === checkpoint.checkpoint,
     );
@@ -1643,8 +1664,15 @@ export const getCheckpoint = query({
       }),
     );
 
-    // Get checkpoint definition
-    const def = CHECKPOINT_DEFINITIONS.find(
+    // Get checkpoint definition. Template-aware — walk the venture
+    // this checkpoint belongs to so we pick the right constants file.
+    // Was hardcoded Venture CHECKPOINT_DEFINITIONS, which meant the
+    // CP page for an Academic Stage-1 CP returned a Venture Stage-1
+    // definition (or undefined for stages that don't align), rendering
+    // Venture task prompts on Academic screens.
+    const parentVenture = await ctx.db.get(checkpoint.ventureId);
+    const tidForDef = (parentVenture?.templateId ?? "venture") as TemplateId;
+    const def = getCheckpointDefinitions(tidForDef).find(
       (d) =>
         d.stage === checkpoint.stage && d.checkpoint === checkpoint.checkpoint,
     );

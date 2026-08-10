@@ -189,7 +189,9 @@ const CREATIVE_STAGES: StageConfig[] = [
     name: "Drafting & Creation",
     biomeName: "The Wilderness",
     subtitle: "Stage 3 · Make the Thing",
-    checkpoints: 5,
+    // Spec + Convex both say 6 CPs (drafting is the meatiest stage).
+    // Was 5 → CP6 defined in Convex but never rendered on the map.
+    checkpoints: 6,
     monster: CREATIVE_MONSTERS[2],
     icon: "🎨",
     biomeTheme: CREATIVE_BIOME_THEMES[2],
@@ -201,7 +203,8 @@ const CREATIVE_STAGES: StageConfig[] = [
     name: "Feedback & Critique",
     biomeName: "Village Square",
     subtitle: "Stage 4 · Hear the Truth",
-    checkpoints: 4,
+    // Spec + Convex say 3. Was 4 → CP4 had no task data.
+    checkpoints: 3,
     monster: CREATIVE_MONSTERS[3],
     icon: "💬",
     biomeTheme: CREATIVE_BIOME_THEMES[3],

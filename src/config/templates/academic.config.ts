@@ -165,7 +165,12 @@ const ACADEMIC_STAGES: StageConfig[] = [
     name: "Topic & Question",
     biomeName: "Ancient Library",
     subtitle: "Stage 1 · Define the Inquiry",
-    checkpoints: 4,
+    // Reconciled with convex/academic/academicConstants.ts + user's
+    // Ibhaveda_gamified_checkpoints_and_tasks_all_templates_v2 spec.
+    // The Excel + Convex both define 3 CPs for this stage; the
+    // frontend previously said 4, which created a 4th CP marker on
+    // the map with no task data (empty CP → user stuck).
+    checkpoints: 3,
     monster: ACADEMIC_MONSTERS[0],
     icon: "📚",
     biomeTheme: ACADEMIC_BIOME_THEMES[0],
@@ -189,7 +194,8 @@ const ACADEMIC_STAGES: StageConfig[] = [
     name: "Methodology",
     biomeName: "Cartographer's Tower",
     subtitle: "Stage 3 · Chart the Method",
-    checkpoints: 4,
+    // Convex + spec both say 3 CPs. Was 4.
+    checkpoints: 3,
     monster: ACADEMIC_MONSTERS[2],
     icon: "🗺️",
     biomeTheme: ACADEMIC_BIOME_THEMES[2],
@@ -201,7 +207,9 @@ const ACADEMIC_STAGES: StageConfig[] = [
     name: "Writing & Drafting",
     biomeName: "The Scriptorium",
     subtitle: "Stage 4 · Inscribe the Work",
-    checkpoints: 5,
+    // Convex + spec both say 6 CPs (Scriptorium is the writing-heavy
+    // stage). Was 5, which capped the map short of the last CP.
+    checkpoints: 6,
     monster: ACADEMIC_MONSTERS[3],
     icon: "✍️",
     biomeTheme: ACADEMIC_BIOME_THEMES[3],

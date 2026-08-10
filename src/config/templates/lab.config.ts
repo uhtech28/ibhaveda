@@ -200,7 +200,8 @@ const LAB_STAGES: StageConfig[] = [
     name: "Background Research",
     biomeName: "Ancient Library",
     subtitle: "Stage 2 · Survey the Field",
-    checkpoints: 4,
+    // Spec + Convex say 3. Was 4 → CP4 had no task data.
+    checkpoints: 3,
     monster: LAB_MONSTERS[1],
     icon: "📚",
     biomeTheme: LAB_BIOME_THEMES[1],
@@ -224,7 +225,8 @@ const LAB_STAGES: StageConfig[] = [
     name: "Build & Execute",
     biomeName: "The Forge",
     subtitle: "Stage 4 · Run the Experiment",
-    checkpoints: 5,
+    // Spec + Convex say 4. Was 5 → CP5 had no task data.
+    checkpoints: 4,
     monster: LAB_MONSTERS[3],
     icon: "⚗️",
     biomeTheme: LAB_BIOME_THEMES[3],
@@ -248,7 +250,8 @@ const LAB_STAGES: StageConfig[] = [
     name: "Iterate & Refine",
     biomeName: "Crossroads Town",
     subtitle: "Stage 6 · Improve the Experiment",
-    checkpoints: 4,
+    // Spec + Convex say 3. Was 4 → CP4 had no task data.
+    checkpoints: 3,
     monster: LAB_MONSTERS[5],
     icon: "🔧",
     biomeTheme: LAB_BIOME_THEMES[5],
@@ -260,7 +263,8 @@ const LAB_STAGES: StageConfig[] = [
     name: "Document & Present",
     biomeName: "Grand Hall",
     subtitle: "Stage 7 · Share the Discovery",
-    checkpoints: 4,
+    // Spec + Convex say 3. Was 4 → CP4 had no task data.
+    checkpoints: 3,
     monster: LAB_MONSTERS[6],
     icon: "📝",
     biomeTheme: LAB_BIOME_THEMES[6],
