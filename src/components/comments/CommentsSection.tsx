@@ -389,9 +389,21 @@ const CommentItem: React.FC<{
                 placeholder="Write a reply…"
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
-                className="min-h-[56px] flex-1 resize-none rounded-xl border border-white/8 bg-[#0A0D12] px-3 py-2 text-sm text-white placeholder:text-[#6B7280] focus:border-[#6366F1]/45 focus:outline-none"
+                // text-base on mobile prevents iOS Safari's zoom-in
+                // on focus (triggered by any input with font-size < 16px,
+                // and Safari refuses to zoom back out).
+                className="min-h-[56px] flex-1 resize-none rounded-xl border border-white/8 bg-[#0A0D12] px-3 py-2 text-base text-white placeholder:text-[#6B7280] focus:border-[#6366F1]/45 focus:outline-none sm:text-sm"
                 maxLength={500}
-                autoFocus
+                // Imperative focus for iOS (autoFocus is ignored
+                // post-mount — gesture context is lost). The ref
+                // callback fires synchronously during the same tick as
+                // the Reply-toggle click, so iOS raises the keyboard.
+                ref={(el) => {
+                  if (el && typeof window !== "undefined" && !el.dataset.autofocused) {
+                    el.dataset.autofocused = "1";
+                    requestAnimationFrame(() => el.focus());
+                  }
+                }}
               />
               <Button
                 type="submit"

@@ -142,6 +142,13 @@ export function PostPublishContributorsDialog({ ideaId, onContinue }: Props) {
         transition={{ duration: 0.3 }}
         className="fixed inset-0 z-[400] flex items-center justify-center overflow-y-auto p-4 sm:p-6"
         style={{
+          // Safe-area insets: iPhone notch + home indicator both eat
+          // into the modal edges without these; on short viewports
+          // the Continue CTA could sit behind the gesture bar.
+          paddingTop:
+            "max(1rem, env(safe-area-inset-top, 0px))",
+          paddingBottom:
+            "max(1rem, env(safe-area-inset-bottom, 0px))",
           background:
             "radial-gradient(ellipse 900px 600px at 50% -5%, rgba(99,102,241,0.14), transparent 60%), rgba(5,8,20,0.88)",
           backdropFilter: "blur(6px)",

@@ -38,7 +38,7 @@ function StandaloneChat() {
           <p className="text-sm text-muted-foreground">Real-time team communication</p>
         </div>
       </div>
-      <div className="flex-1 p-6 max-w-5xl mx-auto w-full h-[calc(100vh-80px)]">
+      <div className="flex-1 p-6 max-w-5xl mx-auto w-full h-[calc(100dvh-80px)]">
         <div className="border rounded-xl h-full bg-card overflow-hidden">
           {venture?.ideaId ? (
             <ChatThread 

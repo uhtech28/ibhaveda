@@ -20,11 +20,12 @@
  *   - "The boss reels" animation between questions (screen shake + hp drop)
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Swords, Crown, Send } from "lucide-react";
 import { acquireBodyScrollLock } from "@/lib/ui/bodyScrollLock";
 import type { StageBoss, SuperBossQuestion } from "@/config/stage-bosses";
+import { useKeyboardInsets } from "@/lib/hooks/useKeyboardInsets";
 
 const ARENA_BG = "/assets/maps-v2/arena/arena-background.png";
 
@@ -73,6 +74,19 @@ export default function SuperBossEncounterOverlay({
   const [submitting, setSubmitting] = useState(false);
   const [bossReeling, setBossReeling] = useState(false);
   const [finalDefeat, setFinalDefeat] = useState(false);
+  // Keyboard-aware sizing — the textarea + Strike CTA sit at the
+  // bottom of the modal. Without visualViewport tracking, iOS Safari
+  // + Android Chrome push the keyboard OVER the CTA, leaving users
+  // unable to submit their answer. Clamps the inner card's max-height
+  // to the visible viewport when the keyboard is open.
+  const kb = useKeyboardInsets();
+  // Imperative textarea focus — iOS Safari ignores React's autoFocus
+  // because focus is applied in a post-mount effect (out of the user
+  // gesture context that would open the keyboard). Instead we grab a
+  // ref and call .focus() synchronously the first render the question
+  // card mounts, inside a rAF so the layout has settled but before the
+  // browser drops the pending gesture.
+  const answerRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Reset state whenever the overlay opens fresh
   useEffect(() => {
@@ -146,7 +160,15 @@ export default function SuperBossEncounterOverlay({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.35 } }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="fixed inset-0 z-[10024] flex items-center justify-center"
+          // items-start when keyboard is up so the top of the modal
+          // stays anchored to the visible viewport top instead of
+          // sliding out of view; items-center otherwise for the
+          // full-screen cinematic composition.
+          className={
+            kb.isKeyboardOpen
+              ? "fixed inset-0 z-[10024] flex items-start justify-center overflow-y-auto"
+              : "fixed inset-0 z-[10024] flex items-center justify-center"
+          }
           role="dialog"
           aria-modal="true"
           aria-labelledby="super-boss-title"
@@ -181,7 +203,12 @@ export default function SuperBossEncounterOverlay({
               ease: bossReeling ? "easeInOut" : [0.16, 1, 0.3, 1],
               delay: bossReeling ? 0 : 0.2,
             }}
-            className="relative mx-3 flex w-full max-w-[720px] flex-col items-center px-3 sm:mx-4 sm:px-6"
+            className="relative mx-3 flex w-full max-w-[720px] flex-col items-center overflow-y-auto px-3 sm:mx-4 sm:px-6"
+            style={
+              kb.isKeyboardOpen && kb.viewportHeight > 0
+                ? { maxHeight: `${Math.floor(kb.viewportHeight * 0.94)}px` }
+                : undefined
+            }
           >
             <motion.p
               initial={{ opacity: 0, y: -6 }}
@@ -295,13 +322,38 @@ export default function SuperBossEncounterOverlay({
                       {active.prompt}
                     </p>
                     <textarea
+                      ref={(el) => {
+                        answerRef.current = el;
+                        // Imperative focus: iOS ignores autoFocus
+                        // post-mount because gesture context is lost.
+                        // Calling .focus() from the ref callback runs
+                        // synchronously as the element attaches — inside
+                        // the click chain that opened this modal — so
+                        // iOS actually raises the keyboard. Guarded so
+                        // it only fires once per element mount.
+                        if (
+                          el &&
+                          typeof window !== "undefined" &&
+                          !el.dataset.autofocused
+                        ) {
+                          el.dataset.autofocused = "1";
+                          requestAnimationFrame(() => el.focus());
+                        }
+                      }}
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
                       disabled={submitting || bossReeling}
                       placeholder="Speak plainly. Ship it, don't polish it."
                       rows={3}
-                      className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/40 disabled:opacity-50"
-                      autoFocus
+                      // text-base on mobile (was text-sm) so iOS Safari
+                      // doesn't auto-zoom the viewport on focus. Zoom-in
+                      // is triggered when the input's font-size < 16px
+                      // and Safari refuses to zoom back out afterward.
+                      className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 text-base text-white placeholder:text-slate-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/40 disabled:opacity-50 sm:text-sm"
+                      style={{
+                        WebkitAppearance: "none",
+                        WebkitTapHighlightColor: "transparent",
+                      }}
                     />
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <span className="text-[11px] text-slate-500">

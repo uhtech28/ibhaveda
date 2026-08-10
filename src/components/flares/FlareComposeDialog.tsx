@@ -261,10 +261,12 @@ export function FlareComposeDialog({
               }
               className="min-h-[140px] rounded-[10px] border-white/5 bg-[#0D1117] p-3 text-sm text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-amber-400"
               disabled={submitting}
-              onPaste={(e) => e.preventDefault()}
-              onCopy={(e) => e.preventDefault()}
-              onCut={(e) => e.preventDefault()}
-              onContextMenu={(e) => e.preventDefault()}
+              // Only block DROP — the previous rev also blocked paste /
+              // copy / cut / context-menu, which broke clipboard on
+              // mobile (users depend on paste; long-press for context
+              // menu is the primary paste UX on iOS). Drop-blocking
+              // stays because dragging a file into the textarea would
+              // otherwise navigate away from the flare form.
               onDrop={(e) => e.preventDefault()}
               // Stop keydown bubbling so tutorial scrim / Phaser / any
               // parent key handler can't swallow space or letters.

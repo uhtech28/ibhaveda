@@ -575,7 +575,14 @@
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
+  /* iOS Safari's 100vh includes the URL bar → canvas bottom + HUD
+     were sliding beneath the bar when it reappeared during scroll.
+     100dvh (dynamic viewport height) tracks the actually-visible
+     area. `100vh` kept as a fallback so any browser without dvh
+     support (< Safari 15.4) still renders full-screen instead of
+     collapsed. Ditto for width via svw if we ever hit iPad split-view. */
   height: 100vh !important;
+  height: 100dvh !important;
   overflow: hidden !important;
   z-index: 1 !important;
   /* Capture touch/pointer events inside map only */

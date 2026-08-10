@@ -405,6 +405,10 @@ export function PersonaSelector({
           border-radius: 18px;
           background: rgba(15, 23, 38, 0.85);
           border: 1px solid rgba(255, 255, 255, 0.08);
+          /* iOS Safari (all versions) needs the -webkit- prefix. Without
+             it the persona-footer's blur-behind effect drops silently
+             on iPhone/iPad, leaving a solid dark bar with no blur. */
+          -webkit-backdrop-filter: blur(24px);
           backdrop-filter: blur(24px);
         }
         @media (max-width: 640px) {

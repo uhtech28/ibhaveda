@@ -52,14 +52,14 @@ function StandaloneVideoCall() {
             allow="camera; microphone; fullscreen; display-capture; autoplay"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
-            className="w-full h-[calc(100vh-65px)] border-0 sm:h-[calc(100vh-80px)]"
+            className="w-full h-[calc(100dvh-65px)] border-0 sm:h-[calc(100dvh-80px)]"
           />
         ) : mounted && venture === null ? (
-          <div className="flex h-[calc(100vh-65px)] items-center justify-center px-6 text-center text-sm text-muted-foreground sm:h-[calc(100vh-80px)]">
+          <div className="flex h-[calc(100dvh-65px)] items-center justify-center px-6 text-center text-sm text-muted-foreground sm:h-[calc(100dvh-80px)]">
             This venture could not be found, so a video room cannot be started.
           </div>
         ) : (
-          <div className="flex h-[calc(100vh-65px)] items-center justify-center text-sm text-muted-foreground sm:h-[calc(100vh-80px)]">
+          <div className="flex h-[calc(100dvh-65px)] items-center justify-center text-sm text-muted-foreground sm:h-[calc(100dvh-80px)]">
             Initializing secure video session...
           </div>
         )}

@@ -52,7 +52,7 @@ import { QuestList, BossHPBar, StageInfo, XPBar } from "@/components/hud";
 import { InterCheckpointOverlay } from "@/components/map/InterCheckpointOverlay";
 import { CombatPanel } from "@/components/combat/CombatPanel";
 import { getVillageBoss } from "@/config/village-bosses";
-import { getStageBoss, getStageSuperBoss } from "@/config/stage-bosses";
+import { getStageBoss, getStageSuperBoss, getStageMiniBosses } from "@/config/stage-bosses";
 import type { StageBoss } from "@/config/stage-bosses";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
@@ -950,7 +950,7 @@ function CheckpointPanelSkeleton() {
       style={{ contain: "layout paint" }}
     >
       <div
-        className="pointer-events-auto flex flex-col font-sans rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-[calc(100vh-8rem)] w-[calc(100%-2rem)] sm:w-[400px] md:w-[440px] max-w-full"
+        className="pointer-events-auto flex flex-col font-sans rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden shadow-2xl h-auto max-h-[calc(100dvh-8rem)] w-[calc(100%-2rem)] sm:w-[400px] md:w-[440px] max-w-full"
         style={{
           background:
             "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
@@ -1062,7 +1062,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
         //     the sticky filter bar + all feed surfaces.
         //   - font-sans on the whole panel forces platform body
         //     font instead of Phaser fantasy defaults.
-        className="pointer-events-auto flex flex-col font-sans rounded-[18px] border border-white/8 bg-[#0F1726]/85 backdrop-blur-xl overflow-hidden shadow-2xl h-auto max-h-[calc(100vh-8rem)] w-[calc(100%-2rem)] sm:w-[400px] md:w-[440px] max-w-full"
+        className="pointer-events-auto flex flex-col font-sans rounded-[18px] border border-white/8 bg-[#0F1726]/85 backdrop-blur-xl overflow-hidden shadow-2xl h-auto max-h-[calc(100dvh-8rem)] w-[calc(100%-2rem)] sm:w-[400px] md:w-[440px] max-w-full"
         style={{
           boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
           contain: "layout style",
@@ -3957,6 +3957,33 @@ function MapPageInner() {
     stage: 0,
   });
 
+  // ── Per-stage super-boss intro cinematic ────────────────────────────
+  // The original BossIntroCinematic was hardwired to the Unraveller +
+  // 4 Village bosses and only played once per user on their first
+  // /map visit. Product ask (2026-08-10): "like we have overview for
+  // unraveller speaking and showing its stage bosses same make for
+  // all super bosses". Now every super-boss encounter first plays a
+  // parameterized version of that cinematic with the super's own art
+  // + intro line + the stage's mini-boss roster; then the existing
+  // SuperBossEncounterOverlay combat modal opens.
+  //
+  // Session-scoped seen tracker: intros play once per browser tab per
+  // (templateId, stage) so refreshes during the same session don't
+  // re-play, but a fresh session or a new stage gets its own beat.
+  const [superIntroTarget, setSuperIntroTarget] = useState<{
+    stage: number;
+    boss: StageBoss;
+    minis: ReadonlyArray<{ name: string; idleAsset: string }>;
+    stageNames: readonly string[];
+    speech: readonly string[];
+    minionsLine: string;
+  } | null>(null);
+  // Encounter payload we defer opening on until the intro finishes.
+  const pendingEncounterRef = useRef<{
+    stage: number;
+    boss: StageBoss | null;
+  } | null>(null);
+
   useEffect(() => {
     const handleEncounter = (e: { stage: number; bossSlug?: string }) => {
       // Route super-boss lookup by template so Academic/Lab/Creative
@@ -3964,7 +3991,7 @@ function MapPageInner() {
       // etc.) instead of the Venture roster.
       const tid = (venture?.templateId ?? "venture") as string;
       const boss = resolveSuperBossForCombat(tid, e.stage);
-      setSuperBossEncounter({ open: true, stage: e.stage, boss });
+
       // Layer a dramatic boss theme over the stage ambience for the
       // encounter's duration. Pick track by boss family so each stage's
       // super boss has a distinct sonic identity.
@@ -3979,10 +4006,90 @@ function MapPageInner() {
       } catch {
         /* audio failure non-blocking */
       }
+
+      // Decide whether to play the per-super intro cinematic first.
+      // Village Stage 1 skips this because the FIRST-VISIT
+      // BossIntroCinematic (mounted separately) already covers the
+      // Unraveller reveal. Every other stage — including all Academic
+      // /Lab/Creative super bosses — gets a fresh cinematic on
+      // first-in-session encounter.
+      const sessionKey = `superIntroSeen:${tid}:${e.stage}`;
+      const alreadySeen =
+        typeof window !== "undefined" &&
+        window.sessionStorage.getItem(sessionKey) === "1";
+      const isVillageStage1 = tid === "venture" && e.stage === 1;
+
+      if (boss && !alreadySeen && !isVillageStage1) {
+        // Buffer the encounter so SuperBossEncounterOverlay opens only
+        // after the cinematic dismisses.
+        pendingEncounterRef.current = { stage: e.stage, boss };
+        // Build the mini-boss roster for the stage strip. Venture pulls
+        // its bespoke per-CP roster from stage-bosses.ts; templates use
+        // the biome boss for every CP (the strip shows a single-item
+        // preview so the user knows what they're about to face).
+        const minis = (() => {
+          if (tid === "venture") {
+            const roster = getStageMiniBosses(e.stage);
+            return roster.map((b) => ({
+              name: b.name,
+              idleAsset: b.idleAsset,
+            }));
+          }
+          // Templates: single biome boss preview for that stage.
+          const tplBoss = getTemplateStageBoss(tid, e.stage);
+          return tplBoss
+            ? [{ name: tplBoss.name, idleAsset: tplBoss.idleAsset }]
+            : [{ name: boss.name, idleAsset: boss.idleAsset }];
+        })();
+        // Stage function names for the strip — Venture uses its
+        // established list; templates use the current stage's short
+        // name. Falls back gracefully.
+        const stageName =
+          templateStages[Math.max(0, e.stage - 1)]?.name ??
+          `Stage ${e.stage}`;
+        const stageNames =
+          tid === "venture"
+            ? ["Ideation", "Research", "Validation", "Offer Design",
+               "Build & Deliver", "Launch", "Iteration", "Scale"].slice(
+                 e.stage - 1, e.stage,
+               )
+            : [stageName];
+        // Speech lines — reuse boss.introLine if present, otherwise a
+        // family-flavoured generic call. Two lines maximum so the
+        // cinematic keeps its pacing.
+        const introLine = boss.introLine ?? `* ${boss.name} rises before you.`;
+        const speech = [
+          introLine.replace(/^\*\s*/, ""),
+          `I am ${boss.name}. Prove your worth or turn back.`,
+        ];
+        const minionsLine =
+          minis.length > 1
+            ? `You'll have to defeat my ${minis.length} minions before you can reach me.`
+            : `${boss.name} stands guard. Face it.`;
+        setSuperIntroTarget({
+          stage: e.stage,
+          boss,
+          minis,
+          stageNames,
+          speech,
+          minionsLine,
+        });
+        // Mark seen up-front so a rapid re-fire (e.g. React StrictMode
+        // double-mount) doesn't stack two intros.
+        try {
+          window.sessionStorage.setItem(sessionKey, "1");
+        } catch {
+          /* no-op */
+        }
+        return;
+      }
+
+      // Skip cinematic → open the combat modal directly.
+      setSuperBossEncounter({ open: true, stage: e.stage, boss });
     };
     eventBridge.onReact("SUPER_BOSS_ENCOUNTER", handleEncounter);
     return () => eventBridge.off("SUPER_BOSS_ENCOUNTER", handleEncounter);
-  }, []);
+  }, [venture?.templateId, templateStages]);
 
   // Listen for STAGE_COMPLETE events from Forest/Harbor/Artisans scenes.
   // Persists progression to Convex via advanceStage (idempotent — the
@@ -5576,6 +5683,37 @@ function MapPageInner() {
         <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />
       )}
 
+      {/* Per-stage super-boss intro cinematic — plays once per browser
+          session per (templateId, stage). Uses the same component as
+          the Unraveller first-visit intro, parameterized with the
+          super boss's own art + intro line + this stage's mini-boss
+          roster. When it dismisses, the buffered SuperBossEncounter
+          combat modal opens with the payload cached in
+          pendingEncounterRef. */}
+      {superIntroTarget && (
+        <BossIntroCinematic
+          mainBossArt={superIntroTarget.boss.idleAsset}
+          mainBossTitle={superIntroTarget.boss.name}
+          speechLines={superIntroTarget.speech}
+          minionsSpeechLine={superIntroTarget.minionsLine}
+          miniBosses={superIntroTarget.minis}
+          stageFunctionNames={superIntroTarget.stageNames}
+          skipMarkSeen
+          onDone={() => {
+            setSuperIntroTarget(null);
+            const pending = pendingEncounterRef.current;
+            pendingEncounterRef.current = null;
+            if (pending) {
+              setSuperBossEncounter({
+                open: true,
+                stage: pending.stage,
+                boss: pending.boss,
+              });
+            }
+          }}
+        />
+      )}
+
       {/* Loading screen — hide once Phaser canvas is ready; data can sync in background */}
       <AnimatePresence>
         {!phaserReady && (
@@ -6189,7 +6327,7 @@ function MapPageInner() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   transition={{ type: "spring", duration: 0.5 }}
-                  className="relative w-full max-w-[600px] h-[680px] max-h-[88vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  className="relative w-full max-w-[600px] h-[680px] max-h-[88dvh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
                   style={{
                     background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
                     boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
@@ -6387,7 +6525,7 @@ function MapPageInner() {
                     `h-auto` so the modal collapses to its content
                     height — the previous fixed height left a big
                     blank void below Submit Board when the board had
-                    only a couple of cards. `max-h-[88vh]` still caps
+                    only a couple of cards. `max-h-[88dvh]` still caps
                     it for very tall boards, and inner content
                     scrolls when it overflows. */}
                 <motion.div
@@ -6395,7 +6533,7 @@ function MapPageInner() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   transition={{ type: "spring", duration: 0.5 }}
-                  className="relative w-full max-w-[1000px] h-auto max-h-[88vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  className="relative w-full max-w-[1000px] h-auto max-h-[88dvh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
                   style={{
                     background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
                     boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
