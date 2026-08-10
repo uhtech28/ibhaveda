@@ -131,26 +131,32 @@ export default function PersonaSetupPage() {
   }, [personaIdRaw, router, showSparkyIntro]);
 
   const handleConfirm = useCallback(
-    async (id: PersonaId) => {
+    (id: PersonaId) => {
       if (submitting) return;
       setSubmitting(true);
-      try {
-        await updatePersonaId({ personaId: id });
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("personaPickerDismissed", "1");
-        }
-        // Show the Sparky intro overlay RIGHT HERE on /persona-setup.
-        // The whole viewport flips to a solid black scrim + Sparky
-        // bubble + "Let's go" CTA. No navigation happens yet — the
-        // user only leaves /persona-setup when they click Let's go.
-        // This is the only way to guarantee zero flash of /feed
-        // content: with the previous approach /feed's SSR HTML
-        // painted before any client-side gate could run.
-        setShowSparkyIntro(true);
-      } catch {
-        // If the mutation fails, unfreeze so the user can retry.
-        setSubmitting(false);
+      // FIRE-AND-FORGET the mutation. Previously we awaited it before
+      // flipping to the Sparky overlay — Convex round-trips can take
+      // 500-2000ms on mobile networks, so users saw the picker freeze
+      // for a beat then jump to black. Now the overlay renders in the
+      // SAME TICK as the click; the mutation resolves in the background.
+      //
+      // Safety: the "Let's go" click waits ~200ms during handleSparkyContinue
+      // if the mutation is still in flight (guaranteed to have started
+      // 100s of ms earlier by then), and the /feed persona-guard
+      // redirect will still bounce them back here if the write actually
+      // failed. Realistically the mutation is always done long before
+      // the user finishes reading Sparky's intro pitch.
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("personaPickerDismissed", "1");
       }
+      void updatePersonaId({ personaId: id }).catch(() => {
+        // Silent — if the mutation fails, the /feed guard redirects
+        // back here and the user can retry. We deliberately don't
+        // block the intro on this error because most failures are
+        // transient network hiccups the user shouldn't have to notice.
+      });
+      // Overlay renders NOW — no wait on the network round-trip.
+      setShowSparkyIntro(true);
     },
     [submitting, updatePersonaId],
   );
