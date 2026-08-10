@@ -280,8 +280,8 @@ describe("Venture Constants", () => {
   });
 
   describe("TOOL_TYPES", () => {
-    it("should have 11 tool types", () => {
-      expect(TOOL_TYPES).toHaveLength(11);
+    it("should have 12 tool types", () => {
+      expect(TOOL_TYPES).toHaveLength(12);
     });
 
     it("should include all expected tools", () => {

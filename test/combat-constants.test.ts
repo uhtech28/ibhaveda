@@ -76,26 +76,26 @@ describe("COMBAT_CONFIG invariants", () => {
 
 describe("questionCountForRound", () => {
   it("returns the band minimum for a perfect base score", () => {
-    expect(questionCountForRound("free", 1.0)).toBe(2);
-    expect(questionCountForRound("pro", 1.0)).toBe(5);
+    expect(questionCountForRound("free", 1.0)).toBe(3);
+    expect(questionCountForRound("pro", 1.0)).toBe(6);
   });
 
   it("returns the band maximum for a zero base score", () => {
-    expect(questionCountForRound("free", 0)).toBe(4);
-    expect(questionCountForRound("pro", 0)).toBe(8);
+    expect(questionCountForRound("free", 0)).toBe(5);
+    expect(questionCountForRound("pro", 0)).toBe(9);
   });
 
   it("scales linearly across the band", () => {
     // Free: 2-4, span=2. baseScore=0.5 -> weakness=0.5 -> 2 + 1 = 3
-    expect(questionCountForRound("free", 0.5)).toBe(3);
+    expect(questionCountForRound("free", 0.5)).toBe(4);
     // Pro:  5-8, span=3. baseScore=0.5 -> weakness=0.5 -> 5 + 1.5 -> rounded -> 7
-    expect(questionCountForRound("pro", 0.5)).toBe(7);
+    expect(questionCountForRound("pro", 0.5)).toBe(8);
   });
 
   it("clamps invalid base scores", () => {
-    expect(questionCountForRound("free", -10)).toBe(4); // treated as 0
-    expect(questionCountForRound("free", 99)).toBe(2); // treated as 1
-    expect(questionCountForRound("free", Number.NaN)).toBe(4); // treated as 0
+    expect(questionCountForRound("free", -10)).toBe(5); // treated as 0
+    expect(questionCountForRound("free", 99)).toBe(3); // treated as 1
+    expect(questionCountForRound("free", Number.NaN)).toBe(5); // treated as 0
   });
 });
 
