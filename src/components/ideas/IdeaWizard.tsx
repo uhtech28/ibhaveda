@@ -19,6 +19,13 @@ import { Label } from "@/components/ui/label";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
 import CardUpload from "@/components/card-upload";
+// Non-tutorial post-publish suggested contributors dialog — shows the
+// same "These are people we think can help you" screen the tutorial
+// used to show, minus the "at least 1 required" gate. Product ask:
+// keep the tutorial's auto-send flow as-is, but expose this fuller
+// UI (title + subtitle + per-user write-message + Continue) for
+// regular posts and let Continue fire any time.
+import { PostPublishContributorsDialog } from "./PostPublishContributorsDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -151,6 +158,16 @@ export function IdeaWizard({
   // the whole modal to the visible visualViewport so the Create /
   // Post Idea CTA stays reachable.
   const kb = useKeyboardInsets();
+
+  // ── Post-publish suggested-contributors modal (non-tutorial only) ──
+  // Populated with { ideaId, ventureId } right after a successful
+  // non-tutorial createIdea + createVenture. The dialog renders on top
+  // of everything else; its Continue button (always enabled) fires the
+  // map navigation and clears this state.
+  const [postPublishTarget, setPostPublishTarget] = useState<{
+    ideaId: Id<"ideas">;
+    ventureId: Id<"ventures">;
+  } | null>(null);
 
   // ── Step & template state ──
   const [step, setStep] = useState<Step>("template");
@@ -573,10 +590,16 @@ export function IdeaWizard({
       // line ~541) handles the map nav once the user finishes
       // inviting collaborators.
       //
-      // Non-tutorial callers still get the direct nav — nothing
-      // gates them from going straight to the map.
+      // Non-tutorial callers: instead of the direct nav that used to
+      // live here, open PostPublishContributorsDialog. Its Continue
+      // button (always enabled — the "at least 1 required" gate was
+      // removed per product spec) fires the map navigation. This is
+      // the "we need this screen after normal post" flow.
       if (!tutorialMode) {
-        router.push(`/map/world?ventureId=${ventureId}`);
+        setPostPublishTarget({
+          ideaId: newIdeaId as Id<"ideas">,
+          ventureId: ventureId as Id<"ventures">,
+        });
       }
     } catch (err) {
       setSubmitError(
@@ -620,6 +643,21 @@ export function IdeaWizard({
 
   // ───────────────────────────────────────────────────────────────────────────
   return (
+    <>
+      {/* Non-tutorial post-publish contributors modal. Renders on top
+          of the closed wizard (isOpen flipped to false in the submit
+          handler). Continue is always active — the user can send
+          invites or skip. Both paths land them on the map. */}
+      {postPublishTarget && (
+        <PostPublishContributorsDialog
+          ideaId={postPublishTarget.ideaId}
+          onContinue={() => {
+            const vid = postPublishTarget.ventureId;
+            setPostPublishTarget(null);
+            router.push(`/map/world?ventureId=${vid}`);
+          }}
+        />
+      )}
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
@@ -1337,6 +1375,7 @@ export function IdeaWizard({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 
