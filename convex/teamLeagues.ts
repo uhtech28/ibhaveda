@@ -281,6 +281,115 @@ export const awardProjectPointsManual = mutation({
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// One-time backfill
+// ─────────────────────────────────────────────────────────────────────
+
+/** Marker written to `reason` so backfilled rows are identifiable and
+ *  the migration is idempotent (re-running skips already-backfilled
+ *  requests). Format: `${prefix}${contributionRequestId}`. */
+const BACKFILL_REASON_PREFIX = "backfill:accepted-contribution:";
+
+/**
+ * Replay historically accepted contribution requests into the
+ * projectWeeklyPoints ledger. The live bump wiring
+ * (contributionRequests.updateStatus → bumpProjectWeeklyPoints) only
+ * records events going forward, so the Team / Top Projects board has no
+ * history to show. This migration reconstructs that history.
+ *
+ * Point value mirrors the live award exactly: 10 for public ideas, 5
+ * for private (see contributionRequests.updateStatus). `awardedAt` uses
+ * the request's `updatedAt` — the acceptance timestamp — so the
+ * community podium's backward-fill dates each entry correctly.
+ *
+ * Batched + idempotent + resumable: processes one page per call and
+ * returns `continueCursor`/`isDone`. Drive it to completion by calling
+ * again with the returned cursor until `isDone` is true. Re-running is
+ * safe — rows already backfilled (matched by the reason marker) are
+ * skipped.
+ *
+ *   # dry run first (inserts nothing, just reports what it would do)
+ *   npx convex run --prod teamLeagues:backfillProjectPointsFromAcceptedContributions '{"dryRun":true}'
+ *   # then for real, following the cursor until isDone
+ *   npx convex run --prod teamLeagues:backfillProjectPointsFromAcceptedContributions '{}'
+ */
+export const backfillProjectPointsFromAcceptedContributions = internalMutation({
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+    dryRun: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const batchSize = args.batchSize ?? 100;
+    const dryRun = args.dryRun ?? false;
+
+    const page = await ctx.db
+      .query("contributionRequests")
+      .paginate({ cursor: args.cursor ?? null, numItems: batchSize });
+
+    let scanned = 0;
+    let inserted = 0;
+    let skippedExisting = 0;
+    let skippedNotAccepted = 0;
+    let skippedNoIdea = 0;
+
+    for (const req of page.page) {
+      scanned++;
+      if (req.status !== "accepted") {
+        skippedNotAccepted++;
+        continue;
+      }
+
+      const marker = `${BACKFILL_REASON_PREFIX}${req._id}`;
+
+      // Idempotency — skip if this request was already backfilled. Scoped
+      // to the idea via the by_idea_awarded index so the scan stays cheap.
+      const existingForIdea = await ctx.db
+        .query("projectWeeklyPoints")
+        .withIndex("by_idea_awarded", (q) => q.eq("ideaId", req.ideaId))
+        .collect();
+      if (existingForIdea.some((e) => e.reason === marker)) {
+        skippedExisting++;
+        continue;
+      }
+
+      const idea = await ctx.db.get(req.ideaId);
+      if (!idea) {
+        skippedNoIdea++;
+        continue;
+      }
+
+      // Mirror the live award in contributionRequests.updateStatus.
+      const amount = idea.visibility === "public" ? 10 : 5;
+      const awardedAt = req.updatedAt ?? req.createdAt ?? req._creationTime;
+
+      if (!dryRun) {
+        await ctx.db.insert("projectWeeklyPoints", {
+          ideaId: req.ideaId,
+          contributorId: req.contributorId,
+          amount,
+          awardedAt,
+          reason: marker,
+        });
+      }
+      inserted++;
+    }
+
+    return {
+      dryRun,
+      isDone: page.isDone,
+      continueCursor: page.isDone ? null : page.continueCursor,
+      batch: {
+        scanned,
+        inserted,
+        skippedExisting,
+        skippedNotAccepted,
+        skippedNoIdea,
+      },
+    };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
 
