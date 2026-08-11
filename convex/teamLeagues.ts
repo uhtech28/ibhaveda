@@ -76,43 +76,64 @@ export interface TeamLadderEntry {
  * Sorted by points desc; tiebreak (PRD §4) is the project with the
  * earlier first-points-this-week (smaller earliest awardedAt within
  * the window). Falls back to idea _creationTime if no events.
+ *
+ * `fillToLimit` (opt-in): when the trailing-7-day window has fewer than
+ * `limit` projects, expand the lookback window one week at a time (up to
+ * 52 weeks) until the podium fills — mirroring the user leaderboard's
+ * `getWeeklyLeaderboard` fallback. The /leagues Team board leaves this
+ * off so it stays a strict weekly competition; the community podium
+ * turns it on so it never renders empty when history exists.
  */
 export const getTopTeamLadder = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+    fillToLimit: v.optional(v.boolean()),
+  },
   handler: async (
     ctx,
-    { limit },
+    { limit, fillToLimit },
   ): Promise<TeamLadderEntry[]> => {
     const viewer = await maybeAuthedUser(ctx);
+    const now = Date.now();
 
-    const since = Date.now() - SEVEN_DAYS_MS;
-    const events = await ctx.db
-      .query("projectWeeklyPoints")
-      .withIndex("by_awarded", (q) => q.gte("awardedAt", since))
-      .collect();
+    // Aggregate all project-lane events awarded since `since`, ranked by
+    // total points desc (tiebreak: earlier first-award wins, PRD §4).
+    const rankWindow = async (since: number) => {
+      const events = await ctx.db
+        .query("projectWeeklyPoints")
+        .withIndex("by_awarded", (q) => q.gte("awardedAt", since))
+        .collect();
 
-    if (events.length === 0) return [];
-
-    // Aggregate by idea.
-    const byIdea = new Map<
-      string,
-      { total: number; earliest: number }
-    >();
-    for (const e of events) {
-      const prev = byIdea.get(String(e.ideaId));
-      if (prev) {
-        prev.total += e.amount;
-        if (e.awardedAt < prev.earliest) prev.earliest = e.awardedAt;
-      } else {
-        byIdea.set(String(e.ideaId), { total: e.amount, earliest: e.awardedAt });
+      const byIdea = new Map<string, { total: number; earliest: number }>();
+      for (const e of events) {
+        const prev = byIdea.get(String(e.ideaId));
+        if (prev) {
+          prev.total += e.amount;
+          if (e.awardedAt < prev.earliest) prev.earliest = e.awardedAt;
+        } else {
+          byIdea.set(String(e.ideaId), { total: e.amount, earliest: e.awardedAt });
+        }
       }
+
+      return Array.from(byIdea.entries()).sort((a, b) => {
+        if (b[1].total !== a[1].total) return b[1].total - a[1].total;
+        return a[1].earliest - b[1].earliest;
+      });
+    };
+
+    // Strict trailing-7-day window by default. With `fillToLimit`, keep
+    // expanding the window a week at a time until it holds at least
+    // `limit` projects (or we hit the 52-week cap). Each expansion is a
+    // superset, so ranking only ever gains projects.
+    const target = limit ?? 0;
+    const maxLookbackWeeks = fillToLimit ? 52 : 1;
+    let ranked: Array<[string, { total: number; earliest: number }]> = [];
+    for (let weeks = 1; weeks <= maxLookbackWeeks; weeks++) {
+      ranked = await rankWindow(now - weeks * SEVEN_DAYS_MS);
+      if (ranked.length >= target) break;
     }
 
-    const ranked = Array.from(byIdea.entries()).sort((a, b) => {
-      if (b[1].total !== a[1].total) return b[1].total - a[1].total;
-      // Tiebreak — earlier attainment wins (PRD §4 tiebreak rule).
-      return a[1].earliest - b[1].earliest;
-    });
+    if (ranked.length === 0) return [];
 
     const cap = Math.min(ranked.length, limit ?? ranked.length);
 

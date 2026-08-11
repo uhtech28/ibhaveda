@@ -363,7 +363,13 @@ const LeaderboardSection = () => {
   // trailing-7-day XP; `getTopTeamLadder` ranks ideas by trailing-7-day
   // XP (same unit — see convex/contributionRequests.ts).
   const topUsers = useQuery(api.leaderboard.getWeeklyLeaderboard, { limit: 3 });
-  const topProjects = useQuery(api.teamLeagues.getTopTeamLadder, { limit: 3 });
+  const topProjects = useQuery(api.teamLeagues.getTopTeamLadder, {
+    limit: 3,
+    // Fill the podium from history when no project earned points in the
+    // last 7 days — matches the Top Contributors fallback so the board
+    // never renders empty when past activity exists.
+    fillToLimit: true,
+  });
 
   const contributorEntries: PodiumEntry[] = React.useMemo(
     () =>
