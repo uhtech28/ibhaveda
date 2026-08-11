@@ -9,6 +9,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { UAParser } from "ua-parser-js";
 
 function getSessionId(): string {
+  if (typeof window === "undefined") return "";
   const key = "ib_sid";
   let id = sessionStorage.getItem(key);
   if (!id) {
@@ -19,6 +20,7 @@ function getSessionId(): string {
 }
 
 function getSeq(): number {
+  if (typeof window === "undefined") return 0;
   const key = "ib_seq";
   const n = parseInt(sessionStorage.getItem(key) ?? "0") + 1;
   sessionStorage.setItem(key, String(n));
@@ -42,7 +44,7 @@ export function useAnalytics(convexUserId?: Id<"users">) {
   const upsertSession = useMutation(api.analytics.upsertSession);
   const updateSession = useMutation(api.analytics.updateSession);
 
-  const sessionId = useRef(getSessionId());
+  const sessionId = useRef("");
   const sessionStarted = useRef(false);
   const prevPath = useRef("");
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -56,6 +58,8 @@ export function useAnalytics(convexUserId?: Id<"users">) {
       properties?: Record<string, unknown>
     ) => {
       if (!convexUserId) return;
+      if (!sessionId.current) sessionId.current = getSessionId();
+      if (!sessionId.current || typeof window === "undefined") return;
       const now = Date.now();
       const seq = getSeq();
       posthog.capture(eventName, {
@@ -88,6 +92,8 @@ export function useAnalytics(convexUserId?: Id<"users">) {
   // Session start
   useEffect(() => {
     if (!convexUserId || sessionStarted.current) return;
+    sessionId.current = getSessionId();
+    if (!sessionId.current) return;
     sessionStarted.current = true;
     const parser = new UAParser(navigator.userAgent).getResult();
     const device = parser.device.type ?? "desktop";
