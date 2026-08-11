@@ -3,6 +3,7 @@ import { mutation, query, internalQuery } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { createContributionRequest, updateRequestStatus, getRequestsByIdea, getIncomingRequests } from "./contributionRequests";
+import { sanitizeUserText } from "./sanitize";
 
 async function getIdeaSparkCount(ctx: any, ideaId: Id<"ideas">) {
   const sparks = await ctx.db
@@ -137,8 +138,8 @@ export const createIdea = mutation({
     // Create the idea
     const ideaData: any = {
       authorId: user._id,
-      title: args.title.trim(),
-      description: args.description.trim(),
+      title: sanitizeUserText(args.title),
+      description: sanitizeUserText(args.description),
       category: args.category,
       industries: args.industries || undefined,
       visibility: args.visibility,
@@ -1293,8 +1294,8 @@ export const updateIdea = mutation({
 
     // Update the idea
     await ctx.db.patch(idea._id, {
-      title: args.title.trim(),
-      description: args.description.trim(),
+      title: sanitizeUserText(args.title),
+      description: sanitizeUserText(args.description),
       category: args.category,
       visibility: args.visibility,
       updatedAt: Date.now(),
@@ -1541,8 +1542,8 @@ export const addSubIdea = mutation({
     // Create the sub-idea
     const subIdeaId = await ctx.db.insert("ideas", {
       authorId: user._id,
-      title: args.title.trim(),
-      description: args.description.trim(),
+      title: sanitizeUserText(args.title),
+      description: sanitizeUserText(args.description),
       category: args.category,
       industries: args.industries || undefined,
       visibility: args.visibility,

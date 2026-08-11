@@ -5,7 +5,12 @@ export default defineSchema({
   // Users table - stores user profiles and settings
   users: defineTable({
     clerkId: v.string(), // Clerk user ID
+    email: v.optional(v.string()), // Email from Clerk (optional — not all accounts have a verified email)
     username: v.string(), // Unique username
+    // Legacy fields — no longer written by current code, kept optional so
+    // pre-existing documents still validate against the schema.
+    lastSeenAt: v.optional(v.float64()),
+    lifecycleStage: v.optional(v.string()),
     displayName: v.string(), // Display name
     bio: v.optional(v.string()), // User bio
     avatar: v.optional(v.string()), // Avatar URL
@@ -49,6 +54,7 @@ export default defineSchema({
     ),
     completedOnboarding: v.boolean(), // Onboarding status
     isActive: v.optional(v.boolean()), // Account status for user management
+    isActivated: v.optional(v.boolean()), // Analytics: user reached activation milestone (drives lifecycle stage)
     role: v.optional(v.string()), // User role (user, moderator, admin)
     followersCount: v.optional(v.number()), // Number of followers
     followingCount: v.optional(v.number()), // Number of users followed
@@ -1283,4 +1289,83 @@ export default defineSchema({
   })
     .index("by_user_created", ["userId", "attemptedAt"])
     .index("by_idea", ["ideaId"]),
+
+  // ─── Analytics platform ──────────────────────────────────────────────────
+  // Client-side engagement instrumentation (see src/lib/analytics/useAnalytics)
+  // dual-writes to PostHog and these tables. retention_snapshots is populated
+  // by the daily retentionCron; email_events is populated by email webhooks.
+  user_sessions: defineTable({
+    userId: v.id("users"),
+    sessionId: v.string(),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    durationSeconds: v.optional(v.number()),
+    pageCount: v.number(),
+    eventCount: v.number(),
+    entryPage: v.string(),
+    exitPage: v.optional(v.string()),
+    lastActionAt: v.optional(v.number()),
+    idleSeconds: v.number(),
+    device: v.optional(v.string()),
+    os: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    ipCountry: v.optional(v.string()),
+    utmSource: v.optional(v.string()),
+    utmMedium: v.optional(v.string()),
+    utmCampaign: v.optional(v.string()),
+    referrer: v.optional(v.string()),
+    isFirstSession: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_session_id", ["sessionId"])
+    .index("by_started_at", ["startedAt"]),
+
+  analytics_events: defineTable({
+    userId: v.id("users"),
+    sessionId: v.string(),
+    eventName: v.string(),
+    eventCategory: v.string(),
+    properties: v.optional(v.any()),
+    pageUrl: v.optional(v.string()),
+    pageTitle: v.optional(v.string()),
+    previousPageUrl: v.optional(v.string()),
+    timestamp: v.number(),
+    serverTimestamp: v.number(),
+    sequenceNumber: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_session", ["sessionId"])
+    .index("by_event_name", ["eventName"])
+    .index("by_user_and_event", ["userId", "eventName"])
+    .index("by_timestamp", ["timestamp"]),
+
+  retention_snapshots: defineTable({
+    userId: v.id("users"),
+    snapshotDate: v.string(),
+    wasActive: v.boolean(),
+    sessionsCount: v.number(),
+    eventsCount: v.number(),
+    daysSinceSignup: v.number(),
+    signupCohort: v.string(),
+    xpEarnedToday: v.number(),
+    projectsWorkedOn: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_date", ["snapshotDate"])
+    .index("by_user_and_date", ["userId", "snapshotDate"])
+    .index("by_cohort", ["signupCohort"]),
+
+  email_events: defineTable({
+    userId: v.optional(v.id("users")),
+    resendEmailId: v.string(),
+    campaignType: v.string(),
+    event: v.string(),
+    clickUrl: v.optional(v.string()),
+    timestamp: v.number(),
+    recipientEmail: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_resend_id", ["resendEmailId"])
+    .index("by_event_type", ["event"])
+    .index("by_timestamp", ["timestamp"]),
 });

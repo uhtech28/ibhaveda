@@ -64,7 +64,7 @@ crons.daily(
 crons.daily(
   "daily-retention-snapshot",
   { hourUTC: 18, minuteUTC: 30 },
-  api.retentionCron.takeRetentionSnapshot
+  api.retentionCron.takeRetentionSnapshot,
 );
 
 // Schedule: Social Proof Engine — daily spark evaluator at 00:05 UTC

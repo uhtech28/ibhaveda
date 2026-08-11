@@ -97,17 +97,6 @@ async function createVentureForUser(
     updatedAt: now,
   });
 
-  await ctx.db.insert("analytics_events", {
-    userId: args.userId,
-    sessionId: "server",
-    eventName: "venture_created",
-    eventCategory: "engagement",
-    properties: { ventureId, templateId },
-    timestamp: now,
-    serverTimestamp: now,
-    sequenceNumber: 0,
-  });
-
   for (const cpDef of checkpointDefs) {
     const checkpointId = await ctx.db.insert("ventureCheckpoints", {
       ventureId,
@@ -462,6 +451,13 @@ export const createVenture = mutation({
       .then((vs) => vs.filter((existing) => existing._id !== ventureId).length);
 
     if (priorVentureCount === 0) {
+      // Analytics: first venture is the activation milestone. Drives
+      // lifecycleStage ("activated"/"retained") in the retention cron.
+      // Idempotent — only write if not already activated.
+      if (!user.isActivated) {
+        await ctx.db.patch(user._id, { isActivated: true });
+      }
+
       const email = identity.email;
       const displayName = user.displayName || identity.givenName || "Adventurer";
       if (email && assignedBossId !== undefined) {
@@ -634,16 +630,6 @@ export const ensureVentureStructure = mutation({
         checkpointPatch.completedAt = cp.completedAt ?? now;
         checkpointPatch.partialStartedAt = undefined;
         cp.status = "completed";
-        await ctx.db.insert("analytics_events", {
-          userId: venture.userId,
-          sessionId: "server",
-          eventName: "checkpoint_completed",
-          eventCategory: "engagement",
-          properties: { checkpointId: String(cp._id), stage: cp.stage, checkpoint: cp.checkpoint },
-          timestamp: now,
-          serverTimestamp: now,
-          sequenceNumber: 0,
-        });
       } else if (completedCount === 1 && cp.status !== "in_progress") {
         checkpointPatch.status = "in_progress";
         if (typeof cp.partialStartedAt !== "number") {

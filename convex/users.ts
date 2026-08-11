@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id, Doc } from "./_generated/dataModel";
 import { ConvexError } from "convex/values";
+import { internal } from "./_generated/api";
+import { sanitizeUserText, sanitizeOptionalText } from "./sanitize";
 
 export type UserProfile = Doc<"users"> & {
   skills: string[];
@@ -64,7 +66,7 @@ export const createUserProfile = mutation({
     industry: v.optional(v.string()),
     industries: v.optional(v.array(v.string())),
   },
-  handler: async ({ db, auth }, args): Promise<string> => {
+  handler: async ({ db, auth, scheduler }, args): Promise<string> => {
     try {
       console.log('👤 Creating user profile:', { username: args.username, skills: args.skills.length, industry: args.industry })
       // Verify authentication
@@ -130,8 +132,8 @@ export const createUserProfile = mutation({
         userId = await db.insert("users", {
           clerkId: identity.subject,
           username: normalizedUsername,
-          displayName: args.displayName,
-          bio: args.bio,
+          displayName: sanitizeUserText(args.displayName),
+          bio: sanitizeOptionalText(args.bio),
           avatar: args.avatar,
           location: args.location,
           website: args.website,
@@ -151,6 +153,23 @@ export const createUserProfile = mutation({
       } catch (insertError) {
         console.error("Failed to insert user profile:", insertError)
         throw new Error("Profile creation failed: Unable to save your profile. Please try again.")
+      }
+
+      // Backup onboarding nudge (no webhook required): 25 minutes after the
+      // profile is created, send the delayed welcome email — but only if the
+      // user still hasn't started a project. sendDelayedWelcomeEmail self-
+      // suppresses via _userHasVenture, so anyone who starts a venture (e.g.
+      // through the tutorial) never receives it.
+      if (identity.email) {
+        await scheduler.runAfter(
+          25 * 60 * 1000,
+          internal.emailWelcome.sendDelayedWelcomeEmail,
+          {
+            email: identity.email,
+            name: args.displayName,
+            clerkId: identity.subject,
+          },
+        )
       }
 
       // Add skills efficiently with batch operations
@@ -276,6 +295,14 @@ export const updateUserProfile = mutation({
           updateData[key] = value
         }
       })
+
+      // Sanitize free-text fields before persisting (defense-in-depth vs stored XSS)
+      if (typeof updateData.displayName === "string") {
+        updateData.displayName = sanitizeUserText(updateData.displayName)
+      }
+      if (typeof updateData.bio === "string") {
+        updateData.bio = sanitizeUserText(updateData.bio)
+      }
 
       await db.patch(profile._id, updateData)
 
