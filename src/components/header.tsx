@@ -202,10 +202,11 @@ export const HeroHeader = ({
                             </div>
                         </SignedOut>
                         <SignedIn>
-                            {/* Nudge the bell 2px left so its unread badge
-                                doesn't crowd the avatar. Transform only —
-                                vertical alignment is unaffected. */}
-                            <span className="inline-flex -translate-x-0.5">
+                            {/* Nudge the bell 5px left so its unread badge
+                                doesn't crowd the avatar, and 2px down so it
+                                lines up vertically with the other icons.
+                                Transform only — layout is unaffected. */}
+                            <span className="inline-flex -translate-x-[5px] translate-y-[2px]">
                                 <NotificationBell />
                             </span>
                             <Popover>
