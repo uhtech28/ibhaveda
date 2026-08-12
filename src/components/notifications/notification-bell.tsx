@@ -57,7 +57,10 @@ export const NotificationBell = () => {
           <Badge
             className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] rounded-full p-0 text-[10px] leading-none font-semibold flex items-center justify-center px-1 bg-red-500 text-white border-0"
           >
-            {unreadCount > 99 ? '99+' : unreadCount}
+            {/* Nudge just the digit 2px left within the bubble. */}
+            <span className="inline-block -translate-x-[2px]">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
           </Badge>
         )}
       </Button>

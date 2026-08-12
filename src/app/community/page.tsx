@@ -186,8 +186,30 @@ type PodiumEntry = {
   subtitle: string;   // @username / by Author
   points: number;     // trailing-7-day XP
   avatar?: string | null;
-  fallbackChar: string;
+  fallbackChar: string;   // initials shown when there's no avatar image
+  fallbackBg?: string;    // hex bg for the initials tile (projects have no photo)
   href: string;
+};
+
+// Text-avatar helpers for entries without an image (projects don't have a
+// photo). Initials come from the title ("Skill Weaver" → "SW") and the tile
+// colour is hashed from the title, so each card gets a stable, distinct swatch.
+const AVATAR_BG_PALETTE = [
+  "#6366F1", "#10B981", "#F97316", "#06B6D4", "#EC4899",
+  "#8B5CF6", "#F59E0B", "#EF4444", "#14B8A6", "#3B82F6",
+];
+
+const initialsFromTitle = (title: string): string => {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
+const colorFromString = (s: string): string => {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+  return AVATAR_BG_PALETTE[Math.abs(hash) % AVATAR_BG_PALETTE.length];
 };
 
 const RANK_STYLES = {
@@ -247,7 +269,10 @@ const PodiumCard: React.FC<{ entry: PodiumEntry; rank: 1 | 2 | 3 }> = ({ entry, 
           }`}
         >
           <AvatarImage src={entry.avatar ?? undefined} alt={entry.title} />
-          <AvatarFallback className={`font-semibold bg-background ${isFirst ? "text-2xl" : "text-lg"}`}>
+          <AvatarFallback
+            className={`font-semibold ${entry.fallbackBg ? "text-white" : "bg-background"} ${isFirst ? "text-2xl" : "text-lg"}`}
+            style={entry.fallbackBg ? { backgroundColor: entry.fallbackBg } : undefined}
+          >
             {entry.fallbackChar}
           </AvatarFallback>
         </Avatar>
@@ -393,7 +418,8 @@ const LeaderboardSection = () => {
         subtitle: `by ${p.authorDisplayName}`,
         points: p.weeklyPoints,
         avatar: undefined,
-        fallbackChar: p.title.charAt(0).toUpperCase(),
+        fallbackChar: initialsFromTitle(p.title),
+        fallbackBg: colorFromString(p.title),
         href: `/idea/${p.ideaId}`,
       })),
     [topProjects],
