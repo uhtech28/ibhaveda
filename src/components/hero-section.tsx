@@ -1,87 +1,449 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { GraduationCap, TrendingUp, Rocket, Building2 } from "lucide-react";
+import {
+  BarChart3,
+  Building2,
+  CheckCheck,
+  Eye,
+  GraduationCap,
+  LockKeyhole,
+  MapPinned,
+  Plus,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+  SquarePen,
+  Star,
+  TrendingUp,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { useAuthModal } from "@/components/auth/auth-modal";
 
 const SELECTED_ROLE_KEY = "ii.selectedRole";
 
-const ROLES = [
+type RoleKey = "student" | "investor" | "founder" | "incubator";
+
+type Role = {
+  key: RoleKey;
+  label: string;
+  eyebrow: string;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  color: string;
+  glow: string;
+};
+
+type Tile = {
+  word: string;
+  role: string;
+  accent: string;
+  icon: React.ComponentType<{ className?: string }>;
+  backTitle: string;
+  backBody: string;
+};
+
+type QuestionSlide = {
+  question: string;
+  nextPrompt: string;
+  gif: string;
+  gifAlt: string;
+  left: [Tile, Tile];
+  right: [Tile, Tile];
+};
+
+const ROLES: Role[] = [
   {
     key: "student",
     label: "Student",
     eyebrow: "Ideate",
-    description: "Validate ideas and find builders",
     icon: GraduationCap,
     color: "#60A5FA",
-    glow: "rgba(96,165,250,0.12)",
+    glow: "rgba(96,165,250,0.14)",
   },
   {
     key: "investor",
     label: "Investor",
     eyebrow: "Discover",
-    description: "Surface high-potential ideas early",
     icon: TrendingUp,
     color: "#34D399",
-    glow: "rgba(52,211,153,0.12)",
+    glow: "rgba(52,211,153,0.14)",
   },
   {
     key: "founder",
     label: "Founder",
     eyebrow: "Build",
-    description: "Move your venture through stages",
-    icon: Rocket,
+    icon: Sparkles,
     color: "#C084FC",
-    glow: "rgba(192,132,252,0.12)",
+    glow: "rgba(192,132,252,0.14)",
   },
   {
     key: "incubator",
     label: "Incubator",
     eyebrow: "Scale",
-    description: "Connect startups with resources",
-    icon: Building2,
+    icon: BarChart3,
     color: "#FBBF24",
-    glow: "rgba(251,191,36,0.12)",
+    glow: "rgba(251,191,36,0.14)",
   },
-] as const;
+];
+
+const QUESTION_SLIDES: QuestionSlide[] = [
+  {
+    question: "What is Ibhaveda?",
+    nextPrompt: "How does it work?",
+    gif: "/landing-preview-assets/spark.gif",
+    gifAlt: "Ibhaveda spark animation",
+    left: [
+      {
+        word: "Proof",
+        role: "Student",
+        accent: "#60A5FA",
+        icon: GraduationCap,
+        backTitle: "Student",
+        backBody:
+          "Turn a rough idea into visible proof: feedback, teammates, badges, and experience you can actually show.",
+      },
+      {
+        word: "Venture",
+        role: "Founder",
+        accent: "#C084FC",
+        icon: Sparkles,
+        backTitle: "Founder",
+        backBody:
+          "Give people one clear place to help, then turn interest into tracked progress on your venture.",
+      },
+    ],
+    right: [
+      {
+        word: "Signal",
+        role: "Investor",
+        accent: "#34D399",
+        icon: TrendingUp,
+        backTitle: "Investor",
+        backBody:
+          "See traction before the pitch: who is helping, what is getting built, and where momentum is forming.",
+      },
+      {
+        word: "Pipeline",
+        role: "Incubator",
+        accent: "#FBBF24",
+        icon: BarChart3,
+        backTitle: "Incubator",
+        backBody:
+          "Find coachable teams already taking action, so your support goes to progress instead of paperwork.",
+      },
+    ],
+  },
+  {
+    question: "How does it work?",
+    nextPrompt: "How can you benefit from it?",
+    gif: "/landing-preview-assets/world-map.gif",
+    gifAlt: "Ibhaveda world map gameplay interface",
+    left: [
+      {
+        word: "Role",
+        role: "Step 1",
+        accent: "#60A5FA",
+        icon: UserRound,
+        backTitle: "Tell us who you are",
+        backBody:
+          "Student, founder, investor, or incubator. Ibhaveda then shows actions that match what you want to gain.",
+      },
+      {
+        word: "Path",
+        role: "Step 2",
+        accent: "#C084FC",
+        icon: MapPinned,
+        backTitle: "Follow a guided path",
+        backBody:
+          "Your idea becomes simple stages with clear next moves, so you know what to do instead of guessing.",
+      },
+    ],
+    right: [
+      {
+        word: "Prove",
+        role: "Step 3",
+        accent: "#34D399",
+        icon: ShieldCheck,
+        backTitle: "Earn trust",
+        backBody:
+          "Clear tasks with evidence. Proof makes collaborators, investors, and programs take you seriously.",
+      },
+      {
+        word: "Unlock",
+        role: "Step 4",
+        accent: "#FBBF24",
+        icon: LockKeyhole,
+        backTitle: "Advance with momentum",
+        backBody:
+          "Stages open when signal is real, turning participation into visible venture growth.",
+      },
+    ],
+  },
+  {
+    question: "How can you benefit from it?",
+    nextPrompt: "How do you use it?",
+    gif: "/landing-preview-assets/notifications-map.gif",
+    gifAlt: "Ibhaveda notifications and map interface",
+    left: [
+      {
+        word: "Cred",
+        role: "Student",
+        accent: "#60A5FA",
+        icon: Star,
+        backTitle: "Student upside",
+        backBody:
+          "Graduate with proof that you can spot problems, build, and contribute beyond coursework.",
+      },
+      {
+        word: "Team",
+        role: "Founder",
+        accent: "#C084FC",
+        icon: Users,
+        backTitle: "Founder upside",
+        backBody:
+          "Stop building alone. Attract collaborators by showing exactly where help creates progress.",
+      },
+    ],
+    right: [
+      {
+        word: "Edge",
+        role: "Investor",
+        accent: "#34D399",
+        icon: Eye,
+        backTitle: "Investor upside",
+        backBody:
+          "Get earlier access to ideas earning real activity, before the market sees a polished pitch.",
+      },
+      {
+        word: "Cohort",
+        role: "Incubator",
+        accent: "#FBBF24",
+        icon: Building2,
+        backTitle: "Incubator upside",
+        backBody:
+          "Find teams already moving, then spend your support on momentum instead of paperwork.",
+      },
+    ],
+  },
+  {
+    question: "How do you use it?",
+    nextPrompt: "Ready to build with people?",
+    gif: "/landing-preview-assets/fog-task.gif",
+    gifAlt: "Ibhaveda task and challenge interface",
+    left: [
+      {
+        word: "Start",
+        role: "Path",
+        accent: "#60A5FA",
+        icon: Plus,
+        backTitle: "Step one",
+        backBody:
+          "Choose your role. The experience starts with what you want to gain, not a blank feed.",
+      },
+      {
+        word: "Post",
+        role: "Idea",
+        accent: "#C084FC",
+        icon: SquarePen,
+        backTitle: "Step two",
+        backBody:
+          "Post or join one idea. Ibhaveda turns attention into a concrete request for help.",
+      },
+    ],
+    right: [
+      {
+        word: "Clear",
+        role: "Tasks",
+        accent: "#34D399",
+        icon: CheckCheck,
+        backTitle: "Step three",
+        backBody:
+          "Clear challenges with proof. Every action reduces doubt and increases your leverage.",
+      },
+      {
+        word: "Level",
+        role: "Up",
+        accent: "#FBBF24",
+        icon: ShieldCheck,
+        backTitle: "Step four",
+        backBody:
+          "Return to the map to see progress, new signals, and the next move worth taking.",
+      },
+    ],
+  },
+];
 
 function PixelField() {
-  const pixels = useMemo(
-    () =>
-      Array.from({ length: 20 }, (_, index) => ({
-        id: index,
-        left: 6 + ((index * 27) % 88),
-        top: 5 + ((index * 33) % 82),
-        delay: (index % 11) * 220,
-        size: 4 + (index % 4) * 3,
-        x: `${(index % 2 === 0 ? 1 : -1) * (18 + (index % 5) * 8)}px`,
-        y: `${-18 - (index % 6) * 9}px`,
-        color: ["#F7D66D", "#E48AA6", "#7C3AED", "#45D5FF"][index % 4],
-      })),
-    [],
-  );
-
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {pixels.map((pixel) => (
-        <span
-          key={pixel.id}
-          className="absolute block"
-          style={{
-            left: `${pixel.left}%`,
-            top: `${pixel.top}%`,
-            width: pixel.size,
-            height: pixel.size,
-            background: pixel.color,
-            opacity: 0,
-            animation: `lp-drift ${4200 + pixel.delay}ms ${pixel.delay}ms ease-in-out infinite`,
-            "--px": pixel.x,
-            "--py": pixel.y,
-          } as React.CSSProperties}
-        />
+      {[0, 1, 2, 3, 4, 5].map((pixel) => (
+        <span key={pixel} className={`lp-pixel lp-pixel-${pixel + 1}`} />
       ))}
+    </div>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M6 9l6 6 6-6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.4"
+      />
+    </svg>
+  );
+}
+
+function AuthSlide({
+  isFinal = false,
+  onNext,
+  onRoleSelect,
+  onSignIn,
+}: {
+  isFinal?: boolean;
+  onNext?: () => void;
+  onRoleSelect: (role: RoleKey) => void;
+  onSignIn: () => void;
+}) {
+  return (
+    <div className="lp-shell">
+      <div className="lp-top" />
+      <div className="lp-auth-core">
+        <button className="lp-member" type="button" onClick={onSignIn}>
+          Already a member? <strong>Log in</strong>
+        </button>
+        <div className="lp-brand">
+          <div className="lp-logo">
+            <Image src="/ibhaveda-logo.jpg" alt="Ibhaveda" width={48} height={48} priority />
+          </div>
+          <p className="lp-brand-text">Ibhaveda</p>
+        </div>
+        <h1>Nobody&apos;s Building With You. Yet.</h1>
+        <p className="lp-sub">Co-founders. Builders. Investors. Zero gatekeeping.</p>
+        <div className="lp-path-label">Choose your path</div>
+        <div className="lp-roles">
+          {ROLES.map((role) => {
+            const Icon = role.icon;
+
+            return (
+              <button
+                key={role.key}
+                className="lp-role"
+                style={
+                  {
+                    "--accent": role.color,
+                    "--glow": role.glow,
+                  } as React.CSSProperties
+                }
+                type="button"
+                aria-label={`Sign up as ${role.label}`}
+                onClick={() => onRoleSelect(role.key)}
+              >
+                <span className="lp-role-inner">
+                  <span>
+                    <span className="lp-role-icon">
+                      <Icon className="size-5" />
+                    </span>
+                    <p className="lp-role-kicker">{role.eyebrow}</p>
+                    <p className="lp-role-name">{role.label}</p>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {!isFinal && (
+        <div className="lp-bottom-question">
+          <p>What is Ibhaveda?</p>
+          <button className="lp-chevron" type="button" aria-label="Answer what is Ibhaveda" onClick={onNext}>
+            <ChevronIcon />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FlipTile({ tile, hint }: { tile: Tile; hint?: boolean }) {
+  const [flipped, setFlipped] = useState(false);
+  const Icon = tile.icon;
+
+  return (
+    <button
+      className={`lp-flip-card ${flipped ? "is-flipped" : ""} ${hint ? "lp-hint" : ""}`}
+      style={{ "--accent": tile.accent } as React.CSSProperties}
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        setFlipped((value) => !value);
+      }}
+    >
+      <span className="lp-flip-inner">
+        <span className="lp-flip-face lp-flip-front">
+          <Icon className="lp-tile-icon" />
+          <span className="lp-tile-word">{tile.word}</span>
+          <span className="lp-tile-role">{tile.role}</span>
+        </span>
+        <span className="lp-flip-face lp-flip-back">
+          <strong>{tile.backTitle}</strong>
+          <span>{tile.backBody}</span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function QuestionSlideView({
+  slide,
+  active,
+  slideIndex,
+  showGif,
+  onNext,
+}: {
+  slide: QuestionSlide;
+  active: boolean;
+  slideIndex: number;
+  showGif: boolean;
+  onNext: () => void;
+}) {
+  return (
+    <div className="lp-shell">
+      <header className="lp-scene-header">
+        <h2>{slide.question}</h2>
+      </header>
+      <div className="lp-scene-main">
+        <div className="lp-card-stack lp-left">
+          {slide.left.map((tile, index) => (
+            <FlipTile key={`${slide.question}-${tile.word}`} tile={tile} hint={active && slideIndex === 0 && index === 0} />
+          ))}
+        </div>
+        {showGif ? (
+          <figure className="lp-capture">
+            <Image src={slide.gif} alt={slide.gifAlt} width={300} height={533} unoptimized loading="lazy" />
+          </figure>
+        ) : (
+          <span className="lp-capture-placeholder" aria-hidden="true" />
+        )}
+        <div className="lp-card-stack lp-right">
+          {slide.right.map((tile) => (
+            <FlipTile key={`${slide.question}-${tile.word}`} tile={tile} />
+          ))}
+        </div>
+      </div>
+      <div className="lp-bottom-question">
+        <p>{slide.nextPrompt}</p>
+        <button className="lp-chevron" type="button" aria-label={`Continue to ${slide.nextPrompt}`} onClick={onNext}>
+          <ChevronIcon />
+        </button>
+      </div>
     </div>
   );
 }
@@ -90,197 +452,783 @@ export default function HeroSection() {
   const { isSignedIn } = useUser();
   const { openSignIn, openSignUp } = useAuthModal();
   const router = useRouter();
+  const [index, setIndex] = useState(0);
+  const [whoosh, setWhoosh] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
+  const lockedRef = useRef(false);
+  const touchStartRef = useRef(0);
+  const slideCount = QUESTION_SLIDES.length + 2;
 
-  const handleSelect = (role: string) => {
-    if (typeof window === "undefined") return;
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 860px)");
+    const sync = () => setIsCompact(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  const setSelectedRole = useCallback((role: RoleKey) => {
     try {
       localStorage.setItem(SELECTED_ROLE_KEY, role);
     } catch {
-      // storage may be unavailable
+      // Storage can be unavailable in strict browser modes.
     }
-  };
+  }, []);
+
+  const handleRoleSelect = useCallback(
+    (role: RoleKey) => {
+      setSelectedRole(role);
+      if (isSignedIn) {
+        router.push("/feed");
+        return;
+      }
+      openSignUp();
+    },
+    [isSignedIn, openSignUp, router, setSelectedRole],
+  );
+
+  const go = useCallback(
+    (next: number) => {
+      const bounded = Math.max(0, Math.min(slideCount - 1, next));
+      if (bounded === index || lockedRef.current) return;
+      lockedRef.current = true;
+      setWhoosh(true);
+      setIndex(bounded);
+      window.setTimeout(() => {
+        setWhoosh(false);
+        lockedRef.current = false;
+      }, 820);
+    },
+    [index, slideCount],
+  );
+
+  const handleWheel = useCallback(
+    (event: React.WheelEvent<HTMLElement>) => {
+      if (Math.abs(event.deltaY) < 26) return;
+      event.preventDefault();
+      go(index + (event.deltaY > 0 ? 1 : -1));
+    },
+    [go, index],
+  );
+
+  const handleTouchStart = useCallback((event: React.TouchEvent<HTMLElement>) => {
+    touchStartRef.current = event.touches[0]?.clientY ?? 0;
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (event: React.TouchEvent<HTMLElement>) => {
+      const delta = touchStartRef.current - (event.changedTouches[0]?.clientY ?? 0);
+      if (Math.abs(delta) < 42) return;
+      go(index + (delta > 0 ? 1 : -1));
+    },
+    [go, index],
+  );
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (["ArrowDown", "PageDown", " "].includes(event.key)) {
+        event.preventDefault();
+        go(index + 1);
+      }
+      if (["ArrowUp", "PageUp"].includes(event.key)) {
+        event.preventDefault();
+        go(index - 1);
+      }
+    },
+    [go, index],
+  );
+
+  const slides = useMemo(
+    () => [
+      <AuthSlide key="intro" onNext={() => go(1)} onRoleSelect={handleRoleSelect} onSignIn={openSignIn} />,
+      ...QUESTION_SLIDES.map((slide, questionIndex) => (
+        <QuestionSlideView
+          key={slide.question}
+          slide={slide}
+          active={index === questionIndex + 1}
+          slideIndex={questionIndex}
+          showGif={!isCompact && index > 0 && index < slideCount - 1 && Math.abs(index - (questionIndex + 1)) <= 1}
+          onNext={() => go(questionIndex + 2)}
+        />
+      )),
+      <AuthSlide key="final" isFinal onRoleSelect={handleRoleSelect} onSignIn={openSignIn} />,
+    ],
+    [go, handleRoleSelect, index, isCompact, openSignIn],
+  );
 
   return (
     <>
-      <style>{`
-        @keyframes lp-drift {
-          from { transform: translate3d(0,0,0) scale(1); opacity: 0.28; }
-          50% { opacity: 0.72; }
-          to { transform: translate3d(var(--px),var(--py),0) scale(0.8); opacity: 0; }
-        }
-        @keyframes lp-logo-pulse {
-          0%,100% { box-shadow: 0 0 0 rgba(247,214,109,0), 0 0 60px rgba(124,58,237,0.12); }
-          50% { box-shadow: 0 0 36px rgba(247,214,109,0.12), 0 0 100px rgba(124,58,237,0.20); }
-        }
-        @keyframes lp-reveal {
-          from { opacity: 0; transform: translateY(14px); filter: blur(5px); }
-          to { opacity: 1; transform: translateY(0); filter: blur(0); }
-        }
-        @keyframes lp-reveal-simple {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes lp-card-in {
-          from { opacity: 0; transform: translateY(10px) scale(0.97); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes lp-card-cta-glow {
-          0%, 25%, 100% {
-            border-color: rgba(255,255,255,0.10);
-            box-shadow: 0 0 0 rgba(255,255,255,0), 0 8px 32px rgba(0,0,0,0.40);
-          }
-          12.5% {
-            border-color: var(--role-color);
-            box-shadow: 0 0 20px var(--role-glow-strong), 0 0 44px var(--role-glow), 0 8px 32px rgba(0,0,0,0.55);
-          }
-        }
-      `}</style>
-
-      <section className="relative flex flex-col items-center justify-center min-h-dvh px-4 py-10 overflow-hidden">
-        {/* Background */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(247,214,109,0.08),transparent_26%),radial-gradient(circle_at_76%_74%,rgba(124,58,237,0.12),transparent_30%),radial-gradient(circle_at_24%_60%,rgba(228,138,166,0.06),transparent_26%)]" />
-        <div className="absolute inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] [background-size:42px_42px]" />
+      <style>{LANDING_STYLES}</style>
+      <main
+        className="lp-page"
+        aria-label="Ibhaveda landing page"
+        tabIndex={-1}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onKeyDown={handleKeyDown}
+      >
+        <div className="lp-grid" />
         <PixelField />
-
-        <div className="relative z-10 w-full max-w-5xl flex flex-col items-center">
-
-
-          {/* ── Already a member ── */}
-          <div
-            className="mb-4"
-            style={{ animation: "lp-reveal-simple 600ms ease both" }}
-          >
-            <button
-              type="button"
-              onClick={() => openSignIn()}
-              className="text-sm text-slate-400 hover:text-slate-200 transition cursor-pointer"
-            >
-              Already a member?{" "}
-              <span className="text-[#F7D66D] font-semibold hover:underline">Log in</span>
-            </button>
-          </div>
-
-          {/* ── Hero copy ── */}
-          <div
-            className="flex flex-col items-center text-center mb-7 sm:mb-8"
-            style={{ animation: "lp-reveal 700ms ease both" }}
-          >
-            <div
-              className="relative grid h-16 w-16 sm:h-20 sm:w-20 place-items-center overflow-hidden rounded-[18px] border border-white/10 bg-black shadow-2xl mb-4"
-              style={{ animation: "lp-logo-pulse 2400ms ease-in-out infinite" }}
-            >
-              <img src="/ibhaveda-logo.jpg" alt="Ibhaveda" className="h-full w-full object-cover" />
-            </div>
-
-            <p className="text-[10px] font-bold uppercase tracking-[0.44em] text-[#F7D66D] mb-3">
-              Ibhaveda
-            </p>
-
-            <h1 className="text-[1.85rem] sm:text-5xl lg:text-[3.25rem] font-black text-white leading-[1.07] tracking-tight max-w-3xl font-display">
-              Nobody's Building With You. Yet.
-            </h1>
-
-            <p className="mt-3 text-sm sm:text-base text-slate-300 max-w-xl leading-6">
-              Co-founders. Builders. Investors. Zero gatekeeping.
-            </p>
-          </div>
-
-          {/* ── Role selector ── */}
-          <div className="w-full">
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <span className="h-px flex-1 max-w-[80px] bg-gradient-to-r from-transparent to-white/[0.10]" />
-              <p className="text-[10px] font-bold uppercase tracking-[0.38em] text-[#F7D66D]">
-                Choose your path
-              </p>
-              <span className="h-px flex-1 max-w-[80px] bg-gradient-to-l from-transparent to-white/[0.10]" />
-            </div>
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {ROLES.map((role, index) => {
-                const Icon = role.icon;
-
-                const inner = (
-                  <>
-                    <div className="absolute inset-0 opacity-[0.09] [background-image:linear-gradient(rgba(255,255,255,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.09)_1px,transparent_1px)] [background-size:18px_18px]" />
-                    <div
-                      className="absolute -right-5 -top-5 h-20 w-20 rounded-full blur-2xl"
-                      style={{ background: role.glow }}
-                    />
-                    <div className="relative z-10 h-full">
-                      <div className="flex h-full flex-col items-center justify-center text-center">
-                        <div
-                          className="mb-6 grid h-10 w-10 place-items-center rounded-xl border border-white/10"
-                          style={{ background: `${role.color}18` }}
-                        >
-                          <Icon className="h-5 w-5" style={{ color: role.color }} />
-                        </div>
-                        <p
-                          className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1"
-                          style={{ color: role.color }}
-                        >
-                          {role.eyebrow}
-                        </p>
-                        <p className="text-lg font-black text-white sm:text-xl">{role.label}</p>
-                        <p className="mt-1 text-[11px] text-slate-400 leading-4 hidden sm:block">
-                          {role.description}
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                );
-
-                const cardClass =
-                  "relative aspect-square overflow-hidden rounded-[20px] border border-white/10 bg-[#0B111A] p-4 transition-transform duration-200 hover:scale-[1.025] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 cursor-pointer text-left";
-
-                const style = {
-                  animation: `lp-card-in 450ms ${index * 80}ms ease both, lp-card-cta-glow 10400ms ${900 + index * 2600}ms ease-in-out infinite`,
-                  "--role-color": role.color,
-                  "--role-glow": role.glow,
-                  "--role-glow-strong": `${role.color}66`,
-                } as React.CSSProperties;
-
-                if (isSignedIn) {
-                  return (
-                    <button
-                      key={role.key}
-                      type="button"
-                      onClick={() => {
-                        handleSelect(role.key);
-                        router.push("/feed");
-                      }}
-                      className={cardClass}
-                      style={style}
-                      aria-label={`Continue as ${role.label}`}
-                    >
-                      {inner}
-                    </button>
-                  );
-                }
-
-                return (
-                  <button
-                    key={role.key}
-                    type="button"
-                    onClick={() => {
-                      handleSelect(role.key);
-                      openSignUp();
-                    }}
-                    className={cardClass}
-                    style={style}
-                    aria-label={`Sign up as ${role.label}`}
-                  >
-                    {inner}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        <div className={`lp-deck ${whoosh ? "lp-whoosh" : ""}`} style={{ transform: `translateY(${-index * 100}dvh)` }}>
+          {slides.map((slide, slideIndex) => (
+            <section key={slide.key ?? slideIndex} className={`lp-slide ${slideIndex === index ? "is-active" : ""}`}>
+              {slide}
+            </section>
+          ))}
         </div>
-
-        {/* Corner sprite decorations */}
-        <img src="/assets/fan-tasy/House_Hay_1.png" alt="" aria-hidden className="absolute left-[2%] bottom-[4%] h-16 w-16 sm:h-24 sm:w-24 object-contain [image-rendering:pixelated] opacity-25 hidden sm:block pointer-events-none" />
-        <img src="/assets/fan-tasy/House_Hay_4_Purple.png" alt="" aria-hidden className="absolute right-[2%] bottom-[5%] h-16 w-16 sm:h-24 sm:w-24 object-contain [image-rendering:pixelated] opacity-25 hidden sm:block pointer-events-none" />
-      </section>
+      </main>
     </>
   );
 }
+
+const LANDING_STYLES = `
+  .lp-page {
+    --bg: #070a0f;
+    --panel: #0b111a;
+    --line: rgba(255,255,255,0.12);
+    --muted: #a8b2c6;
+    --gold: #f7d66d;
+    --blue: #60a5fa;
+    --green: #34d399;
+    --purple: #c084fc;
+    --yellow: #fbbf24;
+    --white: #f8fafc;
+    position: relative;
+    height: 100dvh;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 18%, rgba(247,214,109,0.08), transparent 26%),
+      radial-gradient(circle at 76% 74%, rgba(124,58,237,0.12), transparent 30%),
+      radial-gradient(circle at 24% 60%, rgba(228,138,166,0.06), transparent 26%),
+      var(--bg);
+    color: var(--white);
+  }
+
+  .lp-grid {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    opacity: 0.055;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 42px 42px;
+  }
+
+  .lp-pixel {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    opacity: 0;
+    animation: lp-drift 5.2s ease-in-out infinite;
+  }
+
+  .lp-pixel-1 { left: 7%; top: 18%; background: var(--gold); animation-delay: 0ms; }
+  .lp-pixel-2 { left: 18%; top: 77%; background: #e48aa6; animation-delay: 330ms; }
+  .lp-pixel-3 { left: 41%; top: 12%; background: #45d5ff; animation-delay: 740ms; }
+  .lp-pixel-4 { left: 63%; top: 80%; background: var(--green); animation-delay: 1080ms; }
+  .lp-pixel-5 { left: 78%; top: 19%; background: var(--purple); animation-delay: 1450ms; }
+  .lp-pixel-6 { left: 91%; top: 58%; background: var(--gold); animation-delay: 1880ms; }
+
+  .lp-deck {
+    height: 100dvh;
+    transition: transform 760ms cubic-bezier(0.76, 0, 0.24, 1);
+    will-change: transform;
+  }
+
+  .lp-whoosh .lp-scene-main,
+  .lp-whoosh .lp-auth-core {
+    filter: blur(3px);
+    transform: translateY(-10px) scale(0.985);
+  }
+
+  .lp-slide {
+    position: relative;
+    height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: clamp(14px, 3vw, 42px);
+    overflow: hidden;
+  }
+
+  .lp-shell {
+    position: relative;
+    z-index: 2;
+    width: min(1180px, 100%);
+    height: min(820px, calc(100dvh - 28px));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .lp-top { min-height: 44px; }
+
+  .lp-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .lp-logo {
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #000;
+    box-shadow: 0 0 60px rgba(247,214,109,0.13);
+    animation: lp-logo-pulse 2.4s ease-in-out infinite;
+  }
+
+  .lp-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .lp-brand-text,
+  .lp-path-label,
+  .lp-role-kicker,
+  .lp-tile-role {
+    font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+  }
+
+  .lp-brand-text {
+    margin: 0;
+    color: var(--gold);
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .lp-auth-core,
+  .lp-scene-main {
+    transition: filter 420ms ease, transform 420ms ease, opacity 520ms ease;
+  }
+
+  .lp-auth-core {
+    display: grid;
+    gap: clamp(18px, 3.8vw, 34px);
+    justify-items: center;
+    text-align: center;
+  }
+
+  .lp-member {
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .lp-member strong { color: var(--gold); }
+
+  .lp-page h1,
+  .lp-page h2 {
+    margin: 0;
+    font-family: var(--font-display), Constantia, Georgia, serif;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1.04;
+    text-shadow: 0 3px 0 rgba(0,0,0,0.42), 0 0 30px rgba(247,214,109,0.06);
+  }
+
+  .lp-page h1 {
+    max-width: 850px;
+    font-size: clamp(34px, 7vw, 78px);
+  }
+
+  .lp-page h2 {
+    max-width: 920px;
+    font-size: clamp(28px, 5vw, 58px);
+    text-align: center;
+  }
+
+  .lp-sub {
+    margin: -8px 0 0;
+    color: #cbd5e1;
+    font-size: clamp(14px, 1.8vw, 17px);
+    line-height: 1.5;
+  }
+
+  .lp-path-label {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    width: min(520px, 100%);
+    color: var(--gold);
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .lp-path-label::before,
+  .lp-path-label::after {
+    content: "";
+    height: 1px;
+    flex: 1;
+    background: rgba(255,255,255,0.1);
+  }
+
+  .lp-roles {
+    width: min(900px, 100%);
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .lp-role {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: var(--panel);
+    cursor: pointer;
+    color: white;
+    padding: 16px;
+    animation: lp-card-in 480ms ease both;
+  }
+
+  .lp-role:nth-child(2) { animation-delay: 80ms; }
+  .lp-role:nth-child(3) { animation-delay: 160ms; }
+  .lp-role:nth-child(4) { animation-delay: 240ms; }
+
+  .lp-role::before,
+  .lp-flip-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.09;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.09) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+
+  .lp-role::after {
+    content: "";
+    position: absolute;
+    width: 70%;
+    aspect-ratio: 1;
+    right: -26%;
+    top: -18%;
+    border-radius: 50%;
+    background: var(--glow);
+    filter: blur(22px);
+  }
+
+  .lp-role:hover,
+  .lp-role:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--accent) 72%, white 6%);
+    box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 26%, transparent);
+    transform: translateY(-3px);
+  }
+
+  .lp-role-inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    height: 100%;
+    text-align: center;
+  }
+
+  .lp-role-icon {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 24px;
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, white 8%);
+    border-radius: 14px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  .lp-role-kicker {
+    margin: 0 0 8px;
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .lp-role-name {
+    margin: 0;
+    font-family: var(--font-display), Constantia, Georgia, serif;
+    font-size: clamp(20px, 2.4vw, 28px);
+    font-weight: 900;
+  }
+
+  .lp-scene-header {
+    display: grid;
+    place-items: center;
+    min-height: 110px;
+  }
+
+  .lp-scene-header::after {
+    content: "";
+    width: 9px;
+    height: 9px;
+    margin-top: 18px;
+    background: #45d5ff;
+  }
+
+  .lp-scene-main {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 300px) minmax(220px, 1fr);
+    align-items: center;
+    gap: clamp(16px, 3vw, 34px);
+  }
+
+  .lp-card-stack {
+    display: grid;
+    gap: 14px;
+  }
+
+  .lp-capture {
+    position: relative;
+    width: min(300px, 26vw);
+    aspect-ratio: 9 / 16;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: #05070b;
+    box-shadow: 0 28px 90px rgba(0,0,0,0.45), 0 0 70px rgba(124,58,237,0.12);
+  }
+
+  .lp-capture img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .lp-capture-placeholder {
+    display: block;
+    width: min(300px, 26vw);
+    aspect-ratio: 9 / 16;
+  }
+
+  .lp-flip-card {
+    display: block;
+    position: relative;
+    width: 100%;
+    min-height: 138px;
+    perspective: 900px;
+    border-radius: 18px;
+    cursor: pointer;
+    background: transparent;
+    color: white;
+    padding: 0;
+    text-align: left;
+  }
+
+  .lp-hint { animation: lp-tap-hint 1.75s ease-in-out 3; }
+
+  .lp-flip-inner {
+    display: block;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    min-height: 138px;
+    border-radius: 18px;
+    transition: transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+
+  .lp-flip-face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 78% 20%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 36%),
+      rgba(11,17,26,0.86);
+    overflow: hidden;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: none;
+    transition: transform 220ms ease;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    padding: 16px;
+  }
+
+  .lp-flip-front { z-index: 2; }
+
+  .lp-flip-face::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.08;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.09) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+
+  .lp-flip-back {
+    z-index: 3;
+    align-content: center;
+    justify-items: center;
+    text-align: center;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.98);
+    background:
+      radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 38%),
+      #0b111a;
+  }
+
+  .lp-flip-card:hover .lp-flip-front,
+  .lp-flip-card:focus-visible .lp-flip-front,
+  .lp-flip-card.is-flipped .lp-flip-front {
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(1.02);
+  }
+
+  .lp-flip-card:hover .lp-flip-back,
+  .lp-flip-card:focus-visible .lp-flip-back,
+  .lp-flip-card.is-flipped .lp-flip-back {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+  }
+
+  .lp-tile-icon {
+    position: relative;
+    z-index: 1;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 12px;
+    color: var(--accent);
+    filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 32%, transparent));
+  }
+
+  .lp-tile-word {
+    position: relative;
+    z-index: 1;
+    display: block;
+    font-family: var(--font-display), Constantia, Georgia, serif;
+    font-size: clamp(26px, 2.8vw, 38px);
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .lp-tile-role {
+    position: relative;
+    z-index: 1;
+    display: block;
+    margin-top: 8px;
+    color: var(--accent);
+    font-size: 8px;
+    font-weight: 900;
+  }
+
+  .lp-flip-back strong {
+    position: relative;
+    z-index: 1;
+    color: var(--accent);
+    font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .lp-flip-back span {
+    position: relative;
+    z-index: 1;
+    display: block;
+    max-width: 28ch;
+    margin-top: 10px;
+    color: #f8fafc;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.28;
+    text-align: center;
+  }
+
+  .lp-bottom-question {
+    display: grid;
+    justify-items: center;
+    align-content: end;
+    min-height: 104px;
+    gap: 6px;
+    transform: translateY(4px);
+  }
+
+  .lp-bottom-question p {
+    margin: 0;
+    font-family: var(--font-display), Constantia, Georgia, serif;
+    font-size: clamp(24px, 3.4vw, 38px);
+    font-weight: 900;
+    line-height: 1.05;
+    text-align: center;
+    text-shadow: 0 3px 0 rgba(0,0,0,0.42);
+  }
+
+  .lp-chevron {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    color: #f8fafc;
+    background: transparent;
+    cursor: pointer;
+    animation: lp-bounce 1.25s ease-in-out infinite;
+  }
+
+  .lp-chevron svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .lp-chevron:hover,
+  .lp-chevron:focus-visible {
+    outline: none;
+    color: var(--gold);
+  }
+
+  @keyframes lp-drift {
+    from { opacity: 0.26; transform: translate3d(0,0,0) scale(1); }
+    50% { opacity: 0.78; }
+    to { opacity: 0; transform: translate3d(28px,-44px,0) scale(0.78); }
+  }
+
+  @keyframes lp-logo-pulse {
+    0%,100% { box-shadow: 0 0 0 rgba(247,214,109,0), 0 0 60px rgba(124,58,237,0.12); }
+    50% { box-shadow: 0 0 36px rgba(247,214,109,0.12), 0 0 100px rgba(124,58,237,0.20); }
+  }
+
+  @keyframes lp-card-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes lp-bounce {
+    0%, 100% { transform: translateY(-2px); opacity: 0.82; }
+    50% { transform: translateY(5px); opacity: 1; }
+  }
+
+  @keyframes lp-tap-hint {
+    0%, 100% { transform: translateY(0) scale(1); }
+    45% { transform: translateY(-5px) scale(1.025); }
+  }
+
+  @media (max-width: 980px) {
+    .lp-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lp-role { aspect-ratio: 1.28; }
+  }
+
+  @media (max-width: 860px) {
+    .lp-slide { padding: 4px 12px; }
+    .lp-shell {
+      height: 100dvh;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+    .lp-top { min-height: 8px; }
+    .lp-auth-core { gap: clamp(10px, 2.2dvh, 16px); }
+    .lp-member { font-size: 13px; }
+    .lp-logo { width: 48px; height: 48px; }
+    .lp-page h1 { font-size: clamp(38px, 12vw, 56px); max-width: 520px; }
+    .lp-sub { max-width: 310px; font-weight: 800; text-align: center; }
+    .lp-path-label { width: 100%; font-size: 9px; gap: 10px; }
+    .lp-roles { width: 100%; gap: 12px; }
+    .lp-role { aspect-ratio: 1.45; border-radius: 16px; padding: 12px; }
+    .lp-role-icon { width: 44px; height: 44px; margin-bottom: 14px; }
+    .lp-role-name { font-size: 24px; }
+    .lp-scene-header {
+      min-height: 112px;
+      align-content: center;
+      transform: translateY(14px);
+    }
+    .lp-scene-header::after { width: 8px; height: 8px; margin-top: 15px; }
+    .lp-page h2 { font-size: clamp(32px, 8.5vw, 46px); }
+    .lp-scene-main {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      align-content: center;
+      transform: translateY(-6px);
+    }
+    .lp-card-stack { display: contents; }
+    .lp-left { order: 1; }
+    .lp-right { order: 2; }
+    .lp-capture,
+    .lp-capture-placeholder {
+      order: 1;
+      width: min(215px, 56vw);
+      max-height: 36dvh;
+      display: none;
+    }
+    .lp-flip-card,
+    .lp-flip-inner { min-height: clamp(152px, 23dvh, 196px); }
+    .lp-flip-face { border-radius: 14px; padding: 12px; }
+    .lp-tile-icon { width: 34px; height: 34px; margin-bottom: 8px; }
+    .lp-tile-word { font-size: 24px; }
+    .lp-tile-role {
+      margin-top: 6px;
+      font-size: 7px;
+      letter-spacing: 0.16em;
+    }
+    .lp-flip-back strong {
+      font-size: 9px;
+      letter-spacing: 0.13em;
+    }
+    .lp-flip-back span {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.24;
+    }
+    .lp-bottom-question {
+      min-height: 118px;
+      gap: 2px;
+      align-content: center;
+      transform: translateY(-14px);
+    }
+    .lp-bottom-question p { font-size: clamp(23px, 6.5vw, 29px); }
+    .lp-slide:first-child .lp-bottom-question {
+      min-height: 96px;
+      transform: translateY(4px);
+    }
+  }
+
+  @media (max-width: 380px) {
+    .lp-capture,
+    .lp-capture-placeholder { width: min(195px, 54vw); }
+    .lp-flip-card,
+    .lp-flip-inner { min-height: clamp(118px, 18dvh, 142px); }
+    .lp-scene-header {
+      min-height: 94px;
+      transform: translateY(10px);
+    }
+    .lp-bottom-question {
+      min-height: 98px;
+      transform: translateY(-12px);
+    }
+    .lp-slide:first-child .lp-bottom-question {
+      min-height: 82px;
+      transform: translateY(-6px);
+    }
+    .lp-tile-word { font-size: 20px; }
+    .lp-flip-back span {
+      font-size: 9.5px;
+      line-height: 1.16;
+      margin-top: 5px;
+    }
+    .lp-flip-back strong {
+      font-size: 7.5px;
+      letter-spacing: 0.1em;
+    }
+  }
+`;
