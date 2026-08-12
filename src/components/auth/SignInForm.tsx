@@ -76,22 +76,22 @@ export function SignInForm({
   };
 
   return (
-    <div className="px-8 pt-8">
+    <div className="relative overflow-hidden px-8 pt-8 before:pointer-events-none before:absolute before:inset-0 before:opacity-[0.055] before:[background-image:linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] before:[background-size:24px_24px]">
       <AuthHeaderLogo />
-      <DialogTitle className="text-center text-xl font-bold text-[#212126]">
+      <DialogTitle className="relative text-center font-mono text-2xl font-black text-slate-50">
         Sign in to Ibhaveda
       </DialogTitle>
-      <DialogDescription className="mt-1 text-center text-sm text-[#6b6b76]">
+      <DialogDescription className="relative mt-2 text-center text-sm font-semibold text-slate-400">
         Welcome back! Please sign in to continue
       </DialogDescription>
 
-      <div className="mt-6">
+      <div className="relative mt-6">
         <GoogleButton onClick={handleGoogle} disabled={!isLoaded} />
       </div>
 
       <OrDivider />
 
-      <form onSubmit={handleSubmit} className="pb-2">
+      <form onSubmit={handleSubmit} className="relative pb-2">
         <div className="mb-4">
           <label className={labelClass} htmlFor="signin-identifier">
             Email address or username
@@ -136,12 +136,12 @@ export function SignInForm({
         </div>
       </form>
 
-      <div className="pb-6 pt-4 text-center text-[13px] text-[#6b6b76]">
+      <div className="relative pb-6 pt-4 text-center text-[13px] text-slate-400">
         Don&apos;t have an account?{" "}
         <button
           type="button"
           onClick={onSwitchToSignUp}
-          className="font-semibold text-[#31313a] hover:underline"
+          className="font-bold text-[#f7d66d] hover:underline"
         >
           Sign up
         </button>

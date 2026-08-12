@@ -280,7 +280,7 @@ const QUESTION_SLIDES: QuestionSlide[] = [
 function PixelField() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {[0, 1, 2, 3, 4, 5].map((pixel) => (
+      {Array.from({ length: 12 }, (_, pixel) => (
         <span key={pixel} className={`lp-pixel lp-pixel-${pixel + 1}`} />
       ))}
     </div>
@@ -594,6 +594,7 @@ const LANDING_STYLES = `
     --purple: #c084fc;
     --yellow: #fbbf24;
     --white: #f8fafc;
+    --rpg-display: var(--font-rpg), "Pixelify Sans", "Press Start 2P", "Silkscreen", "VT323", "Pixel Operator", "Perfect DOS VGA 437", var(--font-code), ui-monospace, monospace;
     position: relative;
     height: 100dvh;
     overflow: hidden;
@@ -630,6 +631,12 @@ const LANDING_STYLES = `
   .lp-pixel-4 { left: 63%; top: 80%; background: var(--green); animation-delay: 1080ms; }
   .lp-pixel-5 { left: 78%; top: 19%; background: var(--purple); animation-delay: 1450ms; }
   .lp-pixel-6 { left: 91%; top: 58%; background: var(--gold); animation-delay: 1880ms; }
+  .lp-pixel-7 { left: 12%; top: 48%; background: var(--green); animation-delay: 420ms; }
+  .lp-pixel-8 { left: 27%; top: 31%; background: var(--purple); animation-delay: 980ms; }
+  .lp-pixel-9 { left: 52%; top: 69%; background: #e48aa6; animation-delay: 1320ms; }
+  .lp-pixel-10 { left: 69%; top: 39%; background: var(--gold); animation-delay: 1760ms; }
+  .lp-pixel-11 { left: 84%; top: 83%; background: #45d5ff; animation-delay: 2140ms; }
+  .lp-pixel-12 { left: 36%; top: 88%; background: var(--green); animation-delay: 2520ms; }
 
   .lp-deck {
     height: 100dvh;
@@ -712,9 +719,10 @@ const LANDING_STYLES = `
 
   .lp-auth-core {
     display: grid;
-    gap: clamp(18px, 3.8vw, 34px);
+    gap: clamp(12px, 2.4vw, 24px);
     justify-items: center;
     text-align: center;
+    transform: translateY(-22px);
   }
 
   .lp-member {
@@ -729,11 +737,11 @@ const LANDING_STYLES = `
   .lp-page h1,
   .lp-page h2 {
     margin: 0;
-    font-family: var(--font-display), Constantia, Georgia, serif;
-    font-weight: 900;
+    font-family: var(--rpg-display);
+    font-weight: 800;
     letter-spacing: 0;
-    line-height: 1.04;
-    text-shadow: 0 3px 0 rgba(0,0,0,0.42), 0 0 30px rgba(247,214,109,0.06);
+    line-height: 1.08;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.7), 2px 0 0 rgba(96,165,250,0.22), -2px 0 0 rgba(247,214,109,0.12);
   }
 
   .lp-page h1 {
@@ -748,7 +756,7 @@ const LANDING_STYLES = `
   }
 
   .lp-sub {
-    margin: -8px 0 0;
+    margin: -12px 0 0;
     color: #cbd5e1;
     font-size: clamp(14px, 1.8vw, 17px);
     line-height: 1.5;
@@ -858,9 +866,9 @@ const LANDING_STYLES = `
 
   .lp-role-name {
     margin: 0;
-    font-family: var(--font-display), Constantia, Georgia, serif;
+    font-family: var(--rpg-display);
     font-size: clamp(20px, 2.4vw, 28px);
-    font-weight: 900;
+    font-weight: 800;
   }
 
   .lp-scene-header {
@@ -1017,9 +1025,9 @@ const LANDING_STYLES = `
     position: relative;
     z-index: 1;
     display: block;
-    font-family: var(--font-display), Constantia, Georgia, serif;
+    font-family: var(--rpg-display);
     font-size: clamp(26px, 2.8vw, 38px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1;
     text-align: center;
   }
@@ -1064,15 +1072,15 @@ const LANDING_STYLES = `
     justify-items: center;
     align-content: end;
     min-height: 104px;
-    gap: 6px;
-    transform: translateY(4px);
+    gap: 2px;
+    transform: translateY(-10px);
   }
 
   .lp-bottom-question p {
     margin: 0;
-    font-family: var(--font-display), Constantia, Georgia, serif;
+    font-family: var(--rpg-display);
     font-size: clamp(24px, 3.4vw, 38px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1.05;
     text-align: center;
     text-shadow: 0 3px 0 rgba(0,0,0,0.42);
@@ -1081,8 +1089,8 @@ const LANDING_STYLES = `
   .lp-chevron {
     display: grid;
     place-items: center;
-    width: 46px;
-    height: 46px;
+    width: 42px;
+    height: 42px;
     color: #f8fafc;
     background: transparent;
     cursor: pointer;
@@ -1090,8 +1098,8 @@ const LANDING_STYLES = `
   }
 
   .lp-chevron svg {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
   }
 
   .lp-chevron:hover,
@@ -1118,7 +1126,7 @@ const LANDING_STYLES = `
 
   @keyframes lp-bounce {
     0%, 100% { transform: translateY(-2px); opacity: 0.82; }
-    50% { transform: translateY(5px); opacity: 1; }
+    50% { transform: translateY(3px); opacity: 1; }
   }
 
   @keyframes lp-tap-hint {
@@ -1138,7 +1146,10 @@ const LANDING_STYLES = `
       grid-template-rows: auto minmax(0, 1fr) auto;
     }
     .lp-top { min-height: 8px; }
-    .lp-auth-core { gap: clamp(10px, 2.2dvh, 16px); }
+    .lp-auth-core {
+      gap: clamp(8px, 1.7dvh, 14px);
+      transform: translateY(-8px);
+    }
     .lp-member { font-size: 13px; }
     .lp-logo { width: 48px; height: 48px; }
     .lp-page h1 { font-size: clamp(38px, 12vw, 56px); max-width: 520px; }
@@ -1192,14 +1203,14 @@ const LANDING_STYLES = `
     }
     .lp-bottom-question {
       min-height: 118px;
-      gap: 2px;
+      gap: 0;
       align-content: center;
-      transform: translateY(-14px);
+      transform: translateY(-20px);
     }
     .lp-bottom-question p { font-size: clamp(23px, 6.5vw, 29px); }
     .lp-slide:first-child .lp-bottom-question {
       min-height: 96px;
-      transform: translateY(4px);
+      transform: translateY(-8px);
     }
   }
 
@@ -1214,11 +1225,12 @@ const LANDING_STYLES = `
     }
     .lp-bottom-question {
       min-height: 98px;
-      transform: translateY(-12px);
+      gap: 0;
+      transform: translateY(-20px);
     }
     .lp-slide:first-child .lp-bottom-question {
       min-height: 82px;
-      transform: translateY(-6px);
+      transform: translateY(-16px);
     }
     .lp-tile-word { font-size: 20px; }
     .lp-flip-back span {
