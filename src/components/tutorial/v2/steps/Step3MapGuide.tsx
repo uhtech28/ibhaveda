@@ -21,17 +21,12 @@ import { TutorialMascot, type SparkyMood } from "../TutorialMascot";
 import { TutorialHighlight } from "../TutorialHighlight";
 import { useTutorial } from "../useTutorial";
 import { getVillageBoss } from "@/config/village-bosses";
+import { getTemplateStageBoss } from "@/config/template-stage-bosses";
+import { templateIdAtom } from "@/lib/stores/hudStore";
+import { useAtomValue } from "jotai";
 
-/**
- * Resolve the CP-1 boss name for the tutorial monster. The first-run
- * tour always fights the first checkpoint of stage 1, so the [Monster
- * Name] placeholder from the script → "Fog of Vagueness" (or whatever
- * the current Village CP-1 boss is). Falls back to a safe generic
- * label if the config lookup returns nothing.
- */
-const TUTORIAL_MONSTER_NAME =
-  getVillageBoss(0)?.name ?? "the first monster";
-
+// The first tutorial fight happens at stage 1, checkpoint 1. Resolve
+// that boss through the same template-aware roster used by combat.
 type Stage =
   // PRODUCT DECISION: the map tutorial now skips the "click first task,
   // write an answer, submit" flow entirely. On arrival at /map/world
@@ -93,7 +88,18 @@ export function Step3MapGuide() {
   const tutorial = useTutorial();
   const pathname = usePathname();
   const router = useRouter();
+  const templateId = useAtomValue(templateIdAtom);
   const onMap = pathname?.startsWith("/map/") ?? false;
+  const tutorialMonsterName = useMemo(() => {
+    if (templateId === "venture") {
+      return getVillageBoss(0)?.name ?? "the first monster";
+    }
+    return (
+      getTemplateStageBoss(templateId, 1)?.name ??
+      getVillageBoss(0)?.name ??
+      "the first monster"
+    );
+  }, [templateId]);
 
   // Step numbering: 1=name, 2=username, 3=click+, 4=pick template,
   // 5=write outline, 6=posted, 7=map task, 8=combat/done.
@@ -674,7 +680,7 @@ export function Step3MapGuide() {
         return {
           text: combatOpenState
             ? ""
-            : `You're about to face ${TUTORIAL_MONSTER_NAME}, who'll question your idea. Defend it, fight back, and make him retreat so you can advance. You've got this!`,
+            : `You're about to face ${tutorialMonsterName}, who'll question your idea. Defend it, fight back, and make him retreat so you can advance. You've got this!`,
           mood: combatOpenState ? "idle" : "pointing",
           near: '[data-tutorial="combat-panel"], [aria-label="AI Combat"], [data-combat-panel]',
           highlight: combatOpenState
@@ -694,7 +700,7 @@ export function Step3MapGuide() {
           // after every task under this checkpoint is complete. What
           // just happened is a retreat. Sparky says so explicitly so
           // the user understands why the map still shows the boss.
-          text: `Congratulations, the “${TUTORIAL_MONSTER_NAME}” retreated! Just two more things and you'll have everything you need.`,
+          text: `Congratulations, the "${tutorialMonsterName}" retreated! Just two more things and you'll have everything you need.`,
           mood: "celebrating",
           // Anchor Sparky next to the Victory PANEL specifically —
           // combat-victory-panel is a ~720px centered card, small
@@ -741,7 +747,7 @@ export function Step3MapGuide() {
         // to "flare".
         return {
           text:
-            "This is your saddlebag. It holds every tool you'll need on your journey. Tap to open!",
+            "This is your saddlebag. It holds every tool you'll need to build your idea. Tap to open!",
           mood: "pointing",
           near: '[data-tutorial="saddlebag-button"]',
           highlight: '[data-tutorial="saddlebag-button"]',
@@ -754,7 +760,7 @@ export function Step3MapGuide() {
         // Advance is driven by the DOM poller detecting the
         // FlareComposeDialog opening.
         return {
-          text: "Nice work! If you're ever stuck, fire a Flare from here. People can jump in to help without joining your project.",
+          text: "Nice work! If you're ever stuck, fire a Flare. Everyone will jump in to help.",
           mood: "pointing",
           near: '[data-tutorial="menu-tile-flare"]',
           highlight: '[data-tutorial="menu-tile-flare"]',
@@ -773,13 +779,13 @@ export function Step3MapGuide() {
         // Flare done — one line of praise, then the auto-navigate
         // effect below pushes to /feed for the contribute step.
         return {
-          text: `Great job! Now let's head back to the feed for one last thing.`,
+          text: "Great job! Now let's head back to the feed for one last task.",
           mood: "celebrating",
           near: null,
           highlight: null,
         };
     }
-  }, [stage, tutorial, bossSpeaking, combatOpenState]);
+  }, [stage, tutorial, bossSpeaking, combatOpenState, tutorialMonsterName]);
 
   if (!active) return null;
 

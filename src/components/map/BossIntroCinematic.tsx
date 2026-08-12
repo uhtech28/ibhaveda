@@ -17,12 +17,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { VILLAGE_BOSSES } from "@/config/village-bosses";
-import { STAGES } from "@/config/stages.config";
 import { audioManager } from "@/lib/audio/audioManager";
 
 interface Props {
   /** Called after the cinematic has been fully dismissed. */
   onDone: () => void;
+  mainBossArt?: string;
+  mainBossTitle?: string;
+  speechLines?: readonly string[];
+  minionsSpeechLine?: string;
+  miniBosses?: ReadonlyArray<{ name: string; idleAsset: string; stageLabel?: string }>;
+  stageFunctionNames?: readonly string[];
+  skipMarkSeen?: boolean;
 }
 
 type Phase =
@@ -60,7 +66,16 @@ const MAIN_SPEECH_LINES = [
 const MINIONS_SPEECH_LINE =
   "You'll have to defeat my four minions before you can reach me.";
 
-export function BossIntroCinematic({ onDone }: Props) {
+export function BossIntroCinematic({
+  onDone,
+  mainBossArt = MAIN_BOSS_ART,
+  mainBossTitle = "The Unraveller",
+  speechLines = MAIN_SPEECH_LINES,
+  minionsSpeechLine = MINIONS_SPEECH_LINE,
+  miniBosses = VILLAGE_BOSSES,
+  stageFunctionNames = VENTURE_STAGE_FUNCTION_NAMES,
+  skipMarkSeen = false,
+}: Props) {
   const markSeen = useMutation(api.users.markBossIntroSeen);
   const [phase, setPhase] = useState<Phase>("curtain");
   const [speechIdx, setSpeechIdx] = useState(0);
@@ -88,7 +103,7 @@ export function BossIntroCinematic({ onDone }: Props) {
   // 1400ms → 2400ms so each line lands with room to breathe.
   useEffect(() => {
     if (phase !== "main-speech") return;
-    const line = MAIN_SPEECH_LINES[speechIdx] ?? "";
+    const line = speechLines[speechIdx] ?? "";
     setTypedText("");
     let i = 0;
     const id = window.setInterval(() => {
@@ -98,7 +113,7 @@ export function BossIntroCinematic({ onDone }: Props) {
         window.clearInterval(id);
         // Pause on the finished line before advancing.
         window.setTimeout(() => {
-          if (speechIdx < MAIN_SPEECH_LINES.length - 1) {
+          if (speechIdx < speechLines.length - 1) {
             setSpeechIdx((v) => v + 1);
           } else {
             setPhase("minions");
@@ -107,7 +122,7 @@ export function BossIntroCinematic({ onDone }: Props) {
       }
     }, 55);
     return () => window.clearInterval(id);
-  }, [phase, speechIdx]);
+  }, [phase, speechIdx, speechLines]);
 
   // ── Minion reveal sequence ────────────────────────────────────────
   // Stagger bumped 1400ms → 2000ms per minion and the tail pause
@@ -117,7 +132,7 @@ export function BossIntroCinematic({ onDone }: Props) {
     if (phase !== "minions") return;
     setMinionIdx(0);
     const timers: number[] = [];
-    for (let i = 1; i < VILLAGE_BOSSES.length; i++) {
+    for (let i = 1; i < miniBosses.length; i++) {
       timers.push(
         window.setTimeout(() => setMinionIdx(i), 2000 * i),
       );
@@ -125,11 +140,11 @@ export function BossIntroCinematic({ onDone }: Props) {
     timers.push(
       window.setTimeout(
         () => setPhase("finale"),
-        2000 * VILLAGE_BOSSES.length + 1000,
+        2000 * miniBosses.length + 1000,
       ),
     );
     return () => timers.forEach((t) => window.clearTimeout(t));
-  }, [phase]);
+  }, [phase, miniBosses.length]);
 
   // ── Typewriter for the Unraveller's taunt during the minions reveal.
   // Starts 400ms after the minions phase begins so the first minion has
@@ -152,8 +167,8 @@ export function BossIntroCinematic({ onDone }: Props) {
     const kick = window.setTimeout(() => {
       const id = window.setInterval(() => {
         i += 1;
-        setMinionTypedText(MINIONS_SPEECH_LINE.slice(0, i));
-        if (i >= MINIONS_SPEECH_LINE.length) window.clearInterval(id);
+        setMinionTypedText(minionsSpeechLine.slice(0, i));
+        if (i >= minionsSpeechLine.length) window.clearInterval(id);
       }, 55);
       // Store on window so the cleanup below can clear it.
       (window as unknown as { __unravellerTauntTimer?: number }).__unravellerTauntTimer = id;
@@ -165,7 +180,7 @@ export function BossIntroCinematic({ onDone }: Props) {
       }).__unravellerTauntTimer;
       if (typeof stored === "number") window.clearInterval(stored);
     };
-  }, [phase]);
+  }, [phase, minionsSpeechLine]);
 
   // ── Ambient sting on first reveal ─────────────────────────────────
   useEffect(() => {
@@ -182,11 +197,13 @@ export function BossIntroCinematic({ onDone }: Props) {
     setPhase("leaving");
     // Fire the mutation without awaiting — even if the network hiccups,
     // we don't want the user stuck watching the intro.
-    void markSeen({}).catch(() => {
-      /* no-op */
-    });
+    if (!skipMarkSeen) {
+      void markSeen({}).catch(() => {
+        /* no-op */
+      });
+    }
     window.setTimeout(() => onDone(), 550);
-  }, [markSeen, onDone]);
+  }, [markSeen, onDone, skipMarkSeen]);
 
   // handleSkip removed — the top-right SKIP affordance was pulled per
   // product request. Users advance only via the "Face them" CTA at the
@@ -283,8 +300,8 @@ export function BossIntroCinematic({ onDone }: Props) {
               style={{ willChange: "transform" }}
             >
               <img
-                src={MAIN_BOSS_ART}
-                alt="The Unraveller"
+                src={mainBossArt}
+                alt={mainBossTitle}
                 className="h-[200px] w-[200px] sm:h-[340px] sm:w-[340px]"
                 style={{
                   imageRendering: "pixelated",
@@ -333,7 +350,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                 textShadow: "0 6px 26px rgba(99, 102, 241, 0.35)",
               }}
             >
-              The Unraveller
+              {mainBossTitle}
             </div>
           </motion.div>
 
@@ -391,7 +408,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                       }}
                     />
                     <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#9CA3AF] sm:text-[10px] sm:tracking-[0.32em]">
-                      The Unraveller
+                      {mainBossTitle}
                     </span>
                   </div>
 
@@ -408,10 +425,10 @@ export function BossIntroCinematic({ onDone }: Props) {
                     {phase === "main-speech" ? typedText : minionTypedText}
                     {((phase === "main-speech" &&
                       typedText.length <
-                        (MAIN_SPEECH_LINES[speechIdx]?.length ?? 0)) ||
+                        (speechLines[speechIdx]?.length ?? 0)) ||
                       (phase === "minions" &&
                         minionTypedText.length <
-                          MINIONS_SPEECH_LINE.length)) && (
+                          minionsSpeechLine.length)) && (
                       <span
                         className="ml-0.5 inline-block h-[14px] w-[2px] align-middle sm:h-[16px]"
                         style={{
@@ -475,9 +492,9 @@ export function BossIntroCinematic({ onDone }: Props) {
                 // pack title/boss/minions/CTA into a centered stack
                 // (product ask: "shift everything little upward so it
                 // look centralised for all pc").
-                className="pointer-events-none absolute bottom-[130px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
+                className="pointer-events-none absolute bottom-[154px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
               >
-                {VILLAGE_BOSSES.map((boss, i) => {
+                {miniBosses.map((boss, i) => {
                   const revealed = i <= minionIdx || phase === "finale";
                   return (
                     <motion.div
@@ -500,7 +517,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                           border so it matches the feed card visual
                           language. */}
                       <div
-                        className="relative flex h-[64px] w-[64px] items-center justify-center rounded-xl sm:h-[108px] sm:w-[108px] sm:rounded-2xl"
+                        className="relative flex h-[68px] w-[68px] items-center justify-center rounded-xl sm:h-[116px] sm:w-[116px] sm:rounded-2xl"
                         style={{
                           background: "rgba(15, 23, 38, 0.85)",
                           border: "1px solid rgba(255, 255, 255, 0.08)",
@@ -589,7 +606,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                           on the bottom. */}
                       <div className="text-center">
                         <div className="text-[7px] font-bold uppercase tracking-wider text-[#9CA3AF] sm:text-[9px] sm:tracking-widest">
-                          {VENTURE_STAGE_FUNCTION_NAMES[i] ?? `Stage ${i + 1}`}
+                          {boss.stageLabel ?? stageFunctionNames[i] ?? `Stage ${i + 1}`}
                         </div>
                         <div className="mt-0.5 text-[9px] font-bold leading-tight text-white/95 sm:text-[12px]">
                           {boss.name}
@@ -627,7 +644,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                 // so it lifts off the very bottom of the viewport and
                 // stays inside the centered stack alongside the
                 // minions (which moved to sm:bottom-[28%]).
-                className="absolute inset-x-0 bottom-6 z-[210] flex flex-col items-center gap-3 sm:bottom-[12%]"
+                className="absolute inset-x-0 bottom-12 z-[210] flex flex-col items-center gap-3 sm:bottom-[12%]"
               >
                 {/* CTA re-styled to match the platform's primary
                     indigo action (same treatment as Post Idea,
@@ -647,7 +664,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                     boxShadow: "0 12px 32px -10px rgba(99, 102, 241, 0.55)",
                   }}
                 >
-                  Face them
+                  Face Them
                 </motion.button>
               </motion.div>
             )}

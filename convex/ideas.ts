@@ -4,6 +4,7 @@ import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { createContributionRequest, updateRequestStatus, getRequestsByIdea, getIncomingRequests } from "./contributionRequests";
 import { sanitizeUserText } from "./sanitize";
+import { isCreatedProfileIdea } from "./ideaFilters";
 
 async function getIdeaSparkCount(ctx: any, ideaId: Id<"ideas">) {
   const sparks = await ctx.db
@@ -1752,7 +1753,9 @@ export const getProfileIdeas = query({
       ideasQuery = ideasQuery.filter((q) => q.eq(q.field("visibility"), "public"));
     }
 
-    const ideas = await ideasQuery.order("desc").take(limit);
+    const ideas = (await ideasQuery.order("desc").collect())
+      .filter(isCreatedProfileIdea)
+      .slice(0, limit);
 
     return await enrichIdeasWithSparkState(ctx, ideas);
   },

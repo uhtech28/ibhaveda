@@ -29,6 +29,7 @@ interface PanelCloseClusterProps {
    * strong accent can tune the hover/border. Defaults to slate-neutral.
    */
   className?: string;
+  showSaddlebag?: boolean;
 }
 
 /**
@@ -38,6 +39,7 @@ interface PanelCloseClusterProps {
 export function PanelCloseCluster({
   onClose,
   className,
+  showSaddlebag = true,
 }: PanelCloseClusterProps) {
   const openMenu = () => {
     // Close the current panel first so the menu opens on top of a
@@ -54,15 +56,17 @@ export function PanelCloseCluster({
 
   return (
     <div className={`flex items-center gap-2 ${className ?? ""}`}>
-      <button
-        type="button"
-        onClick={openMenu}
-        aria-label="Open Adventurer's Menu"
-        title="Open menu"
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-400/25 bg-white/[0.03] text-white/70 transition-all hover:border-amber-400/60 hover:bg-amber-500/10 hover:text-white"
-      >
-        <PixelIcon name="saddlebag-backpack" size={20} alt="Menu" />
-      </button>
+      {showSaddlebag && (
+        <button
+          type="button"
+          onClick={openMenu}
+          aria-label="Open Adventurer's Menu"
+          title="Open menu"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-400/25 bg-white/[0.03] text-white/70 transition-all hover:border-amber-400/60 hover:bg-amber-500/10 hover:text-white"
+        >
+          <PixelIcon name="saddlebag-backpack" size={20} alt="Menu" />
+        </button>
+      )}
       <button
         type="button"
         onClick={onClose}

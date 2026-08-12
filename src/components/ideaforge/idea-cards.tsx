@@ -192,7 +192,7 @@ export function FilterTabs<T extends string>({
 
 export function IdeaCardSkeleton() {
   return (
-    <div className={cn(cardSurface, "overflow-hidden p-5")}> 
+    <div className={cn(cardSurface, "overflow-hidden p-5")}>
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-white/5 animate-shimmer" />
         <div className="flex-1 space-y-2">
@@ -738,10 +738,10 @@ export function IdeaStoryCard({
                 }}
                 className={cn(
                   transitionBase,
-                  "rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-2.5 py-1 text-[11px] font-medium text-fuchsia-300 hover:bg-fuchsia-500/18 hover:border-fuchsia-400/55"
+                  "rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-2 py-1 text-[11px] font-medium tabular-nums leading-none text-fuchsia-300 hover:bg-fuchsia-500/18 hover:border-fuchsia-400/55"
                 )}
               >
-                +{hiddenIndustries} more
+                +{hiddenIndustries}
               </button>
             )}
             {!showAllTags && industriesExpanded && industryTags.length > 2 && (
@@ -796,10 +796,10 @@ export function IdeaStoryCard({
                 }}
                 className={cn(
                   transitionBase,
-                  "rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-300 hover:bg-sky-500/16 hover:border-sky-400/55"
+                  "rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-2 py-1 text-[11px] font-medium tabular-nums leading-none text-sky-300 hover:bg-sky-500/16 hover:border-sky-400/55"
                 )}
               >
-                +{hiddenSkills} more
+                +{hiddenSkills}
               </button>
             )}
             {!showAllTags && skillsExpanded && skillTags.length > 2 && (
@@ -926,14 +926,14 @@ export function CompactIdeaCard({
         <button type="button" onClick={() => onOpenIdea(idea._id)} className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" aria-label="Edit idea">
           <PencilLine className="h-4 w-4" />
         </button>
-        <button 
-          type="button" 
-          onClick={(e) => { 
-            e.stopPropagation(); 
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
             const tags = parseTags(idea.category);
-            onRepost?.({ title: idea.title, description: idea.description, tags, category: tags[0] || "SaaS", stage: getIdeaStage(idea) }); 
-          }} 
-          className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14" 
+            onRepost?.({ title: idea.title, description: idea.description, tags, category: tags[0] || "SaaS", stage: getIdeaStage(idea) });
+          }}
+          className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white hover:border-[#6366F1]/35 hover:bg-[#6366F1]/14"
           aria-label="Repost idea"
         >
           <Repeat2 className="h-4 w-4" />

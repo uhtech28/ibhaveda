@@ -155,7 +155,6 @@ export function EditProfileModal({ open, onOpenChange }: EditProfileModalProps) 
       */}
       <DialogContent
         className="w-[95vw] max-w-[95vw] sm:!max-w-4xl md:!max-w-5xl xl:!max-w-6xl max-h-[95vh] overflow-y-auto p-0"
-        srOnlyTitle="Edit Profile"
       >
         <DialogHeader className="px-8 pt-6 pb-3 border-b border-white/5">
           <DialogTitle className="text-2xl">Edit Profile</DialogTitle>

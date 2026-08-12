@@ -52,13 +52,14 @@ export const NotificationBell = () => {
         aria-expanded={open}
         aria-label="Notifications"
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-4 w-4 -translate-x-[6px]" />
         {typeof unreadCount === 'number' && unreadCount > 0 && (
           <Badge
             className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] rounded-full p-0 text-[10px] leading-none font-semibold flex items-center justify-center px-1 bg-red-500 text-white border-0"
           >
-            {/* Nudge just the digit 2px left within the bubble. */}
-            <span className="inline-block -translate-x-[2px]">
+            {/* Nudge just the digit within the bubble: shifted 6px right
+                from the previous −2px position → net +4px. */}
+            <span className="inline-block translate-x-[4px]">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           </Badge>

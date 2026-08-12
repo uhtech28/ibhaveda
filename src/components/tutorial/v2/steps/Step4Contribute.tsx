@@ -222,7 +222,7 @@ export function Step4Contribute() {
         // Contribution Request to actually complete the step. The
         // stage machine advances on modal open/close, not a button.
         return {
-          text: "This is the feed, all our live projects. Send a contribution request to any idea that isn't yours. That's how you plug into a team.",
+          text: "This is the feed, all projects are shown here. Send a contribution request to any idea that you like. That's how you gain experience!",
           mood: "pointing",
           near: null,
           highlight: null,
@@ -235,7 +235,7 @@ export function Step4Contribute() {
         // below disables the modal's X and backdrop so users can't
         // dismiss without committing either.
         return {
-          text: "Fill it in and hit Send Request — that's how the tutorial wraps up.",
+          text: "Fill it in and hit Send Request!",
           mood: "celebrating",
           near: null,
           highlight: null,
@@ -248,7 +248,7 @@ export function Step4Contribute() {
         // coming back on subsequent visits (hard refresh included).
         return {
           text:
-            "Tutorial complete! Start building, explore other projects, and remember, I am here whenever you need help.",
+            "Tutorial complete, you did it! You're ready now. Start building, explore other projects, and remember, It's dangerous to go alone, take this.",
           mood: "celebrating",
           near: null,
           highlight: null,

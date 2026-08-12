@@ -94,6 +94,29 @@ function resolveSuperBossForCombat(
   if (tid === "venture") return getStageSuperBoss(stage);
   return getTemplateStageBoss(tid, stage);
 }
+
+function resolveAssignedPoolBoss(assignedBosses?: readonly unknown[]) {
+  const bossIdRaw = assignedBosses?.[0];
+  const bossId = typeof bossIdRaw === "number" ? bossIdRaw : Number(bossIdRaw);
+  if (!Number.isFinite(bossId) || bossId < 1 || bossId > SUPER_BOSS_POOL.length) {
+    return SUPER_BOSS_POOL[0];
+  }
+  return SUPER_BOSS_POOL[bossId - 1] ?? SUPER_BOSS_POOL[0];
+}
+
+function getPoolBossIntroLines(entry: SuperBossPoolEntry) {
+  const themeLine = entry.represents
+    ? `I feed on ${entry.represents.toLowerCase()}.`
+    : `I am ${entry.name}. Prove your worth or turn back.`;
+  return [
+    "So, you dare to dream of something new.",
+    `I am ${entry.name}. ${themeLine}`,
+  ];
+}
+
+function getPoolBossIntroArt(entry: SuperBossPoolEntry) {
+  return entry.rotations?.south ?? entry.idleAsset ?? "/assets/bosses/village/unraveller/idle.png";
+}
 import { getVentureBadgeEmoji } from "@/components/badges/BadgeCard";
 import {
   checkpointBossKey,
@@ -120,7 +143,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IdeaHierarchyFlowchart } from "@/components/idea/IdeaHierarchyNav";
 // ListTodo dropped â€” the icon-only "Tasks" button that used to sit
 // beside the biome label in the HUD was removed as decorative.
-import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon } from "lucide-react";
+import { GitBranch, Rss, Calendar as CalendarIcon, LayoutDashboard as KanbanIcon, Scroll as JournalIcon, RotateCcw } from "lucide-react";
 import { CalendarTool } from "@/components/tools/calendar-tool";
 import { KanbanTool } from "@/components/tools/kanban-tool";
 import { JournalTool } from "@/components/tools/journal-tool";
@@ -662,7 +685,7 @@ function useMapGame(personaReady: boolean, templateId: string | null = "venture"
         const canvas = game.canvas as HTMLCanvasElement | undefined;
         if (canvas) {
           canvas.style.touchAction = "none";
-          canvas.style.webkitTapHighlightColor = "transparent";
+          canvas.style.setProperty("-webkit-tap-highlight-color", "transparent");
         }
       } catch {
         /* no-op */
@@ -1216,9 +1239,9 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                       {isAdvancing
                         ? "Processing..."
                         : isGold
-                          ? "Proceed â†’"
+                          ? "Proceed"
                           : canAdvance
-                            ? "Advance â†’"
+                            ? "Advance"
                             : `Complete ${2 - doneTasks} more task${2 - doneTasks !== 1 ? "s" : ""} to advance`}
                     </span>
                     {!isCurrentMapCheckpoint && doneTasks >= 2 && !isAdvancing && (
@@ -1426,7 +1449,7 @@ const TaskCard = memo(function TaskCardInner({
               }}
               title="Redo Task"
             >
-              â†º
+              <RotateCcw className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
             </motion.button>
           )}
         </div>
@@ -1719,7 +1742,7 @@ function TemplateMapPlaceholder({
           imageRendering: "pixelated",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        { }
         <link rel="preload" as="image" href={mapUrl} />
         {/* Stage badge â€” top-left, small, low-contrast so it doesn't
             fight the map art. */}
@@ -1806,7 +1829,7 @@ function LoadingScreen() {
         className="map-load-glitch"
         data-text="Entering the World..."
       >
-        Entering the Worldâ€¦
+        Entering the World...
       </div>
       <div
         className="mt-6 h-[3px] w-40 rounded-full overflow-hidden relative"
@@ -2695,6 +2718,47 @@ function MapPageInner() {
   const brightness = worldMapData?.brightness;
   const ideaTitle = sourceIdea?.title ?? worldMapData?.ideaTitle ?? "Your Venture";
   const superBoss = worldMapData?.superBoss ?? null;
+  const assignedPoolBoss = useMemo(
+    () => resolveAssignedPoolBoss(venture?.assignedBosses),
+    [venture?.assignedBosses],
+  );
+  const firstIntroMiniBosses = useMemo(
+    () => {
+      const templateId = (venture?.templateId ?? "venture") as string;
+      if (templateId === "venture") {
+        return getStageMiniBosses(1).map((boss, index) => ({
+          name: boss.name,
+          idleAsset: boss.idleAsset,
+          stageLabel:
+            templateStages[index]?.biome ??
+            templateStages[index]?.name ??
+            `Stage ${index + 1}`,
+        }));
+      }
+
+      return templateStages
+        .slice(0, 4)
+        .map((stage, index) => {
+          const boss = getTemplateStageBoss(templateId, stage.id);
+          return boss
+            ? {
+              name: boss.name,
+              idleAsset: boss.idleAsset,
+              stageLabel: stage.biome ?? stage.name ?? `Stage ${index + 1}`,
+            }
+            : null;
+        })
+        .filter((boss): boss is { name: string; idleAsset: string; stageLabel: string } => !!boss);
+    },
+    [templateStages, venture?.templateId],
+  );
+  const firstIntroStageLabels = useMemo(
+    () =>
+      firstIntroMiniBosses.map(
+        (boss, index) => boss.stageLabel ?? templateStages[index]?.biome ?? `Stage ${index + 1}`,
+      ),
+    [firstIntroMiniBosses, templateStages],
+  );
   type WorldMapCheckpoint = (typeof checkpoints)[number];
   type WorldMapTask = WorldMapCheckpoint["tasks"][number];
   const checkpointEvaluationSummary = useQuery(
@@ -3361,7 +3425,7 @@ function MapPageInner() {
     } else {
       setIsToolsPanelOpen(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [paramCheckpointId, paramPanel, paramTab, checkpoints, buildCheckpointDetail]);
 
   // â”€â”€ Auto-open current active checkpoint on mount if no param is set â”€â”€â”€â”€â”€â”€â”€â”€
@@ -4029,9 +4093,13 @@ function MapPageInner() {
         const minis = (() => {
           if (tid === "venture") {
             const roster = getStageMiniBosses(e.stage);
-            return roster.map((b) => ({
+            return roster.map((b, index) => ({
               name: b.name,
               idleAsset: b.idleAsset,
+              stageLabel:
+                templateStages[Math.max(0, e.stage - 1)]?.biome ??
+                templateStages[Math.max(0, e.stage - 1)]?.name ??
+                `Stage ${e.stage}.${index + 1}`,
             }));
           }
           // Templates: single biome boss preview for that stage.
@@ -4046,13 +4114,13 @@ function MapPageInner() {
         const stageName =
           templateStages[Math.max(0, e.stage - 1)]?.name ??
           `Stage ${e.stage}`;
+        const settingName =
+          templateStages[Math.max(0, e.stage - 1)]?.biome ??
+          stageName;
         const stageNames =
           tid === "venture"
-            ? ["Ideation", "Research", "Validation", "Offer Design",
-               "Build & Deliver", "Launch", "Iteration", "Scale"].slice(
-                 e.stage - 1, e.stage,
-               )
-            : [stageName];
+            ? [settingName]
+            : [settingName];
         // Speech lines â€” reuse boss.introLine if present, otherwise a
         // family-flavoured generic call. Two lines maximum so the
         // cinematic keeps its pacing.
@@ -4230,8 +4298,11 @@ function MapPageInner() {
     try {
       const sceneMgr = gameRef.current?.scene;
       const scene = sceneMgr?.getScene("VillageMapScene");
-      if (scene && typeof (scene as { setAssignedPoolBoss?: (e: SuperBossPoolEntry) => void }).setAssignedPoolBoss === "function") {
-        (scene as { setAssignedPoolBoss: (e: SuperBossPoolEntry) => void }).setAssignedPoolBoss(entry);
+      const villageScene = scene as unknown as {
+        setAssignedPoolBoss?: (e: SuperBossPoolEntry) => void;
+      };
+      if (scene && typeof villageScene.setAssignedPoolBoss === "function") {
+        villageScene.setAssignedPoolBoss(entry);
       }
     } catch (err) {
       console.warn("[MapPage] setAssignedPoolBoss failed", err);
@@ -5578,7 +5649,6 @@ function MapPageInner() {
               // sensible label if the idea / venture name is missing.
               userName={
                 ideaTitle ||
-                activeVenture?.name ||
                 undefined
               }
               // Stage/biome name ("The Village", "The Forest", â€¦)
@@ -5656,17 +5726,20 @@ function MapPageInner() {
           `TemplateMapPlaceholder` is intentionally kept in the file
           in case we need to fall back for a specific edge case, but
           it is no longer rendered by default. */}
-      {false && venture &&
-        venture.templateId &&
-        venture.templateId !== "venture" &&
-        !STAGE_SCENE_KEY[venture.templateId as string]?.[activeStage] && (
+      {(() => {
+        const fallbackVenture = false ? venture : null;
+        return fallbackVenture &&
+          fallbackVenture.templateId &&
+          fallbackVenture.templateId !== "venture" &&
+          !STAGE_SCENE_KEY[fallbackVenture.templateId as string]?.[activeStage] ? (
           <TemplateMapPlaceholder
-            templateId={venture.templateId as string}
+            templateId={fallbackVenture.templateId as string}
             stageName={stageInfo?.biomeName ?? null}
             stageNumber={activeStage}
             currentCheckpoint={activeCP}
           />
-        )}
+        ) : null;
+      })()}
 
       {/* Mobile virtual joystick â€” only renders on touch devices.
           Bottom-left corner. Emits {x,y} vectors via eventBridge that
@@ -5678,8 +5751,16 @@ function MapPageInner() {
           dark, delivers 3 lines of villain speech, then the 4
           checkpoint bosses reveal one by one. Ends with a "Face them"
           CTA. Never plays again for this user (Convex-backed flag). */}
-      {phaserReady && shouldShowBossIntro && (
-        <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />
+      {phaserReady && shouldShowBossIntro && assignedPoolBoss && (
+        <BossIntroCinematic
+          mainBossArt={getPoolBossIntroArt(assignedPoolBoss)}
+          mainBossTitle={assignedPoolBoss.name}
+          speechLines={getPoolBossIntroLines(assignedPoolBoss)}
+          minionsSpeechLine="You'll have to defeat my four minions before you can reach me."
+          miniBosses={firstIntroMiniBosses}
+          stageFunctionNames={firstIntroStageLabels}
+          onDone={() => setBossIntroDismissed(true)}
+        />
       )}
 
       {/* Per-stage super-boss intro cinematic â€” plays once per browser
@@ -6838,6 +6919,7 @@ function MapPageInner() {
                       <GroupList
                         onSelectGroup={handleSelectGroup}
                         onClose={handlePopupClose}
+                        showSaddlebagButton
                       />
                     </div>
                   )}
@@ -6978,7 +7060,7 @@ function MapFeedComposer({
             exit={{ opacity: 0 }}
             className="text-xs text-emerald-400 mt-2 px-1 font-medium flex items-center gap-1"
           >
-            <span>âœ“</span> Post published successfully!
+            <Check className="h-3.5 w-3.5" aria-hidden="true" /> Post published successfully!
           </motion.p>
         )}
       </div>
@@ -7019,16 +7101,16 @@ function MapFeedComposer({
             .map(c => {
               const hasSparked = c.userHasSparked;
               return (
-                <div 
-                  key={c._id} 
+                <div
+                  key={c._id}
                   className="group relative flex gap-3 rounded-2xl border border-white/5 bg-white/[0.01] p-4 transition-all duration-300 hover:bg-white/[0.02] hover:border-white/10"
                 >
                   {/* Left: Avatar */}
                   <div className="shrink-0">
                     {c.author?.avatar ? (
-                      <img 
-                        src={c.author.avatar} 
-                        className="w-9.5 h-9.5 rounded-full object-cover border border-white/10 shadow-sm" 
+                      <img
+                        src={c.author.avatar}
+                        className="w-9.5 h-9.5 rounded-full object-cover border border-white/10 shadow-sm"
                         alt={c.author.name || "User"}
                         referrerPolicy="no-referrer"
                       />
@@ -7218,7 +7300,7 @@ export default function MapPage() {
               className="text-xs tracking-[0.3em] uppercase font-black"
               style={{ color: "#6366f1" }}
             >
-              Entering the Worldâ€¦
+              Entering the World...
             </div>
           </div>
         }
@@ -7292,7 +7374,5 @@ function MapTourMount() {
     />
   );
 }
-
-
 
 

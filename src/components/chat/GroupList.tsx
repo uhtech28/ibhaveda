@@ -3,7 +3,7 @@ import { useQuery } from "convex/react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { X, Users, MessageSquare, Plus } from "lucide-react";
+import { Users, MessageSquare, Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -46,9 +46,10 @@ interface GroupListProps {
   onSelectGroup?: (conversationId: Id<"conversations"> | undefined, ideaId: Id<"ideas">) => void;
   onClose: () => void;
   ideaId?: Id<"ideas">;
+  showSaddlebagButton?: boolean;
 }
 
-const GroupList: React.FC<GroupListProps> = memo(({ onClose }) => {
+const GroupList: React.FC<GroupListProps> = memo(({ onClose, showSaddlebagButton = false }) => {
   const communities = useQuery(api.communities.getUserCommunities);
   const directConversations = useQuery(api.chat.getUserConversations);
   const { openChatWithUser, openGroupChat, selectedIdeaId } = useChat();
@@ -78,7 +79,7 @@ const GroupList: React.FC<GroupListProps> = memo(({ onClose }) => {
           <MessageSquare className="w-3.5 h-3.5" />
           Chats
         </h3>
-        <PanelCloseCluster onClose={onClose} />
+        <PanelCloseCluster onClose={onClose} showSaddlebag={showSaddlebagButton} />
       </div>
 
       <Tabs

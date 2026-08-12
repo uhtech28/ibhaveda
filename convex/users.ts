@@ -4,6 +4,7 @@ import { Id, Doc } from "./_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import { sanitizeUserText, sanitizeOptionalText } from "./sanitize";
+import { isCreatedProfileIdea } from "./ideaFilters";
 
 export type UserProfile = Doc<"users"> & {
   skills: string[];
@@ -559,7 +560,7 @@ export const getUserProfile = query({
     const createdIdeas = await (isOwner
       ? createdIdeasQuery
       : createdIdeasQuery.filter((q) => q.eq(q.field("visibility"), "public"))
-    ).collect()
+    ).collect().then((ideas) => ideas.filter(isCreatedProfileIdea))
 
     const sparkedRecords = await db
       .query("userIdeaSparks")
@@ -621,6 +622,7 @@ export const getAllUsers = query({
           .filter((q) => q.neq(q.field("isDeleted"), true))
           .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
           .collect()
+          .then((ideas) => ideas.filter(isCreatedProfileIdea))
 
         // Fetch sparked ideas count (ideas user has sparked, excluding their own)
         const sparkedRecords = await db
@@ -658,6 +660,34 @@ export const getAllUsers = query({
     return usersWithMetrics
   },
 })
+
+/**
+ * One-off admin cleanup: retire the orphaned `uservjhhhh` row (their Clerk
+ * account no longer exists) so they drop out of every listing that reads
+ * getAllUsers — the community page and the suggested-contributors dialog,
+ * both of which filter isActive !== false.
+ *
+ * Deliberately takes NO arguments (the username is baked in) so it can be
+ * invoked from PowerShell without JSON-quoting headaches:
+ *   npx convex run users:deactivateOrphanUser
+ *
+ * Setting isActive:false rather than hard-deleting keeps referential
+ * integrity (their authored ideas / invitations still resolve) and is
+ * reversible. Safe to delete this function once it's been run.
+ */
+export const deactivateOrphanUser = mutation({
+  args: {},
+  handler: async ({ db }): Promise<{ deactivated: boolean }> => {
+    const username = "uservjhhhh";
+    const user = await db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", username))
+      .first();
+    if (!user) return { deactivated: false };
+    await db.patch(user._id, { isActive: false });
+    return { deactivated: true };
+  },
+});
 
 // Check if user profile is complete
 export const isProfileComplete = query({

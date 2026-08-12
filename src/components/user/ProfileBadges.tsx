@@ -13,7 +13,6 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { BadgeCard, BadgeItem, getNormalizedRarity, getVentureBadgeEmoji } from "../badges/BadgeCard";
 import { BadgeDetailModal } from "../badges/BadgeDetailModal";
-import { AchievementUnlockModal } from "../badges/AchievementUnlockModal";
 import { cn } from "@/lib/utils";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
 
@@ -86,7 +85,6 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
   const [sortBy, setSortBy] = useState<"recent" | "prestige" | "name">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
-  const [badgeQueue, setBadgeQueue] = useState<any[]>([]);
   const [equipSlotIndex, setEquipSlotIndex] = useState<number | null>(null);
 
   // Mutations
@@ -138,7 +136,7 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
         };
       });
 
-      setBadgeQueue((q) => [...q, ...payloads]);
+      void payloads;
     }
 
     prevBadgeCountRef.current = count;
@@ -318,21 +316,11 @@ export const ProfileBadges: React.FC<ProfileBadgesProps> = ({ userId, isOwner, p
 
   const totalEarnedCount = displayBadgesList.filter((b) => b.awardedAt).length;
   const totalPossibleCount = displayBadgesList.length;
-  const activeAwardBadge = badgeQueue[0] || null;
 
   return (
     <Card className="mt-0 shadow-xl border-white/5 bg-slate-950/40 backdrop-blur-md overflow-hidden relative">
       {/* Decorative gradient overlay */}
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
-
-      {/* Real-time dopamine modal trigger */}
-      <AchievementUnlockModal
-        isOpen={!!activeAwardBadge}
-        badge={activeAwardBadge}
-        reason={activeAwardBadge?.description}
-        scoreEarned={500}
-        onClose={() => setBadgeQueue((q) => q.slice(1))}
-      />
 
       {/* Detailed badge inspection popup */}
       {selectedBadge && (
