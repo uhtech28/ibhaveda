@@ -165,16 +165,12 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
         onError={() => fireDone()}
       />
 
-      {/* After the video ends, a subtle "Tap to continue" hint fades
-          in beneath the baked Continue button just in case the
-          artwork alone doesn't read as interactive. Purely
-          decorative — the click handler on the parent is what
-          actually advances. */}
-      {ended && (
-        <div className="welcome-tap-hint">
-          Tap to continue
-        </div>
-      )}
+      {/* Product ask: no separate "Tap to continue" button. Once the
+          video ends, the whole splash (which includes the baked-in red
+          "Continue" button on the scroll artwork) becomes the click
+          target — tapping the video advances to profile setup, exactly
+          as the old button did. The parent onClick handler above is
+          what fires that. */}
 
       <style jsx>{`
         .welcome-splash {
@@ -190,39 +186,19 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
         .welcome-video {
           width: 100%;
           height: 100%;
+          /* Desktop / landscape: show the whole frame, no crop. */
           object-fit: contain;
+          object-position: center;
           background: #000;
           display: block;
         }
-        .welcome-tap-hint {
-          position: absolute;
-          bottom: 24px;
-          left: 50%;
-          transform: translateX(-50%);
-          padding: 8px 20px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          color: #f6f4fa;
-          font-family: "Inter", system-ui, sans-serif;
-          font-size: 12px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          font-weight: 600;
-          pointer-events: none;
-          animation: welcomeHintPulse 1.8s ease-in-out infinite;
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-        }
-        @keyframes welcomeHintPulse {
-          0%,
-          100% {
-            opacity: 0.55;
-            transform: translateX(-50%) translateY(0);
-          }
-          50% {
-            opacity: 1;
-            transform: translateX(-50%) translateY(-3px);
+        /* Mobile / portrait viewports: the 16:9 clip would letterbox
+           into thin black bars. Switch to cover so the video fills the
+           screen, cropping the left/right edges and staying centered on
+           the doorway + scroll (the core of the action). */
+        @media (max-aspect-ratio: 1/1) {
+          .welcome-video {
+            object-fit: cover;
           }
         }
       `}</style>
