@@ -182,17 +182,15 @@ export default function PersonaSetupPage() {
     }
   }, [tutorial, router]);
 
-  // Loading state — auth still resolving, persona query in flight,
-  // OR profile row still being auto-provisioned. All three land the
-  // user on the spinner momentarily instead of the picker so we
-  // never render an unmanaged partial state.
-  const loading =
-    !isLoaded ||
-    !userId ||
-    personaIdRaw === undefined ||
-    personaIdRaw !== null || // already-picked case triggers redirect above
-    existingProfile === undefined ||
-    existingProfile === null; // provisioning in flight
+  // Loading state — ONLY block on Clerk auth resolving. Previously we
+  // also gated on personaIdRaw + existingProfile Convex queries, which
+  // stacked 3-4 sequential round-trips (auth → profile query → persona
+  // query → auto-provision mutation) and left users staring at a spinner
+  // for 5-10 seconds on Convex cold starts. The picker itself is safe
+  // to render even while those queries hydrate — the useEffect above
+  // handles the already-picked redirect and the auto-provision runs in
+  // the background, so a brief flash of the picker during nav is fine.
+  const loading = !isLoaded || !userId;
 
   if (loading) {
     return (
