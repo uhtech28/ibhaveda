@@ -4,13 +4,10 @@ import Image from "next/image";
 import { ChevronRight, Eye, EyeOff } from "lucide-react";
 
 export const inputClass =
-  "w-full rounded-xl border border-white/15 bg-[#0b111a]/90 px-4 py-3 text-sm font-semibold text-slate-50 outline-none transition placeholder:text-slate-500 focus:border-[#f7d66d]/70 focus:ring-2 focus:ring-[#f7d66d]/15";
-
-export const labelClass =
-  "mb-1.5 block text-[12px] font-black uppercase tracking-[0.18em] text-[#f7d66d]";
+  "w-full rounded-xl border border-[#2a3c66] bg-[#0b111a]/90 px-4 py-3 text-sm font-semibold text-slate-50 outline-none transition placeholder:text-[#6f85ad] focus:border-[#818cf8]/90 focus:ring-2 focus:ring-[#6366f1]/25";
 
 export const primaryButtonClass =
-  "flex w-full items-center justify-center gap-1 rounded-xl border border-[#f7d66d]/35 bg-gradient-to-b from-[#f7d66d] to-[#a87924] py-3 text-sm font-black uppercase tracking-[0.12em] text-[#070a0f] shadow-[0_0_28px_rgba(247,214,109,0.18)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45";
+  "flex w-full items-center justify-center gap-1 rounded-xl border border-[#93c5fd]/40 bg-gradient-to-r from-[#7c3aed] via-[#6366f1] to-[#2563eb] py-3 text-sm font-black text-white shadow-[0_0_30px_rgba(99,102,241,0.26)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45";
 
 export function PrimaryButton({
   children,
@@ -43,7 +40,7 @@ export function PasswordToggle({
     <button
       type="button"
       onClick={onToggle}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#f7d66d]"
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8fa3c7] transition hover:text-[#93c5fd]"
       aria-label={show ? "Hide password" : "Show password"}
       tabIndex={-1}
     >
@@ -89,12 +86,12 @@ export function GoogleButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="relative flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#0b111a]/90 py-3 text-sm font-bold text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:border-[#60a5fa]/45 hover:bg-[#101827] disabled:cursor-not-allowed disabled:opacity-60"
+      className="relative flex w-full items-center justify-center gap-2 rounded-xl border border-[#2a3c66] bg-[#0b111a]/90 py-3 text-sm font-bold text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:border-[#818cf8]/70 hover:bg-[#101827] disabled:cursor-not-allowed disabled:opacity-60"
     >
       <GoogleIcon />
       Continue with Google
       {lastUsed && (
-        <span className="absolute -top-2 right-3 rounded-full border border-white/15 bg-[#070a0f] px-1.5 py-0.5 text-[10px] font-normal text-slate-400">
+        <span className="absolute -top-2 right-3 rounded-full border border-[#6366f1]/40 bg-[#070a0f] px-1.5 py-0.5 text-[10px] font-normal text-[#9fb6df]">
           Last used
         </span>
       )}
@@ -105,9 +102,9 @@ export function GoogleButton({
 export function OrDivider() {
   return (
     <div className="my-5 flex items-center gap-3">
-      <span className="h-px flex-1 bg-white/10" />
-      <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">or</span>
-      <span className="h-px flex-1 bg-white/10" />
+      <span className="h-px flex-1 bg-[#2a3c66]/75" />
+      <span className="text-xs font-bold uppercase text-[#6f85ad]">or</span>
+      <span className="h-px flex-1 bg-[#2a3c66]/75" />
     </div>
   );
 }
@@ -115,7 +112,7 @@ export function OrDivider() {
 export function AuthHeaderLogo() {
   return (
     <div className="mb-4 flex justify-center">
-      <span className="grid h-[58px] w-[58px] place-items-center overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_0_42px_rgba(247,214,109,0.16)]">
+      <span className="grid h-[58px] w-[58px] place-items-center overflow-hidden rounded-2xl border border-[#6366f1]/35 bg-black shadow-[0_0_42px_rgba(99,102,241,0.18)]">
         <Image src="/ibhaveda-logo.jpg" alt="Ibhaveda" width={58} height={58} className="h-full w-full object-cover" />
       </span>
     </div>
@@ -124,9 +121,9 @@ export function AuthHeaderLogo() {
 
 export function SecuredByClerk() {
   return (
-    <div className="flex items-center justify-center gap-1.5 border-t border-white/10 bg-black/20 py-3.5 text-[11px] font-medium text-slate-500">
+    <div className="flex items-center justify-center gap-1.5 border-t border-[#2a3c66]/75 bg-black/20 py-3.5 text-[11px] font-medium text-[#6f85ad]">
       Secured by
-      <span className="font-semibold text-slate-300">clerk</span>
+      <span className="font-semibold text-[#c7d2fe]">clerk</span>
     </div>
   );
 }
@@ -144,7 +141,7 @@ export function FieldMessage({
       ? "text-[#fb7185]"
       : tone === "success"
         ? "text-[#34d399]"
-        : "text-slate-400";
+        : "text-[#8fa3c7]";
   return (
     <p className={`mt-1.5 flex items-start gap-1 text-[13px] leading-snug ${color}`}>
       {tone === "success" && <span aria-hidden>✓</span>}

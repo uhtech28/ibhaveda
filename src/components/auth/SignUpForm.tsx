@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   inputClass,
-  labelClass,
   PrimaryButton,
   GoogleButton,
   OrDivider,
@@ -109,17 +108,17 @@ export function SignUpForm({
 
   if (step === "verify") {
     return (
-      <div className="relative overflow-hidden px-8 pt-8 before:pointer-events-none before:absolute before:inset-0 before:opacity-[0.055] before:[background-image:linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] before:[background-size:24px_24px]">
+      <div className="relative overflow-hidden px-8 pt-8 font-[family-name:var(--font-code)] before:pointer-events-none before:absolute before:inset-0 before:opacity-[0.055] before:[background-image:linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] before:[background-size:24px_24px]">
         <AuthHeaderLogo />
-        <DialogTitle className="relative text-center font-mono text-2xl font-black text-slate-50">
+        <DialogTitle className="relative text-center font-[family-name:var(--font-code)] text-2xl font-black text-slate-50">
           Verify your email
         </DialogTitle>
-        <DialogDescription className="relative mt-2 text-center text-sm font-semibold text-slate-400">
+        <DialogDescription className="relative mt-2 text-center text-sm font-semibold text-[#9fb6df]">
           Enter the code we sent to {emailTrim}
         </DialogDescription>
 
         <form onSubmit={handleVerify} className="relative mt-6 pb-2">
-          <label className={labelClass} htmlFor="signup-code">
+          <label className="sr-only" htmlFor="signup-code">
             Verification code
           </label>
           <input
@@ -141,11 +140,11 @@ export function SignUpForm({
           </div>
         </form>
 
-        <div className="relative pb-6 text-center text-[13px] text-slate-400">
+        <div className="relative pb-6 text-center text-[13px] text-[#9fb6df]">
           <button
             type="button"
             onClick={() => setStep("form")}
-            className="font-bold text-[#f7d66d] hover:underline"
+            className="font-bold text-[#93c5fd] hover:underline"
           >
             Use a different email
           </button>
@@ -156,12 +155,12 @@ export function SignUpForm({
   }
 
   return (
-    <div className="relative overflow-hidden px-8 pt-8 before:pointer-events-none before:absolute before:inset-0 before:opacity-[0.055] before:[background-image:linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] before:[background-size:24px_24px]">
+    <div className="relative overflow-hidden px-8 pt-8 font-[family-name:var(--font-code)] before:pointer-events-none before:absolute before:inset-0 before:opacity-[0.055] before:[background-image:linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] before:[background-size:24px_24px]">
       <AuthHeaderLogo />
-      <DialogTitle className="relative text-center font-mono text-2xl font-black text-slate-50">
+      <DialogTitle className="relative text-center font-[family-name:var(--font-code)] text-2xl font-black text-slate-50">
         Create your account
       </DialogTitle>
-      <DialogDescription className="relative mt-2 text-center text-sm font-semibold text-slate-400">
+      <DialogDescription className="relative mt-2 text-center text-sm font-semibold text-[#9fb6df]">
         Welcome! Please fill in the details to get started.
       </DialogDescription>
 
@@ -173,7 +172,7 @@ export function SignUpForm({
 
       <form onSubmit={handleSubmit} className="relative pb-2">
         <div className="mb-4">
-          <label className={labelClass} htmlFor="signup-email">
+          <label className="sr-only" htmlFor="signup-email">
             Email address
           </label>
           <input
@@ -188,7 +187,7 @@ export function SignUpForm({
         </div>
 
         <div className="mb-2">
-          <label className={labelClass} htmlFor="signup-password">
+          <label className="sr-only" htmlFor="signup-password">
             Password
           </label>
           <div className="relative">
@@ -232,12 +231,12 @@ export function SignUpForm({
         </div>
       </form>
 
-      <div className="relative pb-6 pt-4 text-center text-[13px] text-slate-400">
+      <div className="relative pb-6 pt-4 text-center text-[13px] text-[#9fb6df]">
         Already have an account?{" "}
         <button
           type="button"
           onClick={onSwitchToSignIn}
-          className="font-bold text-[#f7d66d] hover:underline"
+          className="font-bold text-[#93c5fd] hover:underline"
         >
           Sign in
         </button>

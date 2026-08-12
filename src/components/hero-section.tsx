@@ -594,7 +594,7 @@ const LANDING_STYLES = `
     --purple: #c084fc;
     --yellow: #fbbf24;
     --white: #f8fafc;
-    --rpg-display: var(--font-rpg), "Pixelify Sans", "Press Start 2P", "Silkscreen", "VT323", "Pixel Operator", "Perfect DOS VGA 437", var(--font-code), ui-monospace, monospace;
+    --rpg-display: var(--font-code), "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
     position: relative;
     height: 100dvh;
     overflow: hidden;
@@ -738,10 +738,10 @@ const LANDING_STYLES = `
   .lp-page h2 {
     margin: 0;
     font-family: var(--rpg-display);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0;
-    line-height: 1.08;
-    text-shadow: 0 2px 0 rgba(0,0,0,0.7), 2px 0 0 rgba(96,165,250,0.22), -2px 0 0 rgba(247,214,109,0.12);
+    line-height: 1.1;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.72), 1px 0 0 rgba(96,165,250,0.2);
   }
 
   .lp-page h1 {
@@ -868,7 +868,7 @@ const LANDING_STYLES = `
     margin: 0;
     font-family: var(--rpg-display);
     font-size: clamp(20px, 2.4vw, 28px);
-    font-weight: 800;
+    font-weight: 700;
   }
 
   .lp-scene-header {
@@ -1027,7 +1027,7 @@ const LANDING_STYLES = `
     display: block;
     font-family: var(--rpg-display);
     font-size: clamp(26px, 2.8vw, 38px);
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1;
     text-align: center;
   }
@@ -1046,10 +1046,10 @@ const LANDING_STYLES = `
     position: relative;
     z-index: 1;
     color: var(--accent);
-    font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: 0.16em;
+    font-family: var(--rpg-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
     text-align: center;
     text-transform: uppercase;
   }
@@ -1061,9 +1061,10 @@ const LANDING_STYLES = `
     max-width: 28ch;
     margin-top: 10px;
     color: #f8fafc;
-    font-size: 14px;
-    font-weight: 800;
-    line-height: 1.28;
+    font-family: var(--rpg-display);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.36;
     text-align: center;
   }
 
@@ -1080,7 +1081,7 @@ const LANDING_STYLES = `
     margin: 0;
     font-family: var(--rpg-display);
     font-size: clamp(24px, 3.4vw, 38px);
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1.05;
     text-align: center;
     text-shadow: 0 3px 0 rgba(0,0,0,0.42);

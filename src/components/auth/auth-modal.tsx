@@ -48,7 +48,7 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton
-          className="w-[calc(100%-2rem)] max-w-[430px] overflow-hidden rounded-[22px] border border-white/15 bg-[#070a0f] p-0 text-slate-50 shadow-[0_28px_100px_rgba(0,0,0,0.72),0_0_80px_rgba(124,58,237,0.22)] sm:max-w-[430px] [&_[data-slot=dialog-close]]:text-slate-300 [&_[data-slot=dialog-close]]:hover:text-[#f7d66d]"
+          className="w-[calc(100%-2rem)] max-w-[430px] overflow-hidden rounded-[22px] border border-[#6366f1]/45 bg-[#070a0f] p-0 text-slate-50 shadow-[0_28px_100px_rgba(0,0,0,0.72),0_0_90px_rgba(99,102,241,0.24)] sm:max-w-[430px] [&_[data-slot=dialog-close]]:text-[#9fb6df] [&_[data-slot=dialog-close]]:hover:text-[#93c5fd]"
         >
           {mode === "signup" ? (
             <SignUpForm onClose={close} onSwitchToSignIn={() => setMode("signin")} />

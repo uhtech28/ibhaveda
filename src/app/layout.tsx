@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, JetBrains_Mono, Pixelify_Sans, Sora } from "next/font/google";
+import { DM_Sans, JetBrains_Mono, Sora } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 
 export const dynamic = 'force-dynamic';
@@ -31,12 +31,6 @@ const monoFont = JetBrains_Mono({
   variable: "--font-code",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
-});
-
-const rpgFont = Pixelify_Sans({
-  variable: "--font-rpg",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
 // metadataBase makes openGraph/twitter image URLs absolute, which Insta /
@@ -155,7 +149,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} ${rpgFont.variable} dark`} suppressHydrationWarning>
+      <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
         <body
           className="font-sans antialiased"
         >
