@@ -38,6 +38,7 @@ import type * as engagement from "../engagement.js";
 import type * as flares from "../flares.js";
 import type * as gamification from "../gamification.js";
 import type * as hierarchy from "../hierarchy.js";
+import type * as ideaFilters from "../ideaFilters.js";
 import type * as ideas from "../ideas.js";
 import type * as interCheckpoint from "../interCheckpoint.js";
 import type * as invitations from "../invitations.js";
@@ -116,6 +117,7 @@ declare const fullApi: ApiFromModules<{
   flares: typeof flares;
   gamification: typeof gamification;
   hierarchy: typeof hierarchy;
+  ideaFilters: typeof ideaFilters;
   ideas: typeof ideas;
   interCheckpoint: typeof interCheckpoint;
   invitations: typeof invitations;
