@@ -945,8 +945,14 @@ const LANDING_STYLES = `
     width: 100%;
     min-height: 138px;
     border-radius: 18px;
-    transition: transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
     transform-style: preserve-3d;
+  }
+
+  .lp-flip-card:hover .lp-flip-inner,
+  .lp-flip-card:focus-visible .lp-flip-inner,
+  .lp-flip-card.is-flipped .lp-flip-inner {
+    transform: rotateY(180deg);
   }
 
   .lp-flip-face {
@@ -964,12 +970,16 @@ const LANDING_STYLES = `
     opacity: 1;
     visibility: visible;
     pointer-events: none;
-    transition: transform 220ms ease;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
     padding: 16px;
   }
 
-  .lp-flip-front { z-index: 2; }
+  .lp-flip-front {
+    z-index: 2;
+    transform: rotateY(0deg);
+  }
 
   .lp-flip-face::before {
     content: "";
@@ -987,28 +997,10 @@ const LANDING_STYLES = `
     align-content: center;
     justify-items: center;
     text-align: center;
-    opacity: 0;
-    visibility: hidden;
-    transform: scale(0.98);
+    transform: rotateY(180deg);
     background:
       radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 38%),
       #0b111a;
-  }
-
-  .lp-flip-card:hover .lp-flip-front,
-  .lp-flip-card:focus-visible .lp-flip-front,
-  .lp-flip-card.is-flipped .lp-flip-front {
-    opacity: 0;
-    visibility: hidden;
-    transform: scale(1.02);
-  }
-
-  .lp-flip-card:hover .lp-flip-back,
-  .lp-flip-card:focus-visible .lp-flip-back,
-  .lp-flip-card.is-flipped .lp-flip-back {
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1);
   }
 
   .lp-tile-icon {
