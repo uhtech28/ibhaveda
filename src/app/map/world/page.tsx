@@ -3831,13 +3831,26 @@ function MapPageInner() {
       totalCheckpointsInStage: stageData?.checkpoints ?? 4,
     });
 
+    const stageCheckpointTotal = stageData?.checkpoints ?? 4;
+    const completedInCurrentStage = checkpoints.filter(
+      (cp) =>
+        cp.stage === activeStage &&
+        cp.checkpoint < activeCP &&
+        cp.t1Completed &&
+        cp.t2Completed &&
+        cp.t3Completed,
+    ).length;
     const goldCount = checkpoints.filter(
-      (cp) => cp.t1Completed && cp.t2Completed && cp.t3Completed,
+      (cp) =>
+        cp.stage === activeStage &&
+        cp.t1Completed &&
+        cp.t2Completed &&
+        cp.t3Completed,
     ).length;
 
     setCheckpointProgressAtom({
-      completed: completedCount,
-      total: totalCheckpointsForTemplate,
+      completed: completedInCurrentStage,
+      total: stageCheckpointTotal,
       goldCount,
     });
 
@@ -5430,6 +5443,18 @@ function MapPageInner() {
   // from staying memoized.
   const handleSidebarOpenPanel = useCallback(
     (tab: string) => {
+      const restrictedTabs = new Set([
+        "chat",
+        "contributors",
+        "feed",
+        "journal",
+        "community",
+        "flare",
+      ]);
+      if (isViewerMode && restrictedTabs.has(tab)) {
+        return;
+      }
+
       if (tab === "chat") {
         if (activeVenture?.ideaId) {
           openGroupChat(
@@ -5516,6 +5541,7 @@ function MapPageInner() {
       checkpoints,
       activeStage,
       activeCP,
+      isViewerMode,
     ],
   );
 
@@ -5556,13 +5582,15 @@ function MapPageInner() {
         }
       `}</style>
 
-      {/* IdeaForge Navbar at top */}
-      <IdeaForgeNavbar
-        currentUser={currentUser}
-        searchQuery=""
-        onSearchChange={() => { }}
-        onOpenComposer={() => { }}
-      />
+      {/* Desktop site navbar. Mobile map uses the game HUD as its header. */}
+      <div className="hidden md:block">
+        <IdeaForgeNavbar
+          currentUser={currentUser}
+          searchQuery=""
+          onSearchChange={() => { }}
+          onOpenComposer={() => router.push("/create-idea")}
+        />
+      </div>
 
       {/* HUD at bottom - Stage Info, Progress, Level, XP.
           `contain: layout paint` confines re-layout from XPBar/Stage
@@ -5583,7 +5611,10 @@ function MapPageInner() {
               (feed / chat / contributors / hierarchy / calendar /
               kanban / journal / settings). All go through the same
               handleSidebarOpenPanel so existing routing works. */}
-          <MapMenuPopover onOpenPanel={handleSidebarOpenPanel} />
+          <MapMenuPopover
+            onOpenPanel={handleSidebarOpenPanel}
+            canSubmitTasks={!isViewerMode}
+          />
 
           {/* Prev/Next stage buttons take ZERO layout space when
               disabled â€” Stage 1 users don't see an empty amber
@@ -6282,17 +6313,28 @@ function MapPageInner() {
               onTabChange={(tab) => updateUrlParams({ panel: "tools", tab })}
               activeVentureId={activeVenture?._id}
               onOpenGroupChat={() => {
+                if (isViewerMode) return;
                 if (activeVenture?.ideaId) {
                   openGroupChat(activeVenture.ideaId, activeConversationId as Id<"conversations"> | undefined);
                 }
                 setIsGroupChatOpen(true);
               }}
-              onOpenContributors={() => setIsContributorsOpen(true)}
-              onOpenContributions={() => setIsContributionsOpen(true)}
+              onOpenContributors={() => {
+                if (isViewerMode) return;
+                setIsContributorsOpen(true);
+              }}
+              onOpenContributions={() => {
+                if (isViewerMode) return;
+                setIsContributionsOpen(true);
+              }}
               onOpenHierarchy={() => setIsHierarchyOpen(true)}
               onOpenCalendar={() => setIsCalendarOpen(true)}
               onOpenKanban={() => setIsKanbanOpen(true)}
-              onOpenJournal={() => setIsJournalOpen(true)}
+              onOpenJournal={() => {
+                if (isViewerMode) return;
+                setIsJournalOpen(true);
+              }}
+              canSubmitTasks={!isViewerMode}
             />
           </div>
 
@@ -6582,6 +6624,7 @@ function MapPageInner() {
                         kanbanData={kanbanData}
                         journalData={journalData}
                         onSubmit={(data) => handleToolSubmit("calendar", data)}
+                        readOnly={isViewerMode}
                       />
                     </div>
                   </div>
@@ -7374,5 +7417,3 @@ function MapTourMount() {
     />
   );
 }
-
-

@@ -401,7 +401,7 @@ export class TemplateMapScene extends Phaser.Scene {
     this.movingBoss = spawnMovingBoss(this, this.cfg.stage ?? 0, boss, {
       x: hub.x,
       y: hub.y,
-    }, { showHpBar: true });
+    }, { showHpBar: false });
     this.movingBoss.sprite.setFlipX(true); // face the persona (which is to its left)
 
     // Camera follow — smooth follow of the persona so movement reads.

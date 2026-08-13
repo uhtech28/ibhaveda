@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { isCreatedProfileIdea } from "./ideaFilters";
 import {
   ACTIVE_LEAGUE_COUNT,
   highestActiveTier,
@@ -146,7 +147,9 @@ export const getTopTeamLadder = query({
       const ideaId = ideaIdStr as unknown as Id<"ideas">;
       const idea = await ctx.db.get(ideaId);
       if (!idea) continue;
+      if (!isCreatedProfileIdea(idea)) continue;
       const author = await ctx.db.get(idea.authorId);
+      if (author?.isActive === false) continue;
       const isViewerProject =
         !!viewer && (idea.authorId === viewer._id);
 

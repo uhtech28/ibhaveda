@@ -64,6 +64,7 @@ interface CalendarToolProps {
     entries: Array<{ id: string; title: string; entry: string; timestamp: number; sharedWithTeam: boolean }>;
     timestamp: number;
   } | null;
+  readOnly?: boolean;
 }
 
 export function CalendarTool({
@@ -74,6 +75,7 @@ export function CalendarTool({
   isStandalone,
   kanbanData,
   journalData,
+  readOnly = false,
 }: CalendarToolProps) {
   const [view, setView] = useState<"week" | "month">("month");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -136,6 +138,7 @@ export function CalendarTool({
   }, [selectedDate]);
 
   const addEvent = () => {
+    if (readOnly) return;
     if (!eventFormData.title.trim()) return;
 
     const newEvent: CalendarEvent = {
@@ -158,6 +161,7 @@ export function CalendarTool({
   };
 
   const addMilestone = () => {
+    if (readOnly) return;
     if (!milestoneFormData.title.trim()) return;
 
     const newMilestone: CalendarEvent = {
@@ -174,6 +178,7 @@ export function CalendarTool({
   };
 
   const deleteEvent = (id: string) => {
+    if (readOnly) return;
     setEvents(events.filter((e) => e.id !== id));
   };
 
@@ -223,6 +228,7 @@ export function CalendarTool({
   };
 
   const handleSubmit = () => {
+    if (readOnly) return;
     if (events.length === 0) return;
     onSubmit({
       events,
@@ -237,6 +243,13 @@ export function CalendarTool({
 
   return (
     <div className="space-y-3">
+      {readOnly && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <span>
+            <strong className="font-semibold">View only.</strong> You can inspect this calendar, but changes are disabled.
+          </span>
+        </div>
+      )}
       {/* Purple "Thursday / August 20, 2026" header block removed per
           product request ("remove the top written august to make the
           calendar compact"). The selected date is still visible in
@@ -469,6 +482,7 @@ export function CalendarTool({
         <Button
           variant="outline"
           size="sm"
+          disabled={readOnly}
           onClick={() => {
             setShowEventForm(!showEventForm);
             setShowMilestoneForm(false);
@@ -484,6 +498,7 @@ export function CalendarTool({
         <Button
           variant="outline"
           size="sm"
+          disabled={readOnly}
           onClick={() => {
             setShowMilestoneForm(!showMilestoneForm);
             setShowEventForm(false);
@@ -616,6 +631,8 @@ export function CalendarTool({
                     <button
                       className="p-1 rounded-md bg-white/5 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-all"
                       onClick={() => deleteEvent(item.id)}
+                      disabled={readOnly}
+                      aria-disabled={readOnly}
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
@@ -800,6 +817,7 @@ export function CalendarTool({
                 {/* Quick actions for this date inside modal */}
                 <div className="flex gap-2 pt-3.5 border-t border-white/10">
                   <Button
+                    disabled={readOnly}
                     onClick={() => {
                       setEventFormData((prev) => ({ ...prev, date: outlineDate }));
                       setShowEventForm(true);
@@ -813,6 +831,7 @@ export function CalendarTool({
                     <span>Add Event</span>
                   </Button>
                   <Button
+                    disabled={readOnly}
                     onClick={() => {
                       setMilestoneFormData((prev) => ({ ...prev, date: outlineDate }));
                       setShowMilestoneForm(true);

@@ -356,6 +356,7 @@ export function ToolsPanel({
                       prompt="Plan your venture milestones and team syncs."
                       initialContent={calendarData}
                       onSubmit={onCalendarSubmit}
+                      readOnly={!canSubmitTasks}
                     />
                   </div>
                 )}
@@ -366,6 +367,7 @@ export function ToolsPanel({
                       initialContent={kanbanData}
                       onSubmit={onKanbanSubmit}
                       activeVentureId={activeVentureId}
+                      readOnly={!canSubmitTasks}
                     />
                   </div>
                 )}
@@ -462,6 +464,7 @@ function AllToolsGrid({
       color: "#6366f1",
       isExternal: true,
       path: "feed",
+      contributorOnly: true,
     },
     {
       id: "chat",
@@ -471,6 +474,7 @@ function AllToolsGrid({
       color: "#3b82f6",
       isExternal: true,
       path: "chat",
+      contributorOnly: true,
     },
     {
       id: "contributors",
@@ -478,6 +482,7 @@ function AllToolsGrid({
       desc: "Team & Collaborators",
       icon: Users,
       color: "#38bdf8",
+      contributorOnly: true,
     },
     {
       id: "hierarchy",
@@ -492,7 +497,6 @@ function AllToolsGrid({
       desc: "Schedule milestones",
       icon: CalendarIcon,
       color: "#fbbf24",
-      contributorOnly: true,
     },
     {
       id: "kanban",
@@ -500,7 +504,6 @@ function AllToolsGrid({
       desc: "Manage task workflow",
       icon: LayoutDashboard,
       color: "#34d399",
-      contributorOnly: true,
     },
     {
       id: "journal",

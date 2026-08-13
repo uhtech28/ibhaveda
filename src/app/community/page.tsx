@@ -56,10 +56,11 @@ export default function CommunityPage() {
   // Filter users based on search query
   const filteredUsers = React.useMemo(() => {
     if (!users) return [];
+    const activeUsers = users.filter((user) => user.username !== "uservjhhhh");
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return users;
+    if (!query) return activeUsers;
 
-    return users.filter((user) => {
+    return activeUsers.filter((user) => {
       const nameMatch = user.displayName.toLowerCase().includes(query);
       const usernameMatch = user.username.toLowerCase().includes(query);
       const bioMatch = user.bio?.toLowerCase().includes(query);
@@ -263,19 +264,26 @@ const PodiumCard: React.FC<{ entry: PodiumEntry; rank: 1 | 2 | 3 }> = ({ entry, 
         href={entry.href}
         className="w-full flex flex-col items-center"
       >
-        <Avatar
-          className={`shadow-md border-4 ${styles.avatarRing} ${
-            isFirst ? "w-24 h-24 mb-4" : "w-16 h-16 mb-3"
+        <div
+          className={`grid place-items-center rounded-full border-4 shadow-md ${styles.avatarRing} ${
+            isFirst ? "w-24 h-24 mb-4 text-2xl" : "w-16 h-16 mb-3 text-lg"
           }`}
+          style={{ backgroundColor: entry.fallbackBg ?? undefined }}
+          aria-label={entry.title}
         >
-          <AvatarImage src={entry.avatar ?? undefined} alt={entry.title} />
-          <AvatarFallback
-            className={`font-semibold ${entry.fallbackBg ? "text-white" : "bg-background"} ${isFirst ? "text-2xl" : "text-lg"}`}
-            style={entry.fallbackBg ? { backgroundColor: entry.fallbackBg } : undefined}
-          >
-            {entry.fallbackChar}
-          </AvatarFallback>
-        </Avatar>
+          {entry.avatar ? (
+            <Avatar className="h-full w-full">
+              <AvatarImage src={entry.avatar} alt={entry.title} />
+              <AvatarFallback className="bg-background font-semibold">
+                {entry.fallbackChar}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <span className="font-bold text-white drop-shadow-sm">
+              {entry.fallbackChar}
+            </span>
+          )}
+        </div>
 
         <h3
           className={`font-bold text-foreground truncate w-full hover:text-primary transition-colors ${
@@ -583,7 +591,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
                   onClick={(e) => e.stopPropagation()}
                   className="shrink-0 rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
                 >
-                  +{hiddenIndustryCount}
+                  + {hiddenIndustryCount}
                 </Link>
               )}
             </>
@@ -608,7 +616,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
                   onClick={(e) => e.stopPropagation()}
                   className="shrink-0 rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
                 >
-                  +{hiddenSkillCount}
+                  + {hiddenSkillCount}
                 </Link>
               )}
             </>

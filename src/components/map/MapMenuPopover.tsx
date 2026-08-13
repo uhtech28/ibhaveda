@@ -44,6 +44,7 @@ export type MapMenuPanelId =
 interface MapMenuPopoverProps {
   onOpenPanel: (tab: MapMenuPanelId) => void;
   className?: string;
+  canSubmitTasks?: boolean;
 }
 
 // Each entry can render either a pixel-art icon (PixelIcon) or a
@@ -56,6 +57,7 @@ const MENU_ITEMS: readonly {
   pixelIcon?: PixelIconName;
   lucideIcon?: LucideIcon;
   accent: string;
+  contributorOnly?: boolean;
 }[] = [
   // Contributions now uses the pixel-art hammer icon per product
   // request — "contributions" reads as builder-work-in-progress and
@@ -67,12 +69,12 @@ const MENU_ITEMS: readonly {
   // per user upload. The tile still opens the ContributionRequestModal
   // (with skill tags) via handleSidebarOpenPanel; only the artwork
   // changed.
-  { id: "contributors", label: "Contributions", pixelIcon: "menu-contributions-v3",   accent: "border-indigo-500/25 hover:border-indigo-500/60 hover:bg-indigo-500/10" },
+  { id: "contributors", label: "Contributions", pixelIcon: "menu-contributions-v3",   accent: "border-indigo-500/25 hover:border-indigo-500/60 hover:bg-indigo-500/10", contributorOnly: true },
   // Quests tile — user-supplied menu PNG. Wired to the existing
   // minigames panel-id (product treats the two as the same "extras"
   // surface).
   { id: "minigames",    label: "Quests",        pixelIcon: "menu-quests-v2",          accent: "border-teal-500/25 hover:border-teal-500/60 hover:bg-teal-500/10" },
-  { id: "chat",         label: "Group Chat",    pixelIcon: "crystal-ball-purple",     accent: "border-blue-500/25 hover:border-blue-500/60 hover:bg-blue-500/10" },
+  { id: "chat",         label: "Group Chat",    pixelIcon: "crystal-ball-purple",     accent: "border-blue-500/25 hover:border-blue-500/60 hover:bg-blue-500/10", contributorOnly: true },
   // Guild tile — pixel-art guild-crest icon, opens the Team &
   // Contributors panel (Incoming Requests + Invite Contributors
   // tabs) that used to open from the Contributions tile. Product
@@ -81,14 +83,14 @@ const MENU_ITEMS: readonly {
   // page's handleSidebarOpenPanel now maps to
   // setIsContributorsOpen(true). Kept the internal id as
   // "community" to avoid a wider MapMenuPanelId union rename.
-  { id: "community",    label: "Guild",         pixelIcon: "menu-community-v2",       accent: "border-yellow-500/25 hover:border-yellow-500/60 hover:bg-yellow-500/10" },
+  { id: "community",    label: "Guild",         pixelIcon: "menu-community-v2",       accent: "border-yellow-500/25 hover:border-yellow-500/60 hover:bg-yellow-500/10", contributorOnly: true },
   // Hierarchy now uses the treasure-map scroll icon per product
   // request — reads better as a "map of your idea tree" than the
   // generic map-region tile that was there before.
   { id: "hierarchy",    label: "Hierarchy",     pixelIcon: "menu-hierarchy-v2",       accent: "border-pink-500/25 hover:border-pink-500/60 hover:bg-pink-500/10" },
   { id: "calendar",     label: "Calendar",      pixelIcon: "menu-calendar-v2",        accent: "border-amber-500/25 hover:border-amber-500/60 hover:bg-amber-500/10" },
   { id: "kanban",       label: "Kanban Board",  pixelIcon: "menu-kanban-v2",          accent: "border-emerald-500/25 hover:border-emerald-500/60 hover:bg-emerald-500/10" },
-  { id: "journal",      label: "Journal",       pixelIcon: "journal",                 accent: "border-violet-500/25 hover:border-violet-500/60 hover:bg-violet-500/10" },
+  { id: "journal",      label: "Journal",       pixelIcon: "journal",                 accent: "border-violet-500/25 hover:border-violet-500/60 hover:bg-violet-500/10", contributorOnly: true },
   // Flare tile replaces Settings in the 9th grid slot per product
   // request — Settings is still one click away via the saddlebag
   // icon-button pinned next to the × in the header, and Flare
@@ -96,14 +98,14 @@ const MENU_ITEMS: readonly {
   // "I'm stuck, help" signal fire. Uses the shipped pixel-art
   // campfire icon so the visual matches the FlareTriggerButton
   // rendered inside the CheckpointPanel.
-  { id: "flare",        label: "Flare",         pixelIcon: "menu-flare-v2",           accent: "border-amber-500/25 hover:border-amber-500/60 hover:bg-amber-500/10" },
+  { id: "flare",        label: "Flare",         pixelIcon: "menu-flare-v2",           accent: "border-amber-500/25 hover:border-amber-500/60 hover:bg-amber-500/10", contributorOnly: true },
 ];
 
 // Modal now covers the center of the screen (like the persona picker)
 // rather than a small popover anchored to the button. Kept the const
 // names to minimise diff, but they're no longer used for positioning.
 
-export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) {
+export function MapMenuPopover({ onOpenPanel, className, canSubmitTasks = true }: MapMenuPopoverProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -244,7 +246,9 @@ export function MapMenuPopover({ onOpenPanel, className }: MapMenuPopoverProps) 
                       Tighter gap on mobile so more tiles fit per row of
                       vertical space. */}
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4">
-                    {MENU_ITEMS.map((item) => (
+                    {MENU_ITEMS
+                      .filter((item) => canSubmitTasks || !item.contributorOnly)
+                      .map((item) => (
                       <button
                         key={item.id}
                         type="button"

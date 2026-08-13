@@ -334,7 +334,10 @@ export const getPublicIdeasFast = query({
       }
     }
 
-    const enrichedIdeas = await enrichIdeasWithSparkState(ctx, ideas);
+    const enrichedIdeas = await enrichIdeasWithSparkState(
+      ctx,
+      ideas.filter(isCreatedProfileIdea),
+    );
 
     return enrichedIdeas.map((idea) => ({
       ...idea,
@@ -363,7 +366,7 @@ export const getPublicIdeas = query({
         .filter((q) => q.neq(q.field("isDeleted"), true))
         .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
         .order("desc")
-        .take(limit * 3),
+        .take(limit * 5),
     ]);
 
     const agentIdSet = new Set(agentUsers.map((u) => String(u._id)));
@@ -371,8 +374,9 @@ export const getPublicIdeas = query({
       topWallets.map((w) => String(w.userId)).filter((id) => !agentIdSet.has(id))
     );
 
-    const humanIdeasRaw = recentPublicIdeas.filter((i) => !agentIdSet.has(String(i.authorId)));
-    const recentAgentIdeas = recentPublicIdeas.filter((i) => agentIdSet.has(String(i.authorId)));
+    const realProjectIdeas = recentPublicIdeas.filter(isCreatedProfileIdea);
+    const humanIdeasRaw = realProjectIdeas.filter((i) => !agentIdSet.has(String(i.authorId)));
+    const recentAgentIdeas = realProjectIdeas.filter((i) => agentIdSet.has(String(i.authorId)));
 
     // 4. Build separate sorted pools
     const BOOST_AMOUNT = 86400000;
@@ -1340,10 +1344,11 @@ export const getUserIdeas = query({
       .filter((q) => q.or(q.eq(q.field("parentId"), undefined), q.eq(q.field("parentId"), null)))
       .order("desc")
       .take(50);
+    const createdIdeas = userIdeas.filter(isCreatedProfileIdea);
 
     // Get author information is included but should be consistent
     const ideasWithDetails = await Promise.all(
-      userIdeas.map(async (idea) => {
+      createdIdeas.map(async (idea) => {
         // Count active contribution requests (not including rejected/deleted related)
         const activeRequestsCount = await ctx.db
           .query("contributionRequests")
@@ -1596,7 +1601,12 @@ export const getPublicSparkedIdeasForUser = query({
           const idea = await ctx.db.get(ideaId);
 
           // Skip if idea doesn't exist, is deleted, is user's own, or is NOT public
-          if (!idea || idea.isDeleted || idea.authorId === args.userId || idea.visibility !== "public") {
+          if (
+            !idea ||
+            !isCreatedProfileIdea(idea) ||
+            idea.authorId === args.userId ||
+            idea.visibility !== "public"
+          ) {
             return null;
           }
 
@@ -1662,7 +1672,7 @@ export const getPublicContributedIdeasForUser = query({
           const idea = await ctx.db.get(ideaId);
 
           // Skip if idea doesn't exist, is deleted, or is NOT public
-          if (!idea || idea.isDeleted || idea.visibility !== "public") {
+          if (!idea || !isCreatedProfileIdea(idea) || idea.visibility !== "public") {
             return null;
           }
 
@@ -1716,7 +1726,7 @@ export const getPublicIdeasForUser = query({
       .order("desc")
       .take(limit);
 
-    return await enrichIdeasWithSparkState(ctx, userIdeas);
+    return await enrichIdeasWithSparkState(ctx, userIdeas.filter(isCreatedProfileIdea));
   },
 });
 

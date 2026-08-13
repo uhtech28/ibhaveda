@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 
 import {
@@ -37,6 +38,7 @@ import { IdeaForgeLeftRail } from "@/components/ideaforge/left-rail";
 import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { IdeaForgeRightRail } from "@/components/ideaforge/right-rail";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
+import { FlareFeedSection } from "@/components/flares/FlareFeedSection";
 import { IdeaWizard } from "@/components/ideas/IdeaWizard";
 import {
   cardSurface,
@@ -274,6 +276,10 @@ export function IdeaForgeExperience({
                     </section>
                   )}
                   <FilterTabs tabs={feedTabs} activeKey={feedTab} onChange={setFeedTab} />
+                  <FlareFeedSection
+                    limit={8}
+                    currentUserId={currentUser?._id ? (currentUser._id as Id<"users">) : null}
+                  />
                 </>
               ) : (
                 <>
