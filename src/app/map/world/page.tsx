@@ -6456,7 +6456,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsContributionsOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -6464,13 +6463,13 @@ function MapPageInner() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   transition={{ type: "spring", duration: 0.5 }}
-                  className="relative w-full max-w-[600px] h-[680px] max-h-[88dvh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  className="map-feed-popup relative w-full max-w-[600px] h-[680px] max-h-[88dvh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
                   style={{
                     background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
                     boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
                   }}
                 >
-                  <div className="flex-1 h-full min-h-0 flex flex-col p-5">
+                  <div className="map-feed-popup-inner flex-1 h-full min-h-0 flex flex-col p-5">
                     {/* Header */}
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
@@ -6533,7 +6532,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsHierarchyOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -6603,7 +6601,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsCalendarOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -6656,7 +6653,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsKanbanOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 {/* Panel height dropped from fixed `h-[700px]` to
@@ -6718,7 +6714,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsJournalOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -6862,7 +6857,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsContributorsOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -6938,7 +6932,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={handlePopupClose}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
 
@@ -7080,9 +7073,9 @@ function MapFeedComposer({
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-3 relative">
+    <div className="map-feed-composer flex flex-col h-full min-h-0 gap-3 relative">
       {/* Composer box */}
-      <div className="shrink-0">
+      <div className="map-feed-composer-box shrink-0">
         <form onSubmit={handlePost}>
           <div className="relative rounded-2xl border border-white/10 bg-white/[0.02] focus-within:border-indigo-500/40 focus-within:bg-white/[0.04] focus-within:shadow-[0_0_20px_rgba(99,102,241,0.05)] transition-all duration-300">
             <textarea
@@ -7091,7 +7084,7 @@ function MapFeedComposer({
               onChange={(e) => setContent(e.target.value)}
               maxLength={1200}
               rows={4}
-              className="w-full resize-none rounded-2xl bg-transparent px-4.5 pt-4 pb-12 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-0 leading-relaxed"
+              className="map-feed-composer-textarea w-full resize-none rounded-2xl bg-transparent px-4.5 pt-4 pb-12 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-0 leading-relaxed"
               disabled={isSubmitting}
             />
             <div className="absolute bottom-3.5 left-4.5 text-[10px] text-zinc-500 font-medium tracking-wide tabular-nums pointer-events-none">

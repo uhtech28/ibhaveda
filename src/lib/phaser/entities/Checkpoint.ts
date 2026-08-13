@@ -72,6 +72,8 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
     this.checkpoint = config.checkpoint;
     this.globalIndex = config.globalIndex;
     this._status = config.status;
+    const baseScale = scene.scale.width < 768 ? 0.7 : 1;
+    this.setScale(baseScale);
 
     const C = CheckpointNode.C;
 
@@ -240,8 +242,8 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
         audioManager.playUI("hover");
         this.scene.tweens.add({
           targets: this,
-          scaleX: 1.05,
-          scaleY: 1.05,
+          scaleX: baseScale * 1.05,
+          scaleY: baseScale * 1.05,
           duration: 140,
           ease: "Quad.easeOut",
         });
@@ -261,8 +263,8 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
 
       this.scene.tweens.add({
         targets: this,
-        scaleX: 1,
-        scaleY: 1,
+        scaleX: baseScale,
+        scaleY: baseScale,
         duration: 140,
         ease: "Quad.easeOut",
       });
@@ -278,8 +280,8 @@ export class CheckpointNode extends Phaser.GameObjects.Container {
         audioManager.playUI("click");
         this.scene.tweens.add({
           targets: this,
-          scaleX: 0.96,
-          scaleY: 0.96,
+          scaleX: baseScale * 0.96,
+          scaleY: baseScale * 0.96,
           duration: 90,
           yoyo: true,
           ease: "Quad.easeOut",
