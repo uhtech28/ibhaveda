@@ -58,6 +58,7 @@ import { getTemplate, type TemplateId } from "@/config/templates";
 import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
 import { generateCheckpointLayout } from "@/lib/phaser/scenes/TemplateMapScene";
 import { getTemplateStageBoss } from "@/config/template-stage-bosses";
+import { IdeaWizard } from "@/components/ideas/IdeaWizard";
 
 /**
  * Unified boss lookup that routes by templateId. For Venture (stages
@@ -1936,6 +1937,7 @@ function MapPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const [showIdeaWizard, setShowIdeaWizard] = useState(false);
 
   // â”€â”€ First-time boss intro cinematic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Plays once per user. `undefined` = query loading (don't render),
@@ -2094,8 +2096,16 @@ function MapPageInner() {
       | null;
     if (g === "male" || g === "female") setSelectedGender(g);
     const s = localStorage.getItem("selectedStage");
-    if (s) setSelectedStageId(parseInt(s, 10));
+    const selectedStageVentureId = localStorage.getItem("selectedStageVentureId");
+    const storedVentureId = localStorage.getItem("activeVentureId");
     const queryVentureId = searchParams.get("ventureId");
+    const expectedVentureId = queryVentureId ?? storedVentureId;
+    if (s && selectedStageVentureId && selectedStageVentureId === expectedVentureId) {
+      setSelectedStageId(parseInt(s, 10));
+    } else if (s) {
+      localStorage.removeItem("selectedStage");
+      localStorage.removeItem("selectedStageVentureId");
+    }
     if (queryVentureId) {
       // URL param is the authoritative source â€” overwrite localStorage and use it
       localStorage.setItem("activeVentureId", queryVentureId);
@@ -5426,6 +5436,7 @@ function MapPageInner() {
         setSelectedStageId(null);
         if (typeof window !== "undefined") {
           localStorage.removeItem("selectedStage");
+          localStorage.removeItem("selectedStageVentureId");
         }
       }, 400);
       return () => clearTimeout(timer);
@@ -5588,9 +5599,13 @@ function MapPageInner() {
           currentUser={currentUser}
           searchQuery=""
           onSearchChange={() => { }}
-          onOpenComposer={() => router.push("/create-idea")}
+          onOpenComposer={() => setShowIdeaWizard(true)}
         />
       </div>
+      <IdeaWizard
+        isOpen={showIdeaWizard}
+        onOpenChange={setShowIdeaWizard}
+      />
 
       {/* HUD at bottom - Stage Info, Progress, Level, XP.
           `contain: layout paint` confines re-layout from XPBar/Stage

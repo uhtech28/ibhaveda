@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SignUpForm } from "./SignUpForm";
 import { SignInForm } from "./SignInForm";
@@ -24,17 +26,29 @@ export function useAuthModal() {
 }
 
 export function AuthModalProvider({ children }: { children: React.ReactNode }) {
+  const { isSignedIn } = useUser();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("signin");
 
   const openSignIn = useCallback(() => {
+    if (isSignedIn) {
+      setOpen(false);
+      router.push("/feed");
+      return;
+    }
     setMode("signin");
     setOpen(true);
-  }, []);
+  }, [isSignedIn, router]);
   const openSignUp = useCallback(() => {
+    if (isSignedIn) {
+      setOpen(false);
+      router.push("/feed");
+      return;
+    }
     setMode("signup");
     setOpen(true);
-  }, []);
+  }, [isSignedIn, router]);
   const close = useCallback(() => setOpen(false), []);
 
   const value = useMemo(

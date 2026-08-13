@@ -462,10 +462,15 @@ export default function MapStagesPage() {
   };
 
   const handleSelectStage = (stageId: number) => {
+    const ventureId = activeVenture?._id;
     if (typeof window !== "undefined") {
       localStorage.setItem("selectedStage", stageId.toString());
+      if (ventureId) {
+        localStorage.setItem("selectedStageVentureId", ventureId);
+      } else {
+        localStorage.removeItem("selectedStageVentureId");
+      }
     }
-    const ventureId = activeVenture?._id;
     router.push(ventureId ? `/map/world?ventureId=${ventureId}` : "/map/world");
   };
 
