@@ -14,6 +14,7 @@ import {
   FieldMessage,
   PasswordToggle,
   clerkErrorMessage,
+  authRedirectUrl,
 } from "./auth-ui";
 
 export function SignInForm({
@@ -35,13 +36,20 @@ export function SignInForm({
   const canSubmit =
     isLoaded && !submitting && identifier.trim().length > 0 && password.length > 0;
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
     if (!isLoaded || !signIn) return;
-    void signIn.authenticateWithRedirect({
-      strategy: "oauth_google",
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/feed",
-    });
+    setError(null);
+    setSubmitting(true);
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: authRedirectUrl("/sso-callback"),
+        redirectUrlComplete: authRedirectUrl("/feed"),
+      });
+    } catch (err) {
+      setError(clerkErrorMessage(err));
+      setSubmitting(false);
+    }
   };
 
   // Safety net: for any status we don't handle inline (2FA, new-device / Client
@@ -85,7 +93,7 @@ export function SignInForm({
       </DialogDescription>
 
       <div className="relative mt-6">
-        <GoogleButton onClick={handleGoogle} disabled={!isLoaded} />
+        <GoogleButton onClick={handleGoogle} disabled={!isLoaded || submitting} />
       </div>
 
       <OrDivider />

@@ -159,3 +159,8 @@ export function clerkErrorMessage(err: unknown): string {
   }
   return "Something went wrong. Please try again.";
 }
+
+export function authRedirectUrl(path: string): string {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
+}

@@ -14,6 +14,7 @@ import {
   FieldMessage,
   PasswordToggle,
   clerkErrorMessage,
+  authRedirectUrl,
 } from "./auth-ui";
 
 export function SignUpForm({
@@ -49,13 +50,20 @@ export function SignUpForm({
 
   const canSubmit = isLoaded && !submitting && emailTrim.length > 0 && isValidPassword;
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
     if (!isLoaded || !signUp) return;
-    void signUp.authenticateWithRedirect({
-      strategy: "oauth_google",
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/profile-setup",
-    });
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      await signUp.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: authRedirectUrl("/sso-callback"),
+        redirectUrlComplete: authRedirectUrl("/profile-setup"),
+      });
+    } catch (err) {
+      setFormError(clerkErrorMessage(err));
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,7 +173,7 @@ export function SignUpForm({
       </DialogDescription>
 
       <div className="relative mt-6">
-        <GoogleButton onClick={handleGoogle} disabled={!isLoaded} />
+        <GoogleButton onClick={handleGoogle} disabled={!isLoaded || submitting} />
       </div>
 
       <OrDivider />

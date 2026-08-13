@@ -13,7 +13,6 @@ import {
   LockKeyhole,
   MapPinned,
   Plus,
-  Rocket,
   ShieldCheck,
   Sparkles,
   SquarePen,
@@ -553,7 +552,7 @@ export default function HeroSection() {
       )),
       <AuthSlide key="final" isFinal onRoleSelect={handleRoleSelect} onSignIn={openSignIn} />,
     ],
-    [go, handleRoleSelect, index, isCompact, openSignIn],
+    [go, handleRoleSelect, index, isCompact, openSignIn, slideCount],
   );
 
   return (
@@ -869,6 +868,7 @@ const LANDING_STYLES = `
     font-family: var(--rpg-display);
     font-size: clamp(20px, 2.4vw, 28px);
     font-weight: 700;
+    line-height: 1;
   }
 
   .lp-scene-header {
@@ -1150,8 +1150,10 @@ const LANDING_STYLES = `
     .lp-path-label { width: 100%; font-size: 9px; gap: 10px; }
     .lp-roles { width: 100%; gap: 12px; }
     .lp-role { aspect-ratio: 1.45; border-radius: 16px; padding: 12px; }
-    .lp-role-icon { width: 44px; height: 44px; margin-bottom: 14px; }
-    .lp-role-name { font-size: 24px; }
+    .lp-role-inner > span { transform: translateY(-6px); }
+    .lp-role-icon { width: 40px; height: 40px; margin-bottom: 8px; }
+    .lp-role-kicker { margin-bottom: 5px; }
+    .lp-role-name { font-size: 22px; line-height: 1; }
     .lp-scene-header {
       min-height: 112px;
       align-content: center;
@@ -1225,6 +1227,10 @@ const LANDING_STYLES = `
       min-height: 82px;
       transform: translateY(-16px);
     }
+    .lp-role-inner > span { transform: translateY(-8px); }
+    .lp-role-icon { width: 34px; height: 34px; margin-bottom: 6px; }
+    .lp-role-kicker { margin-bottom: 4px; font-size: 7px; }
+    .lp-role-name { font-size: 19px; line-height: 1; }
     .lp-tile-word { font-size: 20px; }
     .lp-flip-back span {
       font-size: 9.5px;
