@@ -35,7 +35,6 @@ export function MobilePopup({ children, className, style, onClose }: MobilePopup
         if (event.target !== event.currentTarget) return;
         event.preventDefault();
         event.stopPropagation();
-        onClose();
       }}
       onClick={(event) => {
         event.preventDefault();

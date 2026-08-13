@@ -182,12 +182,12 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-6 overflow-hidden">
-      <DialogHeader>
+    <form onSubmit={handleSubmit} className="contribution-request-form w-full min-w-0 space-y-6 overflow-hidden">
+      <DialogHeader className="contribution-request-header">
         <DialogTitle>Request to Contribute</DialogTitle>
       </DialogHeader>
 
-      <div className="space-y-4">
+      <div className="contribution-request-body space-y-4">
         {projectProfileHeader}
 
         <div>
@@ -203,7 +203,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
               placeholder={`Tell ${displayAuthorName} how you can help!`}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="block min-h-[120px] w-full resize-none rounded-[22px] bg-transparent p-4 text-base leading-6 text-white placeholder:text-[#6B7280] outline-none focus:ring-0 lg:text-sm lg:leading-5"
+              className="contribution-request-textarea block min-h-[120px] w-full resize-none rounded-[22px] bg-transparent p-4 text-base leading-6 text-white placeholder:text-[#6B7280] outline-none focus:ring-0 lg:text-sm lg:leading-5"
               required
             />
           </div>
@@ -216,7 +216,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
         </div>
       </div>
 
-      <DialogFooter>
+      <DialogFooter className="contribution-request-footer">
         <Button type="submit" disabled={!message.trim() || isSubmitting || isOverMessageLimit} className="gap-2">
           {isSubmitting ? <Spinner size={16} /> : <UserPlus className="w-4 h-4" />}
           Send Request

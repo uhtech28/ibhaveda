@@ -7790,6 +7790,7 @@ export class WorldMapScene extends Phaser.Scene {
       if (event.currentStage) {
         const stageChanged = this.currentStage !== event.currentStage;
         this.currentStage = event.currentStage;
+        this.loadStageWhenReady(event.currentStage);
 
         if (ventureChanged || stageChanged) {
           if (this.getMainCamera()) {
@@ -8078,6 +8079,7 @@ export class WorldMapScene extends Phaser.Scene {
     checkpointId?: string;
   }): void {
     try {
+      this.loadStageWhenReady(event.stage);
       this.navigateToViewingStage(event.stage, true);
     } catch (error) {
       // Silently handle focus errors
@@ -8194,6 +8196,7 @@ export class WorldMapScene extends Phaser.Scene {
 
   private navigateToViewingStage(stageId: number, smooth = true): void {
     const stage = Phaser.Math.Clamp(stageId, 1, this.currentStage || 1);
+    this.loadStageWhenReady(stage);
     this.viewingStageId = stage;
     this.updateCameraBoundsForViewingStage(stage);
     this.focusStage(stage, undefined, smooth);

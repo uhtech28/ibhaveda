@@ -242,7 +242,7 @@ export function ToolsPanel({
           animate={{ opacity: 1, scale: 1, x: 0 }}
           exit={{ opacity: 0, scale: 0.92, x: -15 }}
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
-          className="fixed inset-x-4 mx-auto top-1/2 -translate-y-1/2 md:relative md:inset-auto md:mx-0 md:translate-y-0 z-[60] flex flex-col font-sans rounded-2xl border border-white/10 overflow-hidden shadow-2xl w-full max-w-[380px] md:w-[380px]"
+          className="map-tools-panel fixed inset-x-4 mx-auto top-[44%] -translate-y-1/2 md:relative md:inset-auto md:mx-0 md:translate-y-0 z-[60] flex flex-col font-sans rounded-2xl border border-white/10 overflow-hidden shadow-2xl w-full max-w-[380px] md:w-[380px]"
           style={{
             height: "min(85vh, 600px)",
             background:

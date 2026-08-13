@@ -632,7 +632,6 @@ export function KanbanTool({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
 
@@ -642,7 +641,7 @@ export function KanbanTool({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ type: "spring", duration: 0.4 }}
-              className="relative w-full max-w-md bg-[#0D111A]/95 border border-white/10 rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4"
+              className="kanban-task-dialog relative w-full max-w-md bg-[#0D111A]/95 border border-white/10 rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4"
             >
               <div className="flex items-center justify-between pb-2 border-b border-white/5">
                 <div className="space-y-0.5">
@@ -660,7 +659,7 @@ export function KanbanTool({
                 </button>
               </div>
 
-              <div className="space-y-3 py-2">
+              <div className="kanban-task-dialog-body space-y-3 py-2">
                 {/* Title */}
                 <div className="space-y-1">
                   <Label htmlFor="task-title" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
@@ -721,7 +720,7 @@ export function KanbanTool({
                     placeholder="What needs to be completed..."
                     value={newCardTarget}
                     onChange={(e) => setNewCardTarget(e.target.value)}
-                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 min-h-[80px]"
+                    className="kanban-task-target w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 min-h-[80px]"
                   />
                 </div>
 
@@ -779,7 +778,6 @@ export function KanbanTool({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setEditingCard(null)}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
 
@@ -789,7 +787,7 @@ export function KanbanTool({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ type: "spring", duration: 0.4 }}
-              className="relative w-full max-w-md bg-[#0D111A]/95 border border-white/10 rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4"
+              className="kanban-task-dialog relative w-full max-w-md bg-[#0D111A]/95 border border-white/10 rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4"
             >
               <div className="flex items-center justify-between pb-2 border-b border-white/5">
                 <div className="space-y-0.5">
@@ -807,7 +805,7 @@ export function KanbanTool({
                 </button>
               </div>
 
-              <div className="space-y-3 py-2">
+              <div className="kanban-task-dialog-body space-y-3 py-2">
                 {/* Title */}
                 <div className="space-y-1">
                   <Label htmlFor="edit-task-title" className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
@@ -868,7 +866,7 @@ export function KanbanTool({
                     placeholder="What needs to be completed..."
                     value={editCardTarget}
                     onChange={(e) => setEditCardTarget(e.target.value)}
-                    className="w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 min-h-[80px]"
+                    className="kanban-task-target w-full bg-[#121824] border-white/10 text-white rounded-lg focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 min-h-[80px]"
                   />
                 </div>
               </div>

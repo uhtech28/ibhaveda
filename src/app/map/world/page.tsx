@@ -1837,6 +1837,7 @@ function MapPageInner() {
   // HP-based Cross-Question Combat round id, fetched when boss combat target is set.
   const [activeCombatRoundId, setActiveCombatRoundId] = useState<string | null>(null);
   const [combatStartError, setCombatStartError] = useState<string | null>(null);
+  const [tutorialCombatStarting, setTutorialCombatStarting] = useState(false);
   const startCombatRoundMutation = useMutation(api.combat.startCombatRound);
 
   useEffect(() => {
@@ -1865,6 +1866,12 @@ function MapPageInner() {
       cancelled = true;
     };
   }, [bossCombatTarget, startCombatRoundMutation]);
+
+  useEffect(() => {
+    if (activeCombatRoundId || combatStartError || !bossCombatTarget) {
+      setTutorialCombatStarting(false);
+    }
+  }, [activeCombatRoundId, combatStartError, bossCombatTarget]);
 
   // CombatPanel emits a `combat:retry-started` window event when the
   // player clicks "Retry Combat" on the defeat screen. The event detail
@@ -2398,12 +2405,16 @@ function MapPageInner() {
   // grind tasks first.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const handler = () => {
+    const handler = (event: Event) => {
       if (!activeVenture) return;
       const cp = checkpoints.find(
         (c) => c.stage === activeStage && c.checkpoint === activeCP,
       );
       if (!cp) return;
+      const source = (event as CustomEvent<{ source?: string }>).detail?.source;
+      if (source === "feed-tutorial") {
+        setTutorialCombatStarting(true);
+      }
       const doneTasks = [cp.t1Completed, cp.t2Completed, cp.t3Completed].filter(
         Boolean,
       ).length;
@@ -2791,6 +2802,8 @@ function MapPageInner() {
       venture._id,
       venture.templateId ?? "venture",
       selectedGender,
+      activeStage,
+      activeCP,
       corruptionBucket,
       superBossKey,
       worldMapData?.projectState ?? "",
@@ -2845,8 +2858,47 @@ function MapPageInner() {
     superBoss?.bossName,
     worldMapData?.projectState,
     activeStage,
+    activeCP,
     currentUser?.displayName,
     currentUser?.username,
+  ]);
+
+  useEffect(() => {
+    if (!phaserReady || !ideaForContributors?.author || !currentUser?._id) {
+      return;
+    }
+
+    const author = ideaForContributors.author;
+    const authorId = String(author._id);
+    if (authorId === String(currentUser._id)) {
+      eventBridge.dispatchToPhaser({
+        type: "UPDATE_CONTRIBUTORS",
+        contributors: [],
+      });
+      return;
+    }
+
+    eventBridge.dispatchToPhaser({
+      type: "UPDATE_CONTRIBUTORS",
+      contributors: [
+        {
+          requestId: `project-author-${authorId}`,
+          userId: authorId,
+          displayName: author.displayName ?? author.username ?? "Project Builder",
+          username: author.username ?? "builder",
+          avatar: author.avatar ?? "",
+          personaGender: author.personaGender === "male" ? "male" : "female",
+          role: "project owner",
+          level: author.level ?? 1,
+          xp: author.xp ?? 0,
+          isOnline: false,
+        },
+      ],
+    });
+  }, [
+    phaserReady,
+    ideaForContributors?.author,
+    currentUser?._id,
   ]);
 
   // ── Live corruption meter → Phaser map visuals ─────────────────────────────
@@ -4117,6 +4169,9 @@ function MapPageInner() {
               key={activeCombatRoundId}
               roundId={activeCombatRoundId as Id<"combatRounds">}
               checkpointId={bossCombatTarget.checkpointId as Id<"ventureCheckpoints">}
+              introBossName={
+                STAGES.find((stage) => stage.id === bossCombatTarget.stage)?.mini
+              }
               onRetryStarted={(newRoundId) => {
                 // Direct swap to the new round. The key prop above
                 // forces a clean CombatPanel remount when activeCombatRoundId changes.
@@ -4155,7 +4210,16 @@ function MapPageInner() {
           )}
 
           {/* Loading / error state while the combat round is being created */}
-          {bossCombatTarget && activeVenture && !activeCombatRoundId && (
+          {tutorialCombatStarting && !activeCombatRoundId && !combatStartError && (
+            <div className="pointer-events-auto fixed inset-0 z-[82] flex items-center justify-center bg-[#030611]/95 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/80 px-8 py-6 text-center text-white shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-rose-400 border-t-transparent" />
+                <p className="mt-3 text-sm text-white/70">The boss is awakening...</p>
+              </div>
+            </div>
+          )}
+
+          {bossCombatTarget && activeVenture && !activeCombatRoundId && !tutorialCombatStarting && (
             <div className="pointer-events-auto fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-sm">
               <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950 p-8 text-center text-white">
                 {combatStartError ? (
@@ -4419,7 +4483,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsContributionsOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -4427,13 +4490,13 @@ function MapPageInner() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   transition={{ type: "spring", duration: 0.5 }}
-                  className="relative w-full max-w-[600px] h-[680px] max-h-[88vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
+                  className="map-feed-popup relative w-full max-w-[600px] h-[680px] max-h-[88vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl z-10 flex flex-col"
                   style={{
                     background: "linear-gradient(180deg, rgba(16, 20, 35, 0.95), rgba(10, 12, 22, 0.98))",
                     boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
                   }}
                 >
-                  <div className="flex-1 h-full min-h-0 flex flex-col p-5">
+                  <div className="map-feed-popup-inner flex-1 h-full min-h-0 flex flex-col p-5">
                     {/* Header */}
                     <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10 shrink-0">
                       <h2 className="text-md font-bold text-white flex items-center gap-2">
@@ -4496,7 +4559,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsHierarchyOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -4549,7 +4611,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsCalendarOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -4599,7 +4660,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsKanbanOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -4647,7 +4707,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsJournalOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -4695,7 +4754,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setIsContributorsOpen(false)}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
                 <motion.div
@@ -4783,7 +4841,6 @@ function MapPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={handlePopupClose}
                   className="absolute inset-0 bg-black/60 backdrop-blur-md"
                 />
 
@@ -4832,6 +4889,9 @@ function MapPageInner() {
 
         </>
       )}
+      <MapTourMount
+        currentStageBossName={templateStages[activeStage - 1]?.mini}
+      />
     </div>
   );
 }
@@ -4924,9 +4984,9 @@ function MapFeedComposer({
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-3 relative">
+    <div className="map-feed-composer flex flex-col h-full min-h-0 gap-3 relative">
       {/* Composer box */}
-      <div className="shrink-0">
+      <div className="map-feed-composer-box shrink-0">
         <form onSubmit={handlePost}>
           <div className="relative rounded-2xl border border-white/10 bg-white/[0.02] focus-within:border-indigo-500/40 focus-within:bg-white/[0.04] focus-within:shadow-[0_0_20px_rgba(99,102,241,0.05)] transition-all duration-300">
             <textarea
@@ -4935,7 +4995,7 @@ function MapFeedComposer({
               onChange={(e) => setContent(e.target.value)}
               maxLength={1200}
               rows={4}
-              className="w-full resize-none rounded-2xl bg-transparent px-4.5 pt-4 pb-12 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-0 leading-relaxed"
+              className="map-feed-composer-textarea w-full resize-none rounded-2xl bg-transparent px-4.5 pt-4 pb-12 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-0 leading-relaxed"
               disabled={isSubmitting}
             />
             <div className="absolute bottom-3.5 left-4.5 text-[10px] text-zinc-500 font-medium tracking-wide tabular-nums pointer-events-none">
@@ -5195,12 +5255,14 @@ export default function MapPage() {
       }
     >
       <MapPageInner />
-      <MapTourMount />
     </Suspense>
   );
 }
-
-function MapTourMount() {
+function MapTourMount({
+  currentStageBossName,
+}: {
+  currentStageBossName?: string;
+}) {
   const tutorialState = useQuery(api.tutorial.getMyFeedTutorialState, {});
   // Needed to drive the FeedTutorial's phase machine. FeedTutorial
   // itself no longer queries this (deduped from /feed), so each mount
@@ -5259,6 +5321,7 @@ function MapTourMount() {
       initialStep={tutorialState?.step ?? 0}
       onClose={onClose}
       myIdeaCount={myIdeaCount}
+      currentStageBossName={currentStageBossName}
     />
   );
 }

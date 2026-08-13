@@ -47,19 +47,14 @@ function DialogOverlay({
   onClick,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
-  const closeDialog = React.useContext(DialogCloseContext)
-
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       onPointerDown={(event) => {
         onPointerDown?.(event)
         if (event.defaultPrevented) return
-        if (closeDialog) {
-          event.preventDefault()
-          event.stopPropagation()
-          closeDialog()
-        }
+        event.preventDefault()
+        event.stopPropagation()
       }}
       onClick={(event) => {
         onClick?.(event)
@@ -84,12 +79,11 @@ function DialogContent({
   onPointerDown,
   onClick,
   onPointerDownOutside,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
-  const closeDialog = React.useContext(DialogCloseContext)
-
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -106,10 +100,12 @@ function DialogContent({
         onPointerDownOutside={(event) => {
           onPointerDownOutside?.(event)
           if (event.defaultPrevented) return
-          if (closeDialog) {
-            event.preventDefault()
-            closeDialog()
-          }
+          event.preventDefault()
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event)
+          if (event.defaultPrevented) return
+          event.preventDefault()
         }}
         className={cn(
           // z-[10000] sits one above the overlay (z-[9999]) so the dialog

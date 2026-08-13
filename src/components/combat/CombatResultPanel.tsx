@@ -40,7 +40,7 @@ export function CombatResultPanel({
   const isWin = result.outcome === "won";
 
   return (
-    <div className="relative flex flex-col gap-6">
+    <div className="relative isolate flex flex-col gap-4 overflow-visible sm:gap-6">
       {/* Full-panel victory burst — green-gold radial flash + six
           radiating sparkles. Plays once on mount of the win result. */}
       {isWin && (
@@ -50,7 +50,7 @@ export function CombatResultPanel({
             initial={{ opacity: 0, scale: 0.6 }}
             animate={{ opacity: [0, 0.7, 0], scale: [0.6, 1.4, 1.6] }}
             transition={{ duration: 1.2, ease: "easeOut" }}
-            className="pointer-events-none absolute -inset-4 z-30"
+            className="pointer-events-none absolute -inset-4 z-0"
             style={{
               background:
                 "radial-gradient(circle, rgba(52,211,153,0.7) 0%, rgba(253,224,71,0.3) 40%, transparent 70%)",
@@ -67,7 +67,7 @@ export function CombatResultPanel({
                 scale: [0.5, 1.4, 0.4],
               }}
               transition={{ duration: 1.1, ease: "easeOut" }}
-              className="pointer-events-none absolute left-1/2 top-1/3 z-30 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-200 shadow-[0_0_14px_#fde047]"
+              className="pointer-events-none absolute left-1/2 top-1/3 z-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-200 shadow-[0_0_14px_#fde047]"
             />
           ))}
         </>
@@ -80,7 +80,7 @@ export function CombatResultPanel({
           initial={{ opacity: 0 }}
           animate={{ opacity: [0, 0.7, 0.45] }}
           transition={{ duration: 1.3, ease: "easeInOut" }}
-          className="pointer-events-none absolute -inset-4 z-30"
+          className="pointer-events-none absolute -inset-4 z-0"
           style={{
             background:
               "radial-gradient(circle, transparent 25%, rgba(239,68,68,0.55) 90%)",
@@ -88,22 +88,30 @@ export function CombatResultPanel({
         />
       )}
 
-      <Header isWin={isWin} attemptNumber={result.attemptNumber} />
+      <div className="relative z-10">
+        <Header isWin={isWin} attemptNumber={result.attemptNumber} />
+      </div>
 
-      <HpReplay
-        timeline={result.hpTimeline}
-        bossHpInitial={bossHpInitial}
-        playerHpInitial={playerHpInitial}
-        finalScores={result.perQuestionScores}
-      />
+      <div className="relative z-10">
+        <HpReplay
+          timeline={result.hpTimeline}
+          bossHpInitial={bossHpInitial}
+          playerHpInitial={playerHpInitial}
+          finalScores={result.perQuestionScores}
+        />
+      </div>
 
-      <XpSummary points={result.individualPointsAwarded} />
+      <div className="relative z-10">
+        <XpSummary points={result.individualPointsAwarded} />
+      </div>
 
-      {isWin ? (
-        <WinActions onAdvance={onAdvance} />
-      ) : (
-        <LossActions onRetryCombat={onRetryCombat} />
-      )}
+      <div className="relative z-10">
+        {isWin ? (
+          <WinActions onAdvance={onAdvance} />
+        ) : (
+          <LossActions onRetryCombat={onRetryCombat} />
+        )}
+      </div>
     </div>
   );
 }
@@ -160,17 +168,17 @@ function HpReplay({
   finalScores: number[];
 }) {
   return (
-    <div className="border-2 border-white/20 bg-black p-4">
+    <div className="border-2 border-white/20 bg-black p-3 sm:p-4">
       <p className="font-mono text-[10px] uppercase tracking-widest text-white/40">
         Round replay
       </p>
-      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {timeline.map((step, i) => {
           const score = finalScores[i] ?? 1;
           return (
             <div
               key={i}
-              className="flex flex-col gap-2 border border-white/10 bg-black/40 p-2"
+              className="min-w-0 flex flex-col gap-2 border border-white/10 bg-black/40 p-2"
             >
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] text-white/50">
@@ -248,12 +256,12 @@ function scoreColour(s: number): string {
 
 function XpSummary({ points }: { points: number }) {
   return (
-    <div className="flex items-center justify-between border-2 border-white/20 bg-black px-4 py-3">
+    <div className="flex items-center justify-between gap-3 border-2 border-white/20 bg-black px-3 py-2.5 sm:px-4 sm:py-3">
       <span className="font-mono text-xs uppercase tracking-widest text-white/60">
         Individual XP
       </span>
       <span
-        className={`text-lg font-bold tabular-nums ${
+        className={`shrink-0 text-lg font-bold tabular-nums ${
           points >= 0 ? "text-emerald-300" : "text-red-300"
         }`}
       >

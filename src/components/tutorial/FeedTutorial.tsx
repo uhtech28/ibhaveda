@@ -27,6 +27,7 @@ interface Props {
   show: boolean;
   initialStep?: number;
   onClose: () => void;
+  currentStageBossName?: string;
   /** Idea count piped down from the parent so we don't open a duplicate
    *  Convex subscription. Undefined while parent's query is still
    *  loading. */
@@ -49,6 +50,7 @@ type Phase = (typeof PHASES)[number];
 function FeedTutorialInner({
   show,
   onClose,
+  currentStageBossName,
   myIdeaCount,
 }: Props) {
   const pathname = usePathname();
@@ -130,7 +132,10 @@ function FeedTutorialInner({
         <TaskStep onSkip={handleSkip} />
       )}
       {phase === "combat" && onMap && (
-        <CombatStep onSkip={handleSkip} />
+        <CombatStep
+          onSkip={handleSkip}
+          bossName={currentStageBossName ?? "the stage boss"}
+        />
       )}
       {phase === "contribute" && onFeed && (
         <ContributeStep onFinish={handleFinish} onSkip={handleSkip} />
@@ -153,7 +158,8 @@ function useAnyDialogOpen(): boolean {
     const check = () => {
       const hasOpen =
         !!document.querySelector('[role="dialog"][data-state="open"]') ||
-        !!document.querySelector('[role="dialog"][aria-modal="true"]');
+        !!document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        !!document.querySelector('[data-slot="dialog-content"][data-state="open"]');
       setOpen((prev) => (prev === hasOpen ? prev : hasOpen));
     };
     check();
@@ -499,6 +505,58 @@ function GuidedStep({
   );
 }
 
+const SPARKY_MS_PER_CHAR = 32;
+const SPARKY_POST_LINE_PAUSE_MS = 500;
+
+function SparkyCombatPrelude({
+  bossName,
+  onComplete,
+}: {
+  bossName: string;
+  onComplete: () => void;
+}) {
+  const sparkyCombatLine = `${bossName} is awakening. Take a breath, then face the doubt head-on.`;
+  const [visibleChars, setVisibleChars] = useState(0);
+
+  useEffect(() => {
+    if (visibleChars < sparkyCombatLine.length) {
+      const timer = window.setTimeout(
+        () => setVisibleChars((count) => count + 1),
+        SPARKY_MS_PER_CHAR,
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(onComplete, SPARKY_POST_LINE_PAUSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [visibleChars, sparkyCombatLine.length, onComplete]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-hidden bg-[#030611]/95 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(124,58,237,0.24),transparent_34%),radial-gradient(circle_at_50%_76%,rgba(14,165,233,0.12),transparent_28%)]" />
+      <div className="relative flex w-full max-w-lg flex-col items-center">
+        <div className="relative mb-6 h-20 w-16">
+          <div className="absolute left-1/2 top-7 h-12 w-10 -translate-x-1/2 rounded-b-[20px] rounded-t-[14px] bg-[#9b633d] shadow-[inset_0_-4px_0_rgba(0,0,0,0.18)]" />
+          <div className="absolute left-1/2 top-0 h-12 w-14 -translate-x-1/2 rounded-[42%] bg-[#a86a43] shadow-[inset_0_-5px_0_rgba(0,0,0,0.16)]" />
+          <div className="absolute left-0 top-2 h-8 w-5 rotate-[-18deg] rounded-full bg-[#7b482d]" />
+          <div className="absolute right-0 top-2 h-8 w-5 rotate-[18deg] rounded-full bg-[#7b482d]" />
+          <div className="absolute left-1/2 top-5 h-6 w-8 -translate-x-1/2 rounded-full bg-[#f0dcc7]" />
+          <div className="absolute left-[23px] top-4 h-1.5 w-1.5 rounded-full bg-black" />
+          <div className="absolute right-[23px] top-4 h-1.5 w-1.5 rounded-full bg-black" />
+          <div className="absolute left-1/2 top-7 h-2 w-3 -translate-x-1/2 rounded-full bg-[#2a1710]" />
+          <div className="absolute bottom-0 left-2 h-4 w-4 rounded-t-full bg-[#f0dcc7]" />
+          <div className="absolute bottom-0 right-2 h-4 w-4 rounded-t-full bg-[#f0dcc7]" />
+        </div>
+        <div className="relative w-full rounded-2xl border border-white/20 bg-white px-5 py-4 text-left text-sm leading-6 text-[#111827] shadow-[0_18px_50px_rgba(0,0,0,0.45)]">
+          <span className="absolute left-1/2 top-0 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rotate-45 border-l border-t border-white/20 bg-white" />
+          {sparkyCombatLine.slice(0, visibleChars)}
+          <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-[#111827]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ComposeStep({ onSkip }: { onSkip: () => void }) {
   return (
     <GuidedStep
@@ -576,11 +634,36 @@ function TaskStep({ onSkip }: { onSkip: () => void }) {
   );
 }
 
-function CombatStep({ onSkip }: { onSkip: () => void }) {
+function CombatStep({
+  onSkip,
+  bossName,
+}: {
+  onSkip: () => void;
+  bossName: string;
+}) {
+  const [combatIntroState, setCombatIntroState] = useState<
+    "idle" | "prelude" | "starting"
+  >("idle");
   const startFight = () => {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(new CustomEvent("tutorial:force-combat"));
+    setCombatIntroState("prelude");
   };
+  const completePrelude = () => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("tutorial:force-combat", {
+        detail: { source: "feed-tutorial" },
+      }),
+    );
+    setCombatIntroState("starting");
+  };
+
+  if (combatIntroState === "prelude") {
+    return <SparkyCombatPrelude bossName={bossName} onComplete={completePrelude} />;
+  }
+  if (combatIntroState === "starting") {
+    return null;
+  }
+
   return (
     <GuidedStep
       eyebrow="Step 3 of 4"

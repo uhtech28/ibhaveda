@@ -326,13 +326,12 @@ function TaskSubmissionModalInner({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop - Closable */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm cursor-pointer"
+            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm"
           />
 
           {/* Modal - Compact responsive */}

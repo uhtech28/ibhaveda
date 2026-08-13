@@ -993,8 +993,49 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .mobile-contribution-request-dialog--keyboard {
+    top: calc(var(--app-vv-center-y, 50dvh) - 0.5rem) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.55rem !important;
+    padding: 0.75rem !important;
+    width: min(calc(100vw - 1.25rem), 31rem) !important;
+    max-width: min(calc(100vw - 1.25rem), 31rem) !important;
+    max-height: var(--app-vv-contribution-keyboard-height, min(90dvh, 24.375rem)) !important;
+    overflow: hidden !important;
+  }
+
   .mobile-contribution-request-dialog form {
     padding-bottom: 0.25rem;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-form {
+    display: flex !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    overflow: hidden !important;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-header {
+    flex-shrink: 0 !important;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-body {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-textarea {
+    min-height: 7rem !important;
+    height: min(28dvh, 8.5rem) !important;
+    padding: 0.85rem !important;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-footer {
+    flex-shrink: 0 !important;
   }
 
   .mobile-comments-dialog,
@@ -1017,6 +1058,112 @@
   .mobile-comments-dialog > div:last-child {
     min-height: 0 !important;
     overflow: hidden !important;
+  }
+
+  .flare-compose-dialog,
+  .flare-compose-dialog--keyboard {
+    position: fixed !important;
+    inset: auto !important;
+    left: 50vw !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
+    right: auto !important;
+    bottom: auto !important;
+    display: flex !important;
+    width: min(calc(100vw - 1.5rem), 31rem) !important;
+    max-width: min(calc(100vw - 1.5rem), 31rem) !important;
+    max-height: var(--app-vv-flare-height, min(74dvh, 30rem)) !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    padding: 1rem !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    border-radius: 1rem !important;
+    transform: translate3d(-50%, -50%, 0) !important;
+  }
+
+  .flare-compose-dialog--keyboard {
+    max-height: var(--app-vv-flare-keyboard-height, min(90dvh, 22.5rem)) !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .flare-compose-dialog .flare-compose-header {
+    gap: 0.35rem !important;
+    text-align: left !important;
+  }
+
+  .flare-compose-dialog--keyboard .flare-compose-header [data-slot="dialog-description"] {
+    font-size: 0.75rem !important;
+    line-height: 1.2rem !important;
+  }
+
+  .flare-compose-dialog .flare-compose-body {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+
+  .flare-compose-dialog .flare-compose-textarea {
+    min-height: 7rem !important;
+    height: min(30dvh, 9rem) !important;
+  }
+
+  .flare-compose-dialog--keyboard .flare-compose-textarea {
+    min-height: 5.5rem !important;
+    height: min(26dvh, 7rem) !important;
+  }
+
+  .flare-compose-dialog .flare-compose-footer {
+    flex-shrink: 0 !important;
+    gap: 0.5rem !important;
+  }
+
+  .map-tools-panel {
+    top: calc(var(--app-vv-center-y, 50dvh) - 1.5rem) !important;
+    height: min(calc(var(--app-vv-height, 100dvh) - 5.5rem), 38rem) !important;
+    max-height: min(calc(var(--app-vv-height, 100dvh) - 5.5rem), 38rem) !important;
+  }
+
+  .map-feed-popup {
+    height: var(--app-vv-map-feed-keyboard-height, min(90dvh, 24.125rem)) !important;
+    max-height: var(--app-vv-map-feed-keyboard-height, min(90dvh, 24.125rem)) !important;
+    transform: translateY(-0.75rem) !important;
+  }
+
+  .map-feed-popup-inner {
+    padding: 0.85rem !important;
+  }
+
+  .map-feed-composer {
+    gap: 0.6rem !important;
+  }
+
+  .map-feed-composer:focus-within .map-feed-composer-box {
+    flex-shrink: 0 !important;
+  }
+
+  .map-feed-composer:focus-within .map-feed-composer-textarea {
+    height: min(25dvh, 7rem) !important;
+    min-height: 6rem !important;
+    padding-top: 0.85rem !important;
+  }
+
+  .kanban-task-dialog:focus-within {
+    max-height: var(--app-vv-kanban-keyboard-height, min(90dvh, 24.5rem)) !important;
+    gap: 0.65rem !important;
+    padding: 0.85rem !important;
+    transform: translateY(-0.75rem) !important;
+  }
+
+  .kanban-task-dialog:focus-within .kanban-task-dialog-body {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-block: 0.25rem !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kanban-task-dialog:focus-within .kanban-task-target {
+    min-height: 4.75rem !important;
   }
 
   .mobile-post-detail-card {

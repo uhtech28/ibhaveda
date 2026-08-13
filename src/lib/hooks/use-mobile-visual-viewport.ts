@@ -18,7 +18,11 @@ export function useMobileVisualViewport() {
       root.style.setProperty("--app-vv-comments-height", `${Math.min(height * 0.76, 688)}px`);
       root.style.setProperty("--app-vv-comments-keyboard-height", `${Math.min(height * 0.82, 448)}px`);
       root.style.setProperty("--app-vv-contribution-height", `${Math.min(height * 0.78, 544)}px`);
-      root.style.setProperty("--app-vv-contribution-keyboard-height", `${Math.min(height * 0.82, 432)}px`);
+      root.style.setProperty("--app-vv-contribution-keyboard-height", `${Math.min(height * 0.9, 390)}px`);
+      root.style.setProperty("--app-vv-map-feed-keyboard-height", `${Math.min(height * 0.9, 386)}px`);
+      root.style.setProperty("--app-vv-kanban-keyboard-height", `${Math.min(height * 0.9, 392)}px`);
+      root.style.setProperty("--app-vv-flare-height", `${Math.min(height * 0.74, 480)}px`);
+      root.style.setProperty("--app-vv-flare-keyboard-height", `${Math.min(height * 0.9, 360)}px`);
     };
 
     updateViewportVars();

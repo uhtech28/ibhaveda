@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 
 const MIN_DESCRIPTION_CHARS = 20;
 const MAX_DESCRIPTION_CHARS = 600;
@@ -43,8 +44,10 @@ export function FlareComposeDialog({
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const fireFlare = useMutation(api.flares.fireFlare);
+  useMobileVisualViewport();
 
   // Reset state every time the dialog reopens so a closed-and-reopened
   // dialog never shows stale text or an old error.
@@ -53,6 +56,28 @@ export function FlareComposeDialog({
       setDescription("");
       setError(null);
     }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") {
+      setKeyboardOpen(false);
+      return;
+    }
+
+    const update = () => {
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      setKeyboardOpen(window.innerHeight - viewportHeight > 120);
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
   }, [open]);
 
   const trimmedLength = description.trim().length;
@@ -83,26 +108,30 @@ export function FlareComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent
+        className={`flare-compose-dialog ${
+          keyboardOpen ? "flare-compose-dialog--keyboard" : ""
+        } max-w-lg overflow-hidden border-white/10 bg-[#111827] text-white`}
+      >
+        <DialogHeader className="flare-compose-header">
+          <DialogTitle className="flex items-center gap-2 text-white">
             <Radio className="h-5 w-5 text-amber-400" />
             Fire a Flare
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-white/60">
             Ask the community for help. Be specific about what's blocking
             you so people can respond usefully.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="flare-compose-body space-y-3">
           <Textarea
             placeholder="What are you stuck on? Mention what you've tried so far if it helps."
             value={description}
             onChange={(e) =>
               setDescription(e.target.value.slice(0, MAX_DESCRIPTION_CHARS))
             }
-            className="min-h-[140px] resize-none"
+            className="flare-compose-textarea min-h-[140px] resize-none border-white/10 bg-slate-950/70 text-white placeholder:text-white/35"
             disabled={submitting}
           />
 
@@ -130,7 +159,7 @@ export function FlareComposeDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flare-compose-footer">
           <button
             type="button"
             onClick={() => onOpenChange(false)}

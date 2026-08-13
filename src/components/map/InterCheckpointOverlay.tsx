@@ -27,6 +27,15 @@ interface InterCheckpointOverlayProps {
   onBossRetreat?: () => void;
 }
 
+type BossReactionKind =
+  | "idle"
+  | "hit"
+  | "block"
+  | "crit"
+  | "counter"
+  | "victory"
+  | "defeated";
+
 const HENCHMAN_THEMES: Record<string, Record<number, { name: string; represents: string; intro: string; victory: string; retreat: string; icon: string }>> = {
   venture: {
     1: { name: "Doubt Imp", represents: "Vague doubts about the idea", intro: "A small shadow imp blocks your path, whispering doubts about your concept.", victory: "You banished the imp of doubt!", retreat: "The imp slipped away into the shadows.", icon: "😈" },
@@ -151,14 +160,6 @@ export function InterCheckpointOverlay({
   // bossReaction         — short reaction on the boss icon (hit, crit, etc)
   // sequencePhase        — full-screen choreography (victory burst, defeat fade)
   // playerDamageFlash    — full-panel red flash for damage feedback
-  type BossReactionKind =
-    | "idle"
-    | "hit"
-    | "block"
-    | "crit"
-    | "counter"
-    | "victory"
-    | "defeated";
   type SequencePhase =
     | "idle"
     | "victory_burst"
@@ -767,6 +768,13 @@ export function InterCheckpointOverlay({
 
               {phase === "action" && (
                 <div className="w-full flex flex-col items-stretch text-left">
+                  <MiniBattleTableau
+                    bossIcon={henchmanInfo.icon}
+                    bossName={henchmanInfo.name}
+                    bossReaction={bossReaction}
+                    playerDamageFlash={playerDamageFlash}
+                  />
+
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 relative">
                       {/* Ambient aura ring — pulses behind the boss icon
@@ -1260,5 +1268,104 @@ export function InterCheckpointOverlay({
         </motion.div>
       </div>
     </AnimatePresence>
+  );
+}
+
+function MiniBattleTableau({
+  bossIcon,
+  bossName,
+  bossReaction,
+  playerDamageFlash,
+}: {
+  bossIcon: string;
+  bossName: string;
+  bossReaction: BossReactionKind;
+  playerDamageFlash: boolean;
+}) {
+  const bossMotion =
+    bossReaction === "hit"
+      ? { x: [0, -8, 8, -4, 4, 0], filter: ["brightness(1)", "brightness(1.7)", "brightness(1)"] }
+      : bossReaction === "crit"
+        ? { x: [0, -12, 12, -8, 8, 0], scale: [1, 1.12, 1], filter: ["brightness(1)", "brightness(2) drop-shadow(0 0 18px #fb7185)", "brightness(1)"] }
+        : bossReaction === "counter"
+          ? { x: [0, -20, -6, 0], scale: [1, 1.08, 1], filter: ["brightness(1)", "brightness(1.4) drop-shadow(0 0 14px #ef4444)", "brightness(1)"] }
+          : bossReaction === "victory"
+            ? { y: [0, 12, 28], rotate: [0, 12, 45], scale: [1, 0.8, 0.2], opacity: [1, 0.8, 0] }
+            : bossReaction === "defeated"
+              ? { scale: [1, 1.18, 1], filter: ["brightness(1)", "brightness(1.8) drop-shadow(0 0 18px #ef4444)", "brightness(1)"] }
+              : { y: [0, -4, 0] };
+
+  const playerMotion =
+    playerDamageFlash
+      ? { x: [0, -6, 6, -3, 3, 0], filter: ["brightness(1)", "brightness(0.55) hue-rotate(320deg)", "brightness(1)"] }
+      : bossReaction === "hit" || bossReaction === "crit"
+        ? { x: [0, 34, 46, 12, 0], y: [0, -4, 0, 0, 0], scale: [1, 1.08, 1.04, 1, 1] }
+        : bossReaction === "block"
+          ? { x: [0, 12, -2, 0], filter: ["brightness(1)", "drop-shadow(0 0 8px #60a5fa)", "brightness(1)"] }
+          : { y: [0, -3, 0] };
+
+  return (
+    <div className="relative mb-4 h-36 overflow-hidden rounded-xl border border-white/10 bg-slate-950/70">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(99,102,241,0.22),transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))]" />
+      <div className="absolute inset-x-0 bottom-0 h-12 bg-[linear-gradient(180deg,transparent,rgba(15,23,42,0.92))]" />
+      <div className="absolute inset-x-8 bottom-9 h-px bg-white/15" />
+
+      <motion.div
+        className="absolute bottom-8 left-12 flex flex-col items-center gap-1"
+        animate={playerMotion}
+        transition={
+          playerDamageFlash || bossReaction !== "idle"
+            ? { duration: 0.55, ease: "easeOut" }
+            : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
+        }
+      >
+        <PlayerFigure />
+        <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-cyan-200">
+          You
+        </span>
+      </motion.div>
+
+      <motion.div
+        className="absolute bottom-8 right-12 flex flex-col items-center gap-1"
+        animate={bossMotion}
+        transition={
+          bossReaction === "idle"
+            ? { duration: 2.8, repeat: Infinity, ease: "easeInOut" }
+            : { duration: bossReaction === "victory" ? 1.1 : 0.65, ease: "easeOut" }
+        }
+      >
+        <div className="relative grid h-16 w-16 place-items-center rounded-full border border-rose-400/30 bg-rose-500/10 text-4xl shadow-[0_0_24px_rgba(244,63,94,0.18)]">
+          <span aria-hidden>{bossIcon}</span>
+        </div>
+        <span className="max-w-32 truncate rounded-full border border-rose-400/25 bg-rose-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-rose-100">
+          {bossName}
+        </span>
+      </motion.div>
+
+      <div className="absolute left-1/2 top-1/2 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-300/30 bg-amber-300 text-[10px] font-black text-black shadow-[0_0_20px_rgba(251,191,36,0.35)]">
+        VS
+      </div>
+    </div>
+  );
+}
+
+function PlayerFigure() {
+  return (
+    <svg viewBox="0 0 32 40" width="54" height="68" style={{ imageRendering: "pixelated" }} aria-hidden>
+      <ellipse cx="16" cy="38" rx="10" ry="2" fill="#000" opacity="0.45" />
+      <rect x="9" y="3" width="14" height="5" fill="#172554" />
+      <rect x="7" y="7" width="18" height="5" fill="#1d4ed8" />
+      <rect x="9" y="10" width="14" height="9" fill="#f8d2a6" />
+      <rect x="12" y="13" width="2" height="2" fill="#111827" />
+      <rect x="18" y="13" width="2" height="2" fill="#111827" />
+      <rect x="13" y="17" width="6" height="1" fill="#7c2d12" />
+      <rect x="8" y="19" width="16" height="14" fill="#1e3a8a" />
+      <rect x="10" y="20" width="12" height="12" fill="#2563eb" />
+      <rect x="13" y="23" width="6" height="4" fill="#f43f5e" />
+      <rect x="5" y="21" width="4" height="10" fill="#1d4ed8" />
+      <rect x="23" y="21" width="4" height="10" fill="#1d4ed8" />
+      <rect x="10" y="33" width="5" height="6" fill="#3f2a1b" />
+      <rect x="17" y="33" width="5" height="6" fill="#3f2a1b" />
+    </svg>
   );
 }

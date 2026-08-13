@@ -41,7 +41,7 @@ export function IdeaForgeNavbar({
   const navMenu = [
     { name: "Feed", href: "/feed", icon: Home },
     { name: "My Ideas", href: "/my-ideas", icon: IdeaBulb },
-    { name: "Communities", href: "/community", icon: Users },
+    { name: "Community", href: "/community", icon: Users },
   ];
 
   const isMenuActive = (href: string) =>
@@ -59,7 +59,7 @@ export function IdeaForgeNavbar({
   }, [mobileSearchOpen]);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 h-14 lg:h-16 border-b border-white/7 bg-[#0A0D12]/92 backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-50 h-14 lg:h-16 border-b border-white/7 bg-[#0A0D12]/92 backdrop-blur-xl overflow-hidden">
       {/* Mobile / tablet compact bar */}
       <div className="flex h-14 min-w-0 items-center gap-1.5 px-3 lg:hidden">
         {mobileSearchOpen ? (
@@ -67,7 +67,7 @@ export function IdeaForgeNavbar({
             <button type="button" onClick={() => setMobileSearchOpen(false)} aria-label="Close search" className={cn(transitionBase, "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div ref={mobileSearchRef} className="min-w-0 flex-1 overflow-visible">
+            <div ref={mobileSearchRef} className="min-w-0 flex-1">
               <SearchBar value={searchQuery} onSearch={(value) => onSearchChange(value)} placeholder="Search for ideas, people, tags..." className="[&_input]:h-9 [&_input]:rounded-full [&_input]:border-white/8 [&_input]:bg-[#111827] [&_input]:pl-9 [&_input]:pr-3 [&_input]:text-sm [&_input]:text-white [&_input]:placeholder:text-[#6B7280]" />
             </div>
           </>
@@ -136,7 +136,7 @@ export function IdeaForgeNavbar({
           </Link>
         )}
 
-        <Link href="/feed" className="flex items-center gap-3 rounded-full px-2 py-1 text-white">
+        <Link href="/" className="flex items-center gap-3 rounded-full px-2 py-1 text-white">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#6366F1]/30 bg-[#111827] shadow-[0_0_0_1px_rgba(255,255,255,0.03)] overflow-hidden">
             <Image src="/logo.png" alt="" width={44} height={44} className="h-full w-full object-cover" priority />
           </div>

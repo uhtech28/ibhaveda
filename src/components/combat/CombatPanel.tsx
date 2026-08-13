@@ -29,6 +29,7 @@ interface Props {
   /** Called when the user clicks Retry Combat on the defeat screen.
    * Parent should swap the active roundId to remount the panel. */
   onRetryStarted?: (newRoundId: Id<"combatRounds">) => void;
+  introBossName?: string;
 }
 
 export function CombatPanel({
@@ -37,6 +38,7 @@ export function CombatPanel({
   onAdvanceCheckpoint,
   onClose,
   onRetryStarted,
+  introBossName = "The Skeptic",
 }: Props) {
   const { phase, submitAnswer, retryCombat, abandon } = useCombatRound(
     roundId,
@@ -101,6 +103,10 @@ export function CombatPanel({
     return () => clearTimeout(t);
   }, []);
 
+  const introSubject = introBossName.trim().toLowerCase().startsWith("the ")
+    ? introBossName.trim()
+    : `The ${introBossName.trim()}`;
+
   return (
     <div
       role="dialog"
@@ -139,7 +145,7 @@ export function CombatPanel({
                 className="font-mono text-base uppercase tracking-[0.3em] text-white"
                 style={{ fontFamily: "var(--font-pixel-display), monospace" }}
               >
-                * The Skeptic blocks your path.
+                * {introSubject} swirls around you.
               </p>
             </div>
           </motion.div>
