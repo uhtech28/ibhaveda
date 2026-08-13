@@ -12,7 +12,7 @@
  * `false` (unseen) AND the map is ready.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -85,6 +85,14 @@ export function BossIntroCinematic({
   // the minions reveal. Keeping it in its own state prevents the intro
   // typewriter from stomping the taunt (and vice versa).
   const [minionTypedText, setMinionTypedText] = useState("");
+  const speechKey = useMemo(() => speechLines.join("\u0001"), [speechLines]);
+  const stableSpeechLines = useMemo(() => speechKey.split("\u0001"), [speechKey]);
+  const visibleMiniBosses = useMemo(() => {
+    if (phase === "minions") {
+      return minionIdx >= 0 ? miniBosses.slice(minionIdx, minionIdx + 1) : [];
+    }
+    return miniBosses;
+  }, [miniBosses, minionIdx, phase]);
 
   // ── Sequence timing (ms) ──────────────────────────────────────────
   // Slower pacing so the intro reads like a cinematic beat instead of
@@ -103,17 +111,18 @@ export function BossIntroCinematic({
   // 1400ms → 2400ms so each line lands with room to breathe.
   useEffect(() => {
     if (phase !== "main-speech") return;
-    const line = speechLines[speechIdx] ?? "";
+    const line = stableSpeechLines[speechIdx] ?? "";
     setTypedText("");
     let i = 0;
+    let advanceTimer: number | undefined;
     const id = window.setInterval(() => {
       i += 1;
       setTypedText(line.slice(0, i));
       if (i >= line.length) {
         window.clearInterval(id);
         // Pause on the finished line before advancing.
-        window.setTimeout(() => {
-          if (speechIdx < speechLines.length - 1) {
+        advanceTimer = window.setTimeout(() => {
+          if (speechIdx < stableSpeechLines.length - 1) {
             setSpeechIdx((v) => v + 1);
           } else {
             setPhase("minions");
@@ -121,8 +130,11 @@ export function BossIntroCinematic({
         }, 2400);
       }
     }, 55);
-    return () => window.clearInterval(id);
-  }, [phase, speechIdx, speechLines]);
+    return () => {
+      window.clearInterval(id);
+      if (advanceTimer) window.clearTimeout(advanceTimer);
+    };
+  }, [phase, speechIdx, stableSpeechLines]);
 
   // ── Minion reveal sequence ────────────────────────────────────────
   // Stagger bumped 1400ms → 2000ms per minion and the tail pause
@@ -425,7 +437,7 @@ export function BossIntroCinematic({
                     {phase === "main-speech" ? typedText : minionTypedText}
                     {((phase === "main-speech" &&
                       typedText.length <
-                        (speechLines[speechIdx]?.length ?? 0)) ||
+                        (stableSpeechLines[speechIdx]?.length ?? 0)) ||
                       (phase === "minions" &&
                         minionTypedText.length <
                           minionsSpeechLine.length)) && (
@@ -494,8 +506,9 @@ export function BossIntroCinematic({
                 // look centralised for all pc").
                 className="pointer-events-none absolute bottom-[154px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
               >
-                {miniBosses.map((boss, i) => {
-                  const revealed = i <= minionIdx || phase === "finale";
+                {visibleMiniBosses.map((boss, renderIdx) => {
+                  const i = phase === "minions" ? minionIdx : renderIdx;
+                  const revealed = true;
                   return (
                     <motion.div
                       key={boss.name}
@@ -542,9 +555,10 @@ export function BossIntroCinematic({
                             style={{
                               // Match the visible-boss sizing (~78% of the
                               // parent card).
-                              width: "78%",
-                              paddingTop: "78%", // square aspect
+                              width: "100%",
+                              height: "100%",
                               position: "relative",
+                              overflow: "hidden",
                               imageRendering: "pixelated",
                               filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.6))",
                             }}
@@ -552,14 +566,14 @@ export function BossIntroCinematic({
                             <div
                               style={{
                                 position: "absolute",
-                                inset: 0,
+                                inset: "-10% 0 42%",
                                 backgroundImage: `url(${boss.idleAsset})`,
                                 backgroundRepeat: "no-repeat",
                                 // Sheet is 9 frames × 92px = 828px wide,
                                 // 92px tall. Scale so one frame fills the
                                 // box: sheet 9× as wide as displayed.
-                                backgroundSize: "900% 100%",
-                                backgroundPosition: "0 50%",
+                                backgroundSize: "900% 250%",
+                                backgroundPosition: "0 0",
                               }}
                             />
                           </div>
@@ -568,10 +582,11 @@ export function BossIntroCinematic({
                             src={boss.idleAsset}
                             alt={boss.name}
                             style={{
-                              maxWidth: "78%",
-                              maxHeight: "78%",
+                              width: "110%",
+                              height: "185%",
                               imageRendering: "pixelated",
-                              objectFit: "contain",
+                              objectFit: "cover",
+                              objectPosition: "center top",
                               filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.6))",
                             }}
                             draggable={false}

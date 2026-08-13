@@ -854,6 +854,17 @@
     font-size: 16px !important;
   }
 
+  [data-slot="dialog-content"]:has(input:focus),
+  [data-slot="dialog-content"]:has(textarea:focus),
+  [data-slot="dialog-content"]:has(select:focus),
+  [data-slot="dialog-content"]:has([contenteditable="true"]:focus) {
+    position: fixed !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - 0.75rem) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .mobile-contribution-request-dialog,
   .mobile-contribution-request-dialog--keyboard {
     position: fixed !important;
@@ -872,14 +883,14 @@
   }
 
   .mobile-contribution-request-dialog--keyboard {
-    top: calc(var(--app-vv-center-y, 50dvh) - 0.5rem) !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 0.55rem !important;
-    padding: 0.75rem !important;
+    gap: 0.45rem !important;
+    padding: 0.65rem !important;
     width: min(calc(100vw - 1.25rem), 31rem) !important;
     max-width: min(calc(100vw - 1.25rem), 31rem) !important;
-    max-height: var(--app-vv-contribution-keyboard-height, min(90dvh, 24.375rem)) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - 0.75rem) !important;
     overflow: hidden !important;
   }
 
@@ -888,7 +899,7 @@
     min-height: 0 !important;
     flex: 1 1 auto !important;
     flex-direction: column !important;
-    gap: 0.75rem !important;
+    gap: 0.6rem !important;
     overflow: hidden !important;
   }
 
@@ -900,13 +911,14 @@
   .mobile-contribution-request-dialog--keyboard .contribution-request-body {
     min-height: 0 !important;
     flex: 1 1 auto !important;
-    overflow: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   .mobile-contribution-request-dialog--keyboard .contribution-request-textarea {
-    min-height: 7rem !important;
-    height: min(28dvh, 8.5rem) !important;
-    padding: 0.85rem !important;
+    min-height: 5.5rem !important;
+    height: min(24dvh, 7.5rem) !important;
+    padding: 0.8rem !important;
   }
 
   .flare-compose-dialog,
@@ -926,25 +938,25 @@
   }
 
   .flare-compose-dialog--keyboard {
-    max-height: var(--app-vv-flare-keyboard-height, min(90dvh, 22.5rem)) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - 0.75rem) !important;
   }
 
   .flare-compose-dialog--keyboard .flare-compose-header {
-    padding: 0.75rem 1rem !important;
+    padding: 0.65rem 0.9rem !important;
   }
 
   .flare-compose-dialog--keyboard .flare-compose-body {
-    padding: 0.75rem 1rem !important;
-    gap: 0.6rem !important;
+    padding: 0.6rem 0.9rem !important;
+    gap: 0.5rem !important;
   }
 
   .flare-compose-dialog--keyboard .flare-compose-textarea {
-    min-height: 5rem !important;
-    height: min(24dvh, 6.5rem) !important;
+    min-height: 4.75rem !important;
+    height: min(22dvh, 6rem) !important;
   }
 
   .flare-compose-dialog--keyboard .flare-compose-footer {
-    padding: 0.65rem 1rem 0.75rem !important;
+    padding: 0.55rem 0.9rem 0.65rem !important;
   }
 
   .map-tools-panel {

@@ -124,7 +124,7 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
           // a failed background invite shouldn't yank them back.
         });
       }
-      onContinue();
+      window.requestAnimationFrame(() => onContinue());
     },
     [advancing, allUsers, sendInvitation, ideaId, buildTemplateMessage, onContinue],
   );
@@ -188,9 +188,6 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                 </div>
               )}
               {suggestions.map((u) => {
-                const industries = userIndustries(u);
-                const skills = userSkills(u);
-                const hasTags = industries.length > 0 || skills.length > 0;
                 return (
                   <div
                     key={u._id}
@@ -201,7 +198,7 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                         middle group is flex-1 so leftover space collapses
                         BETWEEN the tags and the button — the "invisible
                         barrier" the button never crosses. */}
-                    <div className="flex items-center gap-2.5 px-3 py-2.5">
+                    <div className="flex items-center gap-3 px-3 py-2.5">
                       <div
                         className="grid h-9 w-9 flex-shrink-0 place-items-center overflow-hidden rounded-full border border-white/12 text-[12px] font-semibold text-white"
                         style={{
@@ -222,50 +219,13 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                             .toUpperCase()
                         )}
                       </div>
-                      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                      <div className="min-w-0 flex-1 overflow-hidden">
                         {/* Name yields space before the tags do (higher
                             shrink factor) so short tag labels stay whole and
                             only the name truncates when the row gets tight. */}
-                        <div className="min-w-0 shrink-[3]">
-                          <div className="truncate text-[13px] font-semibold text-[#F9FAFB]">
-                            {u.displayName || u.username}
-                          </div>
-                          <div className="truncate text-[11px] text-[#6B7280]">
-                            @{u.username}
-                          </div>
+                        <div className="truncate text-[13px] font-semibold text-[#F9FAFB]">
+                          @{u.username}
                         </div>
-                        {hasTags && (
-                          // Cluster is min-w-0 (not shrink-0) so on a narrow
-                          // phone the label chips truncate instead of shoving
-                          // into the Invite button. The tiny "+N" chips stay
-                          // shrink-0 so they never collapse to nothing.
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            {industries.length > 0 && (
-                              <>
-                                <span className="min-w-0 max-w-[96px] truncate rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-2 py-0.5 text-[10.5px] font-medium text-fuchsia-300">
-                                  {industries[0]}
-                                </span>
-                                {industries.length > 1 && (
-                                  <span className="shrink-0 rounded-[8px] border border-fuchsia-500/35 bg-fuchsia-500/12 px-1.5 py-0.5 text-[10.5px] font-medium tabular-nums leading-none text-fuchsia-300">
-                                    +{industries.length - 1}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            {skills.length > 0 && (
-                              <>
-                                <span className="min-w-0 max-w-[96px] truncate rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-2 py-0.5 text-[10.5px] font-medium text-sky-300">
-                                  {skills[0]}
-                                </span>
-                                {skills.length > 1 && (
-                                  <span className="shrink-0 rounded-[8px] border border-sky-500/35 bg-sky-500/10 px-1.5 py-0.5 text-[10.5px] font-medium tabular-nums leading-none text-sky-300">
-                                    +{skills.length - 1}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
                       </div>
                       {/* Invite — squarer + darker solid indigo to match
                           the site's other buttons (create-idea etc.), and
@@ -276,7 +236,7 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                         disabled={advancing}
                         className="h-8 shrink-0 rounded-lg bg-[#6366F1] px-3.5 text-[13px] font-medium text-white transition hover:bg-[#5254cc] active:scale-95 disabled:opacity-80"
                       >
-                        Invite
+                        Send Invite
                       </button>
                     </div>
                   </div>
@@ -290,7 +250,16 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                 map. */}
           </div>
         </motion.div>
+        {advancing && <ContributorHandoffScrim />}
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function ContributorHandoffScrim() {
+  return (
+    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+    </div>
   );
 }

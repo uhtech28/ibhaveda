@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { displayFontClass } from "@/components/ideaforge/shared";
 import {
   useKeyboardInsets,
-  keyboardSafeStyle,
+  keyboardSafeDialogStyle,
 } from "@/lib/hooks/useKeyboardInsets";
 
 const MIN_DESCRIPTION_CHARS = 20;
@@ -209,7 +209,7 @@ export function FlareComposeDialog({
         className={`flare-compose-dialog ${
           kb.isKeyboardOpen ? "flare-compose-dialog--keyboard" : ""
         } w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[90dvh]`}
-        style={keyboardSafeStyle(kb, { reserveVh: 0.92 })}
+        style={keyboardSafeDialogStyle(kb, { reserveVh: 0.92 })}
         data-tutorial="flare-compose"
       >
         <DialogHeader className="flare-compose-header border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">

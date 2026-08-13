@@ -406,30 +406,37 @@ const LeaderboardSection = () => {
 
   const contributorEntries: PodiumEntry[] = React.useMemo(
     () =>
-      (topUsers ?? []).map((u) => ({
-        key: u._id,
-        title: u.displayName,
-        subtitle: `@${u.username}`,
-        points: u.points,
-        avatar: u.avatar ?? undefined,
-        fallbackChar: u.displayName.charAt(0).toUpperCase(),
-        href: `/profile/${encodeURIComponent(u.username)}`,
-      })),
+      (topUsers ?? []).map((u) => {
+        const username = u.username || "builder";
+        const title = u.displayName || username;
+        return {
+          key: u._id,
+          title,
+          subtitle: `@${username}`,
+          points: u.points ?? 0,
+          avatar: u.avatar ?? undefined,
+          fallbackChar: title.charAt(0).toUpperCase(),
+          href: `/profile/${encodeURIComponent(username)}`,
+        };
+      }),
     [topUsers],
   );
 
   const projectEntries: PodiumEntry[] = React.useMemo(
     () =>
-      (topProjects ?? []).map((p) => ({
-        key: p.ideaId,
-        title: p.title,
-        subtitle: `by ${p.authorDisplayName}`,
-        points: p.weeklyPoints,
-        avatar: undefined,
-        fallbackChar: initialsFromTitle(p.title),
-        fallbackBg: colorFromString(p.title),
-        href: `/idea/${p.ideaId}`,
-      })),
+      (topProjects ?? []).map((p) => {
+        const title = p.title || "Untitled project";
+        return {
+          key: p.ideaId,
+          title,
+          subtitle: `by ${p.authorDisplayName || "Unknown builder"}`,
+          points: p.weeklyPoints ?? 0,
+          avatar: undefined,
+          fallbackChar: initialsFromTitle(title),
+          fallbackBg: colorFromString(title),
+          href: `/idea/${p.ideaId}`,
+        };
+      }),
     [topProjects],
   );
 

@@ -77,14 +77,11 @@ export function AssetWarmer() {
           rel="preload"
           as="image"
           href={href}
-          // fetchpriority=low so the preloads don't compete with the
+          // fetchPriority=low so the preloads don't compete with the
           // critical Next.js JS/CSS chunks + first-paint HTML. Browser
           // still queues them immediately — they arrive during idle
           // network time.
-          // @ts-expect-error — `fetchpriority` is a valid attribute
-          // supported by all modern browsers; React 18 types don't
-          // include it yet.
-          fetchpriority="low"
+          fetchPriority="low"
         />
       ))}
     </>

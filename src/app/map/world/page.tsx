@@ -56,7 +56,7 @@ import { getStageBoss, getStageSuperBoss, getStageMiniBosses } from "@/config/st
 import type { StageBoss } from "@/config/stage-bosses";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
-import { generateCheckpointLayout } from "@/lib/phaser/scenes/TemplateMapScene";
+import { generateCheckpointLayout } from "@/lib/phaser/utils/checkpoint-layout";
 import { getTemplateStageBoss } from "@/config/template-stage-bosses";
 import { IdeaWizard } from "@/components/ideas/IdeaWizard";
 
@@ -130,6 +130,7 @@ import {
 import { FirstCheckpointPulse } from "@/components/map/FirstCheckpointPulse";
 import { GoldCheckpointPopup } from "@/components/notifications/GoldCheckpointPopup";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 import { MapMenuPopover } from "@/components/map/MapMenuPopover";
 import { ContributionComposeDialog } from "@/components/contributions/ContributionComposeDialog";
 import { AssetWarmer } from "@/components/perf/AssetWarmer";
@@ -2830,7 +2831,7 @@ function MapPageInner() {
   useEffect(() => {
     if (!phaserReady || !gameRef.current) return;
     const desiredStage =
-      requestedStage && Number.isFinite(requestedStage)
+      requestedStage && Number.isFinite(requestedStage) && requestedStage >= activeStage
         ? requestedStage
         : activeStage;
     // Route by (templateId, stage). Non-venture templates have no
@@ -3005,7 +3006,7 @@ function MapPageInner() {
   useEffect(() => {
     if (!phaserReady || !venture) return;
     const stageToPlay =
-      requestedStage && Number.isFinite(requestedStage)
+      requestedStage && Number.isFinite(requestedStage) && requestedStage >= activeStage
         ? requestedStage
         : activeStage;
     try {
@@ -3777,7 +3778,7 @@ function MapPageInner() {
     if (!phaserReady) return;
     const templateId = (activeVenture?.templateId ?? "venture") as "venture" | "academic" | "lab" | "creative";
     const displayedStage =
-      requestedStage && Number.isFinite(requestedStage) && requestedStage >= 1
+      requestedStage && Number.isFinite(requestedStage) && requestedStage >= activeStage
         ? requestedStage
         : activeStage;
     audioManager.playAmbienceForTemplate(templateId, displayedStage);
@@ -5614,7 +5615,7 @@ function MapPageInner() {
           flex content paints, eliminating a CLS contributor on slow
           first paint. */}
       <div
-        className="absolute inset-x-0 bottom-4 z-[70] pointer-events-none flex justify-center"
+        className="absolute inset-x-0 top-4 z-[70] pointer-events-none flex justify-center sm:top-auto sm:bottom-4"
         style={{ contain: "layout paint" }}
       >
         <div
@@ -7327,6 +7328,8 @@ function MapFeedComposer({
 }
 
 export default function MapPage() {
+  useMobileVisualViewport();
+
   return (
     <>
       {/* Warm every asset that gates first-perceived-smoothness on

@@ -179,8 +179,11 @@ export function MapMenuPopover({ onOpenPanel, className, canSubmitTasks = true }
                 role="dialog"
                 aria-modal="true"
                 aria-label="Adventurer's Menu"
-                onClick={() => setOpen(false)}
-                className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-3 backdrop-blur-md sm:p-4"
               >
                 <motion.div
                   initial={{ opacity: 0, y: 12, scale: 0.96 }}
@@ -195,7 +198,8 @@ export function MapMenuPopover({ onOpenPanel, className, canSubmitTasks = true }
                   // capped tighter (75dvh) and given tighter padding
                   // so the tutorial's Sparky bubble docked at the top
                   // of the viewport doesn't overlap the top tiles.
-                  className="relative w-full max-w-2xl max-h-[75dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0A0D12]/95 p-4 shadow-2xl sm:max-h-[90vh] sm:p-8"
+                  className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#0A0D12]/95 p-3 shadow-2xl sm:max-h-[90vh] sm:p-8"
+                  style={{ maxHeight: "calc(var(--app-vv-height, 100dvh) - 3rem)" }}
                 >
                   {/* Saddlebag/Settings button next to × removed per
                       product request — the Adventurer's Menu now
@@ -227,16 +231,16 @@ export function MapMenuPopover({ onOpenPanel, className, canSubmitTasks = true }
                     </svg>
                   </button>
 
-                  <header className="mb-3 pr-10 sm:mb-5">
+                  <header className="mb-2 pr-10 sm:mb-5">
                     <p
-                      className="font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-amber-400/80 sm:text-[10px]"
+                      className="font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-amber-400/80 sm:text-[10px] sm:tracking-[0.25em]"
                       style={{
                         fontFamily: "var(--font-pixel-display), monospace",
                       }}
                     >
                       Adventurer's Menu
                     </p>
-                    <h2 className="mt-0.5 text-base font-semibold text-white sm:mt-1 sm:text-2xl">
+                    <h2 className="mt-0.5 text-sm font-semibold text-white sm:mt-1 sm:text-2xl">
                       Choose your path
                     </h2>
                   </header>
@@ -245,7 +249,7 @@ export function MapMenuPopover({ onOpenPanel, className, canSubmitTasks = true }
                       stays 2-column so the tiles don't get too small.
                       Tighter gap on mobile so more tiles fit per row of
                       vertical space. */}
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4">
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 sm:gap-4">
                     {MENU_ITEMS
                       .filter((item) => canSubmitTasks || !item.contributorOnly)
                       .map((item) => (
@@ -272,7 +276,7 @@ export function MapMenuPopover({ onOpenPanel, className, canSubmitTasks = true }
                           // docked at the top of the viewport. Desktop
                           // keeps the roomier 128px so the 3-col grid
                           // still reads as clickable cards, not chips.
-                          "flex min-h-[92px] flex-col items-center justify-center gap-1.5 rounded-xl border bg-white/[0.02] px-2 py-3 transition-all hover:-translate-y-0.5 sm:min-h-[128px] sm:gap-2 sm:px-3 sm:py-4",
+                          "flex min-h-[68px] flex-col items-center justify-center gap-1 rounded-xl border bg-white/[0.02] px-2 py-2 transition-all hover:-translate-y-0.5 sm:min-h-[128px] sm:gap-2 sm:px-3 sm:py-4",
                           item.accent,
                         )}
                       >
@@ -283,19 +287,28 @@ export function MapMenuPopover({ onOpenPanel, className, canSubmitTasks = true }
                           // tiles). Reads well at both breakpoints and
                           // keeps PixelIcon's inline width/height
                           // simple (no className size override needed).
-                          <PixelIcon
-                            name={item.pixelIcon}
-                            size={56}
-                            alt={item.label}
-                          />
+                          <>
+                            <PixelIcon
+                              name={item.pixelIcon}
+                              size={40}
+                              alt={item.label}
+                              className="sm:hidden"
+                            />
+                            <PixelIcon
+                              name={item.pixelIcon}
+                              size={56}
+                              alt={item.label}
+                              className="hidden sm:block"
+                            />
+                          </>
                         ) : item.lucideIcon ? (
                           <item.lucideIcon
-                            className="h-10 w-10 text-yellow-300/90 sm:h-14 sm:w-14"
+                            className="h-8 w-8 text-yellow-300/90 sm:h-14 sm:w-14"
                             strokeWidth={1.5}
                             aria-label={item.label}
                           />
                         ) : null}
-                        <span className="text-center text-[10px] font-semibold uppercase tracking-wider text-white/85 sm:text-xs">
+                        <span className="text-center text-[9px] font-semibold uppercase tracking-wider text-white/85 sm:text-xs">
                           {item.label}
                         </span>
                       </button>

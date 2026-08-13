@@ -39,7 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   useKeyboardInsets,
-  keyboardSafeStyle,
+  keyboardSafeDialogStyle,
 } from "@/lib/hooks/useKeyboardInsets";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
 import { IndustriesMultiSelect } from "@/components/IndustriesMultiSelect";
@@ -146,7 +146,7 @@ export function ContributionComposeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[90dvh]"
-        style={keyboardSafeStyle(kb, { reserveVh: 0.92 })}
+        style={keyboardSafeDialogStyle(kb, { reserveVh: 0.92 })}
       >
         {/* Header — just the "Post Contribution" title, no project-
             name chip on the right. Product ask: "remove new builder

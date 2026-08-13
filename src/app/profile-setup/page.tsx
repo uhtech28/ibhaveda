@@ -694,10 +694,17 @@ export default function ProfileSetupPage() {
 
     if (showPersonaSelector) {
       return (
-        <PersonaSelector
-          onConfirm={handlePersonaConfirm}
-          submitting={personaSubmitting}
-        />
+        <>
+          <PersonaSelector
+            onConfirm={handlePersonaConfirm}
+            submitting={personaSubmitting}
+          />
+          {personaSubmitting && (
+            <div className="fixed inset-0 z-[100002] flex items-center justify-center bg-black">
+              <Loader2 className="h-8 w-8 animate-spin text-white/80" />
+            </div>
+          )}
+        </>
       );
     }
 

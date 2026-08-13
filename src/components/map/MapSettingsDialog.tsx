@@ -71,7 +71,7 @@ interface Props {
 export function MapSettingsDialog({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-[#0a0d12] border border-white/10 text-white">
+      <DialogContent className="max-w-2xl max-h-[calc(100dvh-2rem)] overflow-hidden bg-[#0a0d12] border border-white/10 text-white">
         <DialogHeader>
           <DialogTitle
             className="font-mono text-lg font-black tracking-widest text-white"
@@ -105,7 +105,7 @@ export function UserSettingsBody({
 }) {
   const [tab, setTab] = useState<Tab>("persona");
   return (
-    <div>
+    <div className="min-h-0 overflow-hidden">
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-white/10 pb-2 mb-3">
         <TabButton active={tab === "persona"} onClick={() => setTab("persona")} icon={<UserIcon className="h-4 w-4" />} label="Persona" />

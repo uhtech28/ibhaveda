@@ -58,7 +58,7 @@ export function MobileJoystick({ hidden = false }: Props) {
       type: "JOYSTICK_MOVE",
       x,
       y,
-    } as unknown as { type: "JOYSTICK_MOVE" });
+    });
   }, []);
 
   const emitStop = useCallback(() => {
@@ -69,7 +69,7 @@ export function MobileJoystick({ hidden = false }: Props) {
       x: 0,
       y: 0,
       released: true,
-    } as unknown as { type: "JOYSTICK_MOVE" });
+    });
   }, []);
 
   const handlePointerDown = useCallback(

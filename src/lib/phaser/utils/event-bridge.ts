@@ -121,6 +121,8 @@ export type ReactToPhaserEvent =
   | { type: "SCROLL_TO_CHECKPOINT"; checkpointId: string }
   /** Ask the camera to frame a full stage biome without exposing neighbors. */
   | { type: "FOCUS_STAGE"; stage: number; checkpointId?: string }
+  /** Mobile virtual joystick movement vector in [-1, 1]. */
+  | { type: "JOYSTICK_MOVE"; x: number; y: number; released?: boolean }
   /** Pause the Phaser game loop (e.g. modal is open). */
   | { type: "GAME_PAUSE" }
   /** Resume the Phaser game loop after a pause. */

@@ -17,6 +17,7 @@
  */
 
 import * as Phaser from "phaser";
+import { eventBridge } from "@/lib/phaser/utils/event-bridge";
 
 export interface EditorTestWalkOptions {
   /** Returns the character sprite once spawned, or null. */
@@ -79,6 +80,7 @@ export function attachEditorTestWalk(
   const feetOffsetY = opts.feetOffsetY ?? 0;
   const walkAnimKey = opts.walkAnimKey ?? "persona-walk";
   const idleAnimKey = opts.idleAnimKey ?? "persona-idle";
+  let joystickVector: { x: number; y: number } | null = null;
 
   const keyboard = scene.input.keyboard;
   if (!keyboard) return;
@@ -89,6 +91,17 @@ export function attachEditorTestWalk(
     S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
     D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
   };
+  const joystickHandler = (event: unknown) => {
+    const payload = event as { x?: number; y?: number; released?: boolean } | null;
+    if (!payload || payload.released) {
+      joystickVector = null;
+      return;
+    }
+    const x = typeof payload.x === "number" ? Phaser.Math.Clamp(payload.x, -1, 1) : 0;
+    const y = typeof payload.y === "number" ? Phaser.Math.Clamp(payload.y, -1, 1) : 0;
+    joystickVector = Math.hypot(x, y) > 0.05 ? { x, y } : null;
+  };
+  const unsubscribeJoystick = eventBridge.onPhaser("JOYSTICK_MOVE", joystickHandler);
 
   // Track which anim we last requested so we only call .play() on state
   // change (Phaser restarts the clip every call — spamming freezes it).
@@ -110,6 +123,10 @@ export function attachEditorTestWalk(
     if (right) dx += 1;
     if (up) dy -= 1;
     if (down) dy += 1;
+    if (joystickVector) {
+      dx += joystickVector.x;
+      dy += joystickVector.y;
+    }
 
     if (dx === 0 && dy === 0) {
       // No input this frame — swap back to idle exactly once.
@@ -187,5 +204,6 @@ export function attachEditorTestWalk(
   scene.events.on(Phaser.Scenes.Events.UPDATE, step);
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
     scene.events.off(Phaser.Scenes.Events.UPDATE, step);
+    unsubscribeJoystick();
   });
 }

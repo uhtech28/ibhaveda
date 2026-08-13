@@ -21,8 +21,9 @@ import { TutorialMascot, type SparkyMood } from "../TutorialMascot";
 import { TutorialHighlight } from "../TutorialHighlight";
 import { useTutorial } from "../useTutorial";
 import { getVillageBoss } from "@/config/village-bosses";
+import { getStageBoss } from "@/config/stage-bosses";
 import { getTemplateStageBoss } from "@/config/template-stage-bosses";
-import { templateIdAtom } from "@/lib/stores/hudStore";
+import { stageInfoAtom, templateIdAtom } from "@/lib/stores/hudStore";
 import { useAtomValue } from "jotai";
 
 // The first tutorial fight happens at stage 1, checkpoint 1. Resolve
@@ -89,17 +90,21 @@ export function Step3MapGuide() {
   const pathname = usePathname();
   const router = useRouter();
   const templateId = useAtomValue(templateIdAtom);
+  const stageInfo = useAtomValue(stageInfoAtom);
   const onMap = pathname?.startsWith("/map/") ?? false;
   const tutorialMonsterName = useMemo(() => {
+    const currentStage = Math.max(1, stageInfo?.stage ?? 1);
     if (templateId === "venture") {
-      return getVillageBoss(0)?.name ?? "the first monster";
+      return currentStage === 1
+        ? getVillageBoss(0)?.name ?? "the first monster"
+        : getStageBoss(currentStage, 0)?.name ?? "the stage monster";
     }
     return (
-      getTemplateStageBoss(templateId, 1)?.name ??
+      getTemplateStageBoss(templateId, currentStage)?.name ??
       getVillageBoss(0)?.name ??
-      "the first monster"
+      "the stage monster"
     );
-  }, [templateId]);
+  }, [stageInfo?.stage, templateId]);
 
   // Step numbering: 1=name, 2=username, 3=click+, 4=pick template,
   // 5=write outline, 6=posted, 7=map task, 8=combat/done.
@@ -700,7 +705,7 @@ export function Step3MapGuide() {
           // after every task under this checkpoint is complete. What
           // just happened is a retreat. Sparky says so explicitly so
           // the user understands why the map still shows the boss.
-          text: `Congratulations, the "${tutorialMonsterName}" retreated! Just two more things and you'll have everything you need.`,
+          text: `Congratulations, ${tutorialMonsterName} retreated! Just two more things and you'll have everything you need.`,
           mood: "celebrating",
           // Anchor Sparky next to the Victory PANEL specifically —
           // combat-victory-panel is a ~720px centered card, small

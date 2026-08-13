@@ -192,13 +192,12 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
           background: #000;
           display: block;
         }
-        /* Mobile / portrait viewports: the 16:9 clip would letterbox
-           into thin black bars. Switch to cover so the video fills the
-           screen, cropping the left/right edges and staying centered on
-           the doorway + scroll (the core of the action). */
+        /* Mobile / portrait viewports: keep the whole authored frame
+           visible. The final artwork has important text near both
+           side edges, so letterboxing is preferable to a 9:16 crop. */
         @media (max-aspect-ratio: 1/1) {
           .welcome-video {
-            object-fit: cover;
+            object-fit: contain;
           }
         }
       `}</style>
