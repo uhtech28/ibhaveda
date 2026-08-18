@@ -54,6 +54,13 @@ const PROGRESS_BAR_BLOCKED_ROUTES = [
   // so returning users editing their profile don't see stale tutorial
   // chrome.
   "/profile-setup",
+  // /persona-setup: after the user picks a persona, an inline Sparky
+  // intro overlay takes over the whole screen (see persona-setup/page.tsx
+  // SparkyIntroOverlay). The global 1/8 progress bar rendering on top
+  // of that overlay read as a broken chrome layer — reported as the
+  // "1/8 bar floating over the Sparky black scrim" glitch. Blocking
+  // this route keeps the persona pick + intro visually clean.
+  "/persona-setup",
 ];
 
 function TutorialProgressBarGate(props: {

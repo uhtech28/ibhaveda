@@ -249,49 +249,75 @@ const TEMPLATE_STAGE_BOSSES: Record<
     },
   ],
   creative: [
-    // Stage 1 · Sacred Grove → Silence That Smothers.
-    // Reuses Silencer of Findings art per user directive
-    // ("reuse existing where names are close enough").
+    // Stage 1 · Sacred Grove → Silence That Smothers. NEW bespoke art
+    // (dark hulking creature, muscular silhouette) — was previously
+    // aliased to Silencer of Findings. Now points at its own folder.
     {
-      slug: "..:lab/silencer-of-findings",
+      slug: "silence-that-smothers",
       name: "Silence That Smothers",
       family: "undead",
       introLine:
         "* A hush settles over the Grove. The Silence smothers every first draft.",
-      clips: { size: 92, frames: { idle: 4, attack: 9, defeat: 9 } },
-      spriteScale: 2.0,
+      // Real art at 96×96: idle uses south-rotation stand-in (1 frame,
+      // no Breathing_Idle in pack), plus 9-frame attack / hurt / defeat.
+      clips: { size: 96, frames: { idle: 1, attack: 9, hurt: 9, defeat: 9 } },
+      spriteScale: 2.1,
+      spriteYOffset: 58,
+    },
+    // Stage 2 · Gallery of Echoes → Curator of Derivative Ghosts. NEW.
+    // Elderly curator clutching portrait frames — thematically perfect
+    // for the "derivative art" boss.
+    {
+      slug: "curator-of-derivative-ghosts",
+      name: "Curator of Derivative Ghosts",
+      family: "undead",
+      introLine:
+        "* The Curator sneers. \"I've seen this piece before. Have you?\"",
+      clips: { size: 88, frames: { idle: 4, attack: 9, hurt: 9 } },
+      spriteScale: 1.9,
       spriteYOffset: 60,
     },
-    // Stage 2 · Gallery of Echoes → Curator of Derivative Ghosts.
-    // Art pending (user hasn't sent this pack yet). Returning null
-    // here makes TemplateMapScene fall back to FALLBACK_BOSS (Fog).
-    null,
-    // Stage 3 · The Wilderness → Beast of the Unfinished.
-    // Reuses Unfinished Golem art per user directive.
+    // Stage 3 · The Wilderness → Beast of the Unfinished. NEW bespoke
+    // art (broad-chested chimera). Was aliased to Unfinished Golem.
     {
-      slug: "..:venture/unfinished-golem",
+      slug: "beast-of-the-unfinished",
       name: "Beast of the Unfinished",
       family: "plant",
       introLine:
         "* The Beast lumbers out of the Wilderness. Half-built and hungry.",
-      clips: { size: 88, frames: { idle: 4, attack: 9 } },
+      clips: { size: 92, frames: { idle: 4, attack: 9, defeat: 9 } },
       spriteScale: 2.2,
       spriteYOffset: 58,
     },
-    // Stage 4 · Village Square → Crowd of False Validation.
-    // Reuses Councillor of False Consensus art per user directive.
+    // Stage 4 · Village Square → Crowd of False Validation. NEW bespoke
+    // art (multi-headed creature — literally embodies the crowd metaphor).
+    // Was aliased to Councillor of False Consensus.
     {
-      slug: "..:academic/councillor-of-false-consensus",
+      slug: "crowd-of-false-validation",
       name: "Crowd of False Validation",
       family: "arcane",
       introLine:
         "* The Crowd claps for everything — even the mediocrity.",
-      clips: { size: 92, frames: { idle: 4, attack: 9, hurt: 9 } },
+      // No attack clip shipped in this pack — fallback chain plays hurt
+      // during attack window (a "wince-into-recoil" reads as bracing to
+      // strike). Idle + hurt cover the primary combat beats.
+      clips: { size: 88, frames: { idle: 4, hurt: 9 } },
       spriteScale: 1.9,
       spriteYOffset: 62,
     },
-    // Stage 5 · Artisan's Workshop → Perfectionist's Spectre. Art pending.
-    null,
+    // Stage 5 · Artisan's Workshop → Perfectionist's Spectre. NEW.
+    // Blue-skinned butcher figure — the "cut it into perfection" bit is
+    // literalised through the knife-lunge attack.
+    {
+      slug: "perfectionists-spectre",
+      name: "Perfectionist's Spectre",
+      family: "undead",
+      introLine:
+        "* The Spectre lifts the knife. \"One more revision. Just one more.\"",
+      clips: { size: 84, frames: { idle: 4, attack: 9, hurt: 9 } },
+      spriteScale: 1.9,
+      spriteYOffset: 60,
+    },
     // Stage 6 · Harbour → Harbourmaster of Hesitation
     // (shared with Venture Stage 6; uses the existing incoming/ pack).
     {

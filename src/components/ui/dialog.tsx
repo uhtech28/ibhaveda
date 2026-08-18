@@ -90,6 +90,25 @@ function DialogContent({
 }) {
   const closeDialog = React.useContext(DialogCloseContext)
 
+  // Radix requires every DialogContent to contain a DialogTitle for
+  // screen-reader accessibility. Callers that provide their own custom
+  // header (most of ours do) don't include a raw DialogTitle, which
+  // triggers the dev-mode warning + a11y regression.
+  //
+  // Auto-detect whether the caller included a DialogTitle anywhere in
+  // `children`. If not, inject a visually-hidden default so the a11y
+  // API always has something to announce, without touching any visible
+  // UI. Custom titles from callers are respected — this only fills
+  // the gap for dialogs that never had one.
+  const hasTitle = React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement(child)) return false
+    // Match either the direct DialogTitle primitive OR our re-exported
+    // DialogTitle wrapper (both share the same displayName from Radix).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const t = (child.type as any)?.displayName ?? (child.type as any)?.name
+    return typeof t === "string" && t.includes("DialogTitle")
+  })
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -119,6 +138,14 @@ function DialogContent({
         )}
         {...props}
       >
+        {!hasTitle && (
+          // sr-only default title — invisible to sighted users, satisfies
+          // Radix's a11y requirement + screen-reader consumers get a
+          // sensible announcement ("Dialog") even when the caller forgot.
+          <DialogPrimitive.Title className="sr-only">
+            Dialog
+          </DialogPrimitive.Title>
+        )}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
