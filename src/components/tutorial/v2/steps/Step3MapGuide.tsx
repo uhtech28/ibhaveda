@@ -21,16 +21,34 @@ import { TutorialMascot, type SparkyMood } from "../TutorialMascot";
 import { TutorialHighlight } from "../TutorialHighlight";
 import { useTutorial } from "../useTutorial";
 import { getVillageBoss } from "@/config/village-bosses";
+import { getTemplateStageBoss } from "@/config/template-stage-bosses";
+import { useActiveVentureTemplateId } from "@/lib/tutorial/useActiveVentureTemplateId";
+import {
+  resolveTutorialCopy,
+  firstMonsterIntro,
+} from "@/config/templates/tutorialCopy";
+import type { TemplateId } from "@/config/templates/templateTypes";
 
 /**
- * Resolve the CP-1 boss name for the tutorial monster. The first-run
- * tour always fights the first checkpoint of stage 1, so the [Monster
- * Name] placeholder from the script → "Fog of Vagueness" (or whatever
- * the current Village CP-1 boss is). Falls back to a safe generic
- * label if the config lookup returns nothing.
+ * Resolve the first-checkpoint monster name for the tutorial, keyed by
+ * the user's active venture template. Every template's stage-1 monster
+ * lives in a different registry:
+ *   - venture  → getVillageBoss(0)  (Fog of Vagueness family)
+ *   - academic → getTemplateStageBoss("academic", 1)  (Librarian…)
+ *   - lab      → getTemplateStageBoss("lab", 1)       (Silencer…)
+ *   - creative → getTemplateStageBoss("creative", 1)  (Silence…)
+ *
+ * Falls back to a safe generic label if the config lookup returns
+ * nothing (e.g. the user hasn't created a venture yet).
  */
-const TUTORIAL_MONSTER_NAME =
-  getVillageBoss(0)?.name ?? "the first monster";
+function resolveFirstMonsterName(
+  templateId: TemplateId | null | undefined,
+): string {
+  if (!templateId || templateId === "venture") {
+    return getVillageBoss(0)?.name ?? "the first monster";
+  }
+  return getTemplateStageBoss(templateId, 1)?.name ?? "the first monster";
+}
 
 type Stage =
   // PRODUCT DECISION: the map tutorial now skips the "click first task,
@@ -94,6 +112,17 @@ export function Step3MapGuide() {
   const pathname = usePathname();
   const router = useRouter();
   const onMap = pathname?.startsWith("/map/") ?? false;
+  // Template-aware first-monster name and Sparky vocabulary. Every
+  // template has its own stage-1 boss (venture: Fog of Vagueness,
+  // academic: Librarian of Lost Questions, lab: Silencer of Findings,
+  // creative: Silence That Smothers), so the "you're about to face…"
+  // and "…retreated!" lines must interpolate the correct name.
+  const activeTemplateId = useActiveVentureTemplateId();
+  const tutorialMonsterName = useMemo(
+    () => resolveFirstMonsterName(activeTemplateId),
+    [activeTemplateId],
+  );
+  const copy = resolveTutorialCopy(activeTemplateId);
 
   // Step numbering: 1=name, 2=username, 3=click+, 4=pick template,
   // 5=write outline, 6=posted, 7=map task, 8=combat/done.
@@ -674,7 +703,9 @@ export function Step3MapGuide() {
         return {
           text: combatOpenState
             ? ""
-            : `You're about to face ${TUTORIAL_MONSTER_NAME}, who'll question your idea. Defend it, fight back, and make him retreat so you can advance. You've got this!`,
+            // Template-aware intro line — see tutorialCopy.ts. Falls
+            // back to venture wording for null template.
+            : firstMonsterIntro(activeTemplateId, tutorialMonsterName),
           mood: combatOpenState ? "idle" : "pointing",
           near: '[data-tutorial="combat-panel"], [aria-label="AI Combat"], [data-combat-panel]',
           highlight: combatOpenState
@@ -694,7 +725,8 @@ export function Step3MapGuide() {
           // after every task under this checkpoint is complete. What
           // just happened is a retreat. Sparky says so explicitly so
           // the user understands why the map still shows the boss.
-          text: `Congratulations, the “${TUTORIAL_MONSTER_NAME}” retreated! Just two more things and you'll have everything you need.`,
+          // Template-aware victory line — see tutorialCopy.ts.
+          text: copy.firstMonsterVictory(tutorialMonsterName),
           mood: "celebrating",
           // Anchor Sparky next to the Victory PANEL specifically —
           // combat-victory-panel is a ~720px centered card, small
@@ -779,7 +811,12 @@ export function Step3MapGuide() {
           highlight: null,
         };
     }
-  }, [stage, tutorial, bossSpeaking, combatOpenState]);
+    // Include the template-aware monster name + vocab in deps so the
+    // memoized Sparky lines refresh when the active venture's template
+    // changes (rare but happens when the user switches ventures without
+    // remounting the tutorial provider).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, tutorial, bossSpeaking, combatOpenState, tutorialMonsterName, activeTemplateId]);
 
   if (!active) return null;
 

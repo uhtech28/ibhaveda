@@ -1032,9 +1032,11 @@ export class VillageMapScene extends Phaser.Scene {
     if (!char) return;
 
     // Viewer mode: we're spectating someone else's map. Persona stays
-    // parked; no keyboard/joystick input applied. Interact hint is also
-    // skipped since there's nothing to interact with (task modal is
-    // owner-only).
+    // parked; no keyboard/joystick input applied. Product ask
+    // (2026-08-16 clarification): "user can move persona for their
+    // own project only" — walking around someone else's map read
+    // as controlling their character, which was confusing. Freezing
+    // makes viewer-mode obviously read-only.
     const viewerMode = this.registry?.get?.("viewerMode") === true;
     if (viewerMode) {
       // Keep shadow glued to the parked character.
@@ -1342,31 +1344,11 @@ export class VillageMapScene extends Phaser.Scene {
       sprite.setFlipX(def.offsetX > 0 ? true : false);
       tagBossFamily(sprite, def.family);
 
-      // Contrast anchor — a wide, soft dark ellipse behind the sprite so
-      // pale-palette bosses (Fog, Chimera) don't disappear against grass.
-      // Sized 1.15x sprite width, tall enough to sit "behind" the whole
-      // silhouette, dark navy at low alpha. Reads as body-shadow / aura.
-      const anchorW = sprite.displayWidth * 1.15;
-      const anchorH = sprite.displayHeight * 1.35;
-      const anchor = this.add.ellipse(
-        sprite.x,
-        sprite.y - sprite.displayHeight * 0.5,
-        anchorW,
-        anchorH,
-        0x0a0a1a,
-        0.28,
-      );
-      anchor.setDepth(sprite.depth - 3);
-      // Follow the sprite as it bobs (per-frame so no lag)
-      this.time.addEvent({
-        delay: 16,
-        loop: true,
-        callback: () => {
-          if (!sprite.active) return;
-          anchor.setPosition(sprite.x, sprite.y - sprite.displayHeight * 0.5);
-          anchor.setVisible(sprite.visible);
-        },
-      });
+      // Contrast anchor (a wide dark ellipse behind the sprite for
+      // pale-palette bosses) removed 2026-08-16 per product ask
+      // "remove this black circle". The fog cloud layer now provides
+      // enough contrast against grass on its own; the dark ellipse
+      // was reading as an ominous black halo, not a soft body-shadow.
 
       // HD pixel-art crisp filter
       const tex = sprite.texture;
@@ -1476,24 +1458,257 @@ export class VillageMapScene extends Phaser.Scene {
         }
       }
 
-      // Product decision — bosses stand STATIC on the map. No bob, no
-      // ambient tendrils, no taunt loop. Bosses only animate during
-      // combat / weaken / defeat events. Reads as a threat waiting for
-      // you rather than a busy background element.
+      // Product revision 2026-08-16: "it's not looking like fog or
+      // mist — should hover, float, and have tendrils". Bosses were
+      // previously rendered stone-still; that read as a rigid statue
+      // for mist-family bosses. Re-enable the ambient FX suite so the
+      // boss floats + drifts + has tendrils around it. Combat FX
+      // (weaken, defeat, retreat) are unchanged.
+      const bobBaseY = sprite.y;
       const bob = this.tweens.add({
         targets: sprite,
-        y: sprite.y, // no delta — tween exists purely so the ref shape
-        duration: 1,
-        repeat: 0,
+        y: bobBaseY - 10, // ~10px vertical hover — enough to read
+        duration: 2100,   // slow — this is a lurking mist, not a jitter
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
       });
-      bob.stop(); // static from the moment it spawns
-
-      // Tendrils/aura are ambient VFX around the boss — disabled to
-      // keep the boss reading as a stone-still threat. Nulls make
-      // downstream `if (aura) …` guards skip the animation calls
-      // cleanly, so no other code path needs to change.
-      const tendrilStop: (() => void) | null = null;
+      // Subtle alpha flicker on mist-family bosses only — pulses the
+      // opacity ~0.85→1.0 in a slow triangle wave so the silhouette
+      // dissolves and reforms slightly, selling "I'm made of fog" .
+      if (def.family === "mist") {
+        this.tweens.add({
+          targets: sprite,
+          alpha: 0.82,
+          duration: 1700,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+      }
+      // Tendril + aura ambient FX. Tendrils stay — they curl around
+      // the boss silhouette itself. Aura ring REMOVED 2026-08-16
+      // ("one black circle is still there") because its helper
+      // positioned the shadow ellipse at `sprite.y + displayHeight
+      // * 0.45`, but the sprite origin is (0.5, 1) so sprite.y is
+      // already the feet — the ×0.45 pushed the shadow a full body
+      // length below into empty grass. Rather than patch the offset,
+      // remove the aura entirely: the CP marker's yellow disc and
+      // the fog cloud already carry the "boss lives here" read.
+      const tendrilStop: (() => void) | null = startAmbientTendrils(
+        this,
+        sprite,
+        def.family,
+      );
       const aura = null;
+
+      // ── Fog cloud composition (mist-family bosses only) ──────────
+      // Product revisions on this file:
+      //   v1 (2026-08-16 morning): flat Ellipse blobs at SCREEN blend.
+      //     Reported as "not looking professional".
+      //   v2 (2026-08-16 fix):  soft radial-alpha texture, 7 tinted
+      //     sprites clustered AROUND the boss. Better edges but too
+      //     local — the map still looked clean everywhere else.
+      //   v3 (2026-08-16 refix): "make fog consistent over all map".
+      //     Spread the fog across the ENTIRE 1536×1024 map instead of
+      //     concentrating it around the boss. Fog of Vagueness is a
+      //     stage-1 theme, so the biome itself should feel foggy.
+      //     ~48 blobs at varied sizes / opacities, distributed via
+      //     a jittered grid so coverage is even but not obviously
+      //     tiled. Boss no longer gets its own local cluster — the
+      //     map fog naturally wraps around it.
+      //
+      // Only fires for Fog of Vagueness today (`family === "mist"`
+      // + this is the first mini-boss).
+      const isFog = def.family === "mist" && idx === 0;
+      if (isFog) {
+        // Generate the shared soft-blob texture once per scene. The
+        // radial gradient bakes the feathered edge into the alpha
+        // channel — hard for Phaser's WebGL renderer to fake at
+        // runtime with primitives, but trivially cheap as a pre-
+        // rendered 128×128 texture.
+        const FOG_TEX_KEY = "vfx-fog-softblob";
+        if (!this.textures.exists(FOG_TEX_KEY)) {
+          const size = 128;
+          const c = document.createElement("canvas");
+          c.width = size;
+          c.height = size;
+          const cx = size / 2;
+          const cy = size / 2;
+          const gctx = c.getContext("2d");
+          if (gctx) {
+            const grad = gctx.createRadialGradient(cx, cy, 0, cx, cy, cx);
+            // Center opaque WHITE (tinted by Phaser at render time),
+            // then gentle falloff — 40% radius still full, 70% at
+            // half alpha, 100% transparent. The double-stop keeps
+            // the core dense enough to read as body while the edge
+            // fades cleanly into the background.
+            grad.addColorStop(0.0, "rgba(255,255,255,1)");
+            grad.addColorStop(0.4, "rgba(255,255,255,0.85)");
+            grad.addColorStop(0.7, "rgba(255,255,255,0.35)");
+            grad.addColorStop(1.0, "rgba(255,255,255,0)");
+            gctx.fillStyle = grad;
+            gctx.fillRect(0, 0, size, size);
+          }
+          this.textures.addCanvas(FOG_TEX_KEY, c);
+        }
+
+        // Map-wide distribution — jittered grid, DENSER.
+        // Density bumped 2026-08-16 ("still there are some spots on
+        // screen remove them and make fog denser and floating") from
+        // 8×6=48 → 12×9=108 anchors. More overlap between adjacent
+        // blobs = softer + denser field with no visible gap that
+        // would read as "spot". Every cell gets a soft-blob sprite
+        // with independent drift/breathing/rotation, plus a slightly
+        // stronger drift range so the whole layer visibly floats.
+        const COLS = 12;
+        const ROWS = 9;
+        const cellW = MAP_WIDTH / COLS;
+        const cellH = MAP_HEIGHT / ROWS;
+        // FOG_DEPTH sits above the map background (depth 0-10) but
+        // well below the boss (60) and persona. Keeps everything
+        // legible through the fog.
+        const FOG_DEPTH = 20;
+        // Per-CP clearing (2026-08-16): each fog blob remembers its
+        // base position + base alpha so it can smoothly fade to 0
+        // when the player clears the CP whose radius covers it.
+        // Radius chosen large-ish (18% of map width ≈ 275px) so a
+        // single CP clear visibly opens a real breathing pocket in
+        // the fog, matching the corruption-wash halo behaviour on
+        // other stages.
+        const CLEAR_RADIUS = MAP_WIDTH * 0.18;
+        type FogBlobRecord = {
+          image: Phaser.GameObjects.Image;
+          baseX: number;
+          baseY: number;
+          baseAlpha: number;
+          faded: boolean;
+        };
+        const fogBlobs: FogBlobRecord[] = [];
+        for (let row = 0; row < ROWS; row += 1) {
+          for (let col = 0; col < COLS; col += 1) {
+            const jx = (Math.random() - 0.5) * cellW * 1.4;
+            const jy = (Math.random() - 0.5) * cellH * 1.4;
+            const x = col * cellW + cellW * 0.5 + jx;
+            const y = row * cellH + cellH * 0.5 + jy;
+            // Bigger scales — with denser grid we can afford larger
+            // blobs. Range now 2.4-4.2 so each covers ~1.5 cells,
+            // guaranteeing overlap even with jitter.
+            const scale = 2.4 + Math.random() * 1.8;
+            // Alpha bumped 0.28-0.50 → 0.35-0.60. Combined with the
+            // denser count, the map now reads as "in fog" instead of
+            // "scattered fog spots".
+            const alpha = 0.35 + Math.random() * 0.25;
+            const blob = this.add.image(x, y, FOG_TEX_KEY);
+            blob.setScale(scale, scale * 0.85); // slight vertical squish
+            blob.setAlpha(alpha);
+            blob.setTint(0xa9b6c4);
+            blob.setDepth(FOG_DEPTH);
+            blob.setBlendMode(Phaser.BlendModes.NORMAL);
+            fogBlobs.push({
+              image: blob,
+              baseX: x,
+              baseY: y,
+              baseAlpha: alpha,
+              faded: false,
+            });
+            // Drift range bumped ±40/±24 → ±80/±48 so the layer
+            // visibly floats past the camera rather than just
+            // shimmering. Durations pulled shorter (was 4.5-7.5s
+            // → 3.5-6s) for a more perceptible float.
+            this.tweens.add({
+              targets: blob,
+              x: x + (Math.random() - 0.5) * 160, // ±80px
+              y: y + (Math.random() - 0.5) * 96,  // ±48px
+              duration: 3500 + Math.random() * 2500,
+              yoyo: true,
+              repeat: -1,
+              ease: "Sine.easeInOut",
+              delay: Math.random() * 1200,
+            });
+            // Alpha breathing — base × 0.65 → base × 1.15.
+            this.tweens.add({
+              targets: blob,
+              alpha: alpha * 0.65,
+              duration: 2600 + Math.random() * 1800,
+              yoyo: true,
+              repeat: -1,
+              ease: "Sine.easeInOut",
+              delay: Math.random() * 900,
+            });
+            // Rotation so soft edges swirl.
+            this.tweens.add({
+              targets: blob,
+              angle: (Math.random() - 0.5) * 30,
+              duration: 7000 + Math.random() * 3500,
+              yoyo: true,
+              repeat: -1,
+              ease: "Sine.easeInOut",
+              delay: Math.random() * 1000,
+            });
+          }
+        }
+
+        // Per-CP fog clearing subscription. React fires
+        // FOG_CLEARED_CHECKPOINTS whenever bossDefeatedAtCheckpoint
+        // changes on the active stage. Each cleared CP's world
+        // position is checked against every fog blob's BASE (spawn)
+        // position — blobs within CLEAR_RADIUS get faded to 0 alpha
+        // via a slow tween. Uses `baseX/baseY` (not the live drifted
+        // position) so blobs mid-drift don't oscillate between
+        // faded/visible when they wander in/out of the radius.
+        const applyClearedCps = (clearedIdx: readonly number[]) => {
+          if (clearedIdx.length === 0) return;
+          // Build the list of cleared CP world positions from the
+          // scene's CHECKPOINTS table. Silently drop any indices
+          // outside the range so a stale React state can't crash.
+          const clearedPositions = clearedIdx
+            .map((i) => CHECKPOINTS[i])
+            .filter((cp): cp is (typeof CHECKPOINTS)[number] => !!cp)
+            .map((cp) => ({ x: cp.x, y: cp.y }));
+          if (clearedPositions.length === 0) return;
+          for (const rec of fogBlobs) {
+            if (rec.faded) continue;
+            const nearCleared = clearedPositions.some((p) => {
+              const dx = rec.baseX - p.x;
+              const dy = rec.baseY - p.y;
+              return dx * dx + dy * dy <= CLEAR_RADIUS * CLEAR_RADIUS;
+            });
+            if (!nearCleared) continue;
+            rec.faded = true;
+            // Stop the alpha-breathing tween so it can't fight the
+            // fade-out. Phaser's tween manager keyed on the target
+            // handles this cleanly.
+            this.tweens.killTweensOf(rec.image);
+            // Also cancel the drift + rotation tweens — the blob
+            // should just fade in place, not keep swimming.
+            this.tweens.add({
+              targets: rec.image,
+              alpha: 0,
+              duration: 1400,
+              ease: "Sine.easeOut",
+              onComplete: () => rec.image.setVisible(false),
+            });
+          }
+        };
+        const onCleared = (evt: {
+          type: "FOG_CLEARED_CHECKPOINTS";
+          clearedCpIndices: readonly number[];
+        }) => {
+          if (evt.type !== "FOG_CLEARED_CHECKPOINTS") return;
+          applyClearedCps(evt.clearedCpIndices);
+        };
+        // Use onPhaser (React → Phaser channel). It returns an
+        // unsubscribe fn we call on scene shutdown to prevent stale
+        // handlers firing after nav-away.
+        const unsubscribeCleared = eventBridge.onPhaser(
+          "FOG_CLEARED_CHECKPOINTS",
+          onCleared,
+        );
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+          unsubscribeCleared();
+        });
+      }
       // Boss HP bar above the sprite removed on the world map per
       // product ask ("you can remove fog of vagueness XP bar on the
       // map"). The same HP is still shown in the bottom HUD's

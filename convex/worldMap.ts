@@ -1517,6 +1517,34 @@ export const getToolData = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
 
+    // PRIVACY GATE (2026-08-16) — Kanban / Calendar / Journal / other
+    // per-venture tool payloads are private working state. Without
+    // this ownership check, any authenticated user who opened someone
+    // else's venture in viewer mode could open the Adventurer's Menu
+    // and read the owner's private cards, events, and journal entries.
+    // Owner + accepted contributors keep full access; everyone else
+    // gets null (the tool UIs already handle null as "no data yet").
+    const venture = await ctx.db.get(args.ventureId);
+    if (!venture) return null;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+    if (!user) return null;
+    const isOwner = venture.userId === user._id;
+    let isContributor = false;
+    if (!isOwner && venture.ideaId) {
+      const accepted = await ctx.db
+        .query("contributionRequests")
+        .withIndex("by_contributor_status", (q) =>
+          q.eq("contributorId", user._id).eq("status", "accepted"),
+        )
+        .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
+        .first();
+      isContributor = !!accepted;
+    }
+    if (!isOwner && !isContributor) return null;
+
     const toolDoc = await ctx.db
       .query("ventureTools")
       .withIndex("by_venture_tool", (q) =>

@@ -38,6 +38,14 @@ import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { IdeaForgeRightRail } from "@/components/ideaforge/right-rail";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
 import { IdeaWizard } from "@/components/ideas/IdeaWizard";
+// FlareFeedSection is the browsable "help requests" surface — the
+// component was built alongside FlareCompose but was never mounted
+// anywhere in /app until this tab wiring landed. Users could fire a
+// flare from the map's saddlebag but had no way to see other people's
+// live flares. Rendering it under the new "Flares" feed tab restores
+// that surface without adding a new route.
+import { FlareFeedSection } from "@/components/flares/FlareFeedSection";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   cardSurface,
   ComposerDraft,
@@ -309,9 +317,32 @@ export function IdeaForgeExperience({
                   ))}
                 </div>
               ) : mode === "feed" ? (
-                currentIdeas.length > 0 ? (
-                  <div className="space-y-5">
-                    {currentIdeas.map((idea) => {
+                <div className="space-y-5">
+                  {/* FLARES module — inline at the TOP of the "For You"
+                      feed (only), above the ideas list. This is where
+                      the community's live help-requests surface has
+                      always lived; a previous refactor accidentally
+                      unmounted it. Rendering on For You (the default
+                      landing tab) preserves the "5-second glance at
+                      who needs a hand" behaviour without cluttering
+                      Latest / Hot / Following, which are content
+                      surfaces the user opts into explicitly. Rendered
+                      OUTSIDE the currentIdeas.length check so flares
+                      stay visible even when the ideas list is empty. */}
+                  {feedTab === "for-you" && (
+                    <FlareFeedSection
+                      limit={30}
+                      // CurrentUserProfile._id is a plain string; the
+                      // FlareFeedSection expects the branded Id
+                      // form. Runtime value is identical, cast is safe.
+                      currentUserId={
+                        (currentUser?._id as Id<"users"> | undefined) ??
+                        null
+                      }
+                    />
+                  )}
+                  {currentIdeas.length > 0 ? (
+                    currentIdeas.map((idea) => {
                       const isMyIdea = idea.authorId === currentUser?._id;
                       return (
                         <IdeaStoryCard
@@ -327,16 +358,16 @@ export function IdeaForgeExperience({
                           onSelectTag={onSearchChange}
                         />
                       );
-                    })}
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="Nothing matched this feed yet"
-                    description="Try another search, switch to a different feed tab, or post the spark that should exist here."
-                    actionLabel="+ Post an Idea"
-                    onAction={openWizard}
-                  />
-                )
+                    })
+                  ) : (
+                    <EmptyState
+                      title="Nothing matched this feed yet"
+                      description="Try another search, switch to a different feed tab, or post the spark that should exist here."
+                      actionLabel="+ Post an Idea"
+                      onAction={openWizard}
+                    />
+                  )}
+                </div>
               ) : myIdeasTab === "analytics" ? (
                 <MyIdeasAnalytics
                   ideas={ideas}

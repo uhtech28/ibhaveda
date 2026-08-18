@@ -36,6 +36,13 @@ import { api } from "../../../convex/_generated/api";
 import { PersonaSelector } from "@/components/persona/PersonaSelector";
 import type { PersonaId } from "@/config/personas";
 import { useTutorialOptional } from "@/components/tutorial/v2/useTutorial";
+// Real animated Sparky puppy sprite — same one TutorialMascot uses
+// on /feed. Product ask (2026-08-16, 4th time): "after selecting
+// persona this is coming instead of our original sparky". Previous
+// inline overlay drew a static "chat bubble with eyes" placeholder
+// glyph; users expect the actual pixel-art puppy from the rest of
+// the tutorial for visual consistency.
+import { AnimatedSparky } from "@/components/tutorial/v2/puppy/AnimatedSparky";
 
 export default function PersonaSetupPage() {
   const { isLoaded, userId } = useAuth();
@@ -257,41 +264,34 @@ function SparkyIntroOverlay({ onContinue }: { onContinue: () => void }) {
               "0 40px 80px -20px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.02)",
           }}
         >
+          {/* Template-neutral welcome — the persona-setup screen runs
+              BEFORE the user picks a template, so "launching a real
+              venture" was wrong for 3 of 4 users (academic → thesis,
+              lab → experiment, creative → creation). Keeping this in
+              sync with the neutral fallback in
+              src/config/templates/tutorialCopy.ts VENTURE.welcomeLine. */}
           <p className="text-[15px] leading-relaxed sm:text-[16px]">
             Hi, I&apos;m Sparky! I&apos;ll walk you through your entire
-            journey, from your first idea to launching a real venture.
+            journey, from your first idea to shipping something real.
             Ready?
           </p>
         </div>
 
-        {/* Sparky puppy sprite — same gold-outline glyph used elsewhere
-            in the tutorial mascot, kept inline so we don't have to
-            import the full animated component. Pixel-art pup at 96×96. */}
-        <div
-          className="grid h-[96px] w-[96px] flex-shrink-0 place-items-center rounded-full border border-[#F5C542]/40"
-          style={{
-            background:
-              "radial-gradient(circle at 35% 35%, #fde68a 0%, #f5c542 55%, #b8790a 100%)",
-            boxShadow: "0 0 24px rgba(245,197,66,0.35)",
-          }}
-          aria-hidden
-        >
-          <svg viewBox="0 0 24 24" width={56} height={56} fill="none">
-            <path
-              d="M6 10c0-3.5 2.7-6 6-6s6 2.5 6 6c0 1-.4 2-1 2.7l1 2.3-2.2-.6c-1 .7-2.3 1-3.8 1s-2.8-.3-3.8-1L6 15l1-2.3c-.6-.7-1-1.7-1-2.7Z"
-              fill="#3a2412"
-            />
-            <circle cx="10" cy="10" r="1" fill="#fff2c8" />
-            <circle cx="14" cy="10" r="1" fill="#fff2c8" />
-            <circle cx="10" cy="10" r="0.5" fill="#3a2412" />
-            <circle cx="14" cy="10" r="0.5" fill="#3a2412" />
-            <path
-              d="M11 12.5c.5.4 1.5.4 2 0"
-              stroke="#3a2412"
-              strokeWidth="0.6"
-              strokeLinecap="round"
-            />
-          </svg>
+        {/* Real animated Sparky puppy — same sprite used across the
+            tutorial on /feed, /map, and the persona-setup post-pick
+            intro. Speech prop is set so the puppy plays TALK while
+            the bubble text is on-screen (matches how TutorialMascot
+            drives him elsewhere). showSpeechBubble={false} because
+            the intro copy already renders in the card above — we
+            don't want a second bubble. */}
+        <div className="flex flex-shrink-0 items-center justify-center">
+          <AnimatedSparky
+            size={140}
+            speech="intro"
+            showSpeechBubble={false}
+            autoRoll={false}
+            ariaLabel="Sparky"
+          />
         </div>
 
         <button

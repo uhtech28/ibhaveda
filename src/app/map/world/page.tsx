@@ -56,8 +56,18 @@ import { getStageBoss, getStageSuperBoss, getStageMiniBosses } from "@/config/st
 import type { StageBoss } from "@/config/stage-bosses";
 import { getTemplate, type TemplateId } from "@/config/templates";
 import { SUPER_BOSS_POOL, type SuperBossPoolEntry } from "@/config/templates/venture.config";
-import { generateCheckpointLayout } from "@/lib/phaser/scenes/TemplateMapScene";
+// SSR-safe checkpoint layout helper — extracted from TemplateMapScene
+// because that file's top-level `import * as Phaser from "phaser"`
+// touches `window` and crashes Next.js server rendering ("window is
+// not defined" at module evaluation). The layout math is pure so it
+// lives in its own no-deps helper.
+import { generateCheckpointLayout } from "@/lib/phaser/utils/checkpoint-layout";
 import { getTemplateStageBoss } from "@/config/template-stage-bosses";
+import {
+  getStageCorruptionProfile,
+  getSuperBossCorruptionProfile,
+} from "@/config/bossCorruptionProfiles";
+import { CorruptionViewportWash } from "@/components/corruption/CorruptionOverlayCanvas";
 
 /**
  * Unified boss lookup that routes by templateId. For Venture (stages
@@ -1932,6 +1942,14 @@ function MapPageInner() {
   const shouldShowBossIntro =
     bossIntroSeen === false && !bossIntroDismissed && !tutorialPastCombat;
 
+  // ── Tutorial random-super-boss guarantee ──────────────────────────
+  // The effect that re-rolls assignedBosses on first tutorial view
+  // for a venture lives lower in this component — it must run AFTER
+  // `activeVentureId` is declared (line ~2240). Keeping the mutation
+  // hook here caused a TDZ ReferenceError: "Cannot access
+  // 'activeVentureId' before initialization". See the block right
+  // below the `activeVentureId` declaration for the actual effect.
+
   // â”€â”€ Persona wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Fetch the user's chosen persona so Phaser boots with the correct
   // spritesheet. `undefined` = query loading; `null` = signed-out or
@@ -2196,6 +2214,51 @@ function MapPageInner() {
     [activeVentureId],
   );
 
+  // ── Tutorial random-super-boss guarantee ──────────────────────────
+  // Product ask (2026-08-14): "the randomised one should only be there
+  // for the tutorial". Legacy ventures (created before the full 12-pool
+  // randomization landed) have assignedBosses stuck at [1] = Unraveller.
+  // Reading that verbatim into the tutorial means every legacy user
+  // still sees Unraveller.
+  //
+  // Fix: on the FIRST tutorial view for a venture, actively re-roll
+  // the venture's assignedBosses to a fresh random pool entry via
+  // rerollSuperBoss. localStorage flag `tutorialBossRolled:{ventureId}`
+  // makes this idempotent — refresh doesn't re-roll again, so combat
+  // matches the tutorial reveal. Once the user progresses past the
+  // tutorial (step >= 8), the flag stays set forever.
+  //
+  // This block MUST live below the `activeVentureId` declaration
+  // above — placing it earlier throws TDZ ("Cannot access
+  // 'activeVentureId' before initialization") because the useEffect
+  // dep array is evaluated on the very first render.
+  const rerollSuperBoss = useMutation(api.ventures.rerollSuperBoss);
+  const rerolledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!shouldShowBossIntro) return;
+    if (!activeVentureId) return;
+    if (rerolledRef.current === activeVentureId) return;
+    const storageKey = `tutorialBossRolled:${activeVentureId}`;
+    if (window.localStorage.getItem(storageKey) === "1") return;
+    // Mark up-front to survive React StrictMode double-mount.
+    rerolledRef.current = activeVentureId;
+    window.localStorage.setItem(storageKey, "1");
+    void rerollSuperBoss({
+      ventureId: activeVentureId as Id<"ventures">,
+    }).catch(() => {
+      // Silent — if the mutation fails, tutorial falls through to the
+      // existing assignedBosses[0] value (worst case: same as before).
+      // Clear the flag so a retry can happen.
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        /* no-op */
+      }
+      rerolledRef.current = null;
+    });
+  }, [shouldShowBossIntro, activeVentureId, rerollSuperBoss]);
+
   // Boot Phaser now that we know the templateId. Non-venture templates
   // skip the entire Village boot chain and just flip phaserReady=true
   // so <TemplateMapPlaceholder> can paint the background-image map
@@ -2306,6 +2369,33 @@ function MapPageInner() {
   // â”€â”€ Convex mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const advanceCheckpoint = useMutation(api.ventures.advanceCheckpoint);
   const advanceStage = useMutation(api.ventures.advanceStage);
+  // Corruption engine wiring — the mutations existed but were never
+  // called anywhere. Now: recordVentureActivity fires when the user
+  // opens the map (resets inactivity clock), reduceCorruptionOnCheckpoint
+  // fires when a CP is cleared (rewards active progress). Both are
+  // fire-and-forget — a network hiccup shouldn't block the map render.
+  const recordVentureActivity = useMutation(
+    api.corruptionEngine.recordVentureActivity,
+  );
+  const reduceCorruptionOnCheckpoint = useMutation(
+    api.corruptionEngine.reduceCorruptionOnCheckpoint,
+  );
+  // Ping activity the moment the user opens their map. This resets
+  // the inactivity clock — the daily cron that raises corruption on
+  // idle ventures now correctly sees the user as engaged for at least
+  // 24h from the visit. Guarded so we only fire once per venture per
+  // mount (the useMutation identity is stable so an infinite-effect
+  // dep loop is impossible, but we short-circuit for safety).
+  const activityPingedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const vid = activeVentureId;
+    if (!vid) return;
+    if (activityPingedRef.current === vid) return;
+    activityPingedRef.current = vid;
+    void recordVentureActivity({ ventureId: vid as Id<"ventures"> }).catch(
+      () => { /* silent — activity ping is best-effort */ },
+    );
+  }, [activeVentureId, recordVentureActivity]);
   const ensureVentureStructure = useMutation(
     api.ventures.ensureVentureStructure,
   );
@@ -2959,11 +3049,107 @@ function MapPageInner() {
     );
   }, [venture?._id, activeStage, activeCP, checkpoints]);
 
+  // ── Refresh-safe boss-gate seed ────────────────────────────────────
+  // Server-truth won checkpoints for this venture. Merges into the
+  // Set so `needsCheckpointBossCombat` returns false for CPs the user
+  // has already beaten — even on the ACTIVE CP where localStorage is
+  // intentionally ignored by mergeBossDefeatedState.
+  //
+  // Why this exists: after winning combat, the tutorial's Step3
+  // watchdog re-dispatches `tutorial:force-combat` every 3s while
+  // `stage === "combat"`. On refresh (before the Convex step-9 ack
+  // lands and reconciles the tutorial's local stage), that dispatcher
+  // reopened combat on whatever CP `startBossCombat` resolved to —
+  // the user was dumped back into a fresh round for a boss they'd
+  // just beaten. This server query is the ground truth: any CP with
+  // a `combatRounds` row at status="won" is off-limits for reopen.
+  const wonCheckpointsQuery = useQuery(
+    api.combat.getMyWonCheckpointIds,
+    activeVentureId ? { ventureId: activeVentureId as Id<"ventures"> } : "skip",
+  );
+  useEffect(() => {
+    if (!wonCheckpointsQuery || wonCheckpointsQuery.length === 0) return;
+    if (!checkpoints.length) return;
+    const wonIds = new Set(wonCheckpointsQuery as string[]);
+    const wonKeys: string[] = [];
+    for (const cp of checkpoints) {
+      if (wonIds.has(cp._id as unknown as string)) {
+        wonKeys.push(checkpointBossKey(cp.stage, cp.checkpoint));
+      }
+    }
+    if (wonKeys.length === 0) return;
+    setBossDefeatedAtCheckpoint((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const k of wonKeys) {
+        if (!next.has(k)) {
+          next.add(k);
+          changed = true;
+        }
+      }
+      // Also persist to storage so subsequent refreshes have a fast
+      // path (query still runs, but the Set is already correct on
+      // first render).
+      if (changed && venture?._id) {
+        persistCheckpointBossDefeated(venture._id, next);
+      }
+      return changed ? next : prev;
+    });
+  }, [wonCheckpointsQuery, checkpoints, venture?._id]);
+
+  // ── Fog per-CP fade dispatcher ────────────────────────────────────
+  // Village stage 1 (Fog of Vagueness) skips the corruption viewport
+  // wash to avoid polka-dot stacking with the Phaser fog cloud. That
+  // meant the per-CP `clearedZones` halo mechanic never fired on
+  // fog stages, so completing CP1 didn't visibly clear fog around
+  // CP1 (product ask 2026-08-16).
+  //
+  // Fix: emit FOG_CLEARED_CHECKPOINTS to VillageMapScene whenever
+  // the cleared-set changes for the current stage. The Phaser scene
+  // fades fog blobs whose SPAWN position is within CLEAR_RADIUS of
+  // any cleared CP's world position — same "hole in the fog" read
+  // as the corruption-wash halo, but built into the actual fog cloud.
+  useEffect(() => {
+    if (!phaserReady) return;
+    const stageCps = checkpoints.filter((cp) => cp.stage === activeStage);
+    const clearedIdx: number[] = [];
+    stageCps.forEach((cp, idx) => {
+      const key = checkpointBossKey(cp.stage, cp.checkpoint);
+      if (bossDefeatedAtCheckpoint.has(key)) clearedIdx.push(idx);
+    });
+    if (clearedIdx.length === 0) return;
+    eventBridge.dispatchToPhaser({
+      type: "FOG_CLEARED_CHECKPOINTS",
+      clearedCpIndices: clearedIdx,
+    });
+  }, [phaserReady, checkpoints, activeStage, bossDefeatedAtCheckpoint]);
+
   const startBossCombat = useCallback(
     (
       cp: { stage: number; checkpoint: number; _id: string },
       doneTasks: number,
     ) => {
+      // HARD SHORT-CIRCUIT — if this CP is already in the defeated
+      // Set (either from server-truth won-checkpoints seed or an
+      // in-session win), refuse to reopen combat. This is the last
+      // line of defence against Step3's watchdog re-firing
+      // `tutorial:force-combat` after refresh: the event still fires
+      // and the map still calls startBossCombat, but we bail before
+      // opening a fresh combat round.
+      //
+      // We do NOT auto-fire handleAdvance here. Earlier revision did
+      // and users hit "At least 2 of 3 tasks must be completed to
+      // advance" on the Convex side, because a returning (non-tour)
+      // user with only 1 completed task on the current CP can't
+      // advance regardless of combat state. The map already reflects
+      // the correct state — the CP is won, the boss discs are dim,
+      // and the tutorial's stage machine will reconcile to "flare"
+      // from the localStorage `tutorial-combat-done` flag on its own.
+      const gateKey = checkpointBossKey(cp.stage, cp.checkpoint);
+      if (bossDefeatedAtCheckpoint.has(gateKey)) {
+        return;
+      }
+
       const isLastCp = isLastCheckpointInStage(
         checkpoints,
         cp.stage,
@@ -3011,7 +3197,7 @@ function MapPageInner() {
         checkpoint: cp.checkpoint,
       });
     },
-    [checkpoints],
+    [checkpoints, venture?.templateId, bossDefeatedAtCheckpoint],
   );
 
   const bossCombatTargetRef = useRef(bossCombatTarget);
@@ -3106,7 +3292,21 @@ function MapPageInner() {
     activeCP,
     tourStateForPulse,
   ]);
-  const corruptionLevel = venture?.corruptionLevel ?? 0;
+  const rawCorruptionLevel = venture?.corruptionLevel ?? 0;
+  // Dev-only override — `?corruption=50` in the URL forces the map to
+  // render at that corruption level regardless of what Convex stores.
+  // Useful for previewing every template's corruption pattern without
+  // waiting for the inactivity cron. Client-side only — never patched
+  // to the venture doc. Any value out of 0-100 is ignored.
+  const corruptionOverride = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const raw = new URLSearchParams(window.location.search).get("corruption");
+    if (raw == null) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+    return n;
+  }, []);
+  const corruptionLevel = corruptionOverride ?? rawCorruptionLevel;
   const corruptionPhase = useMemo(() => {
     if (corruptionLevel >= 90) return "critical" as const;
     if (corruptionLevel >= 75) return "urgent" as const;
@@ -5040,6 +5240,16 @@ function MapPageInner() {
         checkpointId: cp._id as Id<"ventureCheckpoints">,
       });
 
+      // Feed the corruption engine — clearing a CP reduces corruption.
+      // Gold CPs (all 3 tasks done) reduce more per the engine's own logic.
+      // Fire-and-forget so a slow Convex ack doesn't stall the advance.
+      if (activeVentureId) {
+        void reduceCorruptionOnCheckpoint({
+          ventureId: activeVentureId as Id<"ventures">,
+          isGold: !!bossCombatTarget?.isGold,
+        }).catch(() => { /* silent — daily cron will normalize */ });
+      }
+
       if (afterBossVictory) {
         advancingFromBossRef.current = false;
         bossAdvanceCheckpointIdRef.current = null;
@@ -5678,9 +5888,35 @@ function MapPageInner() {
           dark, delivers 3 lines of villain speech, then the 4
           checkpoint bosses reveal one by one. Ends with a "Face them"
           CTA. Never plays again for this user (Convex-backed flag). */}
-      {phaserReady && shouldShowBossIntro && (
-        <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />
-      )}
+      {phaserReady && shouldShowBossIntro && (() => {
+        // First-visit cinematic — persona-agnostic. Uses whichever
+        // super boss got rolled for THIS venture (assignedBosses[0])
+        // instead of the hardcoded Unraveller default. Every user
+        // sees a different intro per the randomization spec.
+        const bossPoolId = Array.isArray(venture?.assignedBosses)
+          ? Number(venture.assignedBosses[0])
+          : NaN;
+        const pool = SUPER_BOSS_POOL[Number.isFinite(bossPoolId) ? bossPoolId - 1 : -1];
+        // Fallback to component defaults (Unraveller) if pool entry
+        // isn't ready yet — avoids a null-render race on first mount.
+        if (!pool) {
+          return <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />;
+        }
+        return (
+          <BossIntroCinematic
+            mainBossArt={pool.idleAsset ?? undefined}
+            mainBossTitle={pool.name}
+            speechLines={[
+              `So, you dare to dream of something new.`,
+              `I am ${pool.name}. I feed on every doubt you have yet to name.`,
+            ]}
+            minionsSpeechLine={
+              "You'll have to defeat my four minions before you can reach me."
+            }
+            onDone={() => setBossIntroDismissed(true)}
+          />
+        );
+      })()}
 
       {/* Per-stage super-boss intro cinematic â€” plays once per browser
           session per (templateId, stage). Uses the same component as
@@ -5745,6 +5981,193 @@ function MapPageInner() {
               }}
             />
           )}
+
+          {/* Boss-specific corruption viewport wash (client spec 2026-08-14).
+              Uses the CURRENT stage's boss profile (pattern + tint) from
+              bossCorruptionProfiles so different templates + different
+              stages surface a visually distinct corruption motif.
+              Opacity scales with the phase — creeping is subtle, urgent
+              and critical are stronger. Kept below the critical red-ring
+              (z-[13]) so both signals stack legibly. */}
+          {(() => {
+            if (!venture) return null;
+            // Product ask 2026-08-16: "make sure corruption model is
+            // on every map". Previously we returned null on Calm
+            // phase — but new ventures start at corruptionLevel: 0
+            // which means Calm, so users never saw corruption on a
+            // fresh map. Every map now paints a soft baseline wash
+            // at Calm (see opacityByPhase.calm below) so the mood
+            // reads immediately; the wash just gets denser as
+            // corruption climbs through Creeping → Critical.
+            const tid = (venture.templateId ?? "venture") as string;
+            // Two-layer corruption wash (2026-08-16):
+            //   • SUPER-BOSS profile → project-scoped villain the
+            //     player is fighting across the whole run. Painted
+            //     UNDERNEATH the stage layer at slightly lower opacity
+            //     so its tint shapes the ambient mood of the whole
+            //     map without drowning the per-stage motif.
+            //   • STAGE profile → the biome-specific antagonist for
+            //     the current stage. Sits ABOVE so its pattern (crack /
+            //     grid / vine / etc.) is the dominant read.
+            // Both use the same opacity ladder scaled by corruption
+            // phase. When only one profile resolves we fall back to a
+            // single-layer wash — matches the pre-refactor behaviour.
+            let stageProfile = getStageCorruptionProfile(tid, activeStage);
+            // Only VillageMapScene (venture template + stage 1) runs
+            // the Phaser fog-cloud replacement layer. On that scene
+            // we suppress the viewport wash so it doesn't stack into
+            // polka-dot spotting on top of the cloud.
+            //
+            // Every OTHER blob-pattern boss (Silence That Smothers
+            // on Creative stage 1, Saboteur of the Forge on Lab
+            // stage 4, etc.) uses TemplateMapScene which has NO fog-
+            // cloud replacement. Suppressing the wash there left the
+            // map with zero corruption ("cant se any corruption make
+            // sure corruption is on all maps" 2026-08-16). Scope the
+            // suppression to Village stage 1 only so every other
+            // template + stage keeps its wash.
+            const hasReplacementFogLayer = tid === "venture" && activeStage === 1;
+            const stageIsMistFog = stageProfile?.pattern === "blob";
+            if (hasReplacementFogLayer && stageIsMistFog) {
+              stageProfile = null;
+            }
+            // assignedBosses[0] = super-boss pool index (1..12) →
+            // SUPER_BOSS_POOL[id-1].id = "super_<slug>". Strip the
+            // prefix and hand the raw slug ("unraveller", etc.) to the
+            // profile lookup. Guards against non-array / out-of-range
+            // values from legacy ventures.
+            let superProfile = null as ReturnType<
+              typeof getSuperBossCorruptionProfile
+            > | null;
+            const raw = Array.isArray(venture.assignedBosses)
+              ? venture.assignedBosses[0]
+              : null;
+            const bossId = typeof raw === "number" ? raw : Number(raw);
+            if (
+              Number.isFinite(bossId) &&
+              bossId >= 1 &&
+              bossId <= SUPER_BOSS_POOL.length
+            ) {
+              const poolEntry = SUPER_BOSS_POOL[bossId - 1];
+              const superSlug = poolEntry?.id?.replace(/^super_/, "") ?? "";
+              // pool ids use underscores ("hollow_king"), the profile
+              // slugs use hyphens ("hollow-king") — normalize.
+              const normalized = superSlug.replace(/_/g, "-");
+              superProfile = getSuperBossCorruptionProfile(normalized);
+            }
+            // When VillageMapScene owns the map with its Phaser fog
+            // cloud, also suppress the super-boss viewport tint —
+            // otherwise its pattern (crack / grid / dither / etc.)
+            // stipples through the fog. Every other template keeps
+            // its super-boss ambient tint.
+            if (hasReplacementFogLayer && stageIsMistFog) {
+              superProfile = null;
+            }
+            if (!stageProfile && !superProfile) return null;
+            // Opacity ladder — every phase gets a real wash so the
+            // corruption motif is visible from the start of a run
+            // and just gets denser as things go wrong. Calm (0-24)
+            // added 2026-08-16 with a subtle 0.07 baseline so fresh
+            // ventures still show their template's corruption
+            // pattern immediately.
+            const opacityByPhase: Record<string, number> = {
+              calm: 0.07,
+              creeping: 0.14,
+              desaturated: 0.24,
+              urgent: 0.34,
+              critical: 0.44,
+            };
+            const op = opacityByPhase[corruptionPhase] ?? 0.15;
+            // ── Per-CP cleared zones ──────────────────────────────
+            // Product ask 2026-08-16: "when we complete 1 checkpoint
+            // then till checkpoint 1 area corruption disappears".
+            // For each cleared CP on the CURRENT stage, punch a
+            // radial hole in the stage wash. Positions come from:
+            //   • Village stage 1 → hand-tuned CHECKPOINTS in
+            //     VillageMapScene (normalized to a 1536×1024 map).
+            //   • Every other stage → generateCheckpointLayout, the
+            //     same serpentine helper the Phaser scenes use, so
+            //     the halo lands exactly on the CP disc.
+            // Radius = 14% of the shorter viewport dim → a soft
+            // ~130px halo on a 900px viewport that comfortably
+            // covers the CP + its immediate walking area.
+            const clearedZones: {
+              xPercent: number;
+              yPercent: number;
+              radiusPercent: number;
+            }[] = [];
+            const stageCps = checkpoints.filter(
+              (cp) => cp.stage === activeStage,
+            );
+            // Normalize CP positions to 0-1 space per stage.
+            let normalized: Array<{ x: number; y: number }> = [];
+            if (tid === "venture" && activeStage === 1) {
+              // Hand-tuned village CPs in a 1536×1024 map.
+              const MW = 1536;
+              const MH = 1024;
+              const VILLAGE_CPS: Array<{ x: number; y: number }> = [
+                { x: 173, y: 215 },
+                { x: 587, y: 633 },
+                { x: 1177, y: 662 },
+                { x: 1304, y: 325 },
+              ];
+              normalized = VILLAGE_CPS.map((p) => ({
+                x: p.x / MW,
+                y: p.y / MH,
+              }));
+            } else {
+              // Same serpentine layout as the Phaser scenes — 8%
+              // margin + 1.5-cycle sine. Use a canonical
+              // 1600×1200 to derive normalized coords; ratios are
+              // scale-invariant so any positive dims work.
+              const layout = generateCheckpointLayout(
+                1600,
+                1200,
+                stageCps.length,
+              );
+              normalized = layout.map((p) => ({
+                x: p.x / 1600,
+                y: p.y / 1200,
+              }));
+            }
+            // Match cleared status by CP index within stage.
+            stageCps.forEach((cp, idx) => {
+              const key = checkpointBossKey(cp.stage, cp.checkpoint);
+              if (!bossDefeatedAtCheckpoint.has(key)) return;
+              const pos = normalized[idx];
+              if (!pos) return;
+              clearedZones.push({
+                xPercent: pos.x * 100,
+                yPercent: pos.y * 100,
+                radiusPercent: 14,
+              });
+            });
+            // Super layer runs at ~65% of the stage opacity so it
+            // reads as an ambient tint rather than competing with the
+            // stage pattern. Stage layer at full opacity for the phase.
+            // Cleared halos ONLY punch the stage wash — the super-boss
+            // ambient tint stays uniform (it represents the project-
+            // wide villain, not the per-CP biome corruption).
+            return (
+              <>
+                {superProfile && (
+                  <CorruptionViewportWash
+                    profile={superProfile}
+                    opacity={op * 0.65}
+                    zIndex={11}
+                  />
+                )}
+                {stageProfile && (
+                  <CorruptionViewportWash
+                    profile={stageProfile}
+                    opacity={op}
+                    zIndex={12}
+                    clearedZones={clearedZones}
+                  />
+                )}
+              </>
+            );
+          })()}
 
           {/* Phase banner removed per user request */}
 

@@ -87,6 +87,20 @@ export function CombatQuestionCard({
   // Cleared when the real reaction lands.
   const [pendingAttack, setPendingAttack] = useState(false);
   const pendingAttackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Every time a REAL server reaction lands (hit / crit / counter),
+  // bump this counter. It's woven into the sprite React `key`, so a
+  // remount fires and the attack/hurt clip plays FRESH — even if the
+  // sprite was already keyed to the same state string via the earlier
+  // optimistic pendingAttack. Without this, the sequence was:
+  //   click → pendingAttack sets state="hurt" → clip plays once for
+  //   1.8s → sprite freezes on frame 0 (fillMode=none) → server
+  //   responds 2-4s later, sets bossReaction="hit" which ALSO maps to
+  //   state="hurt" → same React key → no remount → no second play.
+  //   User never actually saw the damage animation because the visible
+  //   window was over before the outcome committed.
+  // Counter-based key forces a clean second play the moment the real
+  // reaction arrives, at the tuned slow FPS (~1.8s boss / ~3s persona).
+  const [reactionEpoch, setReactionEpoch] = useState(0);
   const [bossDamage, setBossDamage] = useState<number | null>(null);
   const [playerDamage, setPlayerDamage] = useState<number | null>(null);
   const lastBossHpRef = useRef(bossHpCurrent);
@@ -170,6 +184,11 @@ export function CombatQuestionCard({
       const critThreshold = bossHpInitial * 0.2;
       const kind: ReactionKind = bossDelta >= critThreshold ? "crit" : "hit";
       setBossReaction(kind);
+      // Bump epoch → sprite React key changes → attack/hurt clips
+      // remount and replay from frame 0 at the slow cinematic FPS,
+      // guaranteeing the player sees the damage beat even when the
+      // server response outran the optimistic pendingAttack clip.
+      setReactionEpoch((e) => e + 1);
       setBossDamage(Math.round(bossDelta));
       // Reaction hold bumped (2026-08-10) — with the slower FPS above
       // the 9-frame hurt clip now runs ~2.7s at 3-4fps, so returning
@@ -191,6 +210,10 @@ export function CombatQuestionCard({
     } else if (playerDelta > 0) {
       // Boss counter-attacked. Show player damage flash + boss "counter" pose.
       setBossReaction("counter");
+      // See bossDelta branch above for why we bump the epoch — same
+      // remount trick makes the boss's counter-swing and the persona's
+      // hurt recoil replay cleanly at slow cinematic speed.
+      setReactionEpoch((e) => e + 1);
       setPlayerHurt(true);
       setPlayerDamage(Math.round(playerDelta));
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
@@ -469,6 +492,7 @@ export function CombatQuestionCard({
           bossReaction={bossReaction}
           playerHurt={playerHurt}
           pendingAttack={pendingAttack}
+          reactionEpoch={reactionEpoch}
           bossAsset={boss?.idleAsset ?? null}
           checkpointIndex={boss?.checkpointIndex ?? null}
           founderAsset={founderAsset}
@@ -1616,6 +1640,7 @@ function BattleScene({
   bossReaction,
   playerHurt,
   pendingAttack = false,
+  reactionEpoch = 0,
   bossAsset = null,
   checkpointIndex = null,
   founderAsset = null,
@@ -1631,6 +1656,14 @@ function BattleScene({
   /** Optimistic persona pre-swing fired the moment the user submits.
    *  Bridges the 2-3s server round-trip with instant visual feedback. */
   pendingAttack?: boolean;
+  /** Increments every time a REAL server reaction lands. Woven into
+   *  the persona + boss sprite React keys so the attack/hurt clips
+   *  remount and replay from frame 0 at the tuned slow FPS — without
+   *  this, the optimistic pending clip and the confirmed reaction
+   *  clip share a state string ("hurt"/"attack") so no remount fires
+   *  and the animation only plays once (invisibly if the server is
+   *  slower than the 1.8s boss clip / 3s persona clip). */
+  reactionEpoch?: number;
   bossAsset?: string | null;
   checkpointIndex?: number | null;
   founderAsset?: string | null;
@@ -1704,9 +1737,34 @@ function BattleScene({
   // fade + shrink animation has time to READ — the 1400ms transform
   // transition wants at least 1400ms of visible time plus a small
   // hold beat at the end. Defeat clip cadence unchanged.
+  // ── Killing-blow beat ("finisher") ─────────────────────────────────
+  // Product ask (2026-08-16): "when we have retreat time then no attack
+  // damage animation, it should be attack damage then retreat". Refined:
+  // "first damage is playing then attack, first attack should be played".
+  //
+  // On the winning blow, the visible sequence must be strictly:
+  //   swing  → persona sword-swing, boss still standing (no recoil yet)
+  //   impact → boss recoils from the hit, persona holds the follow-through
+  //   retreat → villain slides off
+  //   defeat  → holds off-screen
+  //   cheer   → persona victory loop
+  //
+  // Splitting the finisher into `swing` (persona attack only) and
+  // `impact` (boss hurt only) gives the classic wind-up → contact
+  // beat instead of both animations firing at t=0, which read as
+  // "damage happened first" because the boss's first hurt frame
+  // is a hard recoil pose.
+  const FINISHER_SWING_MS = 900;   // persona wind-up + swing arc
+  const FINISHER_IMPACT_MS = 1800; // boss recoil clip + short hold
   const RETREAT_STAGE_MS = 2200;
   const DEFEAT_STAGE_MS = 2200;
-  type CinematicStage = "none" | "retreat" | "defeat" | "cheer";
+  type CinematicStage =
+    | "none"
+    | "finisher-swing"
+    | "finisher-impact"
+    | "retreat"
+    | "defeat"
+    | "cheer";
   const [cinematicStage, setCinematicStage] = useState<CinematicStage>("none");
   useEffect(() => {
     if (outcome === "active") {
@@ -1714,22 +1772,39 @@ function BattleScene({
       return;
     }
     if (outcome === "won") {
-      // WIN sequence: retreat banner → boss defeat → persona cheer.
-      // The "retreating" beat is a gamification flourish requested by
-      // product — it re-frames the ending as the villain fleeing, not
-      // just an HP-bar-hits-zero moment.
-      setCinematicStage("retreat");
-      const t1 = window.setTimeout(
-        () => setCinematicStage("defeat"),
-        RETREAT_STAGE_MS,
+      // WIN sequence: finisher-swing → finisher-impact → retreat →
+      //               defeat → cheer.
+      // The FINISHER split (2026-08-16) enforces attack-then-damage
+      // order — the swing sub-beat shows the persona committing to
+      // the strike while the boss stays upright, then the impact
+      // sub-beat delivers the recoil. Prior single-stage finisher
+      // played both clips in parallel and the boss's hard first
+      // hurt frame read as "damage before swing".
+      setCinematicStage("finisher-swing");
+      const tImpact = window.setTimeout(
+        () => setCinematicStage("finisher-impact"),
+        FINISHER_SWING_MS,
       );
-      const t2 = window.setTimeout(
+      const tRetreat = window.setTimeout(
+        () => setCinematicStage("retreat"),
+        FINISHER_SWING_MS + FINISHER_IMPACT_MS,
+      );
+      const tDefeat = window.setTimeout(
+        () => setCinematicStage("defeat"),
+        FINISHER_SWING_MS + FINISHER_IMPACT_MS + RETREAT_STAGE_MS,
+      );
+      const tCheer = window.setTimeout(
         () => setCinematicStage("cheer"),
-        RETREAT_STAGE_MS + DEFEAT_STAGE_MS,
+        FINISHER_SWING_MS +
+          FINISHER_IMPACT_MS +
+          RETREAT_STAGE_MS +
+          DEFEAT_STAGE_MS,
       );
       return () => {
-        window.clearTimeout(t1);
-        window.clearTimeout(t2);
+        window.clearTimeout(tImpact);
+        window.clearTimeout(tRetreat);
+        window.clearTimeout(tDefeat);
+        window.clearTimeout(tCheer);
       };
     }
     // LOSS: skip the retreat beat (the boss is triumphant, no retreat).
@@ -2043,6 +2118,13 @@ function BattleScene({
           <BossSpriteFromAsset
             bossAsset={bossAsset}
             displayWidth={bossDisplayWidth}
+            // reactionEpoch bumps on every real hit/crit/counter, and
+            // feeds into the inner sprite key so the hurt/attack clip
+            // remounts + replays from frame 0 at the slow cinematic FPS.
+            // Without it, the animation only played once (during the
+            // optimistic pendingAttack) and finished before the server
+            // response landed.
+            replayKey={reactionEpoch}
             // Endgame-first: on WIN, boss's opacity has already gone
             // to 0 above so this state doesn't matter (boss faded out
             // — but we still send "defeat" for parity in case of
@@ -2065,7 +2147,15 @@ function BattleScene({
               // - lost → boss WINS → wait through defeat stage in
               //          idle, then VICTORY loop when at center.
               outcome === "won"
-                ? "idle"
+                // WIN cinematic staging (2-beat finisher):
+                //   finisher-swing  → hold IDLE (boss still upright as
+                //                     the persona winds up + swings).
+                //   finisher-impact → HURT clip (recoil from the hit).
+                //   retreat / defeat / cheer → IDLE while the villain
+                //                     slides off / stays gone.
+                ? cinematicStage === "finisher-impact"
+                  ? "hurt"
+                  : "idle"
                 : outcome === "lost"
                   ? cinematicStage === "cheer"
                     ? "victory"
@@ -2133,6 +2223,11 @@ function BattleScene({
         {founderAsset && personaIdForSprite ? (
           <AnimatedPersonaSprite
             personaId={personaIdForSprite}
+            // See boss above — replayKey remounts the persona sprite on
+            // every real reaction so the attack/hurt clip plays fresh
+            // at slow FPS instead of silently expiring during the
+            // optimistic pending window.
+            replayKey={reactionEpoch}
             slowMotion={
               // Slow the ATTACK / HURT clips so the user can actually
               // see the swing/recoil instead of it whipping past in
@@ -2155,9 +2250,23 @@ function BattleScene({
               outcome === "lost"
                 ? "defeat"
                 : outcome === "won"
-                  ? cinematicStage === "cheer"
-                    ? "victory"
-                    : "idle"
+                  // Persona WIN staging (2-beat finisher):
+                  //   finisher-swing  → ATTACK clip fires first — the
+                  //                     killing wind-up + swing arc,
+                  //                     played BEFORE any boss recoil
+                  //                     so the sequence reads as
+                  //                     swing → contact → damage, not
+                  //                     damage → swing.
+                  //   finisher-impact → hold ATTACK (follow-through)
+                  //                     while the boss plays HURT.
+                  //   retreat / defeat → hold IDLE (proud stance).
+                  //   cheer → VICTORY loop at center-stage.
+                  ? cinematicStage === "finisher-swing" ||
+                    cinematicStage === "finisher-impact"
+                    ? "attack"
+                    : cinematicStage === "cheer"
+                      ? "victory"
+                      : "idle"
                   : playerHurt
                     ? "hurt"
                     : bossReaction === "hit" || bossReaction === "crit"
@@ -2205,11 +2314,15 @@ function BattleScene({
           decorative — no pointer-events, no state escalation into
           the tutorial's global Sparky module. */}
       <div
-        className="pointer-events-none absolute z-[6] left-1 sm:left-4"
+        className="pointer-events-none absolute z-[6] left-[52px] sm:left-[64px]"
         style={{
           // Shifted ~1cm (~37px at 96dpi) upward per product request so
           // Sparky sits higher and reads as tucked NEXT TO the persona
-          // rather than at the arena floor line.
+          // rather than at the arena floor line. Horizontal offset was
+          // bumped ~2cm (~76px @ 96dpi) rightward (was left-1 / sm:left-4)
+          // so Sparky reads as physically shoulder-to-shoulder with the
+          // persona instead of floating alone at the arena edge —
+          // matches product ask "shift sparky 2 cm right toward persona".
           bottom: 43,
           opacity:
             cinematicStage === "cheer" && outcome === "lost" ? 0.35 : 1,
@@ -2678,6 +2791,7 @@ function AnimatedPersonaSprite({
   onStateComplete,
   displayWidth = 120,
   slowMotion = false,
+  replayKey = 0,
 }: {
   personaId: PersonaId;
   state: PersonaAnimState;
@@ -2689,6 +2803,11 @@ function AnimatedPersonaSprite({
    *  victory) always play at their cinematic-slow cadence
    *  independent of this flag. */
   slowMotion?: boolean;
+  /** Bumped by the parent every time a REAL server reaction lands.
+   *  Woven into the React key so the clip remounts + replays from
+   *  frame 0, even when the sprite was already keyed to the same
+   *  state string via the optimistic pendingAttack. */
+  replayKey?: number;
 }) {
   // Look up the persona's extended config to get the correct frame size,
   // frame count, and per-clip fps. Falls back to alchemist's 88×88 x9 if
@@ -2766,7 +2885,7 @@ function AnimatedPersonaSprite({
             : Math.max(4, Math.round(combatFps * 0.55));
   return (
     <AnimatedSpritesheet
-      key={`${personaId}:${state}`}
+      key={`${personaId}:${state}:${replayKey}`}
       sheetUrl={sheet}
       frameCount={frameCount}
       frameWidth={frameWidth}
@@ -2796,6 +2915,7 @@ function BossSpriteFromAsset({
   state = "idle",
   onStateComplete,
   displayWidth = 300,
+  replayKey = 0,
 }: {
   bossAsset: string;
   state?: BossAnimState;
@@ -2804,6 +2924,11 @@ function BossSpriteFromAsset({
    *  cinematic 300; mobile callers pass ~180 so the boss doesn't
    *  crowd the whole arena on phones. */
   displayWidth?: number;
+  /** Bumped by the parent every time a REAL server reaction lands.
+   *  Woven into the React key so the clip remounts + replays from
+   *  frame 0, even when the sprite was already keyed to the same
+   *  state string via the optimistic pendingAttack. */
+  replayKey?: number;
 }) {
   // Per-CLIP frame counts because most bosses have short 4-frame idle
   // loops but longer 9-frame combat clips (attack / hurt / defeat /
@@ -3237,14 +3362,59 @@ function BossSpriteFromAsset({
         defeat: { frames: 9, frameWidth: 92, frameHeight: 92 },
       },
     },
-    // Existing /incoming/ super-pool bosses ARE already animated
-    // through their own super-pool entries earlier in this list, so no
-    // Creative entries needed for the alias-reuse slots (Silence That
-    // Smothers → silencer, Beast of Unfinished → golem, Crowd of
-    // False Validation → councillor, Harbourmaster / Babel Merchant
-    // already have super-pool entries). Creative Stage 2 + 5 pending
-    // art fall through to the FALLBACK_BOSS (village fog) which is
-    // already registered above.
+    // ── Creative template bosses (2026-08-14) — all 5 stages now
+    //   have their own bespoke Pixellab art (Silence That Smothers,
+    //   Curator of Derivative Ghosts, Beast of Unfinished, Crowd of
+    //   False Validation, Perfectionist's Spectre). Frame sizes vary
+    //   84-96 per pack. Fallback chain covers missing clips per boss.
+    {
+      match: "/bosses/creative/silence-that-smothers/idle.png",
+      folder: "/assets/bosses/creative/silence-that-smothers",
+      clips: {
+        idle:   { frames: 1, frameWidth: 96, frameHeight: 96 },
+        attack: { frames: 9, frameWidth: 96, frameHeight: 96 },
+        hurt:   { frames: 9, frameWidth: 96, frameHeight: 96 },
+        defeat: { frames: 9, frameWidth: 96, frameHeight: 96 },
+      },
+    },
+    {
+      match: "/bosses/creative/curator-of-derivative-ghosts/idle.png",
+      folder: "/assets/bosses/creative/curator-of-derivative-ghosts",
+      clips: {
+        idle:   { frames: 4, frameWidth: 88, frameHeight: 88 },
+        attack: { frames: 9, frameWidth: 88, frameHeight: 88 },
+        hurt:   { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/creative/beast-of-the-unfinished/idle.png",
+      folder: "/assets/bosses/creative/beast-of-the-unfinished",
+      clips: {
+        idle:   { frames: 4, frameWidth: 92, frameHeight: 92 },
+        attack: { frames: 9, frameWidth: 92, frameHeight: 92 },
+        defeat: { frames: 9, frameWidth: 92, frameHeight: 92 },
+      },
+    },
+    {
+      match: "/bosses/creative/crowd-of-false-validation/idle.png",
+      folder: "/assets/bosses/creative/crowd-of-false-validation",
+      clips: {
+        idle: { frames: 4, frameWidth: 88, frameHeight: 88 },
+        // No attack clip shipped — fallback chain uses hurt during
+        // attack window (a wince-recoil reads as a bracing-to-strike
+        // pose for the Crowd's multi-headed silhouette).
+        hurt: { frames: 9, frameWidth: 88, frameHeight: 88 },
+      },
+    },
+    {
+      match: "/bosses/creative/perfectionists-spectre/idle.png",
+      folder: "/assets/bosses/creative/perfectionists-spectre",
+      clips: {
+        idle:   { frames: 4, frameWidth: 84, frameHeight: 84 },
+        attack: { frames: 9, frameWidth: 84, frameHeight: 84 },
+        hurt:   { frames: 9, frameWidth: 84, frameHeight: 84 },
+      },
+    },
   ];
   const sheetDef = SPRITESHEET_BOSSES.find((s) => bossAsset.includes(s.match));
   if (!sheetDef) {
@@ -3313,7 +3483,7 @@ function BossSpriteFromAsset({
           : 5;
   return (
     <AnimatedSpritesheet
-      key={useState_}
+      key={`${useState_}:${replayKey}`}
       sheetUrl={sheetUrl}
       frameCount={spec.frames}
       frameWidth={spec.frameWidth}

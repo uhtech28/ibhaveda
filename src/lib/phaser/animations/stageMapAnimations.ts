@@ -168,7 +168,12 @@ function resolveState(
 
 export interface MovingBossHandle {
   sprite: Phaser.GameObjects.Sprite;
-  anchor: Phaser.GameObjects.Ellipse;
+  /** Legacy body-shadow anchor. The dark-ellipse implementation was
+   *  removed 2026-08-16 (see spawnMovingBoss); this is now a
+   *  hidden zero-size rectangle so existing setVisible / setPosition
+   *  calls stay no-op safe. Widened the type to GameObject so future
+   *  callers can drop the field entirely without another type break. */
+  anchor: Phaser.GameObjects.GameObject;
   hpBar: BossHpBar | null;
   boss: StageBoss;
   stage: number;
@@ -203,30 +208,17 @@ export function spawnMovingBoss(
   sprite.setScale(scale);
   sprite.setDepth(depth);
 
-  // Contrast anchor — matches VillageMapScene.ts:1272-1290. Dark ellipse
-  // behind the sprite so pale-palette bosses don't wash out.
-  const anchorW = sprite.displayWidth * 1.15;
-  const anchorH = sprite.displayHeight * 1.35;
-  const anchor = scene.add.ellipse(
-    sprite.x,
-    sprite.y - sprite.displayHeight * 0.5,
-    anchorW,
-    anchorH,
-    0x0a0a1a,
-    0.28,
-  );
+  // Contrast anchor removed 2026-08-16 ("remove this black circle from
+  // all maps"). Was a wide 0x0a0a1a dark ellipse behind the sprite
+  // meant as a subtle body-shadow for pale-palette bosses, but on the
+  // template maps it read as an ominous black halo. VillageMapScene
+  // dropped the same anchor earlier; parity here fixes academic /
+  // lab / creative. Downstream `handle.anchor` accessors now receive
+  // a lightweight placeholder rectangle at alpha 0 so any code that
+  // calls setVisible / setPosition on it stays no-op safe.
+  const anchor = scene.add.rectangle(sprite.x, sprite.y, 1, 1, 0x000000, 0);
   anchor.setDepth(depth - 3);
-
-  // Anchor follows the sprite as it bobs/tweens.
-  scene.time.addEvent({
-    delay: 16,
-    loop: true,
-    callback: () => {
-      if (!sprite.active) return;
-      anchor.setPosition(sprite.x, sprite.y - sprite.displayHeight * 0.5);
-      anchor.setVisible(sprite.visible);
-    },
-  });
+  anchor.setVisible(false);
 
   // Play idle animation if available; else the static image is already
   // painted by the constructor call.

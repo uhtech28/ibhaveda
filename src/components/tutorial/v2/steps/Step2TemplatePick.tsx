@@ -20,6 +20,8 @@ import { TutorialMascot, type SparkyMood } from "../TutorialMascot";
 import { TutorialHighlight } from "../TutorialHighlight";
 import { SuggestedContributorsDialog } from "../SuggestedContributorsDialog";
 import { useTutorial } from "../useTutorial";
+import { useActiveVentureTemplateId } from "@/lib/tutorial/useActiveVentureTemplateId";
+import { resolveTutorialCopy } from "@/config/templates/tutorialCopy";
 
 type DialogueState =
   | "intro"
@@ -187,6 +189,14 @@ export function Step2TemplatePick() {
   const tutorial = useTutorial();
   const pathname = usePathname();
   const router = useRouter();
+  // Template-aware Sparky vocabulary — the welcome pitch and the
+  // suggested-contributors prompt read differently for a Venture
+  // founder vs an Academic scholar vs a Lab researcher vs a Creative
+  // maker. See src/config/templates/tutorialCopy.ts for the full map.
+  // Falls back to VENTURE when the user hasn't created a venture yet
+  // (first-ever tutorial run), so the intro line stays sensible.
+  const activeTemplateId = useActiveVentureTemplateId();
+  const copy = resolveTutorialCopy(activeTemplateId);
 
   // Step numbering (Step2 owns 3-6):
   //   3 click + · 4 pick template · 5 write outline · 6 posted/heading map.
@@ -471,7 +481,7 @@ export function Step2TemplatePick() {
         // First-meeting hello. Sparky introduces himself and waits for
         // the user to hit Continue before the guided flow kicks off.
         return {
-          text: "Hi, I'm Sparky! I'll walk you through your entire journey, from your first idea to launching a real venture. Ready?",
+          text: copy.welcomeLine,
           mood: "talking",
           highlight: null,
           primary: {
@@ -562,7 +572,11 @@ export function Step2TemplatePick() {
           },
         };
     }
-  }, [dialogue, tutorial, router]);
+    // `copy` (template-aware welcome + collaborator noun) participates
+    // in the memo so switching templates mid-session refreshes the
+    // Sparky lines.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialogue, tutorial, router, copy]);
 
   // Fetch the user's most recent idea so we can target contribution
   // requests at it during the `contributors` step. Only queried once
@@ -619,7 +633,10 @@ export function Step2TemplatePick() {
         />
         <TutorialMascot
           visible
-          text="Pick a builder and tap Send request — I'll auto-write the pitch and take you straight to your map."
+          // "builder" → template-aware ("collaborator" for academic,
+          // "lab partner" for lab, "co-creator" for creative). Falls
+          // back to "builder" for venture / null template.
+          text={`Pick a ${copy.collaboratorNoun} and tap Send request — I'll auto-write the pitch and take you straight to your map.`}
           mood="pointing"
           // Bottom-left so Sparky sits BESIDE the centered contributor
           // modal (max-w-560px) instead of overlapping its Send

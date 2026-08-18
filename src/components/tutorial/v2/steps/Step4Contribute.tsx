@@ -25,6 +25,8 @@ import { usePathname } from "next/navigation";
 import { TutorialMascot, type SparkyMood } from "../TutorialMascot";
 import { TutorialHighlight } from "../TutorialHighlight";
 import { useTutorial } from "../useTutorial";
+import { useActiveVentureTemplateId } from "@/lib/tutorial/useActiveVentureTemplateId";
+import { resolveTutorialCopy } from "@/config/templates/tutorialCopy";
 
 // "finale" — final send-off message shown after the user hits Send
 // Request. Sparky congratulates them and offers a Continue CTA that
@@ -76,6 +78,11 @@ export function Step4Contribute() {
   const tutorial = useTutorial();
   const pathname = usePathname();
   const onFeed = pathname === "/feed";
+  // Template-aware feed tagline — "projects" for venture, "theses" for
+  // academic, "experiments" for lab, "creations" for creative. See
+  // tutorialCopy.ts. Falls back to venture wording for null template.
+  const activeTemplateId = useActiveVentureTemplateId();
+  const copy = resolveTutorialCopy(activeTemplateId);
 
   // Owns internal step 10 (contribute). Flare (step 9) lives on the
   // map and is owned by Step3MapGuide. We stay dormant until the user
@@ -222,7 +229,7 @@ export function Step4Contribute() {
         // Contribution Request to actually complete the step. The
         // stage machine advances on modal open/close, not a button.
         return {
-          text: "This is the feed, all our live projects. Send a contribution request to any idea that isn't yours. That's how you plug into a team.",
+          text: copy.feedTagline,
           mood: "pointing",
           near: null,
           highlight: null,
@@ -265,7 +272,10 @@ export function Step4Contribute() {
           highlight: null,
         };
     }
-  }, [stage]);
+    // `copy` (template-aware feed tagline) participates in the memo
+    // so switching templates mid-session refreshes the Sparky line.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, copy]);
 
   if (!active) return null;
   if (stage === "complete") return null;

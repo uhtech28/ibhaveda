@@ -422,7 +422,15 @@ export class TemplateMapScene extends Phaser.Scene {
     const pid = getCurrentPersonaId();
     attachEditorTestWalk(this, {
       getCharacter: () => this.personaHandle?.sprite ?? null,
-      isBlocked: () => false, // no per-map blockers yet on template scenes
+      // Viewer-mode freeze — the map page pushes `viewerMode = true`
+      // into the game registry when the user is spectating someone
+      // else's venture. `isBlocked` returning true stops the WASD /
+      // joystick driver from writing velocity to the sprite, so the
+      // persona stays parked. Owner writes are still refused elsewhere
+      // (CP click, task submission), but freezing movement matches
+      // the VillageMapScene behaviour — walking around someone else's
+      // map read as controlling their character.
+      isBlocked: () => this.registry?.get?.("viewerMode") === true,
       mapWidth,
       mapHeight,
       force: true,

@@ -23,6 +23,26 @@ import { audioManager } from "@/lib/audio/audioManager";
 interface Props {
   /** Called after the cinematic has been fully dismissed. */
   onDone: () => void;
+  /** Optional overrides so the parent (`map/world/page.tsx`) can
+   *  replace the hardcoded Unraveller reveal with WHICHEVER super
+   *  boss was randomly assigned to this venture (via `venture.
+   *  assignedBosses[0]` → SUPER_BOSS_POOL entry). When omitted, the
+   *  component falls back to the Unraveller defaults so existing
+   *  callers that only pass `onDone` keep working exactly as before.
+   *
+   *  Product ask 2026-08-16: "make super bosses random and the
+   *  random super boss should be there in tutorial" — without these
+   *  overrides the cinematic always showed Unraveller regardless of
+   *  the actual random pick, so the reroll effect had no visible
+   *  effect on the intro. */
+  mainBossArt?: string;
+  mainBossTitle?: string;
+  /** 1–3 lines the super boss speaks during `main-speech`. */
+  speechLines?: readonly string[];
+  /** Taunt over the minions reveal (during the four village-boss
+   *  strip). Only relevant for venture-template intros; other
+   *  templates hide the minion strip entirely (future work). */
+  minionsSpeechLine?: string;
 }
 
 type Phase =
@@ -33,7 +53,8 @@ type Phase =
   | "finale"         // "Face them, founder." + Continue button
   | "leaving";       // fade out on dismiss
 
-const MAIN_BOSS_ART = "/assets/bosses/village/unraveller/idle.png";
+const DEFAULT_MAIN_BOSS_ART = "/assets/bosses/village/unraveller/idle.png";
+const DEFAULT_MAIN_BOSS_TITLE = "The Unraveller";
 
 // Actual Venture stage function names (from convex/ventureConstants.ts
 // VENTURE_STAGES). Kept as a local mirror so this client component
@@ -45,22 +66,31 @@ const VENTURE_STAGE_FUNCTION_NAMES = [
   "Offer Design",
 ];
 
-// Speech that plays during the `main-speech` phase — Unraveller intro
-// lines BEFORE the minions are revealed. Kept intentionally short so
-// the pacing stays cinematic.
-const MAIN_SPEECH_LINES = [
+// Fallback speech for the `main-speech` phase — used only when the
+// parent doesn't pass `speechLines` (e.g. legacy callers). Real intros
+// come from SUPER_BOSS_POOL[id-1].speechLines in map/world/page.tsx.
+const DEFAULT_MAIN_SPEECH_LINES = [
   "So, you dare to dream of something new.",
   "I am the Unraveller. I feed on every doubt you have yet to name.",
 ];
 
-// Speech that plays over the minions reveal — the Unraveller taunts
-// while his four servants materialise beneath him. Split into a
-// dedicated line so it lands on the minion strip rather than being
-// buried in the intro monologue.
-const MINIONS_SPEECH_LINE =
+// Fallback taunt during the minions reveal (venture-template only).
+const DEFAULT_MINIONS_SPEECH_LINE =
   "You'll have to defeat my four minions before you can reach me.";
 
-export function BossIntroCinematic({ onDone }: Props) {
+export function BossIntroCinematic({
+  onDone,
+  mainBossArt = DEFAULT_MAIN_BOSS_ART,
+  mainBossTitle = DEFAULT_MAIN_BOSS_TITLE,
+  speechLines = DEFAULT_MAIN_SPEECH_LINES,
+  minionsSpeechLine = DEFAULT_MINIONS_SPEECH_LINE,
+}: Props) {
+  // Resolve the actual speech arrays used by the effects + render —
+  // defensive clamp so an empty override array doesn't break the
+  // typewriter's `speechIdx < length` loop.
+  const MAIN_SPEECH_LINES =
+    speechLines.length > 0 ? speechLines : DEFAULT_MAIN_SPEECH_LINES;
+  const MINIONS_SPEECH_LINE = minionsSpeechLine;
   const markSeen = useMutation(api.users.markBossIntroSeen);
   const [phase, setPhase] = useState<Phase>("curtain");
   const [speechIdx, setSpeechIdx] = useState(0);
@@ -283,8 +313,8 @@ export function BossIntroCinematic({ onDone }: Props) {
               style={{ willChange: "transform" }}
             >
               <img
-                src={MAIN_BOSS_ART}
-                alt="The Unraveller"
+                src={mainBossArt}
+                alt={mainBossTitle}
                 className="h-[200px] w-[200px] sm:h-[340px] sm:w-[340px]"
                 style={{
                   imageRendering: "pixelated",
@@ -333,7 +363,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                 textShadow: "0 6px 26px rgba(99, 102, 241, 0.35)",
               }}
             >
-              The Unraveller
+              {mainBossTitle}
             </div>
           </motion.div>
 
@@ -391,7 +421,7 @@ export function BossIntroCinematic({ onDone }: Props) {
                       }}
                     />
                     <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#9CA3AF] sm:text-[10px] sm:tracking-[0.32em]">
-                      The Unraveller
+                      {mainBossTitle}
                     </span>
                   </div>
 

@@ -1511,6 +1511,67 @@ export const resetMyCombat = mutation({
   },
 });
 
+// ─────────────────────────────────────────────────────────────────────
+// Public: won-checkpoint IDs for the current user (per venture)
+// ─────────────────────────────────────────────────────────────────────
+//
+// Refresh-safe boss-gate seed. Without this, `bossDefeatedAtCheckpoint`
+// on the map starts empty on refresh — even though the user already
+// won combat at CP N, the tutorial's watchdog dispatcher re-fires
+// `tutorial:force-combat`, `startBossCombat` opens on whatever the
+// current active CP resolves to, and the user is dropped back into a
+// fresh combat round they've already cleared. Storage-only tracking
+// isn't enough because `mergeBossDefeatedState` intentionally deletes
+// the active CP key from storage to avoid trusting tamperable state,
+// so the server has to be the source of truth on refresh.
+//
+// Returns every `combatRounds` row for the current user where status
+// is "won" and (optionally) the round belongs to the specified venture.
+// The client seeds its local Set on mount so `needsCheckpointBossCombat`
+// returns false for previously-won CPs before any user interaction.
+export const getMyWonCheckpointIds = query({
+  args: {
+    ventureId: v.optional(v.id("ventures")),
+  },
+  handler: async (
+    ctx,
+    { ventureId },
+  ): Promise<Array<Id<"ventureCheckpoints">>> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    // Reuse the file-local requireUser to resolve Clerk → users._id.
+    // Wrapped in a try so signed-out or half-provisioned users get an
+    // empty list instead of a throw — this query mounts on the map
+    // page and a throw would poison the whole subtree.
+    let userId: Id<"users">;
+    try {
+      userId = await requireUser(ctx);
+    } catch {
+      return [];
+    }
+    const wonRounds = await ctx.db
+      .query("combatRounds")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", userId).eq("status", "won"),
+      )
+      .collect();
+    const scoped = ventureId
+      ? wonRounds.filter((r) => r.ventureId === ventureId)
+      : wonRounds;
+    // Dedupe checkpointIds — a CP that was won multiple times (e.g.
+    // via retry) shouldn't produce duplicate entries downstream.
+    const seen = new Set<string>();
+    const out: Array<Id<"ventureCheckpoints">> = [];
+    for (const r of scoped) {
+      const key = r.checkpointId as unknown as string;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(r.checkpointId);
+    }
+    return out;
+  },
+});
+
 export function durationForOrder(order: number): number {
   if (order === 1) return 90_000; // 90 seconds
   if (order === 2) return 60_000; // 60 seconds

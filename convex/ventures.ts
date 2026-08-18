@@ -97,16 +97,8 @@ async function createVentureForUser(
     updatedAt: now,
   });
 
-  await ctx.db.insert("analytics_events", {
-    userId: args.userId,
-    sessionId: "server",
-    eventName: "venture_created",
-    eventCategory: "engagement",
-    properties: { ventureId, templateId },
-    timestamp: now,
-    serverTimestamp: now,
-    sequenceNumber: 0,
-  });
+  // analytics_events insert removed — table dropped from schema.
+  // See gamification.ts for the parallel cleanup + revival notes.
 
   for (const cpDef of checkpointDefs) {
     const checkpointId = await ctx.db.insert("ventureCheckpoints", {
@@ -147,13 +139,21 @@ async function createVentureForUser(
     });
   }
 
+  // Full 12-boss super pool for every template. Product ask
+  // (2026-08-14): "for super bosses we want to randomise for
+  // everyone no same pattern". Previously each template was pinned
+  // to a tiny subset (academic:[9,2], lab:[10], creative:[11,12,2]),
+  // which meant lab users always got boss #10, and creative users
+  // rotated between just 3. Now every venture rolls fresh across
+  // all 12 pool entries.
+  const FULL_POOL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const bossAffinities: Record<string, number[]> = {
-    venture: [1, 2, 3, 4, 5, 6, 7, 8],
-    academic: [9, 2],
-    lab: [10],
-    creative: [11, 12, 2],
+    venture: FULL_POOL,
+    academic: FULL_POOL,
+    lab: FULL_POOL,
+    creative: FULL_POOL,
   };
-  const affinities = bossAffinities[templateId] ?? [1, 2, 3, 4, 5, 6, 7, 8];
+  const affinities = bossAffinities[templateId] ?? FULL_POOL;
   const availableBosses = BOSS_DEFINITIONS.filter((b) => affinities.includes(b.id));
   const bossIds = shuffle(availableBosses.map((b) => b.id)).slice(0, 1);
   const assignedBossId = bossIds[0];
@@ -461,21 +461,13 @@ export const createVenture = mutation({
       .collect()
       .then((vs) => vs.filter((existing) => existing._id !== ventureId).length);
 
-    if (priorVentureCount === 0) {
-      const email = identity.email;
-      const displayName = user.displayName || identity.givenName || "Adventurer";
-      if (email && assignedBossId !== undefined) {
-        const idea = await ctx.db.get(args.ideaId);
-        await ctx.scheduler.runAfter(0, internal.emailWelcome.sendOnboardingCompleteEmail, {
-          email,
-          displayName,
-          projectName: idea?.title ?? "Your Project",
-          templateId: templateId ?? "venture",
-          bossId: assignedBossId,
-          bossHealthPercent: 93, // fresh boss at venture creation = 7% corruption from tutorial hit
-        });
-      }
-    }
+    // Onboarding-complete welcome email removed — the
+    // `emailWelcome` module was deleted in a prior cleanup. Convex
+    // typecheck refused the deploy while `internal.emailWelcome`
+    // was still referenced here. Re-wire once the email pipeline is
+    // brought back (see also emailReengagement.ts for the pattern).
+    void priorVentureCount;
+    void assignedBossId;
 
     return ventureId;
   },
@@ -591,11 +583,28 @@ export const ensureVentureStructure = mutation({
     if (!venture.templateId) {
       venturePatch.templateId = "venture";
     }
-    // assignedBosses is required by the schema but pre-PRD venture
-    // rows may have an empty array. Default to the full 8-boss roster
-    // so the world map can render the boss icons over each checkpoint.
+    // assignedBosses is required by the schema. New ventures get
+    // their random assignment during createVentureForUser (single
+    // pick from the 12-boss super pool, filtered by template
+    // affinity). This branch ONLY runs for legacy pre-PRD rows that
+    // still have an empty array — we assign a random pick from the
+    // full 12-boss pool so the "everyone gets a different super boss"
+    // guarantee holds retroactively too. Previously we hardcoded
+    // [1,2,3,4,5,6,7,8] which meant every user saw the same
+    // sequential lineup (Unraveller first, always).
     if (!Array.isArray(venture.assignedBosses) || venture.assignedBosses.length === 0) {
-      venturePatch.assignedBosses = [1, 2, 3, 4, 5, 6, 7, 8];
+      // Deterministic-random by ventureId so the SAME venture always
+      // resolves to the same boss on retry, but different ventures
+      // get different bosses. Uses the venture's `_id` string bytes
+      // to seed — no crypto import needed, plenty of entropy for
+      // 1-in-12 selection uniformity.
+      const idStr = String(venture._id);
+      let seed = 0;
+      for (let i = 0; i < idStr.length; i++) {
+        seed = (seed * 31 + idStr.charCodeAt(i)) | 0;
+      }
+      const pick = ((seed % 12) + 12) % 12; // 0..11
+      venturePatch.assignedBosses = [pick + 1]; // pool IDs are 1-based
     }
     if (Object.keys(venturePatch).length > 0) {
       venturePatch.updatedAt = now;
@@ -634,16 +643,7 @@ export const ensureVentureStructure = mutation({
         checkpointPatch.completedAt = cp.completedAt ?? now;
         checkpointPatch.partialStartedAt = undefined;
         cp.status = "completed";
-        await ctx.db.insert("analytics_events", {
-          userId: venture.userId,
-          sessionId: "server",
-          eventName: "checkpoint_completed",
-          eventCategory: "engagement",
-          properties: { checkpointId: String(cp._id), stage: cp.stage, checkpoint: cp.checkpoint },
-          timestamp: now,
-          serverTimestamp: now,
-          sequenceNumber: 0,
-        });
+        // analytics_events insert removed — table dropped from schema.
       } else if (completedCount === 1 && cp.status !== "in_progress") {
         checkpointPatch.status = "in_progress";
         if (typeof cp.partialStartedAt !== "number") {
@@ -1259,6 +1259,36 @@ export const getVenture = query({
       lastActivityAt: venture.lastActivityAt ?? venture.updatedAt,
     };
 
+    // PRIVACY GATE (2026-08-16) — determine whether the caller is the
+    // owner or an accepted contributor. Non-owners get the map-level
+    // venture metadata (checkpoint completion booleans, boss states,
+    // stage progress) but the private evidence.content field is
+    // stripped from every task below. That preserves the public
+    // "see the discs light up" experience while keeping the actual
+    // typed answers private to the team.
+    const identity = await ctx.auth.getUserIdentity();
+    let canReadPrivate = false;
+    if (identity) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .first();
+      if (user) {
+        if (venture.userId === user._id) {
+          canReadPrivate = true;
+        } else if (venture.ideaId) {
+          const accepted = await ctx.db
+            .query("contributionRequests")
+            .withIndex("by_contributor_status", (q) =>
+              q.eq("contributorId", user._id).eq("status", "accepted"),
+            )
+            .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
+            .first();
+          if (accepted) canReadPrivate = true;
+        }
+      }
+    }
+
     const checkpoints = await ctx.db
       .query("ventureCheckpoints")
       .withIndex("by_venture", (q) => q.eq("ventureId", args.ventureId))
@@ -1307,14 +1337,19 @@ export const getVenture = query({
       }
     }
 
-    // Enrich checkpoints with tasks
+    // Enrich checkpoints with tasks. When the caller isn't the owner
+    // (or an accepted contributor) the `evidence` field is stripped
+    // — the map disc + the "done" checkmark are still returned, but
+    // the actual submitted answer text stays private to the team.
     const enrichedCheckpoints = checkpoints.map((cp) => {
       const tasks = tasksByCheckpoint.get(cp._id) || [];
       const enrichedTasks = tasks.map(
         (task: { evidenceId?: string; [key: string]: unknown }) => ({
           ...task,
-          evidence: task.evidenceId
-            ? evidenceMap.get(task.evidenceId) || null
+          evidence: canReadPrivate
+            ? task.evidenceId
+              ? evidenceMap.get(task.evidenceId) || null
+              : null
             : null,
         }),
       );
@@ -1635,7 +1670,20 @@ export const getUserVentures = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
 
-    const user = await getUserByClerkId(ctx, identity.subject);
+    // Defensive: getUserByClerkId THROWS when no matching users row
+    // exists, but the tutorial provider subscribes to this query on
+    // every mount — including the pre-provisioning window on fresh
+    // signup, before the Clerk-webhook has inserted the users row.
+    // A throw here bubbles up as a red Convex runtime error over the
+    // whole tutorial. Swallow it and return []; the useActiveVenture
+    // hook falls back to venture-default copy, which is exactly what
+    // we want for someone who has no ventures anyway.
+    let user;
+    try {
+      user = await getUserByClerkId(ctx, identity.subject);
+    } catch {
+      return [];
+    }
 
     const ventures = await ctx.db
       .query("ventures")
@@ -1661,6 +1709,34 @@ export const getCheckpoint = query({
     const checkpoint = await ctx.db.get(args.checkpointId);
     if (!checkpoint) return null;
 
+    // PRIVACY GATE (2026-08-16) — same policy as getVenture. Non-owners
+    // still see the checkpoint metadata (done flags, definition) so
+    // the CheckpointPanel renders correctly on other people's projects,
+    // but the actual `evidence.content` (typed answers) is stripped.
+    const venture = await ctx.db.get(checkpoint.ventureId);
+    const identity = await ctx.auth.getUserIdentity();
+    let canReadPrivate = false;
+    if (identity && venture) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .first();
+      if (user) {
+        if (venture.userId === user._id) {
+          canReadPrivate = true;
+        } else if (venture.ideaId) {
+          const accepted = await ctx.db
+            .query("contributionRequests")
+            .withIndex("by_contributor_status", (q) =>
+              q.eq("contributorId", user._id).eq("status", "accepted"),
+            )
+            .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
+            .first();
+          if (accepted) canReadPrivate = true;
+        }
+      }
+    }
+
     const tasks = await ctx.db
       .query("ventureTasks")
       .withIndex("by_checkpoint", (q) =>
@@ -1671,7 +1747,7 @@ export const getCheckpoint = query({
     const enrichedTasks = await Promise.all(
       tasks.map(async (task) => {
         let evidence = null;
-        if (task.evidenceId) {
+        if (canReadPrivate && task.evidenceId) {
           evidence = await ctx.db.get(task.evidenceId);
         }
         return { ...task, evidence };
@@ -2474,3 +2550,33 @@ function shuffle<T>(array: T[]): T[] {
   }
   return result;
 }
+
+/**
+ * Dev-only: re-roll a venture's super boss to a fresh random pick
+ * from the full 1..12 pool. Use to verify randomization without
+ * having to create a fresh idea. Auth-checked so only the venture
+ * owner can call.
+ *
+ * From the browser console (on the map page):
+ *   await window.convex.mutation("ventures:rerollSuperBoss",
+ *     { ventureId: "<the venture id from the URL>" });
+ */
+export const rerollSuperBoss = mutation({
+  args: { ventureId: v.id("ventures") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const venture = await ctx.db.get(args.ventureId);
+    if (!venture) throw new Error("Venture not found");
+    const user = await getUserByClerkId(ctx, identity.subject);
+    if (venture.userId !== user._id) throw new Error("Not your venture");
+
+    // Pick fresh from all 12 pool entries.
+    const pick = Math.floor(Math.random() * 12) + 1;
+    await ctx.db.patch(args.ventureId, {
+      assignedBosses: [pick],
+      updatedAt: Date.now(),
+    });
+    return { newBossId: pick };
+  },
+});

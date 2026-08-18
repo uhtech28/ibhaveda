@@ -163,6 +163,12 @@ export type ReactToPhaserEvent =
   | { type: "BOSS_FINAL_OUTCOME"; stage: number; outcome: "slay_gold" | "retreat_permanent" }
   /** Live corruption meter sync (0–100) — updates map visuals without full venture reload */
   | { type: "UPDATE_CORRUPTION"; corruptionLevel: number }
+  /** Cleared-checkpoint indices for the CURRENT stage (0-based). The
+   *  Phaser fog cloud (Village stage 1) subscribes so it can fade out
+   *  blobs within a radius of each cleared CP's world position. Sent
+   *  from map/world/page.tsx whenever bossDefeatedAtCheckpoint changes
+   *  for the active stage. */
+  | { type: "FOG_CLEARED_CHECKPOINTS"; clearedCpIndices: readonly number[] }
   /**
    * PRD §2 — sync the mini-game state to the Phaser scene.
    *
