@@ -423,7 +423,17 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     id: "super_gravemind",
     name: "The Gravemind",
     represents: "Fear of failure",
-    // Only pool boss with ZERO art. Pending user delivery.
+    // Bespoke Gravemind art pending user delivery. Meanwhile we
+    // proxy the visual through veilwalker's hooded silhouette so the
+    // cinematic + map + combat all show SOMETHING when this boss is
+    // rolled from the random pool (~8% chance). Without a proxy,
+    // rolling Gravemind fell back to Unraveller — wrong title over
+    // Unraveller's silhouette read as a bug, not a placeholder.
+    // Swap this block back to `idleAsset: undefined` once bespoke
+    // Gravemind assets ship.
+    idleAsset: "/assets/bosses/super-pool/veilwalker/idle.png",
+    idleClip:   { asset: "/assets/bosses/super-pool/veilwalker/idle.png",   frameCount: 4, frameWidth: 88, frameHeight: 88, fps: 4 },
+    attackClip: { asset: "/assets/bosses/super-pool/veilwalker/attack.png", frameCount: 9, frameWidth: 88, frameHeight: 88, fps: 10 },
     spriteScale: 2.4, spriteYOffset: 40,
   },
   {
@@ -434,7 +444,11 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     // Full 5-clip Pixellab set on disk at 92Ã—92Ã—9 plus 8-dir rotations
     // extracted from the new `the_rusted_oracle.zip` pack (39 PNGs
     // total including animation frame sequences under anims/).
-    idleClip:    { asset: "/assets/bosses/super-pool/rusted-oracle/idle.png",    ...P92, fps: 6 },
+    // idle is 4-frame (368x92 on disk) — override P92's default
+    // frameCount:9 so the cinematic clips to frame 0 correctly.
+    // Without this override the boss intro rendered 1/9 of a 4-frame
+    // sheet — a chopped half-body silhouette instead of the full pose.
+    idleClip:    { asset: "/assets/bosses/super-pool/rusted-oracle/idle.png",    ...P92, frameCount: 4, fps: 4 },
     attackClip:  { asset: "/assets/bosses/super-pool/rusted-oracle/attack.png",  ...P92, fps: 10 },
     hurtClip:    { asset: "/assets/bosses/super-pool/rusted-oracle/hurt.png",    ...P92, fps: 10 },
     defeatClip:  { asset: "/assets/bosses/super-pool/rusted-oracle/defeat.png",  ...P92, fps: 8 },
@@ -482,7 +496,10 @@ export const SUPER_BOSS_POOL: readonly SuperBossPoolEntry[] = [
     // victory sheet + 256Ã—256 8-direction rotations from the
     // idle_stonecaller.zip pack.
     idleAsset: "/assets/bosses/super-pool/stonecaller/idle.png",
-    idleClip:    { asset: "/assets/bosses/super-pool/stonecaller/idle.png",    ...P92, fps: 6 },
+    // idle is a SINGLE-frame image (92x92 on disk, no anim sheet) —
+    // override P92's default frameCount:9 so the cinematic renders
+    // the whole square instead of clipping to 1/9 of it.
+    idleClip:    { asset: "/assets/bosses/super-pool/stonecaller/idle.png",    ...P92, frameCount: 1, fps: 6 },
     attackClip:  { asset: "/assets/bosses/super-pool/stonecaller/attack.png",  ...P92, fps: 10 },
     hurtClip:    { asset: "/assets/bosses/super-pool/stonecaller/hurt.png",    ...P92, fps: 10 },
     victoryClip: { asset: "/assets/bosses/super-pool/stonecaller/victory.png", ...P92, fps: 8 },
