@@ -1143,27 +1143,22 @@ function BossFaceImagePortrait({
  * (via BossFaceImagePortrait) for the current boss.
  */
 function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
-  // Zoom into the FACE of the boss idle sprite so it fills the 64×64
-  // cell. Calibrated from actual assets — Fog of Vagueness (verified
-  // by pixel scan): 828×92 sheet, 9 frames of 92×92, boss silhouette
-  // spans y:24–68; head + shoulders sit at y:24–44 (~22% to 48%),
-  // horizontally centered in the middle ~33% of frame width.
+  // Fallback portrait for bosses without a hand-picked head-shot in
+  // bossFaces.ts. Shows FRAME 0 of the spritesheet scaled to fit the
+  // 64×64 cell.
   //
-  // Strategy:
-  //   1. Measure natural width/height on img load — synchronously if
-  //      the image is already cached (avoids the "grid of tiny copies"
-  //      caused by the img painting once at squished cell size before
-  //      React's state update lands).
-  //   2. Treat height as one-frame size (square-frame convention).
-  //   3. Scale the whole sheet so FACE_FRAC × frame maps to 64 px.
-  //   4. Absolute-position the img so the desired face rect of frame 0
-  //      lands at (0,0) of the box; overflow:hidden clips the rest.
+  // Previous rev zoomed into a "face region" using proportions
+  // calibrated to Fog of Vagueness (middle-third of frame, y=22%→48%).
+  // That worked for Fog but produced EMPTY RED CELLS for every other
+  // boss whose silhouette is shaped differently — the clip landed on
+  // transparent pixels. Product feedback 2026-08-16: "many ai combat
+  // dont have the face of boss shown".
+  //
+  // New behaviour: paint the WHOLE first frame using CSS
+  // background-position clipping. Same technique the boss-intro
+  // cinematic uses for spritesheets. Works for any 1..N frame sheet
+  // regardless of body proportions.
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
-  // Preload the sprite via a detached Image() so we KNOW the natural
-  // dimensions before the visible <img> even mounts. The previous
-  // ref-callback + onLoad combo left the portrait as an empty red box
-  // when the img mounted with complete=false and then onLoad fired
-  // during a render pass where the state update didn't stick.
   useEffect(() => {
     let cancelled = false;
     const probe = new window.Image();
@@ -1172,8 +1167,6 @@ function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
       setDims({ w: probe.naturalWidth, h: probe.naturalHeight });
     };
     probe.onerror = () => {
-      // If the asset fails, fall back to reasonable defaults so we
-      // still render SOMETHING instead of an empty red cell.
       if (cancelled) return;
       setDims({ w: 92, h: 92 });
     };
@@ -1184,25 +1177,11 @@ function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
   }, [bossAsset]);
 
   const BOX = 64;
-  // Middle-third of the frame width (~33%) = the head+shoulders
-  // column for a standing sprite. Smaller values zoom in tighter.
-  const FACE_FRACTION = 0.33;
-  // Face top edge as a fraction of frame height. 0.22 puts frame-y
-  // ≈ 20 at the top of the window — just above where the head starts
-  // (y ≈ 24 for Fog of Vagueness).
-  const FACE_TOP_FRAC = 0.22;
-
-  const frameSize = dims ? Math.min(dims.w, dims.h) : 64;
-  const displayFrame = BOX / FACE_FRACTION; // 64/0.33 ≈ 194
-  const scale = displayFrame / frameSize; // native → display
-  const renderedW = dims ? dims.w * scale : BOX;
-  const renderedH = dims ? dims.h * scale : BOX;
-
-  const faceLeftDisplay = frameSize
-    ? ((frameSize * (1 - FACE_FRACTION)) / 2) * scale
-    : 0;
-  const faceTopDisplay = frameSize ? frameSize * FACE_TOP_FRAC * scale : 0;
-
+  // Frame is assumed square — height is the single frame's edge.
+  // Sheet width = frameHeight × frameCount, so frameCount = w/h.
+  // Any sheet aspect ratio works because we drive backgroundSize +
+  // backgroundPosition off frameCount rather than trying to divide.
+  const frameCount = dims ? Math.max(1, Math.round(dims.w / dims.h)) : 1;
   return (
     <div
       className="shrink-0 relative overflow-hidden"
@@ -1215,25 +1194,23 @@ function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
       }}
       aria-label="Boss portrait"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        // Force remount when the asset changes so stale dims from a
-        // previous boss don't apply to the new sprite.
+      <div
         key={bossAsset}
-        src={bossAsset}
-        alt=""
+        role="img"
+        aria-label="Boss"
         style={{
           position: "absolute",
-          left: -faceLeftDisplay,
-          top: -faceTopDisplay,
-          width: renderedW,
-          height: renderedH,
+          inset: 0,
+          backgroundImage: `url(${bossAsset})`,
+          // Sheet is `frameCount` frames wide × 1 tall. Sizing to
+          // (N × 100%, 100%) makes each frame fill the full 64×64
+          // display; backgroundPosition "0 50%" pins to frame 0.
+          backgroundSize: `${frameCount * 100}% 100%`,
+          backgroundPosition: "0 50%",
+          backgroundRepeat: "no-repeat",
           imageRendering: "pixelated",
-          userSelect: "none",
-          pointerEvents: "none",
-          // Never render the img before dims are known — otherwise the
-          // browser stretches the whole spritesheet into the cell,
-          // producing the "many tiny copies" artifact.
+          // Hide until dims are known so we never paint a stretched
+          // full-sheet flash before frameCount is resolved.
           visibility: dims ? "visible" : "hidden",
         }}
       />
