@@ -43,6 +43,12 @@ interface Props {
    *  strip). Only relevant for venture-template intros; other
    *  templates hide the minion strip entirely (future work). */
   minionsSpeechLine?: string;
+  /** When the passed `mainBossArt` is a HORIZONTAL SPRITESHEET
+   *  (9-frame Pixellab output for the super-pool bosses), pass the
+   *  per-frame dims here so the cinematic can clip to frame 0
+   *  instead of rendering the whole sheet stretched. Leave undefined
+   *  for single-frame legacy assets like the Unraveller default. */
+  mainBossFrameSize?: { frameWidth: number; frameHeight: number; frameCount: number };
 }
 
 type Phase =
@@ -84,6 +90,7 @@ export function BossIntroCinematic({
   mainBossTitle = DEFAULT_MAIN_BOSS_TITLE,
   speechLines = DEFAULT_MAIN_SPEECH_LINES,
   minionsSpeechLine = DEFAULT_MINIONS_SPEECH_LINE,
+  mainBossFrameSize,
 }: Props) {
   // Resolve the actual speech arrays used by the effects + render —
   // defensive clamp so an empty override array doesn't break the
@@ -312,20 +319,10 @@ export function BossIntroCinematic({
               }}
               style={{ willChange: "transform" }}
             >
-              <img
+              <MainBossPortrait
                 src={mainBossArt}
                 alt={mainBossTitle}
-                className="h-[200px] w-[200px] sm:h-[340px] sm:w-[340px]"
-                style={{
-                  imageRendering: "pixelated",
-                  // Layered drop-shadow gives him a pulsing rose halo —
-                  // the outer glow ramps via the surrounding radial
-                  // pulse element already in place.
-                  filter:
-                    "drop-shadow(0 24px 40px rgba(0,0,0,0.75)) drop-shadow(0 0 30px rgba(214, 34, 90, 0.35))",
-                  objectFit: "contain",
-                }}
-                draggable={false}
+                configuredFrameSize={mainBossFrameSize}
               />
             </motion.div>
           </motion.div>
@@ -692,5 +689,126 @@ export function BossIntroCinematic({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MainBossPortrait
+// ─────────────────────────────────────────────────────────────────────
+/**
+ * Renders the huge boss silhouette in the center of the intro
+ * cinematic. Two render paths, chosen automatically:
+ *
+ *   1. SPRITESHEET (auto-detected) — when the naturalWidth of the
+ *      loaded image is > naturalHeight, treat the asset as a
+ *      horizontal N-frame sheet where `N = round(width / height)`.
+ *      Clip to frame 0 via CSS `background-position`. This is what
+ *      the super-pool Pixellab exports look like (e.g. Tide Caller
+ *      1476×164 = 9 × 164). Runtime detection means we no longer
+ *      depend on the caller passing `configuredFrameSize` correctly.
+ *
+ *   2. SINGLE-FRAME — when the image is square (or nearly so),
+ *      render as a plain `<img>` with `object-fit: contain`. Used
+ *      for Unraveller's legacy single-frame silhouette and any other
+ *      boss whose idle asset is a portrait.
+ *
+ * A configured frame size (from SUPER_BOSS_POOL config) still wins
+ * over auto-detection when passed — lets us handle sheets whose
+ * per-frame square doesn't match the natural height (rare, but
+ * possible if the sheet is 828×92 with frameCount=4 override).
+ *
+ * Product ask (2026-08-18, "one and big for all superbosses like
+ * unraveller take deep analysis"): making the auto-detection the
+ * default means no super boss can accidentally render as a stretched
+ * row of 9 mini-copies just because a config value is missing —
+ * every rolled super now shows one big silhouette.
+ */
+function MainBossPortrait({
+  src,
+  alt,
+  configuredFrameSize,
+}: {
+  src: string;
+  alt: string;
+  configuredFrameSize?: { frameWidth: number; frameHeight: number; frameCount: number };
+}) {
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    // Reset on src change so a stale prior boss's dims can't leak.
+    setDims(null);
+    let cancelled = false;
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      setDims({ w: probe.naturalWidth, h: probe.naturalHeight });
+    };
+    probe.onerror = () => {
+      if (cancelled) return;
+      // Fall through to single-frame path with dummy dims.
+      setDims({ w: 200, h: 200 });
+    };
+    probe.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+
+  // Resolve frame count: configured wins; else auto-detect from
+  // naturalWidth / naturalHeight (round to nearest whole frame so a
+  // sheet 1476/164=9.0 becomes 9 exactly, and near-square 92×92
+  // becomes 1).
+  let frameCount = 1;
+  if (configuredFrameSize && configuredFrameSize.frameCount > 0) {
+    frameCount = configuredFrameSize.frameCount;
+  } else if (dims && dims.h > 0) {
+    const ratio = dims.w / dims.h;
+    frameCount = Math.max(1, Math.round(ratio));
+  }
+
+  const isSheet = frameCount > 1;
+  const filter =
+    "drop-shadow(0 24px 40px rgba(0,0,0,0.75)) drop-shadow(0 0 30px rgba(214, 34, 90, 0.35))";
+  const sizeClass = "h-[200px] w-[200px] sm:h-[340px] sm:w-[340px]";
+
+  // Both paths hidden until dims settle so we never show the
+  // stretched-sheet flash the first time this component mounts.
+  const visibility: "hidden" | "visible" = dims ? "visible" : "hidden";
+
+  if (isSheet) {
+    return (
+      <div
+        role="img"
+        aria-label={alt}
+        className={sizeClass}
+        style={{
+          backgroundImage: `url(${src})`,
+          // Sheet is `frameCount` frames wide × 1 frame tall. Sizing
+          // to (N × 100%, 100%) makes each frame fill the full box;
+          // backgroundPosition "0 50%" pins to frame 0.
+          backgroundSize: `${frameCount * 100}% 100%`,
+          backgroundPosition: "0 50%",
+          backgroundRepeat: "no-repeat",
+          imageRendering: "pixelated",
+          filter,
+          visibility,
+        }}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={sizeClass}
+      style={{
+        imageRendering: "pixelated",
+        filter,
+        objectFit: "contain",
+        visibility,
+      }}
+      draggable={false}
+    />
   );
 }
