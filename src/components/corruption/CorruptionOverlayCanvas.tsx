@@ -459,24 +459,24 @@ export function CorruptionViewportWash({
   return (
     <>
       {/* LAYER 1 — Flat color wash tinted with the boss's spec color.
-          Density calibrated 2026-08-20 to match Village Fog corruption
-          feel ("KEEP THE DENSITY OF ALL THE CORRUPTION LIKE WE HAVE
-          DENSITY FOR THE FOG"). Village stage 1 renders 108 drifting
-          fog blobs at 0.35-0.60 alpha each — very atmospheric read.
-          Non-village templates now hit the same visual weight via a
-          heavier color wash + denser pattern tile stack:
-            calm    0.07 × 1.5 = 0.105 color + 0.07 × 3.0 = 0.21 pattern
-            critical 0.44 × 1.5 = 0.66 color  + 0.44 × 3.0 = 1.0 pattern (clamped)
-          So even fresh ventures paint a real atmospheric tint from
-          the moment the map loads. Both layers use the same mask so
-          per-CP clearing halos punch through uniformly. */}
+          Density retuned 2026-08-21 ("THE CORRUPTION HERE IS TOO
+          DENSE"). Prior multipliers (color × 1.5, pattern × 3.0)
+          tried to match Village fog visually but overshot because
+          Village fog is 108 discrete blobs with lots of GAPS between
+          them (~40-50% effective coverage), while our viewport wash
+          is UNIFORM edge-to-edge — so equal multipliers land much
+          heavier. New tuning targets legibility parity:
+            calm     0.07 × 0.5 = 0.035 color + 0.07 × 1.4 = 0.098 pattern
+            critical 0.44 × 0.5 = 0.22  color + 0.44 × 1.4 = 0.616 pattern
+          Map art stays readable at every phase; corruption reads as
+          atmospheric tint rather than opaque paint. */}
       <div
         role="presentation"
         aria-hidden
         className="pointer-events-none fixed inset-0"
         style={{
           zIndex,
-          opacity: Math.min(1, opacity * 1.5),
+          opacity: Math.min(1, opacity * 0.5),
           backgroundColor: profile.color,
           maskImage,
           WebkitMaskImage: maskImage,
@@ -492,7 +492,7 @@ export function CorruptionViewportWash({
         style={{
           // Sit one z above the color layer so pattern reads on top.
           zIndex: zIndex + 0.001,
-          opacity: Math.min(1, opacity * 3.0),
+          opacity: Math.min(1, opacity * 1.4),
           backgroundImage: tileUrl ? `url(${tileUrl})` : undefined,
           backgroundRepeat: "repeat",
           backgroundSize: `56px 56px`,

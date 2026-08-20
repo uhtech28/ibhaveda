@@ -340,16 +340,17 @@ function MapPreview({
         style={{ objectFit: "cover", imageRendering: "pixelated" }}
         draggable={false}
       />
-      {/* Density calibrated to match Village fog feel (product ask
-          2026-08-20 "KEEP THE DENSITY OF ALL THE CORRUPTION LIKE WE
-          HAVE DENSITY FOR THE FOG"). Multipliers match production
-          CorruptionViewportWash: color × 1.5, pattern × 3.0. */}
+      {/* Multipliers match production CorruptionViewportWash
+          post-retune (2026-08-21): color × 0.5, pattern × 1.4.
+          Uniform edge-to-edge wash reads much heavier than Village
+          fog's spotty coverage — earlier × 1.5 / × 3.0 drowned the
+          map art. */}
       {opacity > 0 && (
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundColor: profile.color,
-            opacity: Math.min(1, opacity * 1.5),
+            opacity: Math.min(1, opacity * 0.5),
           }}
         />
       )}
@@ -362,7 +363,7 @@ function MapPreview({
             backgroundRepeat: "repeat",
             backgroundSize: "48px 48px",
             imageRendering: "pixelated",
-            opacity: Math.min(1, opacity * 3.0),
+            opacity: Math.min(1, opacity * 1.4),
           }}
         />
       )}

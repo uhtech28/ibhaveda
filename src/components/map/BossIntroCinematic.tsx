@@ -373,9 +373,17 @@ export function BossIntroCinematic({
             // the redundant title only served the desktop hero
             // layout — where there's room to spare. `hidden sm:block`
             // keeps the desktop treatment intact.
-            className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 px-4 text-center sm:block sm:top-[10%]"
+            // Title dropped from sm:top-[10%] → sm:top-[16%] (2026-08-21)
+            // because the tutorial progress bar (top-16 ≈ 64px + 6px
+            // bar height + padding ≈ 80–90px total) was overlapping
+            // the boss-name text on standard viewports. Product ask:
+            // "SHIFT THE PROGRESS BAR LITTLE UPWARD ITS COVERING BOSS
+            // NAME". Moving the title down instead of the bar keeps
+            // every other tutorial surface unaffected. Also bumped
+            // the mobile `top` calc so it clears the bar the same way.
+            className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 px-4 text-center sm:block sm:top-[16%]"
             style={{
-              top: "calc(64px + env(safe-area-inset-top, 0px))",
+              top: "calc(96px + env(safe-area-inset-top, 0px))",
             }}
             initial={{ opacity: 0, y: -10 }}
             animate={
