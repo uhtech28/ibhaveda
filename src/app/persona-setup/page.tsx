@@ -179,6 +179,20 @@ export default function PersonaSetupPage() {
     if (tutorial && tutorial.step < 3) {
       void tutorial.goTo(3);
     }
+    // Bridge flag — tells Step2TemplatePick to mount its Sparky
+    // IMMEDIATELY on /feed load without waiting for the Convex
+    // tutorial-state query to hydrate (~300-800ms). Without this
+    // flag users saw a "Sparky flash" — persona-setup Sparky →
+    // /feed with no Sparky → tutorial Sparky appears late. Product
+    // ask 2026-08-20: "after persona selection this sparky comes on
+    // which go button make this after this our sparky come".
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem("sparkyBridgeFromPersonaSetup", "1");
+      } catch {
+        /* no-op */
+      }
+    }
     // Hard reload rather than soft push so /feed remounts with the
     // fresh persona ID + tutorial step baked in. Soft push has raced
     // with the Convex query cache in the past.

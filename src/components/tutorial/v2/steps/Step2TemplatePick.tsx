@@ -204,11 +204,28 @@ export function Step2TemplatePick() {
   // while the internal dialogue state machine ticks between phases.
   // Force-advance below normalises stale lower steps to 3 on arrival.
   const onFeed = pathname === "/feed";
+  // Bridge flag — set by /persona-setup's "Let's go" click right
+  // before it hard-nav'd here. Lets us mount the tutorial Sparky
+  // IMMEDIATELY on /feed load without waiting for Convex tutorial
+  // state to hydrate (~300-800ms), so users never see a "no Sparky"
+  // gap between persona-setup and Step2's mascot. Cleared after
+  // first use so refreshes don't force-mount indefinitely.
+  const [bridgeActive, setBridgeActive] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (sessionStorage.getItem("sparkyBridgeFromPersonaSetup") === "1") {
+        setBridgeActive(true);
+        sessionStorage.removeItem("sparkyBridgeFromPersonaSetup");
+      }
+    } catch {
+      /* no-op */
+    }
+  }, []);
   const active =
-    tutorial.active &&
     onFeed &&
-    tutorial.step >= 1 &&
-    tutorial.step <= 6;
+    (bridgeActive ||
+      (tutorial.active && tutorial.step >= 1 && tutorial.step <= 6));
 
   // PROGRESS ADVANCE — used to auto-bump to step 3 on /feed arrival,
   // which made the progress bar show 1/8 the moment Sparky's intro

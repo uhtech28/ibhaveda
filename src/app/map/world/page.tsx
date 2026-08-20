@@ -5917,6 +5917,46 @@ function MapPageInner() {
               frameCount: pool.idleClip.frameCount,
             }
           : undefined;
+        // Build TEMPLATE-CORRECT minion roster + stage names for the
+        // strip below the boss. Village uses its bespoke 4-boss lineup
+        // via getStageMiniBosses(1); other templates map through their
+        // per-stage boss list from templateStages / getTemplateStageBoss.
+        // Without this the intro always showed Fog / Chimera /
+        // Automaton / Wraith (Venture stage 1 minions) even for
+        // Academic / Lab / Creative — product ask 2026-08-20 "stage
+        // bosses here are always coming for venture it should be
+        // according to template choosen".
+        const tid = (venture?.templateId ?? "venture") as string;
+        const introMinis: Array<{ name: string; idleAsset: string }> = (() => {
+          if (tid === "venture") {
+            const village = getStageMiniBosses(1);
+            return village.map((b) => ({
+              name: b.name,
+              idleAsset: b.idleAsset,
+            }));
+          }
+          // Non-venture templates: show the first 4 stage bosses in
+          // order so the "here are the trials ahead" read still holds
+          // even though templates aren't strictly per-CP.
+          const list: Array<{ name: string; idleAsset: string }> = [];
+          for (let s = 1; s <= 4; s += 1) {
+            const b = getTemplateStageBoss(tid, s);
+            if (b?.idleAsset) list.push({ name: b.name, idleAsset: b.idleAsset });
+          }
+          return list;
+        })();
+        const introStageNames: string[] =
+          tid === "venture"
+            ? ["Ideation", "Research", "Validation", "Offer Design"]
+            : templateStages
+                .slice(0, introMinis.length)
+                .map((s) => s.name ?? "");
+        // Count-agnostic taunt so it reads correctly for 1..4 minions.
+        const minionCount = introMinis.length;
+        const minionsLine =
+          minionCount === 1
+            ? "You'll have to defeat my champion before you can reach me."
+            : `You'll have to defeat my ${minionCount} minions before you can reach me.`;
         return (
           <BossIntroCinematic
             mainBossArt={clipArt ?? undefined}
@@ -5926,9 +5966,9 @@ function MapPageInner() {
               `So, you dare to dream of something new.`,
               `I am ${pool.name}. I feed on every doubt you have yet to name.`,
             ]}
-            minionsSpeechLine={
-              "You'll have to defeat my four minions before you can reach me."
-            }
+            miniBosses={introMinis}
+            stageFunctionNames={introStageNames}
+            minionsSpeechLine={minionsLine}
             onDone={() => setBossIntroDismissed(true)}
           />
         );

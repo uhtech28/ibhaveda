@@ -49,6 +49,20 @@ interface Props {
    *  instead of rendering the whole sheet stretched. Leave undefined
    *  for single-frame legacy assets like the Unraveller default. */
   mainBossFrameSize?: { frameWidth: number; frameHeight: number; frameCount: number };
+  /** Custom minion-strip roster. When present, replaces the default
+   *  VILLAGE_BOSSES list — used to show TEMPLATE-CORRECT stage bosses
+   *  in the strip instead of always the four Village minions. Product
+   *  ask 2026-08-20: "stage bosses here are always coming for venture
+   *  it should be according to template choosen". */
+  miniBosses?: readonly { name: string; idleAsset: string }[];
+  /** Optional list of stage-function labels (e.g. "Ideation") to show
+   *  above each minion card. Length should match miniBosses. */
+  stageFunctionNames?: readonly string[];
+  /** When true, the cinematic dismisses without marking the "boss
+   *  intro seen" Convex flag — used by the per-stage super-boss
+   *  cinematic that plays once per session per stage (not once per
+   *  user). Leave false/undefined for the first-visit intro. */
+  skipMarkSeen?: boolean;
 }
 
 type Phase =
@@ -91,7 +105,24 @@ export function BossIntroCinematic({
   speechLines = DEFAULT_MAIN_SPEECH_LINES,
   minionsSpeechLine = DEFAULT_MINIONS_SPEECH_LINE,
   mainBossFrameSize,
+  miniBosses,
+  stageFunctionNames,
+  skipMarkSeen,
 }: Props) {
+  void skipMarkSeen; // reserved — caller-supplied gate not currently wired
+  // Resolve the actual minion roster + stage-name list. When the
+  // caller passes template-specific rosters (academic/lab/creative
+  // stage bosses) we render THOSE; otherwise fall back to the Village
+  // 4-boss lineup so legacy callers that only pass onDone keep
+  // working identically.
+  const RESOLVED_MINIONS =
+    miniBosses && miniBosses.length > 0
+      ? miniBosses
+      : VILLAGE_BOSSES.map((b) => ({ name: b.name, idleAsset: b.idleAsset }));
+  const RESOLVED_STAGE_NAMES =
+    stageFunctionNames && stageFunctionNames.length > 0
+      ? stageFunctionNames
+      : VENTURE_STAGE_FUNCTION_NAMES;
   // Resolve the actual speech arrays used by the effects + render —
   // defensive clamp so an empty override array doesn't break the
   // typewriter's `speechIdx < length` loop.
@@ -154,7 +185,7 @@ export function BossIntroCinematic({
     if (phase !== "minions") return;
     setMinionIdx(0);
     const timers: number[] = [];
-    for (let i = 1; i < VILLAGE_BOSSES.length; i++) {
+    for (let i = 1; i < RESOLVED_MINIONS.length; i++) {
       timers.push(
         window.setTimeout(() => setMinionIdx(i), 2000 * i),
       );
@@ -162,10 +193,11 @@ export function BossIntroCinematic({
     timers.push(
       window.setTimeout(
         () => setPhase("finale"),
-        2000 * VILLAGE_BOSSES.length + 1000,
+        2000 * RESOLVED_MINIONS.length + 1000,
       ),
     );
     return () => timers.forEach((t) => window.clearTimeout(t));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   // ── Typewriter for the Unraveller's taunt during the minions reveal.
@@ -504,7 +536,7 @@ export function BossIntroCinematic({
                 // look centralised for all pc").
                 className="pointer-events-none absolute bottom-[130px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
               >
-                {VILLAGE_BOSSES.map((boss, i) => {
+                {RESOLVED_MINIONS.map((boss, i) => {
                   const revealed = i <= minionIdx || phase === "finale";
                   return (
                     <motion.div
@@ -534,59 +566,22 @@ export function BossIntroCinematic({
                           boxShadow: "0 8px 24px -8px rgba(0, 0, 0, 0.5)",
                         }}
                       >
-                        {/* Some village boss idles (Fog, Chimera, Automaton,
-                            Wraith) are now 9-frame Pixellab spritesheets
-                            (828×92) — rendering them as plain <img>
-                            would show all 9 frames strung out. Detect
-                            by folder path and paint as a background
-                            clipped to frame 0. */}
-                        {(
-                          boss.idleAsset.includes("/village/fog/idle.png") ||
-                          boss.idleAsset.includes("/village/chimera/idle.png") ||
-                          boss.idleAsset.includes("/village/automaton/idle.png") ||
-                          boss.idleAsset.includes("/village/wraith/idle.png")
-                        ) ? (
-                          <div
-                            role="img"
-                            aria-label={boss.name}
-                            style={{
-                              // Match the visible-boss sizing (~78% of the
-                              // parent card).
-                              width: "78%",
-                              paddingTop: "78%", // square aspect
-                              position: "relative",
-                              imageRendering: "pixelated",
-                              filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.6))",
-                            }}
-                          >
-                            <div
-                              style={{
-                                position: "absolute",
-                                inset: 0,
-                                backgroundImage: `url(${boss.idleAsset})`,
-                                backgroundRepeat: "no-repeat",
-                                // Sheet is 9 frames × 92px = 828px wide,
-                                // 92px tall. Scale so one frame fills the
-                                // box: sheet 9× as wide as displayed.
-                                backgroundSize: "900% 100%",
-                                backgroundPosition: "0 50%",
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <img
-                            src={boss.idleAsset}
-                            alt={boss.name}
-                            style={{
-                              maxWidth: "78%",
-                              maxHeight: "78%",
-                              imageRendering: "pixelated",
-                              objectFit: "contain",
-                              filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.6))",
-                            }}
-                            draggable={false}
-                          />
-                        )}
+                        {/* Minion sprite — auto-detects if the asset is
+                            a horizontal spritesheet (naturalWidth >
+                            naturalHeight) and clips to frame 0 via
+                            CSS background-position. Works for the
+                            9-frame Village sheets AND the template
+                            stage-boss sheets (academic/lab/creative)
+                            without a per-boss allowlist. Product ask
+                            2026-08-20: minions were coming from
+                            venture roster even on other templates,
+                            and even after wiring correct minions the
+                            plain-img fallback painted them as
+                            stretched rows. */}
+                        <MinionSprite
+                          src={boss.idleAsset}
+                          alt={boss.name}
+                        />
                         {i === minionIdx && phase === "minions" && (
                           <motion.div
                             className="absolute -inset-1 rounded-xl border-2 sm:rounded-2xl"
@@ -616,7 +611,7 @@ export function BossIntroCinematic({
                           on the bottom. */}
                       <div className="text-center">
                         <div className="text-[7px] font-bold uppercase tracking-wider text-[#9CA3AF] sm:text-[9px] sm:tracking-widest">
-                          {VENTURE_STAGE_FUNCTION_NAMES[i] ?? `Stage ${i + 1}`}
+                          {RESOLVED_STAGE_NAMES[i] ?? `Stage ${i + 1}`}
                         </div>
                         <div className="mt-0.5 text-[9px] font-bold leading-tight text-white/95 sm:text-[12px]">
                           {boss.name}
@@ -807,6 +802,89 @@ function MainBossPortrait({
         filter,
         objectFit: "contain",
         visibility,
+      }}
+      draggable={false}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MinionSprite
+// ─────────────────────────────────────────────────────────────────────
+/**
+ * Renders one minion in the bottom stage-strip. Auto-detects whether
+ * the asset is a horizontal spritesheet (naturalWidth >
+ * naturalHeight) and clips to frame 0 via CSS background-position.
+ * Falls back to a plain <img> when the asset is a single frame.
+ *
+ * Handles both Village 9-frame Pixellab sheets AND academic / lab /
+ * creative template stage-boss sheets uniformly, without a per-boss
+ * allowlist.
+ */
+function MinionSprite({ src, alt }: { src: string; alt: string }) {
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    setDims(null);
+    let cancelled = false;
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      setDims({ w: probe.naturalWidth, h: probe.naturalHeight });
+    };
+    probe.onerror = () => {
+      if (cancelled) return;
+      setDims({ w: 92, h: 92 });
+    };
+    probe.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+
+  const frameCount = dims && dims.h > 0
+    ? Math.max(1, Math.round(dims.w / dims.h))
+    : 1;
+  const isSheet = frameCount > 1;
+  const filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.6))";
+
+  if (isSheet) {
+    return (
+      <div
+        role="img"
+        aria-label={alt}
+        style={{
+          width: "78%",
+          paddingTop: "78%", // square aspect via padding trick
+          position: "relative",
+          imageRendering: "pixelated",
+          filter,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `url(${src})`,
+            backgroundRepeat: "no-repeat",
+            backgroundSize: `${frameCount * 100}% 100%`,
+            backgroundPosition: "0 50%",
+            visibility: dims ? "visible" : "hidden",
+          }}
+        />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{
+        maxWidth: "78%",
+        maxHeight: "78%",
+        imageRendering: "pixelated",
+        objectFit: "contain",
+        filter,
+        visibility: dims ? "visible" : "hidden",
       }}
       draggable={false}
     />
