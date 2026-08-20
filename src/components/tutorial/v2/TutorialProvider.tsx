@@ -301,12 +301,98 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
       <Step3MapGuide />
       {/* Step 4 mounts on /feed at step 10 (contribution flow) */}
       <Step4Contribute />
-      {/* SwordDropCelebration was previously mounted here as a
-          post-tutorial celebration ("You did it! It's dangerous to go
-          alone, take this."). Removed per product request — the
-          tutorial now ends silently once the contribute step completes.
-          The component file is kept in the repo (unused) in case we
-          want to re-enable a completion cinematic later. */}
+      {/* Universal stuck-watchdog — a small "Skip this step" chip that
+          appears when the same tutorial step has been active for >45s
+          without advancing. Product feedback 2026-08-20: "a few
+          people are facing bugs during the tutorial - it gets stuck
+          at some random points". Skipping unblocks the user without
+          them having to hunt for the top-right × on the progress bar. */}
+      <TutorialStuckEscape
+        active={active}
+        step={effectiveStep}
+        onSkip={skip}
+        onAdvance={advance}
+      />
     </TutorialContext.Provider>
+  );
+}
+
+/**
+ * TutorialStuckEscape
+ *
+ * Fires only when the tutorial has sat on the same step for >45s.
+ * Renders a tiny bottom-right chip: "Stuck? Skip this step" that
+ * gives the user an obvious escape valve without having to find the
+ * × on the progress bar. First tap advances one step (soft-skip);
+ * second tap ends the tutorial entirely (skip mutation).
+ *
+ * The 45s dwell time is long enough that a user reading a Sparky
+ * bubble never sees it, but short enough that a real stuck state
+ * (Convex mutation failed silently, Phaser scene didn't dispatch
+ * PHASER_READY, boss combat didn't spawn, etc.) surfaces the escape
+ * within a minute.
+ *
+ * Timer resets on every step change so bumping steps quickly (which
+ * is what a working tutorial does) never surfaces the chip.
+ */
+function TutorialStuckEscape({
+  active,
+  step,
+  onSkip,
+  onAdvance,
+}: {
+  active: boolean;
+  step: TutorialStep;
+  onSkip: () => void;
+  onAdvance: () => void;
+}) {
+  const [showChip, setShowChip] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+
+  useEffect(() => {
+    // Reset any pending "you look stuck" prompt whenever the step
+    // actually moves — a working tutorial never surfaces this chip.
+    setShowChip(false);
+    setTapCount(0);
+    if (!active) return;
+    if (step < 1 || step > 10) return; // only during the guided window
+    const t = window.setTimeout(() => setShowChip(true), 45_000);
+    return () => window.clearTimeout(t);
+  }, [active, step]);
+
+  if (!active || !showChip) return null;
+
+  const label = tapCount === 0 ? "Stuck? Skip this step" : "Stuck? Skip tutorial";
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (tapCount === 0) {
+          // First tap → advance one step (soft-skip). If we're
+          // already on the final step this becomes a hard skip via
+          // the advance mutation which caps at complete.
+          onAdvance();
+          setTapCount(1);
+          // Re-arm the watchdog on the NEW step in case the advance
+          // landed on another stuck screen.
+          window.setTimeout(() => setShowChip(true), 15_000);
+          setShowChip(false);
+        } else {
+          // Second tap → skip the whole tutorial. Persists via
+          // skipFeedTutorial mutation, provider un-mounts the steps.
+          onSkip();
+          setShowChip(false);
+        }
+      }}
+      // Fixed to bottom-right of viewport with a high z-index so it
+      // sits above every tutorial scrim / bubble / Phaser canvas but
+      // below top-level modals. Same visual language as the app's
+      // ghost-button chips so it doesn't scream "error UI".
+      className="fixed bottom-4 right-4 z-[400] rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-[11px] font-medium tracking-wide text-white/80 shadow-lg backdrop-blur-sm transition hover:bg-black/85 hover:text-white active:scale-[0.98]"
+      aria-label={label}
+    >
+      {label}
+    </button>
   );
 }

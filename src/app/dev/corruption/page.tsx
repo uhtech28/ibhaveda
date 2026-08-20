@@ -12,7 +12,7 @@
  * Not linked from anywhere in-product — share the link directly.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   SUPER_BOSS_CORRUPTION_PROFILES,
@@ -63,6 +63,25 @@ const SECTIONS: {
 
 export default function DevCorruptionPage() {
   const [bg, setBg] = useState<"dark" | "light">("dark");
+  // View mode — grid (default swatch cards) or list (one boss per row,
+  // 5 phases inline). Product ask 2026-08-20: "generate me a direct
+  // link to see the corruption model of all maps line wise" →
+  // ?view=list renders the compact single-line view.
+  //
+  // MUST default to "grid" on both server + client render passes,
+  // otherwise the SSR HTML differs from the first client render and
+  // React throws a hydration mismatch (turbopack red-screen). The
+  // URL param is read post-hydration inside the effect below, which
+  // is safe.
+  const [view, setView] = useState<"grid" | "list">("grid");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (
+      new URLSearchParams(window.location.search).get("view") === "list"
+    ) {
+      setView("list");
+    }
+  }, []);
   const bgColor = bg === "dark" ? "#111017" : "#f4f2ee";
   const textPrimary = bg === "dark" ? "text-white" : "text-black";
   const textMuted = bg === "dark" ? "text-white/60" : "text-black/60";
@@ -95,7 +114,24 @@ export default function DevCorruptionPage() {
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className={textMuted}>Background</span>
+            <span className={textMuted}>View</span>
+            <div className={`inline-flex overflow-hidden rounded-md border ${border}`}>
+              <button
+                type="button"
+                onClick={() => setView("grid")}
+                className={`px-3 py-1 ${view === "grid" ? (bg === "dark" ? "bg-white text-black" : "bg-black text-white") : ""}`}
+              >
+                Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("list")}
+                className={`px-3 py-1 ${view === "list" ? (bg === "dark" ? "bg-white text-black" : "bg-black text-white") : ""}`}
+              >
+                Line
+              </button>
+            </div>
+            <span className={textMuted}>Bg</span>
             <div className={`inline-flex overflow-hidden rounded-md border ${border}`}>
               <button
                 type="button"
@@ -145,6 +181,74 @@ export default function DevCorruptionPage() {
               <p className={`mt-1 text-xs ${textMuted}`}>{section.subtitle}</p>
             </div>
 
+            {view === "list" ? (
+              // ── LINE-WISE VIEW ─────────────────────────────────────
+              // One boss per row: template · stage · name · pattern ·
+              // color swatch · meta blurb · 5 phase tiles inline.
+              // Compact enough to scan the whole model in one screen.
+              <div className={`overflow-hidden rounded-lg border ${border} ${cardBg}`}>
+                <div className={`grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-x-4 border-b ${border} px-4 py-2 text-[10px] uppercase tracking-widest ${textMuted}`}>
+                  <span>Scope</span>
+                  <span>Boss · Theme</span>
+                  <span>Pattern</span>
+                  <span>Color</span>
+                  <span>Phases (calm → critical)</span>
+                </div>
+                {section.profiles.map((profile) => {
+                  const scopeKey =
+                    "templateId" in profile && profile.templateId
+                      ? `${profile.templateId}:s${profile.stage}`
+                      : "super";
+                  const scopeLabel =
+                    "templateId" in profile && profile.templateId
+                      ? `${profile.templateId} · s${profile.stage}`
+                      : "super-pool";
+                  return (
+                    <div
+                      key={`row:${scopeKey}:${profile.slug}`}
+                      className={`grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-x-4 border-b ${border} px-4 py-2 text-xs last:border-b-0`}
+                    >
+                      <span className={`font-mono text-[10px] ${textMuted} min-w-[120px]`}>
+                        {scopeLabel}
+                      </span>
+                      <span className="min-w-0">
+                        <span className={`font-semibold ${textPrimary}`}>{profile.label}</span>
+                        <span className={`ml-2 ${textMuted}`}>· {profile.meta}</span>
+                      </span>
+                      <span className={`font-mono text-[10px] rounded px-1.5 py-0.5 ${textMuted}`} style={{ backgroundColor: bg === "dark" ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.05)" }}>
+                        {profile.pattern}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-block h-3 w-3 rounded border ${border}`}
+                          style={{ backgroundColor: profile.color }}
+                          aria-hidden
+                        />
+                        <span className={`font-mono text-[10px] ${textMuted}`}>{profile.color}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {PHASES.map((phase) => (
+                          <span
+                            key={phase.key}
+                            className={`overflow-hidden rounded border ${border}`}
+                            style={{ width: 36, height: 36 }}
+                            title={`${phase.label} (${phase.range}, opacity ${phase.opacity})`}
+                          >
+                            <CorruptionOverlayCanvas
+                              profile={profile}
+                              size={36}
+                              opacity={phase.opacity}
+                              bg={bgColor}
+                              className="block"
+                            />
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {section.profiles.map((profile) => {
                 const scopeKey =
@@ -231,6 +335,7 @@ export default function DevCorruptionPage() {
                 );
               })}
             </div>
+            )}
           </section>
         ))}
       </div>
