@@ -459,31 +459,25 @@ export function CorruptionViewportWash({
   return (
     <>
       {/* LAYER 1 — Flat color wash tinted with the boss's spec color.
-          Density retuned 2026-08-21 ("THE CORRUPTION HERE IS TOO
-          DENSE"). Prior multipliers (color × 1.5, pattern × 3.0)
-          tried to match Village fog visually but overshot because
-          Village fog is 108 discrete blobs with lots of GAPS between
-          them (~40-50% effective coverage), while our viewport wash
-          is UNIFORM edge-to-edge — so equal multipliers land much
-          heavier. New tuning targets legibility parity:
-            calm     0.07 × 0.5 = 0.035 color + 0.07 × 1.4 = 0.098 pattern
-            critical 0.44 × 0.5 = 0.22  color + 0.44 × 1.4 = 0.616 pattern
-          Map art stays readable at every phase; corruption reads as
-          atmospheric tint rather than opaque paint. */}
+          Density retuned 2026-08-21 pass 3 ("CORRUPTION IS VERY LESS
+          VISIBLE"). With mix-blend-mode: multiply the wash TINTS
+          instead of covering — multiply of a bright pixel × color ≈
+          brightly-tinted pixel, so sprites stay legible while dark
+          map areas get properly shaded. Multiply is inherently much
+          subtler than normal blend, so multipliers must run hotter
+          to reach the visual weight Village fog achieves:
+            calm     0.07 × 1.2 = 0.084 color + 0.07 × 3.2 = 0.224 pattern
+            critical 0.44 × 1.2 = 0.53  color + 0.44 × 3.2 = 1.00  pattern
+          Sprites remain clear because multiply preserves bright
+          luminance; only the map's mid-tones darken. */}
       <div
         role="presentation"
         aria-hidden
         className="pointer-events-none fixed inset-0"
         style={{
           zIndex,
-          opacity: Math.min(1, opacity * 0.5),
+          opacity: Math.min(1, opacity * 1.2),
           backgroundColor: profile.color,
-          // multiply blend so the color layer TINTS underlying pixels
-          // instead of covering them. Bright persona/boss sprites
-          // stay bright (multiply of a bright color × dark tint ≈
-          // bright color); dark map areas get shaded further. Product
-          // ask 2026-08-21: "PERSONA AND BOSSES SHOULD BE CLEAR, THEY
-          // SHOULD BE OVER CORRUPTION FOR ALL MAPS".
           mixBlendMode: "multiply",
           maskImage,
           WebkitMaskImage: maskImage,
@@ -497,15 +491,12 @@ export function CorruptionViewportWash({
         aria-hidden
         className="pointer-events-none fixed inset-0"
         style={{
-          // Sit one z above the color layer so pattern reads on top.
           zIndex: zIndex + 0.001,
-          opacity: Math.min(1, opacity * 1.4),
+          opacity: Math.min(1, opacity * 3.2),
           backgroundImage: tileUrl ? `url(${tileUrl})` : undefined,
           backgroundRepeat: "repeat",
           backgroundSize: `56px 56px`,
           imageRendering: "pixelated",
-          // multiply blend on the pattern too so the motif tints
-          // through the map without opaquely covering sprites.
           mixBlendMode: "multiply",
           maskImage,
           WebkitMaskImage: maskImage,

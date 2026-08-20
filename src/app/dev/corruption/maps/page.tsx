@@ -341,16 +341,16 @@ function MapPreview({
         draggable={false}
       />
       {/* Multipliers match production CorruptionViewportWash
-          post-retune (2026-08-21): color × 0.5, pattern × 1.4.
-          Uniform edge-to-edge wash reads much heavier than Village
-          fog's spotty coverage — earlier × 1.5 / × 3.0 drowned the
-          map art. */}
+          post-retune (2026-08-21 pass 3): color × 1.2, pattern × 3.2.
+          Multiply blend is subtle by nature, so multipliers must run
+          hotter to reach visible weight while sprites (bright pixels)
+          stay legible. */}
       {opacity > 0 && (
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundColor: profile.color,
-            opacity: Math.min(1, opacity * 0.5),
+            opacity: Math.min(1, opacity * 1.2),
             mixBlendMode: "multiply",
           }}
         />
@@ -364,7 +364,7 @@ function MapPreview({
             backgroundRepeat: "repeat",
             backgroundSize: "48px 48px",
             imageRendering: "pixelated",
-            opacity: Math.min(1, opacity * 1.4),
+            opacity: Math.min(1, opacity * 3.2),
             mixBlendMode: "multiply",
           }}
         />
