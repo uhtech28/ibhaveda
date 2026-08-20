@@ -351,6 +351,7 @@ function MapPreview({
           style={{
             backgroundColor: profile.color,
             opacity: Math.min(1, opacity * 0.5),
+            mixBlendMode: "multiply",
           }}
         />
       )}
@@ -364,6 +365,7 @@ function MapPreview({
             backgroundSize: "48px 48px",
             imageRendering: "pixelated",
             opacity: Math.min(1, opacity * 1.4),
+            mixBlendMode: "multiply",
           }}
         />
       )}

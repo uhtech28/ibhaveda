@@ -478,6 +478,13 @@ export function CorruptionViewportWash({
           zIndex,
           opacity: Math.min(1, opacity * 0.5),
           backgroundColor: profile.color,
+          // multiply blend so the color layer TINTS underlying pixels
+          // instead of covering them. Bright persona/boss sprites
+          // stay bright (multiply of a bright color × dark tint ≈
+          // bright color); dark map areas get shaded further. Product
+          // ask 2026-08-21: "PERSONA AND BOSSES SHOULD BE CLEAR, THEY
+          // SHOULD BE OVER CORRUPTION FOR ALL MAPS".
+          mixBlendMode: "multiply",
           maskImage,
           WebkitMaskImage: maskImage,
           maskComposite,
@@ -497,6 +504,9 @@ export function CorruptionViewportWash({
           backgroundRepeat: "repeat",
           backgroundSize: `56px 56px`,
           imageRendering: "pixelated",
+          // multiply blend on the pattern too so the motif tints
+          // through the map without opaquely covering sprites.
+          mixBlendMode: "multiply",
           maskImage,
           WebkitMaskImage: maskImage,
           maskComposite,

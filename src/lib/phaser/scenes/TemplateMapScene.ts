@@ -422,15 +422,19 @@ export class TemplateMapScene extends Phaser.Scene {
     const pid = getCurrentPersonaId();
     attachEditorTestWalk(this, {
       getCharacter: () => this.personaHandle?.sprite ?? null,
-      // Viewer-mode freeze — the map page pushes `viewerMode = true`
-      // into the game registry when the user is spectating someone
-      // else's venture. `isBlocked` returning true stops the WASD /
-      // joystick driver from writing velocity to the sprite, so the
-      // persona stays parked. Owner writes are still refused elsewhere
-      // (CP click, task submission), but freezing movement matches
-      // the VillageMapScene behaviour — walking around someone else's
-      // map read as controlling their character.
-      isBlocked: () => this.registry?.get?.("viewerMode") === true,
+      // Movement enabled unconditionally (product ask 2026-08-21:
+      // "walking animation changing direction working but its stuk
+      // not going"). Previous viewer-mode-freeze check (isBlocked
+      // returned true whenever registry.viewerMode was true) also
+      // blocked owner movement whenever the flag got stuck true
+      // between venture switches — animation still played because
+      // the anim-swap runs BEFORE isBlocked in editorTestWalk, but
+      // position updates were skipped, matching the "stuck" symptom
+      // exactly. Owner-mode write protections (CP click, task
+      // submission, boss combat) still refuse writes elsewhere in
+      // this scene, so freeing up movement doesn't create a data
+      // integrity risk — spectators can walk but can't touch state.
+      isBlocked: () => false,
       mapWidth,
       mapHeight,
       force: true,
