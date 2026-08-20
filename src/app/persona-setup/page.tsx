@@ -141,67 +141,56 @@ export default function PersonaSetupPage() {
     (id: PersonaId) => {
       if (submitting) return;
       setSubmitting(true);
-      // FIRE-AND-FORGET the mutation. Previously we awaited it before
-      // flipping to the Sparky overlay — Convex round-trips can take
-      // 500-2000ms on mobile networks, so users saw the picker freeze
-      // for a beat then jump to black. Now the overlay renders in the
-      // SAME TICK as the click; the mutation resolves in the background.
+      // Product ask 2026-08-20: "AFTER SELECTING PERSONA SPARKY COMES
+      // OF BLACK SCREEN WHEN WE CLICK LETS GO IT TELL TO REDIRECT
+      // AFTER THAT MAIN SPARKY COMES REMOVE THIS STARTING DOUBLE
+      // SPARKY".
       //
-      // Safety: the "Let's go" click waits ~200ms during handleSparkyContinue
-      // if the mutation is still in flight (guaranteed to have started
-      // 100s of ms earlier by then), and the /feed persona-guard
-      // redirect will still bounce them back here if the write actually
-      // failed. Realistically the mutation is always done long before
-      // the user finishes reading Sparky's intro pitch.
+      // Rewrite: skip the intermediate SparkyIntroOverlay entirely.
+      // On persona pick, immediately advance tutorial + navigate to
+      // /feed where Step2TemplatePick's REAL tutorial mascot takes
+      // over. Bridge flag ensures Step2 mounts synchronously without
+      // waiting for Convex tutorial-state hydration, so users see
+      // ONE Sparky (the tutorial one) instead of two.
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("personaPickerDismissed", "1");
+        try {
+          sessionStorage.setItem("personaPickerDismissed", "1");
+          sessionStorage.setItem("sparkyBridgeFromPersonaSetup", "1");
+        } catch {
+          /* no-op */
+        }
       }
+      // Advance tutorial past the intro (step 3 = "click +").
+      if (tutorial && tutorial.step < 3) {
+        void tutorial.goTo(3);
+      }
+      // Fire-and-forget the persona mutation. Convex reactive query
+      // on /feed picks up the new persona within a tick either way.
       void updatePersonaId({ personaId: id }).catch(() => {
-        // Silent — if the mutation fails, the /feed guard redirects
-        // back here and the user can retry. We deliberately don't
-        // block the intro on this error because most failures are
-        // transient network hiccups the user shouldn't have to notice.
+        // /feed guard bounces the user back here if the write
+        // failed. Silent on transient hiccups.
       });
-      // Overlay renders NOW — no wait on the network round-trip.
-      setShowSparkyIntro(true);
+      // Navigate — window.location.replace is faster + drops all
+      // React state so /feed mounts clean.
+      if (typeof window !== "undefined") {
+        window.location.replace("/feed");
+      } else {
+        router.replace("/feed");
+      }
     },
-    [submitting, updatePersonaId],
+    [submitting, updatePersonaId, tutorial, router],
   );
 
-  // "Let's go" click on the Sparky intro overlay. Advances the
-  // tutorial past the intro dialogue (step 3 = click_plus) so /feed
-  // renders Step2TemplatePick with the "tap +" beat already active —
-  // no intro dialogue on the /feed side, no double-scrim.
+  // Deprecated — old SparkyIntroOverlay handler kept in the file
+  // only to satisfy any lingering references. `showSparkyIntro` is
+  // never set true anymore so this is unreachable in practice.
   const handleSparkyContinue = useCallback(async () => {
-    // Fire tutorial advance BEFORE navigation. The mutation is
-    // async but we don't await it (Convex reactive query on /feed
-    // will pick up the new step within a tick either way).
-    if (tutorial && tutorial.step < 3) {
-      void tutorial.goTo(3);
-    }
-    // Bridge flag — tells Step2TemplatePick to mount its Sparky
-    // IMMEDIATELY on /feed load without waiting for the Convex
-    // tutorial-state query to hydrate (~300-800ms). Without this
-    // flag users saw a "Sparky flash" — persona-setup Sparky →
-    // /feed with no Sparky → tutorial Sparky appears late. Product
-    // ask 2026-08-20: "after persona selection this sparky comes on
-    // which go button make this after this our sparky come".
-    if (typeof window !== "undefined") {
-      try {
-        sessionStorage.setItem("sparkyBridgeFromPersonaSetup", "1");
-      } catch {
-        /* no-op */
-      }
-    }
-    // Hard reload rather than soft push so /feed remounts with the
-    // fresh persona ID + tutorial step baked in. Soft push has raced
-    // with the Convex query cache in the past.
     if (typeof window !== "undefined") {
       window.location.replace("/feed");
     } else {
       router.replace("/feed");
     }
-  }, [tutorial, router]);
+  }, [router]);
 
   // Loading state — ONLY block on Clerk auth resolving. Previously we
   // also gated on personaIdRaw + existingProfile Convex queries, which

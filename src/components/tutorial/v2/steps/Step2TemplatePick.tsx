@@ -222,10 +222,29 @@ export function Step2TemplatePick() {
       /* no-op */
     }
   }, []);
+  // Auto-clear the bridge flag when tutorial state advances past
+  // Step2's range OR when Step2's own dialogue finishes. Without
+  // this the bridgeActive flag persisted for the entire session
+  // (component stays mounted at the root, useState survives route
+  // changes) — user returning to /feed at Step 10 for the
+  // Contribute step saw Step2's mascot rendered ALONGSIDE Step4's,
+  // producing two Sparky bubbles simultaneously. Product ask
+  // 2026-08-20: "instead this is coming with 2 SPARKY".
+  useEffect(() => {
+    if (bridgeActive && tutorial.step > 6) {
+      setBridgeActive(false);
+    }
+  }, [bridgeActive, tutorial.step]);
+
+  // Bridge is ONLY allowed to override the Convex-still-loading
+  // gate — it must NOT extend Step2's step-range into Step4's
+  // territory. Even if bridgeActive is true, tutorial.step > 6
+  // means Step2 stays dormant.
+  const inStep2Range = tutorial.step >= 1 && tutorial.step <= 6;
   const active =
     onFeed &&
-    (bridgeActive ||
-      (tutorial.active && tutorial.step >= 1 && tutorial.step <= 6));
+    inStep2Range &&
+    (bridgeActive || tutorial.active);
 
   // PROGRESS ADVANCE — used to auto-bump to step 3 on /feed arrival,
   // which made the progress bar show 1/8 the moment Sparky's intro

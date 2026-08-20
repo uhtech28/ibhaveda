@@ -340,23 +340,19 @@ function MapPreview({
         style={{ objectFit: "cover", imageRendering: "pixelated" }}
         draggable={false}
       />
-      {/* Flat color wash — makes the tint visible on any background.
-          Alpha = phase opacity so the tint scales with severity. */}
+      {/* Density calibrated to match Village fog feel (product ask
+          2026-08-20 "KEEP THE DENSITY OF ALL THE CORRUPTION LIKE WE
+          HAVE DENSITY FOR THE FOG"). Multipliers match production
+          CorruptionViewportWash: color × 1.5, pattern × 3.0. */}
       {opacity > 0 && (
         <div
           className="pointer-events-none absolute inset-0"
-          style={{ backgroundColor: profile.color, opacity: opacity * 0.9 }}
+          style={{
+            backgroundColor: profile.color,
+            opacity: Math.min(1, opacity * 1.5),
+          }}
         />
       )}
-      {/* Pattern tile — repeats at 48px so the motif reads at the
-          260×140 preview scale. Alpha bumped above the wash so the
-          shape is legible through the color layer. Rendered ONLY
-          post-mount (mounted=true) to avoid SSR/client hydration
-          mismatch — canvas isn't available on the server. Div is
-          kept mounted with empty background so React child count
-          matches during hydration.
-          suppressHydrationWarning belts-and-braces in case any
-          browser extension mutates the DOM between SSR + hydration. */}
       {opacity > 0 && (
         <div
           suppressHydrationWarning
@@ -366,7 +362,7 @@ function MapPreview({
             backgroundRepeat: "repeat",
             backgroundSize: "48px 48px",
             imageRendering: "pixelated",
-            opacity: Math.min(1, opacity * 1.5),
+            opacity: Math.min(1, opacity * 3.0),
           }}
         />
       )}

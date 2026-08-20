@@ -454,43 +454,62 @@ export function CorruptionViewportWash({
       ? ["add", ...clearedZones.map(() => "subtract")].join(", ")
       : undefined;
 
+  const tileUrl = canvasRef.current ? canvasRef.current.toDataURL() : undefined;
+
   return (
-    <div
-      role="presentation"
-      aria-hidden
-      className="pointer-events-none fixed inset-0"
-      style={{
-        zIndex,
-        opacity,
-        // Use the canvas as a repeating background tile so a single 96px
-        // paint covers the whole viewport. Chrome + Safari both accept
-        // <canvas> in url() via toDataURL() — we defer that to a second
-        // effect below to avoid re-generating the pattern every render.
-        backgroundImage: canvasRef.current
-          ? `url(${canvasRef.current.toDataURL()})`
-          : undefined,
-        backgroundRepeat: "repeat",
-        // Tile display size dropped 96 → 56 (product ask 2026-08-16:
-        // "make it little more dense"). Same 96px source tile is now
-        // rendered at 56px so the pattern repeats ~3× more often per
-        // viewport row — the crack/grid/vine motifs read as a proper
-        // corrosion field instead of scattered oversized swatches.
-        backgroundSize: `56px 56px`,
-        imageRendering: "pixelated",
-        // Per-CP clearing halos. `-webkit-` prefix duplicates for
-        // older iOS Safari that still gates unprefixed mask parsing.
-        maskImage,
-        WebkitMaskImage: maskImage,
-        maskComposite,
-        WebkitMaskComposite: maskComposite,
-      }}
-    >
-      {/* Hidden generator canvas — off-screen; only its toDataURL is
-          used as the background tile above. */}
-      <canvas
-        ref={canvasRef}
-        style={{ position: "absolute", left: -9999, top: -9999 }}
+    <>
+      {/* LAYER 1 — Flat color wash tinted with the boss's spec color.
+          Density calibrated 2026-08-20 to match Village Fog corruption
+          feel ("KEEP THE DENSITY OF ALL THE CORRUPTION LIKE WE HAVE
+          DENSITY FOR THE FOG"). Village stage 1 renders 108 drifting
+          fog blobs at 0.35-0.60 alpha each — very atmospheric read.
+          Non-village templates now hit the same visual weight via a
+          heavier color wash + denser pattern tile stack:
+            calm    0.07 × 1.5 = 0.105 color + 0.07 × 3.0 = 0.21 pattern
+            critical 0.44 × 1.5 = 0.66 color  + 0.44 × 3.0 = 1.0 pattern (clamped)
+          So even fresh ventures paint a real atmospheric tint from
+          the moment the map loads. Both layers use the same mask so
+          per-CP clearing halos punch through uniformly. */}
+      <div
+        role="presentation"
+        aria-hidden
+        className="pointer-events-none fixed inset-0"
+        style={{
+          zIndex,
+          opacity: Math.min(1, opacity * 1.5),
+          backgroundColor: profile.color,
+          maskImage,
+          WebkitMaskImage: maskImage,
+          maskComposite,
+          WebkitMaskComposite: maskComposite,
+        }}
       />
-    </div>
+      {/* LAYER 2 — Pattern tile (crack / grid / vine / etc.). */}
+      <div
+        role="presentation"
+        aria-hidden
+        className="pointer-events-none fixed inset-0"
+        style={{
+          // Sit one z above the color layer so pattern reads on top.
+          zIndex: zIndex + 0.001,
+          opacity: Math.min(1, opacity * 3.0),
+          backgroundImage: tileUrl ? `url(${tileUrl})` : undefined,
+          backgroundRepeat: "repeat",
+          backgroundSize: `56px 56px`,
+          imageRendering: "pixelated",
+          maskImage,
+          WebkitMaskImage: maskImage,
+          maskComposite,
+          WebkitMaskComposite: maskComposite,
+        }}
+      >
+        {/* Hidden generator canvas — off-screen; only its toDataURL
+            is used as the pattern above. */}
+        <canvas
+          ref={canvasRef}
+          style={{ position: "absolute", left: -9999, top: -9999 }}
+        />
+      </div>
+    </>
   );
 }

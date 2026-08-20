@@ -1202,19 +1202,36 @@ function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
           position: "absolute",
           inset: 0,
           backgroundImage: `url(${bossAsset})`,
-          // HEAD-CROP: scale the sheet up so ONE FRAME is 2× the
-          // cell size, then position it so the top-center of frame 0
-          // lands in the visible 64×64 window. That gives a proper
-          // head-shot instead of showing the entire full-body sprite
-          // shrunk into 64px (product ask 2026-08-20 — boss face
-          // was too small in AI combat panel).
+          // HEAD-CROP: scale to 2× per-frame so ONE FRAME occupies 2×
+          // the cell, then position so the TOP-CENTER of frame 0
+          // (where the head sits for any standing sprite) lands in
+          // the visible 64×64 window.
           //
-          // Math: full sheet at 2× zoom = frameCount frames × 2 wide
-          //       = (frameCount * 200)% wide. Height = 200%.
-          //       Position X = 0 (left edge of frame 0)
-          //       Position Y = 0 (top of the frame = head area)
+          // Math for backgroundSize/position with N frames wide:
+          //   backgroundSize     = (N × 200%) wide × 200% tall
+          //   backgroundPosition X% = center of frame_index in the
+          //                            image's horizontal excess band
+          //   backgroundPosition Y% = 0 (top of frame)
+          //
+          // For frame 0 out of N frames at 2× zoom, we want the
+          // container's horizontal midpoint (32px of 64px) to map to
+          // the middle of frame 0 in the scaled image. Frame 0 spans
+          // pixels 0..(2*container). Its midpoint is at pixel
+          // container. In percentage terms: image excess width =
+          // container * (2N - 1); frame-0 midpoint offset = container;
+          // required position% = container / (container*(2N-1)) =
+          // 1/(2N-1). Multiplied by 100 gives the correct value.
+          //
+          // Previous rev used "0% 0%" which showed the LEFT edge of
+          // frame 0 — for a centered character silhouette that's
+          // mostly transparent border with just a foot poking in.
+          // Product ask 2026-08-20: face still not visible in AI
+          // combat cell.
           backgroundSize: `${frameCount * 200}% 200%`,
-          backgroundPosition: "0% 0%",
+          backgroundPosition:
+            frameCount > 1
+              ? `${(100 / (2 * frameCount - 1)).toFixed(3)}% 0%`
+              : `50% 0%`,
           backgroundRepeat: "no-repeat",
           imageRendering: "pixelated",
           // Hide until dims are known so we never paint a stretched
