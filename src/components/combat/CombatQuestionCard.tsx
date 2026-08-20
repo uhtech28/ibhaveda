@@ -1202,11 +1202,19 @@ function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
           position: "absolute",
           inset: 0,
           backgroundImage: `url(${bossAsset})`,
-          // Sheet is `frameCount` frames wide × 1 tall. Sizing to
-          // (N × 100%, 100%) makes each frame fill the full 64×64
-          // display; backgroundPosition "0 50%" pins to frame 0.
-          backgroundSize: `${frameCount * 100}% 100%`,
-          backgroundPosition: "0 50%",
+          // HEAD-CROP: scale the sheet up so ONE FRAME is 2× the
+          // cell size, then position it so the top-center of frame 0
+          // lands in the visible 64×64 window. That gives a proper
+          // head-shot instead of showing the entire full-body sprite
+          // shrunk into 64px (product ask 2026-08-20 — boss face
+          // was too small in AI combat panel).
+          //
+          // Math: full sheet at 2× zoom = frameCount frames × 2 wide
+          //       = (frameCount * 200)% wide. Height = 200%.
+          //       Position X = 0 (left edge of frame 0)
+          //       Position Y = 0 (top of the frame = head area)
+          backgroundSize: `${frameCount * 200}% 200%`,
+          backgroundPosition: "0% 0%",
           backgroundRepeat: "no-repeat",
           imageRendering: "pixelated",
           // Hide until dims are known so we never paint a stretched
@@ -1597,18 +1605,27 @@ export function focusForCheckpoint(
   const biome = biomeKeyFromBossAsset(bossAsset);
   const cps = biome ? CP_FOCUS_MAP[biome] : null;
   const cp = cps && typeof checkpointIndex === "number" ? cps[checkpointIndex] : null;
+  // Non-village templates (academic / lab / creative) use a tighter
+  // zoom than village. Product ask 2026-08-20: "for ai combat for all
+  // maps except village little bit zoom the ai combat background".
+  // Village stays at 180% (the value tuned against the hand-painted
+  // village CP focus points); every other biome bumps to 260% so the
+  // combat backdrop reads as an area shot, not a full-map screenshot.
+  const isVillage = biomeKeyFromBossAsset(bossAsset) === "village";
+  const nonVillageDefaultSize = "260%";
   if (!cp) {
-    // No CP focus available — default to centered arena crop
-    return { positionX: "50%", positionY: "50%", size: "cover" };
+    // No CP focus data for this biome yet — default to centered
+    // crop, sized per-template so non-village still zooms in.
+    return {
+      positionX: "50%",
+      positionY: "50%",
+      size: isVillage ? "cover" : nonVillageDefaultSize,
+    };
   }
-  // Zoom in on the CP by using a larger background-size and positioning
-  // by the CP's (x%, y%).  180% size ≈ 1.8× zoom which frames the area
-  // around a CP with more surrounding context — the wider view gives
-  // more sense of the biome without turning into a full-map screenshot.
   return {
     positionX: `${cp.x}%`,
     positionY: `${cp.y}%`,
-    size: "180%",
+    size: isVillage ? "180%" : nonVillageDefaultSize,
   };
 }
 

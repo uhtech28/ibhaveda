@@ -745,6 +745,48 @@ export const ensureVentureStructure = mutation({
       });
     }
 
+    // ── Pointer backfill (product ask 2026-08-20) ─────────────────
+    // "the older projects are stuck on the first stage even if they're
+    // at an older stage". Ventures that progressed under earlier code
+    // sometimes have `currentStage/currentCheckpoint` still pinned at
+    // 1/1 even though multiple checkpoints are already marked
+    // completed. That happens when task-submits went through a code
+    // path that never called `advanceVenturePointerAfterCheckpoint`.
+    //
+    // Compute the true pointer from the actual checkpoint state:
+    //   • First checkpoint that ISN'T fully completed → that's where
+    //     the user currently is.
+    //   • If all are complete → last checkpoint (venture done).
+    // Then patch venture only if the pointer moved FORWARD so we
+    // never accidentally regress a healthy venture.
+    const firstIncomplete = orderedCheckpoints.find(
+      (c) => c.status !== "completed",
+    );
+    const targetPointer = firstIncomplete
+      ? { stage: firstIncomplete.stage, checkpoint: firstIncomplete.checkpoint }
+      : orderedCheckpoints.length > 0
+        ? {
+            stage: orderedCheckpoints[orderedCheckpoints.length - 1].stage,
+            checkpoint:
+              orderedCheckpoints[orderedCheckpoints.length - 1].checkpoint,
+          }
+        : null;
+    if (targetPointer) {
+      const currentStage = venture.currentStage ?? 1;
+      const currentCp = venture.currentCheckpoint ?? 1;
+      const shouldAdvance =
+        targetPointer.stage > currentStage ||
+        (targetPointer.stage === currentStage &&
+          targetPointer.checkpoint > currentCp);
+      if (shouldAdvance) {
+        await ctx.db.patch(venture._id, {
+          currentStage: targetPointer.stage,
+          currentCheckpoint: targetPointer.checkpoint,
+          updatedAt: now,
+        });
+      }
+    }
+
     return {
       success: true,
       insertedCheckpoints,

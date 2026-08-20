@@ -5902,9 +5902,25 @@ function MapPageInner() {
         if (!pool) {
           return <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />;
         }
+        // Prefer the idleClip (multi-frame spritesheet) over
+        // idleAsset (single-frame image) — the super-pool Pixellab
+        // exports are 9-frame horizontal sheets, so if we pass the
+        // asset without frame dims the cinematic renders the whole
+        // strip stretched to fit the display box (Tide Caller bug
+        // 2026-08-16). When idleClip is present, hand its per-frame
+        // size to the cinematic so it clips to frame 0.
+        const clipArt = pool.idleClip?.asset ?? pool.idleAsset;
+        const frameSize = pool.idleClip
+          ? {
+              frameWidth: pool.idleClip.frameWidth,
+              frameHeight: pool.idleClip.frameHeight,
+              frameCount: pool.idleClip.frameCount,
+            }
+          : undefined;
         return (
           <BossIntroCinematic
-            mainBossArt={pool.idleAsset ?? undefined}
+            mainBossArt={clipArt ?? undefined}
+            mainBossFrameSize={frameSize}
             mainBossTitle={pool.name}
             speechLines={[
               `So, you dare to dream of something new.`,
@@ -5927,7 +5943,24 @@ function MapPageInner() {
           pendingEncounterRef. */}
       {superIntroTarget && (
         <BossIntroCinematic
-          mainBossArt={superIntroTarget.boss.idleAsset}
+          // Prefer idleClip's asset + frame dims so the cinematic
+          // clips to frame 0 of the spritesheet — see Tide Caller
+          // fix on the first-visit intro above.
+          mainBossArt={
+            superIntroTarget.boss.idleClip?.asset ??
+            superIntroTarget.boss.idleAsset
+          }
+          mainBossFrameSize={
+            superIntroTarget.boss.idleClip &&
+            superIntroTarget.boss.idleClip.frameWidth &&
+            superIntroTarget.boss.idleClip.frameHeight
+              ? {
+                  frameWidth: superIntroTarget.boss.idleClip.frameWidth,
+                  frameHeight: superIntroTarget.boss.idleClip.frameHeight,
+                  frameCount: superIntroTarget.boss.idleClip.frameCount,
+                }
+              : undefined
+          }
           mainBossTitle={superIntroTarget.boss.name}
           speechLines={superIntroTarget.speech}
           minionsSpeechLine={superIntroTarget.minionsLine}
