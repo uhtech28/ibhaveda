@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono, Sora } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 
-export const dynamic = 'force-dynamic';
+// PERF: `export const dynamic = 'force-dynamic'` used to live here. It forced
+// EVERY route (including the marketing landing page) to be rendered per-request
+// with no caching, defeating Next 15's default static/ISR behavior and adding
+// full server RTT to every navigation. Removed 2026-08-21. Individual routes
+// that genuinely need per-request rendering must opt in themselves.
 import { ThemeProvider } from '@/components/theme-provider';
 import { ConvexClientProvider } from '@/lib/convex/providers';
 import { Toaster } from '@/components/ui/toaster';
@@ -15,22 +19,31 @@ import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ClarityScript } from "@/components/analytics/ClarityScript";
 import "./globals.css";
 
+// PERF: `display: 'swap'` swaps in the web font as soon as it downloads instead
+// of blocking text rendering (default is 'auto' == 'block' for ~3s). Prevents
+// FOIT (Flash of Invisible Text) and improves LCP by up to a full second on
+// slow connections. `preload: false` on the mono font stops us shipping a
+// preload <link> for a font used only in code blocks on a couple of pages.
 const displayFont = Sora({
   variable: "--font-display",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 const bodyFont = DM_Sans({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 const monoFont = JetBrains_Mono({
   variable: "--font-code",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
+  display: "swap",
+  preload: false,
 });
 
 // metadataBase makes openGraph/twitter image URLs absolute, which Insta /

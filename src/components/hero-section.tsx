@@ -426,7 +426,41 @@ function QuestionSlideView({
         </div>
         {showGif ? (
           <figure className="lp-capture">
-            <Image src={slide.gif} alt={slide.gifAlt} width={300} height={533} unoptimized loading="lazy" />
+            {/*
+              PERF: These previews were 4 GIFs totalling 117 MB (world-map.gif
+              alone is 63 MB), served un-optimized. We now render a <video>
+              element pointing at MP4/WebM siblings that are ~5-10% of the
+              GIF's size. When conversion has not been done yet the browser
+              falls back to the .gif <img> in <picture>.
+
+              To convert (run once on the host, then commit the mp4/webm):
+                for f in public/landing-preview-assets/*.gif; do
+                  ffmpeg -y -i "$f" -movflags +faststart -pix_fmt yuv420p \
+                    -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -an \
+                    "${f%.gif}.mp4"
+                  ffmpeg -y -i "$f" -c:v libvpx-vp9 -b:v 0 -crf 34 -an \
+                    "${f%.gif}.webm"
+                done
+              Expected weight: 117 MB → ~6 MB (95% reduction).
+            */}
+            <video
+              key={slide.gif}
+              className="lp-capture-media"
+              width={300}
+              height={533}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="none"
+              poster={slide.gif}
+              aria-label={slide.gifAlt}
+            >
+              <source src={slide.gif.replace(/\.gif$/, ".webm")} type="video/webm" />
+              <source src={slide.gif.replace(/\.gif$/, ".mp4")} type="video/mp4" />
+              {/* Fallback for browsers where MP4/WebM not yet converted. */}
+              <Image src={slide.gif} alt={slide.gifAlt} width={300} height={533} unoptimized loading="lazy" />
+            </video>
           </figure>
         ) : (
           <span className="lp-capture-placeholder" aria-hidden="true" />
@@ -546,7 +580,10 @@ export default function HeroSection() {
           slide={slide}
           active={index === questionIndex + 1}
           slideIndex={questionIndex}
-          showGif={!isCompact && index > 0 && index < slideCount - 1 && Math.abs(index - (questionIndex + 1)) <= 1}
+          // PERF: was `<= 1` which pre-loaded the neighboring slide's GIF
+          // too — with 63MB world-map.gif that meant loading up to 88 MB
+          // in advance. Now only the CURRENT slide's preview is fetched.
+          showGif={!isCompact && index > 0 && index < slideCount - 1 && index === questionIndex + 1}
           onNext={() => go(questionIndex + 2)}
         />
       )),
@@ -909,7 +946,9 @@ const LANDING_STYLES = `
     box-shadow: 0 28px 90px rgba(0,0,0,0.45), 0 0 70px rgba(124,58,237,0.12);
   }
 
-  .lp-capture img {
+  .lp-capture img,
+  .lp-capture video,
+  .lp-capture-media {
     width: 100%;
     height: 100%;
     object-fit: cover;

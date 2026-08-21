@@ -10,13 +10,23 @@ import { api } from "../../convex/_generated/api";
 
 function MobileBottomNavContent() {
   const pathname = usePathname();
-  const currentUser = useQuery(api.users.getCurrentUser);
 
-  if (
+  // PERF: this component is mounted globally via the root layout, but is
+  // hidden on the marketing landing + auth pages. Previously we called
+  // `useQuery(getCurrentUser)` BEFORE the early return, so every anonymous
+  // landing-page visitor fired a Convex round-trip that was thrown away.
+  // Compute the hidden state first, then only subscribe when we're actually
+  // going to render.
+  const isHidden =
     pathname === "/" ||
     pathname?.startsWith("/sign-in") ||
-    pathname?.startsWith("/sign-up")
-  ) {
+    pathname?.startsWith("/sign-up");
+  const currentUser = useQuery(
+    api.users.getCurrentUser,
+    isHidden ? "skip" : {},
+  );
+
+  if (isHidden) {
     return null;
   }
 
