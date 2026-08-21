@@ -452,8 +452,22 @@ function QuestionSlideView({
               muted
               loop
               playsInline
-              preload="none"
-              poster={slide.gif}
+              // DESKTOP PERF: was `preload="none"` which starved the
+              // browser of dimensions + poster metadata until the user
+              // interacted, so the media area briefly rendered black on
+              // scroll-in and pushed LCP later. `metadata` fetches the
+              // ~2 KB moov atom only — enough for the browser to hand
+              // us a first frame — without pulling the full stream.
+              preload="metadata"
+              // Was `poster={slide.gif}` pointing at the ORIGINAL
+              // multi-megabyte animated GIF (spark.gif 4.4 MB,
+              // world-map.gif 63 MB before we converted them). Even
+              // though preload="none" prevented the video body from
+              // loading, the poster was still fetched full-size the
+              // moment the <video> mounted. Swap to the .webp sibling
+              // (5–40 KB typically) so the poster download itself
+              // never dominates the page-weight budget.
+              poster={slide.gif.replace(/\.gif$/, ".webp")}
               aria-label={slide.gifAlt}
             >
               <source src={slide.gif.replace(/\.gif$/, ".webm")} type="video/webm" />

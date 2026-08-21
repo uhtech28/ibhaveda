@@ -8,19 +8,16 @@ import { ClerkProvider } from '@clerk/nextjs';
 // full server RTT to every navigation. Removed 2026-08-21. Individual routes
 // that genuinely need per-request rendering must opt in themselves.
 import { ThemeProvider } from '@/components/theme-provider';
-import { ConvexClientProvider } from '@/lib/convex/providers';
-import { ChatProvider } from "@/components/chat/ChatContext";
-import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { AuthModalProvider } from "@/components/auth/auth-modal";
-import { TutorialProvider } from "@/components/tutorial/v2/TutorialProvider";
-import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
-import { ClarityScript } from "@/components/analytics/ClarityScript";
-// MOBILE PERF: ChatWidget + Toaster are dynamic-imported with `ssr: false` from
-// this Client Component wrapper. Next 15 disallows `ssr: false` in Server
-// Components (root layout is a Server Component), so we hoist those two into
-// ClientOnlyOverlays. Effect is identical — they still land in their own chunk
-// and don't ship on landing for signed-out visitors.
-import { ClientOnlyOverlays } from "@/components/layout/ClientOnlyOverlays";
+// MOBILE + DESKTOP PERF: every provider that the marketing landing does NOT
+// need (Convex socket, analytics, Clarity, tutorial state machine, chat
+// context, mobile bottom nav, chat widget, toaster) lives inside AppShell
+// and is dynamic-imported (ssr:false) via ConditionalAppShell. On the
+// landing route (`/`), that chunk is never fetched — signed-out visitors
+// pay zero JS parse cost for the interactive-app tree. Round-1 desktop
+// regression traced to those providers hydrating on landing; this
+// eliminates that entire class of TBT contributor on the marketing page.
+import { ConditionalAppShell } from "@/components/layout/ConditionalAppShell";
 import "./globals.css";
 
 // PERF: `display: 'swap'` swaps in the web font as soon as it downloads instead
@@ -211,20 +208,20 @@ export default function RootLayout({
         <body
           className="font-sans antialiased"
         >
-          <ConvexClientProvider>
-            <AnalyticsProvider>
-              <ClarityScript />
-              <ThemeProvider>
-                <AuthModalProvider>
-                  <TutorialProvider><ChatProvider>
-                    {children}
-                    <MobileBottomNav />
-                    <ClientOnlyOverlays />
-                  </ChatProvider></TutorialProvider>
-                </AuthModalProvider>
-              </ThemeProvider>
-            </AnalyticsProvider>
-          </ConvexClientProvider>
+          <ThemeProvider>
+            {/* AuthModalProvider stays at the root because the marketing
+                landing hero calls useAuthModal() for its role-picker + "Log
+                in" button. Its own SignInForm/SignUpForm are already
+                dynamic-imported (see auth-modal.tsx), so keeping it at the
+                root only ships the tiny Dialog + context wrapper — the
+                heavy form JS still doesn't load until the user opens the
+                modal. */}
+            <AuthModalProvider>
+              <ConditionalAppShell>
+                {children}
+              </ConditionalAppShell>
+            </AuthModalProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
