@@ -847,7 +847,17 @@ const LANDING_STYLES = `
     cursor: pointer;
     color: white;
     padding: 16px;
-    animation: lp-card-in 480ms ease both;
+    /* LCP FIX 2026-08-21: previously `animation: lp-card-in 480ms ease both`
+       with keyframe `from { opacity: 0 }`. Cards are the LARGEST above-fold
+       painted elements on mobile — Chrome's LCP algorithm only records LCP
+       when the largest element paints at opacity > 0. On slow mobile CPUs
+       (Moto G Power / 4G in Lighthouse) React hydration takes ~4-5s before
+       CSS animations begin; cards stayed invisible that whole time and LCP
+       fired at 5.6s. Removing the opacity fade lets cards render immediately
+       at their final size + opacity — LCP now fires at first paint, not
+       post-hydration. A small transform-only micro-animation keeps polish
+       without touching opacity (transform doesn't affect LCP timing). */
+    animation: lp-card-in-transform 480ms ease both;
   }
 
   .lp-role:nth-child(2) { animation-delay: 80ms; }
@@ -1168,6 +1178,13 @@ const LANDING_STYLES = `
   @keyframes lp-card-in {
     from { opacity: 0; transform: translateY(10px) scale(0.97); }
     to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* LCP FIX: transform-only entry — keeps polish, doesn't gate LCP on the
+     hydration+animation clock. Cards paint at opacity: 1 immediately. */
+  @keyframes lp-card-in-transform {
+    from { transform: translateY(6px) scale(0.985); }
+    to { transform: translateY(0) scale(1); }
   }
 
   @keyframes lp-bounce {
