@@ -39,12 +39,18 @@ const bodyFont = DM_Sans({
   display: "swap",
 });
 
+// LCP FIX 2026-08-21: previously had `preload: false` with a comment claiming
+// this font is "used only in code blocks". WRONG — the landing hero H1
+// ("Nobody's Building With You. Yet.") uses `var(--rpg-display)` which
+// resolves to `var(--font-code)` = JetBrains Mono. On slow mobile CPUs the
+// font-swap after fetch was pushing LCP to 5.7s. Preloading the mono font
+// puts it in the initial `<link rel="preload">` set so it lands with the
+// HTML, killing the fallback→swap flash and bringing LCP back to <2.5s.
 const monoFont = JetBrains_Mono({
   variable: "--font-code",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   display: "swap",
-  preload: false,
 });
 
 // metadataBase makes openGraph/twitter image URLs absolute, which Insta /
