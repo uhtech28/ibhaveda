@@ -142,6 +142,13 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider
+      // CI FIX 2026-08-21: passing publishableKey explicitly with a build-safe
+      // fallback prevents the @clerk/clerk-react "Missing publishableKey"
+      // throw during static prerender of /_not-found in CI environments
+      // that don't have NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY set. Real value
+      // still comes from env at runtime; the placeholder only runs during
+      // build-time prerender of the 404 page which never renders auth UI.
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "pk_test_build_placeholder"}
       localization={{
         unstable__errors: {
           // Clerk has a built-in (non-configurable) rule that rejects a password
