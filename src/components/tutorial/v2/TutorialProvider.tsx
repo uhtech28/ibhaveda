@@ -23,14 +23,34 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
+import { useAuth } from "@clerk/nextjs";
 import { api } from "@convex/_generated/api";
 import { TutorialProgressBar } from "./TutorialProgressBar";
-import { Step1Welcome } from "./steps/Step1Welcome";
-import { Step2TemplatePick } from "./steps/Step2TemplatePick";
-import { Step3MapGuide } from "./steps/Step3MapGuide";
-import { Step4Contribute } from "./steps/Step4Contribute";
+// MOBILE PERF: these Step components are only ever active for signed-in users
+// running the guided tutorial. A landing-page visitor on a Moto G4 doesn't need
+// their JS parsed/executed. Loading via next/dynamic (with ssr:false so we skip
+// the hydration cost too) shifts the code into separate chunks that only fetch
+// when the tutorial actually mounts. This is a major TBT win because Step3 pulls
+// in Convex mutations, the mascot, highlight overlays, and template config.
+const Step1Welcome = dynamic(
+  () => import("./steps/Step1Welcome").then((m) => m.Step1Welcome),
+  { ssr: false, loading: () => null },
+);
+const Step2TemplatePick = dynamic(
+  () => import("./steps/Step2TemplatePick").then((m) => m.Step2TemplatePick),
+  { ssr: false, loading: () => null },
+);
+const Step3MapGuide = dynamic(
+  () => import("./steps/Step3MapGuide").then((m) => m.Step3MapGuide),
+  { ssr: false, loading: () => null },
+);
+const Step4Contribute = dynamic(
+  () => import("./steps/Step4Contribute").then((m) => m.Step4Contribute),
+  { ssr: false, loading: () => null },
+);
 // SwordDropCelebration was removed from the mount tree per product
 // request. The file is kept in the repo (unused) in case we want to
 // re-enable a completion cinematic later.
@@ -84,8 +104,18 @@ interface TutorialProviderProps {
 
 export function TutorialProvider({ children }: TutorialProviderProps) {
   // ── Convex subscription ─────────────────────────────────────────────────
-  // Returns null while loading or for signed-out users.
-  const remote = useQuery(api.tutorial.getMyFeedTutorialState, {});
+  // MOBILE PERF: this provider mounts in the root layout, so it renders on
+  // the landing page too. Previously we fired `getMyFeedTutorialState`
+  // unconditionally, which meant every anonymous marketing visit paid for a
+  // Convex round-trip that always returned "not signed in". Gate the query
+  // on Clerk's `isSignedIn` so signed-out landing visitors don't touch the
+  // Convex socket at all — they get the placeholder default and none of the
+  // tutorial machinery activates.
+  const { isSignedIn, isLoaded } = useAuth();
+  const remote = useQuery(
+    api.tutorial.getMyFeedTutorialState,
+    isLoaded && isSignedIn ? {} : "skip",
+  );
 
   // ── Mutations ───────────────────────────────────────────────────────────
   const advanceMutation = useMutation(api.tutorial.advanceFeedTutorial);
@@ -293,14 +323,25 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
         totalSteps={8}
         onSkip={skip}
       />
-      {/* Step 1 mounts on /profile-setup when tutorial step === 1. */}
-      <Step1Welcome />
-      {/* Step 2 mounts on /feed when tutorial step === 2. */}
-      <Step2TemplatePick />
-      {/* Step 3 mounts on /map/world (covers combat + flare) */}
-      <Step3MapGuide />
-      {/* Step 4 mounts on /feed at step 10 (contribution flow) */}
-      <Step4Contribute />
+      {/*
+        MOBILE PERF: only mount the tutorial step components once Clerk has
+        confirmed the user is signed in. Each Step is loaded via next/dynamic,
+        so gating the mount here also gates the chunk download — anonymous
+        landing-page visitors on cellular never fetch this JS at all.
+        Signed-in users pay the download once on first authenticated page load.
+      */}
+      {isLoaded && isSignedIn ? (
+        <>
+          {/* Step 1 mounts on /profile-setup when tutorial step === 1. */}
+          <Step1Welcome />
+          {/* Step 2 mounts on /feed when tutorial step === 2. */}
+          <Step2TemplatePick />
+          {/* Step 3 mounts on /map/world (covers combat + flare) */}
+          <Step3MapGuide />
+          {/* Step 4 mounts on /feed at step 10 (contribution flow) */}
+          <Step4Contribute />
+        </>
+      ) : null}
       {/* Universal stuck-watchdog — a small "Skip this step" chip that
           appears when the same tutorial step has been active for >45s
           without advancing. Product feedback 2026-08-20: "a few

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono, Sora } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
+import dynamic from "next/dynamic";
 
 // PERF: `export const dynamic = 'force-dynamic'` used to live here. It forced
 // EVERY route (including the marketing landing page) to be rendered per-request
@@ -9,8 +10,6 @@ import { ClerkProvider } from '@clerk/nextjs';
 // that genuinely need per-request rendering must opt in themselves.
 import { ThemeProvider } from '@/components/theme-provider';
 import { ConvexClientProvider } from '@/lib/convex/providers';
-import { Toaster } from '@/components/ui/toaster';
-import ChatWidget from "@/components/chat/ChatWidget";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { AuthModalProvider } from "@/components/auth/auth-modal";
@@ -18,6 +17,21 @@ import { TutorialProvider } from "@/components/tutorial/v2/TutorialProvider";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ClarityScript } from "@/components/analytics/ClarityScript";
 import "./globals.css";
+
+// MOBILE PERF: These components never render above the fold and — critically —
+// they never render at all on the landing page for signed-out visitors.
+// Ship them via next/dynamic so their JS lands in a separate chunk that mobile
+// only downloads after the main thread is idle (or once auth resolves and the
+// widget/toast actually mounts). Keeps landing TBT down on Moto G4-class CPUs.
+// `ssr: false` avoids paying the hydration cost on first paint.
+const ChatWidget = dynamic(() => import("@/components/chat/ChatWidget"), {
+  ssr: false,
+  loading: () => null,
+});
+const Toaster = dynamic(
+  () => import("@/components/ui/toaster").then((m) => m.Toaster),
+  { ssr: false, loading: () => null },
+);
 
 // PERF: `display: 'swap'` swaps in the web font as soon as it downloads instead
 // of blocking text rendering (default is 'auto' == 'block' for ~3s). Prevents
@@ -163,6 +177,47 @@ export default function RootLayout({
       }}
     >
       <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} dark`} suppressHydrationWarning>
+        <head>
+          {/*
+            MOBILE PERF: warm the TLS + DNS connection to the auth + realtime
+            backends BEFORE React hydrates and fires its first fetch. On a
+            slow-3G handshake this saves ~200–400ms off the first Convex
+            round-trip, and the same off Clerk's session probe. Origins are
+            hard-coded from env so we don't ship an env parse to the browser.
+          */}
+          {process.env.NEXT_PUBLIC_CONVEX_URL ? (
+            <link
+              rel="preconnect"
+              href={process.env.NEXT_PUBLIC_CONVEX_URL}
+              crossOrigin="anonymous"
+            />
+          ) : null}
+          {process.env.NEXT_PUBLIC_CLERK_FRONTEND_API ? (
+            <link
+              rel="preconnect"
+              href={`https://${process.env.NEXT_PUBLIC_CLERK_FRONTEND_API}`}
+              crossOrigin="anonymous"
+            />
+          ) : (
+            <link
+              rel="preconnect"
+              href="https://clerk.ibhaveda.com"
+              crossOrigin="anonymous"
+            />
+          )}
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+          <link rel="dns-prefetch" href="https://www.clarity.ms" />
+          {/*
+            MOBILE PERF NOTE: we intentionally do NOT hand-roll a
+            <link rel="preload"> for /ibhaveda-logo.jpg. The raw file is
+            ~296 KB (JPEG) even though it's only rendered at 48x48. next/image
+            with priority already emits a preload link, and — critically —
+            that preload points at the /_next/image AVIF/WebP variant which
+            drops the transfer to ~5-10 KB. Preloading the raw JPG would fire
+            a duplicate request AND cost 30x more bytes on 3G. Fix upstream
+            by shrinking the source PNG to a 128x128 icon set.
+          */}
+        </head>
         <body
           className="font-sans antialiased"
         >

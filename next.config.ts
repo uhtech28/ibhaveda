@@ -34,6 +34,14 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-separator",
       "@radix-ui/react-switch",
       "@radix-ui/react-toast",
+      // MOBILE PERF: these packages are re-exports of many small modules;
+      // optimizePackageImports strips unused re-exports at build time so we
+      // don't ship the entire barrel to Moto-G-class devices. Every kB of JS
+      // matters more on mobile because slow-3G throttling + weak CPU turn
+      // extra bytes into visible TBT.
+      "@clerk/nextjs",
+      "convex",
+      "convex/react",
     ],
   },
   async headers() {
@@ -59,6 +67,20 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
+    // MOBILE PERF: AVIF is ~50% smaller than JPEG, WebP is ~30% smaller.
+    // On cellular / data-saver, a 100 KB JPEG hero becomes ~50 KB AVIF —
+    // that alone can shave several hundred ms off mobile LCP. Order matters:
+    // AVIF first so modern mobile browsers pick it, WebP fallback for
+    // Safari < 16, and Next/Image auto-picks the original for older UAs.
+    formats: ["image/avif", "image/webp"],
+    // Tight device sizes — the smallest useful mobile viewport is 360.
+    // Fewer breakpoints => fewer /_next/image build variants per asset =>
+    // smaller total surface + more CDN cache hits.
+    deviceSizes: [360, 480, 640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    // Cache optimized image responses at the CDN for a day; individual
+    // deploys change the underlying source path so this is safe.
+    minimumCacheTTL: 86400,
     remotePatterns: [
       { protocol: "https", hostname: "ik.imagekit.io" },
       { protocol: "https", hostname: "html.tailus.io" },

@@ -1,11 +1,25 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { SignUpForm } from "./SignUpForm";
-import { SignInForm } from "./SignInForm";
+
+// MOBILE PERF: SignInForm + SignUpForm each pull in Clerk's client SDK for
+// their form controls, react-hook-form, zod validators, and a fair amount of
+// styling. None of that JS is needed for a signed-out landing-page visitor who
+// hasn't clicked "Log in" or a role card yet. Loading them via next/dynamic
+// pushes ~30–50 KB gz out of the initial landing bundle, which is a direct
+// TBT win on Moto G4-class devices. ssr:false skips the hydration pass.
+const SignUpForm = dynamic(
+  () => import("./SignUpForm").then((m) => m.SignUpForm),
+  { ssr: false, loading: () => null },
+);
+const SignInForm = dynamic(
+  () => import("./SignInForm").then((m) => m.SignInForm),
+  { ssr: false, loading: () => null },
+);
 
 type Mode = "signin" | "signup";
 

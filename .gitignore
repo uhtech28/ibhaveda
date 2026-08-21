@@ -67,3 +67,6 @@ public/assets/personas/_incoming/*
 
 # Large landing preview assets (serve from CDN)
 public/landing-preview-assets/*.gif
+
+# Original landing gifs — replaced by MP4/WebM/WebP variants
+public/landing-preview-assets/*.gif
