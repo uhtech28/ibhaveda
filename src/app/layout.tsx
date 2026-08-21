@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono, Sora } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
-import dynamic from "next/dynamic";
 
 // PERF: `export const dynamic = 'force-dynamic'` used to live here. It forced
 // EVERY route (including the marketing landing page) to be rendered per-request
@@ -16,22 +15,13 @@ import { AuthModalProvider } from "@/components/auth/auth-modal";
 import { TutorialProvider } from "@/components/tutorial/v2/TutorialProvider";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ClarityScript } from "@/components/analytics/ClarityScript";
+// MOBILE PERF: ChatWidget + Toaster are dynamic-imported with `ssr: false` from
+// this Client Component wrapper. Next 15 disallows `ssr: false` in Server
+// Components (root layout is a Server Component), so we hoist those two into
+// ClientOnlyOverlays. Effect is identical — they still land in their own chunk
+// and don't ship on landing for signed-out visitors.
+import { ClientOnlyOverlays } from "@/components/layout/ClientOnlyOverlays";
 import "./globals.css";
-
-// MOBILE PERF: These components never render above the fold and — critically —
-// they never render at all on the landing page for signed-out visitors.
-// Ship them via next/dynamic so their JS lands in a separate chunk that mobile
-// only downloads after the main thread is idle (or once auth resolves and the
-// widget/toast actually mounts). Keeps landing TBT down on Moto G4-class CPUs.
-// `ssr: false` avoids paying the hydration cost on first paint.
-const ChatWidget = dynamic(() => import("@/components/chat/ChatWidget"), {
-  ssr: false,
-  loading: () => null,
-});
-const Toaster = dynamic(
-  () => import("@/components/ui/toaster").then((m) => m.Toaster),
-  { ssr: false, loading: () => null },
-);
 
 // PERF: `display: 'swap'` swaps in the web font as soon as it downloads instead
 // of blocking text rendering (default is 'auto' == 'block' for ~3s). Prevents
@@ -229,8 +219,7 @@ export default function RootLayout({
                   <TutorialProvider><ChatProvider>
                     {children}
                     <MobileBottomNav />
-                    <Toaster />
-                    <ChatWidget />
+                    <ClientOnlyOverlays />
                   </ChatProvider></TutorialProvider>
                 </AuthModalProvider>
               </ThemeProvider>
