@@ -644,7 +644,16 @@ const LANDING_STYLES = `
     --purple: #c084fc;
     --yellow: #fbbf24;
     --white: #f8fafc;
-    --rpg-display: var(--font-code), "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+    /* LCP FIX 2026-08-21: was `var(--font-code), "SFMono-Regular", ...`.
+       --font-code is JetBrains Mono via next/font. On slow 4G + Moto G Power,
+       waiting for JetBrains Mono to download (~40KB WOFF2) pushed the H1's
+       final paint to ~5s. Chrome re-fired LCP at the font-swap moment,
+       giving LCP 5.7s. Dropping to a pure system-mono stack removes the
+       download entirely — H1 paints at FCP time with system font, LCP
+       drops to ~1.5-2s. Visual delta is minimal (system monospace still
+       reads as retro-pixel/RPG). If designer wants JetBrains Mono back,
+       preload it with fetchpriority=high AND use font-display: optional. */
+    --rpg-display: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
     position: relative;
     height: 100dvh;
     overflow: hidden;
