@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -88,6 +88,14 @@ interface VentureRecord {
 }
 
 export default function CheckpointPageContent() {
+  return (
+    <Suspense fallback={null}>
+      <CheckpointPageContentInner />
+    </Suspense>
+  );
+}
+
+function CheckpointPageContentInner() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();

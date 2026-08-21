@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -42,6 +42,14 @@ function slugify(name: string): string {
 }
 
 export default function ProfileSetupPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProfileSetupPageInner />
+    </Suspense>
+  );
+}
+
+function ProfileSetupPageInner() {
   const { isLoaded, userId } = useAuth();
   const { toast } = useToast();
   const { user } = useUser();

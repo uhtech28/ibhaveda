@@ -12,7 +12,7 @@
  * Optional `?bg=light` for a white backdrop.
  */
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 interface Checkpoint {
@@ -522,6 +522,14 @@ function MapCard({ map }: { map: MapDef }) {
 }
 
 export default function MapsGalleryPage() {
+  return (
+    <Suspense fallback={null}>
+      <MapsGalleryPageInner />
+    </Suspense>
+  );
+}
+
+function MapsGalleryPageInner() {
   const search = useSearchParams();
   const bg = search?.get("bg") === "light"
     ? "bg-neutral-100 text-neutral-900"

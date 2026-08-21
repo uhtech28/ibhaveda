@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -31,6 +31,14 @@ interface UserProfile {
 }
 
 export default function SuggestionsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SuggestionsPageInner />
+    </Suspense>
+  );
+}
+
+function SuggestionsPageInner() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();

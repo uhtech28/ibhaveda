@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -388,6 +388,14 @@ function StageCard({
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function MapStagesPage() {
+  return (
+    <Suspense fallback={null}>
+      <MapStagesPageInner />
+    </Suspense>
+  );
+}
+
+function MapStagesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);

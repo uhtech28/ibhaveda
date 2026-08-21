@@ -21,7 +21,7 @@
  * Add `?bg=dark` (default) or `?bg=light` to flip the backdrop.
  */
 
-import React, { useId, useMemo } from "react";
+import React, { Suspense, useId, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 type GroupId =
@@ -630,6 +630,14 @@ function IdleOnlyCard({
 }
 
 export default function BossesGalleryPage() {
+  return (
+    <Suspense fallback={null}>
+      <BossesGalleryPageInner />
+    </Suspense>
+  );
+}
+
+function BossesGalleryPageInner() {
   const search = useSearchParams();
   const bg = search?.get("bg") === "light" ? "bg-neutral-100 text-neutral-900" : "bg-neutral-950 text-white";
 

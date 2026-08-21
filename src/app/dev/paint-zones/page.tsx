@@ -16,7 +16,7 @@
  * `/dev/paint-zones` directly.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface MapDef {
@@ -70,6 +70,14 @@ const TEMPLATE_LABEL: Record<Exclude<TemplateId, "venture">, string> = {
 };
 
 export default function PaintZonesPage() {
+  return (
+    <Suspense fallback={null}>
+      <PaintZonesPageInner />
+    </Suspense>
+  );
+}
+
+function PaintZonesPageInner() {
   const router = useRouter();
   const search = useSearchParams();
   const templateId = (search.get("template") ?? "academic") as Exclude<TemplateId, "venture">;

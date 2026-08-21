@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useQuery } from "convex/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -39,7 +39,18 @@ class LeaderboardErrorBoundary extends React.Component<{ children: React.ReactNo
 }
 
 
+// Next 15 requires useSearchParams() to be wrapped in a Suspense boundary during
+// static prerender (previously masked by the global `force-dynamic` we removed).
+// Split the body into an inner component and wrap in Suspense.
 export default function CommunityPage() {
+  return (
+    <Suspense fallback={null}>
+      <CommunityPageInner />
+    </Suspense>
+  );
+}
+
+function CommunityPageInner() {
   const { isLoaded: isClerkUserLoaded, user: clerkUser } = useUser();
   const searchParams = useSearchParams();
   const initialQuery = searchParams?.get("q") ?? "";
