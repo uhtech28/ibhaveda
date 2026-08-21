@@ -34,21 +34,30 @@
  *   SSR-safe (returns zeros until mounted). No dependencies.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 export interface KeyboardInsets {
   /** Height in px the software keyboard (+ autofill bar) is occluding. */
   keyboardHeight: number;
   /** Currently visible viewport height in px. */
   viewportHeight: number;
+  /** Currently visible viewport width in px. */
+  viewportWidth: number;
+  /** Visual viewport's top offset in px. */
+  viewportOffsetTop: number;
   /** True when keyboardHeight exceeds ~100px (rough "keyboard open" gate). */
   isKeyboardOpen: boolean;
+  /** True for phone/tablet-sized layouts where keyboard-safe centering matters. */
+  isMobileViewport: boolean;
 }
 
 const EMPTY: KeyboardInsets = {
   keyboardHeight: 0,
   viewportHeight: 0,
+  viewportWidth: 0,
+  viewportOffsetTop: 0,
   isKeyboardOpen: false,
+  isMobileViewport: false,
 };
 
 export function useKeyboardInsets(): KeyboardInsets {
@@ -65,14 +74,19 @@ export function useKeyboardInsets(): KeyboardInsets {
       // VISUAL viewport (shrinks with keyboard). The delta is the
       // keyboard + autofill bar height.
       const layoutH = window.innerHeight;
+      const layoutW = window.innerWidth;
       const visualH = vv ? vv.height : layoutH;
+      const visualW = vv ? vv.width : layoutW;
       const keyboardH = Math.max(0, layoutH - visualH);
       return {
         keyboardHeight: keyboardH,
         viewportHeight: visualH,
+        viewportWidth: visualW,
+        viewportOffsetTop: vv?.offsetTop ?? 0,
         // Heuristic — a small ~40px browser chrome shift shouldn't
         // count as "keyboard open". Real keyboards are 240–380px.
         isKeyboardOpen: keyboardH > 100,
+        isMobileViewport: Math.min(visualW, layoutW) < 768,
       };
     };
 
@@ -119,7 +133,7 @@ export function useKeyboardInsets(): KeyboardInsets {
 export function keyboardSafeStyle(
   insets: KeyboardInsets,
   opts: { reserveVh?: number } = {},
-): React.CSSProperties {
+): CSSProperties {
   const { reserveVh = 0.92 } = opts;
   if (insets.viewportHeight === 0) {
     // SSR / pre-mount — let CSS defaults (e.g. max-h-[90dvh]) drive.
@@ -128,4 +142,25 @@ export function keyboardSafeStyle(
   return {
     maxHeight: `${Math.floor(insets.viewportHeight * reserveVh)}px`,
   };
+}
+
+/**
+ * Recenter fixed DialogContent inside the visible viewport on mobile.
+ * Desktop keeps the shared primitive's default top/left centering.
+ */
+export function keyboardSafeDialogStyle(
+  insets: KeyboardInsets,
+  opts: { reserveVh?: number; mobileOnly?: boolean } = {},
+): CSSProperties {
+  const { reserveVh = 0.92, mobileOnly = true } = opts;
+  if (insets.viewportHeight === 0) return {};
+  const style: CSSProperties = {
+    maxHeight: `${Math.floor(insets.viewportHeight * reserveVh)}px`,
+  };
+  if (!mobileOnly || insets.isMobileViewport) {
+    style.top = `${Math.floor(
+      insets.viewportOffsetTop + insets.viewportHeight / 2,
+    )}px`;
+  }
+  return style;
 }

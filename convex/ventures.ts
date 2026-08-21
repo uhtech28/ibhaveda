@@ -97,8 +97,17 @@ async function createVentureForUser(
     updatedAt: now,
   });
 
-  // analytics_events insert removed — table dropped from schema.
-  // See gamification.ts for the parallel cleanup + revival notes.
+  // Analytics: server-side funnel event (top of the venture funnel)
+  await ctx.db.insert("analytics_events", {
+    userId: args.userId,
+    sessionId: "server",
+    eventName: "venture_created",
+    eventCategory: "engagement",
+    properties: { ventureId, templateId },
+    timestamp: now,
+    serverTimestamp: now,
+    sequenceNumber: 0,
+  });
 
   for (const cpDef of checkpointDefs) {
     const checkpointId = await ctx.db.insert("ventureCheckpoints", {
@@ -461,13 +470,28 @@ export const createVenture = mutation({
       .collect()
       .then((vs) => vs.filter((existing) => existing._id !== ventureId).length);
 
-    // Onboarding-complete welcome email removed — the
-    // `emailWelcome` module was deleted in a prior cleanup. Convex
-    // typecheck refused the deploy while `internal.emailWelcome`
-    // was still referenced here. Re-wire once the email pipeline is
-    // brought back (see also emailReengagement.ts for the pattern).
-    void priorVentureCount;
-    void assignedBossId;
+    if (priorVentureCount === 0) {
+      // Analytics: first venture is the activation milestone. Drives
+      // lifecycleStage ("activated"/"retained") in the retention cron.
+      // Idempotent — only write if not already activated.
+      if (!user.isActivated) {
+        await ctx.db.patch(user._id, { isActivated: true });
+      }
+
+      const email = identity.email;
+      const displayName = user.displayName || identity.givenName || "Adventurer";
+      if (email && assignedBossId !== undefined) {
+        const idea = await ctx.db.get(args.ideaId);
+        await ctx.scheduler.runAfter(0, internal.emailWelcome.sendOnboardingCompleteEmail, {
+          email,
+          displayName,
+          projectName: idea?.title ?? "Your Project",
+          templateId: templateId ?? "venture",
+          bossId: assignedBossId,
+          bossHealthPercent: 93, // fresh boss at venture creation = 7% corruption from tutorial hit
+        });
+      }
+    }
 
     return ventureId;
   },
@@ -643,7 +667,17 @@ export const ensureVentureStructure = mutation({
         checkpointPatch.completedAt = cp.completedAt ?? now;
         checkpointPatch.partialStartedAt = undefined;
         cp.status = "completed";
-        // analytics_events insert removed — table dropped from schema.
+        // Analytics: server-side funnel event (checkpoint progression / drop-off)
+        await ctx.db.insert("analytics_events", {
+          userId: venture.userId,
+          sessionId: "server",
+          eventName: "checkpoint_completed",
+          eventCategory: "engagement",
+          properties: { checkpointId: String(cp._id), stage: cp.stage, checkpoint: cp.checkpoint },
+          timestamp: now,
+          serverTimestamp: now,
+          sequenceNumber: 0,
+        });
       } else if (completedCount === 1 && cp.status !== "in_progress") {
         checkpointPatch.status = "in_progress";
         if (typeof cp.partialStartedAt !== "number") {

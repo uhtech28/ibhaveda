@@ -545,14 +545,14 @@ export function Step2TemplatePick() {
         };
       case "click_plus":
         return {
-          text: "First up, let's create your first post. Tap the plus button at the top.",
+          text: "First up, let's create your project. Tap the plus button at the top.",
           mood: "pointing",
           highlight: 'button[data-tutorial="compose"], button[aria-label="Post Idea"], button[aria-label="Post idea"]',
           skip: { label: "Skip tutorial", onClick: tutorial.skip },
         };
       case "pick_template":
         return {
-          text: "Now pick a template that fits what you're building. This decides what your quest looks like.",
+          text: "Now pick a template that fits what you're building. This decides what tasks you need to build your idea.",
           mood: "pointing",
           // Target ONLY the compose wizard (data-tutorial marker). Was
           // previously the broad `[role="dialog"]` selector which would
@@ -615,12 +615,23 @@ export function Step2TemplatePick() {
   }, [dialogue, tutorial, router, copy]);
 
   // Fetch the user's most recent idea so we can target contribution
-  // requests at it during the `contributors` step. Only queried once
-  // the tutorial reaches that state so we don't fire the query on
-  // every /feed visit.
+  // requests at it during the `contributors` step. We WARM this query
+  // early — from write_outline onward — instead of waiting until the
+  // `contributors` beat. Otherwise the subscription starts cold exactly
+  // when we need the id, and its round-trip is the "few second break in
+  // the handoff" the user sees the bare feed through between Create and
+  // the Potential-Contributors modal. Subscribing during write_outline
+  // means the just-posted idea arrives reactively and latestIdeaId is
+  // ready the instant we reach `contributors`. Still skipped on ordinary
+  // /feed visits (gated on the active tutorial being in these beats).
   const userIdeas = useQuery(
     api.ideas.getUserIdeas,
-    dialogue === "contributors" ? {} : "skip",
+    active &&
+      (dialogue === "write_outline" ||
+        dialogue === "posting" ||
+        dialogue === "contributors")
+      ? {}
+      : "skip",
   );
   const latestIdeaId: Id<"ideas"> | null = useMemo(() => {
     if (!userIdeas || userIdeas.length === 0) return null;
@@ -636,6 +647,19 @@ export function Step2TemplatePick() {
   // top even if the share dialog is momentarily still fading out.
   if (shareOpen && dialogue !== "contributors") return null;
 
+  // ── HANDOFF BRIDGE ────────────────────────────────────────────────────
+  // Between clicking Create and the Potential-Contributors modal there's
+  // a window where the compose wizard has closed but the contributors
+  // dialog can't mount yet (the posted idea is still resolving). Without
+  // cover the user sees the bare feed for a few seconds — a jarring break
+  // in the flow. Drop a full-screen dark scrim over that window so the
+  // handoff reads as one continuous beat. It sits BEHIND the compose
+  // wizard's exit animation (z-400 vs the dialog's z-10000), so as the
+  // wizard fades out the scrim — not the feed — is what's revealed.
+  if (dialogue === "posting") {
+    return <HandoffScrim />;
+  }
+
   // Contributors beat — render the invite dialog AND Sparky beside
   // it (previously Sparky was suppressed here and the tutorial "just
   // to map" step happened silently). Product ask (verbatim): "bring
@@ -645,9 +669,9 @@ export function Step2TemplatePick() {
   // invite" before Continue unlocks; Sparky just narrates the moment.
   if (dialogue === "contributors") {
     if (!latestIdeaId) {
-      // Query still loading — brief blank frame; auto-transitions
-      // once ideaId resolves and the dialog can mount.
-      return null;
+      // Idea id still resolving — keep the scrim up (not a blank frame)
+      // so the feed never flashes through before the dialog mounts.
+      return <HandoffScrim />;
     }
     return (
       <>
@@ -687,16 +711,9 @@ export function Step2TemplatePick() {
     );
   }
 
-  // Hide Sparky during the `posting` beat. The compose wizard unmounts
-  // in one paint but the SuggestedContributorsDialog can't render
-  // until userIdeas resolves (~400ms+), leaving Sparky sitting alone
-  // on /feed typing "Cool. Posting your idea now…" for ~1-2s before
-  // the contributors modal takes over. Product feedback: Sparky flash
-  // bug — screenshot 2. Keeping the mascot mounted with visible=false
-  // (rather than removing the element entirely) preserves the exit
-  // animation and prevents a hard cut.
-  const sparkyVisible = dialogue !== "posting";
-
+  // The `posting` and `contributors` beats are handled above (posting is
+  // covered by the HandoffScrim, contributors renders its own dialog), so
+  // by here Sparky is always meant to be on screen.
   return (
     <>
       <TutorialHighlight
@@ -710,7 +727,7 @@ export function Step2TemplatePick() {
         noRing={dialogue === "write_outline"}
       />
       <TutorialMascot
-        visible={sparkyVisible}
+        visible
         text={view.text}
         mood={view.mood}
         primaryAction={view.primary}
@@ -721,6 +738,47 @@ export function Step2TemplatePick() {
         // the underlying UI (compose dialog, checkpoint, etc.).
         anchor={dialogue === "intro" ? "center" : "bottom-right"}
         nearSelector={view.highlight ?? null}
+        // Describe-Your-Idea is a typing step: use the compact corner
+        // layout on mobile so Sparky sits beside the modal (top-right)
+        // instead of on the textarea — and so the on-screen keyboard
+        // never shoves him onto it. (Corner mode also auto-engages
+        // whenever a keyboard is detected, but this covers the
+        // keyboard-down state where the user hasn't focused yet.)
+        mobileCorner={dialogue === "write_outline"}
       />    </>
+  );
+}
+
+/**
+ * Full-screen dark bridge shown during the Create → Contributors handoff
+ * so the feed never flashes through while the posted idea resolves. Same
+ * deep-navy palette as the rest of the platform's tutorial scrims, with a
+ * quiet spinner + line so the pause reads as intentional, not a stall.
+ */
+function HandoffScrim() {
+  return (
+    <div
+      className="fixed inset-0 z-[400] flex items-center justify-center"
+      style={{
+        background:
+          "radial-gradient(ellipse 900px 600px at 50% 40%, rgba(99,102,241,0.10), transparent 60%), #05070f",
+        animation: "tutorialHandoffFade 160ms ease-out",
+      }}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+        <p className="text-sm font-medium text-white/80">Posting your idea…</p>
+      </div>
+      <style jsx>{`
+        @keyframes tutorialHandoffFade {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </div>
   );
 }

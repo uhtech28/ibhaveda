@@ -10,7 +10,7 @@
  * launches the tour — sets the emotional stakes of the game world.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { PERSONAS, type Persona, type PersonaId } from "@/config/personas";
 
@@ -42,13 +42,43 @@ export function PersonaSelector({
     void onConfirm(selectedId);
   }, [selectedId, submitting, onConfirm]);
 
+  // Custom mobile scroll indicator. iOS Safari ignores ::-webkit-scrollbar
+  // on scroll containers, so on phones there's no native cue that the grid
+  // continues below the fold (Alchemist/Healer + the Begin button). We track
+  // the splash's scroll metrics and paint a thin thumb on the right whose
+  // size/position mirror a real scrollbar. Hidden on desktop via CSS.
+  const splashRef = useRef<HTMLDivElement>(null);
+  const [scrollBar, setScrollBar] = useState({ show: false, thumb: 0, top: 0 });
+
+  const updateScrollBar = useCallback(() => {
+    const el = splashRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    // Only show when there's meaningful overflow to scroll through.
+    if (scrollHeight - clientHeight <= 4) {
+      setScrollBar((s) => (s.show ? { ...s, show: false } : s));
+      return;
+    }
+    setScrollBar({
+      show: true,
+      thumb: clientHeight / scrollHeight,
+      top: scrollTop / scrollHeight,
+    });
+  }, []);
+
+  useEffect(() => {
+    updateScrollBar();
+    window.addEventListener("resize", updateScrollBar);
+    return () => window.removeEventListener("resize", updateScrollBar);
+  }, [updateScrollBar]);
+
   return (
-    <div className="persona-splash">
+    <div className="persona-splash" ref={splashRef} onScroll={updateScrollBar}>
       <div className="persona-wrap">
         <header className="persona-header">
           {/* "Step 2 of 2 — pick your builder" eyebrow removed per
               product request — the header now leads with the title. */}
-          <h1 className="persona-title">Choose your Persona</h1>
+          <h1 className="persona-title">Choose Your Persona</h1>
           {/* Product ask: "remove line The archetype you pick..." —
               header now leads straight into the grid, no subline. */}
         </header>
@@ -225,6 +255,20 @@ export function PersonaSelector({
           </button>
         </div>
       </div>
+
+      {/* Mobile-only scroll indicator — fixed to the viewport's right edge so
+          it stays put while the grid scrolls beneath it. */}
+      {scrollBar.show && (
+        <div className="persona-scrollbar" aria-hidden>
+          <div
+            className="persona-scrollbar-thumb"
+            style={{
+              height: `${scrollBar.thumb * 100}%`,
+              top: `${scrollBar.top * 100}%`,
+            }}
+          />
+        </div>
+      )}
 
       <style jsx>{`
         /* All colors + radii aligned with the platform's feed-card
@@ -416,6 +460,23 @@ export function PersonaSelector({
             flex-direction: column;
             align-items: stretch;
             text-align: center;
+            /* Pin to the bottom of the scroll viewport so the Begin button
+               is always reachable without scrolling to the end of the grid.
+               The footer's translucent fill + backdrop blur let the cards
+               scroll softly behind it. Sits under the scroll indicator
+               (z 100001) but above the grid. */
+            position: sticky;
+            bottom: 8px;
+            z-index: 100000;
+          }
+          .persona-wrap {
+            /* Scroll slack below the grid so the last row (Alchemist/Healer)
+               can scroll fully clear of the sticky footer rather than resting
+               behind it. This padding sits below the footer's natural
+               position — behind the pinned footer — so it adds scroll room
+               without reading as an empty gap. env() keeps it clear of the
+               iOS home indicator. */
+            padding-bottom: calc(168px + env(safe-area-inset-bottom, 0px));
           }
         }
         .persona-preview {
@@ -464,6 +525,33 @@ export function PersonaSelector({
         .persona-cta:disabled {
           opacity: 0.4;
           cursor: not-allowed;
+        }
+        /* Custom scroll indicator — desktop hides it (native scrollbar or no
+           overflow); phones show a thin, unobtrusive thumb on the right so
+           users know Alchemist/Healer + the Begin button sit below the fold. */
+        .persona-scrollbar {
+          display: none;
+        }
+        @media (max-width: 640px) {
+          .persona-scrollbar {
+            display: block;
+            position: fixed;
+            top: 8px;
+            bottom: 8px;
+            right: 3px;
+            width: 4px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            z-index: 100001;
+            pointer-events: none;
+          }
+        }
+        .persona-scrollbar-thumb {
+          position: absolute;
+          left: 0;
+          width: 100%;
+          border-radius: 4px;
+          background: rgba(255, 255, 255, 0.28);
         }
         @keyframes personaFadeIn {
           from {

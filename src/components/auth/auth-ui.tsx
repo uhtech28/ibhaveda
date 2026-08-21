@@ -3,20 +3,11 @@
 import Image from "next/image";
 import { ChevronRight, Eye, EyeOff } from "lucide-react";
 
-/**
- * Shared visual pieces for the custom auth modal. These deliberately mimic
- * Clerk's default (light) modal look so the custom sign-in / sign-up forms are
- * visually identical to the prebuilt components they replace.
- */
-
-// Field + button styling tuned to match Clerk's default modal chrome.
 export const inputClass =
-  "w-full rounded-md border border-[#d9d9de] bg-white px-3 py-2 text-sm text-[#1a1a1e] outline-none transition placeholder:text-[#9394a1] focus:border-[#a8a8b3] focus:ring-2 focus:ring-black/5";
-
-export const labelClass = "mb-1.5 block text-[13px] font-medium text-[#31313a]";
+  "w-full rounded-xl border border-[#2a3c66] bg-[#0b111a]/90 px-4 py-3 text-sm font-semibold text-slate-50 outline-none transition placeholder:text-[#6f85ad] focus:border-[#818cf8]/90 focus:ring-2 focus:ring-[#6366f1]/25";
 
 export const primaryButtonClass =
-  "flex w-full items-center justify-center gap-1 rounded-lg bg-gradient-to-b from-[#3a3a3f] to-[#232327] py-2.5 text-sm font-medium text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60";
+  "flex w-full items-center justify-center gap-1 rounded-xl border border-[#93c5fd]/40 bg-gradient-to-r from-[#7c3aed] via-[#6366f1] to-[#2563eb] py-3 text-sm font-black text-white shadow-[0_0_30px_rgba(99,102,241,0.26)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45";
 
 export function PrimaryButton({
   children,
@@ -49,7 +40,7 @@ export function PasswordToggle({
     <button
       type="button"
       onClick={onToggle}
-      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9394a1] transition hover:text-[#31313a]"
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8fa3c7] transition hover:text-[#93c5fd]"
       aria-label={show ? "Hide password" : "Show password"}
       tabIndex={-1}
     >
@@ -95,12 +86,12 @@ export function GoogleButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="relative flex w-full items-center justify-center gap-2 rounded-lg border border-[#e3e3e8] bg-white py-2.5 text-sm font-medium text-[#31313a] transition hover:bg-[#f7f7f8] disabled:cursor-not-allowed disabled:opacity-60"
+      className="relative flex w-full items-center justify-center gap-2 rounded-xl border border-[#2a3c66] bg-[#0b111a]/90 py-3 text-sm font-bold text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:border-[#818cf8]/70 hover:bg-[#101827] disabled:cursor-not-allowed disabled:opacity-60"
     >
       <GoogleIcon />
       Continue with Google
       {lastUsed && (
-        <span className="absolute -top-2 right-3 rounded-full border border-[#e3e3e8] bg-white px-1.5 py-0.5 text-[10px] font-normal text-[#9394a1]">
+        <span className="absolute -top-2 right-3 rounded-full border border-[#6366f1]/40 bg-[#070a0f] px-1.5 py-0.5 text-[10px] font-normal text-[#9fb6df]">
           Last used
         </span>
       )}
@@ -111,9 +102,9 @@ export function GoogleButton({
 export function OrDivider() {
   return (
     <div className="my-5 flex items-center gap-3">
-      <span className="h-px flex-1 bg-[#ededf0]" />
-      <span className="text-xs text-[#9394a1]">or</span>
-      <span className="h-px flex-1 bg-[#ededf0]" />
+      <span className="h-px flex-1 bg-[#2a3c66]/75" />
+      <span className="text-xs font-bold uppercase text-[#6f85ad]">or</span>
+      <span className="h-px flex-1 bg-[#2a3c66]/75" />
     </div>
   );
 }
@@ -121,8 +112,8 @@ export function OrDivider() {
 export function AuthHeaderLogo() {
   return (
     <div className="mb-4 flex justify-center">
-      <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-xl bg-[#111]">
-        <Image src="/logo.png" alt="Ibhaveda" width={44} height={44} className="h-11 w-11 object-contain" />
+      <span className="grid h-[58px] w-[58px] place-items-center overflow-hidden rounded-2xl border border-[#6366f1]/35 bg-black shadow-[0_0_42px_rgba(99,102,241,0.18)]">
+        <Image src="/ibhaveda-logo.jpg" alt="Ibhaveda" width={58} height={58} className="h-full w-full object-cover" />
       </span>
     </div>
   );
@@ -130,9 +121,9 @@ export function AuthHeaderLogo() {
 
 export function SecuredByClerk() {
   return (
-    <div className="flex items-center justify-center gap-1.5 border-t border-[#ededf0] bg-[#fafafb] py-3.5 text-[11px] font-medium text-[#9394a1]">
+    <div className="flex items-center justify-center gap-1.5 border-t border-[#2a3c66]/75 bg-black/20 py-3.5 text-[11px] font-medium text-[#6f85ad]">
       Secured by
-      <span className="font-semibold text-[#6b6b76]">clerk</span>
+      <span className="font-semibold text-[#c7d2fe]">clerk</span>
     </div>
   );
 }
@@ -147,10 +138,10 @@ export function FieldMessage({
 }) {
   const color =
     tone === "error"
-      ? "text-[#e02e2e]"
+      ? "text-[#fb7185]"
       : tone === "success"
-        ? "text-[#1f9d55]"
-        : "text-[#6b6b76]";
+        ? "text-[#34d399]"
+        : "text-[#8fa3c7]";
   return (
     <p className={`mt-1.5 flex items-start gap-1 text-[13px] leading-snug ${color}`}>
       {tone === "success" && <span aria-hidden>✓</span>}
@@ -167,4 +158,9 @@ export function clerkErrorMessage(err: unknown): string {
     return e.errors[0].longMessage || e.errors[0].message || "Something went wrong. Please try again.";
   }
   return "Something went wrong. Please try again.";
+}
+
+export function authRedirectUrl(path: string): string {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
 }

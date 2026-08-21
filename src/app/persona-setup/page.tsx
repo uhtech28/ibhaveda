@@ -22,10 +22,20 @@
  *     ↓
  *   Picker renders (never leaves this screen until user picks)
  *     ↓
- *   updatePersonaId AWAITED, then window.location.replace("/feed")
+ *   Begin clicked → updatePersonaId AWAITED (Begin shows "Beginning…"),
+ *   then window.location.replace("/feed")
  *     ↓
- *   /feed loads with persona already set → Sparky intro plays on
- *   its black scrim → tutorial continues
+ *   /feed loads with persona already set → Sparky's own intro
+ *   (Step2TemplatePick's "intro" beat — the pixel-dog hello) plays →
+ *   tutorial continues
+ *
+ * NOTE: there is intentionally NO inline Sparky overlay on this screen.
+ * An earlier version rendered a white-card "Hi, I'm Sparky" overlay here
+ * between the pick and the /feed nav; it flashed for a frame and then got
+ * clobbered by the loading spinner (personaIdRaw flipping non-null made
+ * `loading` true and the redirect was gated off), stranding users on a
+ * perpetual spinner. Navigating straight to /feed lets the tutorial's own
+ * mascot own the intro, with no duplicate hello and no flash.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -36,19 +46,11 @@ import { api } from "../../../convex/_generated/api";
 import { PersonaSelector } from "@/components/persona/PersonaSelector";
 import type { PersonaId } from "@/config/personas";
 import { useTutorialOptional } from "@/components/tutorial/v2/useTutorial";
-// Real animated Sparky puppy sprite — same one TutorialMascot uses
-// on /feed. Product ask (2026-08-16, 4th time): "after selecting
-// persona this is coming instead of our original sparky". Previous
-// inline overlay drew a static "chat bubble with eyes" placeholder
-// glyph; users expect the actual pixel-art puppy from the rest of
-// the tutorial for visual consistency.
-import { AnimatedSparky } from "@/components/tutorial/v2/puppy/AnimatedSparky";
 
 export default function PersonaSetupPage() {
   const { isLoaded, userId } = useAuth();
   const { user } = useUser();
   const router = useRouter();
-  const tutorial = useTutorialOptional();
 
   const personaIdRaw = useQuery(
     api.users.getMyPersonaId,
@@ -60,16 +62,8 @@ export default function PersonaSetupPage() {
   );
   const updatePersonaId = useMutation(api.users.updatePersonaId);
   const createUserProfile = useMutation(api.users.createUserProfile);
+  const tutorial = useTutorialOptional();
   const [submitting, setSubmitting] = useState(false);
-  // Post-mutation Sparky intro takes over the whole screen so the
-  // user NEVER navigates to /feed until they click "Let's go".
-  // This eliminates the SSR flash of feed markup that the previous
-  // sessionStorage-based gate couldn't cover — /feed's HTML was being
-  // painted server-side before any client-side flag check could
-  // return a black backdrop. Now the black scrim + Sparky bubble
-  // render RIGHT HERE on /persona-setup; the redirect only fires
-  // from the "Let's go" click. Zero cross-route flash possible.
-  const [showSparkyIntro, setShowSparkyIntro] = useState(false);
 
   // Bounce unauthenticated visitors.
   useEffect(() => {
@@ -120,13 +114,11 @@ export default function PersonaSetupPage() {
     });
   }, [isLoaded, userId, user, existingProfile, createUserProfile]);
 
-  // Already-picked → bounce to /feed. Small debounce so a rapid
-  // picker → mutation → hard-reload sequence doesn't fire an extra
-  // soft redirect mid-navigation. Gated on !showSparkyIntro so once
-  // the user has just picked and we're showing the intro overlay,
-  // this effect doesn't fire a second redirect underneath it.
+  // Already-picked → bounce to /feed. Covers returning users who land
+  // on /persona-setup with a persona already saved. A fresh pick goes
+  // through handleConfirm below (which hard-navigates directly), so
+  // this effect only ever fires for the already-had-a-persona case.
   useEffect(() => {
-    if (showSparkyIntro) return;
     if (personaIdRaw === undefined || personaIdRaw === null) return;
     const t = window.setTimeout(() => {
       if (typeof window !== "undefined") {
@@ -135,10 +127,10 @@ export default function PersonaSetupPage() {
       router.replace("/feed");
     }, 600);
     return () => window.clearTimeout(t);
-  }, [personaIdRaw, router, showSparkyIntro]);
+  }, [personaIdRaw, router]);
 
   const handleConfirm = useCallback(
-    (id: PersonaId) => {
+    async (id: PersonaId) => {
       if (submitting) return;
       setSubmitting(true);
       // Product ask 2026-08-20: "AFTER SELECTING PERSONA SPARKY COMES
@@ -181,17 +173,6 @@ export default function PersonaSetupPage() {
     [submitting, updatePersonaId, tutorial, router],
   );
 
-  // Deprecated — old SparkyIntroOverlay handler kept in the file
-  // only to satisfy any lingering references. `showSparkyIntro` is
-  // never set true anymore so this is unreachable in practice.
-  const handleSparkyContinue = useCallback(async () => {
-    if (typeof window !== "undefined") {
-      window.location.replace("/feed");
-    } else {
-      router.replace("/feed");
-    }
-  }, [router]);
-
   // Loading state — ONLY block on Clerk auth resolving. Previously we
   // also gated on personaIdRaw + existingProfile Convex queries, which
   // stacked 3-4 sequential round-trips (auth → profile query → persona
@@ -210,101 +191,10 @@ export default function PersonaSetupPage() {
     );
   }
 
-  // Sparky intro takes over the whole screen after persona pick.
-  // Renders here so no /feed navigation happens until the user clicks
-  // "Let's go" — eliminates the SSR flash of feed markup that any
-  // client-side gate on /feed can't cover.
-  if (showSparkyIntro) {
-    return <SparkyIntroOverlay onContinue={handleSparkyContinue} />;
-  }
-
   return (
     <PersonaSelector
       onConfirm={handleConfirm}
       submitting={submitting}
     />
-  );
-}
-
-/**
- * Full-screen black overlay with Sparky's intro pitch + "Let's go" CTA.
- *
- * Renders inline on /persona-setup so the transition is seamless:
- *   PersonaSelector picker (bright)
- *      ↓  (user clicks a persona)
- *   Sparky intro (black scrim, this component)
- *      ↓  (user clicks "Let's go")
- *   Hard-nav to /feed with tutorial step already at 3 (click_plus)
- *
- * Kept self-contained (no dependency on TutorialProvider's per-route
- * mount rules) so it works whether or not the tutorial state machine
- * has caught up to Convex.
- */
-function SparkyIntroOverlay({ onContinue }: { onContinue: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-[500] flex items-center justify-center overflow-hidden"
-      style={{
-        // Deep-navy radial matching the rest of the platform's dark
-        // scrims (feed / dialogs / boss intro all use this palette).
-        background:
-          "radial-gradient(ellipse 900px 600px at 50% 40%, rgba(99,102,241,0.10), transparent 60%), #05070f",
-        // Safe-area padding so the CTA never sits under the iPhone
-        // home-indicator + notch never crops the Sparky sprite.
-        paddingTop: "max(1.5rem, env(safe-area-inset-top, 0px))",
-        paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 0px))",
-        fontFamily: "'Inter', system-ui, sans-serif",
-        color: "#F9FAFB",
-      }}
-    >
-      <div className="mx-auto flex w-full max-w-[540px] flex-col items-center gap-6 px-6 text-center">
-        {/* Sparky bubble — white card with the intro pitch */}
-        <div
-          className="relative w-full rounded-2xl border-l-[4px] border-[#F5C542] bg-white px-6 py-5 text-left shadow-2xl"
-          style={{
-            color: "#111827",
-            boxShadow:
-              "0 40px 80px -20px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.02)",
-          }}
-        >
-          {/* Template-neutral welcome — the persona-setup screen runs
-              BEFORE the user picks a template, so "launching a real
-              venture" was wrong for 3 of 4 users (academic → thesis,
-              lab → experiment, creative → creation). Keeping this in
-              sync with the neutral fallback in
-              src/config/templates/tutorialCopy.ts VENTURE.welcomeLine. */}
-          <p className="text-[15px] leading-relaxed sm:text-[16px]">
-            Hi, I&apos;m Sparky! I&apos;ll walk you through your entire
-            journey, from your first idea to shipping something real.
-            Ready?
-          </p>
-        </div>
-
-        {/* Real animated Sparky puppy — same sprite used across the
-            tutorial on /feed, /map, and the persona-setup post-pick
-            intro. Speech prop is set so the puppy plays TALK while
-            the bubble text is on-screen (matches how TutorialMascot
-            drives him elsewhere). showSpeechBubble={false} because
-            the intro copy already renders in the card above — we
-            don't want a second bubble. */}
-        <div className="flex flex-shrink-0 items-center justify-center">
-          <AnimatedSparky
-            size={140}
-            speech="intro"
-            showSpeechBubble={false}
-            autoRoll={false}
-            ariaLabel="Sparky"
-          />
-        </div>
-
-        <button
-          type="button"
-          onClick={onContinue}
-          className="mt-2 rounded-xl bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-8 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-white shadow-lg shadow-[#6366F1]/25 transition hover:brightness-110 active:scale-[0.99]"
-        >
-          Let&apos;s go
-        </button>
-      </div>
-    </div>
   );
 }

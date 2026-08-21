@@ -1,11 +1,53 @@
 "use client";
-// STUB — @excalidraw/excalidraw was referenced but never installed.
-// Restore the real component after `bun add @excalidraw/excalidraw`.
-export function ExcalidrawTool() {
+
+import { MapTool } from "@/components/tools/map-tool";
+
+type MapElement = Parameters<typeof MapTool>[0]["initialContent"] extends {
+  elements: infer Elements;
+}
+  ? Elements[number]
+  : never;
+
+interface ExcalidrawToolProps {
+  prompt: string;
+  onSubmit: (content: {
+    type: "excalidraw";
+    elements: MapElement[];
+    scene: { elements: MapElement[] };
+  }) => void;
+  initialContent?: {
+    elements?: MapElement[];
+    scene?: { elements?: MapElement[] };
+  };
+  isSubmitting?: boolean;
+  hidePrompt?: boolean;
+}
+
+export function ExcalidrawTool({
+  prompt,
+  onSubmit,
+  initialContent,
+  isSubmitting,
+}: ExcalidrawToolProps) {
+  const elements =
+    initialContent?.scene?.elements ??
+    initialContent?.elements ??
+    [];
+
   return (
-    <div className="p-6 text-sm text-white/60">
-      Excalidraw tool temporarily unavailable — pending dependency install.
-    </div>
+    <MapTool
+      prompt={prompt}
+      initialContent={{ elements }}
+      isSubmitting={isSubmitting}
+      onSubmit={(content) =>
+        onSubmit({
+          type: "excalidraw",
+          elements: content.elements,
+          scene: { elements: content.elements },
+        })
+      }
+    />
   );
 }
+
 export default ExcalidrawTool;

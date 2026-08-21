@@ -7,7 +7,6 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { HeroHeader } from "@/components/header";
@@ -309,21 +308,17 @@ export default function ProfileSetupPage() {
 
   useEffect(() => {
     if (user) {
-      const suggestedUsername = (user.username || user.firstName || 'user')
-        .toLowerCase()
-        .replace(/[\s\/\\?#&=:@<>"'`]/g, '');
-      const suggestedName = user.fullName || suggestedUsername;
-      // Auto-pull avatar from Clerk if available, so first-time setup
-      // doesn't have to ask the user to upload one.
+      // Product ask: NO prefill of name/username — both fields start
+      // empty and show their placeholder hints ("Your name" /
+      // "username") so the user types their own. We still silently
+      // pull the Clerk avatar (not a visible form field) so first-time
+      // setup doesn't have to ask for a photo upload.
       const clerkAvatar = user.imageUrl || "";
-      setFormData(prev => ({
-        ...prev,
-        displayName: prev.displayName || suggestedName,
-        username: prev.username || suggestedUsername,
-        avatar: prev.avatar || clerkAvatar,
-      }));
-      if (suggestedUsername && suggestedUsername.length >= 3) {
-        setValidationUsername(suggestedUsername);
+      if (clerkAvatar) {
+        setFormData(prev => ({
+          ...prev,
+          avatar: prev.avatar || clerkAvatar,
+        }));
       }
     }
   }, [user, userId]);
@@ -458,20 +453,18 @@ export default function ProfileSetupPage() {
           <p className="text-xs text-destructive leading-tight">{usernameValidation.error}</p>
         )}
         {usernameValidation.available === false && usernameValidation.suggestions.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">Try one of these:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {usernameValidation.suggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => handleUsernameChange(suggestion)}
-                  className="px-2 py-0.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md transition-colors"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Try one of these:</span>
+            {usernameValidation.suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => handleUsernameChange(suggestion)}
+                className="px-2 py-0.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md transition-colors"
+              >
+                {suggestion}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -701,19 +694,33 @@ export default function ProfileSetupPage() {
 
     if (showPersonaSelector) {
       return (
-        <PersonaSelector
-          onConfirm={handlePersonaConfirm}
-          submitting={personaSubmitting}
-        />
+        <>
+          <PersonaSelector
+            onConfirm={handlePersonaConfirm}
+            submitting={personaSubmitting}
+          />
+          {personaSubmitting && (
+            <div className="fixed inset-0 z-[100002] flex items-center justify-center bg-black">
+              <Loader2 className="h-8 w-8 animate-spin text-white/80" />
+            </div>
+          )}
+        </>
       );
     }
 
     return (
       <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
         <HeroHeader />
-        <main className="flex-1 flex items-center justify-center px-4 py-12 pt-32 w-full">
-          <div className="w-full max-w-2xl">
-            <div className="text-center mb-8">
+        {/* flex-col + `my-auto` on the inner block vertically centers the
+            form when there's room (keyboard closed) but degrades to a
+            normal top-anchored, scrollable layout when the on-screen
+            keyboard shrinks the viewport — so the "Start Building" button
+            stays reachable instead of being trapped below the keyboard.
+            Reduced mobile top padding (pt-20 vs desktop pt-32) keeps the
+            heading clear of the 56px fixed header instead of clipping. */}
+        <main className="flex-1 flex flex-col px-4 pt-20 pb-8 md:pt-32 md:pb-12 w-full">
+          <div className="mx-auto my-auto w-full max-w-2xl">
+            <div className="text-center mb-6 md:mb-8">
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
                 Let&apos;s set up your profile
               </h1>
@@ -723,13 +730,11 @@ export default function ProfileSetupPage() {
             </div>
             <Card className="border-border/50 shadow-xl">
               <CardContent className="p-6 md:p-10">
-                <form onSubmit={handleFirstTimeSubmit} className="space-y-5">
-                  <div className="space-y-2" data-tutorial="name-block">
-                    <Label htmlFor="displayName" className="text-sm font-medium">
-                      Your name
-                    </Label>
+                <form onSubmit={handleFirstTimeSubmit} className="space-y-4">
+                  <div data-tutorial="name-block">
                     <Input
                       id="displayName"
+                      aria-label="Your name"
                       value={formData.displayName}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -759,24 +764,22 @@ export default function ProfileSetupPage() {
                       onKeyDown={(e) => e.stopPropagation()}
                       onKeyUp={(e) => e.stopPropagation()}
                       onKeyPress={(e) => e.stopPropagation()}
-                      placeholder="Your full name"
+                      placeholder="Your name"
                       className="h-11"
                       autoFocus
                       maxLength={60}
                     />
                   </div>
                   <div className="space-y-2" data-tutorial="username-block">
-                    <Label htmlFor="username" className="text-sm font-medium">
-                      Username
-                    </Label>
                     <Input
                       id="username"
+                      aria-label="Username"
                       value={formData.username}
                       onChange={(e) => handleUsernameChange(e.target.value)}
                       onKeyDown={(e) => e.stopPropagation()}
                       onKeyUp={(e) => e.stopPropagation()}
                       onKeyPress={(e) => e.stopPropagation()}
-                      placeholder="yourname"
+                      placeholder="username"
                       className="h-11"
                       maxLength={30}
                     />
@@ -794,7 +797,7 @@ export default function ProfileSetupPage() {
                         Setting up…
                       </>
                     ) : (
-                      "Start building"
+                      "Start Building"
                     )}
                   </Button>
                 </form>

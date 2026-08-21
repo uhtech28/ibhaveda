@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   inputClass,
-  labelClass,
   PrimaryButton,
   GoogleButton,
   OrDivider,
@@ -15,6 +14,7 @@ import {
   FieldMessage,
   PasswordToggle,
   clerkErrorMessage,
+  authRedirectUrl,
 } from "./auth-ui";
 
 export function SignInForm({
@@ -36,13 +36,20 @@ export function SignInForm({
   const canSubmit =
     isLoaded && !submitting && identifier.trim().length > 0 && password.length > 0;
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
     if (!isLoaded || !signIn) return;
-    void signIn.authenticateWithRedirect({
-      strategy: "oauth_google",
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/feed",
-    });
+    setError(null);
+    setSubmitting(true);
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: authRedirectUrl("/sso-callback"),
+        redirectUrlComplete: authRedirectUrl("/feed"),
+      });
+    } catch (err) {
+      setError(clerkErrorMessage(err));
+      setSubmitting(false);
+    }
   };
 
   // Safety net: for any status we don't handle inline (2FA, new-device / Client
@@ -76,24 +83,24 @@ export function SignInForm({
   };
 
   return (
-    <div className="px-8 pt-8">
+    <div className="relative overflow-hidden px-8 pt-8 font-[family-name:var(--font-code)] before:pointer-events-none before:absolute before:inset-0 before:opacity-[0.055] before:[background-image:linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] before:[background-size:24px_24px]">
       <AuthHeaderLogo />
-      <DialogTitle className="text-center text-xl font-bold text-[#212126]">
+      <DialogTitle className="relative text-center font-[family-name:var(--font-code)] text-2xl font-black text-slate-50">
         Sign in to Ibhaveda
       </DialogTitle>
-      <DialogDescription className="mt-1 text-center text-sm text-[#6b6b76]">
+      <DialogDescription className="relative mt-2 text-center text-sm font-semibold text-[#9fb6df]">
         Welcome back! Please sign in to continue
       </DialogDescription>
 
-      <div className="mt-6">
-        <GoogleButton onClick={handleGoogle} disabled={!isLoaded} />
+      <div className="relative mt-6">
+        <GoogleButton onClick={handleGoogle} disabled={!isLoaded || submitting} />
       </div>
 
       <OrDivider />
 
-      <form onSubmit={handleSubmit} className="pb-2">
+      <form onSubmit={handleSubmit} className="relative pb-2">
         <div className="mb-4">
-          <label className={labelClass} htmlFor="signin-identifier">
+          <label className="sr-only" htmlFor="signin-identifier">
             Email address or username
           </label>
           <input
@@ -108,7 +115,7 @@ export function SignInForm({
         </div>
 
         <div className="mb-2">
-          <label className={labelClass} htmlFor="signin-password">
+          <label className="sr-only" htmlFor="signin-password">
             Password
           </label>
           <div className="relative">
@@ -136,12 +143,12 @@ export function SignInForm({
         </div>
       </form>
 
-      <div className="pb-6 pt-4 text-center text-[13px] text-[#6b6b76]">
+      <div className="relative pb-6 pt-4 text-center text-[13px] text-[#9fb6df]">
         Don&apos;t have an account?{" "}
         <button
           type="button"
           onClick={onSwitchToSignUp}
-          className="font-semibold text-[#31313a] hover:underline"
+          className="font-bold text-[#93c5fd] hover:underline"
         >
           Sign up
         </button>

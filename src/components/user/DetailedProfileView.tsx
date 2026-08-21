@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { UserProfile } from "./CompactProfileView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +15,7 @@ import { api } from "../../../convex/_generated/api";
 import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { getNormalizedRarity, getVentureBadgeEmoji, BadgeItem } from "../badges/BadgeCard";
 import { BadgeDetailModal } from "@/components/badges/BadgeDetailModal";
+import { EditProfileModal } from "./EditProfileModal";
 
 interface DetailedProfileViewProps {
   profile: UserProfile;
@@ -62,8 +62,8 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
   myRequests,
   incomingRequests
 }) => {
-  const router = useRouter();
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
   const equippedBadgeIds = profile.equippedBadges || [];
@@ -108,7 +108,7 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
   }, [earnedBadges, equippedBadgeIds]);
 
   const handleEditProfile = () => {
-    router.push("/profile-setup");
+    setEditProfileOpen(true);
   };
 
   return (
@@ -342,6 +342,10 @@ export const DetailedProfileView: React.FC<DetailedProfileViewProps> = ({
         onClose={() => setSelectedBadge(null)}
         isOwner={false} // Inline viewer header is read-only detail view
         isEquipped={selectedBadge ? equippedBadgeIds.includes(selectedBadge.id) : false}
+      />
+      <EditProfileModal
+        open={editProfileOpen}
+        onOpenChange={setEditProfileOpen}
       />
     </TooltipProvider>
   )

@@ -80,10 +80,7 @@ export function AssetWarmer() {
           // fetchPriority=low so the preloads don't compete with the
           // critical Next.js JS/CSS chunks + first-paint HTML. Browser
           // still queues them immediately — they arrive during idle
-          // network time. React 19 accepts the camelCase form and
-          // forwards it to the DOM as the lowercase attribute; using
-          // `fetchpriority` (lowercase) in JSX triggers an "Invalid
-          // DOM property" warning.
+          // network time.
           fetchPriority="low"
         />
       ))}

@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 
 import {
@@ -37,15 +38,8 @@ import { IdeaForgeLeftRail } from "@/components/ideaforge/left-rail";
 import { IdeaForgeNavbar } from "@/components/ideaforge/navbar";
 import { IdeaForgeRightRail } from "@/components/ideaforge/right-rail";
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
-import { IdeaWizard } from "@/components/ideas/IdeaWizard";
-// FlareFeedSection is the browsable "help requests" surface — the
-// component was built alongside FlareCompose but was never mounted
-// anywhere in /app until this tab wiring landed. Users could fire a
-// flare from the map's saddlebag but had no way to see other people's
-// live flares. Rendering it under the new "Flares" feed tab restores
-// that surface without adding a new route.
 import { FlareFeedSection } from "@/components/flares/FlareFeedSection";
-import type { Id } from "@convex/_generated/dataModel";
+import { IdeaWizard } from "@/components/ideas/IdeaWizard";
 import {
   cardSurface,
   ComposerDraft,
@@ -282,6 +276,10 @@ export function IdeaForgeExperience({
                     </section>
                   )}
                   <FilterTabs tabs={feedTabs} activeKey={feedTab} onChange={setFeedTab} />
+                  <FlareFeedSection
+                    limit={8}
+                    currentUserId={currentUser?._id ? (currentUser._id as Id<"users">) : null}
+                  />
                 </>
               ) : (
                 <>

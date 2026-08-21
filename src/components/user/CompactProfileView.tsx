@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react"
-import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -19,6 +18,7 @@ import { PremiumIcon } from "@/components/ui/PremiumIcon";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
+import { EditProfileModal } from "./EditProfileModal";
 
 export interface UserProfile {
   _id: Id<"users">;
@@ -88,11 +88,11 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   myRequests,
   incomingRequests
 }) => {
-  const router = useRouter();
   const { openChatWithUser } = useChat();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"created" | "sparked" | "contributed">("created");
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
 
   const earnedBadges = useQuery(api.badges.getUserProfileBadges, { userId: profile._id });
   const equippedBadgeIds = profile.equippedBadges || [];
@@ -155,7 +155,7 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
   }, [earnedBadges, equippedBadgeIds]);
 
   const handleEditProfile = () => {
-    router.push("/profile-setup");
+    setEditProfileOpen(true);
   };
 
   const openDialog = (type: "created" | "sparked" | "contributed") => {
@@ -471,6 +471,12 @@ export const CompactProfileView: React.FC<CompactProfileViewProps> = ({
         canEquipMore={equippedBadgeIds.length < 3}
         onEquipToggle={selectedBadge ? () => handleEquipToggle(selectedBadge.id) : undefined}
       />
+      {isOwner && (
+        <EditProfileModal
+          open={editProfileOpen}
+          onOpenChange={setEditProfileOpen}
+        />
+      )}
     </div>
   );
 }

@@ -432,11 +432,17 @@ export const internalAwardPoints = internalMutation({
             createdAt: Date.now(),
         });
 
-        // analytics_events insert removed — the table was dropped from
-        // the schema in an earlier cleanup pass but the insert calls
-        // stayed behind. Convex typecheck refused the deploy until
-        // these were pruned. Re-add the table + these inserts if the
-        // analytics pipeline is brought back.
+        // Analytics: server-side funnel event (client hook can't see XP grants)
+        await db.insert("analytics_events", {
+            userId: args.userId,
+            sessionId: "server",
+            eventName: "xp_awarded",
+            eventCategory: "engagement",
+            properties: { amount: args.amount, type: args.type, description: args.description },
+            timestamp: Date.now(),
+            serverTimestamp: Date.now(),
+            sequenceNumber: 0,
+        });
 
         // Mirror the award into the userLevels.titlePoints/totalPoints so the
         // Level progress bar in the profile UI actually moves. This unifies the

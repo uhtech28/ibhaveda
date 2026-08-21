@@ -242,7 +242,7 @@ export function ToolsPanel({
           animate={{ opacity: 1, scale: 1, x: 0 }}
           exit={{ opacity: 0, scale: 0.92, x: -15 }}
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
-          className="fixed inset-x-4 mx-auto top-1/2 -translate-y-1/2 md:relative md:inset-auto md:mx-0 md:translate-y-0 z-[60] flex flex-col font-sans rounded-2xl border border-white/10 overflow-hidden shadow-2xl w-full max-w-[380px] md:w-[380px]"
+          className="map-tools-panel fixed inset-x-4 mx-auto top-[44%] -translate-y-1/2 md:relative md:inset-auto md:mx-0 md:translate-y-0 z-[60] flex flex-col font-sans rounded-2xl border border-white/10 overflow-hidden shadow-2xl w-full max-w-[380px] md:w-[380px]"
           style={{
             height: "min(85vh, 600px)",
             background:
@@ -356,6 +356,7 @@ export function ToolsPanel({
                       prompt="Plan your venture milestones and team syncs."
                       initialContent={calendarData}
                       onSubmit={onCalendarSubmit}
+                      readOnly={!canSubmitTasks}
                     />
                   </div>
                 )}
@@ -366,6 +367,7 @@ export function ToolsPanel({
                       initialContent={kanbanData}
                       onSubmit={onKanbanSubmit}
                       activeVentureId={activeVentureId}
+                      readOnly={!canSubmitTasks}
                     />
                   </div>
                 )}
@@ -462,6 +464,7 @@ function AllToolsGrid({
       color: "#6366f1",
       isExternal: true,
       path: "feed",
+      contributorOnly: true,
     },
     {
       id: "chat",
@@ -471,6 +474,7 @@ function AllToolsGrid({
       color: "#3b82f6",
       isExternal: true,
       path: "chat",
+      contributorOnly: true,
     },
     {
       id: "contributors",
@@ -478,6 +482,7 @@ function AllToolsGrid({
       desc: "Team & Collaborators",
       icon: Users,
       color: "#38bdf8",
+      contributorOnly: true,
     },
     {
       id: "hierarchy",
@@ -492,7 +497,6 @@ function AllToolsGrid({
       desc: "Schedule milestones",
       icon: CalendarIcon,
       color: "#fbbf24",
-      contributorOnly: true,
     },
     {
       id: "kanban",
@@ -500,7 +504,6 @@ function AllToolsGrid({
       desc: "Manage task workflow",
       icon: LayoutDashboard,
       color: "#34d399",
-      contributorOnly: true,
     },
     {
       id: "journal",

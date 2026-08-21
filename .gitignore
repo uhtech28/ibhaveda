@@ -60,3 +60,10 @@ convex-transcript.txt
 # Persona sprite drop zone — raw pose PNGs live here before compose
 public/assets/personas/_incoming/*
 !public/assets/personas/_incoming/README.md
+
+# Instagram reels — standalone, not part of the website code
+/insta-reels/
+/reel_pixar_braintrust/
+
+# Large landing preview assets (serve from CDN)
+public/landing-preview-assets/*.gif

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, X } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -52,12 +52,14 @@ export const NotificationBell = () => {
         aria-expanded={open}
         aria-label="Notifications"
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-4 w-4 -translate-x-[6px]" />
         {typeof unreadCount === 'number' && unreadCount > 0 && (
           <Badge
             className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] rounded-full p-0 text-[10px] leading-none font-semibold flex items-center justify-center px-1 bg-red-500 text-white border-0"
           >
-            {unreadCount > 99 ? '99+' : unreadCount}
+            <span className="inline-block -translate-x-px">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
           </Badge>
         )}
       </Button>

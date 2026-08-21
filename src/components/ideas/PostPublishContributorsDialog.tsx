@@ -53,7 +53,14 @@ export function PostPublishContributorsDialog({ ideaId, onContinue }: Props) {
   const [sentSet, setSentSet] = useState<Set<string>>(new Set());
   const [sendingSet, setSendingSet] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [advancing, setAdvancing] = useState(false);
   const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+
+  const handleContinue = useCallback(() => {
+    if (advancing) return;
+    setAdvancing(true);
+    window.requestAnimationFrame(() => onContinue());
+  }, [advancing, onContinue]);
 
   const handleExpand = useCallback((userId: string) => {
     setExpandedUserId((prev) => {
@@ -176,7 +183,7 @@ export function PostPublishContributorsDialog({ ideaId, onContinue }: Props) {
               gate. */}
           <button
             type="button"
-            onClick={onContinue}
+            onClick={handleContinue}
             aria-label="Skip and continue to map"
             className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white/90"
           >
@@ -247,9 +254,6 @@ export function PostPublishContributorsDialog({ ideaId, onContinue }: Props) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[14px] font-semibold text-[#F9FAFB]">
-                          {u.displayName || u.username}
-                        </div>
-                        <div className="truncate text-[11.5px] text-[#6B7280]">
                           @{u.username}
                         </div>
                       </div>
@@ -271,7 +275,7 @@ export function PostPublishContributorsDialog({ ideaId, onContinue }: Props) {
                           ? "✓ Sent"
                           : expanded
                             ? "Cancel"
-                            : "Send request"}
+                            : "Send Invite"}
                       </button>
                     </div>
 
@@ -354,7 +358,7 @@ export function PostPublishContributorsDialog({ ideaId, onContinue }: Props) {
             <div className="mt-6">
               <button
                 type="button"
-                onClick={onContinue}
+                onClick={handleContinue}
                 className="w-full rounded-xl bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-6 py-3.5 text-[13.5px] font-semibold uppercase tracking-[0.14em] text-white shadow-lg shadow-[#6366F1]/25 transition hover:brightness-110 active:scale-[0.99]"
               >
                 Continue to your map
@@ -362,7 +366,16 @@ export function PostPublishContributorsDialog({ ideaId, onContinue }: Props) {
             </div>
           </div>
         </motion.div>
+        {advancing && <PostPublishHandoffScrim />}
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function PostPublishHandoffScrim() {
+  return (
+    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+    </div>
   );
 }

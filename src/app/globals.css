@@ -853,4 +853,153 @@
   [cmdk-input] {
     font-size: 16px !important;
   }
+
+  [data-slot="dialog-content"]:has(input:focus),
+  [data-slot="dialog-content"]:has(textarea:focus),
+  [data-slot="dialog-content"]:has(select:focus),
+  [data-slot="dialog-content"]:has([contenteditable="true"]:focus) {
+    position: fixed !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - 0.75rem) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-contribution-request-dialog,
+  .mobile-contribution-request-dialog--keyboard {
+    position: fixed !important;
+    inset: auto !important;
+    left: 50vw !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: min(calc(100vw - 2rem), 31rem) !important;
+    max-width: min(calc(100vw - 2rem), 31rem) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - 2rem) !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+    transform: translate3d(-50%, -50%, 0) !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-contribution-request-dialog--keyboard {
+    top: var(--app-vv-center-y, 50dvh) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.45rem !important;
+    padding: 0.65rem !important;
+    width: min(calc(100vw - 1.25rem), 31rem) !important;
+    max-width: min(calc(100vw - 1.25rem), 31rem) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - 0.75rem) !important;
+    overflow: hidden !important;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-form {
+    display: flex !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    gap: 0.6rem !important;
+    overflow: hidden !important;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-header,
+  .mobile-contribution-request-dialog--keyboard .contribution-request-footer {
+    flex-shrink: 0 !important;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-body {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-contribution-request-dialog--keyboard .contribution-request-textarea {
+    min-height: 5.5rem !important;
+    height: min(24dvh, 7.5rem) !important;
+    padding: 0.8rem !important;
+  }
+
+  .flare-compose-dialog,
+  .flare-compose-dialog--keyboard {
+    position: fixed !important;
+    inset: auto !important;
+    left: 50vw !important;
+    top: var(--app-vv-center-y, 50dvh) !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: min(calc(100vw - 1.5rem), 31rem) !important;
+    max-width: min(calc(100vw - 1.5rem), 31rem) !important;
+    max-height: var(--app-vv-flare-height, min(74dvh, 30rem)) !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    transform: translate3d(-50%, -50%, 0) !important;
+  }
+
+  .flare-compose-dialog--keyboard {
+    max-height: calc(var(--app-vv-height, 100dvh) - 0.75rem) !important;
+  }
+
+  .flare-compose-dialog--keyboard .flare-compose-header {
+    padding: 0.65rem 0.9rem !important;
+  }
+
+  .flare-compose-dialog--keyboard .flare-compose-body {
+    padding: 0.6rem 0.9rem !important;
+    gap: 0.5rem !important;
+  }
+
+  .flare-compose-dialog--keyboard .flare-compose-textarea {
+    min-height: 4.75rem !important;
+    height: min(22dvh, 6rem) !important;
+  }
+
+  .flare-compose-dialog--keyboard .flare-compose-footer {
+    padding: 0.55rem 0.9rem 0.65rem !important;
+  }
+
+  .map-tools-panel {
+    top: calc(var(--app-vv-center-y, 50dvh) - 1.5rem) !important;
+    height: min(calc(var(--app-vv-height, 100dvh) - 5.5rem), 38rem) !important;
+    max-height: min(calc(var(--app-vv-height, 100dvh) - 5.5rem), 38rem) !important;
+  }
+
+  .map-feed-popup {
+    height: var(--app-vv-map-feed-keyboard-height, min(90dvh, 24.125rem)) !important;
+    max-height: var(--app-vv-map-feed-keyboard-height, min(90dvh, 24.125rem)) !important;
+    transform: translateY(-0.75rem) !important;
+  }
+
+  .map-feed-popup-inner {
+    padding: 0.85rem !important;
+  }
+
+  .map-feed-composer {
+    gap: 0.6rem !important;
+  }
+
+  .map-feed-composer:focus-within .map-feed-composer-textarea {
+    height: min(25dvh, 7rem) !important;
+    min-height: 6rem !important;
+    padding-top: 0.85rem !important;
+  }
+
+  .kanban-task-dialog:focus-within {
+    max-height: var(--app-vv-kanban-keyboard-height, min(90dvh, 24.5rem)) !important;
+    gap: 0.65rem !important;
+    padding: 0.85rem !important;
+    transform: translateY(-0.75rem) !important;
+  }
+
+  .kanban-task-dialog:focus-within .kanban-task-dialog-body {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-block: 0.25rem !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kanban-task-dialog:focus-within .kanban-task-target {
+    min-height: 4.75rem !important;
+  }
 }

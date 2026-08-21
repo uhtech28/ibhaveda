@@ -439,7 +439,7 @@ export class GoldenHarborScene extends Phaser.Scene {
     const first = bosses[Math.min(this.currentIndex, bosses.length - 1)];
     const cp = CHECKPOINTS[this.currentIndex];
     if (!cp) return;
-    this.movingBoss = spawnMovingBoss(this, 6, first, cp, { showHpBar: true });
+    this.movingBoss = spawnMovingBoss(this, 6, first, cp, { showHpBar: false });
     this.movingBoss.cpIndex = this.currentIndex;
     this.movingBoss.sprite.setFlipX(true);
   }

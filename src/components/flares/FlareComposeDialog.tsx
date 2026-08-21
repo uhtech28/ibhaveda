@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { displayFontClass } from "@/components/ideaforge/shared";
 import {
   useKeyboardInsets,
-  keyboardSafeStyle,
+  keyboardSafeDialogStyle,
 } from "@/lib/hooks/useKeyboardInsets";
 
 const MIN_DESCRIPTION_CHARS = 20;
@@ -206,11 +206,13 @@ export function FlareComposeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[90dvh]"
-        style={keyboardSafeStyle(kb, { reserveVh: 0.92 })}
+        className={`flare-compose-dialog ${
+          kb.isKeyboardOpen ? "flare-compose-dialog--keyboard" : ""
+        } w-[min(100%-2rem,680px)] max-w-[680px] gap-0 flex flex-col rounded-[20px] border border-white/5 bg-[#0A0E1A] p-0 text-[#F9FAFB] shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden h-auto max-h-[90dvh]`}
+        style={keyboardSafeDialogStyle(kb, { reserveVh: 0.92 })}
         data-tutorial="flare-compose"
       >
-        <DialogHeader className="border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
+        <DialogHeader className="flare-compose-header border-b border-white/5 px-5 py-3 text-left bg-[#0D1117] shrink-0">
           <div className="flex items-center gap-2">
             <PixelIcon name="menu-flare-v2" size={22} alt="Flare" />
             <DialogTitle
@@ -229,7 +231,7 @@ export function FlareComposeDialog({
         </DialogHeader>
 
         <div
-          className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0"
+          className="flare-compose-body flex-1 overflow-y-auto custom-scrollbar px-4 py-3 sm:px-5 space-y-3 min-h-0"
           style={kb.isKeyboardOpen ? { scrollPaddingBottom: 96 } : undefined}
         >
           {/* Title — pre-filled from the linked idea */}
@@ -259,7 +261,7 @@ export function FlareComposeDialog({
               onChange={(e) =>
                 setDescription(e.target.value.slice(0, MAX_DESCRIPTION_CHARS))
               }
-              className="min-h-[140px] rounded-[10px] border-white/5 bg-[#0D1117] p-3 text-sm text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-amber-400"
+              className="flare-compose-textarea min-h-[140px] rounded-[10px] border-white/5 bg-[#0D1117] p-3 text-sm text-white placeholder:text-[#6B7280] focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-amber-400"
               disabled={submitting}
               // Only block DROP — the previous rev also blocked paste /
               // copy / cut / context-menu, which broke clipboard on
@@ -334,7 +336,7 @@ export function FlareComposeDialog({
             per product request; the header × already dismisses the
             dialog so an inline cancel was redundant. `justify-end`
             keeps the Fire Flare button flush-right. */}
-        <div className="flex items-center justify-end gap-3 border-t border-white/5 px-5 pt-3 pb-4 bg-[#0D1117] shrink-0">
+        <div className="flare-compose-footer flex items-center justify-end gap-3 border-t border-white/5 px-5 pt-3 pb-4 bg-[#0D1117] shrink-0">
           <button
             type="button"
             onClick={handleSubmit}

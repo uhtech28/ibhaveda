@@ -451,7 +451,7 @@ export class ForestMapScene extends Phaser.Scene {
     const first = bosses[Math.min(this.currentIndex, bosses.length - 1)];
     const cp = CHECKPOINTS[this.currentIndex];
     if (!cp) return;
-    this.movingBoss = spawnMovingBoss(this, 2, first, cp, { showHpBar: true });
+    this.movingBoss = spawnMovingBoss(this, 2, first, cp, { showHpBar: false });
     this.movingBoss.cpIndex = this.currentIndex;
     this.movingBoss.sprite.setFlipX(true); // face the persona (left of boss)
   }

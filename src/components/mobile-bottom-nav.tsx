@@ -15,8 +15,7 @@ function MobileBottomNavContent() {
   if (
     pathname === "/" ||
     pathname?.startsWith("/sign-in") ||
-    pathname?.startsWith("/sign-up") ||
-    pathname?.startsWith("/map")
+    pathname?.startsWith("/sign-up")
   ) {
     return null;
   }
@@ -46,7 +45,7 @@ function MobileBottomNavContent() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 lg:hidden pb-safe">
-      <nav className="grid h-16 grid-cols-4 items-center justify-items-center px-2">
+      <nav className="grid h-[77px] grid-cols-4 items-center justify-items-center px-2">
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -64,10 +63,10 @@ function MobileBottomNavContent() {
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <span className="grid h-6 w-6 place-items-center">
-                <Icon className={cn("h-5 w-5", isActive && "fill-current")} />
+              <span className="grid h-[29px] w-[29px] place-items-center">
+                <Icon className={cn("h-[24px] w-[24px]", isActive && "fill-current")} />
               </span>
-              <span className="text-center text-[10px] font-medium leading-none">{item.name}</span>
+              <span className="text-center text-[12px] font-medium leading-none">{item.name}</span>
             </Link>
           );
         })}

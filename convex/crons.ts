@@ -60,13 +60,12 @@ crons.daily(
     api.emailReengagement.sendReengagementEmails
 );
 
-// Retention snapshot cron removed — the `retentionCron.ts` file was
-// deleted in an earlier cleanup pass, but the cron entry stayed
-// registered. Convex refuses to accept a `npx convex dev` / `deploy`
-// push when a cron references a non-existent function, blocking
-// every unrelated schema/function update. Delete the cron to unblock
-// pushes; re-add it as `retentionCron.ts` + `takeRetentionSnapshot`
-// when retention analytics are needed again.
+// Schedule: Daily retention snapshot at midnight IST (18:30 UTC)
+crons.daily(
+  "daily-retention-snapshot",
+  { hourUTC: 18, minuteUTC: 30 },
+  api.retentionCron.takeRetentionSnapshot,
+);
 
 // Schedule: Social Proof Engine — daily spark evaluator at 00:05 UTC
 crons.daily(

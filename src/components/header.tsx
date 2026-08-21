@@ -126,7 +126,7 @@ export const HeroHeader = ({
                                     <button type="button" aria-label="Post idea" onClick={() => setShowIdeaWizard(true)} className={cn(transitionBase, "grid h-9 w-9 place-items-center rounded-full text-[#D1D5DB] hover:bg-white/[0.06] hover:text-white")}>
                                         <Plus className="h-5 w-5" />
                                     </button>
-                                    <div className="grid h-9 w-9 place-items-center [&_button]:grid [&_button]:h-9 [&_button]:w-9 [&_button]:place-items-center [&_button]:p-0 [&_button]:text-[#D1D5DB] [&_button:hover]:bg-white/[0.06] [&_button:hover]:text-white">
+                                    <div className="grid h-9 w-9 -translate-x-0.5 place-items-center [&_button]:grid [&_button]:h-9 [&_button]:w-9 [&_button]:place-items-center [&_button]:p-0 [&_button]:text-[#D1D5DB] [&_button:hover]:bg-white/[0.06] [&_button:hover]:text-white">
                                         <NotificationBell />
                                     </div>
                                     <Popover>
@@ -202,7 +202,13 @@ export const HeroHeader = ({
                             </div>
                         </SignedOut>
                         <SignedIn>
-                            <NotificationBell />
+                            {/* Nudge the bell 9px left so its unread badge
+                                doesn't crowd the avatar, and 2px down so it
+                                lines up vertically with the other icons.
+                                Transform only — layout is unaffected. */}
+                            <span className="inline-flex -translate-x-[9px] translate-y-[2px]">
+                                <NotificationBell />
+                            </span>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <button type="button" className="rounded-full" aria-label="Open profile menu">

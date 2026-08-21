@@ -50,6 +50,7 @@ function resolveFirstMonsterName(
   return getTemplateStageBoss(templateId, 1)?.name ?? "the first monster";
 }
 
+
 type Stage =
   // PRODUCT DECISION: the map tutorial now skips the "click first task,
   // write an answer, submit" flow entirely. On arrival at /map/world
@@ -773,7 +774,7 @@ export function Step3MapGuide() {
         // to "flare".
         return {
           text:
-            "This is your saddlebag. It holds every tool you'll need on your journey. Tap to open!",
+            "This is your saddlebag. It holds every tool you'll need to build your idea. Tap to open!",
           mood: "pointing",
           near: '[data-tutorial="saddlebag-button"]',
           highlight: '[data-tutorial="saddlebag-button"]',
@@ -786,7 +787,7 @@ export function Step3MapGuide() {
         // Advance is driven by the DOM poller detecting the
         // FlareComposeDialog opening.
         return {
-          text: "Nice work! If you're ever stuck, fire a Flare from here. People can jump in to help without joining your project.",
+          text: "Nice work! If you're ever stuck, fire a Flare. Everyone will jump in to help.",
           mood: "pointing",
           near: '[data-tutorial="menu-tile-flare"]',
           highlight: '[data-tutorial="menu-tile-flare"]',
@@ -805,7 +806,7 @@ export function Step3MapGuide() {
         // Flare done — one line of praise, then the auto-navigate
         // effect below pushes to /feed for the contribute step.
         return {
-          text: `Great job! Now let's head back to the feed for one last thing.`,
+          text: "Great job! Now let's head back to the feed for one last task.",
           mood: "celebrating",
           near: null,
           highlight: null,

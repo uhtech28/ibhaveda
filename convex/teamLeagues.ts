@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { isCreatedProfileIdea } from "./ideaFilters";
 import {
   ACTIVE_LEAGUE_COUNT,
   highestActiveTier,
@@ -76,43 +77,64 @@ export interface TeamLadderEntry {
  * Sorted by points desc; tiebreak (PRD §4) is the project with the
  * earlier first-points-this-week (smaller earliest awardedAt within
  * the window). Falls back to idea _creationTime if no events.
+ *
+ * `fillToLimit` (opt-in): when the trailing-7-day window has fewer than
+ * `limit` projects, expand the lookback window one week at a time (up to
+ * 52 weeks) until the podium fills — mirroring the user leaderboard's
+ * `getWeeklyLeaderboard` fallback. The /leagues Team board leaves this
+ * off so it stays a strict weekly competition; the community podium
+ * turns it on so it never renders empty when history exists.
  */
 export const getTopTeamLadder = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+    fillToLimit: v.optional(v.boolean()),
+  },
   handler: async (
     ctx,
-    { limit },
+    { limit, fillToLimit },
   ): Promise<TeamLadderEntry[]> => {
     const viewer = await maybeAuthedUser(ctx);
+    const now = Date.now();
 
-    const since = Date.now() - SEVEN_DAYS_MS;
-    const events = await ctx.db
-      .query("projectWeeklyPoints")
-      .withIndex("by_awarded", (q) => q.gte("awardedAt", since))
-      .collect();
+    // Aggregate all project-lane events awarded since `since`, ranked by
+    // total points desc (tiebreak: earlier first-award wins, PRD §4).
+    const rankWindow = async (since: number) => {
+      const events = await ctx.db
+        .query("projectWeeklyPoints")
+        .withIndex("by_awarded", (q) => q.gte("awardedAt", since))
+        .collect();
 
-    if (events.length === 0) return [];
-
-    // Aggregate by idea.
-    const byIdea = new Map<
-      string,
-      { total: number; earliest: number }
-    >();
-    for (const e of events) {
-      const prev = byIdea.get(String(e.ideaId));
-      if (prev) {
-        prev.total += e.amount;
-        if (e.awardedAt < prev.earliest) prev.earliest = e.awardedAt;
-      } else {
-        byIdea.set(String(e.ideaId), { total: e.amount, earliest: e.awardedAt });
+      const byIdea = new Map<string, { total: number; earliest: number }>();
+      for (const e of events) {
+        const prev = byIdea.get(String(e.ideaId));
+        if (prev) {
+          prev.total += e.amount;
+          if (e.awardedAt < prev.earliest) prev.earliest = e.awardedAt;
+        } else {
+          byIdea.set(String(e.ideaId), { total: e.amount, earliest: e.awardedAt });
+        }
       }
+
+      return Array.from(byIdea.entries()).sort((a, b) => {
+        if (b[1].total !== a[1].total) return b[1].total - a[1].total;
+        return a[1].earliest - b[1].earliest;
+      });
+    };
+
+    // Strict trailing-7-day window by default. With `fillToLimit`, keep
+    // expanding the window a week at a time until it holds at least
+    // `limit` projects (or we hit the 52-week cap). Each expansion is a
+    // superset, so ranking only ever gains projects.
+    const target = limit ?? 0;
+    const maxLookbackWeeks = fillToLimit ? 52 : 1;
+    let ranked: Array<[string, { total: number; earliest: number }]> = [];
+    for (let weeks = 1; weeks <= maxLookbackWeeks; weeks++) {
+      ranked = await rankWindow(now - weeks * SEVEN_DAYS_MS);
+      if (ranked.length >= target) break;
     }
 
-    const ranked = Array.from(byIdea.entries()).sort((a, b) => {
-      if (b[1].total !== a[1].total) return b[1].total - a[1].total;
-      // Tiebreak — earlier attainment wins (PRD §4 tiebreak rule).
-      return a[1].earliest - b[1].earliest;
-    });
+    if (ranked.length === 0) return [];
 
     const cap = Math.min(ranked.length, limit ?? ranked.length);
 
@@ -125,7 +147,9 @@ export const getTopTeamLadder = query({
       const ideaId = ideaIdStr as unknown as Id<"ideas">;
       const idea = await ctx.db.get(ideaId);
       if (!idea) continue;
+      if (!isCreatedProfileIdea(idea)) continue;
       const author = await ctx.db.get(idea.authorId);
+      if (author?.isActive === false) continue;
       const isViewerProject =
         !!viewer && (idea.authorId === viewer._id);
 
@@ -256,6 +280,115 @@ export const awardProjectPointsManual = mutation({
       awardedAt: Date.now(),
       reason: args.reason,
     });
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// One-time backfill
+// ─────────────────────────────────────────────────────────────────────
+
+/** Marker written to `reason` so backfilled rows are identifiable and
+ *  the migration is idempotent (re-running skips already-backfilled
+ *  requests). Format: `${prefix}${contributionRequestId}`. */
+const BACKFILL_REASON_PREFIX = "backfill:accepted-contribution:";
+
+/**
+ * Replay historically accepted contribution requests into the
+ * projectWeeklyPoints ledger. The live bump wiring
+ * (contributionRequests.updateStatus → bumpProjectWeeklyPoints) only
+ * records events going forward, so the Team / Top Projects board has no
+ * history to show. This migration reconstructs that history.
+ *
+ * Point value mirrors the live award exactly: 10 for public ideas, 5
+ * for private (see contributionRequests.updateStatus). `awardedAt` uses
+ * the request's `updatedAt` — the acceptance timestamp — so the
+ * community podium's backward-fill dates each entry correctly.
+ *
+ * Batched + idempotent + resumable: processes one page per call and
+ * returns `continueCursor`/`isDone`. Drive it to completion by calling
+ * again with the returned cursor until `isDone` is true. Re-running is
+ * safe — rows already backfilled (matched by the reason marker) are
+ * skipped.
+ *
+ *   # dry run first (inserts nothing, just reports what it would do)
+ *   npx convex run --prod teamLeagues:backfillProjectPointsFromAcceptedContributions '{"dryRun":true}'
+ *   # then for real, following the cursor until isDone
+ *   npx convex run --prod teamLeagues:backfillProjectPointsFromAcceptedContributions '{}'
+ */
+export const backfillProjectPointsFromAcceptedContributions = internalMutation({
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+    dryRun: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const batchSize = args.batchSize ?? 100;
+    const dryRun = args.dryRun ?? false;
+
+    const page = await ctx.db
+      .query("contributionRequests")
+      .paginate({ cursor: args.cursor ?? null, numItems: batchSize });
+
+    let scanned = 0;
+    let inserted = 0;
+    let skippedExisting = 0;
+    let skippedNotAccepted = 0;
+    let skippedNoIdea = 0;
+
+    for (const req of page.page) {
+      scanned++;
+      if (req.status !== "accepted") {
+        skippedNotAccepted++;
+        continue;
+      }
+
+      const marker = `${BACKFILL_REASON_PREFIX}${req._id}`;
+
+      // Idempotency — skip if this request was already backfilled. Scoped
+      // to the idea via the by_idea_awarded index so the scan stays cheap.
+      const existingForIdea = await ctx.db
+        .query("projectWeeklyPoints")
+        .withIndex("by_idea_awarded", (q) => q.eq("ideaId", req.ideaId))
+        .collect();
+      if (existingForIdea.some((e) => e.reason === marker)) {
+        skippedExisting++;
+        continue;
+      }
+
+      const idea = await ctx.db.get(req.ideaId);
+      if (!idea) {
+        skippedNoIdea++;
+        continue;
+      }
+
+      // Mirror the live award in contributionRequests.updateStatus.
+      const amount = idea.visibility === "public" ? 10 : 5;
+      const awardedAt = req.updatedAt ?? req.createdAt ?? req._creationTime;
+
+      if (!dryRun) {
+        await ctx.db.insert("projectWeeklyPoints", {
+          ideaId: req.ideaId,
+          contributorId: req.contributorId,
+          amount,
+          awardedAt,
+          reason: marker,
+        });
+      }
+      inserted++;
+    }
+
+    return {
+      dryRun,
+      isDone: page.isDone,
+      continueCursor: page.isDone ? null : page.continueCursor,
+      batch: {
+        scanned,
+        inserted,
+        skippedExisting,
+        skippedNotAccepted,
+        skippedNoIdea,
+      },
+    };
   },
 });
 

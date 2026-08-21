@@ -230,7 +230,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full min-w-0 space-y-6 overflow-y-auto"
+      className="contribution-request-form w-full min-w-0 space-y-6 overflow-y-auto"
       // Clamp to the visible viewport when the on-screen keyboard is
       // open (visualViewport-derived). Prevents the textarea + Send
       // Request button from disappearing behind the keyboard on iOS
@@ -241,7 +241,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
           : undefined
       }
     >
-      <div className="flex flex-col gap-1.5 text-left">
+      <div className="contribution-request-header flex flex-col gap-1.5 text-left">
         <h2 className="text-lg leading-none font-semibold">
           Request to Contribute
         </h2>
@@ -258,7 +258,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="contribution-request-body space-y-4">
         {projectProfileHeader}
 
         {/* ── SKILL TAGS ────────────────────────────────────────────
@@ -315,7 +315,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
               onKeyDown={(e) => e.stopPropagation()}
               onKeyUp={(e) => e.stopPropagation()}
               onKeyPress={(e) => e.stopPropagation()}
-              className="block min-h-[120px] w-full resize-none rounded-[22px] bg-transparent p-4 text-base leading-6 text-white placeholder:text-[#6B7280] outline-none focus:ring-0 lg:text-sm lg:leading-5"
+              className="contribution-request-textarea block min-h-[120px] w-full resize-none rounded-[22px] bg-transparent p-4 text-base leading-6 text-white placeholder:text-[#6B7280] outline-none focus:ring-0 lg:text-sm lg:leading-5"
               required
             />
           </div>
@@ -352,7 +352,7 @@ export const ContributionRequestModal: React.FC<ContributionRequestModalProps> =
         </div>
       </div>
 
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <div className="contribution-request-footer flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="submit" disabled={!message.trim() || isSubmitting || isOverMessageLimit} className="gap-2">
           {isSubmitting ? <Spinner size={16} /> : <UserPlus className="w-4 h-4" />}
           Send Request

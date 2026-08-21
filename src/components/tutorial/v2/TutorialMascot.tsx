@@ -85,6 +85,16 @@ interface TutorialMascotProps {
    * writing) where a rolling puppy would distract the user.
    */
   suppressRoll?: boolean;
+  /**
+   * MOBILE ONLY — force the compact "corner" layout (small Sparky with a
+   * bubble beside him, tucked at the highlighted modal's top-right)
+   * instead of the full-width centered/hugging stack. Set this on steps
+   * where the user types into a field: the full-width stack either covers
+   * the textarea or gets shoved onto it when the on-screen keyboard opens.
+   * The corner layout also auto-engages whenever a keyboard is detected,
+   * so this prop mainly controls the keyboard-DOWN state of typing steps.
+   */
+  mobileCorner?: boolean;
 }
 
 // ─── Size constants (must match rendered widths) ─────────────────────────────
@@ -112,6 +122,17 @@ const VIEWPORT_MARGIN = 12;
 // Mobile
 const MOBILE_BREAKPOINT = 640; // px — below this we switch layouts
 const SPARKY_SIZE_MOBILE = 90; // small enough to peek above a full-width bubble
+// Intro beat gets a larger Sparky — he's the focal point of the first
+// hello (no highlight target competing for attention), and the docked
+// 90px felt undersized there (product feedback: "a touch too small in
+// the first intro").
+const SPARKY_SIZE_MOBILE_INTRO = 124;
+// Compact side-by-side sizes for the "corner" layout used on typing
+// steps (Describe Your Idea): small enough to tuck beside the modal
+// without covering the textarea, and smaller still while the on-screen
+// keyboard is up and vertical room is scarce.
+const SPARKY_SIZE_MOBILE_CORNER = 84;      // keyboard down
+const SPARKY_SIZE_MOBILE_CORNER_KBD = 58;  // keyboard up
 const BUBBLE_BOTTOM_INSET_MOBILE = 12; // gap from viewport bottom
 const BUBBLE_SIDE_INSET_MOBILE = 12;   // left/right insets
 
@@ -633,6 +654,7 @@ export function TutorialMascot({
   nearSelector = null,
   noScrim = false,
   suppressRoll = false,
+  mobileCorner = false,
 }: TutorialMascotProps): ReactElement | null {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -799,12 +821,25 @@ export function TutorialMascot({
     typeof window !== "undefined"
       ? (window.visualViewport?.height ?? window.innerHeight)
       : 800;
+  // On-screen keyboard height = how much the layout viewport exceeds the
+  // visible one. > ~120px means a keyboard (not just the URL bar) is up.
+  const readKbInset = () =>
+    typeof window !== "undefined" && window.visualViewport
+      ? Math.max(
+          0,
+          window.innerHeight -
+            window.visualViewport.height -
+            window.visualViewport.offsetTop,
+        )
+      : 0;
   const [vw, setVw] = useState<number>(readVw);
   const [vh, setVh] = useState<number>(readVh);
+  const [kbInset, setKbInset] = useState<number>(readKbInset);
   useEffect(() => {
     const onResize = () => {
       setVw(readVw());
       setVh(readVh());
+      setKbInset(readKbInset());
     };
     window.addEventListener("resize", onResize, { passive: true });
     const vv = window.visualViewport;
@@ -821,6 +856,7 @@ export function TutorialMascot({
     };
   }, []);
   const isMobile = vw < MOBILE_BREAKPOINT;
+  const keyboardOpen = kbInset > 120;
 
   // ── Mobile only: scroll the highlighted target into the upper half of
   //    the viewport when the selector changes, so the fixed-bottom bubble
@@ -922,127 +958,88 @@ export function TutorialMascot({
           {!noScrim && <TutorialScrim targetRect={targetRect} />}
           {isMobile ? (
             // ── MOBILE LAYOUT ─────────────────────────────────────────
-            // Sparky+bubble stack docks to the viewport edge OPPOSITE
-            // the highlighted target's center. Prevents the puppy from
-            // sitting on top of centered modals (product feedback:
-            // "in mobile view sparky overlapping" — Describe Your Idea
-            // & Template Picker screens where Sparky's head landed
-            // inside the modal's input).
+            // Goal (product ask): keep Sparky + his bubble near the
+            // VERTICAL CENTER, but tuck the stack right up against
+            // whatever is highlighted. Concretely:
+            //   • no highlight (intro)            → dead center.
+            //   • highlight OUTSIDE the centre    → dead center (the
+            //       stack wouldn't cover it — e.g. the "+" button up in
+            //       the navbar), so Sparky stays middle-of-screen.
+            //   • highlight IN the centre band    → hug it: sit just
+            //       BELOW it if there's room, else just ABOVE. This is
+            //       what keeps him off centered modals (template picker,
+            //       "Describe your idea") while still reading as attached
+            //       to them, instead of marooned at the bottom edge.
             //
-            // Rules:
-            //   • target above midline → stack docks to BOTTOM edge
-            //   • target below midline → stack docks to TOP edge
-            //   • no target → default to BOTTOM edge (previously the
-            //     mobile default; user asked for center once but that
-            //     interacts badly with centered modals so we err on
-            //     out-of-the-way instead)
-            //
-            // The bubble is full-width (minus 12px insets) and Sparky
-            // peeks out of the bubble on whichever edge faces the
-            // target so the tail direction reads correctly.
+            // The bubble is full-width (minus side insets); Sparky peeks
+            // out of its top edge. `side="top"` points the tail up at him.
             (() => {
-              // Use the tracked `vh` from state (backed by visualViewport
-              // where available) instead of reading window.innerHeight
-              // directly — iOS Safari's URL bar changes innerHeight
-              // mid-scroll and the dock would flip top↔bottom.
-              const targetCenterY = targetRect
-                ? (targetRect.top + targetRect.bottom) / 2
-                : null;
-              // Default DOCK: bottom. Swap to top only when the target
-              // sits in the lower half (so stack ends up above target).
-              const dockTop =
-                targetCenterY !== null && targetCenterY > vh * 0.55;
-              // Sparky peeks toward the target: if we're docked at
-              // bottom (target is above us) Sparky sits at the TOP of
-              // the bubble; if docked at top, Sparky sits at the BOTTOM.
-              const sparkyOnTop = !dockTop;
-              // ── Keyboard-aware bottom offset ──────────────────────
-              // On mobile, `position: fixed` bottom-anchored elements
-              // stick to the LAYOUT viewport bottom, NOT the visual
-              // viewport bottom. When the on-screen keyboard opens,
-              // `visualViewport.height` shrinks by the keyboard height
-              // but a fixed `bottom: 20px` still glues Sparky's bubble
-              // to below the keyboard — user sees the bubble jump
-              // and then get covered. Reported as: "when we open
-              // keyboard in tutorial sparky shifts like bug".
-              //
-              // Fix: compute the keyboard offset from the visualViewport
-              // and add it to the `bottom` inset. When there's no
-              // keyboard, offset is 0 → same layout as before.
-              // Transitioning bottom with a 220ms cubic-out ease makes
-              // the shift read as a smooth glide (Apple / Google
-              // standard sizing) instead of a snap.
-              const keyboardOffsetPx =
-                typeof window !== "undefined" && window.visualViewport
-                  ? Math.max(
-                      0,
-                      window.innerHeight -
-                        window.visualViewport.height -
-                        window.visualViewport.offsetTop,
-                    )
-                  : 0;
-              return (
-                <div
-                  className="pointer-events-none fixed inset-x-0 z-[10010] flex justify-center"
-                  style={{
-                    top: dockTop ? BUBBLE_BOTTOM_INSET_MOBILE : undefined,
-                    bottom: dockTop
-                      ? undefined
-                      : `calc(${BUBBLE_BOTTOM_INSET_MOBILE}px + env(safe-area-inset-bottom, 0px) + ${keyboardOffsetPx}px)`,
-                    // Extra top padding when docked-top so the peeking-
-                    // out Sparky doesn't collide with the notch/status bar.
-                    paddingTop: dockTop ? SPARKY_SIZE_MOBILE - 8 : 0,
-                    // Smooth transition when the keyboard opens/closes.
-                    // 220ms matches iOS's own keyboard slide-in curve
-                    // and Android's Material easing, so Sparky reads
-                    // as part of the same motion instead of a
-                    // separate delayed jump.
-                    transition:
-                      "bottom 220ms cubic-bezier(0.22, 1, 0.36, 1), top 220ms cubic-bezier(0.22, 1, 0.36, 1)",
-                    willChange: "bottom, top",
-                  }}
-                >
-                  <motion.div
-                    key="mobile-tutorial"
-                    initial={{
-                      opacity: 0,
-                      y: dockTop ? -40 : 40,
-                    }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{
-                      opacity: 0,
-                      y: dockTop ? -40 : 40,
-                    }}
-                    transition={{ type: "spring", stiffness: 260, damping: 26 }}
+              // ── CORNER layout (typing steps) ───────────────────────────
+              // Steps where the user types into a field (Describe Your
+              // Idea) can't use the full-width stack: it either sits on the
+              // textarea or, once the keyboard opens, gets shoved up onto
+              // it. Instead put a compact Sparky beside a bubble at the
+              // highlighted modal's TOP-RIGHT — near the box, clear of the
+              // textarea below it, and above the keyboard. Engages when the
+              // step opts in (`mobileCorner`) OR whenever a keyboard is up.
+              if (keyboardOpen || mobileCorner) {
+                const cornerSize = keyboardOpen
+                  ? SPARKY_SIZE_MOBILE_CORNER_KBD
+                  : SPARKY_SIZE_MOBILE_CORNER;
+                // Anchor to the modal's top edge when we know it, clamped so
+                // the group never rides off the top or down under the
+                // keyboard (vh already excludes the keyboard area).
+                const cornerGroupH = Math.max(cornerSize, 132);
+                const rawTop = targetRect ? targetRect.top : 0;
+                const topY = Math.min(
+                  Math.max(rawTop, 0),
+                  Math.max(0, vh - cornerGroupH - 12),
+                );
+                return (
+                  <div
+                    className="pointer-events-none fixed z-[10010] flex justify-end"
                     style={{
-                      width: "100%",
-                      paddingLeft: BUBBLE_SIDE_INSET_MOBILE,
-                      paddingRight: BUBBLE_SIDE_INSET_MOBILE,
-                      pointerEvents: "none", // children opt in
+                      left: 8,
+                      right: 8,
+                      top: `calc(${topY}px + env(safe-area-inset-top, 0px) + 6px)`,
+                      alignItems: "flex-start",
+                      transition: "top 200ms cubic-bezier(0.22, 1, 0.36, 1)",
+                      willChange: "top",
                     }}
                   >
-                    <div style={{ position: "relative" }}>
-                      {/* Sparky peeks out of the bubble on the side
-                          that faces the highlighted target. */}
+                    <motion.div
+                      key="mobile-corner"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        pointerEvents: "none",
+                        maxWidth: "100%",
+                      }}
+                    >
+                      {hasBubbleContent && (
+                        <div style={{ pointerEvents: "none", minWidth: 0 }}>
+                          <TutorialSpeechBubble
+                            text={stableText}
+                            primaryAction={wrappedPrimary}
+                            secondaryAction={secondaryAction}
+                            side="right"
+                          />
+                        </div>
+                      )}
                       <div
                         style={{
-                          position: "absolute",
-                          top: sparkyOnTop
-                            ? -(SPARKY_SIZE_MOBILE - 8)
-                            : undefined,
-                          bottom: sparkyOnTop
-                            ? undefined
-                            : -(SPARKY_SIZE_MOBILE - 8),
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          width: SPARKY_SIZE_MOBILE,
-                          height: SPARKY_SIZE_MOBILE,
-                          pointerEvents: "none",
-                          zIndex: 1,
+                          width: cornerSize,
+                          height: cornerSize,
+                          flexShrink: 0,
                         }}
                       >
                         <AnimatedSparky
-                          size={SPARKY_SIZE_MOBILE}
+                          size={cornerSize}
                           speech={activeSpeech}
                           cheerTick={cheerTick}
                           autoRoll={true}
@@ -1051,20 +1048,140 @@ export function TutorialMascot({
                           ariaLabel="Sparky the tutorial mascot"
                         />
                       </div>
-                      {/* Full-width bubble on mobile. pointerEvents:none
-                          so the bubble body doesn't intercept clicks meant
-                          for the panel underneath — the primary action
-                          button inside opts back in via its own class.
-                          Hidden when Sparky has nothing to say. Tail side
-                          matches Sparky's peek side so the arrow points
-                          at him correctly. */}
+                    </motion.div>
+                  </div>
+                );
+              }
+
+              // Intro (no target) gets the larger sprite; every guided
+              // step keeps the standard size.
+              const isIntro = !targetRect && anchor === "center";
+              const sparkySize = isIntro
+                ? SPARKY_SIZE_MOBILE_INTRO
+                : SPARKY_SIZE_MOBILE;
+              const GAP = 16;
+              // Rough combined-height estimate (Sparky peek + bubble).
+              // Only used to DECIDE center-vs-hug and which side has room;
+              // the actual position is set with exact CSS below, so a
+              // loose estimate is fine. Generous so we err toward hugging
+              // rather than overlapping a modal.
+              const groupHEst = sparkySize + 180;
+
+              // Decide vertical placement.
+              //   dock   — no target AND a corner anchor (e.g. the
+              //            contributors beat, which sits beside its own
+              //            centered modal with noScrim). Keep it bottom-
+              //            docked and out of the way like before.
+              //   center — no target + intro, OR a target that a centered
+              //            stack wouldn't cover (e.g. the top "+" button).
+              //   below/above — target sits in the centre band; hug it.
+              let mode: "center" | "below" | "above" | "dock";
+              if (!targetRect) {
+                mode = anchor === "center" ? "center" : "dock";
+              } else {
+                const centeredTop = (vh - groupHEst) / 2;
+                const centeredBottom = (vh + groupHEst) / 2;
+                const collides =
+                  centeredBottom > targetRect.top - GAP &&
+                  centeredTop < targetRect.bottom + GAP;
+                if (!collides) {
+                  mode = "center";
+                } else {
+                  const spaceBelow = vh - targetRect.bottom;
+                  const spaceAbove = targetRect.top;
+                  if (spaceBelow >= groupHEst + GAP) mode = "below";
+                  else if (spaceAbove >= groupHEst + GAP) mode = "above";
+                  else mode = spaceBelow >= spaceAbove ? "below" : "above";
+                }
+              }
+
+              // ── Keyboard-aware nudge ───────────────────────────────
+              // When the on-screen keyboard opens, visualViewport height
+              // shrinks; `vh` (state) already tracks that, so center/below
+              // math re-solves against the visible area automatically. We
+              // keep the smooth transition so the shift glides.
+              const outerStyle: React.CSSProperties = {
+                transition:
+                  "padding 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                willChange: "padding",
+              };
+              if (mode === "below" && targetRect) {
+                outerStyle.alignItems = "flex-start";
+                // Clamp so a tall bubble can't push off the bottom edge —
+                // degrades gracefully to a near-bottom dock if nothing fits.
+                outerStyle.paddingTop = Math.min(
+                  targetRect.bottom + GAP,
+                  Math.max(GAP, vh - groupHEst - GAP),
+                );
+              } else if (mode === "above" && targetRect) {
+                outerStyle.alignItems = "flex-end";
+                outerStyle.paddingBottom = Math.min(
+                  vh - targetRect.top + GAP,
+                  Math.max(GAP, vh - groupHEst - GAP),
+                );
+              } else if (mode === "dock") {
+                outerStyle.alignItems = "flex-end";
+                outerStyle.paddingBottom = `calc(${BUBBLE_BOTTOM_INSET_MOBILE}px + env(safe-area-inset-bottom, 0px))`;
+              } else {
+                outerStyle.alignItems = "center";
+              }
+
+              return (
+                <div
+                  className="pointer-events-none fixed inset-0 z-[10010] flex justify-center"
+                  style={outerStyle}
+                >
+                  <motion.div
+                    key="mobile-tutorial"
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                    style={{
+                      width: "100%",
+                      maxWidth: 460,
+                      paddingLeft: BUBBLE_SIDE_INSET_MOBILE,
+                      paddingRight: BUBBLE_SIDE_INSET_MOBILE,
+                      pointerEvents: "none", // children opt in
+                    }}
+                  >
+                    {/* marginTop reserves the peek space above the bubble
+                        so the COMBINED group (Sparky + bubble) is what gets
+                        centered / hugged, not just the bubble. */}
+                    <div style={{ position: "relative", marginTop: sparkySize - 8 }}>
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: -(sparkySize - 8),
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          width: sparkySize,
+                          height: sparkySize,
+                          pointerEvents: "none",
+                          zIndex: 1,
+                        }}
+                      >
+                        <AnimatedSparky
+                          size={sparkySize}
+                          speech={activeSpeech}
+                          cheerTick={cheerTick}
+                          autoRoll={true}
+                          suppressRoll={suppressRoll}
+                          showSpeechBubble={false}
+                          ariaLabel="Sparky the tutorial mascot"
+                        />
+                      </div>
+                      {/* Full-width bubble. pointerEvents:none so it doesn't
+                          intercept clicks meant for the panel underneath —
+                          the primary action button re-enables its own hit
+                          area. Hidden when Sparky has nothing to say. */}
                       {hasBubbleContent && (
                         <div style={{ pointerEvents: "none" }}>
                           <TutorialSpeechBubble
                             text={stableText}
                             primaryAction={wrappedPrimary}
                             secondaryAction={secondaryAction}
-                            side={sparkyOnTop ? "top" : "bottom"}
+                            side="top"
                             fullWidth
                           />
                         </div>

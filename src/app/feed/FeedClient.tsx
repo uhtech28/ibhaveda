@@ -274,8 +274,10 @@ export function FeedClient() {
             setActiveContributeIdea(null);
             setContributionKeyboardOpen(false);
           }}
-          className="overflow-y-auto border-white/10 bg-[#111827] p-6 text-white"
-          style={{ maxHeight: contributionKeyboardOpen ? 'var(--app-vv-contribution-keyboard-height, min(82dvh, 27rem))' : 'var(--app-vv-contribution-height, min(78dvh, 34rem))' }}
+          className={`mobile-contribution-request-dialog ${
+            contributionKeyboardOpen ? "mobile-contribution-request-dialog--keyboard" : ""
+          } overflow-y-auto border-white/10 bg-[#111827] p-6 text-white`}
+          style={{ maxHeight: contributionKeyboardOpen ? 'var(--app-vv-contribution-keyboard-height, min(90dvh, 24.375rem))' : 'var(--app-vv-contribution-height, min(78dvh, 34rem))' }}
         >
           <div
             onFocus={(event) => {

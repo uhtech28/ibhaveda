@@ -56,10 +56,11 @@ export default function CommunityPage() {
   // Filter users based on search query
   const filteredUsers = React.useMemo(() => {
     if (!users) return [];
+    const activeUsers = users.filter((user) => user.username !== "uservjhhhh");
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return users;
+    if (!query) return activeUsers;
 
-    return users.filter((user) => {
+    return activeUsers.filter((user) => {
       const nameMatch = user.displayName.toLowerCase().includes(query);
       const usernameMatch = user.username.toLowerCase().includes(query);
       const bioMatch = user.bio?.toLowerCase().includes(query);
@@ -138,7 +139,7 @@ export default function CommunityPage() {
           </div>
 
           <LeaderboardErrorBoundary>
-            <WeeklyLeaderboard />
+            <LeaderboardSection />
           </LeaderboardErrorBoundary>
 
           {/* Users Grid */}
@@ -171,13 +172,45 @@ export default function CommunityPage() {
   );
 }
 
-// Weekly Leaderboard Component
-type LeaderboardUser = {
-  _id: string;
-  username: string;
-  displayName: string;
+// ─────────────────────────────────────────────────────────────────────
+// Weekly leaderboard — one podium UI shared by two boards:
+//   - Top Contributors: users ranked by trailing-7-day XP.
+//   - Top Projects:     ideas ranked by trailing-7-day XP.
+// A segmented toggle switches which query feeds the podium. Both boards
+// use the same unit (XP) so they read consistently side by side.
+// ─────────────────────────────────────────────────────────────────────
+
+// Normalized entry the podium renders, regardless of source entity.
+type PodiumEntry = {
+  key: string;
+  title: string;      // display name / project title
+  subtitle: string;   // @username / by Author
+  points: number;     // trailing-7-day XP
   avatar?: string | null;
-  points: number;
+  fallbackChar: string;   // initials shown when there's no avatar image
+  fallbackBg?: string;    // hex bg for the initials tile (projects have no photo)
+  href: string;
+};
+
+// Text-avatar helpers for entries without an image (projects don't have a
+// photo). Initials come from the title ("Skill Weaver" → "SW") and the tile
+// colour is hashed from the title, so each card gets a stable, distinct swatch.
+const AVATAR_BG_PALETTE = [
+  "#6366F1", "#10B981", "#F97316", "#06B6D4", "#EC4899",
+  "#8B5CF6", "#F59E0B", "#EF4444", "#14B8A6", "#3B82F6",
+];
+
+const initialsFromTitle = (title: string): string => {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
+const colorFromString = (s: string): string => {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+  return AVATAR_BG_PALETTE[Math.abs(hash) % AVATAR_BG_PALETTE.length];
 };
 
 const RANK_STYLES = {
@@ -204,7 +237,7 @@ const RANK_STYLES = {
   },
 } as const;
 
-const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user, rank }) => {
+const PodiumCard: React.FC<{ entry: PodiumEntry; rank: 1 | 2 | 3 }> = ({ entry, rank }) => {
   const styles = RANK_STYLES[rank];
   const isFirst = rank === 1;
   const heightClass = rank === 1 ? "md:min-h-[300px]" : rank === 2 ? "md:min-h-[240px]" : "md:min-h-[210px]";
@@ -228,33 +261,43 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
       </div>
 
       <Link
-        href={`/profile/${encodeURIComponent(user.username)}`}
+        href={entry.href}
         className="w-full flex flex-col items-center"
       >
-        <Avatar
-          className={`shadow-md border-4 ${styles.avatarRing} ${
-            isFirst ? "w-24 h-24 mb-4" : "w-16 h-16 mb-3"
+        <div
+          className={`grid place-items-center rounded-full border-4 shadow-md ${styles.avatarRing} ${
+            isFirst ? "w-24 h-24 mb-4 text-2xl" : "w-16 h-16 mb-3 text-lg"
           }`}
+          style={{ backgroundColor: entry.fallbackBg ?? undefined }}
+          aria-label={entry.title}
         >
-          <AvatarImage src={user.avatar ?? undefined} alt={user.displayName} />
-          <AvatarFallback className={`font-semibold bg-background ${isFirst ? "text-2xl" : "text-lg"}`}>
-            {user.displayName.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+          {entry.avatar ? (
+            <Avatar className="h-full w-full">
+              <AvatarImage src={entry.avatar} alt={entry.title} />
+              <AvatarFallback className="bg-background font-semibold">
+                {entry.fallbackChar}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <span className="font-bold text-white drop-shadow-sm">
+              {entry.fallbackChar}
+            </span>
+          )}
+        </div>
 
         <h3
           className={`font-bold text-foreground truncate w-full hover:text-primary transition-colors ${
             isFirst ? "text-xl" : "text-base"
           }`}
         >
-          {user.displayName}
+          {entry.title}
         </h3>
         <p
-          className={`text-muted-foreground ${
+          className={`text-muted-foreground truncate w-full ${
             isFirst ? "text-xs mb-4" : "text-[11px] mb-3"
           }`}
         >
-          @{user.username}
+          {entry.subtitle}
         </p>
 
         <div
@@ -263,7 +306,7 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
           }`}
         >
           <span className={`font-bold font-mono ${styles.pointsText} ${isFirst ? "text-base" : "text-sm"}`}>
-            {user.points}
+            {entry.points}
           </span>
           <span className={`text-muted-foreground font-medium uppercase tracking-wider ${isFirst ? "text-xs" : "text-[10px]"}`}>
             XP
@@ -274,48 +317,159 @@ const PodiumCard: React.FC<{ user: LeaderboardUser; rank: 1 | 2 | 3 }> = ({ user
   );
 };
 
-const WeeklyLeaderboard = () => {
+// Shared podium layout. `entries` is ordered rank 1, 2, 3; missing
+// trailing ranks (fewer than 3 competitors) render as empty columns.
+const Podium: React.FC<{ entries: PodiumEntry[] }> = ({ entries }) => {
+  const [first, second, third] = entries;
+
+  return (
+    // Podium grid.
+    // Mobile (grid-cols-1): cards stack in DOM order — rank 1, 2, 3.
+    // Desktop (md:grid-cols-3): podium layout via md:order-X — rank 2 on
+    // the left, rank 1 elevated in the center, rank 3 on the right.
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
+      {/* Rank 1 — first in DOM (top on mobile), centered + elevated on desktop */}
+      <div className="md:order-2">
+        {first && <PodiumCard entry={first} rank={1} />}
+      </div>
+
+      {/* Rank 2 — second in DOM, left column on desktop */}
+      <div className="md:order-1">
+        {second ? <PodiumCard entry={second} rank={2} /> : <div className="hidden md:block" />}
+      </div>
+
+      {/* Rank 3 — third in DOM, right column on desktop */}
+      <div className="md:order-3">
+        {third ? <PodiumCard entry={third} rank={3} /> : <div className="hidden md:block" />}
+      </div>
+    </div>
+  );
+};
+
+type BoardId = "contributors" | "projects";
+
+const BOARD_HEADINGS: Record<BoardId, string> = {
+  contributors: "Weekly Top Contributors",
+  projects: "Weekly Top Projects",
+};
+
+// Segmented toggle (styled like the app's other pill toggles) that
+// switches the active board.
+const BoardToggle: React.FC<{
+  value: BoardId;
+  onChange: (next: BoardId) => void;
+}> = ({ value, onChange }) => {
+  const options: Array<{ id: BoardId; label: string }> = [
+    { id: "contributors", label: "Top Contributors" },
+    { id: "projects", label: "Top Projects" },
+  ];
+
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/30 p-1">
+      {options.map((opt) => {
+        const active = opt.id === value;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onChange(opt.id)}
+            aria-pressed={active}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              active
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const LeaderboardSection = () => {
+  const [board, setBoard] = React.useState<BoardId>("contributors");
+
+  // Both queries run so switching boards is instant. Each defaults to
+  // its top 3 for the podium. `getWeeklyLeaderboard` ranks users by
+  // trailing-7-day XP; `getTopTeamLadder` ranks ideas by trailing-7-day
+  // XP (same unit — see convex/contributionRequests.ts).
   const topUsers = useQuery(api.leaderboard.getWeeklyLeaderboard, { limit: 3 });
+  const topProjects = useQuery(api.teamLeagues.getTopTeamLadder, {
+    limit: 3,
+    // Fill the podium from history when no project earned points in the
+    // last 7 days — matches the Top Contributors fallback so the board
+    // never renders empty when past activity exists.
+    fillToLimit: true,
+  });
 
-  if (topUsers === undefined) return null; // Loading silently
-  if (topUsers === null || topUsers.length === 0) return null; // No one earned points this week
+  const contributorEntries: PodiumEntry[] = React.useMemo(
+    () =>
+      (topUsers ?? []).map((u) => {
+        const username = u.username || "builder";
+        const title = u.displayName || username;
+        return {
+          key: u._id,
+          title,
+          subtitle: `@${username}`,
+          points: u.points ?? 0,
+          avatar: u.avatar ?? undefined,
+          fallbackChar: title.charAt(0).toUpperCase(),
+          href: `/profile/${encodeURIComponent(username)}`,
+        };
+      }),
+    [topUsers],
+  );
 
-  // topUsers[0] is rank 1, [1] is rank 2, [2] is rank 3 (per leaderboard ordering).
-  // Podium display order on screen: rank 2 (left) → rank 1 (center, elevated) → rank 3 (right).
-  const first = topUsers[0];
-  const second = topUsers[1];
-  const third = topUsers[2];
+  const projectEntries: PodiumEntry[] = React.useMemo(
+    () =>
+      (topProjects ?? []).map((p) => {
+        const title = p.title || "Untitled project";
+        return {
+          key: p.ideaId,
+          title,
+          subtitle: `by ${p.authorDisplayName || "Unknown builder"}`,
+          points: p.weeklyPoints ?? 0,
+          avatar: undefined,
+          fallbackChar: initialsFromTitle(title),
+          fallbackBg: colorFromString(title),
+          href: `/idea/${p.ideaId}`,
+        };
+      }),
+    [topProjects],
+  );
+
+  const isLoading =
+    board === "contributors" ? topUsers === undefined : topProjects === undefined;
+  const entries = board === "contributors" ? contributorEntries : projectEntries;
 
   return (
     <div className="mb-16">
-      <div className="flex items-center justify-center gap-3 mb-8">
-        <Trophy className="w-8 h-8 text-yellow-500" />
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
-          Weekly Top Contributors
-        </h2>
-        <Trophy className="w-8 h-8 text-yellow-500" />
+      <div className="flex flex-col items-center gap-6 mb-8">
+        <div className="flex items-center justify-center gap-3">
+          <Trophy className="w-8 h-8 text-yellow-500" />
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
+            {BOARD_HEADINGS[board]}
+          </h2>
+          <Trophy className="w-8 h-8 text-yellow-500" />
+        </div>
+        <BoardToggle value={board} onChange={setBoard} />
       </div>
 
-      {/* Podium grid.
-       * Mobile (grid-cols-1): cards stack in DOM order — rank 1, 2, 3.
-       * Desktop (md:grid-cols-3): podium layout via md:order-X — rank 2 on
-       * the left, rank 1 elevated in the center, rank 3 on the right. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto items-end">
-        {/* Rank 1 — first in DOM (top on mobile), centered + elevated on desktop */}
-        <div className="md:order-2">
-          {first && <PodiumCard user={first} rank={1} />}
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <Spinner />
         </div>
-
-        {/* Rank 2 — second in DOM, left column on desktop */}
-        <div className="md:order-1">
-          {second ? <PodiumCard user={second} rank={2} /> : <div className="hidden md:block" />}
-        </div>
-
-        {/* Rank 3 — third in DOM, right column on desktop */}
-        <div className="md:order-3">
-          {third ? <PodiumCard user={third} rank={3} /> : <div className="hidden md:block" />}
-        </div>
-      </div>
+      ) : entries.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-10">
+          {board === "contributors"
+            ? "No XP earned this week yet — be the first to make the podium."
+            : "No project earned XP this week yet — contribute to a project to put it on the board."}
+        </p>
+      ) : (
+        <Podium entries={entries} />
+      )}
     </div>
   );
 };
@@ -444,7 +598,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
                   onClick={(e) => e.stopPropagation()}
                   className="shrink-0 rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 transition-colors hover:border-purple-500/40 hover:bg-purple-500/20"
                 >
-                  +{hiddenIndustryCount}
+                  + {hiddenIndustryCount}
                 </Link>
               )}
             </>
@@ -469,7 +623,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, currentUserId, onTagClick }) 
                   onClick={(e) => e.stopPropagation()}
                   className="shrink-0 rounded-md border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-500/40 hover:bg-blue-500/20"
                 >
-                  +{hiddenSkillCount}
+                  + {hiddenSkillCount}
                 </Link>
               )}
             </>

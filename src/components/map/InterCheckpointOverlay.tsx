@@ -1156,35 +1156,35 @@ export function InterCheckpointOverlay({
               </p>
 
               {/* Feedbacks (XP, Corruption, etc.) */}
-              <div className="flex justify-center gap-4 w-full mb-6">
+              <div className="flex flex-wrap justify-center gap-2 sm:gap-4 w-full mb-6">
                 {resultData.xpEarned > 0 && (
                   <motion.div
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
-                    className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
+                    className="min-w-[8rem] flex-1 p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
                   >
                     <span className="text-xs text-white/50">Score</span>
-                    <span className="text-lg font-bold text-emerald-400 font-mono">+{resultData.xpEarned} Score</span>
+                    <span className="text-base sm:text-lg font-bold text-emerald-400 font-mono leading-tight">+{resultData.xpEarned} Score</span>
                   </motion.div>
                 )}
                 {resultData.corruptionReduction > 0 && (
                   <motion.div
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
-                    className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
+                    className="min-w-[8rem] flex-1 p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
                   >
                     <span className="text-xs text-white/50">Corruption Purged</span>
-                    <span className="text-lg font-bold text-purple-400 font-mono">-{resultData.corruptionReduction}%</span>
+                    <span className="text-base sm:text-lg font-bold text-purple-400 font-mono leading-tight">-{resultData.corruptionReduction}%</span>
                   </motion.div>
                 )}
                 {resultData.goldDeducted && (
                   <motion.div
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
-                    className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
+                    className="min-w-[8rem] flex-1 p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center"
                   >
                     <span className="text-xs text-white/50">Gold Spent</span>
-                    <span className="text-lg font-bold text-yellow-500 font-mono">-{resultData.goldDeducted} Gold</span>
+                    <span className="text-base sm:text-lg font-bold text-yellow-500 font-mono leading-tight">-{resultData.goldDeducted} Gold</span>
                   </motion.div>
                 )}
               </div>

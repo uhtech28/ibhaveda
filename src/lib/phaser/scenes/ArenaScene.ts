@@ -347,7 +347,7 @@ export class ArenaScene extends Phaser.Scene {
     const cp = CHECKPOINTS[this.currentIndex];
     if (!cp) return;
     this.movingBoss = spawnMovingBoss(this, 3, first, cp, {
-      showHpBar: true,
+      showHpBar: false,
     });
     this.movingBoss.cpIndex = this.currentIndex;
     // Face the character (persona spawns at CP top-left → left of boss)
