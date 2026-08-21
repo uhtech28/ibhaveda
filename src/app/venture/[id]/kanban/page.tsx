@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -64,12 +64,16 @@ function StandaloneKanban() {
 }
 
 export default function KanbanPage() {
+  // Next 15: KanbanTool (nested inside StandaloneKanban) calls useSearchParams,
+  // which must be inside a Suspense boundary during static prerender.
   return (
-    <VentureErrorBoundary
-      title="Failed to load Kanban board"
-      description="We couldn't load this project management tool."
-    >
-      <StandaloneKanban />
-    </VentureErrorBoundary>
+    <Suspense fallback={null}>
+      <VentureErrorBoundary
+        title="Failed to load Kanban board"
+        description="We couldn't load this project management tool."
+      >
+        <StandaloneKanban />
+      </VentureErrorBoundary>
+    </Suspense>
   );
 }
