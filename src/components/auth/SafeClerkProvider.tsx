@@ -1,38 +1,36 @@
 /**
  * @file SafeClerkProvider.tsx
- * @description Wrapper around @clerk/nextjs ClerkProvider that skips
- *   initialization entirely when NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not
- *   present in the environment. Children render as a plain fragment, so
- *   the build's static-prerender pass on any Clerk-touching page (feed,
- *   calendar, community, map, etc.) succeeds even without Clerk env.
+ * @description Wrapper around @clerk/nextjs ClerkProvider that supplies a
+ *   format-valid dummy publishableKey when NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ *   is missing (e.g. Aryan's CI). This lets the static-prerender pass
+ *   complete without throwing "Missing publishableKey" or "useUser can only
+ *   be used within <ClerkProvider>" errors on pages like /calendar, /feed,
+ *   /community that use Clerk hooks.
  *
- *   Vercel prod / any environment with the real key: identical behaviour
- *   to importing ClerkProvider directly. This is a pure passthrough there.
+ *   Vercel prod / any env with the real key: real key wins, behaviour is
+ *   identical to raw ClerkProvider.
  *
- *   Aryan's CI (no env): ClerkProvider is not mounted. Auth-dependent
- *   pages render placeholder UI (no useUser context), but the build
- *   completes. His deployed site will still throw at runtime unless he
- *   adds the env var — that's a config task, not something code can fix.
- *
- *   NOTE: this is a build-safety net, not a runtime workaround. Prod MUST
- *   set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` for the app to actually work.
+ *   The dummy key `pk_test_ZHVtbXktY2kuYnVpbGQk` decodes to `dummy-ci.build$`
+ *   which is Clerk's expected format (`base64url(<domain>$)` after the
+ *   `pk_test_` prefix). Clerk accepts it as syntactically valid but never
+ *   makes network calls during prerender, so the build succeeds. In a
+ *   deployment that runs this key at runtime, actual auth calls would fail
+ *   at the network layer — but that's the correct behaviour: deployments
+ *   must set the real env var to actually work.
  */
 
 import { ClerkProvider, type ClerkProviderProps } from "@clerk/nextjs";
 
+// base64url("dummy-ci.build$") — Clerk's expected format for pk_test_<data>
+const DUMMY_BUILD_KEY = "pk_test_ZHVtbXktY2kuYnVpbGQk";
+
 export function SafeClerkProvider({ children, ...rest }: ClerkProviderProps) {
-  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  if (!key) {
-    // CI/prerender fallback: no key, no ClerkProvider. Children render
-    // without auth context — that's fine for static prerender because
-    // Clerk hooks return undefined and pages usually gate on isLoaded.
-    if (typeof window === "undefined") {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[SafeClerkProvider] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY missing at prerender — Clerk skipped. Set the env var for the deployed environment to actually work.",
-      );
-    }
-    return <>{children}</>;
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || DUMMY_BUILD_KEY;
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && typeof window === "undefined") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[SafeClerkProvider] Using dummy publishableKey — NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set. Deployment auth will fail until real env is provided.",
+    );
   }
-  return <ClerkProvider {...rest}>{children}</ClerkProvider>;
+  return <ClerkProvider {...rest} publishableKey={key}>{children}</ClerkProvider>;
 }
