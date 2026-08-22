@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono, Sora } from "next/font/google";
-import { ClerkProvider } from '@clerk/nextjs';
+// CI FIX 2026-08-21: SafeClerkProvider skips Clerk entirely at prerender
+// when NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing (e.g. Aryan's CI). In
+// production/Vercel with env set, behaviour is identical to ClerkProvider.
+import { SafeClerkProvider as ClerkProvider } from '@/components/auth/SafeClerkProvider';
 
 // PERF: `export const dynamic = 'force-dynamic'` used to live here. It forced
 // EVERY route (including the marketing landing page) to be rendered per-request
