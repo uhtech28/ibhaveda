@@ -470,13 +470,16 @@ export function CorruptionViewportWash({
             critical 0.44 × 1.2 = 0.53  color + 0.44 × 3.2 = 1.00  pattern
           Sprites remain clear because multiply preserves bright
           luminance; only the map's mid-tones darken. */}
+      {/* LAYER 1 — Color tint. Bumped multiplier 1.2 → 1.8 for stronger
+          visible tint on bright biome maps (Sacred Grove, Ancient
+          Library, etc.) where multiply blend was washing out. */}
       <div
         role="presentation"
         aria-hidden
         className="pointer-events-none fixed inset-0"
         style={{
           zIndex,
-          opacity: Math.min(1, opacity * 1.2),
+          opacity: Math.min(1, opacity * 1.8),
           backgroundColor: profile.color,
           mixBlendMode: "multiply",
           maskImage,
@@ -485,7 +488,14 @@ export function CorruptionViewportWash({
           WebkitMaskComposite: maskComposite,
         }}
       />
-      {/* LAYER 2 — Pattern tile (crack / grid / vine / etc.). */}
+      {/* LAYER 2 — Pattern tile. Blend changed to `darken` so pattern
+          strokes read as dark ink on bright biome maps (Sacred Grove,
+          Ancient Library) where `multiply` was invisible. Darken =
+          min(pattern, map) per channel → stroke color wins wherever
+          it's darker than the map (~always for dark corruption
+          strokes), and the map wins on transparent tile pixels. Also
+          preserves persona/boss sprite luminance because bright sprite
+          pixels dominate the transparent tile regions. */}
       <div
         role="presentation"
         aria-hidden
@@ -497,7 +507,7 @@ export function CorruptionViewportWash({
           backgroundRepeat: "repeat",
           backgroundSize: `56px 56px`,
           imageRendering: "pixelated",
-          mixBlendMode: "multiply",
+          mixBlendMode: "darken",
           maskImage,
           WebkitMaskImage: maskImage,
           maskComposite,

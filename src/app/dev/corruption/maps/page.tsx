@@ -71,11 +71,11 @@ const MAP_ASSETS: Record<string, Record<number, { mapUrl: string; biomeName: str
 // 2026-08-22 pass 4: bumped baseline so template maps show visible
 // corruption on calm phase (was invisible on bright biomes).
 const PHASES = [
-  { key: "calm",         label: "Calm",         range: "0–24",   opacity: 0.22 },
-  { key: "creeping",     label: "Creeping",     range: "25–49",  opacity: 0.30 },
-  { key: "desaturated",  label: "Desaturated",  range: "50–74",  opacity: 0.40 },
-  { key: "urgent",       label: "Urgent",       range: "75–89",  opacity: 0.50 },
-  { key: "critical",     label: "Critical",     range: "90–100", opacity: 0.60 },
+  { key: "calm",         label: "Calm",         range: "0–24",   opacity: 0.35 },
+  { key: "creeping",     label: "Creeping",     range: "25–49",  opacity: 0.45 },
+  { key: "desaturated",  label: "Desaturated",  range: "50–74",  opacity: 0.55 },
+  { key: "urgent",       label: "Urgent",       range: "75–89",  opacity: 0.65 },
+  { key: "critical",     label: "Critical",     range: "90–100", opacity: 0.75 },
 ] as const;
 
 const TEMPLATE_ORDER: Array<{ id: "venture" | "academic" | "lab" | "creative"; label: string; accent: string }> = [

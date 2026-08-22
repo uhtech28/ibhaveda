@@ -2022,25 +2022,17 @@ function MapPageInner() {
   // below the `activeVentureId` declaration for the actual effect.
 
   // â”€â”€ Persona wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Fetch the user's chosen persona so Phaser boots with the correct
-  // spritesheet. `undefined` = query loading; `null` = signed-out or
-  // never set. In both loading-or-missing cases we treat the default
-  // ("arcanist") as ready, so the map still renders for guests.
-  const personaIdRaw = useQuery(api.users.getMyPersonaId, {});
-  const personaResolved = personaIdRaw !== undefined;
-  // All 8 personas now have full Pixellab extended spritesheets
-  // (arcanist/artisan/drifter/engineer/healer/oracle/pathfinder @92Ã—92,
-  // alchemist @88Ã—88). Use whichever the user picked; fall back to
-  // alchemist if they somehow got here without one set.
-  const chosenPersonaId: PersonaId = isValidPersonaId(personaIdRaw)
-    ? personaIdRaw
-    : "alchemist";
-  // Push the persona id into the module-level slot before Phaser boots.
-  // Doing this synchronously in render (not an effect) guarantees the
-  // scene's preload sees the right id on the first frame.
-  if (personaResolved) {
-    setCurrentPersonaId(chosenPersonaId);
-  }
+  // Fetch the current user's chosen persona. For viewer mode (viewing
+  // another builder's venture), the OWNER's persona is resolved further
+  // down the file — see the "Resolve FINAL persona BEFORE booting
+  // Phaser" block below the `activeVenture` + `currentUser` declarations.
+  //
+  // Query only — the FINAL persona (own vs. viewer-mode owner) can't be
+  // picked until `activeVenture` and `currentUser` are known, so
+  // `setCurrentPersonaId` is called further down (right before
+  // `useMapGame`). Calling it here first would let Phaser's preload race
+  // and pull the wrong spritesheet when viewing someone else's venture.
+  const myPersonaIdRaw = useQuery(api.users.getMyPersonaId, {});
   // useMapGame is called BELOW after `activeVenture` is memoized so
   // its templateId can be passed in â€” non-venture templates (academic
   // / lab / creative) skip the entire Village Phaser boot chain
@@ -2330,12 +2322,62 @@ function MapPageInner() {
     });
   }, [shouldShowBossIntro, activeVentureId, rerollSuperBoss]);
 
+  // ── Resolve FINAL persona BEFORE booting Phaser ─────────────────────
+  // Phaser's preload runs on the first frame after `useMapGame` fires,
+  // so the module-level persona slot must hold the RIGHT id (viewer's
+  // own OR — in viewer mode — the venture owner's) before we call it.
+  // Moving `currentUser` up here (was declared later) is the load-bearing
+  // change; everything else here is a fresh addition. Downstream reads
+  // of `currentUser` still work because they run in later hooks / JSX.
+  const currentUser = useQuery(api.users.getCurrentUser);
+
+  // Viewer mode: viewing someone else's venture — use owner's persona.
+  const isViewerMode =
+    !!activeVenture && !!currentUser?._id && activeVenture.userId !== currentUser._id;
+  const otherPersonaId = useQuery(
+    api.users.getPersonaIdForUser,
+    isViewerMode && activeVenture ? { userId: activeVenture.userId } : "skip",
+  );
+
+  // `ventureResolved`: we know for sure whether an active venture exists
+  // (and thus whether viewer mode applies). Without this we could
+  // transiently see activeVenture===null while ventureById is still
+  // in-flight and boot Phaser with the viewer's persona for a
+  // never-was-viewer-mode venture.
+  const ventureResolved =
+    ventures !== undefined &&
+    (!hasUrlVentureParam || ventureById !== undefined);
+
+  const finalPersonaRaw = isViewerMode ? otherPersonaId : myPersonaIdRaw;
+  const finalPersonaId: PersonaId = isValidPersonaId(finalPersonaRaw)
+    ? finalPersonaRaw
+    : "alchemist";
+
+  // personaReady: true only when the FINAL persona is guaranteed correct
+  // for the first Phaser boot. Blocks on:
+  //   • currentUser resolved (need identity to detect viewer mode)
+  //   • venture resolved (need to know which venture / whose it is)
+  //   • the correct persona source resolved (owner's or viewer's own)
+  const personaReady =
+    currentUser !== undefined &&
+    ventureResolved &&
+    (isViewerMode
+      ? otherPersonaId !== undefined
+      : myPersonaIdRaw !== undefined);
+
+  // Push the resolved persona id into the module-level slot before
+  // Phaser boots. Doing this in render (not an effect) guarantees the
+  // scene's preload sees the right id on the first frame.
+  if (personaReady) {
+    setCurrentPersonaId(finalPersonaId);
+  }
+
   // Boot Phaser now that we know the templateId. Non-venture templates
   // skip the entire Village boot chain and just flip phaserReady=true
   // so <TemplateMapPlaceholder> can paint the background-image map
   // instantly. See useMapGame in this file for details.
   const { containerRef, phaserReady, gameRef } = useMapGame(
-    personaResolved,
+    personaReady,
     (activeVenture?.templateId as string | undefined) ?? "venture",
   );
 
@@ -2354,40 +2396,17 @@ function MapPageInner() {
   );
   const activeConversationId = chatChannels?.[0]?._id;
 
-  // currentUser needed for level + streak + badge lookups
-  const currentUser = useQuery(api.users.getCurrentUser);
-
-  // â”€â”€ Viewer mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // If the loaded venture belongs to someone else (spectating a friend's
-  // map), we render THEIR persona and disable free-roam input + interact.
-  // Progress on the map still reflects the venture's checkpoints â€” that
-  // data is already scoped to `activeVentureId` in downstream queries.
-  const isViewerMode =
-    !!activeVenture && !!currentUser?._id && activeVenture.userId !== currentUser._id;
-  const otherPersonaId = useQuery(
-    api.users.getPersonaIdForUser,
-    isViewerMode && activeVenture ? { userId: activeVenture.userId } : "skip",
-  );
-  // Override the persona id AFTER the initial `setCurrentPersonaId` render
-  // pushed the viewer's own persona in. Runs each time viewer-mode flips.
+  // currentUser, isViewerMode, and otherPersonaId are declared above,
+  // before `useMapGame`, so Phaser's preload sees the correct persona.
+  // See the "Resolve FINAL persona BEFORE booting Phaser" block above.
+  //
+  // Sync the viewerMode flag into the Phaser game registry so scenes can
+  // read it (input gating, chat overlays, etc.). Persona itself is
+  // already set in render via setCurrentPersonaId(finalPersonaId), so
+  // this effect only mirrors the boolean into the game.
   useEffect(() => {
-    if (!isViewerMode) return;
-    if (otherPersonaId === undefined) return; // still loading
-    const effective: PersonaId = isValidPersonaId(otherPersonaId)
-      ? otherPersonaId
-      : "alchemist";
-    setCurrentPersonaId(effective);
-    // Push viewerMode into Phaser game registry so scenes can read it.
-    if (gameRef.current) {
-      gameRef.current.registry.set("viewerMode", true);
-    }
-  }, [isViewerMode, otherPersonaId, gameRef]);
-  // Clear viewer flag when navigating back to your own venture.
-  useEffect(() => {
-    if (isViewerMode) return;
-    if (gameRef.current) {
-      gameRef.current.registry.set("viewerMode", false);
-    }
+    if (!gameRef.current) return;
+    gameRef.current.registry.set("viewerMode", isViewerMode);
   }, [isViewerMode, gameRef]);
 
   const levelData = useQuery(
@@ -3185,15 +3204,19 @@ function MapPageInner() {
     const stageCps = checkpoints.filter((cp) => cp.stage === activeStage);
     const clearedIdx: number[] = [];
     stageCps.forEach((cp, idx) => {
-      const key = checkpointBossKey(cp.stage, cp.checkpoint);
-      if (bossDefeatedAtCheckpoint.has(key)) clearedIdx.push(idx);
+      // FIX 2026-08-23: match corruption-wash logic — only fade the
+      // Village fog around a CP when the CP is FULLY completed
+      // (cp.status === "completed"), not just when a combatRounds
+      // won-row exists. Tutorial-triggered combat was writing "won"
+      // rounds without task completion, prematurely clearing fog.
+      if (cp.status === "completed") clearedIdx.push(idx);
     });
     if (clearedIdx.length === 0) return;
     eventBridge.dispatchToPhaser({
       type: "FOG_CLEARED_CHECKPOINTS",
       clearedCpIndices: clearedIdx,
     });
-  }, [phaserReady, checkpoints, activeStage, bossDefeatedAtCheckpoint]);
+  }, [phaserReady, checkpoints, activeStage]);
 
   const startBossCombat = useCallback(
     (
@@ -6305,14 +6328,20 @@ function MapPageInner() {
             // ~7% coverage, invisible on bright biome maps like Ancient
             // Library. New baseline reaches parity with Village at calm
             // phase; critical is still dramatic without drowning the map.
+            // 2026-08-23 pass 5: bumped baseline further because
+            // multiply-blend color layer + previous multiplier was
+            // still washing out on bright biome maps (Sacred Grove).
+            // Combined with color ×1.8 and pattern using `darken`
+            // blend, calm phase now delivers a clearly visible
+            // atmospheric tint + ink pattern from the first CP.
             const opacityByPhase: Record<string, number> = {
-              calm: 0.22,
-              creeping: 0.30,
-              desaturated: 0.40,
-              urgent: 0.50,
-              critical: 0.60,
+              calm: 0.35,
+              creeping: 0.45,
+              desaturated: 0.55,
+              urgent: 0.65,
+              critical: 0.75,
             };
-            const op = opacityByPhase[corruptionPhase] ?? 0.30;
+            const op = opacityByPhase[corruptionPhase] ?? 0.45;
             // ── Per-CP cleared zones ──────────────────────────────
             // Product ask 2026-08-16: "when we complete 1 checkpoint
             // then till checkpoint 1 area corruption disappears".
@@ -6366,9 +6395,18 @@ function MapPageInner() {
               }));
             }
             // Match cleared status by CP index within stage.
+            // FIX 2026-08-23: previously only checked
+            // bossDefeatedAtCheckpoint (populated from combatRounds
+            // where status="won"). Tutorial-triggered AI combat could
+            // insert a "won" row without actually completing the CP's
+            // tasks — so the corruption cleared around CP1 before the
+            // user finished their required task submissions. Now we
+            // AND with cp.status === "completed" (server truth from
+            // the checkpoint doc — only true when 2/3 tasks are done
+            // AND the boss-combat-if-any resolved). Corruption only
+            // clears when the CP is fully done end-to-end.
             stageCps.forEach((cp, idx) => {
-              const key = checkpointBossKey(cp.stage, cp.checkpoint);
-              if (!bossDefeatedAtCheckpoint.has(key)) return;
+              if (cp.status !== "completed") return;
               const pos = normalized[idx];
               if (!pos) return;
               clearedZones.push({
