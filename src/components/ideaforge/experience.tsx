@@ -276,10 +276,12 @@ export function IdeaForgeExperience({
                     </section>
                   )}
                   <FilterTabs tabs={feedTabs} activeKey={feedTab} onChange={setFeedTab} />
-                  <FlareFeedSection
-                    limit={8}
-                    currentUserId={currentUser?._id ? (currentUser._id as Id<"users">) : null}
-                  />
+                  {/* Removed duplicate FlareFeedSection here (2026-08-22).
+                      The canonical FLARES mount is farther below at the
+                      top of the For You feed content (limit={30}). This
+                      one was rendering unconditionally under the tabs
+                      and causing two FLARES sections to stack on top of
+                      each other on the For You tab. */}
                 </>
               ) : (
                 <>

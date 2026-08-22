@@ -112,6 +112,25 @@ export function attachEditorTestWalk(
     const char = opts.getCharacter();
     if (!char) return;
 
+    // Viewer mode gate — matches VillageMapScene.update() behaviour.
+    // When the world/page.tsx has flipped `viewerMode` on in the game
+    // registry (spectating someone else's venture), freeze the persona
+    // and swap back to idle. Position updates are skipped so the sprite
+    // parks in place. This is what makes read-only viewer mode read as
+    // "you can't drive their character around their map".
+    //
+    // We DO NOT re-introduce the old "always-blocked" hack that broke
+    // owner movement (see TemplateMapScene comment history) — the gate
+    // is strictly viewer-mode, so owners are unaffected.
+    if (scene.registry?.get?.("viewerMode") === true) {
+      if (isWalking) {
+        if (scene.anims.exists(idleAnimKey)) char.play(idleAnimKey, true);
+        isWalking = false;
+        currentWalkKey = null;
+      }
+      return;
+    }
+
     const left = cursors.left?.isDown || wasd.A.isDown;
     const right = cursors.right?.isDown || wasd.D.isDown;
     const up = cursors.up?.isDown || wasd.W.isDown;

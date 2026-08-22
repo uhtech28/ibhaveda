@@ -27,11 +27,11 @@ import { CorruptionOverlayCanvas } from "@/components/corruption/CorruptionOverl
 // Keep this ladder in sync with map/world/page.tsx opacityByPhase.
 // Bumped 2026-08-16 to match the denser production wash.
 const PHASES = [
-  { key: "calm",         label: "Calm",         range: "0–24",   opacity: 0.07 },
-  { key: "creeping",     label: "Creeping",     range: "25–49",  opacity: 0.14 },
-  { key: "desaturated",  label: "Desaturated",  range: "50–74",  opacity: 0.24 },
-  { key: "urgent",       label: "Urgent",       range: "75–89",  opacity: 0.34 },
-  { key: "critical",     label: "Critical",     range: "90–100", opacity: 0.44 },
+  { key: "calm",         label: "Calm",         range: "0–24",   opacity: 0.22 },
+  { key: "creeping",     label: "Creeping",     range: "25–49",  opacity: 0.30 },
+  { key: "desaturated",  label: "Desaturated",  range: "50–74",  opacity: 0.40 },
+  { key: "urgent",       label: "Urgent",       range: "75–89",  opacity: 0.50 },
+  { key: "critical",     label: "Critical",     range: "90–100", opacity: 0.60 },
 ] as const;
 
 type SectionId = "super-pool" | "stage-bosses";

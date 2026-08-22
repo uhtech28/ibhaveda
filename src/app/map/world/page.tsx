@@ -230,6 +230,12 @@ interface Task {
   _taskId?: Id<"ventureTasks">;
   _convexCheckpointId?: Id<"ventureCheckpoints">;
   _taskLevel?: "t1" | "t2" | "t3";
+  /** Owner's submitted evidence content — only populated when the
+   *  caller has read privilege (owner / contributor / public-idea
+   *  viewer). Non-owners on private ventures always get null. */
+  _evidenceContent?: string | null;
+  _evidenceTool?: string | null;
+  _evidenceSubmittedAt?: number | null;
 }
 
 interface CheckpointDetail {
@@ -999,6 +1005,8 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
   totalCheckpointsInStage = 4,
   tourActive = false,
   ventureId,
+  readOnly = false,
+  privateForViewer = false,
 }: {
   detail: CheckpointDetail | null;
   onClose: () => void;
@@ -1013,6 +1021,13 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
   /** First-run product tour active. Relaxes the advance threshold so
    *  the user can fight the Doubt Imp after a single task submission. */
   tourActive?: boolean;
+  /** Viewer mode — non-owner spectating a public venture. Hides
+   *  interactive controls (task-toggle, Advance) and swaps completed
+   *  tasks to show read-only evidence content. */
+  readOnly?: boolean;
+  /** Viewer + venture idea is NOT public. Panel renders a
+   *  "This venture is private" message instead of task rows. */
+  privateForViewer?: boolean;
   evaluationSummary?: Array<{
     taskLevel: "t1" | "t2" | "t3";
     taskStatus: string;
@@ -1092,6 +1107,25 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
           </div>
 
           <div className="flex flex-col gap-3.5 px-5 py-5 sm:p-5 sm:pt-6 flex-1 overflow-y-auto no-scrollbar">
+            {/* Viewer-mode banner — shown at the top of the panel when
+                spectating someone else's venture. Two variants:
+                  - Private venture: message-only, task rows suppressed
+                  - Public venture: "Read-only" chip, task rows below
+                    render evidence content instead of the click-to-work
+                    interactive surface. */}
+            {readOnly && (
+              <div
+                className={`rounded-[10px] px-3 py-2 text-[11px] font-semibold ${
+                  privateForViewer
+                    ? "border border-amber-400/25 bg-amber-500/10 text-amber-200"
+                    : "border border-indigo-400/25 bg-indigo-500/10 text-indigo-200"
+                }`}
+              >
+                {privateForViewer
+                  ? "This venture is private — only the owner can see the task details."
+                  : "Read-only view — viewing another builder's venture."}
+              </div>
+            )}
             {/* Checkpoint Title + inline outcome â€” sized so single-line
                 CP names ("Pierce the Fog of Vagueness", "Chart the
                 Forest", etc.) fit on a single row inside the mobile
@@ -1113,7 +1147,9 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
               </p>
             </div>
 
-            {/* Tasks */}
+            {/* Tasks — suppressed entirely when viewing a private
+                venture we don't own (no evidence, no metadata). */}
+            {!privateForViewer && (
             <div
               className="flex flex-col gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3"
               data-tutorial="task-list"
@@ -1138,6 +1174,7 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                       task={task}
                       index={i}
                       locked={isLocked}
+                      readOnly={readOnly}
                       evaluationSummary={evaluationSummary?.find(
                         (entry) => entry.taskLevel === task._taskLevel,
                       )}
@@ -1154,11 +1191,14 @@ const CheckpointPanel = memo(function CheckpointPanelInner({
                 );
               })}
             </div>
+            )}
 
           </div>
 
-          {/* Advance + boss counter â€” shown on every unlocked checkpoint */}
-          {!isLocked && (
+          {/* Advance + boss counter â€” shown on every unlocked checkpoint.
+              Suppressed in read-only viewer mode so spectators can't
+              trigger boss combat / advance on the owner's venture. */}
+          {!isLocked && !readOnly && (
               <div className="p-2.5 sm:p-3 pt-0 flex flex-col gap-2">
                 {!isGold && canAdvance && (
                   <div className="flex items-center justify-between px-1 text-[11px] font-medium text-[#9CA3AF]">
@@ -1296,10 +1336,15 @@ const TaskCard = memo(function TaskCardInner({
   evaluationSummary,
   onToggle,
   onRedo,
+  readOnly = false,
 }: {
   task: Task;
   index?: number;
   locked: boolean;
+  /** Viewer mode — disables click-to-work, removes redo, and expands
+   *  a read-only evidence card underneath completed tasks so the
+   *  spectator can see what the owner actually submitted. */
+  readOnly?: boolean;
   evaluationSummary?: {
     taskStatus: string;
     isPending: boolean;
@@ -1321,12 +1366,12 @@ const TaskCard = memo(function TaskCardInner({
 
   return (
     <motion.div
-      onClick={locked ? undefined : task.done ? undefined : onToggle}
+      onClick={readOnly || locked ? undefined : task.done ? undefined : onToggle}
       onMouseEnter={() => {
-        if (!locked && !task.done) audioManager.playUI("hover");
+        if (!readOnly && !locked && !task.done) audioManager.playUI("hover");
       }}
-      whileHover={locked || task.done ? {} : { x: 4 }}
-      whileTap={locked || task.done ? {} : { scale: 0.98 }}
+      whileHover={readOnly || locked || task.done ? {} : { x: 4 }}
+      whileTap={readOnly || locked || task.done ? {} : { scale: 0.98 }}
       // Row visual language aligned with the platform's idea-card
       // action rows (see idea-cards.tsx line 372 area): 12-14px
       // border-radius, border-white/8, hover state uses the same
@@ -1416,8 +1461,8 @@ const TaskCard = memo(function TaskCardInner({
               })()}
             </p>
           </div>
-          {/* Redo button - always visible for completed tasks */}
-          {task.done && onRedo && !locked && (
+          {/* Redo button - always visible for completed tasks (owner only) */}
+          {task.done && onRedo && !locked && !readOnly && (
             <motion.button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1448,6 +1493,32 @@ const TaskCard = memo(function TaskCardInner({
         {/* Score badge (STANDARD Â· 8/12) hidden per user preference â€”
             keep evaluation data in state for combat logic but do not show
             the tier/score label on task cards. */}
+        {/* Read-only evidence block — spectator view of owner's
+            submission. Only rendered in viewer mode for a completed
+            task; owner's own panel keeps the click-to-work surface. */}
+        {readOnly && task.done && (
+          <div className="mt-2 rounded-[10px] border border-white/8 bg-white/[0.03] p-2.5">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/85">
+                Submitted evidence · read-only
+              </span>
+              {task._evidenceSubmittedAt ? (
+                <span className="text-[9px] text-slate-400">
+                  {new Date(task._evidenceSubmittedAt).toLocaleDateString()}
+                </span>
+              ) : null}
+            </div>
+            {task._evidenceContent ? (
+              <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-200 font-sans max-h-64 overflow-y-auto">
+                {task._evidenceContent}
+              </pre>
+            ) : (
+              <p className="text-[11px] italic text-slate-400">
+                Owner marked this complete without attaching a written submission.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -3493,6 +3564,18 @@ function MapPageInner() {
           _taskId: t._id,
           _convexCheckpointId: cp._id,
           _taskLevel: t.taskLevel,
+          _evidenceContent: (() => {
+            const ev = (t as unknown as { evidence?: { content?: unknown } | null }).evidence;
+            if (!ev || ev.content == null) return null;
+            if (typeof ev.content === "string") return ev.content;
+            try {
+              return JSON.stringify(ev.content, null, 2);
+            } catch {
+              return String(ev.content);
+            }
+          })(),
+          _evidenceTool: ((t as unknown as { evidence?: { toolType?: string } | null }).evidence?.toolType) ?? null,
+          _evidenceSubmittedAt: ((t as unknown as { evidence?: { _creationTime?: number } | null }).evidence?._creationTime) ?? null,
           };
         }),
       };
@@ -4246,13 +4329,17 @@ function MapPageInner() {
         const stageName =
           templateStages[Math.max(0, e.stage - 1)]?.name ??
           `Stage ${e.stage}`;
-        const stageNames =
-          tid === "venture"
-            ? ["Ideation", "Research", "Validation", "Offer Design",
-               "Build & Deliver", "Launch", "Iteration", "Scale"].slice(
-                 e.stage - 1, e.stage,
-               )
-            : [stageName];
+        // Per-stage cinematic label: use SETTING name from v4_final spec
+        // (e.g. "The Village") rather than function name (e.g. "Ideation").
+        // Mirror of STAGE_SETTING_NAMES defined lower in this file.
+        const _STAGE_SETTINGS: Record<string, readonly string[]> = {
+          venture: ["The Village", "The Forest", "The Arena", "The Artisan's Quarter", "The Mine", "The Harbour", "The Crossroads Town", "The Capital"],
+          academic: ["The Ancient Library", "The Ruins", "The Cartographer's Tower", "The Scriptorium", "The Council Chamber", "The Grand Archive"],
+          lab: ["The Observatory", "The Ancient Library", "The Cartographer's Tower", "The Forge", "The Alchemist's Laboratory", "The Crossroads Town", "The Grand Hall"],
+          creative: ["The Sacred Grove", "The Gallery of Echoes", "The Wilderness", "The Village Square", "The Artisan's Workshop", "The Harbour"],
+        };
+        const settingLabel = _STAGE_SETTINGS[tid]?.[e.stage - 1] ?? stageName;
+        const stageNames = [settingLabel];
         // Speech lines â€” reuse boss.introLine if present, otherwise a
         // family-flavoured generic call. Two lines maximum so the
         // cinematic keeps its pacing.
@@ -4685,6 +4772,11 @@ function MapPageInner() {
   const handleTaskToggle = useCallback(
     async (taskIdx: number) => {
       if (!selectedDetail) return;
+      // Viewer-mode short-circuit — spectators cannot submit tasks.
+      // Panel already suppresses the click surface via readOnly, but
+      // guarding here defends against E/Space keyboard shortcut or
+      // any programmatic caller.
+      if (isViewerMode) return;
       const task = selectedDetail.tasks[taskIdx];
       if (!task || task.done) return; // tasks can only be marked done, not undone
 
@@ -5114,6 +5206,10 @@ function MapPageInner() {
     fromBossVictory = false,
   ) => {
     if (!venture || isAdvancingCheckpoint) return;
+    // Viewer-mode short-circuit — spectators can't advance the owner's
+    // venture. Panel already hides the Advance button in read-only,
+    // this defends against boss-victory / programmatic callers.
+    if (isViewerMode) return;
 
     const cp = fromBossVictory && bossAdvanceCheckpointIdRef.current
       ? checkpoints.find((c) => c._id === bossAdvanceCheckpointIdRef.current)
@@ -5896,11 +5992,34 @@ function MapPageInner() {
         const bossPoolId = Array.isArray(venture?.assignedBosses)
           ? Number(venture.assignedBosses[0])
           : NaN;
-        const pool = SUPER_BOSS_POOL[Number.isFinite(bossPoolId) ? bossPoolId - 1 : -1];
-        // Fallback to component defaults (Unraveller) if pool entry
-        // isn't ready yet — avoids a null-render race on first mount.
+        // RANDOMIZATION FIX 2026-08-22: previously fell back to the
+        // component-default Unraveller when assignedBosses wasn't set,
+        // so every venture that hadn't been backfilled saw the same
+        // super. Now we derive a stable random pool entry from the
+        // ventureId (hash-based, so re-renders show the same super)
+        // when assignedBosses is missing — different ventures see
+        // different supers even before the Convex mutation writes
+        // assignedBosses. Follow-up: populate assignedBosses on
+        // venture creation so this fallback is never hit.
+        let pool = SUPER_BOSS_POOL[Number.isFinite(bossPoolId) ? bossPoolId - 1 : -1];
         if (!pool) {
-          return <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />;
+          // Same hash algorithm as convex/ventures.ts:625-631
+          // (ensureVentureStructure backfill) so the client-side render
+          // shows the SAME super the Convex mutation will eventually
+          // write to assignedBosses[0]. Prevents the "flash to a
+          // different boss after mutation completes" glitch.
+          const vid = String(venture?._id ?? "");
+          let seed = 0;
+          for (let i = 0; i < vid.length; i++) {
+            seed = (seed * 31 + vid.charCodeAt(i)) | 0;
+          }
+          const idx = ((seed % SUPER_BOSS_POOL.length) + SUPER_BOSS_POOL.length) % SUPER_BOSS_POOL.length;
+          pool = SUPER_BOSS_POOL[idx];
+          // If STILL null (empty pool — shouldn't happen), fall back to
+          // the raw component default so the intro at least renders.
+          if (!pool) {
+            return <BossIntroCinematic onDone={() => setBossIntroDismissed(true)} />;
+          }
         }
         // Prefer the idleClip (multi-frame spritesheet) over
         // idleAsset (single-frame image) — the super-pool Pixellab
@@ -5945,12 +6064,52 @@ function MapPageInner() {
           }
           return list;
         })();
-        const introStageNames: string[] =
-          tid === "venture"
-            ? ["Ideation", "Research", "Validation", "Offer Design"]
-            : templateStages
-                .slice(0, introMinis.length)
-                .map((s) => s.name ?? "");
+        // Setting/biome names from v4_final spec — every template stage
+        // has a canonical "Setting" name (e.g. "The Village") that reads
+        // as a place, not a function. Product ask 2026-08-23: intro
+        // strip should show setting names, not function names like
+        // "Ideation" / "Research". Full mapping per template below.
+        const STAGE_SETTING_NAMES: Record<string, readonly string[]> = {
+          venture: [
+            "The Village",
+            "The Forest",
+            "The Arena",
+            "The Artisan's Quarter",
+            "The Mine",
+            "The Harbour",
+            "The Crossroads Town",
+            "The Capital",
+          ],
+          academic: [
+            "The Ancient Library",
+            "The Ruins",
+            "The Cartographer's Tower",
+            "The Scriptorium",
+            "The Council Chamber",
+            "The Grand Archive",
+          ],
+          lab: [
+            "The Observatory",
+            "The Ancient Library",
+            "The Cartographer's Tower",
+            "The Forge",
+            "The Alchemist's Laboratory",
+            "The Crossroads Town",
+            "The Grand Hall",
+          ],
+          creative: [
+            "The Sacred Grove",
+            "The Gallery of Echoes",
+            "The Wilderness",
+            "The Village Square",
+            "The Artisan's Workshop",
+            "The Harbour",
+          ],
+        };
+        const settingNames = STAGE_SETTING_NAMES[tid] ?? [];
+        const introStageNames: string[] = settingNames
+          .slice(0, introMinis.length)
+          .map((s, i) => s || templateStages[i]?.name || "");
         // Count-agnostic taunt so it reads correctly for 1..4 minions.
         const minionCount = introMinis.length;
         const minionsLine =
@@ -6137,20 +6296,23 @@ function MapPageInner() {
               superProfile = null;
             }
             if (!stageProfile && !superProfile) return null;
-            // Opacity ladder — every phase gets a real wash so the
-            // corruption motif is visible from the start of a run
-            // and just gets denser as things go wrong. Calm (0-24)
-            // added 2026-08-16 with a subtle 0.07 baseline so fresh
-            // ventures still show their template's corruption
-            // pattern immediately.
+            // Opacity ladder — 2026-08-22 pass 4: baseline bumped from
+            // 0.07 → 0.22 for calm and proportionally across the ladder.
+            // User feedback: "I can see perfect corruption only on
+            // village map, other templates have very light thats not
+            // visible". Village uses Phaser fog cloud (108 blobs) which
+            // reads as ~50% coverage — the CSS wash at 0.07 baseline was
+            // ~7% coverage, invisible on bright biome maps like Ancient
+            // Library. New baseline reaches parity with Village at calm
+            // phase; critical is still dramatic without drowning the map.
             const opacityByPhase: Record<string, number> = {
-              calm: 0.07,
-              creeping: 0.14,
-              desaturated: 0.24,
-              urgent: 0.34,
-              critical: 0.44,
+              calm: 0.22,
+              creeping: 0.30,
+              desaturated: 0.40,
+              urgent: 0.50,
+              critical: 0.60,
             };
-            const op = opacityByPhase[corruptionPhase] ?? 0.15;
+            const op = opacityByPhase[corruptionPhase] ?? 0.30;
             // ── Per-CP cleared zones ──────────────────────────────
             // Product ask 2026-08-16: "when we complete 1 checkpoint
             // then till checkpoint 1 area corruption disappears".
@@ -6728,6 +6890,12 @@ function MapPageInner() {
                 onAdvance={handleAdvance}
                 onTaskToggle={handleTaskToggle}
                 onTaskRedo={handleTaskRedo}
+                readOnly={isViewerMode}
+                privateForViewer={
+                  isViewerMode &&
+                  (worldMapData?.isPrivateForViewer === true ||
+                    worldMapData?.viewerCanReadPrivate === false)
+                }
                 evaluationSummary={checkpointEvaluationSummary ?? undefined}
                 isAdvancing={isAdvancingCheckpoint}
                 activeStage={activeStage}

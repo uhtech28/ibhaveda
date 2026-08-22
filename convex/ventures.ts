@@ -1335,35 +1335,60 @@ export const getVenture = query({
       lastActivityAt: venture.lastActivityAt ?? venture.updatedAt,
     };
 
-    // PRIVACY GATE (2026-08-16) — determine whether the caller is the
-    // owner or an accepted contributor. Non-owners get the map-level
-    // venture metadata (checkpoint completion booleans, boss states,
-    // stage progress) but the private evidence.content field is
-    // stripped from every task below. That preserves the public
-    // "see the discs light up" experience while keeping the actual
-    // typed answers private to the team.
+    // PRIVACY GATE (2026-08-22 revision) — visibility model:
+    //   - Owner or accepted contributor → always canReadPrivate
+    //   - Non-owner + linked idea.visibility === "public" →
+    //     canReadPrivate (product ask: viewers on a public venture
+    //     should see the OWNER's submitted evidence for completed
+    //     checkpoints so the map reads as "real progress" instead
+    //     of empty discs)
+    //   - Non-owner + private/unlisted/no-idea → NOT canReadPrivate,
+    //     and we flag `isPrivateForViewer` so the UI can show a
+    //     "This venture is private" banner instead of empty task rows.
+    //
+    // Anonymous callers (no identity) fall through the try/catch to
+    // canReadPrivate=false — same as any signed-in non-owner.
     const identity = await ctx.auth.getUserIdentity();
     let canReadPrivate = false;
+    let isOwnerOrContributor = false;
+    const linkedIdea = venture.ideaId ? await ctx.db.get(venture.ideaId) : null;
+    const ideaVisibility = linkedIdea?.visibility ?? null;
     if (identity) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-        .first();
-      if (user) {
-        if (venture.userId === user._id) {
-          canReadPrivate = true;
-        } else if (venture.ideaId) {
-          const accepted = await ctx.db
-            .query("contributionRequests")
-            .withIndex("by_contributor_status", (q) =>
-              q.eq("contributorId", user._id).eq("status", "accepted"),
-            )
-            .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
-            .first();
-          if (accepted) canReadPrivate = true;
+      try {
+        const user = await ctx.db
+          .query("users")
+          .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+          .first();
+        if (user) {
+          if (venture.userId === user._id) {
+            canReadPrivate = true;
+            isOwnerOrContributor = true;
+          } else if (venture.ideaId) {
+            const accepted = await ctx.db
+              .query("contributionRequests")
+              .withIndex("by_contributor_status", (q) =>
+                q.eq("contributorId", user._id).eq("status", "accepted"),
+              )
+              .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
+              .first();
+            if (accepted) {
+              canReadPrivate = true;
+              isOwnerOrContributor = true;
+            }
+          }
         }
+      } catch {
+        // getUserByClerkId-style lookups can throw for freshly-created
+        // Clerk identities that haven't landed in the users table yet.
+        // Treat as anonymous non-owner rather than 500-ing the query.
       }
     }
+    // Public-idea exposure — non-owners get evidence for completed
+    // checkpoints as long as the idea itself is public.
+    if (!canReadPrivate && ideaVisibility === "public") {
+      canReadPrivate = true;
+    }
+    const isPrivateForViewer = !isOwnerOrContributor && ideaVisibility !== "public";
 
     const checkpoints = await ctx.db
       .query("ventureCheckpoints")
@@ -1462,6 +1487,11 @@ export const getVenture = query({
       stageStates,
       projectState,
       slainBosses: buildSlainBosses(enrichedBosses),
+      // Viewer-mode flags — React uses these to decide read-only UI
+      // and the "This venture is private" banner.
+      viewerCanReadPrivate: canReadPrivate,
+      isPrivateForViewer,
+      ideaVisibility,
     };
   },
 });
@@ -1785,32 +1815,42 @@ export const getCheckpoint = query({
     const checkpoint = await ctx.db.get(args.checkpointId);
     if (!checkpoint) return null;
 
-    // PRIVACY GATE (2026-08-16) — same policy as getVenture. Non-owners
-    // still see the checkpoint metadata (done flags, definition) so
-    // the CheckpointPanel renders correctly on other people's projects,
-    // but the actual `evidence.content` (typed answers) is stripped.
+    // PRIVACY GATE (2026-08-22 revision) — mirrors getVenture:
+    //   - Owner / contributor → canReadPrivate
+    //   - Public idea → non-owners also canReadPrivate (read-only)
+    //   - Private idea → non-owner sees metadata only, evidence null
     const venture = await ctx.db.get(checkpoint.ventureId);
+    const linkedIdea =
+      venture?.ideaId ? await ctx.db.get(venture.ideaId) : null;
+    const ideaVisibility = linkedIdea?.visibility ?? null;
     const identity = await ctx.auth.getUserIdentity();
     let canReadPrivate = false;
     if (identity && venture) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-        .first();
-      if (user) {
-        if (venture.userId === user._id) {
-          canReadPrivate = true;
-        } else if (venture.ideaId) {
-          const accepted = await ctx.db
-            .query("contributionRequests")
-            .withIndex("by_contributor_status", (q) =>
-              q.eq("contributorId", user._id).eq("status", "accepted"),
-            )
-            .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
-            .first();
-          if (accepted) canReadPrivate = true;
+      try {
+        const user = await ctx.db
+          .query("users")
+          .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+          .first();
+        if (user) {
+          if (venture.userId === user._id) {
+            canReadPrivate = true;
+          } else if (venture.ideaId) {
+            const accepted = await ctx.db
+              .query("contributionRequests")
+              .withIndex("by_contributor_status", (q) =>
+                q.eq("contributorId", user._id).eq("status", "accepted"),
+              )
+              .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
+              .first();
+            if (accepted) canReadPrivate = true;
+          }
         }
+      } catch {
+        // Same fallback as getVenture — freshly-signed-up identities.
       }
+    }
+    if (!canReadPrivate && ideaVisibility === "public") {
+      canReadPrivate = true;
     }
 
     const tasks = await ctx.db

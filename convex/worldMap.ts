@@ -808,6 +808,46 @@ export const getWorldMapData = query({
     // ── Idea title (venture name shown in HUD) ────────────────────────────────
     const idea = await ctx.db.get(venture.ideaId);
     const ideaTitle = idea?.title ?? "Unnamed Venture";
+    const ideaVisibility = idea?.visibility ?? null;
+
+    // ── Privacy gate — mirrors convex/ventures.ts:getVenture ───────────
+    // Non-owners viewing a PUBLIC idea's venture get read-only evidence
+    // for completed tasks (product ask 2026-08-22). Owners/contributors
+    // always get evidence. Non-owners on a private idea get nothing.
+    const identity = await ctx.auth.getUserIdentity();
+    let canReadPrivate = false;
+    let isOwnerOrContributor = false;
+    if (identity) {
+      try {
+        const user = await ctx.db
+          .query("users")
+          .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+          .first();
+        if (user) {
+          if (venture.userId === user._id) {
+            canReadPrivate = true;
+            isOwnerOrContributor = true;
+          } else if (venture.ideaId) {
+            const accepted = await ctx.db
+              .query("contributionRequests")
+              .withIndex("by_contributor_status", (q) =>
+                q.eq("contributorId", user._id).eq("status", "accepted"),
+              )
+              .filter((q) => q.eq(q.field("ideaId"), venture.ideaId))
+              .first();
+            if (accepted) {
+              canReadPrivate = true;
+              isOwnerOrContributor = true;
+            }
+          }
+        }
+      } catch {
+        // Freshly-created identity without a users row — treat anon.
+      }
+    }
+    if (!canReadPrivate && ideaVisibility === "public") canReadPrivate = true;
+    const isPrivateForViewer =
+      !isOwnerOrContributor && ideaVisibility !== "public";
 
     // ── Checkpoints ───────────────────────────────────────────────────────────
     const checkpoints = await ctx.db
@@ -891,6 +931,16 @@ export const getWorldMapData = query({
             prompt,
             taskTitle,
             taskSubheader,
+            // Placeholder — evidence hydration happens below in a
+            // separate batch so the map query stays a single pass over
+            // the tasks. Kept as `null` here so the type has a stable
+            // shape even for tasks with no submitted evidence.
+            evidence: null as null | {
+              _id: string;
+              content: unknown;
+              _creationTime?: number;
+              toolType?: string;
+            },
           };
         });
 
@@ -908,6 +958,53 @@ export const getWorldMapData = query({
         tasks,
       };
     });
+
+    // ── Evidence hydration ────────────────────────────────────────────
+    // Batch fetch evidence for tasks that have submitted answers, but
+    // only expose content when the caller is allowed to read private
+    // data. Non-owners on a private venture see `evidence: null` even
+    // for completed tasks — matches getVenture's stripping behaviour.
+    if (canReadPrivate) {
+      const evidenceIds = new Set<string>();
+      for (const cp of checkpointsWithTasks) {
+        for (const t of cp.tasks) {
+          const eid = (t as { evidenceId?: string }).evidenceId;
+          if (eid) evidenceIds.add(eid);
+        }
+      }
+      const evidenceMap = new Map<
+        string,
+        {
+          _id: string;
+          content: unknown;
+          _creationTime?: number;
+          toolType?: string;
+        }
+      >();
+      await Promise.all(
+        Array.from(evidenceIds).map(async (eid) => {
+          const doc = await ctx.db.get(
+            eid as unknown as Id<"ventureEvidence">,
+          );
+          if (doc) {
+            evidenceMap.set(eid, {
+              _id: doc._id as unknown as string,
+              content: (doc as { content?: unknown }).content ?? null,
+              _creationTime: (doc as { _creationTime?: number })._creationTime,
+              toolType: (doc as { toolType?: string }).toolType,
+            });
+          }
+        }),
+      );
+      for (const cp of checkpointsWithTasks) {
+        for (const t of cp.tasks) {
+          const eid = (t as { evidenceId?: string }).evidenceId;
+          if (eid && evidenceMap.has(eid)) {
+            (t as { evidence: unknown }).evidence = evidenceMap.get(eid)!;
+          }
+        }
+      }
+    }
 
     // ── Brightness ────────────────────────────────────────────────────────────
     const templateId = (venture.templateId ?? "venture") as TemplateId;
@@ -931,6 +1028,11 @@ export const getWorldMapData = query({
       superBoss,
       stageStates,
       projectState,
+      // Viewer-mode metadata — React uses these to enter read-only
+      // mode + show the "This venture is private" banner.
+      viewerCanReadPrivate: canReadPrivate,
+      isPrivateForViewer,
+      ideaVisibility,
     };
   },
 });

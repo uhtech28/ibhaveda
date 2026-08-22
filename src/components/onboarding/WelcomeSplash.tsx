@@ -37,7 +37,16 @@ interface Props {
   onDone: () => void;
 }
 
-const VIDEO_SRC = "/assets/videos/welcome-intro.mp4";
+// Video sources — two variants keyed by device orientation. The mobile
+// variant (720x1280 portrait) shows the arched-portal shot; the desktop
+// variant (1280x720 landscape) shows the throne room. Both are Gemini
+// watermark-stripped via ffmpeg `delogo`. Legacy welcome-intro.mp4 kept
+// as a final fallback for cases where neither variant loads.
+const VIDEO_SRC_DESKTOP_MP4 = "/assets/videos/welcome-intro-desktop.mp4";
+const VIDEO_SRC_DESKTOP_WEBM = "/assets/videos/welcome-intro-desktop.webm";
+const VIDEO_SRC_MOBILE_MP4 = "/assets/videos/welcome-intro-mobile.mp4";
+const VIDEO_SRC_MOBILE_WEBM = "/assets/videos/welcome-intro-mobile.webm";
+const VIDEO_SRC_FALLBACK = "/assets/videos/welcome-intro.mp4";
 
 /** Hard upper bound — only kicks in if the video never loads AND
  *  never fires `onError` (offline dev, blocked domain, whatever).
@@ -49,8 +58,30 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
   void _unused; // silence unused-var lint without changing the API
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [ended, setEnded] = useState(false);
+  // Device orientation — mounted at "desktop" default (matches SSR),
+  // flipped to true inside effect if the viewport is portrait / narrow.
+  // Prevents SSR/hydration mismatch (server can't know viewport size).
+  const [isMobile, setIsMobile] = useState(false);
   const doneRef = useRef(false);
   const safetyTimerRef = useRef<number | null>(null);
+
+  // Pick the video variant based on viewport orientation. Portrait or
+  // narrow (<= 768px) → mobile clip (720x1280); everything else → the
+  // desktop clip (1280x720). Detected client-side to avoid SSR mismatch.
+  useEffect(() => {
+    const detect = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setIsMobile(w <= 768 || h > w);
+    };
+    detect();
+    window.addEventListener("resize", detect);
+    window.addEventListener("orientationchange", detect);
+    return () => {
+      window.removeEventListener("resize", detect);
+      window.removeEventListener("orientationchange", detect);
+    };
+  }, []);
 
   // Wrap onDone in a fire-once guard so a rapid keyboard-and-click
   // combo can't fire twice (would cause a double router.replace on
@@ -129,8 +160,11 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
     >
       <video
         ref={videoRef}
+        // `key` forces React to fully remount the <video> element when
+        // orientation flips, so the browser reads the new <source> set
+        // instead of continuing with the previously-loaded stream.
+        key={isMobile ? "mobile" : "desktop"}
         className="welcome-video"
-        src={VIDEO_SRC}
         autoPlay
         muted
         playsInline
@@ -163,7 +197,25 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
         // black splash. The safety-valve timer above catches slower
         // stalls too.
         onError={() => fireDone()}
-      />
+      >
+        {/* Device-appropriate variant loads first (WebM preferred for
+            smaller size in Chrome/Firefox; MP4 fallback for Safari).
+            Fallback path is the legacy welcome-intro.mp4 if variants
+            fail to load. All variants are watermark-stripped via
+            ffmpeg delogo. */}
+        {isMobile ? (
+          <>
+            <source src={VIDEO_SRC_MOBILE_WEBM} type="video/webm" />
+            <source src={VIDEO_SRC_MOBILE_MP4} type="video/mp4" />
+          </>
+        ) : (
+          <>
+            <source src={VIDEO_SRC_DESKTOP_WEBM} type="video/webm" />
+            <source src={VIDEO_SRC_DESKTOP_MP4} type="video/mp4" />
+          </>
+        )}
+        <source src={VIDEO_SRC_FALLBACK} type="video/mp4" />
+      </video>
 
       {/* Product ask: no separate "Tap to continue" button. Once the
           video ends, the whole splash (which includes the baked-in red
@@ -186,19 +238,16 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
         .welcome-video {
           width: 100%;
           height: 100%;
-          /* Desktop / landscape: show the whole frame, no crop. */
-          object-fit: contain;
+          /* Full-screen coverage on every device — product ask
+             2026-08-22: video must cover the whole viewport with no
+             letterbox bars. cover=fill viewport, crop overflow. Since
+             we ship a desktop-aspect (16:9) clip AND a mobile-aspect
+             (9:16) clip, the device-appropriate variant matches the
+             viewport aspect closely and crop is minimal. */
+          object-fit: cover;
           object-position: center;
           background: #000;
           display: block;
-        }
-        /* Mobile / portrait viewports: keep the whole authored frame
-           visible. The final artwork has important text near both
-           side edges, so letterboxing is preferable to a 9:16 crop. */
-        @media (max-aspect-ratio: 1/1) {
-          .welcome-video {
-            object-fit: contain;
-          }
         }
       `}</style>
     </div>
