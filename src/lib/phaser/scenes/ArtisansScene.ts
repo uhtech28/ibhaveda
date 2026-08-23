@@ -17,6 +17,7 @@ import { attachTimeOfDay, type TimeOfDayController } from "../utils/time-of-day"
 import { attachAmbientVFX, type AmbientVFXController } from "../utils/ambient-vfx";
 import { playCpClearBurst } from "../utils/cp-clear-burst";
 import { CorruptionOverlay } from "@/lib/phaser/systems/corruptionOverlay";
+import { attachCorruptionMapTintWithBridge } from "@/lib/phaser/systems/corruptionMapTint";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
 import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
@@ -249,6 +250,18 @@ export class ArtisansScene extends Phaser.Scene {
 
   create(): void {
     this.add.image(0, 0, "artisans-composite").setOrigin(0, 0).setDepth(0);
+
+    // In-scene corruption tint (color + pattern). Painted between the
+    // map (depth 0) and sprites (persona/boss/CP disc >=50) so it
+    // never washes the character sprites. Driven by CORRUPTION_STATE
+    // events from map/world/page.tsx; auto-cleans on scene shutdown.
+    attachCorruptionMapTintWithBridge(this, {
+      profile: null,
+      opacity: 0,
+      mapWidth: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+      spriteDepth: 50,
+    });
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);

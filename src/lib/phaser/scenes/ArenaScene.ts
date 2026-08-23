@@ -28,6 +28,7 @@ import { playCpClearBurst } from "../utils/cp-clear-burst";
 // helpers (ensureCorruptionPattern / motifForStage / OverlayCheckpoint)
 // were used by the now-removed `new CorruptionOverlay(...)` block.
 import { CorruptionOverlay } from "@/lib/phaser/systems/corruptionOverlay";
+import { attachCorruptionMapTintWithBridge } from "@/lib/phaser/systems/corruptionMapTint";
 import type { CheckpointState } from "@/lib/phaser/utils/event-bridge";
 import { attachZoneEditor, type Rect as ZoneRect } from "@/lib/phaser/systems/zoneEditor";
 import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
@@ -173,6 +174,20 @@ export class ArenaScene extends Phaser.Scene {
 
   create(): void {
     this.add.image(0, 0, "arena-composite").setOrigin(0, 0).setDepth(0);
+
+    // In-scene corruption tint (color + pattern), painted BETWEEN the
+    // map (depth 0) and every sprite (persona/boss/CP disc >=50).
+    // Replaces the old React CorruptionViewportWash which washed the
+    // persona/boss sprites with a CSS blend. Driven by
+    // CORRUPTION_STATE events from map/world/page.tsx. Auto-cleans on
+    // scene shutdown via the withBridge helper.
+    attachCorruptionMapTintWithBridge(this, {
+      profile: null,
+      opacity: 0,
+      mapWidth: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+      spriteDepth: 50,
+    });
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);

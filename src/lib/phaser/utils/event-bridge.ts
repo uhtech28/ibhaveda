@@ -194,7 +194,46 @@ export type ReactToPhaserEvent =
    * next stage (Forest of Perfectionism) for a few seconds before
    * settling back to the map centre.
    */
-  | { type: "PREVIEW_NEXT_STAGE"; stage: number };
+  | { type: "PREVIEW_NEXT_STAGE"; stage: number }
+  /**
+   * Push the current corruption tint state into the active Phaser map
+   * scene so it can paint an IN-SCENE full-map tint (color + pattern
+   * layer) between the map tiles and the sprites. Replaces the old
+   * React-side full-viewport `CorruptionViewportWash` overlay which
+   * covered persona/boss sprites with a CSS blend and washed out
+   * their color.
+   *
+   *   - `profile` carries the boss corruption `color` + `pattern` id
+   *     (from `bossCorruptionProfiles.ts`). `null` clears the tint.
+   *   - `opacity` is the phase-scaled intensity 0..1 (calm..critical).
+   *   - `clearedZones` are the per-CP cleared radial holes (0..1
+   *     normalized map coords + radius in map pixels). v1 helper
+   *     stores but does not yet punch them out (defer).
+   *
+   * Emitted from `src/app/map/world/page.tsx` whenever the boss
+   * profile / corruption phase / cleared-CP set changes. Every stage
+   * scene except VillageMapScene (which owns a bespoke Phaser fog
+   * cloud) subscribes and forwards the payload to its
+   * `corruption-map-tint` helper.
+   */
+  | {
+      type: "CORRUPTION_STATE";
+      profile: {
+        slug: string;
+        label: string;
+        pattern: string;
+        color: string;
+      } | null;
+      opacity: number;
+      clearedZones?: readonly {
+        /** Map-space X, 0..1 normalized. */
+        xNorm: number;
+        /** Map-space Y, 0..1 normalized. */
+        yNorm: number;
+        /** Radius in pixels of the SHORTER map dimension. */
+        radiusNorm: number;
+      }[];
+    };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phaser → React events

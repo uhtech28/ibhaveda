@@ -31,6 +31,10 @@ import { eventBridge } from "../utils/event-bridge";
 import { attachEditorTestWalk } from "@/lib/phaser/systems/editorTestWalk";
 import { getResponsiveZoom } from "@/lib/phaser/utils/responsive-zoom";
 import {
+  attachCorruptionMapTint,
+  type CorruptionMapTintHandle,
+} from "@/lib/phaser/systems/corruptionMapTint";
+import {
   getCurrentPersonaId,
   loadPersonaSprites,
   registerPersonaAnimations,
@@ -191,6 +195,12 @@ export class TemplateMapScene extends Phaser.Scene {
   private checkpoints: ReadonlyArray<{ x: number; y: number; label: string }> = [];
   private currentIndex = 0;
   private checkpointNodes: Phaser.GameObjects.Arc[] = [];
+  /** In-scene corruption tint (color + pattern) — replaces the old
+   *  React CorruptionViewportWash which painted OVER the persona/boss
+   *  sprites. Populated in create() and driven by CORRUPTION_STATE
+   *  events dispatched from the map/world page. */
+  private corruptionTint: CorruptionMapTintHandle | null = null;
+  private corruptionUnsub: (() => void) | null = null;
 
   constructor() {
     super({ key: "TemplateMapScene" });
@@ -276,6 +286,43 @@ export class TemplateMapScene extends Phaser.Scene {
 
     // Map backdrop — pinned to (0,0) with origin top-left.
     this.add.image(0, 0, mapKey).setOrigin(0, 0).setDepth(0);
+
+    // In-scene corruption tint (color + pattern). Sits between the
+    // map (depth 0) and every sprite (persona 100, boss 60, CP disc
+    // 50). Starts hidden — the map page pushes the real profile +
+    // opacity via a CORRUPTION_STATE event once the venture data
+    // resolves. See shutdown() for the unsubscribe path.
+    this.corruptionTint = attachCorruptionMapTint(this, {
+      profile: null,
+      opacity: 0,
+      mapWidth,
+      mapHeight,
+      spriteDepth: 50,
+    });
+    this.corruptionUnsub = eventBridge.onPhaser(
+      "CORRUPTION_STATE",
+      (evt: {
+        profile: {
+          slug: string;
+          label: string;
+          pattern: string;
+          color: string;
+        } | null;
+        opacity: number;
+        clearedZones?: readonly {
+          xNorm: number;
+          yNorm: number;
+          radiusNorm: number;
+        }[];
+      }) => {
+        if (!this.corruptionTint) return;
+        this.corruptionTint.setProfile(evt.profile);
+        this.corruptionTint.update(evt.opacity);
+        if (evt.clearedZones) {
+          this.corruptionTint.setClearedZones(evt.clearedZones);
+        }
+      },
+    );
 
     // Camera — mirrors Village: responsive zoom, bounds set to ACTUAL
     // painted map size so follow-cam can't scroll past the image edge.
@@ -529,5 +576,11 @@ export class TemplateMapScene extends Phaser.Scene {
   shutdown(): void {
     this.tweens.killAll();
     this.input.removeAllListeners();
+    if (this.corruptionUnsub) {
+      this.corruptionUnsub();
+      this.corruptionUnsub = null;
+    }
+    this.corruptionTint?.destroy();
+    this.corruptionTint = null;
   }
 }

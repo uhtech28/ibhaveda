@@ -4530,6 +4530,119 @@ function MapPageInner() {
     });
   }, [phaserReady, venture?._id, corruptionLevel]);
 
+  // ── In-scene corruption tint (color + pattern) ──────────────────
+  // Replaces the old CSS `CorruptionViewportWash` — that component
+  // painted TWO full-viewport <div>s over the Phaser canvas with
+  // `mix-blend-mode` set to `color`/`darken`, which washed the
+  // persona and boss sprites along with the map (user feedback:
+  // "the color fade is covering the persona and boss instead of
+  // keeping their original color").  Now we push the resolved
+  // profile + opacity + cleared-CP set into whichever stage scene
+  // is live via a CORRUPTION_STATE bridge event; each scene paints
+  // the tint IN-SCENE between the map tiles and its sprites so
+  // sprites keep their native color.
+  //
+  // VillageMapScene deliberately does NOT subscribe — it owns a
+  // bespoke Phaser fog cloud the product likes.  Dispatching to it
+  // is a no-op (no listener registered).
+  useEffect(() => {
+    if (!phaserReady || !venture) return;
+    const tid = (venture.templateId ?? "venture") as string;
+
+    // Village stage 1 runs a hand-crafted Phaser fog cloud instead
+    // of the generic tint — mirror the old wash logic that skipped
+    // painting on that combo so nothing double-stacks.
+    const hasReplacementFogLayer = tid === "venture" && activeStage === 1;
+
+    let stageProfile = getStageCorruptionProfile(tid, activeStage);
+    if (hasReplacementFogLayer && stageProfile?.pattern === "blob") {
+      stageProfile = null;
+    }
+
+    // Super-boss profile ambient layer — not yet a first-class
+    // second layer in the Phaser tint (the tint helper paints ONE
+    // profile). We prefer the stage profile as the dominant read
+    // and fall back to the super-boss profile only if stage-lookup
+    // has no entry, so most maps still show the per-stage tint.
+    let superProfile: ReturnType<typeof getSuperBossCorruptionProfile> | null = null;
+    const raw = Array.isArray(venture.assignedBosses)
+      ? venture.assignedBosses[0]
+      : null;
+    const bossId = typeof raw === "number" ? raw : Number(raw);
+    if (
+      Number.isFinite(bossId) &&
+      bossId >= 1 &&
+      bossId <= SUPER_BOSS_POOL.length
+    ) {
+      const poolEntry = SUPER_BOSS_POOL[bossId - 1];
+      const superSlug = poolEntry?.id?.replace(/^super_/, "") ?? "";
+      const normalized = superSlug.replace(/_/g, "-");
+      superProfile = getSuperBossCorruptionProfile(normalized);
+    }
+
+    const chosen = stageProfile ?? superProfile;
+
+    const opacityByPhase: Record<string, number> = {
+      calm: 0.35,
+      creeping: 0.45,
+      desaturated: 0.55,
+      urgent: 0.65,
+      critical: 0.75,
+    };
+    const op = opacityByPhase[corruptionPhase] ?? 0.45;
+
+    // Cleared zones — normalized to 0..1 in map space. v1 of the
+    // Phaser helper stores them but doesn't yet punch out radial
+    // holes (see TODO in corruptionMapTint.ts). We still compute +
+    // dispatch them so the mask implementation lands without a
+    // re-wire pass later.
+    const clearedZones: { xNorm: number; yNorm: number; radiusNorm: number }[] = [];
+    const stageCps = checkpoints.filter((cp) => cp.stage === activeStage);
+    let normalized: Array<{ x: number; y: number }> = [];
+    if (tid === "venture" && activeStage === 1) {
+      const MW = 1536;
+      const MH = 1024;
+      const VILLAGE_CPS: Array<{ x: number; y: number }> = [
+        { x: 173, y: 215 },
+        { x: 587, y: 633 },
+        { x: 1177, y: 662 },
+        { x: 1304, y: 325 },
+      ];
+      normalized = VILLAGE_CPS.map((p) => ({ x: p.x / MW, y: p.y / MH }));
+    } else {
+      const layout = generateCheckpointLayout(1600, 1200, stageCps.length);
+      normalized = layout.map((p) => ({ x: p.x / 1600, y: p.y / 1200 }));
+    }
+    stageCps.forEach((cp, idx) => {
+      if (cp.status !== "completed") return;
+      const pos = normalized[idx];
+      if (!pos) return;
+      clearedZones.push({ xNorm: pos.x, yNorm: pos.y, radiusNorm: 0.14 });
+    });
+
+    eventBridge.dispatchToPhaser({
+      type: "CORRUPTION_STATE",
+      profile: chosen
+        ? {
+            slug: chosen.slug,
+            label: chosen.label,
+            pattern: chosen.pattern,
+            color: chosen.color,
+          }
+        : null,
+      opacity: chosen ? op : 0,
+      clearedZones,
+    });
+  }, [
+    phaserReady,
+    venture?._id,
+    venture?.templateId,
+    venture?.assignedBosses,
+    activeStage,
+    corruptionPhase,
+    checkpoints,
+  ]);
+
   // â”€â”€ Assigned pool super-boss â†’ VillageMapScene reveal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Venture creation writes a random pool boss id (1..12) to
   // `venture.assignedBosses[0]` (see convex/ventures.ts:createVentureForUser).
@@ -6246,14 +6359,16 @@ function MapPageInner() {
             />
           )}
 
-          {/* Boss-specific corruption viewport wash (client spec 2026-08-14).
-              Uses the CURRENT stage's boss profile (pattern + tint) from
-              bossCorruptionProfiles so different templates + different
-              stages surface a visually distinct corruption motif.
-              Opacity scales with the phase — creeping is subtle, urgent
-              and critical are stronger. Kept below the critical red-ring
-              (z-[13]) so both signals stack legibly. */}
-          {(() => {
+          {/* Corruption tint moved INTO Phaser (2026-08-23). See the
+              `CORRUPTION_STATE` effect above — it dispatches profile +
+              opacity + cleared zones to whichever stage scene is live
+              via the event bridge, and each scene paints the tint in
+              its own render pipeline BETWEEN the map and the sprites
+              (persona/boss stay at native color). Full history preserved
+              in git; the CSS `CorruptionViewportWash` component in
+              `src/components/corruption/CorruptionOverlayCanvas.tsx`
+              remains for the dev-page tile HUD variants. */}
+          {false && (() => {
             if (!venture) return null;
             // Product ask 2026-08-16: "make sure corruption model is
             // on every map". Previously we returned null on Calm

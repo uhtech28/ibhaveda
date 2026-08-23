@@ -292,7 +292,19 @@ function drawBlock(ctx: CanvasRenderingContext2D, color: string, bg: string) {
   }
 }
 
-function paintPattern(
+/** LOGICAL_SIZE is the internal resolution every drawer targets — kept
+ *  identical to the client's reference HTML so the procedural randomness
+ *  matches visually. Exported so callers that build a full tile via
+ *  {@link paintPattern} on their own offscreen canvas (e.g. the Phaser
+ *  corruption-map-tint helper) know how big to make the canvas. */
+export const CORRUPTION_TILE_LOGICAL_SIZE = LOGICAL_SIZE;
+
+/** Framework-agnostic pattern painter — paints ONE full
+ *  LOGICAL_SIZE × LOGICAL_SIZE tile of the given `pattern` in the
+ *  given color over `bg`. Safe to call from React (see
+ *  {@link CorruptionOverlayCanvas}) OR from any other canvas context
+ *  (see Phaser corruption-map-tint helper for the map-scene port). */
+export function paintPattern(
   ctx: CanvasRenderingContext2D,
   pattern: CorruptionPattern,
   color: string,
