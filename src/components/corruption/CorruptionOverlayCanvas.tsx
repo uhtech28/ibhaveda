@@ -470,6 +470,32 @@ export function CorruptionViewportWash({
             critical 0.44 × 1.2 = 0.53  color + 0.44 × 3.2 = 1.00  pattern
           Sprites remain clear because multiply preserves bright
           luminance; only the map's mid-tones darken. */}
+      {/* LAYER 0 — Atmospheric "corruption fog" via backdrop-filter.
+          2026-08-23 pass 6: multiply-blend color + darken-blend pattern
+          still read as invisible on bright biome maps because pattern
+          generators draw sparse strokes on transparent bg (~30% pixel
+          coverage) and multiply preserves map brightness. Real Village
+          fog succeeds by physically dimming and desaturating the map.
+          This layer replicates that atmosphere with a backdrop-filter
+          that DIRECTLY desaturates + darkens the actual map pixels
+          behind the wash. Effect scales with `opacity`: calm = mild,
+          critical = heavy. Sprites (persona, boss) will also darken
+          slightly but this matches the "corruption is real, it dims
+          the world" narrative Village fog delivers. */}
+      <div
+        role="presentation"
+        aria-hidden
+        className="pointer-events-none fixed inset-0"
+        style={{
+          zIndex: zIndex - 0.001,
+          backdropFilter: `saturate(${Math.max(0.15, 1 - opacity * 1.1)}) brightness(${Math.max(0.55, 1 - opacity * 0.45)}) contrast(${1 + opacity * 0.2})`,
+          WebkitBackdropFilter: `saturate(${Math.max(0.15, 1 - opacity * 1.1)}) brightness(${Math.max(0.55, 1 - opacity * 0.45)}) contrast(${1 + opacity * 0.2})`,
+          maskImage,
+          WebkitMaskImage: maskImage,
+          maskComposite,
+          WebkitMaskComposite: maskComposite,
+        }}
+      />
       {/* LAYER 1 — Color tint. Bumped multiplier 1.2 → 1.8 for stronger
           visible tint on bright biome maps (Sacred Grove, Ancient
           Library, etc.) where multiply blend was washing out. */}
