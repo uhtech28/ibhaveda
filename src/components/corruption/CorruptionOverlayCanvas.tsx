@@ -470,35 +470,23 @@ export function CorruptionViewportWash({
             critical 0.44 × 1.2 = 0.53  color + 0.44 × 3.2 = 1.00  pattern
           Sprites remain clear because multiply preserves bright
           luminance; only the map's mid-tones darken. */}
-      {/* LAYER 0 — Atmospheric "corruption fog" via backdrop-filter.
-          2026-08-23 pass 6: multiply-blend color + darken-blend pattern
-          still read as invisible on bright biome maps because pattern
-          generators draw sparse strokes on transparent bg (~30% pixel
-          coverage) and multiply preserves map brightness. Real Village
-          fog succeeds by physically dimming and desaturating the map.
-          This layer replicates that atmosphere with a backdrop-filter
-          that DIRECTLY desaturates + darkens the actual map pixels
-          behind the wash. Effect scales with `opacity`: calm = mild,
-          critical = heavy. Sprites (persona, boss) will also darken
-          slightly but this matches the "corruption is real, it dims
-          the world" narrative Village fog delivers. */}
-      <div
-        role="presentation"
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          zIndex: zIndex - 0.001,
-          backdropFilter: `saturate(${Math.max(0.15, 1 - opacity * 1.1)}) brightness(${Math.max(0.55, 1 - opacity * 0.45)}) contrast(${1 + opacity * 0.2})`,
-          WebkitBackdropFilter: `saturate(${Math.max(0.15, 1 - opacity * 1.1)}) brightness(${Math.max(0.55, 1 - opacity * 0.45)}) contrast(${1 + opacity * 0.2})`,
-          maskImage,
-          WebkitMaskImage: maskImage,
-          maskComposite,
-          WebkitMaskComposite: maskComposite,
-        }}
-      />
-      {/* LAYER 1 — Color tint. Bumped multiplier 1.2 → 1.8 for stronger
-          visible tint on bright biome maps (Sacred Grove, Ancient
-          Library, etc.) where multiply blend was washing out. */}
+      {/* LAYER 0 removed 2026-08-23 pass 7 — backdrop-filter dimmed
+          the entire Phaser canvas including persona/boss sprites,
+          which the user explicitly rejected ("corruption should not
+          effect the color of persona and boss"). Since sprites and
+          map share one canvas we can't selectively filter — reverted
+          to blend-mode-only approach. Multiply blend on the color
+          layer + darken blend on the pattern layer preserve sprite
+          luminance because bright sprite pixels dominate both blends. */}
+      {/* LAYER 1 — Color tint. 2026-08-23 pass 7: blend changed from
+          `multiply` (which darkens sprites too) to `color` — applies
+          the HUE + SATURATION of the corruption color while preserving
+          the LUMINANCE of whatever's underneath. Bright persona/boss
+          sprites keep their brightness (only shift hue slightly);
+          the map's colors shift to the corruption palette. User
+          feedback: "corruption should not effect the color of persona
+          and boss" — `color` blend is the closest single-canvas
+          solution short of dynamic sprite-position masking. */}
       <div
         role="presentation"
         aria-hidden
@@ -507,7 +495,7 @@ export function CorruptionViewportWash({
           zIndex,
           opacity: Math.min(1, opacity * 1.8),
           backgroundColor: profile.color,
-          mixBlendMode: "multiply",
+          mixBlendMode: "color",
           maskImage,
           WebkitMaskImage: maskImage,
           maskComposite,

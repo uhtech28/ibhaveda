@@ -2404,10 +2404,19 @@ function MapPageInner() {
   // read it (input gating, chat overlays, etc.). Persona itself is
   // already set in render via setCurrentPersonaId(finalPersonaId), so
   // this effect only mirrors the boolean into the game.
+  //
+  // 2026-08-23 fix: deps now include `phaserReady`. Previously the effect
+  // ran ONLY when `isViewerMode` toggled; if Phaser hadn't booted yet
+  // (gameRef.current === null), the effect returned early and never
+  // re-fired after boot, leaving viewerMode unset and the persona
+  // freely walkable on other users' template maps. Re-running the effect
+  // once Phaser is ready guarantees the flag lands in the registry
+  // before the scene's first update tick reads it.
   useEffect(() => {
+    if (!phaserReady) return;
     if (!gameRef.current) return;
     gameRef.current.registry.set("viewerMode", isViewerMode);
-  }, [isViewerMode, gameRef]);
+  }, [isViewerMode, phaserReady, gameRef]);
 
   const levelData = useQuery(
     api.levels.getUserLevelProgress,
