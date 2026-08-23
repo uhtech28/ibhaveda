@@ -30,7 +30,38 @@ export const advanceFeedTutorial = mutation({
   handler: async (ctx, { step }) => {
     const user = await maybeUser(ctx);
     if (!user) return null;
+
+    // ── Anti-regression guards ──────────────────────────────────────────
+    // The tutorial state machine is MONOTONIC-FORWARD only. Any call
+    // that would regress a user (send them back to an earlier step or
+    // resurrect a terminal state) is silently ignored — the only
+    // legitimate way to reset tutorial state is `restartFeedTutorial`.
+    //
+    // Why this lives on the server: a stale client (e.g. a Step3 effect
+    // that fires goTo(7) during the Convex-still-loading window before
+    // remoteLoaded flips true) would otherwise write "in_progress + step
+    // 7" over a completed user's record and restart the tour on refresh.
+    // The provider now guards on `remoteLoaded`, but a bad build or a
+    // third-party integration hitting the mutation directly must not be
+    // able to reopen the tour either.
+    const currentState = user.feedTutorialState ?? "not_started";
+    const currentStep = user.feedTutorialStep ?? 0;
     const next = Math.max(0, Math.floor(step));
+
+    // (1) Terminal states are sticky. A completed user stays completed.
+    // A skipped user stays skipped. Only `restartFeedTutorial` clears
+    // these — advance MUST NOT.
+    if (currentState === "completed" || currentState === "skipped") {
+      return { state: currentState, step: currentStep };
+    }
+
+    // (2) Monotonic forward. A lower step arriving from a stale client
+    // (or from a race between two step components) is a no-op. Equal
+    // is also a no-op — no need for a DB write.
+    if (next <= currentStep) {
+      return { state: currentState, step: currentStep };
+    }
+
     await ctx.db.patch(user._id, {
       feedTutorialState: "in_progress",
       feedTutorialStep: next,

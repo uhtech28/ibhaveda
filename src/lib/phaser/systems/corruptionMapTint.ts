@@ -128,10 +128,15 @@ export interface CorruptionMapTintHandle {
  *  produces a clearly visible tint on bright biome maps (product ask
  *  "cant se any corruption make sure corruption is on all maps") and
  *  critical phase reaches heavy-but-not-blackout coverage. */
-const COLOR_LAYER_MULT = 1.5;
-const PATTERN_LAYER_MULT = 2.0;
+// 2026-08-23 pass 8: bumped multipliers + ceilings for MULTIPLY blend.
+// Multiply darkens by MIN(src, dst) per channel — at low alpha the effect
+// is subtle; needs alpha > 0.6 to visibly dim a mid-tone map. At calm
+// (opacity 0.35): color alpha = 0.35 × 2.2 = 0.77, pattern = 0.35 × 2.5 = 0.87.
+// Critical (0.75): both clamp near max — heavy but not black.
+const COLOR_LAYER_MULT = 2.2;
+const PATTERN_LAYER_MULT = 2.5;
 const MAX_COLOR_ALPHA = 0.95;
-const MAX_PATTERN_ALPHA = 0.85;
+const MAX_PATTERN_ALPHA = 0.90;
 
 /**
  * Namespace prefix for the offscreen Phaser textures this helper
@@ -238,6 +243,16 @@ export function attachCorruptionMapTint(
   colorRect.setOrigin(0, 0);
   colorRect.setDepth(spriteDepth - 2);
   colorRect.setScrollFactor(1); // scrolls with the camera / map
+  // 2026-08-23 pass 8: MULTIPLY blend mode. Prior NORMAL blend showed
+  // the tint's LITERAL rgb only, which is invisible when the tint
+  // color matches the biome (e.g. Librarian's #9a95a0 gray on the
+  // Ancient Library's stone/wood grays = imperceptible change).
+  // MULTIPLY darkens the underlying map by the tint color regardless
+  // of similarity — light gray × stone = darker stone (clearly visible).
+  // Sprites render at higher depth so they composite on TOP of the
+  // already-darkened map with their own default blend, preserving
+  // native sprite color completely.
+  colorRect.setBlendMode(Phaser.BlendModes.MULTIPLY);
 
   // ── Layer B — repeating pattern tile ────────────────────────────
   // Start with an empty 1×1 placeholder texture so the TileSprite has
@@ -261,6 +276,9 @@ export function attachCorruptionMapTint(
   patternTile.setDepth(spriteDepth - 1);
   patternTile.setScrollFactor(1);
   patternTile.setAlpha(0); // hidden until profile applied
+  // Pattern strokes darken the map (multiply) so they read on both
+  // bright and dark biomes. Sprites (higher depth) unaffected.
+  patternTile.setBlendMode(Phaser.BlendModes.MULTIPLY);
 
   // ── Internal state ──────────────────────────────────────────────
   let currentProfile: CorruptionMapTintProfile | null =

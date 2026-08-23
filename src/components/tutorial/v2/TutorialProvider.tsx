@@ -154,6 +154,27 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
     }
   }, [remote, optimisticStep, optimisticState]);
 
+  // Terminal-lock reconciliation: if the server says the user is
+  // completed or skipped but a racing step-file effect wrote optimistic
+  // in_progress before our action-level guards were in place (or before
+  // remote hydrated), CLEAR that optimistic immediately. Without this,
+  // the optimistic values would linger — the normal reconcile effect
+  // above only clears when remote matches optimistic, so a permanent
+  // mismatch (in_progress vs completed) would keep the tutorial visible
+  // forever. This is the last line of defence for the "completed user
+  // sees tutorial for one frame after refresh" bug.
+  useEffect(() => {
+    if (
+      remote &&
+      (remote.state === "completed" || remote.state === "skipped") &&
+      (optimisticState !== null || optimisticStep !== null) &&
+      optimisticState !== remote.state
+    ) {
+      setOptimisticStep(null);
+      setOptimisticState(null);
+    }
+  }, [remote, optimisticState, optimisticStep]);
+
   // ── Derived flags ───────────────────────────────────────────────────────
   // The tutorial is "active" when:
   //  - Convex query has RESOLVED (remote !== undefined) — critical to
@@ -170,8 +191,18 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   // signup. Treat the "not_started + step 0" combination as step 1
   // active so the dog appears on /profile-setup.
   const remoteLoaded = remote !== undefined;
+  // REMOTE-authoritative terminal check. A completed / skipped user must
+  // NEVER see the tutorial — even for a single frame — regardless of
+  // what optimistic state some racing step effect wrote. We deliberately
+  // key off `remote.state` (not the merged `backendState`) so a stray
+  // optimistic "in_progress" from a step-file goTo cannot reopen the
+  // tour for someone the server has already marked terminal.
+  const remoteTerminal =
+    remoteLoaded &&
+    (remote?.state === "completed" || remote?.state === "skipped");
   const baseActive =
     remoteLoaded &&
+    !remoteTerminal &&
     (backendState === "in_progress" || backendState === "not_started") &&
     ((step >= 1 && step <= 10) || (backendState === "not_started" && step === 0));
   // Debug: `?tutorial_debug=N` in URL forces the overlay open at step N (1-7).
@@ -185,7 +216,17 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
     if (Number.isFinite(n) && n >= 1 && n <= 10) setDebugStep(n);
   }, []);
   const debugActive = debugStep >= 1 && debugStep <= 10;
-  const active = activeOverride != null ? activeOverride : (baseActive || debugActive);
+  // TERMINAL LOCK: a completed/skipped user (per the remote truth) can
+  // NEVER see the tutorial via the normal path. `?tutorial_debug=N` is
+  // still honoured because QA needs a way to preview steps against real
+  // user accounts, but the natural `baseActive` and any transient
+  // `activeOverride(true)` are forced off. Fixes the completed-user
+  // "tour briefly flashes then disappears" regression.
+  const active = remoteTerminal
+    ? debugActive
+    : activeOverride != null
+      ? activeOverride
+      : (baseActive || debugActive);
   // Effective step — debug override, else real step, else 1 if user
   // is "not_started" (new signup — Step 1 component needs to mount).
   const effectiveStep = debugActive
@@ -193,8 +234,31 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
     : (backendState === "not_started" && step === 0 ? (1 as TutorialStep) : step);
 
   // ── Actions ─────────────────────────────────────────────────────────────
+  // Ref-mirror of the REMOTE terminal-state check so action callbacks
+  // don't need to be re-memoised each time remote changes (which would
+  // break their stable identity in step-file effect deps and cause
+  // extra re-runs). A step effect can capture a stale `goTo` closure
+  // and fire it after the user hits completed — reading the current
+  // remote through this ref means the callback still short-circuits.
+  const remoteTerminalRef = useRef(remoteTerminal);
+  remoteTerminalRef.current = remoteTerminal;
+  const remoteStepRef = useRef<number>(0);
+  remoteStepRef.current = remote?.step ?? 0;
+
   const goTo = useCallback(
     async (next: TutorialStep) => {
+      // Terminal-lock: never allow a step-file effect to reopen the
+      // tour for a completed / skipped user. Server also enforces this
+      // (advanceFeedTutorial refuses if state is terminal), but we
+      // short-circuit here to prevent the optimistic mirror from
+      // briefly flipping the UI to "in_progress" before the server ack
+      // rolls it back — which is exactly the "tutorial flashes for a
+      // frame after refresh" bug.
+      if (remoteTerminalRef.current) return;
+      // Monotonic-forward on the client too — matches the server guard
+      // so we don't fire a doomed round-trip when a stale effect asks
+      // for a lower step than the user has already reached.
+      if (next <= remoteStepRef.current) return;
       setOptimisticStep(next);
       setOptimisticState("in_progress");
       try {
@@ -210,6 +274,9 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   );
 
   const advance = useCallback(async () => {
+    // Same terminal-lock — nothing advances a terminal user forward
+    // except an explicit restart (below).
+    if (remoteTerminalRef.current) return;
     const next = Math.min(step + 1, TUTORIAL_TOTAL_STEPS + 1) as TutorialStep;
     if (next > TUTORIAL_TOTAL_STEPS) {
       // Moving past the last step completes the tutorial.
