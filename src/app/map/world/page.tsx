@@ -1495,28 +1495,78 @@ const TaskCard = memo(function TaskCardInner({
             the tier/score label on task cards. */}
         {/* Read-only evidence block — spectator view of owner's
             submission. Only rendered in viewer mode for a completed
-            task; owner's own panel keeps the click-to-work surface. */}
+            task; owner's own panel keeps the click-to-work surface.
+            2026-08-23 fix: also show the TASK QUESTION (prompt /
+            description) so the viewer can see WHAT was asked, not
+            just what was submitted. And clean up the null-evidence
+            content — for tasks completed via the self-report path
+            (worldMap.ts:1117 stores a `{note}` sentinel), unpack
+            that so viewers see a meaningful message. */}
         {readOnly && task.done && (
-          <div className="mt-2 rounded-[10px] border border-white/8 bg-white/[0.03] p-2.5">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/85">
-                Submitted evidence · read-only
-              </span>
-              {task._evidenceSubmittedAt ? (
-                <span className="text-[9px] text-slate-400">
-                  {new Date(task._evidenceSubmittedAt).toLocaleDateString()}
+          <div className="mt-2 space-y-2">
+            {/* Task question — visible in viewer mode so the observer
+                understands what the owner was asked. Owner-mode hides
+                this since it's shown in the modal when they open it. */}
+            {task.description && task.description !== "No description provided." ? (
+              <div className="rounded-[10px] border border-indigo-400/15 bg-indigo-500/[0.06] p-2.5">
+                <div className="text-[9px] font-black uppercase tracking-[0.14em] text-indigo-300/85 mb-1">
+                  Task question
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-100">
+                  {task.description}
+                </p>
+              </div>
+            ) : null}
+            {/* Owner's submitted answer */}
+            <div className="rounded-[10px] border border-white/8 bg-white/[0.03] p-2.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300/85">
+                  Owner's answer · read-only
                 </span>
-              ) : null}
+                {task._evidenceSubmittedAt ? (
+                  <span className="text-[9px] text-slate-400">
+                    {new Date(task._evidenceSubmittedAt).toLocaleDateString()}
+                  </span>
+                ) : null}
+              </div>
+              {(() => {
+                const raw = task._evidenceContent;
+                if (!raw) {
+                  return (
+                    <p className="text-[11px] italic text-slate-400">
+                      Owner marked this complete without a written submission.
+                    </p>
+                  );
+                }
+                // Try to unwrap the self-report sentinel that
+                // worldMap.ts:1117 writes on world-map quick-check.
+                // Shape: `{"note":"Marked complete from world map","completedAt":123}`.
+                // Strip that noise so viewers see "Quick-check" rather
+                // than JSON internals. Everything else renders verbatim.
+                try {
+                  const parsed = JSON.parse(raw);
+                  if (
+                    parsed &&
+                    typeof parsed === "object" &&
+                    typeof parsed.note === "string" &&
+                    Object.keys(parsed).length <= 2
+                  ) {
+                    return (
+                      <p className="text-[11px] italic text-slate-400">
+                        Owner marked this complete via quick-check (no written answer).
+                      </p>
+                    );
+                  }
+                } catch {
+                  /* not JSON — fall through to raw render */
+                }
+                return (
+                  <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-200 font-sans max-h-64 overflow-y-auto">
+                    {raw}
+                  </pre>
+                );
+              })()}
             </div>
-            {task._evidenceContent ? (
-              <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-200 font-sans max-h-64 overflow-y-auto">
-                {task._evidenceContent}
-              </pre>
-            ) : (
-              <p className="text-[11px] italic text-slate-400">
-                Owner marked this complete without attaching a written submission.
-              </p>
-            )}
           </div>
         )}
       </div>
