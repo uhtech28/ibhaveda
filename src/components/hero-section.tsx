@@ -1206,15 +1206,59 @@ const LANDING_STYLES = `
     .lp-shell {
       height: 100dvh;
       grid-template-rows: auto minmax(0, 1fr) auto;
+      /* NOTE: no backticks in these comments — this whole block lives
+         inside a styled-jsx template literal, so one would terminate
+         the string and silently drop every rule after it.
+
+         Was inheriting align-items:center from the base rule. On a
+         short viewport the auth-core stack (brand + headline + sub +
+         path label + 2x2 role grid) is TALLER than its 1fr track, and
+         a centered grid item overflows its track symmetrically: half
+         above, half below. That put the role cards on top of the
+         "What is Ibhaveda?" prompt and simultaneously clipped the
+         "Already a member?" link off the top edge. Stretching pins the
+         item to its track so the overflow rule below can contain it. */
+      align-items: stretch;
     }
     .lp-top { min-height: 8px; }
     .lp-auth-core {
       gap: clamp(8px, 1.7dvh, 14px);
-      transform: translateY(-8px);
+      /* min-height:0 lets the 1fr track actually shrink this item —
+         without it the track floors at min-content and pushes past the
+         shell no matter what align-items says. align-content keeps the
+         stack optically centred now that the box fills its row. */
+      min-height: 0;
+      /* "safe" is load-bearing: plain center on an overflowing grid
+         clips BOTH ends, which is what cut the "Already a member?"
+         line off the top. safe centre falls back to start the moment
+         the content stops fitting, so overflow only ever goes one way
+         (downward, into the scroll area) and nothing is unreachable.
+         Plain center first as the fallback for older engines. */
+      align-content: center;
+      align-content: safe center;
+      /* Safety net for viewports too short even for the height-aware
+         type scale below: the stack scrolls WITHIN its own row rather
+         than spilling onto its neighbours. Scrollbar hidden so it
+         reads as a hero, not a scroll pane. */
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+      /* Optical nudge no longer needed — align-content centres it, and
+         the -8px was pushing the top line under the viewport edge. */
+      transform: none;
     }
+    .lp-auth-core::-webkit-scrollbar { display: none; }
     .lp-member { font-size: 13px; }
     .lp-logo { width: 48px; height: 48px; }
-    .lp-page h1 { font-size: clamp(38px, 12vw, 56px); max-width: 520px; }
+    /* Sized off WIDTH only (12vw) before, which is why a short phone
+       still rendered a ~47px headline wrapping to 3-4 lines and blew
+       the height budget. min() adds a height ceiling so the headline
+       scales down on short viewports instead of pushing the stack
+       into the prompt below. */
+    .lp-page h1 {
+      font-size: clamp(30px, min(12vw, 7.4dvh), 56px);
+      max-width: 520px;
+    }
     .lp-sub { max-width: 310px; font-weight: 800; text-align: center; }
     .lp-path-label { width: 100%; font-size: 9px; gap: 10px; }
     .lp-roles { width: 100%; gap: 12px; }
@@ -1274,7 +1318,10 @@ const LANDING_STYLES = `
     .lp-bottom-question p { font-size: clamp(23px, 6.5vw, 29px); }
     .lp-slide:first-child .lp-bottom-question {
       min-height: 96px;
-      transform: translateY(-8px);
+      /* Was translateY(-8px), which lifted the prompt 8px INTO the
+         role cards above it — the last 8px of the collision. The row
+         is already tight; it doesn't need pulling closer. */
+      transform: none;
     }
   }
 
@@ -1309,6 +1356,40 @@ const LANDING_STYLES = `
     .lp-flip-back strong {
       font-size: 7.5px;
       letter-spacing: 0.1em;
+    }
+  }
+
+  /* SHORT viewports, any phone width. This is the case the mobile
+     breakpoint alone missed: a phone in Safari with its address bar
+     showing has the full ~390px of width but only ~660px of height,
+     so every width-based clamp above still renders at full size and
+     the stack overflows its row. Symptom was the role cards landing
+     on top of the "What is Ibhaveda?" prompt.
+
+     The containment rules further up mean overflow can no longer
+     collide with anything, but scrolling a hero is a poor substitute
+     for fitting. So trim the two biggest height contributors, the
+     headline and the role tiles, and the stack fits outright.
+     Placed last so it wins over the width-only blocks above. */
+  @media (max-width: 860px) and (max-height: 720px) {
+    .lp-page h1 { font-size: clamp(28px, min(11vw, 6.2dvh), 44px); }
+    .lp-sub { font-size: 13px; }
+    /* max-width matters on WIDE-but-short viewports (a tablet in
+       landscape, a resized desktop window). The tiles are sized by
+       aspect-ratio, so at 768px the grid gave each one 366px of width
+       and therefore ~205px of height — two rows of that do not fit in
+       700px and the bottom row got cut. Capping the grid keeps the
+       tiles phone-sized regardless of how wide the window is. No
+       effect on real phones, which are narrower than the cap. */
+    .lp-roles { gap: 10px; max-width: 420px; margin-inline: auto; }
+    .lp-role { aspect-ratio: 1.78; padding: 10px; }
+    .lp-role-icon { width: 34px; height: 34px; margin-bottom: 6px; }
+    .lp-role-kicker { margin-bottom: 4px; }
+    .lp-role-name { font-size: 19px; }
+    .lp-bottom-question,
+    .lp-slide:first-child .lp-bottom-question {
+      min-height: 78px;
+      transform: none;
     }
   }
 `;
