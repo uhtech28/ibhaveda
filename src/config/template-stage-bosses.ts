@@ -30,6 +30,7 @@
  */
 
 import type { StageBoss, BossClipMeta, VillageBossFamily } from "./stage-bosses";
+import { getBossSpriteGeometry } from "./boss-sprite-manifest";
 import type { TemplateId } from "./templates/templateTypes";
 
 type NonVentureTemplate = Exclude<TemplateId, "venture">;
@@ -175,8 +176,12 @@ const TEMPLATE_STAGE_BOSSES: Record<
       spriteYOffset: 58,
     },
     // Stage 2 · Ancient Library (shared with Academic Stage 1)
+    // The art lives under academic/ — there is no lab/ copy, and a bare
+    // slug resolves to /assets/bosses/<template>/<slug>. That produced
+    // 404s for every clip, so this boss never animated on Lab. The "..:"
+    // prefix is the existing cross-template override.
     {
-      slug: "librarian-of-lost-questions",
+      slug: "..:academic/librarian-of-lost-questions",
       name: "Librarian of Lost Questions",
       family: "undead",
       introLine:
@@ -186,8 +191,9 @@ const TEMPLATE_STAGE_BOSSES: Record<
       spriteYOffset: 62,
     },
     // Stage 3 · Cartographer's Tower (shared with Academic Stage 3)
+    // Cross-template art reuse — see the Librarian note above.
     {
-      slug: "cartographer-of-crooked-maps",
+      slug: "..:academic/cartographer-of-crooked-maps",
       name: "Cartographer of Crooked Maps",
       family: "arcane",
       introLine:
@@ -230,9 +236,13 @@ const TEMPLATE_STAGE_BOSSES: Record<
       family: "arcane",
       introLine:
         "* The Merchant offers you a hundred paths — every one detours.",
-      // Existing incoming/ pack: 92×92 with idle/attack (retreat as
-      // hurt-fallback, victory shipped).
-      clips: { size: 92, frames: { idle: 9, attack: 9, hurt: 9, victory: 9 } },
+      // Existing incoming/ pack ships idle/attack/retreat/victory — there
+      // is NO hurt.png. The comment used to claim retreat stood in as the
+      // hurt fallback, but makeClip only ever builds `<base>/<state>.png`,
+      // so declaring hurt here just requested a file that isn't there.
+      // Omitting it makes makeClip return undefined and the runtime falls
+      // back to idle, which is the intended degradation.
+      clips: { size: 92, frames: { idle: 9, attack: 9, victory: 9 } },
       spriteScale: 1.9,
       spriteYOffset: 62,
     },
@@ -326,8 +336,9 @@ const TEMPLATE_STAGE_BOSSES: Record<
       family: "machine",
       introLine:
         "* The Harbourmaster demands proof you belong on this dock.",
-      // Existing pack: idle/attack/retreat/victory at 92×92.
-      clips: { size: 92, frames: { idle: 9, attack: 9, hurt: 9, victory: 9 } },
+      // Existing pack ships idle/attack/retreat/victory — no hurt.png.
+      // See the Babel Merchant note above for why declaring it broke.
+      clips: { size: 92, frames: { idle: 9, attack: 9, victory: 9 } },
       spriteScale: 1.9,
       spriteYOffset: 62,
     },
@@ -357,8 +368,25 @@ function makeClip(
   fps: number,
 ): BossClipMeta | undefined {
   if (!frames) return undefined;
+  const asset = `${base}/${state}.png`;
+  // Prefer geometry MEASURED from the shipped PNG over the hand-written
+  // `clips.size` / `clips.frames` in the roster below. Those were kept by
+  // hand and had drifted for a number of bosses; a wrong frame count does
+  // not 404, it silently plays the wrong slice of the strip, which is how
+  // "the animation doesn't work" presents. Declared values remain the
+  // fallback for assets the manifest hasn't measured.
+  const measured = getBossSpriteGeometry(asset);
+  if (measured) {
+    return {
+      asset,
+      frameCount: measured.frames,
+      frameWidth: measured.size,
+      frameHeight: measured.size,
+      fps,
+    };
+  }
   return {
-    asset: `${base}/${state}.png`,
+    asset,
     frameCount: frames,
     frameWidth: size,
     frameHeight: size,

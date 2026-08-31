@@ -22,6 +22,7 @@
  */
 
 import type { VillageBossFamily, VillageBossInfo } from "./village-bosses";
+import { getBossSpriteGeometry } from "./boss-sprite-manifest";
 
 /**
  * Animation clip descriptor. When `frameCount > 1` the loader will
@@ -84,8 +85,36 @@ export interface SuperBossQuestion {
 const PX_92: Pick<BossClipMeta, "frameCount" | "frameWidth" | "frameHeight"> =
   { frameCount: 9, frameWidth: 92, frameHeight: 92 };
 
+/**
+ * Build clip metadata for a boss sheet.
+ *
+ * The geometry is MEASURED from the shipped PNG (see
+ * boss-sprite-manifest.ts), not assumed. This function previously stamped
+ * PX_92 — 92x92, 9 frames — onto all 87 of its call sites regardless of
+ * what the artist actually delivered, and roughly a third of the roster
+ * doesn't match that: sheets come in 76/84/88/92/96px frames with 1, 4 or
+ * 9 frames.
+ *
+ * The mismatch is silent and it is the reason "some animations don't
+ * work". Nothing 404s — the CSS steps() player just derives its
+ * background-size from the wrong frame count and slides through the wrong
+ * slice of the strip, so the boss reads as frozen on a partial frame or
+ * jitters through a fraction of its animation.
+ *
+ * PX_92 remains the fallback for any asset the manifest doesn't know
+ * about, so an un-generated or newly added sheet degrades to the old
+ * behaviour rather than rendering nothing.
+ */
 function pxClip(asset: string, fps?: number): BossClipMeta {
-  return { asset, ...PX_92, fps };
+  const measured = getBossSpriteGeometry(asset);
+  if (!measured) return { asset, ...PX_92, fps };
+  return {
+    asset,
+    frameCount: measured.frames,
+    frameWidth: measured.size,
+    frameHeight: measured.size,
+    fps,
+  };
 }
 
 // Thematic super-boss question banks. These are meaningful founder prompts
