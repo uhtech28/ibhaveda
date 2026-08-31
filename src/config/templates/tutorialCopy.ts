@@ -40,6 +40,11 @@ export interface TutorialCopy {
    *  Venture: "builder", Academic: "collaborator", Lab: "lab partner",
    *  Creative: "co-creator". */
   collaboratorNoun: string;
+  /** Plural of `collaboratorNoun`. Step2's contributor beat introduces
+   *  the whole suggested list at once ("These are potential builders
+   *  for your venture"), so it needs the plural rather than the
+   *  singular pick-one phrasing. */
+  collaboratorNounPlural: string;
   /** What Sparky calls the antagonist that questions the user during
    *  AI Combat. All four templates use "boss" today, but Academic and
    *  Lab may prefer "challenger" once feedback lands. Keeping the
@@ -72,13 +77,14 @@ const VENTURE: TutorialCopy = {
   userNoun: "founder",
   taskNoun: "task",
   collaboratorNoun: "builder",
+  collaboratorNounPlural: "builders",
   bossNoun: "boss",
   firstMonsterIntroPrefix:
     "You're about to face ",
   firstMonsterIntroSuffix:
     ", who'll question your idea. Defend it, fight back, and make him retreat so you can advance. You've got this!",
   firstMonsterVictory: (name) =>
-    `Congratulations, the "${name}" retreated! Just two more things and you'll have everything you need.`,
+    `Congratulations, the ${name} retreated! Just two more things and you'll have everything you need.`,
   feedTagline:
     "This is the feed, all our live projects. Send a contribution request to any idea that isn't yours. That's how you plug into a team.",
   // Template-neutral by design. This line renders on the VERY FIRST
@@ -102,13 +108,14 @@ const ACADEMIC: TutorialCopy = {
   userNoun: "scholar",
   taskNoun: "assignment",
   collaboratorNoun: "collaborator",
+  collaboratorNounPlural: "collaborators",
   bossNoun: "examiner",
   firstMonsterIntroPrefix:
     "You're about to face ",
   firstMonsterIntroSuffix:
     ", who'll probe the rigour of your thesis. Defend your argument, cite what you know, and push back so you can move on. You've got this!",
   firstMonsterVictory: (name) =>
-    `Nicely argued — "${name}" backed off. Just two more things and your foundation is set.`,
+    `Nicely argued! ${name} backed off. Just two more things and your foundation is set.`,
   feedTagline:
     "This is the feed, all our live theses and papers. Send a collaboration request to any project that isn't yours. That's how you plug into a research team.",
   // Neutral by design — see VENTURE.welcomeLine for the rationale.
@@ -123,13 +130,14 @@ const LAB: TutorialCopy = {
   userNoun: "researcher",
   taskNoun: "task",
   collaboratorNoun: "lab partner",
+  collaboratorNounPlural: "lab partners",
   bossNoun: "peer reviewer",
   firstMonsterIntroPrefix:
     "You're about to face ",
   firstMonsterIntroSuffix:
     ", who'll stress-test your hypothesis. Show the evidence, defend your method, and outlast the doubt so you can advance. You've got this!",
   firstMonsterVictory: (name) =>
-    `Great result — "${name}" withdrew the objection! Just two more things and the experiment is on track.`,
+    `Great result! ${name} withdrew the objection. Just two more things and the experiment is on track.`,
   feedTagline:
     "This is the feed, all our live experiments. Send a collaboration request to any project that isn't yours. That's how you plug into a lab.",
   // Neutral by design — see VENTURE.welcomeLine for the rationale.
@@ -144,13 +152,14 @@ const CREATIVE: TutorialCopy = {
   userNoun: "maker",
   taskNoun: "task",
   collaboratorNoun: "co-creator",
+  collaboratorNounPlural: "co-creators",
   bossNoun: "critic",
   firstMonsterIntroPrefix:
     "You're about to face ",
   firstMonsterIntroSuffix:
     ", who'll pick at your creation. Own your choices, answer with intent, and make them back off so you can move on. You've got this!",
   firstMonsterVictory: (name) =>
-    `Nailed it — "${name}" walked away! Just two more things and your piece is coming together.`,
+    `Nailed it! ${name} walked away. Just two more things and your piece is coming together.`,
   feedTagline:
     "This is the feed, all our live creations. Send a collaboration request to any piece that isn't yours. That's how you plug into a crew.",
   // Neutral by design — see VENTURE.welcomeLine for the rationale.

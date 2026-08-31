@@ -589,7 +589,10 @@ export function Step2TemplatePick() {
         // this beat so he doesn't overlap the modal. The dialog itself
         // owns the copy + Continue CTA.
         return {
-          text: "These are people we think can help you. Send a contribution request if you'd like their help, or click continue and ask later.",
+          // Kept in sync with the bubble the JSX branch below actually
+          // renders (search `collaboratorNounPlural`), so the two can't
+          // drift if that early return is ever removed.
+          text: "These are potential contributors for your project. Send a request to anyone you'd like on board, or hit continue and ask later.",
           mood: "talking",
           highlight: null,
         };
@@ -693,10 +696,14 @@ export function Step2TemplatePick() {
         />
         <TutorialMascot
           visible
-          // "builder" → template-aware ("collaborator" for academic,
-          // "lab partner" for lab, "co-creator" for creative). Falls
-          // back to "builder" for venture / null template.
-          text={`Pick a ${copy.collaboratorNoun} and tap Send request — I'll auto-write the pitch and take you straight to your map.`}
+          // Leads by naming what the list IS, rather than jumping
+          // straight to an instruction — the user is looking at a
+          // modal full of strangers and needs to know why they're
+          // being shown before being told what to do with them.
+          // "builders" → template-aware ("collaborators" for academic,
+          // "lab partners" for lab, "co-creators" for creative). Falls
+          // back to "builders" for venture / null template.
+          text={`These are potential ${copy.collaboratorNounPlural} for your ${copy.projectNoun}. Tap Send request on anyone you like and I'll write the pitch, then take you straight to your map.`}
           mood="pointing"
           // Bottom-left so Sparky sits BESIDE the centered contributor
           // modal (max-w-560px) instead of overlapping its Send

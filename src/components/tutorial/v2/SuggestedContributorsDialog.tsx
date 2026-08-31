@@ -184,7 +184,7 @@ export function SuggestedContributorsDialog({ ideaId, onContinue }: Props) {
                 <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-6 text-center text-[13px] text-[#6B7280]">
                   {allUsers === undefined
                     ? "Finding builders you might want to invite…"
-                    : "No suggestions yet — taking you to your map."}
+                    : "No suggestions yet. Taking you to your map."}
                 </div>
               )}
               {suggestions.map((u) => {
