@@ -64,10 +64,25 @@ function ProfileSetupPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [profilePopulated, setProfilePopulated] = useState(false);
-  // Post-signup congrats splash — real gating is in the effect below
-  // once existingProfile has been declared. Initial state stays false
-  // so returning users never see a flash.
-  const [showSplash, setShowSplash] = useState(false);
+  // ── Post-signup intro video gate ─────────────────────────────────
+  // TRI-STATE, deliberately. This used to be a plain `false` boolean,
+  // which caused the "username form flashes for ~2s, then the intro
+  // video replaces it" bug:
+  //
+  //   Convex `useQuery` returns `undefined` while in flight, and
+  //   `undefined` is falsy — so the `if (!existingProfile)` branch
+  //   below fired BEFORE we knew whether this user was new, painting
+  //   the name/username form. Only once getCurrentUser resolved to
+  //   `null` did the effect flip the boolean and swap in the video.
+  //   The form's visible lifetime was exactly the Convex round-trip.
+  //
+  // With three states the form simply cannot paint before the
+  // decision is made: "pending" renders the black curtain (which
+  // matches the video's own background, so signup → video reads as
+  // one continuous beat), and only "skip" ever reaches the form.
+  const [splashState, setSplashState] = useState<
+    "pending" | "show" | "skip"
+  >("pending");
 
   // ── Persona portrait preloader ────────────────────────────────────
   // Fires 8 detached <Image>() requests the moment this page mounts so
@@ -145,20 +160,61 @@ function ProfileSetupPageInner() {
   const [showPersonaSelector, setShowPersonaSelector] = useState(false);
   const [personaSubmitting, setPersonaSubmitting] = useState(false);
 
-  // ── Post-signup congrats splash ──────────────────────────────────────
-  // Shown for ~2.5s the FIRST time a fresh signup lands here, then the
-  // name/username form fades in. sessionStorage gate stops it from
-  // re-firing on refresh, and it never runs for returning users (they
-  // already have an existingProfile row).
+  // ── Resolve the intro-video decision ─────────────────────────────
+  // Runs the moment we have BOTH a Clerk session and a settled Convex
+  // answer. Every path assigns a terminal state, so the curtain below
+  // can never hang: fresh signup → "show", everyone else → "skip".
+  // The sessionStorage gate stops the video re-firing on refresh.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!isLoaded || !userId) return;
     if (existingProfile === undefined) return; // wait for Convex
-    if (existingProfile) return; // returning user — no splash
-    if (sessionStorage.getItem("welcomeSplashShown") === "1") return;
-    sessionStorage.setItem("welcomeSplashShown", "1");
-    setShowSplash(true);
+    if (existingProfile) {
+      setSplashState("skip"); // returning user — straight past
+      return;
+    }
+    let alreadyPlayed = false;
+    try {
+      alreadyPlayed = sessionStorage.getItem("welcomeSplashShown") === "1";
+      if (!alreadyPlayed) sessionStorage.setItem("welcomeSplashShown", "1");
+    } catch {
+      /* private mode — play the intro rather than dead-end */
+    }
+    setSplashState(alreadyPlayed ? "skip" : "show");
   }, [isLoaded, userId, existingProfile]);
+
+  // Warm the intro video while Clerk and Convex are still resolving.
+  // The clips are 1.5-2.6 MB and were previously fetched only once
+  // <WelcomeSplash> mounted, so the user sat on black while it
+  // buffered. Starting the fetch here means the bytes are usually in
+  // the HTTP cache by the time the element mounts, and playback
+  // begins on the first frame instead of after a stall.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (isExplicitEdit) return; // editing a profile — no intro coming
+    const portrait =
+      window.innerWidth <= 768 || window.innerHeight > window.innerWidth;
+    const sources = portrait
+      ? [
+          "/assets/videos/welcome-intro-mobile.webm",
+          "/assets/videos/welcome-intro-mobile.mp4",
+        ]
+      : [
+          "/assets/videos/welcome-intro-desktop.webm",
+          "/assets/videos/welcome-intro-desktop.mp4",
+        ];
+    const links = sources.map((href) => {
+      const el = document.createElement("link");
+      el.rel = "prefetch";
+      el.as = "video";
+      el.href = href;
+      document.head.appendChild(el);
+      return el;
+    });
+    return () => {
+      for (const el of links) el.remove();
+    };
+  }, [isExplicitEdit]);
   // Tutorial context — used on submit to advance from the (now-hidden)
   // profile-setup phase to Step 3 on /feed. Was previously handled
   // inside Step1Welcome, but that component is disabled per product
@@ -480,22 +536,30 @@ function ProfileSetupPageInner() {
   };
 
   if (!isLoaded || !userId) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <HeroHeader />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <Card className="max-w-md w-full">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p>Loading your profile setup...</p>
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-        <FooterSection />
-      </div>
-    );
+    // Someone who clicked the profile pencil is expecting a form, so
+    // give them a normal chrome-and-spinner wait. A fresh signup is
+    // about to get the intro video, so give them the black curtain
+    // instead — a spinner card followed by a black video reads as two
+    // separate loads of two different things.
+    if (isExplicitEdit) {
+      return (
+        <div className="min-h-screen flex flex-col bg-background">
+          <HeroHeader />
+          <main className="flex-1 flex items-center justify-center px-4">
+            <Card className="max-w-md w-full">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p>Loading your profile setup...</p>
+                </div>
+              </CardContent>
+            </Card>
+          </main>
+          <FooterSection />
+        </div>
+      );
+    }
+    return <OnboardingCurtain />;
   }
 
   // If an existing profile row is present (returning user, OR the
@@ -538,6 +602,15 @@ function ProfileSetupPageInner() {
     return null;
   }
 
+  // Convex hasn't answered yet, so we do NOT know whether this is a
+  // fresh signup (intro video first) or a returning user (redirect
+  // out). Falling through here is what used to flash the username
+  // form: `undefined` is falsy, so the first-time branch below fired
+  // while the answer was still in flight. Hold the curtain instead.
+  if (existingProfile === undefined && !isExplicitEdit) {
+    return <OnboardingCurtain />;
+  }
+
   if (!existingProfile) {
     // "Gate of Ibhaveda" onboarding intro — DISABLED per product
     // request. The scaffold component + Convex flag + mutation are
@@ -557,14 +630,21 @@ function ProfileSetupPageInner() {
     // }
     void shouldShowGate;
     void markGateSeen;
-    // Congrats splash — takes over the whole viewport for ~2.5s,
-    // then flips showSplash to false and the form below renders.
-    if (showSplash) {
-      // No `durationMs` prop — WelcomeSplash is now video-driven and
+
+    // ORDER MATTERS, and it is enforced here rather than by timing.
+    // "pending" means the effect above hasn't decided yet — keep the
+    // curtain up. Only "show" plays the video, and only "skip" is
+    // allowed to reach the name/username form underneath. There is
+    // no state in which the form can paint ahead of the video.
+    if (splashState === "pending") {
+      return <OnboardingCurtain />;
+    }
+    if (splashState === "show") {
+      // No `durationMs` prop — WelcomeSplash is video-driven and
       // dismisses ONLY on the user clicking after the video ends
       // (or on video error). Passing the old 3000ms would trigger
       // the safety-valve timeout and skip the video after 3s.
-      return <WelcomeSplash onDone={() => setShowSplash(false)} />;
+      return <WelcomeSplash onDone={() => setSplashState("skip")} />;
     }
     const usernameReady =
       formData.username.length >= 3 &&
@@ -833,6 +913,41 @@ function ProfileSetupPageInner() {
   // FallbackRedirect fires silently and the next paint is the
   // destination page (/persona-setup).
   return <FallbackRedirect />;
+}
+
+/**
+ * OnboardingCurtain — the black frame that holds the signup flow
+ * together while Clerk and Convex resolve.
+ *
+ * It is the same #000 as <WelcomeSplash>'s backdrop, deliberately:
+ * the intro video mounts straight into this ground, so the handoff
+ * from "waiting" to "video playing" has no visible seam. Previously
+ * this window rendered a spinner card with the site header and
+ * footer, then the username form, then the video — three distinct
+ * screens where the product intends one.
+ *
+ * The spinner fades in only after 1.2s, so a fast connection sees a
+ * clean black beat rather than a spinner flash, while a slow or
+ * broken one still gets feedback that something is happening.
+ */
+function OnboardingCurtain() {
+  const [showSpinner, setShowSpinner] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowSpinner(true), 1200);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div
+      className="fixed inset-0 z-[100000] flex items-center justify-center bg-black"
+      role="status"
+      aria-label="Preparing your welcome"
+    >
+      <Loader2
+        className="h-7 w-7 animate-spin text-white/40 transition-opacity duration-500 motion-reduce:animate-none"
+        style={{ opacity: showSpinner ? 1 : 0 }}
+      />
+    </div>
+  );
 }
 
 /**

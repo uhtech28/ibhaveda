@@ -58,10 +58,19 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
   void _unused; // silence unused-var lint without changing the API
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [ended, setEnded] = useState(false);
-  // Device orientation — mounted at "desktop" default (matches SSR),
-  // flipped to true inside effect if the viewport is portrait / narrow.
-  // Prevents SSR/hydration mismatch (server can't know viewport size).
-  const [isMobile, setIsMobile] = useState(false);
+  // Device orientation — `null` until measured, NOT `false`.
+  //
+  // Defaulting to "desktop" meant a phone began downloading the 2.1 MB
+  // landscape clip, then the detect effect flipped `isMobile`, the
+  // `key` below remounted the <video>, and the browser threw that away
+  // to start the 2.6 MB portrait clip from scratch. Users saw a long
+  // black wait for a video that was being fetched twice. Holding at
+  // `null` for one frame (against an already-black backdrop, so it is
+  // invisible) means exactly one clip is ever requested.
+  //
+  // Safe against hydration mismatch: the parent only mounts this
+  // component from a client effect, so it never renders on the server.
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const doneRef = useRef(false);
   const safetyTimerRef = useRef<number | null>(null);
 
@@ -119,7 +128,11 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
   // Kick playback on mount. iOS Safari sometimes needs an explicit
   // .play() call even with autoPlay attribute, and Chrome's
   // autoplay-with-sound policy requires we start muted (we do).
+  // Depends on `isMobile` because the <video> element does not exist
+  // until orientation is measured — on an empty dep array this ran
+  // against a null ref and never kicked playback.
   useEffect(() => {
+    if (isMobile === null) return;
     const v = videoRef.current;
     if (!v) return;
     v.muted = true;
@@ -128,7 +141,7 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
     // browsers throw when a tab loses focus mid-mount.
     const p = v.play();
     if (p && typeof p.catch === "function") p.catch(() => { /* no-op */ });
-  }, []);
+  }, [isMobile]);
 
   // Keyboard shortcut — Enter or Space advances once the video ends.
   // Prevents a stuck user who can't find the baked Continue button.
@@ -158,6 +171,7 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
       aria-label={ended ? "Continue to profile setup" : "Welcome video playing"}
       style={{ cursor: ended ? "pointer" : "default" }}
     >
+      {isMobile === null ? null : (
       <video
         ref={videoRef}
         // `key` forces React to fully remount the <video> element when
@@ -168,6 +182,12 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
         autoPlay
         muted
         playsInline
+        // Fetch the whole clip, not just metadata. This is a ~2 MB
+        // full-screen intro the user is staring at a black frame
+        // waiting for — buffering it lazily is the one thing we don't
+        // want. /profile-setup also prefetches these bytes while Clerk
+        // and Convex resolve, so this usually hits a warm cache.
+        preload="auto"
         // No `loop` — spec says play once + pause at end.
         // Playback started for real — kill the never-loaded safety
         // valve so it can't dismiss the splash mid-video.
@@ -216,6 +236,7 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
         )}
         <source src={VIDEO_SRC_FALLBACK} type="video/mp4" />
       </video>
+      )}
 
       {/* Product ask: no separate "Tap to continue" button. Once the
           video ends, the whole splash (which includes the baked-in red
