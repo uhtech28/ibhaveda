@@ -1260,11 +1260,15 @@ function XpBadgeReveal({
   return (
     <div className="relative flex items-center justify-center gap-4 py-2">
       {/* Ornate hex XP badge — gold outline, dark navy fill, gold XP label. */}
+      {/* 64x72 -> 48x54 (2026-08-31). At the old size the hex crowded
+          the +XP counter beside it and, on a phone, overhung the panel's
+          inner border. The viewBox is unchanged so every polygon and the
+          label scale together; only the rendered box shrinks. */}
       <div
         className="relative flex items-center justify-center"
-        style={{ width: 64, height: 72 }}
+        style={{ width: 48, height: 54 }}
       >
-        <svg viewBox="0 0 64 72" width={64} height={72} aria-hidden>
+        <svg viewBox="0 0 64 72" width={48} height={54} aria-hidden>
           {/* Outer hex */}
           <polygon
             points="32,2 60,18 60,54 32,70 4,54 4,18"

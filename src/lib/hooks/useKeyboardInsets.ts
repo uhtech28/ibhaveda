@@ -45,6 +45,15 @@ export interface KeyboardInsets {
   viewportWidth: number;
   /** Visual viewport's top offset in px. */
   viewportOffsetTop: number;
+  /**
+   * Visual viewport's LEFT offset in px. Non-zero whenever iOS has shifted
+   * the visible window horizontally — which it does when a focused input
+   * sits inside a wide/transformed container, and whenever the user has
+   * pinch-zoomed. Fixed elements are positioned against the LAYOUT
+   * viewport, so ignoring this is what pushed the flare and contribution
+   * dialogs off the left edge of the screen while the keyboard was up.
+   */
+  viewportOffsetLeft: number;
   /** True when keyboardHeight exceeds ~100px (rough "keyboard open" gate). */
   isKeyboardOpen: boolean;
   /** True for phone/tablet-sized layouts where keyboard-safe centering matters. */
@@ -56,6 +65,7 @@ const EMPTY: KeyboardInsets = {
   viewportHeight: 0,
   viewportWidth: 0,
   viewportOffsetTop: 0,
+  viewportOffsetLeft: 0,
   isKeyboardOpen: false,
   isMobileViewport: false,
 };
@@ -83,6 +93,7 @@ export function useKeyboardInsets(): KeyboardInsets {
         viewportHeight: visualH,
         viewportWidth: visualW,
         viewportOffsetTop: vv?.offsetTop ?? 0,
+        viewportOffsetLeft: vv?.offsetLeft ?? 0,
         // Heuristic — a small ~40px browser chrome shift shouldn't
         // count as "keyboard open". Real keyboards are 240–380px.
         isKeyboardOpen: keyboardH > 100,
@@ -161,6 +172,21 @@ export function keyboardSafeDialogStyle(
     style.top = `${Math.floor(
       insets.viewportOffsetTop + insets.viewportHeight / 2,
     )}px`;
+    // Pin the HORIZONTAL axis too. The dialog primitive centres with
+    // `left: 50%` + `translateX(-50%)`, which resolves against the LAYOUT
+    // viewport. Once iOS shifts the visible window sideways to clear a
+    // focused input (viewportOffsetLeft > 0) that centre is no longer the
+    // centre of anything the user can see, and the dialog hangs off the
+    // left edge — the reported flare and contribution layout bugs.
+    style.left = `${Math.floor(
+      insets.viewportOffsetLeft + insets.viewportWidth / 2,
+    )}px`;
+    // And clamp the width to the VISIBLE viewport. `w-[min(100%-2rem,…)]`
+    // measures the layout viewport, so on a shifted/zoomed visual viewport
+    // the dialog could still be wider than the window it has to fit in.
+    const safeW = Math.max(240, Math.floor(insets.viewportWidth) - 24);
+    style.width = `${safeW}px`;
+    style.maxWidth = `${safeW}px`;
   }
   return style;
 }

@@ -542,7 +542,12 @@ export function BossIntroCinematic({
                 // pack title/boss/minions/CTA into a centered stack
                 // (product ask: "shift everything little upward so it
                 // look centralised for all pc").
-                className="pointer-events-none absolute bottom-[130px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
+                // items-start: labels wrap to different line counts
+                // ("Cartographer of Crooked Maps" takes two, "Blank Page
+                // Wraith" one), and under the default `stretch` that
+                // difference could shift a card's sprite box. Pinning the
+                // row to the top keeps all four tiles on one line.
+                className="pointer-events-none absolute bottom-[130px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 items-start justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
               >
                 {RESOLVED_MINIONS.map((boss, i) => {
                   const revealed = i <= minionIdx || phase === "finale";
@@ -829,19 +834,103 @@ function MainBossPortrait({
  * creative template stage-boss sheets uniformly, without a per-boss
  * allowlist.
  */
+/**
+ * MinionSprite — renders frame 0 of a boss sprite at a size that MATCHES
+ * its siblings.
+ *
+ * The tiles were always identical 64/108px squares, but the bosses inside
+ * them read as wildly different sizes (product report: "the bosses below
+ * are not equally sized"). The cause is the source art, not the layout:
+ * each sprite sits inside its frame with its own amount of transparent
+ * padding, so scaling the FRAME to 78% of the tile scales the padding
+ * too. A boss drawn small inside a 96px frame stayed small; one drawn
+ * edge-to-edge filled the tile.
+ *
+ * Fix: crop frame 0 to its opaque bounding box on a canvas, then let that
+ * trimmed image fit the tile. Every boss is then measured by its actual
+ * pixels, so they all present at the same visual weight. Falls back to
+ * the untrimmed frame if the canvas is unavailable or the scan finds
+ * nothing (fully transparent / decode failure), so a bad asset degrades
+ * to the previous behaviour rather than rendering nothing.
+ */
 function MinionSprite({ src, alt }: { src: string; alt: string }) {
-  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [trimmed, setTrimmed] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
   useEffect(() => {
-    setDims(null);
+    setTrimmed(null);
+    setFailed(false);
     let cancelled = false;
     const probe = new window.Image();
+    probe.crossOrigin = "anonymous";
     probe.onload = () => {
       if (cancelled) return;
-      setDims({ w: probe.naturalWidth, h: probe.naturalHeight });
+      try {
+        const nw = probe.naturalWidth;
+        const nh = probe.naturalHeight;
+        if (!nw || !nh) {
+          setFailed(true);
+          return;
+        }
+        // Horizontal spritesheets are near-exact multiples of their
+        // height; anything else is treated as a single frame.
+        const frameCount = Math.max(1, Math.round(nw / nh));
+        const fw = Math.round(nw / frameCount);
+
+        const c = document.createElement("canvas");
+        c.width = fw;
+        c.height = nh;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        if (!ctx) {
+          setFailed(true);
+          return;
+        }
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(probe, 0, 0, fw, nh, 0, 0, fw, nh);
+
+        const { data } = ctx.getImageData(0, 0, fw, nh);
+        let minX = fw;
+        let minY = nh;
+        let maxX = -1;
+        let maxY = -1;
+        // Alpha > 8 ignores the near-transparent fringe some exports
+        // carry, which would otherwise defeat the whole trim.
+        for (let y = 0; y < nh; y++) {
+          for (let x = 0; x < fw; x++) {
+            if (data[(y * fw + x) * 4 + 3] > 8) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (maxX < minX || maxY < minY) {
+          setFailed(true); // nothing opaque — use the raw frame
+          return;
+        }
+
+        const cw = maxX - minX + 1;
+        const ch = maxY - minY + 1;
+        const out = document.createElement("canvas");
+        out.width = cw;
+        out.height = ch;
+        const octx = out.getContext("2d");
+        if (!octx) {
+          setFailed(true);
+          return;
+        }
+        octx.imageSmoothingEnabled = false;
+        octx.drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+        setTrimmed(out.toDataURL("image/png"));
+      } catch {
+        // Tainted canvas or any decode error — fall back gracefully.
+        setFailed(true);
+      }
     };
     probe.onerror = () => {
       if (cancelled) return;
-      setDims({ w: 92, h: 92 });
+      setFailed(true);
     };
     probe.src = src;
     return () => {
@@ -849,50 +938,38 @@ function MinionSprite({ src, alt }: { src: string; alt: string }) {
     };
   }, [src]);
 
-  const frameCount = dims && dims.h > 0
-    ? Math.max(1, Math.round(dims.w / dims.h))
-    : 1;
-  const isSheet = frameCount > 1;
   const filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.6))";
 
-  if (isSheet) {
+  // Fallback: original untrimmed frame-0 render.
+  if (failed) {
     return (
-      <div
-        role="img"
-        aria-label={alt}
+      <img
+        src={src}
+        alt={alt}
         style={{
-          width: "78%",
-          paddingTop: "78%", // square aspect via padding trick
-          position: "relative",
+          maxWidth: "78%",
+          maxHeight: "78%",
           imageRendering: "pixelated",
+          objectFit: "contain",
           filter,
         }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: `url(${src})`,
-            backgroundRepeat: "no-repeat",
-            backgroundSize: `${frameCount * 100}% 100%`,
-            backgroundPosition: "0 50%",
-            visibility: dims ? "visible" : "hidden",
-          }}
-        />
-      </div>
+        draggable={false}
+      />
     );
   }
+
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      src={trimmed ?? undefined}
       alt={alt}
       style={{
-        maxWidth: "78%",
-        maxHeight: "78%",
+        maxWidth: "82%",
+        maxHeight: "82%",
         imageRendering: "pixelated",
         objectFit: "contain",
         filter,
-        visibility: dims ? "visible" : "hidden",
+        visibility: trimmed ? "visible" : "hidden",
       }}
       draggable={false}
     />

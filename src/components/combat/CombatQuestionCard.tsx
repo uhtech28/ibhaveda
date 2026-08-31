@@ -1727,7 +1727,18 @@ function BattleScene({
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
-  const bossDisplayWidth = isMobile ? 180 : 300;
+  // 180 -> 220 on mobile (2026-08-31). The persona renders at 120, so at
+  // 180 the two read as roughly peers once each sprite's internal padding
+  // is accounted for; product ask is for the boss to clearly outsize the
+  // founder. Desktop is unchanged.
+  const bossDisplayWidth = isMobile ? 220 : 300;
+  // Mobile baseline alignment. The boss box hangs at bottom:-40 on desktop
+  // to bury its sprite padding below the arena floor; on a phone that sank
+  // the whole figure well under the persona (bottom:8) so they read as
+  // standing on two different ground lines. Lifting the boss to +4 puts
+  // both combatants on the same level with the boss a touch higher, which
+  // is the staging the product ask describes.
+  const bossBottom = isMobile ? 4 : -40;
 
   // ── Three-stage cinematic ──────────────────────────────────────────
   // Stage 0 (win only) RETREAT (0 - 1600ms): a gamified banner reads
@@ -2065,7 +2076,7 @@ function BattleScene({
         // visible against the smaller opponent.
         className="absolute right-2 sm:right-16"
         style={{
-          bottom: "-40px",
+          bottom: bossBottom,
           // CINEMATIC LAYOUT
           // - retreat stage (WIN only): boss slides ~180px to the RIGHT
           //   + fades + shrinks so it visually RETREATS off the arena.
@@ -2325,16 +2336,17 @@ function BattleScene({
           decorative — no pointer-events, no state escalation into
           the tutorial's global Sparky module. */}
       <div
-        className="pointer-events-none absolute z-[6] left-[52px] sm:left-[64px]"
+        className="pointer-events-none absolute z-[6]"
         style={{
-          // Shifted ~1cm (~37px at 96dpi) upward per product request so
-          // Sparky sits higher and reads as tucked NEXT TO the persona
-          // rather than at the arena floor line. Horizontal offset was
-          // bumped ~2cm (~76px @ 96dpi) rightward (was left-1 / sm:left-4)
-          // so Sparky reads as physically shoulder-to-shoulder with the
-          // persona instead of floating alone at the arena edge —
-          // matches product ask "shift sparky 2 cm right toward persona".
-          bottom: 43,
+          // MOBILE: down at the persona's feet and just to their LEFT, so
+          // Sparky reads as a companion sitting by the founder's leg.
+          // He previously sat at bottom:43 / left:52 which floated him at
+          // chest height and, at phone widths, on top of the persona.
+          //
+          // DESKTOP: unchanged (left 64 / bottom 43) — there is room for
+          // the shoulder-to-shoulder staging on a wide arena.
+          left: isMobile ? 14 : 64,
+          bottom: isMobile ? 10 : 43,
           opacity:
             cinematicStage === "cheer" && outcome === "lost" ? 0.35 : 1,
           transition: "opacity 500ms ease-out",
