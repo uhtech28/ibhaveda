@@ -95,6 +95,17 @@ interface TutorialMascotProps {
    * so this prop mainly controls the keyboard-DOWN state of typing steps.
    */
   mobileCorner?: boolean;
+  /**
+   * MOBILE ONLY — always hug the highlighted target instead of letting the
+   * centre-vs-hug heuristic decide.
+   *
+   * That heuristic centres the stack whenever a centred group wouldn't
+   * physically overlap the target. For a target near the bottom edge (the
+   * saddlebag button in the map HUD) it never overlaps, so Sparky sat in
+   * the middle of the screen pointing at something far below him. Steps
+   * whose target lives at an edge set this to keep him next to it.
+   */
+  mobileHugTarget?: boolean;
 }
 
 // ─── Size constants (must match rendered widths) ─────────────────────────────
@@ -655,6 +666,7 @@ export function TutorialMascot({
   noScrim = false,
   suppressRoll = false,
   mobileCorner = false,
+  mobileHugTarget = false,
 }: TutorialMascotProps): ReactElement | null {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -832,14 +844,27 @@ export function TutorialMascot({
             window.visualViewport.offsetTop,
         )
       : 0;
+  // Distance from the top of the LAYOUT viewport to the top of the VISIBLE
+  // one. Non-zero whenever iOS shifts the page up to keep a focused input
+  // above the keyboard. `position: fixed` coordinates are layout-viewport
+  // relative, so any fixed element positioned purely from `vh` renders
+  // OUTSIDE the visible window once this is non-zero — that is what made
+  // Sparky and his bubble vanish the moment the keyboard opened on the
+  // "Describe your idea" and flare steps.
+  const readVvTop = () =>
+    typeof window !== "undefined"
+      ? (window.visualViewport?.offsetTop ?? 0)
+      : 0;
   const [vw, setVw] = useState<number>(readVw);
   const [vh, setVh] = useState<number>(readVh);
   const [kbInset, setKbInset] = useState<number>(readKbInset);
+  const [vvTop, setVvTop] = useState<number>(readVvTop);
   useEffect(() => {
     const onResize = () => {
       setVw(readVw());
       setVh(readVh());
       setKbInset(readKbInset());
+      setVvTop(readVvTop());
     };
     window.addEventListener("resize", onResize, { passive: true });
     const vv = window.visualViewport;
@@ -986,22 +1011,35 @@ export function TutorialMascot({
                 const cornerSize = keyboardOpen
                   ? SPARKY_SIZE_MOBILE_CORNER_KBD
                   : SPARKY_SIZE_MOBILE_CORNER;
-                // Anchor to the modal's top edge when we know it, clamped so
-                // the group never rides off the top or down under the
-                // keyboard (vh already excludes the keyboard area).
+                // Anchor to the modal's top edge when we know it, then clamp
+                // into the VISIBLE viewport.
+                //
+                // The clamp used to run against [0, vh] — layout-viewport
+                // coordinates measured against a visual-viewport height.
+                // The moment iOS shifted the page up to clear the keyboard
+                // (vvTop > 0) that window no longer described anything the
+                // user could see, and the whole group rendered above the
+                // visible area: "Sparky disappears when the keyboard is on".
+                // Clamping to [vvTop, vvTop + vh] keeps him on screen in
+                // every keyboard state, on iOS and Android alike.
                 const cornerGroupH = Math.max(cornerSize, 132);
-                const rawTop = targetRect ? targetRect.top : 0;
-                const topY = Math.min(
-                  Math.max(rawTop, 0),
-                  Math.max(0, vh - cornerGroupH - 12),
-                );
+                const rawTop = targetRect ? targetRect.top : vvTop;
+                const minTop = vvTop + 8;
+                const maxTop = Math.max(minTop, vvTop + vh - cornerGroupH - 12);
+                const topY = Math.min(Math.max(rawTop, minTop), maxTop);
                 return (
                   <div
                     className="pointer-events-none fixed z-[10010] flex justify-end"
                     style={{
                       left: 8,
                       right: 8,
-                      top: `calc(${topY}px + env(safe-area-inset-top, 0px) + 6px)`,
+                      // Plain px, not calc(... + safe-area-inset-top). topY is
+                      // already an absolute layout-viewport coordinate derived
+                      // from getBoundingClientRect / visualViewport, both of
+                      // which account for the notch. Adding the inset again
+                      // double-counted it and could push the group past the
+                      // clamp we just computed.
+                      top: `${topY}px`,
                       alignItems: "flex-start",
                       transition: "top 200ms cubic-bezier(0.22, 1, 0.36, 1)",
                       willChange: "top",
@@ -1084,7 +1122,11 @@ export function TutorialMascot({
                 const collides =
                   centeredBottom > targetRect.top - GAP &&
                   centeredTop < targetRect.bottom + GAP;
-                if (!collides) {
+                // mobileHugTarget forces the hug branch even when a centred
+                // stack would clear the target — see the prop's docs. Used
+                // by edge-anchored steps like the saddlebag button, where
+                // centring left Sparky stranded mid-screen.
+                if (!collides && !mobileHugTarget) {
                   mode = "center";
                 } else {
                   const spaceBelow = vh - targetRect.bottom;

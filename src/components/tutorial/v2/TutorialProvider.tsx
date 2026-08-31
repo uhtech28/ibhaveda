@@ -58,6 +58,7 @@ import {
   TutorialContext,
   TUTORIAL_TOTAL_STEPS,
   type TutorialBackendState,
+  type TutorialMilestone,
   type TutorialStep,
 } from "./useTutorial";
 
@@ -122,6 +123,7 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   const skipMutation = useMutation(api.tutorial.skipFeedTutorial);
   const completeMutation = useMutation(api.tutorial.completeFeedTutorial);
   const restartMutation = useMutation(api.tutorial.restartFeedTutorial);
+  const markMilestoneMutation = useMutation(api.tutorial.markTutorialMilestone);
 
   // ── Local optimistic mirror ─────────────────────────────────────────────
   const [optimisticStep, setOptimisticStep] = useState<TutorialStep | null>(null);
@@ -131,6 +133,13 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   // to a page where we want Sparky to disappear briefly without losing
   // their step).
   const [activeOverride, setActiveOverride] = useState<boolean | null>(null);
+  // Locally-marked beats, unioned over the server's list. Keeps the guard
+  // effective on the render immediately after markMilestone() rather than
+  // only after the Convex round-trip lands — that gap is exactly when a
+  // remount would otherwise replay the beat we just finished.
+  const [localMilestones, setLocalMilestones] = useState<
+    readonly TutorialMilestone[]
+  >([]);
 
   // Resolve the effective state — optimistic wins over remote, remote
   // wins over default.
@@ -139,6 +148,25 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
 
   const step: TutorialStep =
     optimisticStep ?? ((remote?.step ?? 0) as TutorialStep);
+
+  // Server list ∪ locally-marked. A terminal user is treated as having
+  // finished every beat regardless of what the array says, so no step
+  // component can find something left to replay for them.
+  const milestones = useMemo<readonly TutorialMilestone[]>(() => {
+    const fromServer = (remote?.milestones ?? []) as TutorialMilestone[];
+    const merged = new Set<TutorialMilestone>([
+      ...fromServer,
+      ...localMilestones,
+    ]);
+    if (remote?.state === "completed" || remote?.state === "skipped") {
+      merged.add("map_task_done");
+      merged.add("combat_done");
+      merged.add("flare_done");
+      merged.add("contribute_done");
+    }
+    return Array.from(merged);
+  }, [remote?.milestones, remote?.state, localMilestones]);
+  const milestonesLoaded = remote !== undefined;
 
   // Reconcile optimistic state with remote once they match — prevents
   // stale optimistic values from sticking around.
@@ -321,6 +349,9 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   const restart = useCallback(async () => {
     setOptimisticState("in_progress");
     setOptimisticStep(1 as TutorialStep);
+    // Restart is the only path that un-marks beats — drop the local
+    // mirror too, or it would keep suppressing them after the reset.
+    setLocalMilestones([]);
     try {
       await restartMutation({});
     } catch (err) {
@@ -329,6 +360,31 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
       setOptimisticStep(null);
     }
   }, [restartMutation]);
+
+  const markMilestone = useCallback(
+    (key: TutorialMilestone) => {
+      // Local first so the very next render already sees the beat as
+      // done. The server call is fire-and-forget and idempotent; if it
+      // fails the user simply keeps the in-memory guard for this session
+      // and the mutation is retried the next time the beat completes.
+      setLocalMilestones((prev) =>
+        prev.includes(key) ? prev : [...prev, key],
+      );
+      void markMilestoneMutation({ key }).catch((err) => {
+        console.warn("[tutorial] milestone mark failed", key, err);
+      });
+    },
+    [markMilestoneMutation],
+  );
+
+  const milestonesRef = useRef<readonly TutorialMilestone[]>(milestones);
+  milestonesRef.current = milestones;
+  // Reads through a ref so the callback identity stays stable — step
+  // effects put it in dep arrays.
+  const hasMilestone = useCallback(
+    (key: TutorialMilestone) => milestonesRef.current.includes(key),
+    [],
+  );
 
   // `null` clears the override (natural baseActive takes over again).
   // `true` / `false` force-show / force-hide respectively. See the
@@ -346,6 +402,40 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
     }
   }, [backendState]);
 
+  // ── Self-healing completion ─────────────────────────────────────────
+  // Completion used to depend entirely on the user pressing Continue on
+  // Step4's finale card. Anyone who sent their contribution request and
+  // then closed the tab was left at `in_progress` / step 10 forever, and
+  // the tour re-mounted on every subsequent visit — the "it keeps coming
+  // back even after I finished it" report.
+  //
+  // Every beat being marked IS the definition of finished, so persist it
+  // rather than waiting on a button. Runs once per session (ref guard),
+  // only on a hydrated non-terminal record.
+  const autoCompleteFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoCompleteFiredRef.current) return;
+    if (!remoteLoaded || remoteTerminal) return;
+    const allDone = (
+      [
+        "map_task_done",
+        "combat_done",
+        "flare_done",
+        "contribute_done",
+      ] as const
+    ).every((k) => milestones.includes(k));
+    if (!allDone) return;
+    autoCompleteFiredRef.current = true;
+    setOptimisticState("completed");
+    setOptimisticStep(11 as TutorialStep);
+    void completeMutation({}).catch((err) => {
+      console.warn("[tutorial] auto-complete failed", err);
+      autoCompleteFiredRef.current = false;
+      setOptimisticState(null);
+      setOptimisticStep(null);
+    });
+  }, [remoteLoaded, remoteTerminal, milestones, completeMutation]);
+
   // (Post-tutorial sword-drop celebration removed — tutorial now
   // ends silently once the contribute step completes.)
 
@@ -355,14 +445,32 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
       backendState,
       step: effectiveStep as TutorialStep,
       active,
+      milestones,
+      milestonesLoaded,
       advance,
       goTo,
       skip,
       complete,
       restart,
       setActive,
+      markMilestone,
+      hasMilestone,
     }),
-    [backendState, effectiveStep, active, advance, goTo, skip, complete, restart, setActive],
+    [
+      backendState,
+      effectiveStep,
+      active,
+      milestones,
+      milestonesLoaded,
+      advance,
+      goTo,
+      skip,
+      complete,
+      restart,
+      setActive,
+      markMilestone,
+      hasMilestone,
+    ],
   );
 
   // ── Render ──────────────────────────────────────────────────────────────
@@ -409,18 +517,14 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
           <Step4Contribute />
         </>
       ) : null}
-      {/* Universal stuck-watchdog — a small "Skip this step" chip that
-          appears when the same tutorial step has been active for >45s
-          without advancing. Product feedback 2026-08-20: "a few
-          people are facing bugs during the tutorial - it gets stuck
-          at some random points". Skipping unblocks the user without
-          them having to hunt for the top-right × on the progress bar. */}
-      <TutorialStuckEscape
-        active={active}
-        step={effectiveStep}
-        onSkip={skip}
-        onAdvance={advance}
-      />
+      {/* REMOVED per product 2026-08-31: the "Stuck? Skip this step"
+          watchdog chip. It was firing on perfectly healthy steps — any
+          beat where the user spends >45s reading, typing an idea, or
+          fighting a boss surfaced it — so it read as the tutorial
+          admitting it was broken. The × on the progress bar remains the
+          escape hatch. TutorialStuckEscape is kept below (unused) so the
+          behaviour can be restored by re-mounting this one element if
+          real stuck reports come back. */}
     </TutorialContext.Provider>
   );
 }
@@ -442,7 +546,11 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
  *
  * Timer resets on every step change so bumping steps quickly (which
  * is what a working tutorial does) never surfaces the chip.
+ *
+ * CURRENTLY UNMOUNTED — see the note where it used to render above.
+ * Kept intact so restoring it is a one-line change.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TutorialStuckEscape({
   active,
   step,

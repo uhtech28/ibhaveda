@@ -9,6 +9,32 @@ import type { Doc } from "./_generated/dataModel";
 // can't be farmed by restart abuse (each user can only claim once).
 const TUTORIAL_COMPLETION_XP = 100;
 
+/**
+ * Durable per-user record of finished tutorial BEATS.
+ *
+ * `feedTutorialStep` is one coarse number (0..11), but each step owns a
+ * multi-beat sub-flow (Step3 alone runs checkpoint → task → boss intro →
+ * combat → victory → saddlebag → flare). Those beats lived only in the
+ * step component's local React state, so every unmount — a route change,
+ * a refresh, opening the map from a different entry point — reset them
+ * and replayed the beat. The AI-combat beat was the visible symptom: it
+ * re-fired on every return to the map at step 6-8.
+ *
+ * A previous attempt guarded combat with a `localStorage` flag. That made
+ * it worse in two ways: the key was NOT namespaced per user (two accounts
+ * in one browser shared it) and it was per-device (a second device
+ * replayed everything). This array is the server-side replacement.
+ *
+ * Append-only. Only `restartFeedTutorial` clears it.
+ */
+export const TUTORIAL_MILESTONES = [
+  "map_task_done",
+  "combat_done",
+  "flare_done",
+  "contribute_done",
+] as const;
+export type TutorialMilestone = (typeof TUTORIAL_MILESTONES)[number];
+
 export const getMyFeedTutorialState = query({
   args: {},
   handler: async (ctx) => {
@@ -21,7 +47,35 @@ export const getMyFeedTutorialState = query({
         | "completed"
         | "skipped",
       step: user.feedTutorialStep ?? 0,
+      milestones: user.tutorialMilestones ?? [],
     };
+  },
+});
+
+/**
+ * Record a finished tutorial beat. Idempotent and append-only: calling it
+ * twice is a no-op, and a milestone can never be un-set here. Safe to
+ * fire-and-forget from a step component's effect.
+ *
+ * Terminal users are a no-op too — once someone has completed or skipped,
+ * there is nothing left to record and we must not touch their row.
+ */
+export const markTutorialMilestone = mutation({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const user = await maybeUser(ctx);
+    if (!user) return null;
+    if (!(TUTORIAL_MILESTONES as readonly string[]).includes(key)) {
+      return { milestones: user.tutorialMilestones ?? [] };
+    }
+    const current = user.tutorialMilestones ?? [];
+    if (current.includes(key)) return { milestones: current };
+    const next = [...current, key];
+    await ctx.db.patch(user._id, {
+      tutorialMilestones: next,
+      updatedAt: Date.now(),
+    });
+    return { milestones: next };
   },
 });
 
@@ -88,6 +142,9 @@ export const completeFeedTutorial = mutation({
       // Persist the terminal step (11) so nothing can re-open the
       // tutorial at step 10 (flare) by regressing the step field alone.
       feedTutorialStep: 11,
+      // Seal every beat as well. Belt-and-braces against a step component
+      // that reads milestones without also checking the terminal state.
+      tutorialMilestones: [...TUTORIAL_MILESTONES],
       updatedAt: now,
     });
 
@@ -145,6 +202,14 @@ export const skipFeedTutorial = mutation({
     if (!user) return null;
     await ctx.db.patch(user._id, {
       feedTutorialState: "skipped",
+      // Pin the terminal step too. Skip used to leave feedTutorialStep at
+      // whatever beat the user bailed on, so any later path that revived
+      // "in_progress" would drop them back into the middle of the flow
+      // (e.g. straight into AI combat at step 8). Matches completeFeedTutorial.
+      feedTutorialStep: 11,
+      // Every beat is moot once skipped — record them all so no step
+      // component can decide it still has something to replay.
+      tutorialMilestones: [...TUTORIAL_MILESTONES],
       updatedAt: Date.now(),
     });
     return { state: "skipped" };
@@ -159,6 +224,9 @@ export const restartFeedTutorial = mutation({
     await ctx.db.patch(user._id, {
       feedTutorialState: "in_progress",
       feedTutorialStep: 0,
+      // The ONLY place milestones are cleared — an explicit restart means
+      // the user asked to see every beat again.
+      tutorialMilestones: [],
       updatedAt: Date.now(),
     });
     return { state: "in_progress", step: 0 };

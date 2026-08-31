@@ -46,6 +46,20 @@ export type TutorialBackendState =
   | "completed"
   | "skipped";
 
+/**
+ * Durable per-user record of finished tutorial BEATS. Mirrors
+ * TUTORIAL_MILESTONES in convex/tutorial.ts — keep the two in sync.
+ *
+ * `step` is one coarse number; each step contains a multi-beat sub-flow
+ * that used to live only in a step component's local React state and so
+ * replayed on every remount. These keys are what stop that.
+ */
+export type TutorialMilestone =
+  | "map_task_done"
+  | "combat_done"
+  | "flare_done"
+  | "contribute_done";
+
 export interface TutorialState {
   /** Convex-backed state (persists across sessions). */
   backendState: TutorialBackendState;
@@ -53,6 +67,14 @@ export interface TutorialState {
   step: TutorialStep;
   /** Whether the tutorial overlay is visible right now. */
   active: boolean;
+  /** Beats this user has already finished. Empty until Convex resolves. */
+  milestones: readonly TutorialMilestone[];
+  /**
+   * False until the Convex tutorial query has resolved. Step components
+   * MUST NOT decide which beat to open before this is true, or they race
+   * the milestone data and replay a finished beat for one render.
+   */
+  milestonesLoaded: boolean;
 }
 
 export interface TutorialActions {
@@ -64,8 +86,17 @@ export interface TutorialActions {
   skip: () => Promise<void>;
   /** Mark the tutorial completed. Persists to Convex. */
   complete: () => Promise<void>;
-  /** Restart from step 1. Persists to Convex. */
+  /** Restart from step 1. Persists to Convex (and clears milestones). */
   restart: () => Promise<void>;
+  /**
+   * Record a finished beat so it never replays for this user, on any
+   * device. Idempotent and append-only; safe to fire-and-forget. Updates
+   * the local mirror synchronously so the guard is effective on the very
+   * next render rather than after the server round-trip.
+   */
+  markMilestone: (key: TutorialMilestone) => void;
+  /** Convenience predicate over `milestones`. */
+  hasMilestone: (key: TutorialMilestone) => boolean;
   /**
    * Programmatically override the overlay's visibility without persisting.
    *   - `false` → force-hide (e.g. while a modal owns the screen)

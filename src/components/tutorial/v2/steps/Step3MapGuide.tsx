@@ -13,7 +13,7 @@
  *   3. prevents Step2 from re-firing if user goes back to /feed
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -168,13 +168,65 @@ export function Step3MapGuide() {
     tutorial.step >= 6 &&
     tutorial.step <= 9;
 
-  // Initial stage:
-  //   step >= 9 → "flare" (user is returning to the map to fire a flare,
-  //               e.g. after a refresh mid-flow)
-  //   otherwise → "combat" (first visit — auto-fires the combat panel)
-  const [stage, setStage] = useState<Stage>(() =>
-    tutorial.step >= 9 ? "flare" : "combat",
+  // ── Resolved starting beat ──────────────────────────────────────────
+  // `null` = not decided yet. This USED to be a lazy initialiser reading
+  // `tutorial.step >= 9 ? "flare" : "combat"`, which is the bug behind
+  // "AI combat keeps coming back": local state resets on every unmount,
+  // so any remount at step 6-8 (route change, refresh, re-entering the
+  // map from anywhere) restarted at "combat" and auto-fired the combat
+  // panel — even for a user who had already beaten it.
+  //
+  // The starting beat is now derived from server-persisted milestones,
+  // and stays `null` until they load. Rendering nothing for that beat is
+  // what closes the race: a lazy initialiser necessarily runs before the
+  // Convex query resolves, so it could never have read them correctly.
+  const [stage, setStageRaw] = useState<Stage | null>(null);
+
+  // Wrapper so no call site can move the machine BACKWARDS into a beat
+  // the user has already finished — the other half of the replay loop.
+  const setStage = useCallback(
+    (next: Stage | ((prev: Stage) => Stage)) => {
+      setStageRaw((prev) => {
+        const resolved =
+          typeof next === "function" ? next((prev ?? "combat") as Stage) : next;
+        if (
+          (resolved === "combat" ||
+            resolved === "boss_intro" ||
+            resolved === "checkpoint" ||
+            resolved === "task_open" ||
+            resolved === "submitted") &&
+          tutorial.hasMilestone("combat_done")
+        ) {
+          return prev;
+        }
+        if (
+          (resolved === "flare" || resolved === "flare_opened") &&
+          tutorial.hasMilestone("flare_done")
+        ) {
+          return prev;
+        }
+        return resolved;
+      });
+    },
+    [tutorial],
   );
+
+  // Resolve the starting beat exactly once, after milestones land.
+  const stageResolvedRef = useRef(false);
+  useEffect(() => {
+    if (stageResolvedRef.current) return;
+    if (!tutorial.milestonesLoaded) return;
+    if (!active) return;
+    stageResolvedRef.current = true;
+    if (tutorial.hasMilestone("flare_done")) {
+      // Everything on the map is behind them — go straight to the hand-off.
+      setStageRaw("done");
+    } else if (tutorial.hasMilestone("combat_done") || tutorial.step >= 9) {
+      setStageRaw("flare");
+    } else {
+      setStageRaw("combat");
+    }
+  }, [tutorial, active]);
 
   // Sub-state for the boss-intro cinematic: TRUE while the villain is
   // actively speaking (intro monologue OR minions taunt). We poll the
@@ -254,13 +306,21 @@ export function Step3MapGuide() {
   useEffect(() => {
     if (!active) return;
     if (forceCombatFiredRef.current) return;
-    // DON'T re-fire combat if the user has already progressed past
-    // it. Step >= 9 = flare (map flare beat). Skip combat and drop
-    // straight into the flare stage so re-visits mid-flow (e.g.
-    // browser refresh) resume where they were.
-    if (tutorial.step >= 9) {
+    // Wait for the durable record before deciding anything. Firing on a
+    // half-loaded state is how this dispatcher used to shove people who
+    // had already beaten the boss back into combat.
+    if (!tutorial.milestonesLoaded) return;
+    // DON'T re-fire combat if the user has already beaten it.
+    //
+    // `tutorial.step >= 9` alone was the old guard, and it is precisely
+    // the signal that fails: the goTo(9) that sets it is an async Convex
+    // mutation fired at victory, so a closed tab / dropped connection /
+    // second device leaves the step at 8 with combat long since won. The
+    // milestone is written locally first and persisted per user, so it
+    // survives all three.
+    if (tutorial.hasMilestone("combat_done") || tutorial.step >= 9) {
       forceCombatFiredRef.current = true;
-      setStage("flare");
+      setStage(tutorial.hasMilestone("flare_done") ? "done" : "flare");
       return;
     }
     // Two INDEPENDENT counters so waiting-for-intro doesn't burn the
@@ -467,7 +527,7 @@ export function Step3MapGuide() {
       // flare button lives inside the CheckpointPanel — "task bar of
       // the map"). Only after the user fires a flare do we navigate
       // to /feed for the contribute step.
-      setStage((prev) => {
+      setStage((prev: Stage) => {
         // Cinematic just went up — switch to villain-intro copy.
         if (bossIntroUp && prev !== "boss_intro") {
           return "boss_intro";
@@ -552,46 +612,38 @@ export function Step3MapGuide() {
       tutorial.step < 9
     ) {
       void tutorial.goTo(9);
-      // Defensive local flag: if the Convex mutation ACK is slow and
-      // the user hard-refreshes in the ~500ms window, `tutorial.step`
-      // might still read 8 on next mount and the combat tutorial
-      // would replay. This flag is checked on mount below and forces
-      // an immediate re-advance so the AI-combat tutorial never
-      // re-triggers after victory. Product ask: "if i used ai combat
-      // in tutorial and came till victory board i should never get
-      // back the tutorial of ai combat".
-      if (typeof window !== "undefined") {
-        try {
-          sessionStorage.setItem("tutorial-combat-done", "1");
-          localStorage.setItem("tutorial-combat-done", "1");
-        } catch {
-          /* no-op */
-        }
-      }
+      // Durable, per-user, cross-device record that the combat beat is
+      // finished. This replaces a pair of localStorage / sessionStorage
+      // flags that were keyed globally rather than per user: two accounts
+      // sharing a browser shared the flag, and a second device had none
+      // at all so combat replayed there. Marked locally first, so a hard
+      // refresh inside the mutation-ack window is already covered.
+      tutorial.markMilestone("combat_done");
     }
   }, [stage, active, tutorial, bossIntroSeen]);
 
-  // Mount-time reconciliation — if the persisted tutorial.step lags
-  // behind our local "combat done" markers (hard-refresh during the
-  // mutation ack window), force-advance to step 9 immediately so the
-  // combat tutorial doesn't replay from stage-1 defaults.
+  // Beat markers for the map task and the flare, recorded as soon as the
+  // machine passes them. Same contract as combat_done: once written, the
+  // beat never opens again for this user on any device.
   useEffect(() => {
-    if (!active) return;
-    if (tutorial.step >= 9) return;
-    if (typeof window === "undefined") return;
-    let done = false;
-    try {
-      done =
-        sessionStorage.getItem("tutorial-combat-done") === "1" ||
-        localStorage.getItem("tutorial-combat-done") === "1";
-    } catch {
-      /* no-op */
+    if (!active || !stage) return;
+    if (
+      stage === "boss_intro" ||
+      stage === "combat" ||
+      stage === "victory" ||
+      stage === "saddlebag" ||
+      stage === "flare" ||
+      stage === "flare_opened" ||
+      stage === "done"
+    ) {
+      if (!tutorial.hasMilestone("map_task_done")) {
+        tutorial.markMilestone("map_task_done");
+      }
     }
-    if (done) {
-      void tutorial.goTo(9);
+    if (stage === "done" && !tutorial.hasMilestone("flare_done")) {
+      tutorial.markMilestone("flare_done");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [stage, active, tutorial]);
 
   // Auto-navigate to /feed on done. Runs once per active session.
   // Uses a fire-and-forget setTimeout OUTSIDE the effect's cleanup
@@ -638,6 +690,12 @@ export function Step3MapGuide() {
     primary?: { label: string; onClick: () => void };
     skip?: { label: string; onClick: () => void };
   }>(() => {
+    // Starting beat not resolved yet (milestones still loading). Render a
+    // silent Sparky rather than guessing — guessing is what replayed the
+    // combat beat. The component also returns null in this state below.
+    if (!stage) {
+      return { text: "", mood: "idle", near: null, highlight: null };
+    }
     switch (stage) {
       case "checkpoint":
         // Panel is open on the right. Sparky sits LEFT of the target and
@@ -820,6 +878,10 @@ export function Step3MapGuide() {
   }, [stage, tutorial, bossSpeaking, combatOpenState, tutorialMonsterName, activeTemplateId]);
 
   if (!active) return null;
+  // Milestones haven't landed, so we don't yet know which beat this user
+  // still needs. Paint nothing rather than defaulting to "combat" — that
+  // default is what re-opened AI combat for people who had already won it.
+  if (!stage) return null;
 
   return (
     <>
@@ -874,6 +936,12 @@ export function Step3MapGuide() {
         // OR the user is inside AI combat. In both moments a rolling
         // puppy would pull attention off the primary content.
         suppressRoll={bossSpeaking || combatOpenState}
+        // The saddlebag button sits at the very bottom of the map HUD, so
+        // a centred Sparky never overlapped it and the layout heuristic
+        // parked him mid-screen pointing at nothing (product report:
+        // "make sparky towards bottom for saddle bag tutorial"). Hugging
+        // puts him just above the icon he is talking about.
+        mobileHugTarget={stage === "saddlebag"}
       />
       {/* Global CSS pulse ring around the Flare tile inside the
           Adventurer's Menu during the flare step. NOTE: the selector

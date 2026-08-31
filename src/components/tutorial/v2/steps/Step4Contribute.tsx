@@ -88,8 +88,17 @@ export function Step4Contribute() {
   // map and is owned by Step3MapGuide. We stay dormant until the user
   // arrives here from the map with step >= 9 (the flare beat is done
   // or in progress).
+  // `contribute_done` is the durable record that this beat is finished.
+  // Without it, a user who sent their request but whose `complete()` call
+  // never landed (closed the tab on the finale, offline blip) came back to
+  // step 10 and was walked through the whole contribute beat again.
   const active =
-    tutorial.active && onFeed && tutorial.step >= 9 && tutorial.step <= 10;
+    tutorial.active &&
+    onFeed &&
+    tutorial.step >= 9 &&
+    tutorial.step <= 10 &&
+    tutorial.milestonesLoaded &&
+    !tutorial.hasMilestone("contribute_done");
 
   const [stage, setStage] = useState<Stage>("contribute");
   // Set to true the instant the user commits to Send Request. Until
@@ -193,6 +202,19 @@ export function Step4Contribute() {
     };
   }, [active, stage]);
 
+  // Mark the beat the moment the user commits, NOT when the tutorial
+  // finishes completing. These are different instants and the gap is a
+  // real failure mode: the user sends the request, reaches the finale,
+  // then closes the tab without pressing Continue. `complete()` never
+  // fires, the record stays in_progress at step 10, and the whole
+  // contribute beat replays on their next visit. The milestone closes it.
+  useEffect(() => {
+    if (!active) return;
+    if (stage !== "finale" && stage !== "complete") return;
+    if (tutorial.hasMilestone("contribute_done")) return;
+    tutorial.markMilestone("contribute_done");
+  }, [active, stage, tutorial]);
+
   // Complete the tutorial when the contribute modal closes.
   const completeFiredRef = useRef(false);
   useEffect(() => {
@@ -204,6 +226,43 @@ export function Step4Contribute() {
       /* no-op — TutorialProvider will still hide the overlay */
     });
   }, [active, stage, tutorial]);
+
+  // ── One-shot scroll to the first Contribute button ──────────────────
+  // The feed opens with the FLARES rail on top, and during the tutorial
+  // that rail always has at least one entry (the flare the user just
+  // fired two steps ago). That pushes the first idea card's Contribute
+  // chip below the fold, so Sparky says "send a contribution request"
+  // while the button he means is off screen.
+  //
+  // Scroll to it exactly once on entering the stage. `didScrollRef`
+  // makes it one-shot so the user is never fighting the page afterwards,
+  // and the retry loop covers the feed still streaming in from Convex
+  // when the stage flips (poll ~200ms, give up after ~4s).
+  const didScrollRef = useRef(false);
+  useEffect(() => {
+    if (!active || stage !== "contribute") return;
+    if (didScrollRef.current) return;
+    if (typeof window === "undefined") return;
+
+    let tries = 0;
+    const tick = window.setInterval(() => {
+      tries += 1;
+      const el = document.querySelector('[data-tutorial="contribute"]');
+      if (el) {
+        didScrollRef.current = true;
+        window.clearInterval(tick);
+        // `center` rather than `start` so the whole card stays readable
+        // and Sparky's bottom-docked bubble doesn't cover the button.
+        (el as HTMLElement).scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      } else if (tries > 20) {
+        window.clearInterval(tick);
+      }
+    }, 200);
+    return () => window.clearInterval(tick);
+  }, [active, stage]);
 
   // NOTE: previous versions of this file had four fallback timers
   // (60s + 8s) that auto-advanced flare → contribute and contribute →

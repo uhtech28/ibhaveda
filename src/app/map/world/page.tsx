@@ -3297,7 +3297,9 @@ function MapPageInner() {
       // advance regardless of combat state. The map already reflects
       // the correct state — the CP is won, the boss discs are dim,
       // and the tutorial's stage machine will reconcile to "flare"
-      // from the localStorage `tutorial-combat-done` flag on its own.
+      // from the server-persisted `combat_done` milestone on its own
+      // (was a localStorage flag; see convex/tutorial.ts
+      // TUTORIAL_MILESTONES for why that had to move server-side).
       const gateKey = checkpointBossKey(cp.stage, cp.checkpoint);
       if (bossDefeatedAtCheckpoint.has(gateKey)) {
         return;
@@ -6802,7 +6804,19 @@ function MapPageInner() {
 
           {/* â”€â”€ HP-based Cross-Question Combat â€” replaces the old single-question
                 Doubt Imp overlay. Fires when player walks into a boss checkpoint. â”€â”€ */}
-          {bossCombatTarget && activeVenture && activeCombatRoundId && (
+          {/* GATED ON THE CINEMATICS (2026-08-31). The checkpoint combat
+              panel opens its own full-screen intro card ("* The Librarian
+              offers her endless index …"). Nothing stopped it mounting
+              while a boss-intro cinematic was already playing, so that
+              card flashed for ~2s on top of the super-boss reveal before
+              the cinematic painted over it. The panel now waits for both
+              cinematics to finish; the encounter state it needs is
+              already buffered, so nothing is lost by deferring. */}
+          {bossCombatTarget &&
+            activeVenture &&
+            activeCombatRoundId &&
+            !superIntroTarget &&
+            !shouldShowBossIntro && (
             <CombatPanel
               key={activeCombatRoundId}
               roundId={activeCombatRoundId as Id<"combatRounds">}

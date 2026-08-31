@@ -75,6 +75,15 @@ export default defineSchema({
       ),
     ),
     feedTutorialStep: v.optional(v.number()), // Last viewed step index
+    // Append-only set of finished tutorial BEATS (see TUTORIAL_MILESTONES
+    // in convex/tutorial.ts). `feedTutorialStep` is a single coarse
+    // number, but each step contains a multi-beat sub-flow that lived
+    // only in React state — so any remount (route change, refresh, a
+    // second device) replayed it. AI combat was the worst offender: it
+    // re-fired on every return to the map. These keys are the durable,
+    // per-user record of "this beat is done, never show it again".
+    // Never removed except by restartFeedTutorial.
+    tutorialMilestones: v.optional(v.array(v.string())),
     // First-time boss intro cinematic on /map/world. Flipped to true
     // after the Unraveller + checkpoint reveal plays. Missing = unseen.
     hasSeenBossIntro: v.optional(v.boolean()),
