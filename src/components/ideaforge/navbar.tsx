@@ -100,7 +100,21 @@ export function IdeaForgeNavbar({
 
             <Popover>
               <PopoverTrigger asChild>
-                <button type="button" className="shrink-0 rounded-full" aria-label="Open profile menu">
+                {/* suppressHydrationWarning: Radix derives the trigger's
+                    aria-controls from useId(), whose value encodes the
+                    component's position in the React tree. Something above
+                    this navbar renders a different tree shape on the server
+                    than on the first client render, so the two ids differ
+                    and React reports a hydration error and re-renders the
+                    whole tree client-side.
+
+                    This suppresses the SYMPTOM on this element only. It is
+                    safe here specifically because the id is generated, has
+                    no meaning across renders, and the client value wins
+                    once hydrated -- aria-controls then correctly points at
+                    the popover content. It does NOT fix the underlying
+                    divergence; see the note on the desktop trigger below. */}
+                <button type="button" suppressHydrationWarning className="shrink-0 rounded-full" aria-label="Open profile menu">
                   <Avatar className="h-7 w-7">
                     <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
                     <AvatarFallback className="bg-[#1B2440] text-[10px] font-semibold text-white">{getInitials(currentUser?.displayName)}</AvatarFallback>
@@ -173,7 +187,20 @@ export function IdeaForgeNavbar({
           <NotificationBell />
           <Popover>
             <PopoverTrigger asChild>
-              <button type="button" className="rounded-full" aria-label="Open profile menu">
+              {/* Same useId hydration mismatch as the mobile trigger above.
+                  ROOT CAUSE, for whoever picks this up: the tree shape
+                  differs between SSR and hydration somewhere above this
+                  component. Everything in our own chain was checked and is
+                  deterministic (navbar state, NotificationBell,
+                  ClarityScript, ConvexClientProvider, ThemeProvider,
+                  AuthModalProvider). The remaining candidates are the
+                  <Suspense fallback={null}> around FeedClient in
+                  src/app/feed/page.tsx -- required by Next 15 because
+                  FeedClient calls useSearchParams -- and Clerk's own tree,
+                  whose auth state legitimately differs between the server
+                  render and the first client render. Fixing either needs a
+                  reproduction on an authenticated route. */}
+              <button type="button" suppressHydrationWarning className="rounded-full" aria-label="Open profile menu">
                 <Avatar className="h-11 w-11 ring-2 ring-[#6366F1]/45 ring-offset-2 ring-offset-[#0A0D12]">
                   <AvatarImage src={currentUser?.avatar} alt={currentUser?.displayName} />
                   <AvatarFallback className="bg-[#1B2440] text-white">{getInitials(currentUser?.displayName)}</AvatarFallback>
