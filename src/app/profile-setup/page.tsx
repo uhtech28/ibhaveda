@@ -194,25 +194,32 @@ function ProfileSetupPageInner() {
     if (isExplicitEdit) return; // editing a profile — no intro coming
     const portrait =
       window.innerWidth <= 768 || window.innerHeight > window.innerWidth;
-    const sources = portrait
-      ? [
-          "/assets/videos/welcome-intro-mobile.webm",
-          "/assets/videos/welcome-intro-mobile.mp4",
-        ]
-      : [
-          "/assets/videos/welcome-intro-desktop.webm",
-          "/assets/videos/welcome-intro-desktop.mp4",
-        ];
-    const links = sources.map((href) => {
-      const el = document.createElement("link");
-      el.rel = "prefetch";
-      el.as = "video";
-      el.href = href;
-      document.head.appendChild(el);
-      return el;
-    });
+    // ONE file, not both. This used to prefetch the webm AND the mp4 for
+    // the orientation — but <video> only ever plays one of them, so the
+    // other was pure waste: ~2 MB of redundant download competing for
+    // bandwidth with the file actually being played, on the exact screen
+    // the user is waiting on. That made the wait longer, not shorter.
+    //
+    // Pick the same one the <source> list in WelcomeSplash will resolve
+    // to: webm is listed first and every engine that can play it takes
+    // it; Safari cannot, and falls through to the mp4.
+    const probe = document.createElement("video");
+    const preferWebm = probe.canPlayType('video/webm; codecs="vp9"') !== "";
+    const href = portrait
+      ? preferWebm
+        ? "/assets/videos/welcome-intro-mobile.webm"   // 1.89 MB
+        : "/assets/videos/welcome-intro-mobile.mp4"    // 2.52 MB
+      : preferWebm
+        ? "/assets/videos/welcome-intro-desktop.webm"  // 1.50 MB
+        : "/assets/videos/welcome-intro-desktop.mp4";  // 2.05 MB
+
+    const el = document.createElement("link");
+    el.rel = "prefetch";
+    el.as = "video";
+    el.href = href;
+    document.head.appendChild(el);
     return () => {
-      for (const el of links) el.remove();
+      el.remove();
     };
   }, [isExplicitEdit]);
   // Tutorial context — used on submit to advance from the (now-hidden)

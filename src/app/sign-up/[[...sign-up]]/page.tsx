@@ -12,6 +12,50 @@ export default function SignUpPage() {
     setMounted(true);
   }, []);
 
+  // ── Warm the post-signup intro video from HERE ──────────────────────
+  // The clip is 1.5-2.5 MB and is the very first thing shown after the
+  // username step. Starting the fetch on /profile-setup only buys the
+  // few hundred ms that Clerk and Convex take to resolve; starting it
+  // here buys the whole time the user spends filling in this form, which
+  // is usually tens of seconds. That is the difference between the video
+  // opening instantly and opening on black.
+  //
+  // rel="prefetch" is deliberately LOW priority: it fetches during idle
+  // time and will not compete with this page's own resources or with
+  // Clerk's bundle. Skipped entirely on a metered or slow connection, so
+  // a user on 2G who may not even finish signing up never pays for it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const conn = (
+      navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+      }
+    ).connection;
+    if (conn?.saveData) return;
+    if (conn?.effectiveType && /^(slow-)?2g$/.test(conn.effectiveType)) return;
+
+    const portrait =
+      window.innerWidth <= 768 || window.innerHeight > window.innerWidth;
+    const probe = document.createElement("video");
+    const preferWebm = probe.canPlayType('video/webm; codecs="vp9"') !== "";
+    const href = portrait
+      ? preferWebm
+        ? "/assets/videos/welcome-intro-mobile.webm"
+        : "/assets/videos/welcome-intro-mobile.mp4"
+      : preferWebm
+        ? "/assets/videos/welcome-intro-desktop.webm"
+        : "/assets/videos/welcome-intro-desktop.mp4";
+
+    const el = document.createElement("link");
+    el.rel = "prefetch";
+    el.as = "video";
+    el.href = href;
+    document.head.appendChild(el);
+    return () => {
+      el.remove();
+    };
+  }, []);
+
   // Don't render until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
