@@ -218,16 +218,47 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   // failed the `step >= 1` check so Sparky never showed up after
   // signup. Treat the "not_started + step 0" combination as step 1
   // active so the dog appears on /profile-setup.
-  const remoteLoaded = remote !== undefined;
+  // `undefined` = query in flight. `null` = the query ran but
+  // getMyFeedTutorialState found no user row, which it returns whenever
+  // ctx.auth.getUserIdentity() is not resolved yet -- i.e. the window
+  // after a reload before Convex's auth token propagates.
+  //
+  // Treating null as "loaded" was the cause of the "completed tutorial
+  // reappears for 1-2 seconds on reload" bug: null made remoteLoaded
+  // true, remoteTerminal false (null?.state is undefined), backendState
+  // fall back to "not_started" and step to 0 -- every condition for
+  // baseActive. The tour switched itself on for a finished user and only
+  // switched off once the token landed and the real state arrived.
+  //
+  // Both null and undefined now mean "we do not know yet", so nothing
+  // activates until the server has actually answered for a real user.
+  const remoteLoaded = remote !== undefined && remote !== null;
   // REMOTE-authoritative terminal check. A completed / skipped user must
   // NEVER see the tutorial — even for a single frame — regardless of
   // what optimistic state some racing step effect wrote. We deliberately
   // key off `remote.state` (not the merged `backendState`) so a stray
   // optimistic "in_progress" from a step-file goTo cannot reopen the
   // tour for someone the server has already marked terminal.
+  // LATCH. Once the server has told us this session that the user is
+  // finished, that is permanent for the lifetime of the page -- a later
+  // null (auth token refresh, a dropped socket, a transient query error)
+  // must never be read as "maybe they can start again".
+  //
+  // remoteLoaded already stops the reload-time flash; this stops the
+  // same thing happening mid-session, where there is no page load to
+  // re-derive state from.
+  const sawTerminalRef = useRef(false);
+  if (
+    remote != null &&
+    (remote.state === "completed" || remote.state === "skipped")
+  ) {
+    sawTerminalRef.current = true;
+  }
+
   const remoteTerminal =
-    remoteLoaded &&
-    (remote?.state === "completed" || remote?.state === "skipped");
+    sawTerminalRef.current ||
+    (remoteLoaded &&
+      (remote?.state === "completed" || remote?.state === "skipped"));
   const baseActive =
     remoteLoaded &&
     !remoteTerminal &&
@@ -347,6 +378,9 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   }, [completeMutation]);
 
   const restart = useCallback(async () => {
+    // Release the terminal latch -- restart is the one deliberate way
+    // back in, and without this the guard above would block it forever.
+    sawTerminalRef.current = false;
     setOptimisticState("in_progress");
     setOptimisticStep(1 as TutorialStep);
     // Restart is the only path that un-marks beats — drop the local
