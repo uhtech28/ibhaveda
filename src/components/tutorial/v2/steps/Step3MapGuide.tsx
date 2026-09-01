@@ -329,6 +329,10 @@ export function Step3MapGuide() {
   // "was up, is now gone" as the dismissal signal.
   const introMountedRef = useRef(false);
   const introDismissedRef = useRef(false);
+  // State mirror of introDismissedRef. The ref alone cannot drive the
+  // mascot's `visible` prop -- mutating a ref does not re-render, so
+  // Sparky would stay hidden after the cinematic finished.
+  const [introDismissed, setIntroDismissed] = useState(false);
   useEffect(() => {
     if (!active) return;
     const id = window.setInterval(() => {
@@ -336,10 +340,20 @@ export function Step3MapGuide() {
       if (up) introMountedRef.current = true;
       if (!up && introMountedRef.current && !introDismissedRef.current) {
         introDismissedRef.current = true;
+        setIntroDismissed(true);
       }
     }, 200);
     return () => window.clearInterval(id);
   }, [active]);
+
+  // True while a boss-intro cinematic is coming but not yet finished:
+  // Convex says it is unseen (or has not answered), and we have not
+  // observed it dismiss. Used to suppress BOTH Sparky and the
+  // force-combat watchdog during that window, so the user lands on the
+  // cinematic rather than on a Sparky bubble or an AI-combat card.
+  const bossIntroPending =
+    (bossIntroSeen === false || bossIntroSeen === undefined) &&
+    !introDismissed;
 
   // FORCE-COMBAT DISPATCH — as soon as Step3 becomes active on the
   // map, fire the window event the map page already listens for. The
@@ -491,7 +505,23 @@ export function Step3MapGuide() {
       const spinnerUp =
         typeof document !== "undefined" &&
         document.body.innerText.includes("The boss is awakening");
-      if (combatOpen || spinnerUp) return;
+      // HOLD FOR THE CINEMATIC. Arriving on the map from the invite beat,
+      // `stage` is "combat" while the boss-intro cinematic is still
+      // mounting -- so this watchdog fired and opened AI combat over the
+      // top of it, which is the "boss name for AI combat comes" report.
+      // The one-shot dispatcher above already waits on these two signals;
+      // the watchdog never learned about them.
+      //   introUp        -> the cinematic is on screen right now
+      //   introPending   -> Convex says it has not been seen (it WILL
+      //                     play), or the query has not answered yet, and
+      //                     we have not yet observed it dismiss
+      const introUp =
+        typeof document !== "undefined" &&
+        !!document.querySelector('[data-boss-intro="active"]');
+      const introPending =
+        (bossIntroSeen === false || bossIntroSeen === undefined) &&
+        !introDismissedRef.current;
+      if (combatOpen || spinnerUp || introUp || introPending) return;
       // Reset the one-shot latch so Step3's tryDispatch loop can run
       // again the next time this effect ticks. Then fire the event
       // directly so we don't wait a full poll cycle.
@@ -505,7 +535,7 @@ export function Step3MapGuide() {
     return () => window.clearInterval(tick);
     // findCombatPanel is stable via useCallback in the enclosing scope
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, stage]);
+  }, [active, stage, bossIntroSeen]);
 
   useEffect(() => {
     if (!active) return;
@@ -969,7 +999,18 @@ export function Step3MapGuide() {
         // like a flashing empty box (product report: "before the
         // unraveller starts speaking sparky conversation box is there
         // for 1-2 seconds then it gets remove").
-        visible={stage !== "boss_intro"}
+        // ALSO hidden while the cinematic is merely PENDING. `stage` only
+        // becomes "boss_intro" once the DOM poller sees
+        // [data-boss-intro="active"], so arriving on the map from the
+        // invite beat leaves stage at "combat" for the ~1s the cinematic
+        // takes to mount -- and Sparky painted "You're about to face X"
+        // over that gap before the villain had appeared. Reported as
+        // "sometimes Sparky is there for 1 second".
+        //
+        // bossIntroPending covers both the not-yet-mounted window and the
+        // Convex query still resolving, and clears once we have actually
+        // observed the cinematic dismiss (introDismissedRef).
+        visible={stage !== "boss_intro" && !bossIntroPending}
         text={view.text}
         mood={view.mood}
         primaryAction={view.primary}
