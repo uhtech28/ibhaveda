@@ -11,7 +11,7 @@
  *   5. to_map          — Post complete. Sparky offers a button to go to the map.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -269,8 +269,73 @@ export function Step2TemplatePick() {
   // "click_plus" so /feed doesn't re-play the intro pitch. This is
   // what prevents the second Sparky bubble users used to see on /feed
   // after the persona-setup intro.
-  const [dialogue, setDialogue] = useState<DialogueState>(() =>
-    tutorial.step >= 3 ? "click_plus" : "intro",
+  // ── Resolved starting beat ──────────────────────────────────────────
+  // `null` = not decided yet.
+  //
+  // This used to be a lazy initialiser reading
+  //   tutorial.step >= 3 ? "click_plus" : "intro"
+  // which collapsed EVERY persisted position (4 = pick a template, 5 =
+  // write the outline, 6 = idea posted) back to the very first
+  // instruction. Refreshing mid-flow left the progress bar showing real
+  // progress while Sparky restarted from "tap the plus button" — the
+  // "I was on step 4, refreshed, and came back to the start" report.
+  //
+  // Step 6 was the damaging case: the idea is already published by then,
+  // so telling the user to tap + and create a project asks them to make a
+  // SECOND one.
+  //
+  // The step IS persisted correctly; it was only ever ignored here. A
+  // lazy initialiser also necessarily runs before Convex resolves, so it
+  // would read step 0 on a cold load — hence resolving in an effect once
+  // the query has landed, rendering nothing until then.
+  const [dialogue, setDialogueRaw] = useState<DialogueState | null>(null);
+  const dialogueResolvedRef = useRef(false);
+  useEffect(() => {
+    if (dialogueResolvedRef.current) return;
+    if (!tutorial.milestonesLoaded) return; // Convex has answered
+    if (!active) return;
+    dialogueResolvedRef.current = true;
+    const s = tutorial.step;
+    if (s >= 6) {
+      // Idea is already live. Never send them back to the composer.
+      setDialogueRaw("to_map");
+    } else if (s >= 3) {
+      // Steps 3-5 all live inside the compose wizard, which does not
+      // survive a reload — so the honest resume is "open it again".
+      setDialogueRaw("click_plus");
+    } else {
+      setDialogueRaw("intro");
+    }
+  }, [tutorial, active]);
+
+  // Guarded setter: never walk the machine BACKWARDS past a beat the
+  // persisted step says is already done. Without this a DOM poll that
+  // briefly sees no compose dialog could knock a resumed session back to
+  // click_plus.
+  const setDialogue = useCallback(
+    (next: DialogueState | ((prev: DialogueState) => DialogueState)) => {
+      setDialogueRaw((prev) => {
+        const resolved =
+          typeof next === "function"
+            ? next((prev ?? "intro") as DialogueState)
+            : next;
+        const ORDER: DialogueState[] = [
+          "intro",
+          "click_plus",
+          "pick_template",
+          "write_outline",
+          "posting",
+          "contributors",
+          "to_map",
+        ];
+        // Floor the machine at whatever the server says we reached.
+        const floor =
+          tutorial.step >= 6 ? "contributors" : ("intro" as DialogueState);
+        if (ORDER.indexOf(resolved) < ORDER.indexOf(floor)) return prev;
+        return resolved;
+      });
+    },
+    [tutorial.step],
   );
   // Poll for the post-publish share dialog. When it opens, we hide the
   // tutorial (Sparky + scrim + highlight) so the user can interact with the
@@ -512,6 +577,12 @@ export function Step2TemplatePick() {
     primary?: { label: string; onClick: () => void };
     skip?: { label: string; onClick: () => void };
   }>(() => {
+    // Starting beat not resolved yet — silent Sparky. The component also
+    // returns null in this state, so this never actually paints; it just
+    // keeps the switch total.
+    if (!dialogue) {
+      return { text: "", mood: "idle", highlight: null };
+    }
     switch (dialogue) {
       case "intro":
         // First-meeting hello. Sparky introduces himself and waits for
@@ -644,6 +715,10 @@ export function Step2TemplatePick() {
   }, [userIdeas]);
 
   if (!active) return null;
+  // Starting beat not resolved yet (Convex still answering). Paint
+  // nothing rather than defaulting — defaulting is what restarted the
+  // flow from "tap the plus button" for users mid-way through.
+  if (!dialogue) return null;
   // Hide the entire tutorial UI while the post-publish share dialog is up
   // — UNLESS we're already in the `contributors` beat, in which case the
   // Suggested-Contributors modal owns the screen and needs to render on
