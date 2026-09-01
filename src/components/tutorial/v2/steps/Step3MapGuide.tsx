@@ -268,7 +268,21 @@ export function Step3MapGuide() {
       // Everything on the map is behind them — go straight to the hand-off.
       setStageRaw("done");
     } else if (tutorial.hasMilestone("combat_done") || tutorial.step >= 9) {
-      setStageRaw("flare");
+      // "saddlebag", NOT "flare". The beat order after combat is
+      // victory -> saddlebag -> flare, and resuming at "flare" skipped the
+      // saddlebag beat entirely (reported: finished AI combat, refreshed,
+      // landed on flare instead of saddlebag).
+      //
+      // It was also broken on its own terms: the flare beat highlights a
+      // tile INSIDE the Adventurer's Menu, and a refresh closes that menu
+      // -- so Sparky pointed at an element that was not on screen.
+      // Resuming at "saddlebag" asks the user to open the menu, which is
+      // exactly what has to happen before the flare beat can work.
+      //
+      // A user who had already reached "flare" is sent back one beat, and
+      // that is the right trade: re-opening the saddlebag is a single tap,
+      // whereas resuming into a closed menu is a dead end.
+      setStageRaw("saddlebag");
     } else {
       setStageRaw("combat");
     }
@@ -380,7 +394,10 @@ export function Step3MapGuide() {
     // survives all three.
     if (tutorial.hasMilestone("combat_done") || tutorial.step >= 9) {
       forceCombatFiredRef.current = true;
-      setStage(tutorial.hasMilestone("flare_done") ? "done" : "flare");
+      // "saddlebag" not "flare" — same reasoning as the resume effect
+      // above: saddlebag is the next incomplete beat after combat, and the
+      // flare beat's target lives inside a menu that a reload has closed.
+      setStage(tutorial.hasMilestone("flare_done") ? "done" : "saddlebag");
       return;
     }
     // Two INDEPENDENT counters so waiting-for-intro doesn't burn the
