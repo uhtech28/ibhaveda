@@ -2864,6 +2864,22 @@ function AnimatedPersonaSprite({
     ? "idle"
     : state;
   const sheet = `/assets/personas/${personaId}/${resolvedState}.png`;
+
+  // Warm the persona's non-idle clips for the same reason as the boss
+  // (see BossSpriteFromAsset): the CSS steps() player does not wait for
+  // the image, so the founder's very first swing would otherwise animate
+  // an attack.png that has not arrived yet. Skips anything the persona
+  // declares missing, so we never request a known-404.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const clips: PersonaAnimState[] = ["attack", "hurt", "defeat", "victory"];
+    for (const c of clips) {
+      if (ext?.missingClips?.includes(c as never)) continue;
+      const img = new window.Image();
+      img.src = `/assets/personas/${personaId}/${c}.png`;
+    }
+  }, [personaId, ext]);
+
   const isLoop = resolvedState === "idle" || resolvedState === "victory";
   // Only terminal (defeat / victory) clips freeze on the last frame —
   // attack and hurt release so the sprite doesn't sit on its knelt /
@@ -3440,6 +3456,31 @@ function BossSpriteFromAsset({
     },
   ];
   const sheetDef = SPRITESHEET_BOSSES.find((s) => bossAsset.includes(s.match));
+
+  // ── Warm every clip this boss owns, as soon as it mounts ────────────
+  // MUST be declared before the early return below — hooks have to run in
+  // the same order on every render.
+  //
+  // AnimatedSpritesheet is a pure CSS background-image + steps() player:
+  // the animation starts the instant the element mounts and NEVER waits
+  // for the image to decode. Each state is its own file, so on the FIRST
+  // attack the browser begins downloading attack.png while the clip is
+  // already running -- the animation finishes before the bytes land and
+  // the user sees nothing. The second attack hits a warm cache and plays.
+  //
+  // That is the "first attack animation is invisible, second one works"
+  // report, and why it varied by template: heavier attack sheets miss the
+  // window more often, and only idle.png is warmed beforehand by the
+  // boss's resting clip.
+  useEffect(() => {
+    if (typeof window === "undefined" || !sheetDef) return;
+    for (const s of Object.keys(sheetDef.clips) as BossAnimState[]) {
+      if (s === "idle") continue; // already loaded by the resting clip
+      const img = new window.Image();
+      img.src = `${sheetDef.folder}/${s}.png`;
+    }
+  }, [sheetDef]);
+
   if (!sheetDef) {
     return (
       <img
@@ -3479,6 +3520,7 @@ function BossSpriteFromAsset({
     FALLBACK_CHAIN[state].find((s) => sheetDef.clips[s]) ?? "idle";
   const spec = sheetDef.clips[useState_] ?? sheetDef.clips.idle!;
   const sheetUrl = `${sheetDef.folder}/${useState_}.png`;
+
   const isLoop = useState_ === "idle" || useState_ === "victory";
   // Terminal (defeat / victory) clips freeze on their last frame.
   // Transient combat clips (attack / hurt) release so the boss
