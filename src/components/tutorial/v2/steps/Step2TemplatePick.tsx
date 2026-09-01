@@ -369,6 +369,36 @@ export function Step2TemplatePick() {
   // write_outline → posting transition.
   const hadOutlineTextRef = useRef(false);
 
+  // ── Warm /map/world before the user asks for it ─────────────────────
+  // Sending an invite pushes straight to the map, and nothing prefetched
+  // it -- so the browser started pulling a 728 kB first load (350 kB of
+  // it route-specific, plus Phaser) cold at the exact moment the user
+  // clicked, then still had to boot the scene and fetch the map art.
+  // That is the "takes a little long to load map" wait.
+  //
+  // Start as soon as the idea is posted: from `posting` onward the map is
+  // the only place this flow goes, so this is a certain navigation rather
+  // than a speculative one, and the user spends several seconds on the
+  // contributors modal for the chunks to arrive in.
+  const mapPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (!active) return;
+    if (mapPrefetchedRef.current) return;
+    if (
+      dialogue !== "posting" &&
+      dialogue !== "contributors" &&
+      dialogue !== "to_map"
+    ) {
+      return;
+    }
+    mapPrefetchedRef.current = true;
+    try {
+      router.prefetch("/map/world");
+    } catch {
+      /* prefetch is best-effort; navigation still works without it */
+    }
+  }, [active, dialogue, router]);
+
   // Watch the DOM each tick to detect dialog open / template pick / outline / submit.
   // We now key transitions on the *visible wizard screen* (detected from
   // dialog title text) rather than template-selection heuristics, which
