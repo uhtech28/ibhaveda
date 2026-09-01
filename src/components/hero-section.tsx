@@ -720,7 +720,15 @@ const LANDING_STYLES = `
     height: min(820px, calc(100dvh - 28px));
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
-    align-items: center;
+    /* stretch, NOT center. A centered grid item that is taller than its
+       track overflows symmetrically — half above, half below — so the
+       role cards spilled onto the "What is Ibhaveda?" prompt underneath.
+       This was fixed for phones first, inside the max-width:860px block,
+       but the cause is the base rule and it bites any short window: on a
+       1900px-wide desktop the overlap starts below ~810px of height.
+       Stretching pins the item to its track so .lp-auth-core's own
+       overflow rule can contain it. */
+    align-items: stretch;
   }
 
   .lp-top { min-height: 44px; }
@@ -777,7 +785,27 @@ const LANDING_STYLES = `
     justify-items: center;
     text-align: center;
     transform: translateY(-22px);
+    /* NO BACKTICKS IN THIS COMMENT. The whole stylesheet is one
+       styled-jsx template literal, so a single backtick ends the string
+       and silently drops every rule after it — the page then renders
+       with default typography and no media queries at all.
+
+       Containment, paired with align-items:stretch on .lp-shell.
+       min-height:0 lets the 1fr track actually shrink this item; without
+       it the track floors at min-content and pushes past the shell no
+       matter what align-items says. The "safe" keyword on align-content
+       falls back to start once the content stops fitting, so overflow
+       only ever goes one way instead of clipping the top line too, with
+       plain center declared first for engines that lack it. */
+    min-height: 0;
+    align-content: center;
+    align-content: safe center;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
   }
+
+  .lp-auth-core::-webkit-scrollbar { display: none; }
 
   .lp-member {
     background: transparent;
@@ -1357,6 +1385,31 @@ const LANDING_STYLES = `
       font-size: 7.5px;
       letter-spacing: 0.1em;
     }
+  }
+
+  /* SHORT DESKTOP / LAPTOP windows. Everything above the prompt is sized
+     off WIDTH, so a wide-but-short window (a 1900px laptop with the dock
+     and browser chrome eating height, or any half-height window) renders
+     a 78px headline and 219px-tall cards into a track that cannot hold
+     them. Measured: the overlap starts below ~810px of viewport height.
+
+     The containment on .lp-shell / .lp-auth-core already guarantees the
+     prompt is never overlapped, but clipped cards are a poor second best,
+     so trim the two big height contributors until the stack fits outright.
+     Scoped to min-width:861px so it cannot collide with the phone blocks,
+     and placed after them so it wins where both could match. */
+  @media (min-width: 861px) and (max-height: 860px) {
+    .lp-page h1 { font-size: clamp(34px, min(7vw, 8.2dvh), 78px); }
+    .lp-auth-core { gap: clamp(10px, 1.6dvh, 18px); }
+    /* aspect-ratio alone was 1.6, which at a 216px card width worked out
+       to 135px tall -- shorter than the icon + kicker + name stack, so the
+       role label overflowed 2.7px BELOW the card border. min-height is the
+       real guarantee here: aspect-ratio scales with the card's width, so
+       on a narrow-but-wide-viewport layout it can always undercut the
+       content again. The floor keeps a comfortable gap under the label at
+       any width. */
+    .lp-role { aspect-ratio: 1.42; min-height: 158px; }
+    .lp-bottom-question { min-height: 88px; }
   }
 
   /* SHORT viewports, any phone width. This is the case the mobile
