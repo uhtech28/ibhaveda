@@ -703,7 +703,12 @@ export function Step2TemplatePick() {
           // "builders" → template-aware ("collaborators" for academic,
           // "lab partners" for lab, "co-creators" for creative). Falls
           // back to "builders" for venture / null template.
-          text={`These are potential ${copy.collaboratorNounPlural} for your ${copy.projectNoun}. Tap Send request on anyone you like and I'll write the pitch, then take you straight to your map.`}
+          // Trimmed 2026-09-01: the tail ("and I'll write the pitch, then
+          // take you straight to your map") described plumbing the user
+          // does not need to know about, and pushed the bubble to six
+          // lines on a phone. The instruction ends where the user's job
+          // ends.
+          text={`These are potential ${copy.collaboratorNounPlural} for your ${copy.projectNoun}. Tap Send request on anyone you like.`}
           mood="pointing"
           // Bottom-left so Sparky sits BESIDE the centered contributor
           // modal (max-w-560px) instead of overlapping its Send
