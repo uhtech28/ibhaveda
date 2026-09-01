@@ -113,6 +113,8 @@ export function Step3MapGuide() {
   const pathname = usePathname();
   const router = useRouter();
   const onMap = pathname?.startsWith("/map/") ?? false;
+  // Used only by the off-surface recovery card below.
+  const onFeed = pathname === "/feed";
   // Template-aware first-monster name and Sparky vocabulary. Every
   // template has its own stage-1 boss (venture: Fog of Vagueness,
   // academic: Librarian of Lost Questions, lab: Silencer of Findings,
@@ -167,6 +169,50 @@ export function Step3MapGuide() {
     onMap &&
     tutorial.step >= 6 &&
     tutorial.step <= 9;
+
+  // ── Off-map recovery ────────────────────────────────────────────────
+  // Steps 7-9 belong to the map, but nothing owned them when the user
+  // was NOT on the map: Step2 stops at 6, Step4 starts at 9-on-feed, and
+  // Step3 required `onMap`. So a user at step 7 or 8 sitting anywhere
+  // else saw the progress bar (tutorial.active is true) with no Sparky
+  // and no route back -- stranded, with no way to resume.
+  //
+  // Reported after a laptop was closed and reopened on /feed mid boss
+  // intro. Any route change out of the map does it: a back button, a
+  // notification link, a restored session.
+  //
+  // Generalised: every step has a surface that owns it, and being on the
+  // wrong one strands the user the same way.
+  //
+  //   steps 1-6   -> /feed        (Step2, requires onFeed)
+  //   steps 7-8   -> /map/world   (Step3, requires onMap)
+  //   step  9     -> either       (Step3 on map, Step4 on feed) - no gap
+  //   step  10    -> /feed        (Step4, requires onFeed)
+  //
+  // Nothing else can be mounted in any of these gaps, so this cannot
+  // produce a second Sparky: in each case the other two step components
+  // fail their own route or range check.
+  const recoveryHref: string | null = (() => {
+    if (!tutorial.active) return null;
+    const s = tutorial.step;
+    if (s >= 1 && s <= 6) return onFeed ? null : "/feed";
+    if (s >= 7 && s <= 8) return onMap ? null : "/map/world";
+    if (s === 10) return onFeed ? null : "/feed";
+    return null; // step 9 is valid on either surface
+  })();
+  const offMap = recoveryHref !== null;
+
+  // Debounced so a normal feed -> map navigation, which passes through
+  // "not on the map yet" for a beat, never flashes the recovery card.
+  const [showRecovery, setShowRecovery] = useState(false);
+  useEffect(() => {
+    if (!offMap) {
+      setShowRecovery(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowRecovery(true), 1200);
+    return () => window.clearTimeout(t);
+  }, [offMap]);
 
   // ── Resolved starting beat ──────────────────────────────────────────
   // `null` = not decided yet. This USED to be a lazy initialiser reading
@@ -876,6 +922,31 @@ export function Step3MapGuide() {
     // remounting the tutorial provider).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, tutorial, bossSpeaking, combatOpenState, tutorialMonsterName, activeTemplateId]);
+
+  // Off-map recovery card — the only thing Step3 renders when the user
+  // is mid map-phase but somewhere else. No scrim: they may be reading
+  // the feed and should stay free to use the page.
+  if (!active && showRecovery && recoveryHref) {
+    const toMap = recoveryHref === "/map/world";
+    return (
+      <TutorialMascot
+        visible
+        text={
+          toMap
+            ? "Your map is waiting. Let's pick up where you left off."
+            : "Let's head back to the feed and finish up."
+        }
+        mood="pointing"
+        anchor="bottom-right"
+        nearSelector={null}
+        noScrim
+        primaryAction={{
+          label: toMap ? "Back to my map" : "Back to the feed",
+          onClick: () => router.push(recoveryHref),
+        }}
+      />
+    );
+  }
 
   if (!active) return null;
   // Milestones haven't landed, so we don't yet know which beat this user
