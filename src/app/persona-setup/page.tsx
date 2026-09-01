@@ -45,7 +45,6 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { PersonaSelector } from "@/components/persona/PersonaSelector";
 import type { PersonaId } from "@/config/personas";
-import { useTutorialOptional } from "@/components/tutorial/v2/useTutorial";
 
 export default function PersonaSetupPage() {
   const { isLoaded, userId } = useAuth();
@@ -62,7 +61,10 @@ export default function PersonaSetupPage() {
   );
   const updatePersonaId = useMutation(api.users.updatePersonaId);
   const createUserProfile = useMutation(api.users.createUserProfile);
-  const tutorial = useTutorialOptional();
+  // Tutorial state is deliberately NOT read or written here any more.
+  // This screen used to advance the tutorial past its intro beat before
+  // navigating, which is what made "Hi, I'm Sparky" flash and disappear
+  // on /feed. Step2 owns that beat and advances itself.
   const [submitting, setSubmitting] = useState(false);
 
   // Bounce unauthenticated visitors.
@@ -139,11 +141,14 @@ export default function PersonaSetupPage() {
       // SPARKY".
       //
       // Rewrite: skip the intermediate SparkyIntroOverlay entirely.
-      // On persona pick, immediately advance tutorial + navigate to
-      // /feed where Step2TemplatePick's REAL tutorial mascot takes
-      // over. Bridge flag ensures Step2 mounts synchronously without
-      // waiting for Convex tutorial-state hydration, so users see
-      // ONE Sparky (the tutorial one) instead of two.
+      // On persona pick, navigate to /feed where Step2TemplatePick's
+      // REAL tutorial mascot takes over. The bridge flag ensures Step2
+      // mounts synchronously without waiting for Convex tutorial-state
+      // hydration, so users see ONE Sparky (the tutorial one).
+      //
+      // That fix also used to advance the tutorial to step 3 here. It no
+      // longer does -- see the note further down. Advancing skipped the
+      // very intro beat this hand-off exists to reach.
       if (typeof window !== "undefined") {
         try {
           sessionStorage.setItem("personaPickerDismissed", "1");
@@ -168,13 +173,24 @@ export default function PersonaSetupPage() {
       //
       // Costs a few hundred ms, spent under the existing `submitting`
       // overlay -- cheaper than a modal the user has to read and dismiss.
+      // NOTE: we deliberately do NOT advance the tutorial here.
+      //
+      // This used to call goTo(3), which is "past the intro" -- so the
+      // user landed on /feed already at step 3 and Step2 resolved
+      // straight to click_plus. The "Hi, I'm Sparky" beat flashed for
+      // about a second and was gone, which is exactly the reported bug.
+      //
+      // That advance existed to avoid a double Sparky back when
+      // /persona-setup rendered its own inline SparkyIntroOverlay. That
+      // overlay is gone (see the note at the top of this file), so the
+      // reason for skipping the intro went with it.
+      //
+      // Step2's intro beat already advances itself: its "Let's go" button
+      // calls goTo(3) and moves to click_plus. Leaving the step alone lets
+      // that beat actually run, and the user dismisses it deliberately
+      // rather than watching it vanish.
       try {
-        await Promise.all([
-          updatePersonaId({ personaId: id }),
-          tutorial && tutorial.step < 3
-            ? tutorial.goTo(3)
-            : Promise.resolve(),
-        ]);
+        await updatePersonaId({ personaId: id });
       } catch {
         // Transient failure: still navigate. /feed's guard bounces the
         // user back here if the persona genuinely did not save.
@@ -187,7 +203,10 @@ export default function PersonaSetupPage() {
         router.replace("/feed");
       }
     },
-    [submitting, updatePersonaId, tutorial, router],
+    // `tutorial` is intentionally absent: this handler no longer touches
+    // the tutorial state (see the note above about not skipping the
+    // intro beat).
+    [submitting, updatePersonaId, router],
   );
 
   // Loading state — ONLY block on Clerk auth resolving. Previously we
