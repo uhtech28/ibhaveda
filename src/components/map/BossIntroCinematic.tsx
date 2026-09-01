@@ -558,7 +558,11 @@ export function BossIntroCinematic({
                 // Wraith" one), and under the default `stretch` that
                 // difference could shift a card's sprite box. Pinning the
                 // row to the top keeps all four tiles on one line.
-                className="pointer-events-none absolute bottom-[130px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 items-start justify-center gap-2 px-1 sm:bottom-[28%] sm:w-auto sm:gap-4 sm:px-0"
+                // Desktop strip lowered 28% -> 24% (2026-09-01). Smaller
+                // bottom offset = further down: on a 1000px-tall window
+                // that is ~40px, the requested 1 cm. Still clears the
+                // "Face them" CTA at sm:bottom-[12%]. Mobile untouched.
+                className="pointer-events-none absolute bottom-[130px] left-1/2 flex w-[calc(100vw-12px)] max-w-full -translate-x-1/2 items-start justify-center gap-2 px-1 sm:bottom-[24%] sm:w-auto sm:gap-4 sm:px-0"
               >
                 {RESOLVED_MINIONS.map((boss, i) => {
                   const revealed = i <= minionIdx || phase === "finale";
