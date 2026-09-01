@@ -877,7 +877,14 @@ function MinionSprite({ src, alt }: { src: string; alt: string }) {
     setFailed(false);
     let cancelled = false;
     const probe = new window.Image();
-    probe.crossOrigin = "anonymous";
+    // NO crossOrigin. These assets are same-origin (/assets/bosses/...),
+    // which never needs it -- but setting it turns any response WITHOUT
+    // Access-Control-Allow-Origin into a hard load FAILURE rather than a
+    // normal load. Behind a CDN or an asset host that does not emit CORS
+    // headers, every probe would hit onerror, `failed` would flip true,
+    // and the component would silently fall back to the UNTRIMMED frame
+    // -- i.e. exactly the unequal sizes this trim exists to fix, with no
+    // error anywhere. Dropping it costs nothing and removes that mode.
     probe.onload = () => {
       if (cancelled) return;
       try {
