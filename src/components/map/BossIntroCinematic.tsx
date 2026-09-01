@@ -326,7 +326,18 @@ export function BossIntroCinematic({
             // 32%→28% so the boss + surrounding stack (title / bubble
             // above, minions + CTA below) reads as a vertically
             // centered composition instead of sitting mid-lower.
-            className="pointer-events-none absolute left-1/2 top-[28%] -translate-x-1/2 -translate-y-1/2 sm:top-[30%]"
+            // Desktop 30% -> 35% (2026-09-01). The title sits at
+            // sm:top-[16%] and tall bosses (Thornwarden's antlers, the
+            // Forest Colossus) reached up into it, so the heading cut
+            // across the boss's face. This container is centred on its
+            // `top` via -translate-y-1/2, so +5% of viewport height moves
+            // the sprite down by ~48px on a 950px-tall window -- the
+            // "1-2 cm" the product ask describes -- while staying well
+            // clear of the minion strip at sm:bottom-[28%].
+            //
+            // Mobile is unchanged: the title is `hidden sm:block` there,
+            // so there is nothing for the sprite to collide with.
+            className="pointer-events-none absolute left-1/2 top-[28%] -translate-x-1/2 -translate-y-1/2 sm:top-[35%]"
             initial={{ opacity: 0, y: 60, scale: 0.9 }}
             animate={
               phase === "curtain"
