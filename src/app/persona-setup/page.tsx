@@ -152,18 +152,35 @@ export default function PersonaSetupPage() {
           /* no-op */
         }
       }
-      // Advance tutorial past the intro (step 3 = "click +").
-      if (tutorial && tutorial.step < 3) {
-        void tutorial.goTo(3);
+      // AWAIT both mutations before navigating.
+      //
+      // These were fire-and-forget, with window.location.replace firing
+      // immediately after. That is a HARD navigation, and Convex's client
+      // registers a beforeunload handler that warns whenever it still has
+      // incomplete requests -- so every persona pick produced a browser
+      // "Leave site? Changes you made may not be saved." dialog.
+      //
+      // The dialog was also telling the truth: choosing "Leave" could
+      // abort the in-flight writes and lose the persona, which is why the
+      // old comment noted that "/feed guard bounces the user back here if
+      // the write failed". Awaiting removes the dialog AND makes the
+      // persona actually durable before we leave the page.
+      //
+      // Costs a few hundred ms, spent under the existing `submitting`
+      // overlay -- cheaper than a modal the user has to read and dismiss.
+      try {
+        await Promise.all([
+          updatePersonaId({ personaId: id }),
+          tutorial && tutorial.step < 3
+            ? tutorial.goTo(3)
+            : Promise.resolve(),
+        ]);
+      } catch {
+        // Transient failure: still navigate. /feed's guard bounces the
+        // user back here if the persona genuinely did not save.
       }
-      // Fire-and-forget the persona mutation. Convex reactive query
-      // on /feed picks up the new persona within a tick either way.
-      void updatePersonaId({ personaId: id }).catch(() => {
-        // /feed guard bounces the user back here if the write
-        // failed. Silent on transient hiccups.
-      });
-      // Navigate — window.location.replace is faster + drops all
-      // React state so /feed mounts clean.
+      // Navigate — window.location.replace drops all React state so
+      // /feed mounts clean, with no stale pre-persona query snapshots.
       if (typeof window !== "undefined") {
         window.location.replace("/feed");
       } else {
