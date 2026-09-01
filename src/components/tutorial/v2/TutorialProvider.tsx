@@ -84,6 +84,42 @@ const PROGRESS_BAR_BLOCKED_ROUTES = [
   "/persona-setup",
 ];
 
+/**
+ * Routes where NO tutorial surface may mount at all -- not the progress
+ * bar, not a step component, not Sparky.
+ *
+ * PROGRESS_BAR_BLOCKED_ROUTES above only hides the bar; the four Step
+ * components still mounted and each decided for itself whether to render.
+ * They gate on pathname, so in principle none of them should paint here
+ * -- but "in principle" has not held up: the moment createUserProfile
+ * writes the user row, the tutorial flips to active (state not_started,
+ * step 0) while the user is still mid-signup, and any step component that
+ * mis-reads its route for a frame during the profile-setup ->
+ * persona-setup transition paints a Sparky nobody asked for.
+ *
+ * Reported as "after setting up username, Sparky came for 1 sec, then the
+ * persona selection window". Rather than chase which component wins that
+ * race, nothing tutorial-related is allowed to exist on the signup path.
+ * The tour legitimately begins on /feed once onboarding is finished.
+ */
+const TUTORIAL_BLOCKED_ROUTES = [
+  "/",
+  "/sign-in",
+  "/sign-up",
+  "/login",
+  "/register",
+  "/sso-callback",
+  "/profile-setup",
+  "/persona-setup",
+];
+
+function isTutorialBlockedRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return TUTORIAL_BLOCKED_ROUTES.some(
+    (r) => pathname === r || pathname.startsWith(`${r}/`),
+  );
+}
+
 function TutorialProgressBarGate(props: {
   visible: boolean;
   step: number;
@@ -113,6 +149,11 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
   // Convex socket at all — they get the placeholder default and none of the
   // tutorial machinery activates.
   const { isSignedIn, isLoaded } = useAuth();
+  // Signup-path gate — see TUTORIAL_BLOCKED_ROUTES. Read here rather than
+  // inside each step so there is a single place that decides, and no step
+  // component can disagree for a frame during a route transition.
+  const providerPathname = usePathname();
+  const tutorialBlockedHere = isTutorialBlockedRoute(providerPathname);
   const remote = useQuery(
     api.tutorial.getMyFeedTutorialState,
     isLoaded && isSignedIn ? {} : "skip",
@@ -539,7 +580,11 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
         landing-page visitors on cellular never fetch this JS at all.
         Signed-in users pay the download once on first authenticated page load.
       */}
-      {isLoaded && isSignedIn ? (
+      {/* Hard route gate: on the signup path nothing tutorial-related
+          mounts at all, so no step component can paint a Sparky during
+          the profile-setup -> persona-setup transition. See
+          TUTORIAL_BLOCKED_ROUTES. */}
+      {isLoaded && isSignedIn && !tutorialBlockedHere ? (
         <>
           {/* Step 1 mounts on /profile-setup when tutorial step === 1. */}
           <Step1Welcome />
