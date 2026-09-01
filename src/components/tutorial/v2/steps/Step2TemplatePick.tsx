@@ -297,8 +297,13 @@ export function Step2TemplatePick() {
     dialogueResolvedRef.current = true;
     const s = tutorial.step;
     if (s >= 6) {
-      // Idea is already live. Never send them back to the composer.
-      setDialogueRaw("to_map");
+      // Step 6 means "idea posted, contributors beat NOT finished" --
+      // completing that beat is what fires goTo(7), from either the
+      // dialog's onContinue or the to_map CTA. So a user sitting at 6 was
+      // last seen on the send-invite screen and that is where they
+      // resume. Resuming at to_map instead skipped them past it with a
+      // "Go to map" card they never asked for.
+      setDialogueRaw("contributors");
     } else if (s >= 3) {
       // Steps 3-5 all live inside the compose wizard, which does not
       // survive a reload — so the honest resume is "open it again".
@@ -328,9 +333,22 @@ export function Step2TemplatePick() {
           "contributors",
           "to_map",
         ];
-        // Floor the machine at whatever the server says we reached.
-        const floor =
-          tutorial.step >= 6 ? "contributors" : ("intro" as DialogueState);
+        // Floor the machine at whatever the server says we reached, beat
+        // by beat. Previously this only floored at step 6, so a DOM poll
+        // or a late-arriving effect could still knock a resumed session
+        // all the way back to "intro" for a frame -- the "starting Sparky
+        // box appeared for a second" flash. Now every persisted step has
+        // a floor and nothing can paint a beat the user is already past.
+        const floor: DialogueState =
+          tutorial.step >= 6
+            ? "contributors"
+            : tutorial.step >= 5
+              ? "write_outline"
+              : tutorial.step >= 4
+                ? "pick_template"
+                : tutorial.step >= 3
+                  ? "click_plus"
+                  : "intro";
         if (ORDER.indexOf(resolved) < ORDER.indexOf(floor)) return prev;
         return resolved;
       });
