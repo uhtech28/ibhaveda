@@ -159,6 +159,10 @@ const SPARKY_SIZE_MOBILE_CORNER_KBD = 58;  // keyboard up
  */
 const CORNER_LIFT_KEYBOARD_DOWN_PX = 94;
 const BUBBLE_BOTTOM_INSET_MOBILE = 12; // gap from viewport bottom
+/** Dock inset for hug beats: clears the map's bottom HUD bar (~90px), so
+ *  the bubble sits just above the control it is pointing at instead of on
+ *  top of it. */
+const HUG_DOCK_BOTTOM_INSET_MOBILE = 96;
 const BUBBLE_SIDE_INSET_MOBILE = 12;   // left/right insets
 
 type Side = "right" | "left" | "below" | "above";
@@ -1146,7 +1150,22 @@ export function TutorialMascot({
               //            stack wouldn't cover (e.g. the top "+" button).
               //   below/above — target sits in the centre band; hug it.
               let mode: "center" | "below" | "above" | "dock";
-              if (!targetRect) {
+              if (mobileHugTarget) {
+                // DETERMINISTIC. A hug step's target is a bottom-HUD
+                // control, so dock low and stop asking.
+                //
+                // The measured path was reaching "above" and still landing
+                // mid-screen, because every term in it -- vh, targetRect,
+                // groupHEst -- mixes visual-viewport and layout-viewport
+                // coordinates, and on iOS those disagree by the height of
+                // the browser chrome. The result was Sparky floating in the
+                // middle of the map pointing at an icon far below him.
+                //
+                // There is nothing to compute here: the saddlebag is at the
+                // bottom of the screen on every phone. Dock above the HUD
+                // bar and it is right in every viewport state.
+                mode = "dock";
+              } else if (!targetRect) {
                 mode = anchor === "center" ? "center" : "dock";
               } else {
                 const centeredTop = (vh - groupHEst) / 2;
@@ -1195,7 +1214,13 @@ export function TutorialMascot({
                 );
               } else if (mode === "dock") {
                 outerStyle.alignItems = "flex-end";
-                outerStyle.paddingBottom = `calc(${BUBBLE_BOTTOM_INSET_MOBILE}px + env(safe-area-inset-bottom, 0px))`;
+                // Hug beats clear the bottom HUD bar they are pointing at;
+                // everything else keeps the tight 12px dock.
+                outerStyle.paddingBottom = `calc(${
+                  mobileHugTarget
+                    ? HUG_DOCK_BOTTOM_INSET_MOBILE
+                    : BUBBLE_BOTTOM_INSET_MOBILE
+                }px + env(safe-area-inset-bottom, 0px))`;
               } else {
                 outerStyle.alignItems = "center";
               }

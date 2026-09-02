@@ -1110,7 +1110,7 @@ export function Step3MapGuide() {
         // to "flare".
         return {
           text:
-            "This is your saddlebag. It holds every tool you'll need to build your idea. Tap to open!",
+            "Your saddlebag is highlighted. It holds every tool you'll need to build your idea. Tap to open!",
           mood: "pointing",
           near: '[data-tutorial="saddlebag-button"]',
           highlight: '[data-tutorial="saddlebag-button"]',
