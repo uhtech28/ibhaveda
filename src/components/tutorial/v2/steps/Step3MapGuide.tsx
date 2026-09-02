@@ -432,6 +432,23 @@ export function Step3MapGuide() {
   useEffect(() => {
     if (!active) return;
     if (forceCombatFiredRef.current) return;
+    // COMBAT ALREADY HAPPENED IN THIS SESSION -- stand down entirely.
+    //
+    // This dispatcher's whole job is to OPEN combat, and its skip-ahead
+    // branch below ("already beaten, jump to the next incomplete beat")
+    // is for someone ARRIVING with the fight behind them. Once the user
+    // has actually fought here, the stage poller owns what comes next.
+    //
+    // Without this it fires at the killing blow: combatDone flips the
+    // instant the server records the won round, this effect re-runs on
+    // that dep, and -- because the stuck-tutorial watchdog clears
+    // forceCombatFiredRef during the pre-combat wait, so it is false by
+    // now -- it fell straight into the skip-ahead and yanked the machine
+    // to "saddlebag". The victory panel was still on screen, so the user
+    // got the saddlebag ring floating over it with nothing under it, and
+    // the Continue they were about to press belonged to a beat the
+    // tutorial had already left.
+    if (combatWasOpenRef.current) return;
     // Same reason as the resume effect: firing combat at someone whose
     // won-round record has not arrived yet is how this dispatcher used to
     // shove people who had already beaten the boss back into combat.
