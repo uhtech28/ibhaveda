@@ -132,6 +132,10 @@ export function BossIntroCinematic({
   const MINIONS_SPEECH_LINE = minionsSpeechLine;
   const markSeen = useMutation(api.users.markBossIntroSeen);
   const [phase, setPhase] = useState<Phase>("curtain");
+  // The villain's speech bubble occupies these two phases (see its render
+  // further down). The mobile boss title stands down while it is up and
+  // takes the stage whenever it is not.
+  const bossBubbleUp = phase === "main-speech" || phase === "minions";
   const [speechIdx, setSpeechIdx] = useState(0);
   const [typedText, setTypedText] = useState("");
   const [minionIdx, setMinionIdx] = useState(-1);
@@ -377,14 +381,20 @@ export function BossIntroCinematic({
               per-stage cards below). Only "The Unraveller" title
               renders here now. */}
           <motion.div
-            // Title HIDDEN on mobile (< sm) per product ask:
-            // "FIX THE MOBILE VIEW THE CONVERSATION BOX IS OVERLAPPING
-            // BOSS FACE". The giant "The Unraveller" heading was
-            // colliding with the speech bubble below it. The bubble
-            // already labels the speaker ("THE UNRAVELLER" chip), so
-            // the redundant title only served the desktop hero
-            // layout — where there's room to spare. `hidden sm:block`
-            // keeps the desktop treatment intact.
+            // Title on mobile is PHASE-GATED, not hidden outright.
+            //
+            // It used to be `hidden sm:block` because the heading collided
+            // with the villain's speech bubble ("the conversation box is
+            // overlapping boss face"). True while he is speaking -- and the
+            // bubble carries a speaker chip, so the title is redundant then
+            // anyway. But it is NOT true for the rest of the cinematic: the
+            // bubble is absent during the reveal and gone again at the
+            // finale, and on that final screen the super boss was the only
+            // one of the five bosses on it with no name, while all four
+            // stage bosses are labelled.
+            //
+            // So show it whenever no bubble is up. Desktop is unchanged --
+            // `sm:block` still forces it visible at every phase.
             // Title dropped from sm:top-[10%] → sm:top-[16%] (2026-08-21)
             // because the tutorial progress bar (top-16 ≈ 64px + 6px
             // bar height + padding ≈ 80–90px total) was overlapping
@@ -393,7 +403,9 @@ export function BossIntroCinematic({
             // NAME". Moving the title down instead of the bar keeps
             // every other tutorial surface unaffected. Also bumped
             // the mobile `top` calc so it clears the bar the same way.
-            className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 px-4 text-center sm:block sm:top-[16%]"
+            className={`pointer-events-none absolute left-1/2 -translate-x-1/2 px-4 text-center sm:block sm:top-[16%] ${
+              bossBubbleUp ? "hidden" : "block"
+            }`}
             style={{
               top: "calc(96px + env(safe-area-inset-top, 0px))",
             }}
