@@ -1648,6 +1648,13 @@ export function focusForCheckpoint(
   };
 }
 
+/**
+ * Where the arena's ground line sits on mobile: how far above the bottom
+ * of the arena a character's FEET should land. The HP readout runs along
+ * the bottom of the box, so this clears it.
+ */
+const ARENA_GROUND_INSET_MOBILE = 30;
+
 function BattleScene({
   persona,
   bossReaction,
@@ -1740,7 +1747,37 @@ function BattleScene({
   // standing on two different ground lines. Lifting the boss to +4 puts
   // both combatants on the same level with the boss a touch higher, which
   // is the staging the product ask describes.
-  const bossBottom = isMobile ? 4 : -40;
+  //
+  // MOBILE: derived from the art, not hand-picked.
+  //
+  // Measured at 375x812: the Librarian's figure occupies rows 32-69 of a
+  // 96px frame, and at bottom:4 that put its feet 68px above the arena
+  // floor -- visibly hovering, which is the report. A fixed `bottom` can
+  // only ever be right for one boss, because every sheet carries a
+  // different amount of empty space under the character; the same 4px
+  // leaves one boss floating and buries the next.
+  //
+  // So compute it. The manifest records frame 0's opaque box, which gives
+  // the gap between the character's feet and the bottom of its frame;
+  // subtract that and every boss lands its feet on the same line, on every
+  // template and map.
+  //
+  // The drop this produces is about 1cm, not the 2-3cm asked for: the
+  // arena is 169px tall on a phone and the HP row occupies the bottom of
+  // it, so 2cm would put the boss's feet through the floor. This is as far
+  // down as the box allows.
+  //
+  // DESKTOP is left on its hand-tuned -40. It was reported as correct and
+  // this is not the place to quietly restage it.
+  const bossBottom = (() => {
+    if (!isMobile) return -40;
+    const geo = getBossSpriteGeometry(bossAsset);
+    if (!geo?.bounds || !geo.size) return 4; // unmeasured art -> prior value
+    const scale = bossDisplayWidth / geo.size;
+    // Empty frame rows below the character, in rendered px.
+    const gapBelowFeet = (geo.size - (geo.bounds.y + geo.bounds.h)) * scale;
+    return Math.round(ARENA_GROUND_INSET_MOBILE - gapBelowFeet);
+  })();
 
   // ── Three-stage cinematic ──────────────────────────────────────────
   // Stage 0 (win only) RETREAT (0 - 1600ms): a gamified banner reads
@@ -2456,7 +2493,10 @@ function BattleScene({
           // DESKTOP: unchanged (left 64 / bottom 43) — there is room for
           // the shoulder-to-shoulder staging on a wide arena.
           left: isMobile ? 14 : 64,
-          bottom: isMobile ? 10 : 43,
+          // Raised 10 -> 48 on mobile (~1cm). At 10 he sat inside the HP
+          // row that runs along the bottom of the arena, overlapping the
+          // "YOU 10/10" readout. Desktop has the room and is unchanged.
+          bottom: isMobile ? 48 : 43,
           opacity:
             cinematicStage === "cheer" && outcome === "lost" ? 0.35 : 1,
           transition: "opacity 500ms ease-out",
