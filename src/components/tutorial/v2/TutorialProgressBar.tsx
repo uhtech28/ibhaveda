@@ -48,7 +48,19 @@ export function TutorialProgressBar({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.25 }}
-          className="fixed top-16 left-0 right-0 z-[10015] flex items-center justify-center px-4 pointer-events-none"
+          // LAYERING: above the tutorial scrim (10005) so the bar is never
+          // dimmed, but BELOW Sparky (10010/10011) so his speech bubble
+          // wins when they collide.
+          //
+          // At 10015 the bar sat on top of everything tutorial, and on a
+          // phone with the keyboard up there is not enough height for both:
+          // the compose modal rides up, the bubble lands at the same height
+          // as the bar, and the bar painted straight through the middle of
+          // the sentence the user was being asked to read.
+          //
+          // The bar is a thin strip that can be re-read at any time; the
+          // bubble is the instruction and is transient. So the bubble wins.
+          className="fixed top-16 left-0 right-0 z-[10008] flex items-center justify-center px-4 pointer-events-none"
         >
           <div
             className="flex items-center gap-3 pointer-events-auto rounded-full px-3 py-1.5 border border-white/8"
