@@ -766,6 +766,10 @@ export function Step2TemplatePick() {
   // Holding the last value means a transient undefined is invisible,
   // while the genuine "not posted yet" case (ref still null) still shows
   // the scrim, which is what it is for.
+  // Latches once the contributors modal is actually on screen. See the
+  // block above the render gates for why this is a latch and not a
+  // condition.
+  const contributorsLatchedRef = useRef(false);
   const lastIdeaIdRef = useRef<Id<"ideas"> | null>(null);
   const latestIdeaId: Id<"ideas"> | null = useMemo(() => {
     if (!userIdeas || userIdeas.length === 0) {
@@ -777,16 +781,65 @@ export function Step2TemplatePick() {
     return first._id;
   }, [userIdeas]);
 
+  // Holding the contributors beat back until the share panel is gone is
+  // right, but it must not be able to dead-end: the panel is closed by a
+  // DOM click on its X, and if that click ever misses, the user would sit
+  // on the scrim forever. After 2.5s, show the modal regardless.
+  const [shareBlockExpired, setShareBlockExpired] = useState(false);
+  useEffect(() => {
+    if (dialogue !== "contributors" || !shareOpen) {
+      setShareBlockExpired(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShareBlockExpired(true), 2500);
+    return () => window.clearTimeout(t);
+  }, [dialogue, shareOpen]);
+  const shareBlocking = shareOpen && !shareBlockExpired;
+
+  // ── CONTRIBUTORS IS A TERMINAL BEAT ──────────────────────────────────
+  // Reported: the invite list appears for ~2s, goes black for ~0.5s, then
+  // "restarts" and stays. That shape is the modal MOUNTING TWICE -- its
+  // own backdrop is rgba(5,8,20,0.88) and its card animates in over
+  // 450ms, so an unmount/remount reads as exactly that black gap.
+  //
+  // Every gate below can tear it down for a frame, and each one can flip
+  // spuriously: `active` folds in `tutorial.active`, which is derived
+  // from a Convex query that returns undefined on ANY re-subscription --
+  // and the `goTo(6)` fired on entering this very beat causes one;
+  // `shareOpen` is a 400ms DOM text poll over an element that is
+  // animating; `latestIdeaId` re-resolves whenever its own query
+  // re-subscribes.
+  //
+  // Rather than harden three independent gates against the same class of
+  // transient, treat the beat as what it actually is: once the invite
+  // list is up it OWNS the screen until the user continues. Latching in
+  // render (not an effect) is deliberate -- an effect runs after paint,
+  // by which point the black frame has already been shown.
+  if (dialogue === "contributors" && latestIdeaId && !shareBlocking) {
+    contributorsLatchedRef.current = true;
+  }
+  // Released when the beat is genuinely over: the user continued (step
+  // moves past 6) or left /feed. Without this the modal would follow the
+  // user onto the map.
+  if (!onFeed || tutorial.step >= 7) {
+    contributorsLatchedRef.current = false;
+  }
+  const showContributors =
+    contributorsLatchedRef.current ||
+    (dialogue === "contributors" && !!latestIdeaId && !shareBlocking);
+
+  if (showContributors) return renderContributors();
+
   if (!active) return null;
   // Starting beat not resolved yet (Convex still answering). Paint
   // nothing rather than defaulting — defaulting is what restarted the
   // flow from "tap the plus button" for users mid-way through.
   if (!dialogue) return null;
-  // Hide the entire tutorial UI while the post-publish share dialog is up
-  // — UNLESS we're already in the `contributors` beat, in which case the
-  // Suggested-Contributors modal owns the screen and needs to render on
-  // top even if the share dialog is momentarily still fading out.
-  if (shareOpen && dialogue !== "contributors") return null;
+  // Hide the entire tutorial UI while the post-publish share dialog is up.
+  // The contributors beat is handled above -- it does not mount until the
+  // share panel is gone, so the two never stack and the share panel can
+  // never close out from under it.
+  if (shareOpen) return null;
 
   // ── HANDOFF BRIDGE ────────────────────────────────────────────────────
   // Between clicking Create and the Potential-Contributors modal there's
@@ -801,19 +854,30 @@ export function Step2TemplatePick() {
     return <HandoffScrim />;
   }
 
-  // Contributors beat — render the invite dialog AND Sparky beside
-  // it (previously Sparky was suppressed here and the tutorial "just
-  // to map" step happened silently). Product ask (verbatim): "bring
-  // it back and use sparky there with conversation 'Write a quick
-  // message saying why you'd be a great fit, then send your
-  // request!'". The dialog itself still enforces "at least one
-  // invite" before Continue unlocks; Sparky just narrates the moment.
+  // Reached only when the beat is NOT showable yet -- the id is still
+  // resolving, or the share panel is still up. Keep the scrim rather than
+  // a blank frame so the feed never flashes through.
   if (dialogue === "contributors") {
-    if (!latestIdeaId) {
-      // Idea id still resolving — keep the scrim up (not a blank frame)
-      // so the feed never flashes through before the dialog mounts.
-      return <HandoffScrim />;
-    }
+    return <HandoffScrim />;
+  }
+
+  // The `posting` and `contributors` beats are handled above (posting is
+  // covered by the HandoffScrim, contributors renders its own dialog), so
+  // by here Sparky is always meant to be on screen.
+  return renderSparky();
+
+  // ── Contributors beat ────────────────────────────────────────────────
+  // Rendered via the latch above rather than inline, so the gates that
+  // precede it cannot tear it down mid-beat.
+  //
+  // Sparky renders BESIDE the dialog (he used to be suppressed here and
+  // the beat happened silently). The dialog itself still enforces "at
+  // least one invite" before Continue unlocks; Sparky just narrates.
+  function renderContributors() {
+    // Guaranteed non-null by `showContributors` (the latch is only set
+    // once an id has been seen, and `lastIdeaIdRef` never clears), but
+    // that reasoning runs through a ref the compiler cannot follow.
+    if (!latestIdeaId) return <HandoffScrim />;
     return (
       <>
         <SuggestedContributorsDialog
@@ -861,10 +925,8 @@ export function Step2TemplatePick() {
     );
   }
 
-  // The `posting` and `contributors` beats are handled above (posting is
-  // covered by the HandoffScrim, contributors renders its own dialog), so
-  // by here Sparky is always meant to be on screen.
-  return (
+  function renderSparky() {
+    return (
     <>
       <TutorialHighlight
         visible={!!view.highlight}
@@ -895,8 +957,10 @@ export function Step2TemplatePick() {
         // whenever a keyboard is detected, but this covers the
         // keyboard-down state where the user hasn't focused yet.)
         mobileCorner={dialogue === "write_outline"}
-      />    </>
-  );
+      />
+      </>
+    );
+  }
 }
 
 /**
