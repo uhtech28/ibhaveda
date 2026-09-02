@@ -71,8 +71,25 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
   // Safe against hydration mismatch: the parent only mounts this
   // component from a client effect, so it never renders on the server.
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
+  // Playback actually began (the `playing` event), as opposed to merely
+  // having loaded. Everything below distinguishes those two: on a phone
+  // they come apart, and treating "loaded" as "playing" is what let the
+  // splash give up on a video that was still perfectly alive.
+  const [started, setStarted] = useState(false);
+  // Autoplay was refused, so the user has to start it. Muted inline
+  // autoplay is normally allowed on mobile, but iOS Low Power Mode and
+  // Android Data Saver both veto it outright.
+  const [needsTap, setNeedsTap] = useState(false);
   const doneRef = useRef(false);
   const safetyTimerRef = useRef<number | null>(null);
+  // Once the user has a way forward -- playback started, or a visible
+  // "Tap to play" -- the valve is done for good. It has to LATCH: media
+  // elements keep emitting progress/suspend/canplay events after they
+  // have finished loading, and each of those rearmed the deadline. That
+  // is why clearing it on `needsTap` alone was not enough; a later
+  // event armed it again and it expired 15s afterwards, taking the intro
+  // with it.
+  const valveDisarmedRef = useRef(false);
 
   // Pick the video variant based on viewport orientation. Portrait or
   // narrow (<= 768px) → mobile clip (720x1280); everything else → the
@@ -101,9 +118,24 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
     onDone();
   };
 
+  // Start (or resume) playback from a real user gesture.
+  const startPlayback = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = true;
+    v.playsInline = true;
+    const p = v.play();
+    if (p && typeof p.catch === "function") p.catch(() => { /* no-op */ });
+  };
+
   // Clear the safety-valve timer. Called once playback actually
   // starts (onPlay) — from that point on we trust `onEnded` and the
   // click handler to advance, never a wall-clock timer.
+  const disarmSafetyValve = () => {
+    valveDisarmedRef.current = true;
+    clearSafetyTimer();
+  };
+
   const clearSafetyTimer = () => {
     if (safetyTimerRef.current !== null) {
       window.clearTimeout(safetyTimerRef.current);
@@ -111,16 +143,32 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
     }
   };
 
-  // Safety-valve auto-dismiss — ONLY fires if the video never even
-  // starts playing (broken mp4, dropped connection, autoplay blocked
-  // AND user never interacts). Cleared the moment `onPlay` fires.
-  // Once cleared, the splash sits on the last frame forever waiting
-  // for the user to tap Continue — which is the product spec.
-  useEffect(() => {
+  // Safety valve, REARMED on every sign of life.
+  //
+  // This used to be one fixed 15s deadline from mount, cleared by
+  // `loadeddata`. On a phone that is the wrong shape twice over. The
+  // mobile clip is the BIGGEST of the set (2.6 MB mp4 / 2.0 MB webm,
+  // larger than either desktop variant), so on cellular it can easily
+  // still be downloading at 15s -- at which point the valve fired and
+  // skipped the intro out from under a video that was loading fine. That
+  // is the reported "came up with a pause icon and went straight to
+  // username setup without playing": not a broken video, an impatient
+  // timer.
+  //
+  // Now the deadline means "15 seconds with NO PROGRESS AT ALL". Every
+  // buffering event pushes it out, so a slow download is waited on for as
+  // long as it keeps making headway, while a genuinely dead load still
+  // releases the user instead of stranding them.
+  const armSafetyTimer = () => {
+    if (valveDisarmedRef.current) return;
+    clearSafetyTimer();
     safetyTimerRef.current = window.setTimeout(
       fireDone,
       NEVER_LOADED_TIMEOUT_MS,
     );
+  };
+  useEffect(() => {
+    armSafetyTimer();
     return clearSafetyTimer;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,13 +183,53 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
     if (isMobile === null) return;
     const v = videoRef.current;
     if (!v) return;
+    // Set BOTH as properties before calling play(). React renders `muted`
+    // as a property rather than an HTML attribute, and a video the engine
+    // does not consider muted at the moment autoplay is evaluated gets
+    // refused on every mobile browser.
     v.muted = true;
     v.playsInline = true;
-    // Fire-and-forget play; ignore the promise rejection that some
-    // browsers throw when a tab loses focus mid-mount.
-    const p = v.play();
-    if (p && typeof p.catch === "function") p.catch(() => { /* no-op */ });
+    let cancelled = false;
+    const attempt = v.play();
+    if (attempt && typeof attempt.catch === "function") {
+      attempt.catch(() => {
+        // Refused. Do NOT silently sit on a paused first frame with no
+        // affordance -- that is the stuck state the user hit. Ask for a
+        // tap instead.
+        if (!cancelled) setNeedsTap(true);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [isMobile]);
+
+  // Offer the tap when the video is READY BUT PAUSED.
+  //
+  // Readiness is the important half. Being paused on its own is also true
+  // all through a normal slow load, and prompting then would be wrong --
+  // there is nothing a tap can do about bytes that have not arrived.
+  // readyState >= HAVE_FUTURE_DATA means the browser could play it right
+  // now and has chosen not to, which is precisely a refused autoplay.
+  useEffect(() => {
+    if (isMobile === null || started || ended) return;
+    const id = window.setInterval(() => {
+      const v = videoRef.current;
+      if (!v) return;
+      if (v.paused && v.readyState >= 3) setNeedsTap(true);
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [isMobile, started, ended]);
+
+  // A visible "Tap to play" IS a way forward, so the safety valve has no
+  // more work to do. Leaving it armed is what made the harness -- and the
+  // phone -- skip the intro out from under a video that was loaded, ready,
+  // and simply waiting to be started: a paused video emits no progress
+  // events, so nothing rearmed the deadline and it expired on the spot.
+  useEffect(() => {
+    if (needsTap) disarmSafetyValve();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsTap]);
 
   // Keyboard shortcut — Enter or Space advances once the video ends.
   // Prevents a stuck user who can't find the baked Continue button.
@@ -166,10 +254,26 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
       // inside the video they tap. Before the video ends, this
       // handler no-ops so a stray early click doesn't skip the
       // intro.
-      onClick={ended ? fireDone : undefined}
-      role={ended ? "button" : undefined}
-      aria-label={ended ? "Continue to profile setup" : "Welcome video playing"}
-      style={{ cursor: ended ? "pointer" : "default" }}
+      // Two jobs, depending on where we are:
+      //   ended        -> advance to profile setup (the artwork's own
+      //                   Continue button is what the user is aiming at)
+      //   not started  -> START the video. A tap is a user gesture, which
+      //                   is exactly what a browser that refused autoplay
+      //                   is waiting for. Previously this handler was
+      //                   undefined until `ended`, so a phone that blocked
+      //                   autoplay showed a paused frame that could not be
+      //                   dismissed OR started by tapping it.
+      // Mid-playback it stays inert, so a stray tap cannot skip the intro.
+      onClick={ended ? fireDone : started ? undefined : startPlayback}
+      role={ended || !started ? "button" : undefined}
+      aria-label={
+        ended
+          ? "Continue to profile setup"
+          : started
+            ? "Welcome video playing"
+            : "Play the welcome video"
+      }
+      style={{ cursor: ended || !started ? "pointer" : "default" }}
     >
       {isMobile === null ? null : (
       <video
@@ -191,9 +295,24 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
         // No `loop` — spec says play once + pause at end.
         // Playback started for real — kill the never-loaded safety
         // valve so it can't dismiss the splash mid-video.
-        onPlay={clearSafetyTimer}
-        onPlaying={clearSafetyTimer}
-        onLoadedData={clearSafetyTimer}
+        // `playing` is the only event that means pixels are moving, so
+        // it is the only one that retires the safety valve outright.
+        onPlaying={() => {
+          disarmSafetyValve();
+          setStarted(true);
+          setNeedsTap(false);
+        }}
+        // Everything below is evidence the load is alive but not yet
+        // playing. Each one pushes the deadline out rather than clearing
+        // it -- see armSafetyTimer for why that distinction matters on a
+        // phone.
+        onLoadStart={armSafetyTimer}
+        onLoadedMetadata={armSafetyTimer}
+        onLoadedData={armSafetyTimer}
+        onProgress={armSafetyTimer}
+        onCanPlay={armSafetyTimer}
+        onWaiting={armSafetyTimer}
+        onStalled={armSafetyTimer}
         onEnded={() => {
           // Pause explicitly so the last frame stays painted even
           // on browsers that snap the poster back on ended events
@@ -238,6 +357,19 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
       </video>
       )}
 
+      {/* Tap-to-play, shown ONLY when the browser refused to autoplay.
+          Desktop never sees it. On a phone where autoplay is vetoed --
+          iOS Low Power Mode, Android Data Saver -- this is the difference
+          between "a paused video with a pause icon on it" and something
+          the user can actually start. The whole splash is the tap target
+          (see onClick above); this is just the visible affordance. */}
+      {needsTap && !started && !ended && (
+        <div className="welcome-tap" aria-hidden="true">
+          <span className="welcome-tap-glyph">▶</span>
+          <span className="welcome-tap-label">Tap to play</span>
+        </div>
+      )}
+
       {/* Product ask: no separate "Tap to continue" button. Once the
           video ends, the whole splash (which includes the baked-in red
           "Continue" button on the scroll artwork) becomes the click
@@ -255,6 +387,38 @@ export function WelcomeSplash({ durationMs: _unused, onDone }: Props) {
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+        .welcome-tap {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          pointer-events: none;
+          background: rgba(0, 0, 0, 0.45);
+          color: #fff;
+          font-family: var(--font-sans), system-ui, sans-serif;
+        }
+        .welcome-tap-glyph {
+          display: grid;
+          place-items: center;
+          width: 74px;
+          height: 74px;
+          border-radius: 999px;
+          border: 2px solid rgba(255, 255, 255, 0.75);
+          background: rgba(0, 0, 0, 0.35);
+          font-size: 26px;
+          line-height: 1;
+          padding-left: 5px;
+        }
+        .welcome-tap-label {
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          opacity: 0.85;
         }
         .welcome-video {
           width: 100%;
