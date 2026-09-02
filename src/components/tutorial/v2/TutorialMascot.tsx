@@ -144,6 +144,20 @@ const SPARKY_SIZE_MOBILE_INTRO = 124;
 // keyboard is up and vertical room is scarce.
 const SPARKY_SIZE_MOBILE_CORNER = 84;      // keyboard down
 const SPARKY_SIZE_MOBILE_CORNER_KBD = 58;  // keyboard up
+
+/**
+ * How far to lift the corner group above the highlighted box when the
+ * on-screen keyboard is DOWN.
+ *
+ * Anchored flush to the modal's top edge, Sparky and his bubble sat over
+ * the content the step is asking the user to read. With the keyboard down
+ * there is plenty of room above, so use it. ~2.5cm: a CSS px is
+ * density-independent and 1cm is about 37.8 of them.
+ *
+ * Keyboard UP is deliberately left alone -- vertical room is scarce
+ * there, and the existing placement is what keeps him on screen at all.
+ */
+const CORNER_LIFT_KEYBOARD_DOWN_PX = 94;
 const BUBBLE_BOTTOM_INSET_MOBILE = 12; // gap from viewport bottom
 const BUBBLE_SIDE_INSET_MOBILE = 12;   // left/right insets
 
@@ -1035,7 +1049,13 @@ export function TutorialMascot({
                 // Clamping to [vvTop, vvTop + vh] keeps him on screen in
                 // every keyboard state, on iOS and Android alike.
                 const cornerGroupH = Math.max(cornerSize, 132);
-                const rawTop = targetRect ? targetRect.top : vvTop;
+                // Lift only while the keyboard is down -- see
+                // CORNER_LIFT_KEYBOARD_DOWN_PX. Applied BEFORE the clamp so
+                // it can never push the group off the top of the visible
+                // viewport; on a short screen the clamp simply absorbs it.
+                const rawTop =
+                  (targetRect ? targetRect.top : vvTop) -
+                  (keyboardOpen ? 0 : CORNER_LIFT_KEYBOARD_DOWN_PX);
                 const minTop = vvTop + 8;
                 const maxTop = Math.max(minTop, vvTop + vh - cornerGroupH - 12);
                 const topY = Math.min(Math.max(rawTop, minTop), maxTop);
