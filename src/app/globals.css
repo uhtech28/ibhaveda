@@ -879,7 +879,19 @@
     max-height: calc(var(--app-vv-height, 100dvh) - 2rem) !important;
     margin: 0 !important;
     overflow-y: auto !important;
-    transform: translate3d(-50%, -50%, 0) !important;
+    /* NO `transform` HERE ON PURPOSE.
+       Radix's DialogContent already centres itself with
+       `translate-x-[-50%] translate-y-[-50%]`, and Tailwind v4 compiles
+       those to the standalone `translate` property -- not to `transform`.
+       The two are independent and COMPOSE, so a `transform:
+       translate3d(-50%,-50%,0)` here did not replace that centring, it
+       DOUBLED it: a full -100% on both axes, which is what put these
+       dialogs off the left edge with their right side on the screen's
+       centre line.
+       Cancelling it with `translate: none` does not work either -- the
+       CSS minifier drops that declaration as redundant next to a
+       transform, so it never reaches the browser. Setting neither is the
+       fix: one source of truth, nothing to cancel. */
     -webkit-overflow-scrolling: touch;
   }
 
@@ -940,7 +952,19 @@
     max-height: var(--app-vv-flare-height, min(74dvh, 30rem)) !important;
     margin: 0 !important;
     overflow: hidden !important;
-    transform: translate3d(-50%, -50%, 0) !important;
+    /* NO `transform` HERE ON PURPOSE.
+       Radix's DialogContent already centres itself with
+       `translate-x-[-50%] translate-y-[-50%]`, and Tailwind v4 compiles
+       those to the standalone `translate` property -- not to `transform`.
+       The two are independent and COMPOSE, so a `transform:
+       translate3d(-50%,-50%,0)` here did not replace that centring, it
+       DOUBLED it: a full -100% on both axes, which is what put these
+       dialogs off the left edge with their right side on the screen's
+       centre line.
+       Cancelling it with `translate: none` does not work either -- the
+       CSS minifier drops that declaration as redundant next to a
+       transform, so it never reaches the browser. Setting neither is the
+       fix: one source of truth, nothing to cancel. */
   }
 
   .flare-compose-dialog--keyboard {
