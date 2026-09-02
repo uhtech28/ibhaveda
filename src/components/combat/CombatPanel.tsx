@@ -31,6 +31,8 @@ import {
 } from "@/config/village-bosses";
 import { getPersona, isValidPersonaId } from "@/config/personas";
 import { useKeyboardInsets } from "@/lib/hooks/useKeyboardInsets";
+import { BOSS_SPRITE_MANIFEST } from "@/config/boss-sprite-manifest";
+import { warmSprites } from "@/lib/sprites/spriteCache";
 
 interface Props {
   roundId: Id<"combatRounds">;
@@ -87,6 +89,42 @@ export function CombatPanel({
   const personaId = isValidPersonaId(personaIdRaw) ? personaIdRaw : "alchemist";
   const persona = getPersona(personaId);
   const founderAssetPath = persona.assets.portrait;
+
+  // ── Warm the combat sprite sheets before the first question ────────
+  //
+  // Every combat state (attack / hurt / defeat / victory) is a separate
+  // PNG, and the sprite player animates them as CSS backgrounds -- a CSS
+  // animation starts on insert and never waits for its image. Only
+  // idle.png is loaded ahead of time, by the boss's resting clip, so the
+  // first swing of a fight used to race its own download.
+  //
+  // The player now holds each clip until its sheet is decoded, so the
+  // animation is never lost. Warming here as well means that wait is
+  // almost always already over: this fires when the panel mounts, while
+  // the round is still in its "loading" phase and the user has not seen
+  // a question yet, rather than when the sprites first mount.
+  //
+  // Boss URLs come from the build-time manifest so we only request
+  // sheets that exist -- bosses ship different clip sets (several have
+  // idle + attack only) and guessing would 404.
+  useEffect(() => {
+    const idle = boss?.idleAsset;
+    if (!idle) return;
+    const folder = idle.slice(0, idle.lastIndexOf("/") + 1);
+    warmSprites(
+      Object.keys(BOSS_SPRITE_MANIFEST).filter(
+        (url) => url.startsWith(folder) && url !== idle,
+      ),
+    );
+  }, [boss?.idleAsset]);
+
+  useEffect(() => {
+    warmSprites(
+      ["attack", "hurt", "defeat", "victory"].map(
+        (c) => `/assets/personas/${personaId}/${c}.png`,
+      ),
+    );
+  }, [personaId]);
 
   const [submitting, setSubmitting] = useState(false);
   const [showAntiCheatWarning, setShowAntiCheatWarning] = useState(false);

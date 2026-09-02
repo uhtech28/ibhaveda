@@ -30,6 +30,7 @@ import type { VillageBossInfo } from "@/config/village-bosses";
 import { getPersona, type PersonaId } from "@/config/personas";
 import { PixelIcon } from "@/components/ui/PixelIcon";
 import { getBossFaceUrl } from "@/lib/bosses/bossFaces";
+import { isSpriteReady, warmSprite, warmSprites } from "@/lib/sprites/spriteCache";
 
 interface Props {
   question: CombatCurrentQuestion;
@@ -2697,12 +2698,66 @@ function AnimatedSpritesheet({
   const sheetTotalW = frameCount * frameWidth;
   const durationMs = Math.max(60, (frameCount / Math.max(1, fps)) * 1000);
 
-  // Fire onComplete once for non-looping clips.
+  // ── Hold the clip until the sheet can actually be painted ──────────
+  //
+  // A CSS animation starts the instant the element is inserted and never
+  // waits for its background-image. Each combat state is a separate file,
+  // so the FIRST swing of a fight ran its whole clip against an image
+  // that had not arrived yet -- the user saw nothing, then a snap back to
+  // idle. The second swing hit a warm cache and played. That is the
+  // "first attack has no animation" report.
+  //
+  // `armed` gates the animation on two conditions:
+  //
+  //   1. THE SHEET IS DECODED. isSpriteReady is synchronous, so a sheet
+  //      that has been used before (the common case after the first
+  //      beat) arms on the very next tick with no visible delay. A cold
+  //      sheet waits for warmSprite's decode() -- tens of milliseconds
+  //      against a warm HTTP cache, and the parent's reaction hold has
+  //      ~400ms of headroom over the 1.8s clip.
+  //
+  //   2. THE KEYFRAMES ARE COMMITTED. Arming from an effect guarantees
+  //      the <style> below is in the document before anything references
+  //      its animation-name, rather than betting on both landing in the
+  //      same commit.
+  //
+  // The 1200ms ceiling is a deadlock guard: on a genuinely broken or very
+  // slow asset we start the clip regardless. An invisible sprite for one
+  // beat is the old behaviour; a sprite frozen forever is worse.
+  const [armed, setArmed] = useState(false);
   useEffect(() => {
-    if (loop || !onComplete) return;
+    setArmed(false);
+    let alive = true;
+    const arm = () => {
+      if (alive) setArmed(true);
+    };
+    if (isSpriteReady(sheetUrl)) {
+      // Already paintable -- arm on the next tick so the keyframes are
+      // committed first. Imperceptible, and it keeps both paths identical
+      // instead of special-casing the warm one.
+      const t = window.setTimeout(arm, 0);
+      return () => {
+        alive = false;
+        window.clearTimeout(t);
+      };
+    }
+    void warmSprite(sheetUrl).then(arm);
+    const guard = window.setTimeout(arm, 1200);
+    return () => {
+      alive = false;
+      window.clearTimeout(guard);
+    };
+  }, [sheetUrl]);
+
+  // Fire onComplete once for non-looping clips. Timed from ARMING, not
+  // from mount: if the clip was held back waiting on the sheet, starting
+  // this at mount would retire the animation partway through -- the exact
+  // truncation the hold exists to prevent.
+  useEffect(() => {
+    if (loop || !onComplete || !armed) return;
     const t = window.setTimeout(onComplete, durationMs + 30);
     return () => window.clearTimeout(t);
-  }, [loop, onComplete, durationMs, sheetUrl]);
+  }, [loop, onComplete, durationMs, sheetUrl, armed]);
 
   // CSS-`steps(N)` sprite technique: the FROM→TO range must span ONE
   // FULL sheet width, not (N-1) frames. `steps(N)` then divides that
@@ -2769,8 +2824,13 @@ function AnimatedSpritesheet({
   // every browser we ship for.
   const iterCount = loop ? "infinite" : "1";
   const fillMode = holdLast ? "forwards" : "none";
-  const animationShorthand =
-    `${animId} ${durationMs}ms steps(${frameCount}) ${iterCount} ${fillMode}`;
+  // `armed` is false for the first tick (and for as long as a cold sheet
+  // is decoding) -- see the effect above. Until then the element paints
+  // frame 0 with no animation, so the clip always begins from its first
+  // frame at a moment when it can actually be seen.
+  const animationShorthand = armed
+    ? `${animId} ${durationMs}ms steps(${frameCount}) ${iterCount} ${fillMode}`
+    : "none";
   return (
     <>
       <style>{keyframes}</style>
@@ -2871,13 +2931,12 @@ function AnimatedPersonaSprite({
   // an attack.png that has not arrived yet. Skips anything the persona
   // declares missing, so we never request a known-404.
   useEffect(() => {
-    if (typeof window === "undefined") return;
     const clips: PersonaAnimState[] = ["attack", "hurt", "defeat", "victory"];
-    for (const c of clips) {
-      if (ext?.missingClips?.includes(c as never)) continue;
-      const img = new window.Image();
-      img.src = `/assets/personas/${personaId}/${c}.png`;
-    }
+    warmSprites(
+      clips
+        .filter((c) => !ext?.missingClips?.includes(c as never))
+        .map((c) => `/assets/personas/${personaId}/${c}.png`),
+    );
   }, [personaId, ext]);
 
   const isLoop = resolvedState === "idle" || resolvedState === "victory";
@@ -3472,14 +3531,20 @@ function BossSpriteFromAsset({
   // report, and why it varied by template: heavier attack sheets miss the
   // window more often, and only idle.png is warmed beforehand by the
   // boss's resting clip.
+  const bossFolder = sheetDef?.folder;
+  const bossClipKeys = sheetDef ? Object.keys(sheetDef.clips).join(",") : "";
   useEffect(() => {
-    if (typeof window === "undefined" || !sheetDef) return;
-    for (const s of Object.keys(sheetDef.clips) as BossAnimState[]) {
-      if (s === "idle") continue; // already loaded by the resting clip
-      const img = new window.Image();
-      img.src = `${sheetDef.folder}/${s}.png`;
-    }
-  }, [sheetDef]);
+    if (!bossFolder || !bossClipKeys) return;
+    warmSprites(
+      bossClipKeys
+        .split(",")
+        .filter((k) => k !== "idle") // already loaded by the resting clip
+        .map((k) => `${bossFolder}/${k}.png`),
+    );
+    // Keyed on the folder + clip NAMES rather than `sheetDef`, whose
+    // identity changes on every render (SPRITESHEET_BOSSES is rebuilt in
+    // the component body), which re-ran this warm on every single render.
+  }, [bossFolder, bossClipKeys]);
 
   if (!sheetDef) {
     return (
