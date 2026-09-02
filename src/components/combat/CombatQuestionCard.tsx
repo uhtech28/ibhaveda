@@ -2742,7 +2742,12 @@ function AnimatedSpritesheet({
       };
     }
     void warmSprite(sheetUrl).then(arm);
-    const guard = window.setTimeout(arm, 1200);
+    // Short on purpose. The clip runs ~1800ms and the parent holds the
+    // reaction for 2200ms, so the entire budget for waiting is ~400ms --
+    // arm later than that and the clip is still running when the beat
+    // ends, which looks exactly like no animation at all. A genuinely
+    // unreachable sheet costs a quarter second and then plays anyway.
+    const guard = window.setTimeout(arm, 250);
     return () => {
       alive = false;
       window.clearTimeout(guard);

@@ -82,6 +82,8 @@ export function warmSprite(url: string): Promise<void> {
   // clip window. "high" moves it to the front; the sheets are tiny enough
   // that this costs the page nothing.
   img.fetchPriority = "high";
+  // Hint the decoder without depending on it -- see below.
+  img.decoding = "async";
   // Not `crossOrigin` -- these are same-origin assets, and setting it
   // would force a CORS preflight-style request that the CDN answers
   // without the header, failing the load outright.
@@ -93,15 +95,42 @@ export function warmSprite(url: string): Promise<void> {
     keepAlive.delete(img);
   };
 
-  // decode() is the only API that guarantees "paintable", but it is
-  // absent on older WebViews -- fall back to load/error events there.
-  const p: Promise<void> =
-    typeof img.decode === "function"
-      ? img.decode().then(settle, settle)
-      : new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-        }).then(settle);
+  // RESOLVE ON LOAD, NOT ON decode().
+  //
+  // decode() is the API that promises "paintable", and this used to await
+  // it. Measured in Chrome, on a DETACHED image -- which every warm here
+  // is, since the element is never inserted -- decode() simply never
+  // settles: the image reaches complete=true with naturalWidth 864 and
+  // the promise is still pending seconds later. Its decode is tied to a
+  // rendering opportunity the element never gets.
+  //
+  // The cost of that was not "the warm is useless", it was worse than
+  // doing nothing: isSpriteReady stayed false forever, so every clip fell
+  // through to the player's timeout before starting. The clip then began
+  // AFTER the reaction window had closed, which reads as no animation at
+  // all -- the exact bug this file was added to fix.
+  //
+  // The load event is reliable for detached images. Once loaded the frame
+  // is in the browser's memory cache and painting it as a background is
+  // immediate in practice; the earlier measurement showed the delay that
+  // actually loses the clip is the FETCH (seconds), not the decode.
+  //
+  // decode() is still kicked off for its side effect, unawaited, so a
+  // browser that does honour it has the frame ready even sooner.
+  const p = new Promise<void>((resolve) => {
+    if (img.complete && img.naturalWidth > 0) {
+      resolve();
+      return;
+    }
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+  }).then(settle);
+
+  if (typeof img.decode === "function") {
+    void img.decode().catch(() => {
+      /* best effort; never gates readiness */
+    });
+  }
 
   inFlight.set(url, p);
   return p;
