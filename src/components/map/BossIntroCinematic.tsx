@@ -870,9 +870,12 @@ function MainBossPortrait({
  * All sizing is calc() against `--mb`, the card's side length, which the
  * parent sets (64px, 108px at sm). SPRITE_FILL is the fraction of the
  * card the sprite's longest side occupies, so every boss ends up the
- * same visual height regardless of how it was drawn.
+ * same visual height regardless of how it was drawn. Raised 0.82 -> 0.88
+ * on a "make bosses 1 and 2 bigger" ask: it lifts all four, but the two
+ * that gain most are the ones drawn smallest inside their frames, which
+ * were the two being complained about.
  */
-const SPRITE_FILL = 0.82;
+const SPRITE_FILL = 0.88;
 
 function MinionSprite({ src, alt }: { src: string; alt: string }) {
   const filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.6))";
