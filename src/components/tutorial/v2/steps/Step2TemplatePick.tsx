@@ -21,6 +21,8 @@ import { TutorialHighlight } from "../TutorialHighlight";
 import { SuggestedContributorsDialog } from "../SuggestedContributorsDialog";
 import { useTutorial } from "../useTutorial";
 import { useActiveVentureTemplateId } from "@/lib/tutorial/useActiveVentureTemplateId";
+import { tutorialFirstMapUrl } from "@/config/tutorial-first-map";
+import { warmSprites } from "@/lib/sprites/spriteCache";
 import { resolveTutorialCopy } from "@/config/templates/tutorialCopy";
 
 type DialogueState =
@@ -397,7 +399,16 @@ export function Step2TemplatePick() {
     } catch {
       /* prefetch is best-effort; navigation still works without it */
     }
-  }, [active, dialogue, router]);
+    // Pull the stage-1 map PNG down too. It is 3-5 MB and the single
+    // biggest thing standing between Continue and a painted map, and
+    // Phaser does not start fetching it until /map/world has mounted.
+    // The user is about to spend several seconds on the contributors
+    // list doing nothing network-bound, so spend it on this instead.
+    // Best-effort: a miss costs one request, and the map page still
+    // resolves and loads the real asset itself either way.
+    const mapUrl = tutorialFirstMapUrl(activeTemplateId);
+    if (mapUrl) warmSprites([mapUrl]);
+  }, [active, dialogue, router, activeTemplateId]);
 
   // Watch the DOM each tick to detect dialog open / template pick / outline / submit.
   // We now key transitions on the *visible wizard screen* (detected from
@@ -815,18 +826,28 @@ export function Step2TemplatePick() {
   // list is up it OWNS the screen until the user continues. Latching in
   // render (not an effect) is deliberate -- an effect runs after paint,
   // by which point the black frame has already been shown.
-  if (dialogue === "contributors" && latestIdeaId && !shareBlocking) {
+  // The beat is OVER once the user has continued (step past 6) or left
+  // /feed. This has to gate the whole decision, not just the latch: the
+  // latch had a second, un-gated path into `showContributors`, so after
+  // Send Invite navigated to /map/world the beat re-enabled itself there
+  // and the dialog -- with its `advancing` handoff scrim, a full-screen
+  // black cover at z-500 -- rendered on top of the map. That is the
+  // "black screen with a spinner instead of the map" report: not a slow
+  // route at all, the map was loading underneath the whole time.
+  //
+  // `goTo(7)` sets the step optimistically, so this flips on the same
+  // tick as the click and Next's own route loading UI takes over
+  // immediately.
+  const beatOver = !onFeed || tutorial.step >= 7;
+  if (beatOver) {
+    contributorsLatchedRef.current = false;
+  } else if (dialogue === "contributors" && latestIdeaId && !shareBlocking) {
     contributorsLatchedRef.current = true;
   }
-  // Released when the beat is genuinely over: the user continued (step
-  // moves past 6) or left /feed. Without this the modal would follow the
-  // user onto the map.
-  if (!onFeed || tutorial.step >= 7) {
-    contributorsLatchedRef.current = false;
-  }
   const showContributors =
-    contributorsLatchedRef.current ||
-    (dialogue === "contributors" && !!latestIdeaId && !shareBlocking);
+    !beatOver &&
+    (contributorsLatchedRef.current ||
+      (dialogue === "contributors" && !!latestIdeaId && !shareBlocking));
 
   if (showContributors) return renderContributors();
 
