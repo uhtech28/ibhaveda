@@ -1864,14 +1864,32 @@ function BattleScene({
       bossAsset.slice(0, bossAsset.lastIndexOf("/") + 1) + "hurt.png";
     return !!getBossSpriteGeometry(hurtSheet);
   })();
-  // The beats where the boss is TAKING damage: the optimistic swing on
-  // submit, and the confirmed hit/crit once the server grades it. Only
-  // during live combat -- the win/loss cinematics stage their own motion
-  // and must not be shoved sideways by this.
+  // Every beat where the boss is TAKING damage.
+  //
+  //  - live combat: the optimistic swing on submit, and the confirmed
+  //    hit/crit once the server grades the answer.
+  //  - the WIN cinematic's finisher-impact: the killing blow. This one
+  //    was missed on the first pass, and dropping the hurt -> attack
+  //    fallback in the same change took its recoil away with nothing to
+  //    replace it -- so the finisher, which HAD been animating, stopped.
+  //    It maps to "hurt" like any other hit and needs the same treatment.
+  //
+  // Retreat / defeat / cheer are deliberately absent: those stage their
+  // own motion (slide, fade, victory loop) and must not be shoved
+  // sideways by a knockback.
   const bossTakingDamage =
     outcome === "active" &&
     (pendingAttack || bossReaction === "hit" || bossReaction === "crit");
-  const synthHitBeat = !bossHasHurtClip && bossTakingDamage;
+  const bossFinisherImpact =
+    outcome === "won" && cinematicStage === "finisher-impact";
+  const synthHitBeat =
+    !bossHasHurtClip && (bossTakingDamage || bossFinisherImpact);
+  // The finisher is the heaviest hit in the fight and its beat runs
+  // FINISHER_IMPACT_MS (1.8s), so it gets a longer, deeper recoil than a
+  // regular exchange rather than a 620ms flinch inside a 1.8s hold.
+  const synthHitAnimation = bossFinisherImpact
+    ? "bossTakeHitHeavy 1150ms cubic-bezier(0.22, 1, 0.36, 1) both"
+    : "bossTakeHit 620ms cubic-bezier(0.22, 1, 0.36, 1) both";
 
   // ── Evaluation zoom ────────────────────────────────────────────────
   // Product spec (2026-08-10): "after giving an answer the ai evalutes
@@ -2180,9 +2198,7 @@ function BattleScene({
           <div
             key={`bosshit-${reactionEpoch}-${synthHitBeat ? 1 : 0}`}
             style={{
-              animation: synthHitBeat
-                ? "bossTakeHit 620ms cubic-bezier(0.22, 1, 0.36, 1) both"
-                : undefined,
+              animation: synthHitBeat ? synthHitAnimation : undefined,
               willChange: synthHitBeat ? "transform, filter" : undefined,
             }}
           >
@@ -2254,6 +2270,18 @@ function BattleScene({
             44%  { transform: translateX(11px); filter: none; }
             62%  { transform: translateX(3px); }
             80%  { transform: translateX(7px); }
+            100% { transform: translateX(0); filter: none; }
+          }
+          @keyframes bossTakeHitHeavy {
+            0%   { transform: translateX(0) scale(1); filter: none; }
+            8%   { transform: translateX(34px) scale(0.94);
+                   filter: brightness(3) saturate(0.3) sepia(1) hue-rotate(-32deg); }
+            22%  { transform: translateX(20px) scale(0.99);
+                   filter: brightness(1.8) sepia(0.6) hue-rotate(-32deg); }
+            40%  { transform: translateX(27px) scale(1); filter: none; }
+            58%  { transform: translateX(12px); }
+            74%  { transform: translateX(19px); }
+            88%  { transform: translateX(6px); }
             100% { transform: translateX(0); filter: none; }
           }
         `}</style>
