@@ -1888,7 +1888,7 @@ function BattleScene({
   // FINISHER_IMPACT_MS (1.8s), so it gets a longer, deeper recoil than a
   // regular exchange rather than a 620ms flinch inside a 1.8s hold.
   const synthHitAnimation = bossFinisherImpact
-    ? "bossTakeHitHeavy 1150ms cubic-bezier(0.22, 1, 0.36, 1) both"
+    ? "bossTakeHitHeavy 1500ms cubic-bezier(0.22, 1, 0.36, 1) both"
     : "bossTakeHit 620ms cubic-bezier(0.22, 1, 0.36, 1) both";
 
   // ── Evaluation zoom ────────────────────────────────────────────────
@@ -2272,17 +2272,36 @@ function BattleScene({
             80%  { transform: translateX(7px); }
             100% { transform: translateX(0); filter: none; }
           }
+          /* The killing blow, for a boss with no hurt sheet to play.
+             A 34px nudge on a 220-300px sprite was too polite to read as
+             the fight-ending hit -- the user saw the swing, then the
+             retreat, and nothing in between. This is the JRPG grammar
+             instead: knock back hard, stagger (tilt), flash red, blink,
+             and only then settle. Blinking is what actually sells "took
+             damage" when the sprite itself cannot change pose. */
           @keyframes bossTakeHitHeavy {
-            0%   { transform: translateX(0) scale(1); filter: none; }
-            8%   { transform: translateX(34px) scale(0.94);
-                   filter: brightness(3) saturate(0.3) sepia(1) hue-rotate(-32deg); }
-            22%  { transform: translateX(20px) scale(0.99);
-                   filter: brightness(1.8) sepia(0.6) hue-rotate(-32deg); }
-            40%  { transform: translateX(27px) scale(1); filter: none; }
-            58%  { transform: translateX(12px); }
-            74%  { transform: translateX(19px); }
-            88%  { transform: translateX(6px); }
-            100% { transform: translateX(0); filter: none; }
+            0%   { transform: translateX(0) rotate(0deg) scale(1);
+                   filter: none; opacity: 1; }
+            5%   { transform: translateX(62px) rotate(7deg) scale(0.9);
+                   filter: brightness(3.4) saturate(0.25) sepia(1) hue-rotate(-30deg);
+                   opacity: 1; }
+            11%  { opacity: 0.25; }
+            17%  { transform: translateX(52px) rotate(5deg) scale(0.94);
+                   filter: brightness(2.6) sepia(0.9) hue-rotate(-30deg);
+                   opacity: 1; }
+            23%  { opacity: 0.3; }
+            30%  { transform: translateX(44px) rotate(6deg) scale(0.97);
+                   filter: brightness(2) sepia(0.7) hue-rotate(-30deg);
+                   opacity: 1; }
+            38%  { opacity: 0.4; }
+            46%  { transform: translateX(36px) rotate(3deg) scale(1);
+                   filter: brightness(1.4) sepia(0.35) hue-rotate(-30deg);
+                   opacity: 1; }
+            60%  { transform: translateX(22px) rotate(4deg); filter: none; }
+            74%  { transform: translateX(28px) rotate(2deg); }
+            86%  { transform: translateX(12px) rotate(1deg); }
+            100% { transform: translateX(0) rotate(0deg) scale(1);
+                   filter: none; opacity: 1; }
           }
         `}</style>
       </div>
