@@ -127,6 +127,54 @@ export function Step3MapGuide() {
   );
   const copy = resolveTutorialCopy(activeTemplateId);
 
+  // ── SERVER TRUTH: has this venture's combat already been won? ───────
+  //
+  // The tutorial's own `combat_done` milestone is the intended record of
+  // this beat, but it is a SEPARATE write on a separate table, and when
+  // that write does not land -- a dropped connection, a backend without
+  // the mutation deployed -- nothing else knows the fight happened. The
+  // stage machine then resolves to "combat" on every remount and reload,
+  // which is Sparky reading "You're about to face X" to someone who has
+  // already beaten X.
+  //
+  // combatRounds rows are the GAME's own record, written by the round
+  // itself as part of finishing it. They cannot disagree with what the
+  // user actually did, and the map page already relies on them for the
+  // same reason (it refuses to reopen combat on a won checkpoint). Read
+  // them here too, so the tutorial's idea of "combat is behind you"
+  // matches the map's.
+  //
+  // Scoped to the active venture: a returning user with old wins should
+  // not have a fresh venture's combat beat skipped.
+  const ventures = useQuery(api.ventures.getUserVentures, {});
+  const activeVentureId = useMemo(() => {
+    if (!ventures || ventures.length === 0) return null;
+    // Most-recently-updated wins — mirrors the map's own resolution.
+    const sorted = [...ventures].sort(
+      (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+    );
+    return sorted[0]?._id ?? null;
+  }, [ventures]);
+  const wonCheckpoints = useQuery(
+    api.combat.getMyWonCheckpointIds,
+    activeVentureId ? { ventureId: activeVentureId } : "skip",
+  );
+  const combatWonOnServer = !!wonCheckpoints && wonCheckpoints.length > 0;
+  // Every consumer below must wait for this. Treating "still loading" as
+  // "not won" is the same mistake as treating it as "not started", and it
+  // is what makes a beat replay for a frame before the answer arrives.
+  const combatWonResolved =
+    ventures !== undefined && (!activeVentureId || wonCheckpoints !== undefined);
+  // Read inside a 500ms interval, so it needs a ref to stay fresh.
+  const combatWonRef = useRef(false);
+  combatWonRef.current = combatWonOnServer;
+  // Durable "the fight already happened" signal, as a plain boolean so
+  // effects can depend on it without depending on the whole tutorial
+  // context object. Either record counts: the tutorial's own milestone,
+  // or the game's won-round row.
+  const combatDone =
+    tutorial.hasMilestone("combat_done") || combatWonOnServer;
+
   // Step numbering: 1=name, 2=username, 3=click+, 4=pick template,
   // 5=write outline, 6=posted, 7=map task, 8=combat/done.
   // Force-advance to 7 on map arrival so the bar advances the moment the
@@ -262,12 +310,16 @@ export function Step3MapGuide() {
   useEffect(() => {
     if (stageResolvedRef.current) return;
     if (!tutorial.milestonesLoaded) return;
+    // Resolve only once BOTH records have answered. Deciding on the
+    // milestone alone, before combatRounds has replied, is what put a
+    // user who had already won back on "combat".
+    if (!combatWonResolved) return;
     if (!active) return;
     stageResolvedRef.current = true;
     if (tutorial.hasMilestone("flare_done")) {
       // Everything on the map is behind them — go straight to the hand-off.
       setStageRaw("done");
-    } else if (tutorial.hasMilestone("combat_done") || tutorial.step >= 9) {
+    } else if (combatDone || tutorial.step >= 9) {
       // "saddlebag", NOT "flare". The beat order after combat is
       // victory -> saddlebag -> flare, and resuming at "flare" skipped the
       // saddlebag beat entirely (reported: finished AI combat, refreshed,
@@ -286,7 +338,7 @@ export function Step3MapGuide() {
     } else {
       setStageRaw("combat");
     }
-  }, [tutorial, active]);
+  }, [tutorial, active, combatDone, combatWonResolved]);
 
   // Sub-state for the boss-intro cinematic: TRUE while the villain is
   // actively speaking (intro monologue OR minions taunt). We poll the
@@ -312,10 +364,6 @@ export function Step3MapGuide() {
   // window before force-combat has spawned it. Prevents the tutorial
   // from jumping straight to "Congratulations!" on map arrival.
   const combatWasOpenRef = useRef(false);
-  // Durable "the fight already happened" signal, read as a plain boolean
-  // so effects can depend on it without depending on the whole tutorial
-  // context object.
-  const combatDone = tutorial.hasMilestone("combat_done");
   useEffect(() => {
     if (!active) return;
     const id = window.setInterval(() => {
@@ -384,6 +432,10 @@ export function Step3MapGuide() {
   useEffect(() => {
     if (!active) return;
     if (forceCombatFiredRef.current) return;
+    // Same reason as the resume effect: firing combat at someone whose
+    // won-round record has not arrived yet is how this dispatcher used to
+    // shove people who had already beaten the boss back into combat.
+    if (!combatWonResolved) return;
     // Wait for the durable record before deciding anything. Firing on a
     // half-loaded state is how this dispatcher used to shove people who
     // had already beaten the boss back into combat.
@@ -396,7 +448,7 @@ export function Step3MapGuide() {
     // second device leaves the step at 8 with combat long since won. The
     // milestone is written locally first and persisted per user, so it
     // survives all three.
-    if (tutorial.hasMilestone("combat_done") || tutorial.step >= 9) {
+    if (combatDone || tutorial.step >= 9) {
       forceCombatFiredRef.current = true;
       // "saddlebag" not "flare" — same reasoning as the resume effect
       // above: saddlebag is the next incomplete beat after combat, and the
@@ -488,7 +540,13 @@ export function Step3MapGuide() {
       cancelled = true;
       window.clearTimeout(kick);
     };
-  }, [active, bossIntroSeen]);
+    // `tutorial` and `setStage` are deliberately omitted: this effect owns
+    // a chain of 500ms self-rescheduling timers, and re-running it on every
+    // context-identity change would restart that chain (and its 800ms
+    // initial kick) instead of letting it finish. The signals that actually
+    // matter for the decision are in the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, bossIntroSeen, combatDone, combatWonResolved]);
 
   // Reset the fire-once ref when Step3 deactivates so re-entering the
   // tutorial (e.g. via restart) triggers combat again. Same treatment
@@ -500,6 +558,20 @@ export function Step3MapGuide() {
       flareWasOpenRef.current = false;
     }
   }, [active]);
+
+  // Mirror the server's won-round record into the tutorial milestone.
+  //
+  // The milestone is what the rest of the machine (and Step4, and the
+  // provider's completion check) reads, so the two records must not be
+  // allowed to disagree. This also repairs accounts that won the fight
+  // while the milestone write was failing: the next time they load the
+  // map, combatRounds says "won" and the milestone is written from it.
+  useEffect(() => {
+    if (!active) return;
+    if (!combatWonOnServer) return;
+    if (tutorial.hasMilestone("combat_done")) return;
+    tutorial.markMilestone("combat_done");
+  }, [active, combatWonOnServer, tutorial]);
 
   // WATCHDOG — "stuck at Sparky's about-to-face line, needed refresh"
   // fix. The primary force-combat dispatch above is one-shot (retries
@@ -676,7 +748,7 @@ export function Step3MapGuide() {
         // retry loop, is one too many.
         if (
           prev === "combat" &&
-          combatWasOpenRef.current &&
+          (combatWasOpenRef.current || combatWonRef.current) &&
           (!combat || bossDefeated)
         ) {
           return "victory";
