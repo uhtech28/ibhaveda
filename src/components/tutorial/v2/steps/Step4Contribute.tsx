@@ -239,6 +239,55 @@ export function Step4Contribute() {
   // and the retry loop covers the feed still streaming in from Convex
   // when the stage flips (poll ~200ms, give up after ~4s).
   const didScrollRef = useRef(false);
+  const releaseHoldRef = useRef<(() => void) | null>(null);
+
+  /**
+   * Keep the contribute button in view for a moment after scrolling to it.
+   *
+   * Reported on mobile: the page scrolls to the button and then snaps back
+   * to the top. A single one-shot scrollIntoView cannot survive that,
+   * because whatever moves the page happens AFTER us -- the feed's flare
+   * rail and idea cards stream in from Convex and reflow the document
+   * under our feet, and a client navigation that settles late takes the
+   * scroll position with it. Desktop wins that race often enough to look
+   * fine; a phone, with less above-the-fold and slower streaming, does not.
+   *
+   * So do not scroll once and hope. Re-assert for 2.5s, and stop the
+   * instant the user touches the page -- a tutorial that fights your
+   * thumb is worse than one that starts in the wrong place.
+   */
+  const holdPosition = useCallback((el: HTMLElement) => {
+    releaseHoldRef.current?.();
+    let userTookOver = false;
+    const yieldToUser = () => {
+      userTookOver = true;
+    };
+    // Intent events only. A plain `scroll` listener would fire on our own
+    // smooth scroll and cancel the hold immediately.
+    const EVENTS = ["touchstart", "wheel", "keydown"] as const;
+    EVENTS.forEach((e) =>
+      window.addEventListener(e, yieldToUser, { passive: true }),
+    );
+    const check = window.setInterval(() => {
+      if (userTookOver || !el.isConnected) return;
+      const r = el.getBoundingClientRect();
+      const drift = Math.abs(r.top + r.height / 2 - window.innerHeight / 2);
+      // Only correct a real displacement, not the last few pixels of the
+      // smooth scroll still settling.
+      if (drift > window.innerHeight * 0.4) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 250);
+    const stop = window.setTimeout(() => release(), 2500);
+    const release = () => {
+      window.clearInterval(check);
+      window.clearTimeout(stop);
+      EVENTS.forEach((e) => window.removeEventListener(e, yieldToUser));
+      releaseHoldRef.current = null;
+    };
+    releaseHoldRef.current = release;
+  }, []);
+
   useEffect(() => {
     if (!active || stage !== "contribute") return;
     if (didScrollRef.current) return;
@@ -257,12 +306,16 @@ export function Step4Contribute() {
           behavior: "smooth",
           block: "center",
         });
+        holdPosition(el as HTMLElement);
       } else if (tries > 20) {
         window.clearInterval(tick);
       }
     }, 200);
-    return () => window.clearInterval(tick);
-  }, [active, stage]);
+    return () => {
+      window.clearInterval(tick);
+      releaseHoldRef.current?.();
+    };
+  }, [active, stage, holdPosition]);
 
   // NOTE: previous versions of this file had four fallback timers
   // (60s + 8s) that auto-advanced flare → contribute and contribute →
