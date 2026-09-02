@@ -31,6 +31,7 @@ import { getPersona, type PersonaId } from "@/config/personas";
 import { PixelIcon } from "@/components/ui/PixelIcon";
 import { getBossFaceUrl } from "@/lib/bosses/bossFaces";
 import { isSpriteReady, warmSprite, warmSprites } from "@/lib/sprites/spriteCache";
+import { getBossSpriteGeometry } from "@/config/boss-sprite-manifest";
 
 interface Props {
   question: CombatCurrentQuestion;
@@ -1854,6 +1855,24 @@ function BattleScene({
     bossReaction === "crit" ||
     bossReaction === "counter";
 
+  // Does this boss actually ship a hurt sheet? The build-time manifest
+  // lists every sheet that exists on disk, so a null lookup is a
+  // definitive "no art for that state" -- no guessing, no 404.
+  const bossHasHurtClip = (() => {
+    if (!bossAsset) return true; // no sprite path -> nothing to compensate for
+    const hurtSheet =
+      bossAsset.slice(0, bossAsset.lastIndexOf("/") + 1) + "hurt.png";
+    return !!getBossSpriteGeometry(hurtSheet);
+  })();
+  // The beats where the boss is TAKING damage: the optimistic swing on
+  // submit, and the confirmed hit/crit once the server grades it. Only
+  // during live combat -- the win/loss cinematics stage their own motion
+  // and must not be shoved sideways by this.
+  const bossTakingDamage =
+    outcome === "active" &&
+    (pendingAttack || bossReaction === "hit" || bossReaction === "crit");
+  const synthHitBeat = !bossHasHurtClip && bossTakingDamage;
+
   // ── Evaluation zoom ────────────────────────────────────────────────
   // Product spec (2026-08-10): "after giving an answer the ai evalutes
   // answer in that evalution time zoom the combat screen". Combined
@@ -2138,6 +2157,35 @@ function BattleScene({
             background clipped to the first frame (92×92 within a
             828×92 sheet) and scale it up to 300×300 for display. */}
         {bossAsset ? (
+          // SYNTHESISED HIT REACTION
+          // ────────────────────────────────────────────────────────────
+          // Sprite clips are the only source of boss motion in this arena
+          // (the old framer shake was removed because it outlived the clip
+          // and read as a phantom second animation). That is fine for a
+          // boss with a hurt sheet -- and half of them do not have one.
+          // For those, landing a hit produced no motion at all: just a
+          // number and a shrinking bar. "It does not show the attack
+          // damage animation, the health just goes down."
+          //
+          // So when the art cannot show the hit, the arena does: a
+          // knockback, a red flash and a short settle, on the wrapper
+          // rather than the sprite, so it composes with the idle clip
+          // instead of fighting it. Bosses that DO ship hurt.png are
+          // untouched -- their clip is still the reaction.
+          //
+          // Keyed on the epoch AND the beat so it replays on the
+          // optimistic swing and again when the server confirms damage;
+          // without the beat in the key the first hit shares a key with
+          // idle and never starts.
+          <div
+            key={`bosshit-${reactionEpoch}-${synthHitBeat ? 1 : 0}`}
+            style={{
+              animation: synthHitBeat
+                ? "bossTakeHit 620ms cubic-bezier(0.22, 1, 0.36, 1) both"
+                : undefined,
+              willChange: synthHitBeat ? "transform, filter" : undefined,
+            }}
+          >
           <BossSpriteFromAsset
             bossAsset={bossAsset}
             displayWidth={bossDisplayWidth}
@@ -2192,9 +2240,23 @@ function BattleScene({
                         : "idle"
             }
           />
+          </div>
         ) : (
           <BossSprite persona={persona} />
         )}
+        <style>{`
+          @keyframes bossTakeHit {
+            0%   { transform: translateX(0) scale(1); filter: none; }
+            10%  { transform: translateX(15px) scale(0.97);
+                   filter: brightness(2.6) saturate(0.35) sepia(1) hue-rotate(-32deg); }
+            26%  { transform: translateX(7px) scale(1);
+                   filter: brightness(1.6) sepia(0.55) hue-rotate(-32deg); }
+            44%  { transform: translateX(11px); filter: none; }
+            62%  { transform: translateX(3px); }
+            80%  { transform: translateX(7px); }
+            100% { transform: translateX(0); filter: none; }
+          }
+        `}</style>
       </div>
 
       {/* Player character sprite — left side, faces right.
@@ -3582,7 +3644,12 @@ function BossSpriteFromAsset({
   const FALLBACK_CHAIN: Record<BossAnimState, BossAnimState[]> = {
     idle:    ["idle"],
     attack:  ["attack", "idle"],
-    hurt:    ["hurt", "attack", "idle"],
+    // NOT ["hurt", "attack", "idle"]. 27 of the 55 boss folders ship no
+    // hurt.png, and borrowing their attack clip meant the boss SWUNG AT
+    // YOU at the exact moment it was supposed to be recoiling -- the
+    // opposite read. Those bosses now hold idle and the arena plays a
+    // synthesised hit reaction over the top instead (see bossTakeHit).
+    hurt:    ["hurt", "idle"],
     defeat:  ["defeat", "hurt", "idle"],
     victory: ["victory", "attack", "idle"],
   };
