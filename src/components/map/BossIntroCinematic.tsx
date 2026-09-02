@@ -874,10 +874,11 @@ function MainBossPortrait({
  *
  * Tuned by eye against the four academic bosses: 0.82 was too small while
  * the sprites were still being measured by their frames rather than their
- * pixels, 0.88 was too tight once they were, 0.80 sits them in the tile
- * with a little air around them.
+ * pixels, 0.88 was too tight once they were. 0.60 is the last ask --
+ * "reduce to 75%" of the 0.80 that preceded it -- so each boss now takes
+ * 60% of its tile and sits well clear of the edges.
  */
-const SPRITE_FILL = 0.8;
+const SPRITE_FILL = 0.6;
 
 function MinionSprite({ src, alt }: { src: string; alt: string }) {
   const filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.6))";
