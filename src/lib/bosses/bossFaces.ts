@@ -101,6 +101,92 @@ const FACE_ALIASES: Record<string, string> = {
   "forest colosseus": "the-forest-colosseus-super",
 };
 
+/**
+ * Art-folder → face-slug. The AUTHORITATIVE mapping.
+ *
+ * The name-keyed table above needs an entry for every wording a boss is
+ * referred to by, and the rosters drift from it constantly: "The Forge
+ * Dragon" misses `forge dragon`, "Colossal Sea Serpent" misses
+ * `sea serpent`, "The Iron Bureaucrat's Herald" misses `the iron
+ * bureaucrat`. Forty of the fifty boss names in the configs failed to
+ * resolve, so most bosses fell through to a clipped spritesheet.
+ *
+ * A boss's art folder does not drift -- it is the same folder the sprite
+ * is loaded from -- so keying on it fixes the whole class instead of one
+ * name at a time. Two bosses sharing art share a face, which is correct:
+ * that is what sharing art means.
+ *
+ * Folders deliberately absent (no matching portrait was supplied):
+ *   stage2/forest-sorceress, stage2/forest-wraith, super-pool/mirror-witch,
+ *   super-pool/wraith-council, and the whole academic / lab / creative
+ *   rosters. Those fall back to the cropped sprite portrait rather than
+ *   being given a face that is not theirs.
+ */
+const ASSET_FOLDER_FACES: Record<string, string> = {
+  "village/fog": "fog-of-vagueness",
+  "village/chimera": "chimera",
+  "village/automaton": "automation",
+  "village/wraith": "pathwarden-wraith",
+  "village/unraveller": "unraveller",
+
+  "stage2/shadow-specter": "shadow-specter",
+  "stage2/thornbearer": "thornbeared-champion",
+  "stage2/forest-colossus": "the-forest-colosseus-super",
+
+  "arena/judge": "judge-of-false-precedent",
+  "arena/masked-challenger": "the-masked-challenger",
+  "arena/oracle-of-doubt": "oracle-of-doubt",
+  "arena/advocate": "the-advocate-of-comfortable-slies",
+
+  "stage3/harbor-merchant": "harbor-merchant",
+  "stage3/harbor-mist": "harbor-mist",
+  "stage3/harbor-official": "harbor-official",
+  "stage3/sea-serpent": "sea-serpent",
+  "stage3/leviathan": "leviathan",
+
+  "stage4/armor-golem": "armor-golem",
+  "stage4/artisan-automaton": "artisian-automation",
+  "stage4/forge-dragon": "forge-dragon",
+  "stage4/spectral-king": "spectral-king",
+  "stage4/undead-titan": "undead-titan",
+
+  "incoming/babel-merchant": "babel-merchant",
+  "incoming/collapse-specter": "the-collapse-secter",
+  "incoming/harbourmaster": "the-harbourmaster-of-hesitation",
+  "incoming/iron-bureaucrat": "the-iron-bureaucrat",
+
+  "venture/unfinished-golem": "armor-golem",
+
+  "super-pool/ashen-drake": "forge-dragon",
+  "super-pool/hollow-king": "spectral-king",
+  "super-pool/pale-architect": "undead-titan",
+  "super-pool/rusted-oracle": "rusted-oracle",
+  "super-pool/stonecaller": "stronecaller",
+  "super-pool/thornwarden": "thornbeared-champion",
+  "super-pool/tide-caller": "tide-caller",
+  "super-pool/unraveller": "unraveller",
+  "super-pool/veilwalker": "the-veilwalker",
+};
+
+/**
+ * Resolve a face from the boss's SPRITE PATH, e.g.
+ * "/assets/bosses/stage4/forge-dragon/idle.png" -> the forge-dragon face.
+ * Returns null for art we have no portrait for.
+ */
+export function getBossFaceUrlFromAsset(
+  assetPath: string | null | undefined,
+): string | null {
+  if (!assetPath) return null;
+  // Split on path segments rather than a regex literal: no escaping,
+  // and it tolerates a leading origin or a query string.
+  const parts = assetPath.split("/").filter(Boolean);
+  const i = parts.indexOf("bosses");
+  if (i === -1 || parts.length < i + 3) return null;
+  const key = parts[i + 1] + "/" + parts[i + 2];
+  const slug = ASSET_FOLDER_FACES[key];
+  return slug ? `${FACE_DIR}/${slug}.jpeg` : null;
+}
+
 /** Normalise a boss display name for alias lookup. */
 function normalize(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");

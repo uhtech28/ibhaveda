@@ -29,7 +29,7 @@ import type {
 import type { VillageBossInfo } from "@/config/village-bosses";
 import { getPersona, type PersonaId } from "@/config/personas";
 import { PixelIcon } from "@/components/ui/PixelIcon";
-import { getBossFaceUrl } from "@/lib/bosses/bossFaces";
+import { getBossFaceUrl, getBossFaceUrlFromAsset } from "@/lib/bosses/bossFaces";
 import { isSpriteReady, warmSprite, warmSprites } from "@/lib/sprites/spriteCache";
 import { getBossSpriteGeometry } from "@/config/boss-sprite-manifest";
 
@@ -1051,7 +1051,12 @@ function DialoguePanel({
   // ai combat screen uses boss head png".
   // Fallback chain (only if no hand-picked face exists):
   //   bossFaceUrl → clipped spritesheet frame → procedural SVG.
-  const bossFaceUrl = getBossFaceUrl(bossName);
+  // Name first (it carries hand-written aliases), then the ART FOLDER.
+  // The folder is what actually identifies a boss -- display names drift
+  // from the alias table constantly, which is why most bosses were
+  // falling through to the sprite crop despite having a portrait shipped.
+  const bossFaceUrl =
+    getBossFaceUrl(bossName) ?? getBossFaceUrlFromAsset(bossAsset);
   return (
     <div className="flex items-start gap-4 bg-black p-4">
       {bossFaceUrl ? (
@@ -1184,6 +1189,34 @@ function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
   // Any sheet aspect ratio works because we drive backgroundSize +
   // backgroundPosition off frameCount rather than trying to divide.
   const frameCount = dims ? Math.max(1, Math.round(dims.w / dims.h)) : 1;
+
+  // MEASURED HEAD CROP.
+  //
+  // The percentage maths below zooms 2x on the top-centre of frame 0 and
+  // hopes the head is there. For a sprite drawn small inside its frame it
+  // is not: the Librarian's figure is 16x37 px of a 96px frame starting
+  // 33% down, so a 2x top-centre crop renders it as a speck low in the
+  // cell -- which is the red box with a dot in it that was reported.
+  //
+  // The manifest records frame 0's opaque box, so we can crop to the
+  // character instead of to the frame. Square window over the top of the
+  // figure: its full width, or the top 42% of its height, whichever is
+  // larger, so a tall-thin sprite and a short-wide one both frame as a
+  // head-and-shoulders rather than one being over-zoomed.
+  const geo = getBossSpriteGeometry(bossAsset);
+  const measured = (() => {
+    const b = geo?.bounds;
+    if (!b || !geo?.size) return null;
+    const side = Math.min(geo.size, Math.max(b.w, b.h * 0.42));
+    // Keep the window inside the frame so we never sample the neighbour.
+    const sx = Math.max(0, Math.min(geo.size - side, b.x + b.w / 2 - side / 2));
+    const sy = Math.max(0, Math.min(geo.size - side, b.y));
+    const zoom = BOX / side;
+    return {
+      size: `${(geo.size * geo.frames * zoom).toFixed(1)}px ${(geo.size * zoom).toFixed(1)}px`,
+      pos: `${(-sx * zoom).toFixed(1)}px ${(-sy * zoom).toFixed(1)}px`,
+    };
+  })();
   return (
     <div
       className="shrink-0 relative overflow-hidden"
@@ -1229,9 +1262,12 @@ function BossFacePortrait({ bossAsset }: { bossAsset: string }) {
           // mostly transparent border with just a foot poking in.
           // Product ask 2026-08-20: face still not visible in AI
           // combat cell.
-          backgroundSize: `${frameCount * 200}% 200%`,
-          backgroundPosition:
-            frameCount > 1
+          backgroundSize: measured
+            ? measured.size
+            : `${frameCount * 200}% 200%`,
+          backgroundPosition: measured
+            ? measured.pos
+            : frameCount > 1
               ? `${(100 / (2 * frameCount - 1)).toFixed(3)}% 0%`
               : `50% 0%`,
           backgroundRepeat: "no-repeat",
