@@ -974,6 +974,18 @@ export function TutorialMascot({
     <AnimatePresence>
       {effectiveVisible && (
         <>
+          {/* Typing marker. Sparky's typewriter state is internal, but the
+              step components need it -- the map step must not open AI
+              combat while Sparky is still mid-sentence introducing the
+              boss. Published as a DOM attribute rather than a callback
+              prop because the steps already observe this component through
+              the DOM (data-tutorial-hide, data-boss-intro), and Sparky is
+              rendered through a portal from several call sites. */}
+          <span
+            data-tutorial-typing={isTyping ? "true" : "false"}
+            aria-hidden="true"
+            style={{ display: "none" }}
+          />
           {/* Scrim — blocks all page clicks except the highlighted target
               and Sparky's bubble. Ensures the user must advance via Sparky's
               Continue button, not via the underlying page controls.

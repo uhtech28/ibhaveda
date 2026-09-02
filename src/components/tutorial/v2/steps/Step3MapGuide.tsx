@@ -102,6 +102,26 @@ function findTaskModal(): HTMLElement | null {
   );
 }
 
+/**
+ * Is Sparky still typing his current line?
+ *
+ * TutorialMascot publishes its typewriter state as data-tutorial-typing.
+ * The map step needs it because the beat right before AI combat is Sparky
+ * naming the boss ("You're about to face <Boss>, who'll ..."), and combat
+ * was opening on its own timer -- the panel covered the bubble halfway
+ * through the sentence.
+ *
+ * Returns false when no mascot is mounted, so a step with no bubble never
+ * waits on one.
+ */
+/** How long the finished line stays uncovered before combat opens. */
+const POST_SPEECH_HOLD_MS = 900;
+
+function isMascotTyping(): boolean {
+  if (typeof document === "undefined") return false;
+  return !!document.querySelector('[data-tutorial-typing="true"]');
+}
+
 function findCombatPanel(): HTMLElement | null {
   return document.querySelector<HTMLElement>(
     '[data-tutorial="combat-panel"], [aria-label="AI Combat"], [data-combat-panel]',
@@ -482,6 +502,10 @@ export function Step3MapGuide() {
     // the listener silently returned and combat never opened.
     let introAttempts = 0;   // capped at 60 (~30s) while intro plays
     let dispatchAttempts = 0; // capped at 30 (~15s) once we start firing
+    let speechAttempts = 0;      // capped at 20 (~10s) while Sparky types
+    let speechStartAttempts = 0; // capped at 6 (~2.4s) waiting for him to start
+    let speechSeen = false;      // latched once we have observed him typing
+    let speechSettledAt = 0;     // when the typewriter finished, for the hold
     let cancelled = false;
     const tryDispatch = () => {
       if (cancelled || forceCombatFiredRef.current) return;
@@ -530,6 +554,42 @@ export function Step3MapGuide() {
         }
         // Query never resolved after ~20s — fall through and dispatch
         // anyway rather than dead-end the whole tutorial.
+      }
+
+      // LET SPARKY FINISH. The beat immediately before combat is Sparky
+      // naming the boss ("You're about to face <Boss>, who'll ..."), and
+      // combat was opening on its own timer -- the panel covered the
+      // bubble mid-sentence.
+      //
+      // Three phases, each budgeted so a bubble that never behaves cannot
+      // strand the tutorial:
+      //
+      //  1. WAIT FOR HIM TO START. We arrive here up to a poll ahead of
+      //     the stage machine, while Sparky is still silent on the
+      //     boss_intro beat, and the mascot debounces incoming text by
+      //     400ms on top. Without this window "not typing yet" reads as
+      //     "already finished" and we dispatch before he says anything.
+      //  2. WAIT FOR HIM TO FINISH.
+      //  3. HOLD, so the completed sentence is readable for a moment
+      //     rather than being covered on its last character.
+      if (isMascotTyping()) {
+        speechSeen = true;
+        if (speechAttempts < 20) {
+          speechAttempts++;
+          window.setTimeout(tryDispatch, 500);
+          return;
+        }
+      } else if (!speechSeen && speechStartAttempts < 6) {
+        speechStartAttempts++;
+        window.setTimeout(tryDispatch, 400);
+        return;
+      }
+      if (!speechSettledAt) {
+        speechSettledAt = Date.now();
+      }
+      if (Date.now() - speechSettledAt < POST_SPEECH_HOLD_MS) {
+        window.setTimeout(tryDispatch, 200);
+        return;
       }
 
       // Dispatch phase — fires the event once per tick until either
@@ -651,7 +711,10 @@ export function Step3MapGuide() {
       const introPending =
         (bossIntroSeen === false || bossIntroSeen === undefined) &&
         !introDismissedRef.current;
+      // Same rule as the dispatcher: never open combat over a sentence
+      // Sparky is still typing.
       if (combatOpen || spinnerUp || introUp || introPending) return;
+      if (isMascotTyping()) return;
       // Reset the one-shot latch so Step3's tryDispatch loop can run
       // again the next time this effect ticks. Then fire the event
       // directly so we don't wait a full poll cycle.
