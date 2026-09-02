@@ -312,6 +312,10 @@ export function Step3MapGuide() {
   // window before force-combat has spawned it. Prevents the tutorial
   // from jumping straight to "Congratulations!" on map arrival.
   const combatWasOpenRef = useRef(false);
+  // Durable "the fight already happened" signal, read as a plain boolean
+  // so effects can depend on it without depending on the whole tutorial
+  // context object.
+  const combatDone = tutorial.hasMilestone("combat_done");
   useEffect(() => {
     if (!active) return;
     const id = window.setInterval(() => {
@@ -515,7 +519,27 @@ export function Step3MapGuide() {
   useEffect(() => {
     if (!active) return;
     if (stage !== "combat") return;
+    // Never chase a fight that is already over. This watchdog exists for
+    // "combat never opened"; it had no idea combat could already have
+    // been fought and won, and that is the bug behind "after I defeated
+    // the boss the about-to-face line came back":
+    //
+    //   win -> panel closes -> watchdog ticks before the 500ms stage
+    //   poller does -> sees no panel, no spinner, no cinematic -> clears
+    //   forceCombatFiredRef and re-fires tutorial:force-combat.
+    //
+    // Clearing that ref is what broke it. The stage poller's victory
+    // transition required forceCombatFiredRef to be TRUE, so once the
+    // watchdog cleared it the machine could never leave "combat" -- and
+    // "combat" with the panel closed is exactly the pre-combat
+    // "You're about to face X" line. Meanwhile the re-fired event
+    // reopened the checkpoint modal over the map.
+    //
+    // The milestone covers reloads; combatWasOpenRef (checked per tick,
+    // since it flips during this effect's lifetime) covers this session.
+    if (combatDone) return;
     const tick = window.setInterval(() => {
+      if (combatWasOpenRef.current) return;
       const combatOpen = !!findCombatPanel();
       // Awakening spinner has this exact text — if it's up, combat
       // IS starting, don't spam more dispatches.
@@ -552,7 +576,7 @@ export function Step3MapGuide() {
     return () => window.clearInterval(tick);
     // findCombatPanel is stable via useCallback in the enclosing scope
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, stage, bossIntroSeen]);
+  }, [active, stage, bossIntroSeen, combatDone]);
 
   useEffect(() => {
     if (!active) return;
@@ -640,9 +664,18 @@ export function Step3MapGuide() {
         // closed AND BEFORE it ever spawned — so the tutorial jumped
         // straight to "Congratulations!" the instant the user landed
         // on the map, before they'd even entered combat.
+        // `combatWasOpenRef` is the real precondition -- it means the
+        // user actually reached the fight, which is what stops this
+        // firing on map arrival before combat has spawned.
+        //
+        // This also used to require `forceCombatFiredRef`, and that was
+        // wrong: that ref is dispatch bookkeeping, not progress, and the
+        // watchdog above clears it. When it did, the machine was stuck in
+        // "combat" forever with the fight already won. Two independent
+        // signals for the same fact, one of them mutable by an unrelated
+        // retry loop, is one too many.
         if (
           prev === "combat" &&
-          forceCombatFiredRef.current &&
           combatWasOpenRef.current &&
           (!combat || bossDefeated)
         ) {
