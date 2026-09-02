@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
@@ -64,6 +64,23 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
     setOpen(true);
   }, [isSignedIn, router]);
   const close = useCallback(() => setOpen(false), []);
+
+  // SELF-CORRECT once Clerk answers.
+  //
+  // Both openers branch on `isSignedIn`, which is undefined until Clerk
+  // has loaded -- and undefined is falsy, so a click in that window opens
+  // the auth modal at someone who is already signed in. Callers should not
+  // ask before Clerk is ready (the landing page's role cards now wait),
+  // but this provider is opened from several places and should not depend
+  // on every one of them getting that right. If we ever end up showing an
+  // auth modal to a signed-in user, close it and send them where they were
+  // going.
+  useEffect(() => {
+    if (!open) return;
+    if (!isSignedIn) return;
+    setOpen(false);
+    router.push("/feed");
+  }, [open, isSignedIn, router]);
 
   const value = useMemo(
     () => ({ openSignIn, openSignUp, close }),

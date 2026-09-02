@@ -514,7 +514,7 @@ function QuestionSlideView({
 }
 
 export default function HeroSection() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
   const { openSignIn, openSignUp } = useAuthModal();
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -540,17 +540,56 @@ export default function HeroSection() {
     }
   }, []);
 
-  const handleRoleSelect = useCallback(
-    (role: RoleKey) => {
-      setSelectedRole(role);
-      if (isSignedIn) {
+  // Clicks that arrived before Clerk answered, replayed once it does.
+  const pendingRoleRef = useRef<RoleKey | null>(null);
+
+  // All four cards run this same function -- there has never been any
+  // per-role branching here, and the role we store is not read anywhere,
+  // so it cannot change where anyone lands. What made this feel unreliable
+  // for some cards and not others is a RACE, and it has nothing to do with
+  // which card was pressed:
+  //
+  //   `useUser()` reports isSignedIn === undefined until Clerk finishes
+  //   loading. Undefined is falsy, so a click landing in that window read
+  //   as "signed out" and opened the sign-up modal at an already-signed-in
+  //   user instead of sending them to the feed. Whether you hit that window
+  //   depends only on how soon after page load you click.
+  //
+  // So: never decide while the answer is unknown. Remember the click and
+  // replay it the moment Clerk reports, which also means the press is never
+  // silently swallowed.
+  const runRoleSelect = useCallback(
+    (role: RoleKey, signedIn: boolean | undefined) => {
+      if (signedIn) {
         router.push("/feed");
         return;
       }
       openSignUp();
     },
-    [isSignedIn, openSignUp, router, setSelectedRole],
+    [openSignUp, router],
   );
+
+  const handleRoleSelect = useCallback(
+    (role: RoleKey) => {
+      // Store first either way -- the choice is worth keeping even if the
+      // navigation has to wait a beat.
+      setSelectedRole(role);
+      if (!isLoaded) {
+        pendingRoleRef.current = role;
+        return;
+      }
+      runRoleSelect(role, isSignedIn);
+    },
+    [isLoaded, isSignedIn, runRoleSelect, setSelectedRole],
+  );
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const pending = pendingRoleRef.current;
+    if (!pending) return;
+    pendingRoleRef.current = null;
+    runRoleSelect(pending, isSignedIn);
+  }, [isLoaded, isSignedIn, runRoleSelect]);
 
   const go = useCallback(
     (next: number) => {

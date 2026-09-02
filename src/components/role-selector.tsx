@@ -47,7 +47,7 @@ const ROLES = [
 ] as const;
 
 export default function RoleSelector() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
   const { openSignUp } = useAuthModal();
   const router = useRouter();
 
@@ -58,6 +58,25 @@ export default function RoleSelector() {
     } catch {
       // localStorage may be unavailable
     }
+  };
+
+  // Same rule as the landing hero: isSignedIn is undefined until Clerk has
+  // loaded, and undefined reads as "signed out", so a fast click opened the
+  // sign-up modal at someone already signed in. Every card runs this one
+  // function so no card can behave differently from another.
+  const go = (role: string) => {
+    handleSelect(role);
+    if (!isLoaded) {
+      // Unknown, so decide nothing yet. The provider's own guard closes the
+      // modal and redirects if Clerk comes back signed-in.
+      openSignUp();
+      return;
+    }
+    if (isSignedIn) {
+      router.push("/feed");
+      return;
+    }
+    openSignUp();
   };
 
   return (
@@ -118,33 +137,17 @@ export default function RoleSelector() {
           const cardClass =
             "relative overflow-hidden rounded-[22px] border border-white/10 bg-[#0B111A] min-h-[200px] md:min-h-[240px] p-5 transition-all duration-200 hover:border-white/20 hover:scale-[1.02] hover:shadow-[0_8px_40px_rgba(0,0,0,0.6)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 cursor-pointer text-left flex flex-col";
 
-          if (isSignedIn) {
-            return (
-              <button
-                key={role.key}
-                type="button"
-                onClick={() => {
-                  handleSelect(role.key);
-                  router.push("/feed");
-                }}
-                className={cardClass}
-                aria-label={`Continue as ${role.label}`}
-              >
-                {inner}
-              </button>
-            );
-          }
-
           return (
             <button
               key={role.key}
               type="button"
-              onClick={() => {
-                handleSelect(role.key);
-                openSignUp();
-              }}
+              onClick={() => go(role.key)}
               className={cardClass}
-              aria-label={`Sign up as ${role.label}`}
+              aria-label={
+                isSignedIn
+                  ? `Continue as ${role.label}`
+                  : `Sign up as ${role.label}`
+              }
             >
               {inner}
             </button>
