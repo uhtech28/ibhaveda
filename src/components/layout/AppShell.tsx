@@ -27,8 +27,28 @@ import { TutorialProvider } from "@/components/tutorial/v2/TutorialProvider";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { ClientOnlyOverlays } from "@/components/layout/ClientOnlyOverlays";
+import { useMobileVisualViewport } from "@/lib/hooks/use-mobile-visual-viewport";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Publish the visual-viewport CSS variables for EVERY signed-in route.
+  //
+  // These drive the mobile dialog rules in globals.css -- --app-vv-center-x/y,
+  // --app-vv-width/height and the per-dialog height caps. They were being set
+  // by three individual pages (/feed, /idea/[id], /my-feed), so on every other
+  // route the variables were simply absent and the CSS fell back to 50vw /
+  // 50dvh / 100vw: the LAYOUT viewport.
+  //
+  // The flare composer opens on /map/world, which was not one of those three.
+  // So on iOS, once Safari shifts the visible window to clear the keyboard,
+  // the dialog was positioned against a centre the user could not see and
+  // rendered half off the left edge -- the reported bug. Same for the map's
+  // other dialogs.
+  //
+  // AppShell wraps every route except the marketing landing (which has no
+  // dialogs), so this is the correct level: one subscription, always present,
+  // instead of a list of pages that has to be remembered.
+  useMobileVisualViewport();
+
   return (
     <ConvexClientProvider>
       <AnalyticsProvider>

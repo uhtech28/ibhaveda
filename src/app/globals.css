@@ -869,12 +869,13 @@
   .mobile-contribution-request-dialog--keyboard {
     position: fixed !important;
     inset: auto !important;
-    left: 50vw !important;
+    /* See the flare dialog below -- same visual-viewport correction. */
+    left: var(--app-vv-center-x, 50vw) !important;
     top: var(--app-vv-center-y, 50dvh) !important;
     right: auto !important;
     bottom: auto !important;
-    width: min(calc(100vw - 2rem), 31rem) !important;
-    max-width: min(calc(100vw - 2rem), 31rem) !important;
+    width: min(calc(var(--app-vv-width, 100vw) - 2rem), 31rem) !important;
+    max-width: min(calc(var(--app-vv-width, 100vw) - 2rem), 31rem) !important;
     max-height: calc(var(--app-vv-height, 100dvh) - 2rem) !important;
     margin: 0 !important;
     overflow-y: auto !important;
@@ -888,8 +889,8 @@
     flex-direction: column !important;
     gap: 0.45rem !important;
     padding: 0.65rem !important;
-    width: min(calc(100vw - 1.25rem), 31rem) !important;
-    max-width: min(calc(100vw - 1.25rem), 31rem) !important;
+    width: min(calc(var(--app-vv-width, 100vw) - 1.25rem), 31rem) !important;
+    max-width: min(calc(var(--app-vv-width, 100vw) - 1.25rem), 31rem) !important;
     max-height: calc(var(--app-vv-height, 100dvh) - 0.75rem) !important;
     overflow: hidden !important;
   }
@@ -925,12 +926,17 @@
   .flare-compose-dialog--keyboard {
     position: fixed !important;
     inset: auto !important;
-    left: 50vw !important;
+    /* Horizontal axis from the VISUAL viewport, matching how --app-vv-center-y
+       already handles the vertical one. `50vw` is the layout-viewport centre,
+       which on iOS is not the centre of what the user can see once Safari
+       shifts the window for a focused input -- that is what put this dialog
+       half off the left edge. */
+    left: var(--app-vv-center-x, 50vw) !important;
     top: var(--app-vv-center-y, 50dvh) !important;
     right: auto !important;
     bottom: auto !important;
-    width: min(calc(100vw - 1.5rem), 31rem) !important;
-    max-width: min(calc(100vw - 1.5rem), 31rem) !important;
+    width: min(calc(var(--app-vv-width, 100vw) - 1.5rem), 31rem) !important;
+    max-width: min(calc(var(--app-vv-width, 100vw) - 1.5rem), 31rem) !important;
     max-height: var(--app-vv-flare-height, min(74dvh, 30rem)) !important;
     margin: 0 !important;
     overflow: hidden !important;
