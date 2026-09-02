@@ -755,10 +755,25 @@ export function Step2TemplatePick() {
       ? {}
       : "skip",
   );
+  // LATCHED. Convex's useQuery returns `undefined` on any re-subscription
+  // -- a gate flipping, args changing, a socket reconnect -- not just
+  // before the first result. Reading that as "no idea yet" made the
+  // contributors branch fall back to <HandoffScrim />, a full-screen
+  // near-black overlay. So the modal appeared, blanked to black for ~0.5s,
+  // then came back: the reported "looks like a bug" flash.
+  //
+  // Once we have seen an id it cannot become un-known — the idea exists.
+  // Holding the last value means a transient undefined is invisible,
+  // while the genuine "not posted yet" case (ref still null) still shows
+  // the scrim, which is what it is for.
+  const lastIdeaIdRef = useRef<Id<"ideas"> | null>(null);
   const latestIdeaId: Id<"ideas"> | null = useMemo(() => {
-    if (!userIdeas || userIdeas.length === 0) return null;
+    if (!userIdeas || userIdeas.length === 0) {
+      return lastIdeaIdRef.current;
+    }
     // getUserIdeas returns newest-first; take the top row.
     const first = userIdeas[0] as unknown as { _id: Id<"ideas"> };
+    lastIdeaIdRef.current = first._id;
     return first._id;
   }, [userIdeas]);
 
