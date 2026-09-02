@@ -17,9 +17,18 @@
  *   panel's XP hexagon, and for the menu tile icons on the
  *   Adventurer's Menu first-open.
  *
- *   Preload cost is tiny (each PNG is <30KB, most are ~4-8KB) and
+ *   Preload cost is tiny (each PNG is <30KB, most are ~7-20KB) and
  *   the browser will still cache them, so subsequent renders read
  *   from disk instantly.
+ *
+ *   That sentence used to be wrong, and the wrongness is worth keeping
+ *   a note of. The menu tile icons shipped as ~1254x1254 PNGs of about
+ *   1.3MB each -- rendered at 40-56px. Warming the ten of them pulled
+ *   7.6MB, so this file was not making the menu faster, it was
+ *   scheduling several megabytes of download on a phone. The icons are
+ *   now downscaled to 256px (still 4.5x the largest render size), which
+ *   took the whole directory from 23.3MB to 0.92MB. Keep new icons at
+ *   256px or this stops being true again.
  *
  *   Purely a `<head>` injection — no DOM overhead, no re-renders,
  *   no runtime cost after the initial render.
