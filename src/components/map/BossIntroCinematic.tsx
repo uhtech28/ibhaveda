@@ -19,6 +19,7 @@ import { api } from "@convex/_generated/api";
 import { VILLAGE_BOSSES } from "@/config/village-bosses";
 import { STAGES } from "@/config/stages.config";
 import { audioManager } from "@/lib/audio/audioManager";
+import { getBossSpriteGeometry } from "@/config/boss-sprite-manifest";
 
 interface Props {
   /** Called after the cinematic has been fully dismissed. */
@@ -587,7 +588,12 @@ export function BossIntroCinematic({
                           border so it matches the feed card visual
                           language. */}
                       <div
-                        className="relative flex h-[64px] w-[64px] items-center justify-center rounded-xl sm:h-[108px] sm:w-[108px] sm:rounded-2xl"
+                        // --mb carries the card's own side length down to
+                        // MinionSprite, which sizes the sprite with calc()
+                        // against it. An inline style cannot hold a media
+                        // query, so the responsive value rides in as a
+                        // Tailwind arbitrary property instead.
+                        className="relative flex h-[64px] w-[64px] items-center justify-center rounded-xl [--mb:64px] sm:h-[108px] sm:w-[108px] sm:rounded-2xl sm:[--mb:108px]"
                         style={{
                           background: "rgba(15, 23, 38, 0.85)",
                           border: "1px solid rgba(255, 255, 255, 0.08)",
@@ -840,131 +846,44 @@ function MainBossPortrait({
 // MinionSprite
 // ─────────────────────────────────────────────────────────────────────
 /**
- * Renders one minion in the bottom stage-strip. Auto-detects whether
- * the asset is a horizontal spritesheet (naturalWidth >
- * naturalHeight) and clips to frame 0 via CSS background-position.
- * Falls back to a plain <img> when the asset is a single frame.
+ * MinionSprite — renders frame 0 of a boss sheet at the SAME visual size
+ * as its siblings, using geometry measured at build time.
  *
- * Handles both Village 9-frame Pixellab sheets AND academic / lab /
- * creative template stage-boss sheets uniformly, without a per-boss
- * allowlist.
+ * The tiles were always identical squares, but the bosses inside them
+ * read as wildly different sizes: each sprite sits in its frame with its
+ * own amount of transparent padding, so scaling the FRAME scales the
+ * padding with it. Measured, the academic four occupy 16x37, 21x24,
+ * 33x46 and 22x35 of frames that are 96, 88, 92 and 76 px square.
+ *
+ * A previous rev cropped to the opaque bounding box on a <canvas> at
+ * runtime. The maths was right, but it depended on canvas + getImageData
+ * succeeding in the browser, and when that failed — a tainted canvas, a
+ * blocked image load, an asset host without CORS headers — the component
+ * silently fell back to the untrimmed frame, i.e. exactly the unequal
+ * sizes it existed to fix, with no error anywhere.
+ *
+ * Now the bounding boxes are measured by scripts/gen-boss-sprite-manifest.mjs
+ * and baked into boss-sprite-manifest.ts, and this is pure CSS: the
+ * element is sized to the sprite's own pixels and the sheet is offset
+ * behind it. Nothing can fail at runtime.
+ *
+ * All sizing is calc() against `--mb`, the card's side length, which the
+ * parent sets (64px, 108px at sm). SPRITE_FILL is the fraction of the
+ * card the sprite's longest side occupies, so every boss ends up the
+ * same visual height regardless of how it was drawn.
  */
-/**
- * MinionSprite — renders frame 0 of a boss sprite at a size that MATCHES
- * its siblings.
- *
- * The tiles were always identical 64/108px squares, but the bosses inside
- * them read as wildly different sizes (product report: "the bosses below
- * are not equally sized"). The cause is the source art, not the layout:
- * each sprite sits inside its frame with its own amount of transparent
- * padding, so scaling the FRAME to 78% of the tile scales the padding
- * too. A boss drawn small inside a 96px frame stayed small; one drawn
- * edge-to-edge filled the tile.
- *
- * Fix: crop frame 0 to its opaque bounding box on a canvas, then let that
- * trimmed image fit the tile. Every boss is then measured by its actual
- * pixels, so they all present at the same visual weight. Falls back to
- * the untrimmed frame if the canvas is unavailable or the scan finds
- * nothing (fully transparent / decode failure), so a bad asset degrades
- * to the previous behaviour rather than rendering nothing.
- */
+const SPRITE_FILL = 0.82;
+
 function MinionSprite({ src, alt }: { src: string; alt: string }) {
-  const [trimmed, setTrimmed] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setTrimmed(null);
-    setFailed(false);
-    let cancelled = false;
-    const probe = new window.Image();
-    // NO crossOrigin. These assets are same-origin (/assets/bosses/...),
-    // which never needs it -- but setting it turns any response WITHOUT
-    // Access-Control-Allow-Origin into a hard load FAILURE rather than a
-    // normal load. Behind a CDN or an asset host that does not emit CORS
-    // headers, every probe would hit onerror, `failed` would flip true,
-    // and the component would silently fall back to the UNTRIMMED frame
-    // -- i.e. exactly the unequal sizes this trim exists to fix, with no
-    // error anywhere. Dropping it costs nothing and removes that mode.
-    probe.onload = () => {
-      if (cancelled) return;
-      try {
-        const nw = probe.naturalWidth;
-        const nh = probe.naturalHeight;
-        if (!nw || !nh) {
-          setFailed(true);
-          return;
-        }
-        // Horizontal spritesheets are near-exact multiples of their
-        // height; anything else is treated as a single frame.
-        const frameCount = Math.max(1, Math.round(nw / nh));
-        const fw = Math.round(nw / frameCount);
-
-        const c = document.createElement("canvas");
-        c.width = fw;
-        c.height = nh;
-        const ctx = c.getContext("2d", { willReadFrequently: true });
-        if (!ctx) {
-          setFailed(true);
-          return;
-        }
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(probe, 0, 0, fw, nh, 0, 0, fw, nh);
-
-        const { data } = ctx.getImageData(0, 0, fw, nh);
-        let minX = fw;
-        let minY = nh;
-        let maxX = -1;
-        let maxY = -1;
-        // Alpha > 8 ignores the near-transparent fringe some exports
-        // carry, which would otherwise defeat the whole trim.
-        for (let y = 0; y < nh; y++) {
-          for (let x = 0; x < fw; x++) {
-            if (data[(y * fw + x) * 4 + 3] > 8) {
-              if (x < minX) minX = x;
-              if (x > maxX) maxX = x;
-              if (y < minY) minY = y;
-              if (y > maxY) maxY = y;
-            }
-          }
-        }
-        if (maxX < minX || maxY < minY) {
-          setFailed(true); // nothing opaque — use the raw frame
-          return;
-        }
-
-        const cw = maxX - minX + 1;
-        const ch = maxY - minY + 1;
-        const out = document.createElement("canvas");
-        out.width = cw;
-        out.height = ch;
-        const octx = out.getContext("2d");
-        if (!octx) {
-          setFailed(true);
-          return;
-        }
-        octx.imageSmoothingEnabled = false;
-        octx.drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
-        setTrimmed(out.toDataURL("image/png"));
-      } catch {
-        // Tainted canvas or any decode error — fall back gracefully.
-        setFailed(true);
-      }
-    };
-    probe.onerror = () => {
-      if (cancelled) return;
-      setFailed(true);
-    };
-    probe.src = src;
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
-
   const filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.6))";
+  const geo = getBossSpriteGeometry(src);
 
-  // Fallback: original untrimmed frame-0 render.
-  if (failed) {
+  // No measured bounds (asset not in the manifest, or a PNG the generator
+  // could not decode) — fall back to the plain contained frame. Slightly
+  // unequal, but always visible.
+  if (!geo?.bounds) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={alt}
@@ -980,20 +899,28 @@ function MinionSprite({ src, alt }: { src: string; alt: string }) {
     );
   }
 
+  const { size, frames, bounds } = geo;
+  // k converts frame-local px into a fraction of the card, such that the
+  // sprite's LONGEST side lands on SPRITE_FILL of it.
+  const k = SPRITE_FILL / Math.max(bounds.w, bounds.h);
+  const px = (n: number) => `calc(var(--mb, 108px) * ${(n * k).toFixed(5)})`;
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={trimmed ?? undefined}
-      alt={alt}
+    <div
+      role="img"
+      aria-label={alt}
       style={{
-        maxWidth: "82%",
-        maxHeight: "82%",
+        width: px(bounds.w),
+        height: px(bounds.h),
+        backgroundImage: `url(${src})`,
+        backgroundRepeat: "no-repeat",
+        // Whole strip scaled by the same factor...
+        backgroundSize: `${px(size * frames)} ${px(size)}`,
+        // ...then shifted so the opaque box sits at the element's origin.
+        backgroundPosition: `${px(-bounds.x)} ${px(-bounds.y)}`,
         imageRendering: "pixelated",
-        objectFit: "contain",
         filter,
-        visibility: trimmed ? "visible" : "hidden",
       }}
-      draggable={false}
     />
   );
 }
